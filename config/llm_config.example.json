@@ -1,0 +1,34 @@
+{
+  "preferred_provider": "openai",
+  "fallback_providers": ["anthropic", "google"],
+  "daily_budget_usd": 50.0,
+  "max_tokens_per_request": 4000,
+  "enable_caching": true,
+  "cache_ttl_hours": 24,
+  
+  "task_routing": {
+    "simple_classification": "fast",
+    "product_enrichment": "balanced", 
+    "complex_analysis": "premium",
+    "image_analysis": "premium"
+  },
+  
+  "cost_optimization": {
+    "use_cheapest_for_retries": true,
+    "batch_similar_requests": true,
+    "cache_frequent_queries": true
+  },
+  
+  "provider_settings": {
+    "openai": {
+      "organization_id": null,
+      "request_timeout": 30
+    },
+    "anthropic": {
+      "request_timeout": 30
+    },
+    "google": {
+      "request_timeout": 30
+    }
+  }
+}

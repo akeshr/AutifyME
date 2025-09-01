@@ -1,0 +1,40 @@
+# Core AI Framework
+langgraph>=0.2.0
+langchain>=0.3.0
+langsmith>=0.1.0
+
+# LLM Providers (install as needed)
+langchain-openai>=0.1.0
+langchain-anthropic>=0.1.0
+langchain-google-genai>=1.0.0
+langchain-community>=0.2.0
+
+# Database & Storage
+supabase>=2.0.0
+google-api-python-client>=2.0.0
+google-auth>=2.0.0
+
+# Web Framework
+fastapi>=0.104.0
+uvicorn>=0.24.0
+streamlit>=1.28.0
+
+# Image Processing
+pillow>=10.0.0
+opencv-python>=4.8.0
+
+# Data Processing
+pandas>=2.1.0
+numpy>=1.24.0
+pydantic>=2.5.0
+
+# Utilities
+python-dotenv>=1.0.0
+requests>=2.31.0
+aiohttp>=3.9.0
+
+# Development
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.7.0
