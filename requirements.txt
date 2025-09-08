@@ -1,40 +1,61 @@
-# Core AI Framework
-langgraph>=0.2.0
-langchain>=0.3.0
-langsmith>=0.1.0
+# AutifyME Core Dependencies - Optimized
+# Install with: uv sync
 
-# LLM Providers (install as needed)
+# Core AI Framework (actually used)
+langchain>=0.3.0
 langchain-openai>=0.1.0
 langchain-anthropic>=0.1.0
-langchain-google-genai>=1.0.0
-langchain-community>=0.2.0
 
-# Database & Storage
+# Database & Security
 supabase>=2.0.0
-google-api-python-client>=2.0.0
-google-auth>=2.0.0
+cryptography>=41.0.0
 
-# Web Framework
-fastapi>=0.104.0
-uvicorn>=0.24.0
-streamlit>=1.28.0
-
-# Image Processing
-pillow>=10.0.0
-opencv-python>=4.8.0
-
-# Data Processing
-pandas>=2.1.0
-numpy>=1.24.0
+# Core Utilities (actually used)
 pydantic>=2.5.0
-
-# Utilities
-python-dotenv>=1.0.0
+pillow>=10.0.0
 requests>=2.31.0
-aiohttp>=3.9.0
+
+# Optional: Additional LLM Providers
+# uv sync --extra llm-providers
+# langchain-google-genai>=1.0.0
+# langchain-community>=0.2.0
+
+# Optional: Workflow Orchestration (when implemented)
+# uv sync --extra workflow
+# langgraph>=0.2.0
+
+# Optional: Monitoring (when implemented)  
+# uv sync --extra monitoring
+# langsmith>=0.1.0
+
+# Optional: Google Services (when implemented)
+# uv sync --extra google
+# google-api-python-client>=2.0.0
+# google-auth>=2.0.0
+
+# Optional: Async HTTP (when needed)
+# uv sync --extra async
+# aiohttp>=3.9.0
+
+# Optional: Config Files (alternative to os.environ)
+# uv sync --extra config
+# python-dotenv>=1.0.0
+
+# Optional: Web Interface
+# uv sync --extra web
+# fastapi>=0.104.0
+# uvicorn>=0.24.0
+# streamlit>=1.28.0
+
+# Optional: Data Processing
+# uv sync --extra data  
+# pandas>=2.1.0
+# numpy>=1.24.0
+# opencv-python>=4.8.0
 
 # Development
-pytest>=7.4.0
-black>=23.0.0
-flake8>=6.0.0
-mypy>=1.7.0
+# uv sync --extra dev
+# pytest>=7.4.0
+# black>=23.0.0
+# flake8>=6.0.0
+# mypy>=1.7.0
