@@ -6,12 +6,11 @@ This document outlines the technology stack for the AutifyME Agentic Service. Ea
 
 ## 1. Core Agentic Logic & Orchestration
 
-- **Choice:** **LangChain & LangGraph**
+- **Choice:** **LangChain, LangGraph, and the `deepagents` library**
 - **Reasoning:**
   - **Version:** We will be utilizing the latest stable v1 releases of these libraries to ensure access to modern features and long-term support.
-  - **Mature Ecosystem:** LangChain is the most mature and widely-adopted framework for building LLM-powered applications. It provides a vast library of integrations for LLMs, vector stores, tools, and more.
-  - **Purpose-Built for Agents:** LangGraph is specifically designed for creating stateful, multi-agent systems. Its graph-based approach, where nodes are functions (tools or LLM calls) and edges are the control flow, is a perfect match for the "Agent/Specialist/Tool" architecture described in the whitepaper. It explicitly supports cycles, which are essential for complex reasoning, and has built-in persistence and human-in-the-loop capabilities.
-  - **Community & Support:** The large community ensures that we can find solutions to problems quickly and that the framework is constantly improving.
+  - **Core Framework:** LangChain and LangGraph provide the fundamental building blocks for creating stateful agentic systems.
+  - **Advanced Agent Implementation:** The `deepagents` library provides a pre-built, production-ready implementation of the advanced patterns (planning, reflection, sub-agent delegation, HITL) required for our top-level `ProjectManagerAgent`. Adopting it allows us to accelerate development by building on a tested foundation instead of implementing these complex patterns from scratch.
 - **Cost Model:** Free (Open Source Libraries).
 
 ---

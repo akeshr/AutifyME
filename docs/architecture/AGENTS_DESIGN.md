@@ -1,10 +1,21 @@
 # AutifyME Agentic System Design
 
-This document outlines the architectural pattern for the multi-agent system that powers AutifyME. The design prioritizes scalability, reusability, and effective context management.
+This document outlines the architectural pattern for the multi-agent system that powers AutifyME. The design prioritizes scalability, reusability, and effective context management within a single-tenant deployment model.
 
 ---
 
-## 1. Core Principles
+## 1. Product Delivery Model: Single-Tenant Managed Service
+
+The AutifyME product will be delivered as a **Single-Tenant Managed Service**. This means that each client (company) will receive their own completely isolated and dedicated instance of the entire application stack (database, agent service, etc.).
+
+-   **Architectural Implications:**
+    -   **Data Isolation:** Data is physically segregated at the infrastructure level, providing the highest level of security and privacy.
+    -   **Simplified Logic:** The application code does not need to handle multi-tenancy. There is no `company_id` required in our data models, as the entire application instance serves a single company.
+    -   **Context Management:** The "company profile" and other contextual data will be loaded at application startup, as it is constant for the lifetime of the instance.
+
+---
+
+## 2. Core Principles
 
 - **Hierarchy & Delegation:** Instead of a single monolithic agent, the system is a hierarchy of specialized agents. Higher-level agents delegate tasks to lower-level agents, mirroring a well-structured organization.
 - **Separation of Concerns:** Each agent has a single, well-defined responsibility. This makes them easier to build, test, debug, and reuse.
@@ -13,7 +24,7 @@ This document outlines the architectural pattern for the multi-agent system that
 
 ---
 
-## 2. Proposed Architecture: The "Department" Model
+## 3. Proposed Architecture: The "Department" Model
 
 We will model our system after a company's organizational structure. A central routing agent acts as a "Project Manager," decomposing complex goals and directing tasks to the appropriate "Department," which in turn manages "Specialist" agents to get the work done.
 
@@ -57,7 +68,7 @@ We will model our system after a company's organizational structure. A central r
 
 ---
 
-## 3. Advanced Concepts: Handling Complex Workflows
+## 4. Advanced Concepts: Handling Complex Workflows
 
 This architecture is designed to handle complex, real-world business processes that require the coordination of multiple teams and can be optimized for speed.
 
@@ -90,7 +101,7 @@ This ensures that data dependencies are explicitly managed, tracked, and kept cl
 
 ---
 
-## 4. Example Workflow: "Launch a new product: the 'Auto-Widget'"
+## 5. Example Workflow: "Launch a new product: the 'Auto-Widget'"
 
 1.  **User Request:** "Launch our new product, the 'Auto-Widget'."
 2.  **Project Manager Agent** receives the request. It creates a plan (DAG):
@@ -108,7 +119,7 @@ This ensures that data dependencies are explicitly managed, tracked, and kept cl
 
 ---
 
-## 5. Resilience & Safeguards
+## 6. Resilience & Safeguards
 
 To build a production-grade system, the architecture must be resilient to failures and unexpected behavior. The following patterns will be implemented to ensure robustness.
 
@@ -142,24 +153,104 @@ To build a production-grade system, the architecture must be resilient to failur
 
 ---
 
-## 6. Agent Evaluation & Quality Assurance
+## 7. Agent Evaluation & Quality Assurance
 
-To ensure agents perform tasks to a high standard, a dual evaluation strategy will be implemented: offline evaluation for development and online evaluation as a live QA gate.
+To ensure agents perform tasks to a high standard, a **dual evaluation strategy** is implemented: **offline evaluation** for retrospective analysis and continuous improvement, and **online evaluation** for real-time quality gates in production workflows.
 
-### Offline Evaluation (CI/CD for Agents)
+**Critical Distinction:** These are complementary approaches. LangSmith handles offline evaluation, but does NOT replace the need for in-workflow Reviewer agents.
 
-This process prevents regressions and ensures that changes to an agent's logic or prompts improve its performance.
+### Offline Evaluation (LangSmith - Retrospective)
 
--   **Golden Datasets:** For key specialist agents, we will create and maintain "golden datasets" in LangSmith. These datasets will contain a representative set of inputs and the criteria for a successful output.
--   **Evaluator Agents:** We will create dedicated `EvaluatorAgent`s. These agents do not perform production tasks; they critique the output of other agents. An evaluator takes an agent's output and scores it against a rubric (e.g., tone, accuracy, format).
--   **Automated Testing:** As part of a CI/CD pipeline, any change to an agent will trigger an automated evaluation run. The modified agent will be run against its golden dataset, and its outputs will be scored by the corresponding `EvaluatorAgent`. If the quality score drops below a defined threshold, the change is automatically rejected.
+**Purpose:** Prevent regressions, compare versions, monitor quality trends over time.
 
-### Online Evaluation (In-flight QA Gates)
+**When:** CI/CD pipelines, nightly runs, A/B testing, historical analysis.
 
-This process provides real-time quality control for live, novel tasks within a production workflow.
+**How:**
+-   **Golden Datasets:** Create and maintain datasets in LangSmith containing representative inputs and expected outputs for key workflows.
+-   **Custom Evaluators:** Define custom evaluator functions (Python code) that score agent outputs against business criteria (e.g., brand voice, accuracy, completeness). These are NOT separate agents; they are functions registered with LangSmith.
+-   **Automated Testing:** Any change to an agent triggers an evaluation run in CI/CD. The modified agent runs against its golden dataset, outputs are scored by evaluators, and the change is rejected if quality drops below threshold.
+-   **A/B Testing:** Deploy new agent versions to a subset of traffic and compare performance in LangSmith dashboards.
 
--   **QA as a Specialist:** Quality assurance is treated as a task performed by a specialist agent (e.g., a `ReviewerAgent`, `ComplianceAgent`).
--   **Critique & Refinement Loops:** A `Department Head` agent can incorporate a QA step into its plan. For example, after a `CopywriterAgent` produces a draft, the `MarketingDeptAgent` can delegate a review of that draft to a `ReviewerAgent`.
--   **Conditional Logic:** Based on the output of the `ReviewerAgent` (e.g., a score or a list of issues), the `Department Head` can decide its next step:
+**Example:**
+```python
+from langsmith import Client
+
+# Define custom evaluator function
+def brand_voice_evaluator(run_input: dict, run_output: dict) -> dict:
+    """Evaluates if output matches company brand voice."""
+    # Use LLM or rules to score
+    score = evaluate_brand_voice(run_output["description"], company_profile)
+    return {"score": score, "feedback": "..."}
+
+# Run evaluation in CI/CD
+client = Client()
+client.evaluate(
+    cataloging_workflow,
+    data="product-cataloging-golden",
+    evaluators=[brand_voice_evaluator, accuracy_evaluator]
+)
+```
+
+### Online Evaluation (Reviewer Agents - Real-Time)
+
+**Purpose:** Ensure quality NOW, before proceeding to next step. Enable self-correction and refinement loops.
+
+**When:** During production workflows, before expensive operations, before publishing, before irreversible actions.
+
+**How:**
+-   **Reviewer as a Specialist:** Quality assurance is treated as a task performed by a specialist agent (e.g., `ReviewerAgent`, `CriticAgent`, `ComplianceAgent`). These are real agents that run as part of the workflow.
+-   **Critique & Refinement Loops:** A `Department Head` agent incorporates a review step into its plan. After a specialist produces output, a `ReviewerAgent` critiques it in real-time.
+-   **Conditional Logic:** Based on the reviewer's output (score, approved/rejected, feedback), the department head decides:
     -   **If Approved:** Proceed with the workflow.
-    -   **If Rejected:** Send the work back to the original specialist agent along with the reviewer's feedback for another attempt. This creates a powerful "critique and refinement" loop that iteratively improves the quality of the final output.
+    -   **If Needs Refinement:** Send back to specialist with feedback for another attempt (up to max attempts).
+    -   **If Rejected:** Escalate to human or block the action.
+
+**Example:**
+```python
+@traceable(name="Create Product Description with Review Loop")
+def create_product_with_qa(product_data: dict) -> dict:
+    max_attempts = 3
+    
+    for attempt in range(max_attempts):
+        # Specialist creates draft
+        draft = copywriter_specialist.create_description(product_data)
+        
+        # Reviewer agent evaluates IN REAL-TIME
+        review = reviewer_agent.review(
+            output=draft,
+            criteria=["brand_voice", "accuracy", "completeness"],
+            context=company_profile
+        )
+        
+        if review.approved:
+            return draft  # Quality gate passed
+        else:
+            # Feed critique back to specialist
+            product_data["previous_attempt"] = draft
+            product_data["feedback"] = review.feedback
+    
+    # Max attempts reached - escalate to human
+    return escalate_to_human(draft, review)
+```
+
+### How They Work Together
+
+1.  **In Production:** Reviewer agents provide real-time quality gates
+2.  **LangSmith Traces:** Every workflow (including reviewer feedback) is traced
+3.  **Offline Analysis:** LangSmith evaluators analyze patterns and trends
+4.  **Continuous Improvement:** Identify issues, update prompts/logic, A/B test
+5.  **Deployment:** Roll out improvements based on offline evaluation data
+
+### Implementation Guidelines
+
+**Reviewer Agents:**
+-   Create a generic `ReviewerAgent` specialist that can be reused across departments
+-   Use structured output (Pydantic) for review results: `ReviewResult(score: float, approved: bool, feedback: str)`
+-   Always set max attempts to prevent infinite loops
+-   Log all reviews for analysis in LangSmith
+
+**LangSmith Evaluators:**
+-   Define evaluators as pure Python functions (not agents)
+-   Store in `core/evaluators.py`
+-   Register with LangSmith for automated runs
+-   Use for regression testing, A/B testing, and monitoring

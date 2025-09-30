@@ -1,5 +1,5 @@
 
-# AutifyME Agentic Business OS Whitepaper (v2.1)
+# AutifyME Agentic Business OS Whitepaper (v3.0)
 
 ---
 
@@ -23,27 +23,60 @@ The system’s principle: **every business task that can be made agentic, will b
 
 ## 2. Core Design Model
 
-### Agents
-Dynamic roles that plan and execute workflows.  
-Examples: Company Onboarding Agent, Catalog Agent, Website Agent, Marketing Agent, CRM Agent, Billing Agent, HR Agent, Shipping Agent, Procurement Agent, Production Agent, Quality Control Agent, Forecasting Agent.
+The system is a hierarchical agentic architecture designed for scalability and resilience, mirroring a well-structured company.
 
-### Specialists
-Reusable expert roles supporting agents with niche skills.  
-Examples: SEO Specialist, Visual Designer, CRO Specialist, Accessibility Auditor, Copywriter, Paid Media Buyer, Tax Compliance Specialist, Inventory Planner, Production Scheduler.
+### Project Manager Agents
+The top-level orchestrators. A `Project Manager` agent analyzes complex user goals (e.g., "launch a new product"), creates a multi-step, multi-department plan, and manages the execution of the entire workflow.
+
+### Department Agents
+Domain-specific managers that oversee a particular business function (e.g., Marketing, Cataloging, Operations). A `Department` agent receives a goal from a Project Manager, creates a more granular plan, and delegates tasks to its team of Specialists.
+
+### Specialist Agents
+Reusable, task-specific "doers" that execute a single, well-defined task. They are the workhorses of the system.
+Examples: SEO Specialist, Visual Designer, Copywriter, Image Analyzer, Tax Compliance Specialist.
 
 ### Tools
-Deterministic functions that agents invoke.  
-Examples:  
-- Website: crawl DOM, section mapping, intelligent screenshots, extract metadata.  
-- Catalog: create product draft, dedupe, resolve taxonomy, attach images.  
-- Studio: plan shots, generate images.  
-- Marketing: generate campaign briefs, copy, creatives.  
-- QA: SEO audit, accessibility check, Lighthouse perf.  
-- Ops: create invoice, reconcile payment, shipping label, payroll run.
+Deterministic functions that agents invoke to interact with the outside world (e.g., database clients, third-party APIs).
 
 ---
 
-## 3. Workflow Coverage
+## 3. Architectural Principles
+
+-   **Architecture-First Development:** The complete generic agent infrastructure (Project Manager, Department framework, core patterns) is built first before implementing any workflows. This ensures every subsequent workflow benefits from the same robust foundation, with no technical debt or refactoring required later.
+-   **Single-Tenant Managed Service:** Each client receives a fully isolated, dedicated instance of the application stack, ensuring maximum data security and performance. Multi-tenancy may be added as an optional future enhancement if market demands it.
+-   **Hexagonal Architecture (Ports & Adapters):** The core application logic is decoupled from external services, allowing for maintainable and swappable integrations.
+-   **Resilience by Design:** The system is built with robust error handling, state persistence for long-running tasks, and safeguards against common failures.
+-   **Continuous Quality Assurance:** A dual strategy of offline evaluation (CI/CD for agents) and online QA gates (in-flight review) ensures agents perform to a high standard.
+
+---
+
+## 4. Technology Stack
+
+The system is built on a modern, production-grade technology stack optimized for rapid development while maintaining enterprise-level reliability.
+
+### Core Agentic Framework
+-   **LangChain v1 & LangGraph v1:** Provides the foundational building blocks for creating stateful, hierarchical agentic systems with native support for complex workflows and state persistence.
+-   **deepagents Library:** Pre-built implementation of advanced agent patterns (planning, reflection, self-correction) for the Project Manager agent, accelerating development.
+
+### Observability & Monitoring
+-   **LangSmith v1:** Purpose-built observability platform for LLM applications, providing automatic tracing, cost tracking, debugging, and offline evaluation capabilities.
+
+### Backend & Database
+-   **Supabase:** Managed PostgreSQL database with built-in authentication, object storage, and vector database capabilities (pgvector for RAG). Provides a generous free tier suitable for development and early production.
+
+### Development Tools
+-   **Python 3.11+:** Primary language for all agent logic and orchestration.
+-   **uv:** Modern, high-performance package manager for fast dependency resolution and installation.
+-   **Pydantic:** Data validation and settings management for type-safe agent communication.
+
+### User Interface (Initial)
+-   **Streamlit:** Rapid prototyping framework for building initial UI and HITL approval flows, allowing focus on core agent logic.
+
+**Philosophy:** "Production-grade, free-tier first" - selecting modern, well-supported tools that enable rapid development without initial costs while maintaining enterprise reliability.
+
+---
+
+## 5. Workflow Coverage
 
 1. **Company Onboarding** — build profile, brand tokens, starter site, seed CRM/billing.  
 2. **Product Ingestion** — from raw images → product draft → dedupe/taxonomy → studio shots → catalog entry.  
@@ -62,7 +95,7 @@ Examples:
 
 ---
 
-## 4. Governance
+## 6. Governance
 
 - **Human-in-the-Loop (HITL):** required for high-risk actions (finance > threshold, ad spend, payroll, homepage hero changes).  
 - **QA Gates:** performance, SEO, accessibility, policy/claims validation before publish.  
@@ -71,42 +104,53 @@ Examples:
 
 ---
 
-## 5. Observability
+## 7. Observability
 
-- Traces: every tool call is logged with inputs, outputs, cost, latency.  
-- Metrics: success %, error %, throughput, per-tenant cost.  
-- Dashboards: SEO performance, CWV, ad spend vs ROAS, campaign results, order-to-cash flows.  
-- Replay: failed workflows can be rerun deterministically.
+**LangSmith Integration:** All agent execution is traced using LangSmith, providing comprehensive visibility into system behavior:
 
----
-
-## 6. Roadmap
-
-**0–3 months:**  
-- Website intelligence (section mapping, intelligent screenshots).  
-- Product ingestion from images.  
-- QA gates and HITL approvals.  
-
-**3–6 months:**  
-- Section updates/redesign flows.  
-- Asset strategy + creative generation.  
-- Marketing workflows (FB, IG, X).  
-- CRM basics.  
-
-**6–9 months:**  
-- Inventory, billing, shipping workflows.  
-- HR onboarding + payroll.  
-- Procurement + production + QC stubs.  
-- Forecasting + pricing recs.  
-
-**9–12 months:**  
-- Scale workflows across all domains.  
-- Launch SaaS platform with multi-tenant support.  
-- API-first design for integrations.  
+- **Automatic Tracing:** Every LLM call, tool invocation, and agent decision is logged with inputs, outputs, cost, and latency.
+- **Cost Attribution:** Token usage and costs are tracked per workflow, per agent, and per tenant.
+- **Debugging:** Detailed execution traces enable rapid identification of issues with replay capabilities for failed workflows.
+- **Evaluation:** Custom evaluator functions enable automated regression testing in CI/CD pipelines, ensuring agent quality doesn't degrade over time.
+- **Business Metrics:** Dashboards track SEO performance, CWV, ad spend vs ROAS, campaign results, and order-to-cash flows.
+- **Monitoring:** Real-time alerts for error rates, latency spikes, and cost overruns.
 
 ---
 
-## 7. Market & Business Model
+## 8. Roadmap
+
+**Phase 1: Core Infrastructure (Weeks 1-3)**
+- Build complete hierarchical agent architecture (Project Manager, Department framework, Specialist patterns)
+- Implement resilience patterns (error handling, state persistence, HITL)
+- Set up observability (LangSmith tracing, monitoring, evaluation)
+- Establish testing framework and CI/CD pipeline
+
+**Phase 2: First Workflow - WhatsApp Product Cataloging (Weeks 4-5)**
+- WhatsApp integration for Indian small businesses
+- Cataloging Department with Image and Text Analysis specialists
+- Multi-turn conversation handling with HITL approval
+- Production deployment with first customer
+
+**Phase 3: Additional Workflows (3-6 months)**
+- Website intelligence (section mapping, intelligent screenshots)
+- Marketing workflows (campaign creation, multi-channel posting)
+- CRM basics (lead management, nurture flows)  
+
+**Phase 4: Operational Workflows (6-9 months)**
+- Inventory, billing, and shipping workflows
+- HR onboarding and payroll
+- Procurement and supplier management
+- Quality control and production planning
+
+**Phase 5: Advanced Features (9-12 months)**
+- Forecasting and dynamic pricing
+- Advanced analytics and business intelligence
+- API-first design for third-party integrations
+- Multi-tenancy support (if market demands)
+
+---
+
+## 9. Market & Business Model
 
 - **Target Market:** SMEs and MSMEs globally who lack full digital operations.  
 - **Monetization:** subscription tiers by workflow coverage; usage-based billing for heavy compute (e.g., image/video generation).  
@@ -115,7 +159,7 @@ Examples:
 
 ---
 
-## 8. Risks & Mitigation
+## 10. Risks & Mitigation
 
 - **Hallucinations / errors** → validators, QA gates, HITL approvals.  
 - **Costs** → budgets, throttles, caching, model routing.  
@@ -126,7 +170,7 @@ Examples:
 
 ---
 
-## 9. Conclusion
+## 11. Conclusion
 
 AutifyME delivers a universal **Agentic Business OS**: a single system that creates, runs, and optimizes the full lifecycle of any business. It treats websites, catalogs, and assets as first-class, adds CRM/finance/inventory/shipping/HR/production as the company grows, and enforces trust through QA, HITL, and auditability.  
 
