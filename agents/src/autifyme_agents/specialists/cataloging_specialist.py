@@ -1,3 +1,5 @@
+"""Cataloging specialist for extracting product details from text."""
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
@@ -5,37 +7,33 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.schemas.models import Product
 from autifyme_agents.core.prompt_loader import load_prompt
 
-# The prompt is now loaded from a version-controlled file,
-# adhering to our architecture.
+# Load prompt from version-controlled file
 CATALOGING_SPECIALIST_SYSTEM_PROMPT = load_prompt("specialists/cataloging_specialist.prompt")
+
 
 def create_cataloging_specialist() -> Runnable:
     """
-    Creates and returns a specialist agent focused on extracting product
-    information from unstructured text and formatting it as a Product object.
-
-    This specialist is a simple, non-cyclical chain (not a ReAct agent) because
-    its task is a one-shot extraction, not a multi-step process involving tools.
-    It leverages LangChain v1's `.with_structured_output()` to guarantee
-    type-safe, Pydantic-based output.
-
+    Creates a specialist agent for extracting product info from unstructured text.
+    
+    This is a simple chain (not a ReAct agent) that:
+    1. Takes text as input
+    2. Extracts product details using an LLM
+    3. Returns structured Product model via .with_structured_output()
+    
     Returns:
-        A Runnable chain that takes a user message and returns a Product object.
+        A Runnable chain that takes {"user_message": str} and returns Product.
     """
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", CATALOGING_SPECIALIST_SYSTEM_PROMPT),
-        ]
-    )
-
-    # Use our centralized LLM factory to get a consistent, cached model
+    # Build prompt
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", CATALOGING_SPECIALIST_SYSTEM_PROMPT),
+        ("human", "{user_message}"),
+    ])
+    
+    # Use centralized LLM factory with prompt caching
     llm = get_llm(provider="openai", model="gpt-4o")
-
-    # The core of our type-safe extraction. This method ensures the LLM's
-    # output is a valid instance of the Product Pydantic model.
+    
+    # Force structured output (LangChain v1 feature)
     structured_llm = llm.with_structured_output(Product)
-
-    # Create the final chain
-    chain = prompt | structured_llm
-
-    return chain
+    
+    # Compose chain using LCEL
+    return prompt | structured_llm

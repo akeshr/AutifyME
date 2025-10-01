@@ -1,0 +1,29 @@
+---
+alwaysApply: true
+---
+# Rule: Systematic Debugging
+
+## Process (in order):
+1. **Read full traceback** - Not just error message
+2. **Verify SDK behavior** - Don't assume async/sync or API signatures
+3. **Add debug prints** - Inspect actual runtime values
+4. **Search official docs** - Before trying random fixes
+5. **Change one thing** - Test immediately
+6. **Fix root cause** - Not symptoms
+
+## Quick Checks:
+```python
+# Is it async?
+import inspect
+inspect.iscoroutinefunction(func)
+
+# Add debug logging
+print(f"DEBUG: kwargs = {kwargs}")
+```
+
+## Anti-Patterns:
+- ❌ Assuming based on memory (frameworks change rapidly)
+- ❌ Making 5 changes at once
+- ❌ Adding `config=None` everywhere instead of fixing middleware
+
+**If stuck >15 min:** Write minimal test case to isolate issue

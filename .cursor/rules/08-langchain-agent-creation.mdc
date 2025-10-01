@@ -1,0 +1,32 @@
+---
+globs: "agents/src/autifyme_agents/departments/**/*.py,agents/src/autifyme_agents/workflows/**/*.py"
+---
+# Rule: LangChain v1 Agent Creation
+
+## Correct Pattern:
+```python
+from langchain.agents import create_agent
+
+# Prompt MUST have these placeholders
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "Instructions"),
+    ("human", "{messages}"),  # NOT {input}
+    ("placeholder", "{agent_scratchpad}"),  # Required
+])
+
+agent = create_agent(llm, tools, prompt=prompt)  # prompt= is kwarg
+```
+
+## Invoke Format:
+```python
+await agent.ainvoke(
+    {"messages": [("human", task)]},  # messages key, NOT input
+    config={"configurable": {...}}
+)
+```
+
+## Don't:
+- ❌ `from langgraph.prebuilts import create_react_agent` (deprecated)
+- ❌ `from langchain.agents import AgentExecutor` (doesn't exist)
+- ❌ `prompt` as positional arg
+- ❌ `llm.bind_tools()` before passing to `create_agent`
