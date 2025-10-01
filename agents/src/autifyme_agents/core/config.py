@@ -1,9 +1,6 @@
-import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
-# Load environment variables from a .env file if it exists
-# This is useful for local development.
 load_dotenv()
 
 class Settings(BaseSettings):
@@ -20,6 +17,7 @@ class Settings(BaseSettings):
     
     SUPABASE_URL: str
     SUPABASE_ANON_KEY: str
+    DATABASE_URL: str  # PostgreSQL connection for LangGraph checkpointer
 
 
 # Create a single, globally accessible instance of the settings.

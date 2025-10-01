@@ -4,101 +4,78 @@ import asyncio
 from pprint import pprint
 import uuid
 
+from langchain_core.messages import HumanMessage
+from langgraph.checkpoint.postgres import PostgresSaver
+
 from autifyme_agents.departments.cataloging_department import create_cataloging_department
 from autifyme_agents.tools.storage_tools import initialize_storage
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
+from autifyme_agents.core.config import settings
 
 
-async def main():
+def main():
     """
-    Tests the full hierarchical agent flow: Department → Specialists → Tools.
-    
-    This validates:
-    - Department Head reasoning and tool selection
-    - Image Analysis Specialist extracts visual information
-    - Storage tools save data to Supabase
-    - LangSmith captures all traces
+    Tests the full stateful workflow for the Cataloging Department.
     """
     print("=" * 60)
-    print("🚀 CATALOGING DEPARTMENT - END-TO-END TEST")
+    print("🚀 CATALOGING DEPARTMENT - STATE PERSISTENCE TEST")
     print("=" * 60)
     
-    # Initialize storage adapter (dependency injection)
-    print("\n[1/5] Initializing storage adapter...")
-    storage_client = SupabaseStorageClient()
-    initialize_storage(storage_client)
-    print("✓ Storage initialized")
-    
-    # Create Department Head agent
-    print("\n[2/5] Creating Cataloging Department agent...")
-    department_agent = create_cataloging_department()
-    print("✓ Agent ready")
-    
-    # Define test task (simulates WhatsApp message)
-    print("\n[3/5] Defining cataloging task...")
-    task = """
-    Please catalog a new product.
-    It's a vintage-style blue denim jacket. The price is 89.99.
-    It comes in sizes S, M, and L.
-    Here is the image for it: https://i.imgur.com/325hRIH.jpeg
-    """
-    print(f"Task:\n{task.strip()}")
-    
-    # Configure LangSmith tracing
-    print("\n[4/5] Configuring LangSmith tracing...")
-    # It's critical for tracing a request through the entire system.
-    # The 'company_id' here will be picked up by our middleware (Rule 05).
-    run_config = {
-        "metadata": {
-            "conversation_id": str(uuid.uuid4()),
-            "user_id": "user_123_test",
-        },
-        "configurable": {
-            "company_id": "test_company_id_123" # This will be used by company_context_middleware
+    # Use a `with` block to correctly manage the PostgresSaver connection
+    # NOTE: Run `python agents/setup_checkpointer_once.py` first to create tables
+    with PostgresSaver.from_conn_string(settings.DATABASE_URL) as checkpointer:
+        # Initialize storage adapter (dependency injection)
+        print("\n[1/4] Initializing storage adapter...")
+        storage_client = SupabaseStorageClient()
+        initialize_storage(storage_client)
+        print("✓ Storage initialized")
+        
+        # Create Department Head agent, passing the checkpointer
+        print("\n[2/4] Creating Cataloging Department agent...")
+        department_agent = create_cataloging_department(checkpointer)
+        print("✓ Agent ready")
+        
+        print("\n[3/4] Defining cataloging task...")
+        # NOTE: Using a consistent test - the image shows sneakers, so we catalog sneakers
+        task = """
+        Please catalog a new product.
+        It's a pair of high-top canvas sneakers with a classic design. The price is 79.99.
+        They come in sizes 7, 8, 9, 10, 11.
+        Here is the image for it: https://i.imgur.com/325hRIH.jpeg
+        """
+        print(f"Task:\n{task.strip()}")
+        
+        thread_id = str(uuid.uuid4())
+        print(f"\nGenerated Thread ID for this conversation: {thread_id}")
+
+        run_config = {
+            "configurable": {
+                "thread_id": thread_id,
+                "company_id": "test_company_id_123"
+            }
         }
-    }
-    print(f"✓ Trace ID: {run_config['metadata']['conversation_id']}")
-    
-    # Invoke agent
-    print("\n[5/5] Invoking agent...")
-    print("-" * 60)
-    
-    try:
-        # LangChain v1 agents expect messages in the "messages" key
-        # Convert the task string into a HumanMessage
-        from langchain_core.messages import HumanMessage
-        
-        result = await department_agent.ainvoke(
-            {"messages": [HumanMessage(content=task)]},
-            config=run_config
-        )
-
-        print("\n--- Department Finished ---")
-        pprint(result)
-        
+        print(f"\n[4/4] Invoking agent with thread_id: {thread_id}...")
         print("-" * 60)
-        print("\n✅ TEST PASSED")
-        print("=" * 60)
-        print("\nAgent Result:")
-        pprint(result, indent=2)
         
-        print("\n" + "=" * 60)
-        print("🎉 Check LangSmith for full trace:")
-        print("   https://smith.langchain.com")
-        print("=" * 60)
-        
-    except Exception as e:
-        print("-" * 60)
-        print("\n❌ TEST FAILED")
-        print("=" * 60)
-        print(f"\nError: {str(e)}")
-        print("\nDebugging tips:")
-        print("1. Check LangSmith for error traces")
-        print("2. Verify .env has all required keys")
-        print("3. Confirm Supabase schema exists")
-        print("=" * 60)
-        raise
+        try:
+            initial_input = {"messages": [HumanMessage(content=task)]}
+            
+            # Using synchronous `stream` as PostgresSaver doesn't fully support async
+            for event in department_agent.stream(initial_input, config=run_config):
+                print("---")
+                pprint(event)
 
+            print("\n" + "=" * 60)
+            print("✅ TEST PASSED")
+            print(f"State persisted for thread_id='{thread_id}'")
+            print("=" * 60)
+            
+        except Exception as e:
+            print("-" * 60)
+            print("\n❌ TEST FAILED")
+            print("=" * 60)
+            print(f"\nError: {str(e)}")
+            raise
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

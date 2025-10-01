@@ -11,6 +11,6 @@ This project MUST use LangChain v1's native, production-grade features over cust
 ## Key Feature Checklist:
 
 - **Human-in-the-Loop (HITL):** ALWAYS use `interrupt_before` or `interrupt_after` for approval workflows. DO NOT build custom state machines for pausing/resuming.
-- **Error Handling:** ALWAYS use the `handle_errors` argument with a `ToolStrategy` (`RAISE`, `RETRY_WITH_FEEDBACK`, `CONTINUE`) for agent-level error management. DO NOT implement manual `try/except` blocks for retries within the agent logic itself.
+- **Error Handling:** Use tool-level `@retry` decorators for retryable errors. ToolNode automatically converts exceptions to ToolMessages that the agent can see and reason about. For structured output validation errors, use `ToolStrategy(schema=MyModel, handle_errors=True)` in the `response_format` parameter.
 - **Type Safety:** ALWAYS use `.with_structured_output(PydanticModel)` for agent outputs that need to be consumed by other systems or tools. DO NOT parse dictionaries or unstructured text.
 - **Middleware:** ALWAYS use the middleware pattern for cross-cutting concerns (e.g., injecting company context, tracing, logging, auth). DO NOT add this logic directly into individual tools.

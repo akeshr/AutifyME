@@ -15,35 +15,60 @@ def company_context_middleware(func: Callable) -> Callable:
     any middleware-decorated tools are invoked.
     
     Also passes LangChain config through to enable proper trace nesting.
+    Supports both sync and async functions.
     """
-
-    @wraps(func)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        # The 'config' kwarg is automatically passed by LangChain's agent runtime.
-        # We don't need to pop it; just use it and pass it on.
-        config = kwargs.get("config", {})
-        
-        if "company_profile" not in kwargs:
-            # Import here to avoid circular dependency
-            from autifyme_agents.tools.storage_tools import _storage_client
+    import asyncio
+    
+    if asyncio.iscoroutinefunction(func):
+        @wraps(func)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+            # The 'config' kwarg is automatically passed by LangChain's agent runtime.
+            config = kwargs.get("config", {})
             
-            if _storage_client is None:
-                logger.warning(
-                    f"Tool '{func.__name__}' called but storage client not initialized. "
-                    "Skipping company_profile injection."
-                )
-            else:
-                try:
-                    company_profile = _storage_client.get_company_profile()
-                    kwargs["company_profile"] = company_profile
-                    logger.info(f"Injected company profile for '{company_profile.name}' into '{func.__name__}'")
-                except Exception as e:
-                    logger.error(f"Failed to fetch company profile: {e}")
+            if "company_profile" not in kwargs:
+                # Import here to avoid circular dependency
+                from autifyme_agents.tools.storage_tools import _storage_client
+                
+                if _storage_client is None:
+                    logger.warning(
+                        f"Tool '{func.__name__}' called but storage client not initialized. "
+                        "Skipping company_profile injection."
+                    )
+                else:
+                    try:
+                        company_profile = _storage_client.get_company_profile()
+                        kwargs["company_profile"] = company_profile
+                        logger.info(f"Injected company profile for '{company_profile.name}' into '{func.__name__}'")
+                    except Exception as e:
+                        logger.error(f"Failed to fetch company profile: {e}")
 
-        # The original `config` object will be passed down through kwargs
-        return await func(*args, **kwargs)
+            return await func(*args, **kwargs)
+        return async_wrapper
+    else:
+        @wraps(func)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+            # The 'config' kwarg is automatically passed by LangChain's agent runtime.
+            config = kwargs.get("config", {})
+            
+            if "company_profile" not in kwargs:
+                # Import here to avoid circular dependency
+                from autifyme_agents.tools.storage_tools import _storage_client
+                
+                if _storage_client is None:
+                    logger.warning(
+                        f"Tool '{func.__name__}' called but storage client not initialized. "
+                        "Skipping company_profile injection."
+                    )
+                else:
+                    try:
+                        company_profile = _storage_client.get_company_profile()
+                        kwargs["company_profile"] = company_profile
+                        logger.info(f"Injected company profile for '{company_profile.name}' into '{func.__name__}'")
+                    except Exception as e:
+                        logger.error(f"Failed to fetch company profile: {e}")
 
-    return wrapper
+            return func(*args, **kwargs)
+        return sync_wrapper
 
 
 def langsmith_tracing_middleware(workflow_name: str) -> Callable:

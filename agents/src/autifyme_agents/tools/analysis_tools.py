@@ -20,7 +20,6 @@ import logging
 from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 from autifyme_agents.core.middleware import company_context_middleware
-from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.core.exceptions import (
     ImageAnalysisError,
     ExternalAPIError,
@@ -39,12 +38,15 @@ logger = logging.getLogger(__name__)
     before_sleep=before_sleep_log(logger, logging.WARNING),
     reraise=True
 )
-async def analyze_product_image(image_url: str, company_profile: CompanyProfile, **kwargs) -> ImageAnalysisResult:
+def analyze_product_image(image_url: str, **kwargs) -> ImageAnalysisResult:
     """
     Analyzes a product image using Vision AI and returns structured visual information.
     
     This is a generic vision analysis tool that can be used across all workflows
     requiring product image understanding (cataloging, quality control, style matching, etc.).
+    
+    IMPORTANT: company_profile is automatically injected by @company_context_middleware.
+    DO NOT pass it as an argument - the agent should only provide image_url.
     
     Retry Strategy:
         - Retries up to 3 times on transient API errors
@@ -54,8 +56,7 @@ async def analyze_product_image(image_url: str, company_profile: CompanyProfile,
 
     Args:
         image_url: The public URL of the product image to analyze.
-        company_profile: The company's profile, injected by middleware.
-        **kwargs: Catches the `config` object passed by LangChain for tracing.
+        **kwargs: Contains 'company_profile' (injected by middleware) and 'config' (for tracing).
 
     Returns:
         An ImageAnalysisResult object containing visual description, colors, and style tags.
@@ -65,6 +66,15 @@ async def analyze_product_image(image_url: str, company_profile: CompanyProfile,
         ImageAnalysisError: If image analysis fails
         ExternalAPIError: If Vision API is unreachable (after retries)
     """
+    # Extract company_profile from kwargs (injected by middleware)
+    company_profile = kwargs.get('company_profile')
+    
+    if not company_profile:
+        raise ValidationError(
+            "Company profile not available. Ensure middleware is properly configured.",
+            field="company_profile",
+            value=None
+        )
     # Validate image URL
     if not image_url or not image_url.startswith(('http://', 'https://')):
         raise ValidationError(
@@ -78,7 +88,7 @@ async def analyze_product_image(image_url: str, company_profile: CompanyProfile,
         
         # Pass config to specialist invocation for proper tracing
         invoke_config = kwargs.get("config", {})
-        result = await specialist.ainvoke(
+        result = specialist.invoke(
             {"input": {"image_url": image_url, "company_profile": company_profile}},
             config=invoke_config
         )

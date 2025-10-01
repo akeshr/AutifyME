@@ -117,7 +117,7 @@ agent = create_agent(
 **Why This Matters for AutifyME:**
 - **Project Manager Agent** - Use `create_agent` as base for our PM implementation
 - **HITL Workflows** - `interrupt_before` perfect for "approve before publishing" flows
-- **Error Resilience** - `handle_errors=True` enables robust, configurable error handling.
+- **Error Resilience** - Tool-level error handling with `@retry` + ToolNode automatic exception handling
 - **Structured Outputs** - Guarantee `Product` schema compliance via Pydantic
 
 ---
@@ -180,10 +180,53 @@ def risky_api_call(query: str) -> str:
         )
 ```
 
+**⚠️ CORRECTION (Oct 2025):**  
+The code examples above are INCORRECT. The `handle_errors` parameter does NOT exist in `create_agent()`.
+
+**CORRECT Pattern for Error Handling:**
+
+```python
+# Tool-level error handling with @retry
+from tenacity import retry, stop_after_attempt, retry_if_exception_type
+from langchain.tools import tool
+
+@tool
+@retry(
+    stop=stop_after_attempt(3),
+    retry=retry_if_exception_type(ExternalAPIError),
+    reraise=True
+)
+def my_tool(arg: str) -> str:
+    # Tool implementation
+    result = external_api_call(arg)  # May raise ExternalAPIError
+    return result
+
+# Agent setup (no handle_errors parameter)
+from langchain.agents import create_agent
+
+agent = create_agent(
+    model=llm,
+    tools=[my_tool],
+    # ToolNode automatically converts exceptions to ToolMessages
+)
+
+# For structured output validation errors:
+from langchain.agents.structured_output import ToolStrategy
+
+agent = create_agent(
+    model=llm,
+    tools=tools,
+    response_format=ToolStrategy(
+        schema=MyPydanticModel,
+        handle_errors=True  # ✅ ONLY here, not in create_agent
+    )
+)
+```
+
 **Why This Matters for AutifyME:**
-- **WhatsApp Integration** - Prevent retry storms on network failures
-- **Image Analysis** - Gracefully handle Vision API quota errors
-- **Data Integrity** - Fail fast on critical errors (e.g., DB write failures)
+- **WhatsApp Integration** - Prevent retry storms on network failures with tool-level `@retry`
+- **Image Analysis** - Gracefully handle Vision API quota errors with `@retry`
+- **Data Integrity** - ToolNode automatically returns errors as messages for agent reasoning
 
 ---
 
