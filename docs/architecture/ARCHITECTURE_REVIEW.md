@@ -268,7 +268,7 @@ Build the complete agentic architecture that all workflows will use.
 - Create `core/exceptions.py` with exception hierarchy
 - Add error handling to all external calls (storage, LLM)
 - Test circuit breaker patterns
-- **Add `handle_errors=ToolStrategy` to agents**
+- **Add `handle_errors=True` to agents**
 
 **2. Testing Framework (2-3 days) - P0** ❌ **PENDING - CRITICAL**
 - ✅ `pytest` and `pytest-asyncio` installed
@@ -389,7 +389,7 @@ All of these must be ✅:
 
 A comprehensive guide to all new features in LangChain v1 alpha, including:
 - `.content_blocks` for multimodal content
-- Enhanced `create_react_agent` with HITL and structured outputs
+- Enhanced `create_agent` with HITL and structured outputs
 - Improved error handling patterns
 - `deepagents` library integration
 - LangGraph Platform capabilities
@@ -398,7 +398,7 @@ A comprehensive guide to all new features in LangChain v1 alpha, including:
 **Why This Matters:**
 We're leveraging v1-specific features like:
 - `interrupt_before` for HITL approval workflows
-- `handle_errors=ToolStrategy.RETRY_WITH_FEEDBACK` for self-correction
+- `handle_errors=True` for self-correction
 - `.content_blocks` for structured image analysis results
 - Anthropic prompt caching for cost optimization
 

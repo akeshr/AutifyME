@@ -64,11 +64,12 @@ async def main():
     print("-" * 60)
     
     try:
-        # We pass both the input and the config to the `ainvoke` method.
-        # The key is "messages" and the value is a list containing the task.
-        # This matches the new input schema for agents created with `create_agent`.
+        # LangChain v1 agents expect messages in the "messages" key
+        # Convert the task string into a HumanMessage
+        from langchain_core.messages import HumanMessage
+        
         result = await department_agent.ainvoke(
-            {"messages": [("human", task)]},
+            {"messages": [HumanMessage(content=task)]},
             config=run_config
         )
 

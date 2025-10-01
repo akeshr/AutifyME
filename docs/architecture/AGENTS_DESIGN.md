@@ -125,19 +125,19 @@ To build a production-grade system, the architecture must be resilient to failur
 
 ### Error Handling & Recovery
 
-We leverage **LangChain v1's `ToolStrategy`** for consistent, production-grade error handling:
+We leverage **LangChain v1's built-in error handling** for consistent, production-grade error management:
 
--   **Critical Operations:** `ToolStrategy.RAISE` - Fail fast for DB writes, irreversible actions
--   **Self-Healing Operations:** `ToolStrategy.RETRY_WITH_FEEDBACK` - LLM learns from errors and adjusts approach
--   **Best-Effort Operations:** `ToolStrategy.CONTINUE` - Log error, keep going for optional tasks
+-   **Critical Operations:** For database writes or irreversible actions, we can configure agents to fail fast by setting `handle_errors=False`.
+-   **Self-Healing Operations:** For most operations, we'll use `handle_errors=True`, which enables the agent's self-correction capabilities. The LLM can learn from tool errors and adjust its approach.
+-   **Best-Effort Operations:** For optional tasks, `handle_errors=True` is also suitable, as the agent can log the error and decide to continue with the main workflow.
 
 ```python
-from langchain.agents import create_react_agent, ToolStrategy
+from langchain.agents import create_agent
 
-agent = create_react_agent(
+agent = create_agent(
     model=llm,
     tools=tools,
-    handle_errors=ToolStrategy.RETRY_WITH_FEEDBACK  # v1: Self-correction
+    handle_errors=True  # v1: Enables self-correction
 )
 ```
 
@@ -160,9 +160,9 @@ agent = create_react_agent(
 We use **LangChain v1's native `interrupt_before`** for approval workflows:
 
 ```python
-from langchain.agents import create_react_agent
+from langchain.agents import create_agent
 
-agent = create_react_agent(
+agent = create_agent(
     model=llm,
     tools=tools,
     interrupt_before=["save_product", "publish_website", "send_invoice"]  # v1: Auto-pause

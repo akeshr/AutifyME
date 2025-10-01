@@ -20,14 +20,15 @@ def create_image_analysis_specialist() -> Runnable:
     Pydantic-based output using LangChain v1's `.with_structured_output()`.
 
     Returns:
-        A Runnable chain that takes an image URL and returns an ImageAnalysisResult.
+        A Runnable chain that takes a dict `{"input": {"image_url": "...", "company_profile": ...}}` and returns an ImageAnalysisResult.
     """
     llm = get_llm(provider="openai", model="gpt-4o")
     structured_llm = llm.with_structured_output(ImageAnalysisResult)
 
     # For multimodal messages, we construct them dynamically using a RunnableLambda
-    def format_messages(inputs: dict) -> list:
+    def format_messages(payload: dict) -> list:
         """Formats the multimodal input as a list of messages for the LLM."""
+        inputs = payload["input"]
         company_profile = inputs.get('company_profile')
         if company_profile:
             context_text = f"Company Brand Voice: {company_profile.brand_voice}\nTarget Audience: {company_profile.target_audience}"

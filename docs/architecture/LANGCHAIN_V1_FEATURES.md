@@ -21,7 +21,25 @@ LangChain v1 represents a major evolution focusing on **production-grade agent s
 
 ## 🚀 Major New Features
 
-### 1. `.content_blocks` Property - Multimodal & Reasoning Support
+### 1. Package Restructuring & Modularization
+
+**What it is:**  
+LangChain has been refactored from a monolithic library into a set of smaller, more focused packages. This is a foundational change for v1.
+
+**Key Packages:**
+- **`langchain-core`**: The heart of the library, containing base abstractions, interfaces, and the LangChain Expression Language (LCEL). All other packages depend on this.
+- **`langchain-community`**: Contains all third-party integrations (LLMs, vector stores, tools). This package is very large and will likely be broken up further.
+- **`langchain`**: The "main" package. It contains high-level, chain-of-thought logic and orchestrators (agents, chains) that are provider-agnostic.
+- **Partner Packages (`langchain-openai`, `langchain-anthropic`, etc.)**: Provider-specific SDKs that depend on `langchain-core`. This allows for smaller, more secure, and easier-to-manage dependencies.
+
+**Why This Matters for AutifyME:**
+- **Smaller Dependencies**: We can now install only the providers we need (e.g., `pip install langchain-openai langchain-anthropic`), reducing our dependency footprint.
+- **Clearer Imports**: Imports now reflect the source of the component (e.g., `from langchain_openai import ChatOpenAI`), making the code easier to understand.
+- **Stability**: Changes to a community integration in `langchain-community` won't affect the stability of `langchain-core`.
+
+---
+
+### 2. `.content_blocks` Property - Multimodal & Reasoning Support
 
 **What it is:**  
 A fully typed, structured view of LLM message content that standardizes modern features across providers.
@@ -59,12 +77,12 @@ for block in response.content_blocks:
 
 ---
 
-### 2. Prebuilt Agents in `langchain.agents`
+### 3. Prebuilt Agents in `langchain.agents`
 
 **What Changed:**  
 Agent creation APIs moved from `langgraph.prebuilts` to `langchain.agents` with **major enhancements**.
 
-#### **`create_react_agent` - Enhanced ReAct Pattern**
+#### **`create_agent` - The Modern Agent Constructor**
 
 **New Features:**
 - **Structured Output Enforcement** - Pydantic models guarantee output schema
@@ -80,12 +98,12 @@ from langgraph.prebuilts import create_react_agent
 agent = create_react_agent(model, tools)
 
 # NEW (v1 - langchain.agents)
-from langchain.agents import create_react_agent, ToolStrategy
+from langchain.agents import create_agent
 
-agent = create_react_agent(
+agent = create_agent(
     model=model,
     tools=tools,
-    handle_errors=ToolStrategy.RAISE,  # NEW: Control error behavior
+    handle_errors=True,  # Simplified error handling flag
     interrupt_before=["save_product"],  # NEW: HITL approval
     state_modifier="You are an expert cataloging agent",  # NEW: Dynamic prompts
 )
@@ -97,41 +115,44 @@ agent = create_react_agent(
 - **Import Path** - Must update imports from `langgraph.prebuilts` → `langchain.agents`
 
 **Why This Matters for AutifyME:**
-- **Project Manager Agent** - Use `create_react_agent` as base for our PM implementation
+- **Project Manager Agent** - Use `create_agent` as base for our PM implementation
 - **HITL Workflows** - `interrupt_before` perfect for "approve before publishing" flows
-- **Error Resilience** - `handle_errors=ToolStrategy.RETRY` for flaky external APIs
+- **Error Resilience** - `handle_errors=True` enables robust, configurable error handling.
 - **Structured Outputs** - Guarantee `Product` schema compliance via Pydantic
 
 ---
 
-### 3. Enhanced Error Handling & Resilience
+### 4. Enhanced Error Handling & Resilience
 
 **New Capabilities:**
 
 #### **A. Structured Output Error Control**
 
 ```python
-from langchain.agents import ToolStrategy
+from langchain.agents import create_agent
 
 # Strategy 1: Raise exceptions immediately (fail-fast)
-agent = create_react_agent(
+agent = create_agent(
     model=llm,
     tools=tools,
-    handle_errors=ToolStrategy.RAISE
+    handle_errors=False # Default behavior
 )
 
 # Strategy 2: Retry with LLM feedback (self-correction)
-agent = create_react_agent(
+# The `handle_errors` parameter can be configured with more complex strategies
+# for retries, but the simple boolean is the most common use case.
+agent = create_agent(
     model=llm,
     tools=tools,
-    handle_errors=ToolStrategy.RETRY_WITH_FEEDBACK
+    handle_errors=True 
 )
 
 # Strategy 3: Continue with error message (best-effort)
-agent = create_react_agent(
+# This would require a custom error handler function passed to `handle_errors`
+agent = create_agent(
     model=llm,
     tools=tools,
-    handle_errors=ToolStrategy.CONTINUE
+    handle_errors=True # Simplified for documentation
 )
 ```
 
@@ -166,7 +187,7 @@ def risky_api_call(query: str) -> str:
 
 ---
 
-### 4. State & Context Management ⭐️ NEW
+### 5. State & Context Management ⭐️ NEW
 
 LangChain v1 introduces powerful, native features for managing conversation history and state, which are critical for our context engineering strategy.
 
@@ -215,7 +236,7 @@ memory.add_middleware(summarization_middleware)
 
 ---
 
-### 5. Middleware System - Cross-Cutting Concerns ⭐️ NEW in v1.0.0a8
+### 6. Middleware System - Cross-Cutting Concerns ⭐️ NEW in v1.0.0a8
 
 **What it is:**  
 A **decorator-based middleware system** for injecting custom logic into agent/tool execution pipelines without modifying core code.
@@ -281,7 +302,7 @@ def analyze_product_image(image_url: str, company_profile: dict = None) -> dict:
 
 **Advanced: Tool Registration Middleware**
 ```python
-from langchain.agents import create_react_agent
+from langchain.agents import create_agent
 
 def langsmith_tracing_middleware(tools, workflow_id: str, department: str):
     """Enrich all tool traces with workflow context"""
@@ -315,7 +336,7 @@ traced_tools = langsmith_tracing_middleware(
     department="cataloging"
 )
 
-agent = create_react_agent(model, traced_tools)
+agent = create_agent(model, traced_tools)
 ```
 
 **Why This Matters for AutifyME:**
@@ -338,7 +359,7 @@ agent = create_react_agent(model, traced_tools)
 
 ---
 
-### 6. LangGraph Runtime Integration
+### 7. LangGraph Runtime Integration
 
 **What it means:**  
 All `langchain.agents` are now **backed by LangGraph's stateful runtime**, giving you:
@@ -350,15 +371,15 @@ All `langchain.agents` are now **backed by LangGraph's stateful runtime**, givin
 
 **Example:**
 ```python
-from langchain.agents import create_react_agent
+from langchain.agents import create_agent
 from langgraph.checkpoint.postgres import PostgresSaver
 
 # Create agent with checkpointing
 checkpointer = PostgresSaver.from_conn_string(settings.DATABASE_URL)
-agent = create_react_agent(model, tools, checkpointer=checkpointer)
+agent = create_agent(model, tools, checkpointer=checkpointer)
 
 # HITL: Interrupt before dangerous actions
-agent = create_react_agent(
+agent = create_agent(
     model,
     tools,
     checkpointer=checkpointer,
@@ -377,7 +398,7 @@ agent.update_state(thread_id, {"approved": True})
 
 ---
 
-### 7. Improved Type Safety & Developer Experience
+### 8. Improved Type Safety & Developer Experience
 
 #### **A. Message Type Updates**
 
@@ -415,7 +436,7 @@ Python 3.9 support dropped. Requires **Python 3.10+**.
 
 ---
 
-### 8. Anthropic & OpenAI Enhancements
+### 9. Anthropic & OpenAI Enhancements
 
 #### **A. Anthropic Prompt Caching**
 
@@ -456,7 +477,7 @@ llm = ChatOpenAI(
 
 ---
 
-### 9. LangSmith Deep Integration
+### 10. LangSmith Deep Integration
 
 While not specific to v1, **LangChain v1 + LangSmith** work seamlessly together:
 
@@ -479,10 +500,10 @@ from langchain import hub
 # Pull versioned prompt from LangSmith
 project_manager_prompt = hub.pull("autifyme/project-manager:v2")
 
-agent = create_react_agent(
+agent = create_agent(
     model=llm,
     tools=tools,
-    state_modifier=project_manager_prompt
+    prompt=project_manager_prompt # Prompts are now passed directly
 )
 ```
 
@@ -493,7 +514,7 @@ agent = create_react_agent(
 | **Change** | **Impact** | **Migration** |
 |------------|------------|---------------|
 | Python 3.10+ required | Must upgrade Python | Update CI/CD, dev environments |
-| `create_react_agent` moved to `langchain.agents` | Import errors | Update imports |
+| `create_react_agent` → `create_agent` | Import and runtime errors | Update function calls and imports |
 | Return type: `BaseMessage` → `AIMessage` | Type checker errors | Update type hints |
 | `.text()` → `.text` property | Deprecation warnings | Remove parentheses |
 | No pre-bound models | Runtime errors | Pass model + tools separately |
@@ -507,10 +528,10 @@ agent = create_react_agent(
 
 ### **Immediate Use (Week 1-2)**
 
-1. **`create_react_agent`** - Base for Project Manager Agent
+1. **`create_agent`** - Base for Project Manager Agent
    - Use `interrupt_before` for HITL approval on product publishing
-   - Use `handle_errors=ToolStrategy.RETRY_WITH_FEEDBACK` for self-correction
-   - Use `state_modifier` for dynamic prompt injection (company profile)
+   - Use `handle_errors=True` for self-correction and resilience.
+   - Use the `prompt` parameter for dynamic prompt injection (company profile)
 
 2. **PostgresSaver Checkpointing** - Multi-turn WhatsApp conversations
    - Persist conversation state across messages
@@ -650,14 +671,14 @@ tool_configs={
 ### **v1 Compatibility:**
 
 `deepagents` is **fully compatible with LangChain v1** and uses:
-- `create_react_agent` under the hood (benefits from v1 improvements)
+- `create_agent` under the hood (benefits from v1 improvements)
 - `.content_blocks` for structured outputs
 - LangGraph checkpointing for state management
 - LangSmith tracing for observability
 
 **Our Strategy:**
 1. Use `deepagents` for **Project Manager** (complex orchestration)
-2. Use `create_react_agent` for **Departments** (simpler delegation)
+2. Use `create_agent` for **Departments** (simpler delegation)
 3. Use `@tool` functions for **Specialists** (focused tasks)
 
 ---
@@ -750,7 +771,7 @@ We've set up LangSmith for observability. Here's what it provides:
 
 1. **Update `pyproject.toml`** - Ensure we're using latest alpha versions ✅ (Already done)
 2. **Build Middleware System** - Create `core/middleware.py` for company context, tracing, rate limiting (P0)
-3. **Create Base Agent** - Implement `create_react_agent` wrapper in `workflows/project_manager.py`
+3. **Create Base Agent** - Implement `create_agent` wrapper in `workflows/project_manager.py`
 4. **Implement Checkpointing** - Set up `PostgresSaver` for state persistence
 5. **Add HITL Patterns** - Use `interrupt_before` for approval workflows
 6. **Leverage `.content_blocks`** - Extract structured data from Vision API responses

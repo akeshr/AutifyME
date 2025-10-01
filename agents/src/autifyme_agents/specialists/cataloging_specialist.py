@@ -21,12 +21,12 @@ def create_cataloging_specialist() -> Runnable:
     3. Returns structured Product model via .with_structured_output()
     
     Returns:
-        A Runnable chain that takes {"user_message": str} and returns Product.
+        A Runnable chain that takes {"input": {"user_message": str}} and returns Product.
     """
     # Build prompt
     prompt = ChatPromptTemplate.from_messages([
         ("system", CATALOGING_SPECIALIST_SYSTEM_PROMPT),
-        ("human", "{user_message}"),
+        ("human", "{input[user_message]}"),
     ])
     
     # Use centralized LLM factory with prompt caching

@@ -19,8 +19,9 @@ def company_context_middleware(func: Callable) -> Callable:
 
     @wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        # Extract config for trace propagation
-        config = kwargs.pop("config", {})
+        # The 'config' kwarg is automatically passed by LangChain's agent runtime.
+        # We don't need to pop it; just use it and pass it on.
+        config = kwargs.get("config", {})
         
         if "company_profile" not in kwargs:
             # Import here to avoid circular dependency
@@ -39,9 +40,7 @@ def company_context_middleware(func: Callable) -> Callable:
                 except Exception as e:
                     logger.error(f"Failed to fetch company profile: {e}")
 
-        # Pass config through for downstream LangChain calls (specialists, LLMs)
-        kwargs["_langchain_config"] = config
-        
+        # The original `config` object will be passed down through kwargs
         return await func(*args, **kwargs)
 
     return wrapper
@@ -64,7 +63,7 @@ def langsmith_tracing_middleware(workflow_name: str) -> Callable:
         if asyncio.iscoroutinefunction(func):
             @wraps(func)
             async def async_wrapper(*args, **kwargs) -> Any:
-                config = kwargs.pop("config", {})
+                config = kwargs.get("config", {})
                 
                 # Enrich config with workflow context
                 metadata = config.setdefault("metadata", {})
@@ -78,10 +77,6 @@ def langsmith_tracing_middleware(workflow_name: str) -> Callable:
                 run_name = config.setdefault("run_name", func.__name__)
                 if not run_name.startswith(workflow_name):
                     config["run_name"] = f"{workflow_name}-{run_name}"
-                
-                # Store enriched config in kwargs for downstream LangChain calls
-                # Tools that invoke specialists/LLMs will use this config
-                kwargs["_langchain_config"] = config
                 
                 result = await func(*args, **kwargs)
                 return result
@@ -89,7 +84,7 @@ def langsmith_tracing_middleware(workflow_name: str) -> Callable:
         else:
             @wraps(func)
             def sync_wrapper(*args, **kwargs) -> Any:
-                config = kwargs.pop("config", {})
+                config = kwargs.get("config", {})
                 
                 # Enrich config with workflow context
                 metadata = config.setdefault("metadata", {})
@@ -103,9 +98,6 @@ def langsmith_tracing_middleware(workflow_name: str) -> Callable:
                 run_name = config.setdefault("run_name", func.__name__)
                 if not run_name.startswith(workflow_name):
                     config["run_name"] = f"{workflow_name}-{run_name}"
-                
-                # Store enriched config in kwargs for downstream LangChain calls
-                kwargs["_langchain_config"] = config
                 
                 result = func(*args, **kwargs)
                 return result
