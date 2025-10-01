@@ -10,7 +10,7 @@ from autifyme_agents.schemas.models import CompanyProfile
 
 @tool
 @company_context_middleware
-async def analyze_product_image(image_url: str, company_profile: CompanyProfile) -> ImageAnalysisResult:
+async def analyze_product_image(image_url: str, company_profile: CompanyProfile, _langchain_config: dict = None) -> ImageAnalysisResult:
     """
     Analyzes a product image and returns structured visual information.
     
@@ -20,10 +20,17 @@ async def analyze_product_image(image_url: str, company_profile: CompanyProfile)
     Args:
         image_url: The public URL of the product image to analyze.
         company_profile: The company's profile, injected by middleware.
+        _langchain_config: Internal LangChain config for tracing (auto-injected by middleware).
 
     Returns:
         An ImageAnalysisResult object containing visual description, colors, and style tags.
     """
     specialist = create_image_analysis_specialist()
-    result = await specialist.ainvoke({"image_url": image_url, "company_profile": company_profile})
+    
+    # Pass config to specialist invocation for proper tracing
+    invoke_config = _langchain_config or {}
+    result = await specialist.ainvoke(
+        {"image_url": image_url, "company_profile": company_profile},
+        config=invoke_config
+    )
     return result

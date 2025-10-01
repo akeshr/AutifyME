@@ -13,10 +13,13 @@ def company_context_middleware(func: Callable) -> Callable:
     Uses the global storage client initialized at application startup.
     The storage client must be initialized via initialize_storage() before
     any middleware-decorated tools are invoked.
+    
+    Also passes LangChain config through to enable proper trace nesting.
     """
 
     @wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Extract config for trace propagation
         config = kwargs.pop("config", {})
         
         if "company_profile" not in kwargs:
@@ -36,6 +39,9 @@ def company_context_middleware(func: Callable) -> Callable:
                 except Exception as e:
                     logger.error(f"Failed to fetch company profile: {e}")
 
+        # Pass config through for downstream LangChain calls (specialists, LLMs)
+        kwargs["_langchain_config"] = config
+        
         return await func(*args, **kwargs)
 
     return wrapper
@@ -43,54 +49,66 @@ def company_context_middleware(func: Callable) -> Callable:
 
 def langsmith_tracing_middleware(workflow_name: str) -> Callable:
     """
-    Middleware factory to inject LangSmith tracing tags and run_name.
-
-    This allows us to automatically add context to all LangSmith traces
-    for tools within a specific workflow.
+    Middleware factory to inject LangSmith tracing metadata.
     
-    The middleware extracts the config, enriches it, but then removes it
-    from kwargs before calling the tool function (since tools don't expect it).
+    Enriches the LangChain config with workflow-specific tags and metadata
+    for better trace organization in LangSmith.
     
-    Supports both sync and async tools automatically.
+    Note: This middleware operates at the decorator level and modifies the
+    wrapped function's metadata. For tools that call LLMs or specialists,
+    the config propagation happens through LangChain's RunnableConfig system.
     """
     def decorator(func: Callable) -> Callable:
-        # Check if the wrapped function is async
         import asyncio
-        import inspect
         
         if asyncio.iscoroutinefunction(func):
             @wraps(func)
             async def async_wrapper(*args, **kwargs) -> Any:
-                # Extract and enrich config for LangSmith tracing
                 config = kwargs.pop("config", {})
-                tags = config.get("tags", [])
-                run_name = config.get("run_name", func.__name__)
-
-                # Add workflow-specific tags
-                tags.append(f"workflow:{workflow_name}")
-                config["tags"] = tags
-                config["run_name"] = f"{workflow_name}-{run_name}"
                 
-                # The config is used by LangChain's tracing automatically;
-                # we don't pass it down to the tool function
-                return await func(*args, **kwargs)
+                # Enrich config with workflow context
+                metadata = config.setdefault("metadata", {})
+                metadata["workflow"] = workflow_name
+                metadata["tool_name"] = func.__name__
+                
+                tags = config.setdefault("tags", [])
+                if f"workflow:{workflow_name}" not in tags:
+                    tags.append(f"workflow:{workflow_name}")
+                
+                run_name = config.setdefault("run_name", func.__name__)
+                if not run_name.startswith(workflow_name):
+                    config["run_name"] = f"{workflow_name}-{run_name}"
+                
+                # Store enriched config in kwargs for downstream LangChain calls
+                # Tools that invoke specialists/LLMs will use this config
+                kwargs["_langchain_config"] = config
+                
+                result = await func(*args, **kwargs)
+                return result
             return async_wrapper
         else:
             @wraps(func)
             def sync_wrapper(*args, **kwargs) -> Any:
-                # Extract and enrich config for LangSmith tracing
                 config = kwargs.pop("config", {})
-                tags = config.get("tags", [])
-                run_name = config.get("run_name", func.__name__)
-
-                # Add workflow-specific tags
-                tags.append(f"workflow:{workflow_name}")
-                config["tags"] = tags
-                config["run_name"] = f"{workflow_name}-{run_name}"
                 
-                # The config is used by LangChain's tracing automatically;
-                # we don't pass it down to the tool function
-                return func(*args, **kwargs)
+                # Enrich config with workflow context
+                metadata = config.setdefault("metadata", {})
+                metadata["workflow"] = workflow_name
+                metadata["tool_name"] = func.__name__
+                
+                tags = config.setdefault("tags", [])
+                if f"workflow:{workflow_name}" not in tags:
+                    tags.append(f"workflow:{workflow_name}")
+                
+                run_name = config.setdefault("run_name", func.__name__)
+                if not run_name.startswith(workflow_name):
+                    config["run_name"] = f"{workflow_name}-{run_name}"
+                
+                # Store enriched config in kwargs for downstream LangChain calls
+                kwargs["_langchain_config"] = config
+                
+                result = func(*args, **kwargs)
+                return result
             return sync_wrapper
     return decorator
 

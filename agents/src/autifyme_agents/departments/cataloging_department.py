@@ -37,7 +37,14 @@ def create_cataloging_department() -> Runnable:
     llm = get_llm()
     agent = create_agent(llm, tools, prompt=prompt)
     
+    # Apply workflow-level tracing configuration
+    # This enriches all traces from this agent with Cataloging workflow context
     return agent.with_config({
-        "run_name": "CatalogingDepartment-Run",
-        "tags": ["Department", "Cataloging"]
+        "run_name": "CatalogingDepartment",
+        "tags": ["department:cataloging", "workflow:Cataloging"],
+        "metadata": {
+            "department": "cataloging",
+            "workflow": "Cataloging",
+            "agent_type": "department_head"
+        }
     })
