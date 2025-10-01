@@ -60,119 +60,27 @@ agent = create_agent(
 
 ---
 
-### 2. **Middleware Configuration Not Passed to LLM Calls (P0 - Blocker)**
+### 2. **~~Middleware Configuration Not Passed to LLM Calls~~ (✅ FIXED)**
 
-**Problem:**  
-Our middleware enriches `config` with LangSmith tags, but this **config is never passed to the underlying LLM or specialist chains**. This means:
-- ❌ LangSmith traces are **not enriched** with workflow/department tags
-- ❌ The `config` we modify in middleware is **discarded**
-- ❌ Middleware is doing work that has zero effect
+**Status:** ✅ **RESOLVED** (October 1, 2025)
 
-**Evidence:**
-```python
-# middleware.py (Lines 80-91)
-def langsmith_tracing_middleware(workflow_name: str):
-    def decorator(func):
-        async def async_wrapper(*args, **kwargs):
-            config = kwargs.pop("config", {})  # ✅ Extract config
-            config["tags"] = tags              # ✅ Enrich config
-            # ❌ BUT THEN config IS NEVER USED!
-            return await func(*args, **kwargs)  # ❌ config not passed
-```
-
-**Expected Pattern (from LangChain v1 docs):**
-```python
-# Middleware should pass config to downstream calls
-return await func(*args, config=config, **kwargs)
-```
-
-**Impact:**
-- 🟡 **High** - LangSmith traces lack critical context for debugging
-- 🟡 **High** - Makes distributed tracing impossible
-- 🟡 **High** - Defeats the purpose of middleware
-
-**Required Fix:**
-Update middleware to **inject config into the function call context** OR use LangChain's `RunnableConfig` pattern correctly.
+**Solution:** Agent-level `.with_config()` + middleware passes through `_langchain_config` + tools pass to specialists
 
 ---
 
-### 3. **Hardcoded REACT_PROMPT_TEMPLATE is Dead Code (P1)**
+### 3. **~~Hardcoded REACT_PROMPT_TEMPLATE is Dead Code~~ (✅ FIXED)**
 
-**Problem:**  
-`cataloging_department.py` contains a 33-line `REACT_PROMPT_TEMPLATE` (Lines 14-32) that is **never used**.
+**Status:** ✅ **RESOLVED** (October 1, 2025)
 
-**Evidence:**
-```python
-# cataloging_department.py (Line 14)
-REACT_PROMPT_TEMPLATE = """Answer the following questions..."""  # ❌ Dead code
-
-# Line 75 - create_agent doesn't use it
-agent = create_agent(llm, tools, prompt=prompt)  # Uses custom prompt, not REACT template
-```
-
-**Why This Matters:**
-- The comment says "Hardcoded because it's framework-level (not domain-specific)"
-- But `create_agent` **already handles ReAct formatting internally** (LangChain v1 behavior)
-- This template is a leftover from v0 migration
-
-**Required Fix:**
-**DELETE Lines 14-32** - They serve no purpose and confuse the architecture.
+**Solution:** Deleted 33 lines of unused code (LangChain v1's `create_agent` handles ReAct internally)
 
 ---
 
-### 4. **Placeholder `get_company_profile` in Middleware is a Workaround (P1)**
+### 4. **~~Placeholder `get_company_profile` in Middleware~~ (✅ FIXED)**
 
-**Problem:**  
-`company_context_middleware` contains a **hardcoded placeholder function** that returns fake data instead of using the real `StorageInterface`.
+**Status:** ✅ **RESOLVED** (October 1, 2025)
 
-**Evidence:**
-```python
-# middleware.py (Lines 10-22)
-def get_company_profile(company_id: str) -> dict:
-    """
-    Placeholder function to retrieve a company's profile.
-    In a real implementation, this would fetch data from our storage layer.
-    """
-    # This will be replaced by a call to the StorageInterface  # ❌ TODO comment
-    logger.info(f"Fetching profile for company_id: {company_id}")
-    return {
-        "id": company_id,
-        "name": f"Company {company_id}",  # ❌ Fake data
-        "brand_voice": "Friendly and professional",
-        "target_audience": "Small business owners",
-    }
-```
-
-**Architecture Says:**
-> "Middleware MUST inject context from StorageInterface, not hardcode data"
-
-**Why This Is a Shortcut:**
-- We already have `SupabaseStorageClient.get_company_profile()` (fully implemented)
-- We already have a global `initialize_storage()` pattern
-- The middleware should **reuse** the storage layer, not duplicate logic
-
-**Impact:**
-- 🟡 **Medium** - Test script passes with fake data, masking real DB issues
-- 🟡 **Medium** - Violates Hexagonal Architecture (middleware depends on nothing)
-- 🟡 **Medium** - Creates duplicate "source of truth" for company profiles
-
-**Required Fix:**
-```python
-# middleware.py should import and use:
-from autifyme_agents.tools.storage_tools import _storage_client
-
-def company_context_middleware(func):
-    async def wrapper(*args, **kwargs):
-        config = kwargs.pop("config", {})
-        company_id = config.get("configurable", {}).get("company_id")
-        
-        if company_id and _storage_client:
-            # ✅ Use real storage interface
-            kwargs["company_profile"] = _storage_client.get_company_profile()
-        
-        return await func(*args, **kwargs)
-    return wrapper
-```
+**Solution:** Middleware now uses real `_storage_client.get_company_profile()` instead of hardcoded fake data
 
 ---
 
@@ -245,26 +153,11 @@ agent = create_agent(
 
 ---
 
-### 8. **Generic vs. Specific Design Violation**
+### 8. **~~Generic vs. Specific Design Violation~~ (✅ FIXED)**
 
-**Problem:**  
-Some components are **too specific to the WhatsApp cataloging workflow**, violating our "generic-first" principle.
+**Status:** ✅ **RESOLVED** (October 1, 2025)
 
-**Evidence:**
-```python
-# storage_tools.py (Line 32)
-@langsmith_tracing_middleware(workflow_name="Cataloging")  # ❌ Hardcoded workflow
-def save_product(**kwargs):
-    ...
-```
-
-**Why This Is Wrong:**
-- `save_product` is a **generic** database operation
-- It should be usable across **all** workflows (not just cataloging)
-- Hardcoding `workflow_name="Cataloging"` couples it to one use case
-
-**Required Fix:**
-Middleware should be applied **at the agent/department level**, not the tool level.
+**Solution:** Removed workflow-specific decorators from tools; workflow context now applied at agent level via `.with_config()`
 
 ---
 
@@ -286,27 +179,28 @@ Middleware should be applied **at the agent/department level**, not the tool lev
 
 ### Immediate (Before Any New Feature Work):
 
-1. **Implement Error Handling (2-3 days)**
+1. **Implement Error Handling (2-3 days)** ❌ **PENDING**
    - Add `handle_errors=ToolStrategy.RETRY_WITH_FEEDBACK` to all agents
    - Create `core/exceptions.py` with custom exception hierarchy
    - Add `ToolException` to all tools that call external APIs
    - Add `tenacity` retry decorators to storage operations
 
-2. **Fix Middleware Config Propagation (0.5 days)**
-   - Ensure enriched `config` is passed to downstream LLM calls
-   - Test that LangSmith traces show workflow tags
+2. **~~Fix Middleware Config Propagation~~** ✅ **COMPLETED** (Oct 1, 2025)
+   - ✅ Config passed to downstream LLM calls via `_langchain_config`
+   - ✅ Agent-level `.with_config()` for workflow context
+   - ✅ Tests verify proper trace nesting
 
-3. **Implement Checkpointing (1 day)**
+3. **Implement Checkpointing (1 day)** ❌ **PENDING**
    - Add `PostgresSaver` to all agents
    - Test state resumption after interruption
 
-4. **Remove Dead Code (0.25 days)**
-   - Delete `REACT_PROMPT_TEMPLATE` from `cataloging_department.py`
-   - Clean up TODOs in middleware
+4. **~~Remove Dead Code~~** ✅ **COMPLETED** (Oct 1, 2025)
+   - ✅ Deleted `REACT_PROMPT_TEMPLATE` from `cataloging_department.py`
+   - ✅ Cleaned up middleware comments
 
-5. **Fix Middleware Storage Integration (0.5 days)**
-   - Replace placeholder `get_company_profile` with real storage call
-   - Ensure proper initialization order
+5. **~~Fix Middleware Storage Integration~~** ✅ **COMPLETED** (Oct 1, 2025)
+   - ✅ Replaced placeholder with real `_storage_client`
+   - ✅ Proper initialization order verified
 
 ### High Priority (Week 2):
 
@@ -319,9 +213,9 @@ Middleware should be applied **at the agent/department level**, not the tool lev
    - Write tests for existing code
    - Configure pytest + CI/CD
 
-8. **Decouple Workflow-Specific Logic (1 day)**
-   - Make tools truly generic
-   - Move workflow-specific middleware to department level
+8. **~~Decouple Workflow-Specific Logic~~** ✅ **COMPLETED** (Oct 1, 2025)
+   - ✅ Tools are now truly generic
+   - ✅ Workflow context moved to agent/department level
 
 ---
 
@@ -329,18 +223,19 @@ Middleware should be applied **at the agent/department level**, not the tool lev
 
 | Rule/Principle | Status | Grade |
 |----------------|--------|-------|
-| Architecture-First | ⚠️ Partial | C+ |
-| LangChain v1 Best Practices | ❌ Critical Gaps | D |
+| Architecture-First | ✅ Good | B+ |
+| LangChain v1 Best Practices | ⚠️ Partial | C+ |
 | Hexagonal Architecture | ✅ Excellent | A |
 | Type Safety | ✅ Excellent | A |
-| Middleware Pattern | ⚠️ Implemented, Not Used Correctly | C |
+| Middleware Pattern | ✅ Working Correctly | A- |
 | Error Handling | ❌ Not Implemented | F |
 | State Persistence | ❌ Not Implemented | F |
 | Prompt Management | ✅ Good | B+ |
 | Async/Sync Handling | ✅ Good | A- |
+| Generic Design | ✅ Excellent | A |
 
-**Overall Grade: C-**  
-*Reason:* Core architecture is sound, but **critical production features are missing**.
+**Overall Grade: B-** (Improved from C-)  
+*Reason:* Core architecture is solid, middleware fixed, but **2 critical P0 blockers remain** (error handling, state persistence).
 
 ---
 
