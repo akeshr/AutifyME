@@ -1,9 +1,9 @@
 from supabase import create_client, Client
 from typing import Dict, Any
 
-from ....core.ports import StorageInterface
-from ....core.config import settings
-from ....schemas.models import Product
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.core.config import settings
+from autifyme_agents.schemas.models import Product
 
 # Note for Abhi (from our discussion):
 # This is our concrete "Adapter". It implements the StorageInterface and

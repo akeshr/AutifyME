@@ -4,7 +4,55 @@ version = "0.1.0"
 description = "The agentic service for the AutifyME Business OS."
 authors = [{ name = "Abhi", email = "" }]
 requires-python = ">=3.11"
+dependencies = [
+    # Core Agentic Framework (latest pre-release/stable)
+    # Note: Using flexible version specs to get the latest available versions
+    "langchain",
+    "langchain-core",
+    "langgraph",
+    "langsmith",
+    
+    # Advanced Agent Implementation
+    "deepagents",
+    
+    # LLM Providers
+    "langchain-openai",
+    "langchain-google-genai",
+    
+    # Database & Storage
+    "supabase",
+    
+    # Data Validation & Settings
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "tenacity>=8.0.0",
+    
+    # UI (MVP)
+    "streamlit>=1.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    
+    # Code Quality
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+    
+    # E2E Testing
+    "playwright>=1.40.0",
+]
 
 [tool.uv]
-# This section will be used by uv to manage dependencies, similar to a package.json
-# We will add our dependencies here in the future.
+# uv configuration
+dev-dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -361,7 +361,32 @@ All of these must be ✅:
 
 ---
 
-## Part 4: Key Architectural Decisions
+## Part 4: Key Resources
+
+### 📘 LangChain v1 Features Guide
+
+**Document:** [`LANGCHAIN_V1_FEATURES.md`](./LANGCHAIN_V1_FEATURES.md)
+
+A comprehensive guide to all new features in LangChain v1 alpha, including:
+- `.content_blocks` for multimodal content
+- Enhanced `create_react_agent` with HITL and structured outputs
+- Improved error handling patterns
+- `deepagents` library integration
+- LangGraph Platform capabilities
+- LangSmith integration best practices
+
+**Why This Matters:**
+We're leveraging v1-specific features like:
+- `interrupt_before` for HITL approval workflows
+- `handle_errors=ToolStrategy.RETRY_WITH_FEEDBACK` for self-correction
+- `.content_blocks` for structured image analysis results
+- Anthropic prompt caching for cost optimization
+
+**Action:** Review this document before implementing agents to understand what's available.
+
+---
+
+## Part 5: Key Architectural Decisions
 
 ### Decision 1: Build Full Architecture First ✅
 

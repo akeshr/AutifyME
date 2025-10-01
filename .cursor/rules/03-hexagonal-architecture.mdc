@@ -1,0 +1,20 @@
+---
+globs: "agents/src/autifyme_agents/**/*.py"
+---
+# Rule: Hexagonal Architecture (Ports & Adapters)
+
+To maintain a clean, decoupled architecture, we follow the Dependency Inversion Principle. Core application logic MUST depend on abstractions (interfaces), not on concrete implementations.
+
+## Implementation Guardrails:
+
+1.  **NEVER Import from `integrations`:**
+    -   Files within `core/`, `workflows/`, `departments/`, and `specialists/` MUST NOT directly import any code from the `integrations/` directory.
+    -   **Bad:** `from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient`
+    -   This would tightly couple our core logic to Supabase.
+
+2.  **ALWAYS Depend on `ports`:**
+    -   Core logic should only interact with external services (like databases or APIs) through the interfaces defined in `core/ports.py`.
+    -   **Good:** `from autifyme_agents.core.ports import StorageInterface`
+
+3.  **Instantiation:**
+    -   Concrete implementations (e.g., `SupabaseStorageClient`) should be instantiated only at the application's entry point or within a dedicated dependency injection container, and then passed to the core logic as an instance of the interface.

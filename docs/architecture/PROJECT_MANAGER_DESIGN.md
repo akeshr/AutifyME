@@ -243,46 +243,40 @@ __all__ = [
 
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
+
+class ImageAnalysisResult(BaseModel):
+    """Structured output from image analysis."""
+    category: str = Field(description="Product category")
+    color: str = Field(description="Primary color")
+    pattern: str | None = Field(description="Pattern type")
+    description: str = Field(description="Description in brand voice")
+    confidence: float = Field(ge=0.0, le=1.0)
 
 @tool
-def image_analysis_specialist(image_url: str, company_context: dict) -> dict:
+def image_analysis_specialist(image_url: str, company_context: dict) -> ImageAnalysisResult:
     """
     Analyzes a product image and extracts structured information.
     
-    Use this tool when you need to understand what's in a product image.
-    
-    Args:
-        image_url: URL to the product image
-        company_context: Company brand voice and guidelines
-    
     Returns:
-        Dictionary with: category, color, pattern, description, confidence
+        ImageAnalysisResult: Type-safe Pydantic model (v1 structured output)
     """
-    # Implementation using multimodal LLM
     llm = ChatOpenAI(model="gpt-4o")
+    
+    # v1: .with_structured_output() guarantees schema compliance
+    structured_llm = llm.with_structured_output(ImageAnalysisResult)
     
     prompt = f"""
     Analyze this product image for {company_context['company_name']}.
-    
     Brand Voice: {company_context['brand_voice']}
-    Target Audience: {company_context['target_audience']}
-    
-    Extract:
-    - Product category
-    - Colors
-    - Patterns/designs
-    - Key features
-    - Description in brand voice
-    
     Image: {image_url}
     """
     
-    result = llm.invoke([
+    # Returns ImageAnalysisResult object, not dict!
+    return structured_llm.invoke([
         {"type": "text", "text": prompt},
         {"type": "image_url", "image_url": {"url": image_url}}
     ])
-    
-    return parse_structured_output(result)
 
 @tool
 def text_analysis_specialist(text: str, company_context: dict) -> dict:

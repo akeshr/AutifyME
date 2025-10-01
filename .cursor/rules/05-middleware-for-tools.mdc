@@ -1,0 +1,38 @@
+---
+globs: "agents/src/autifyme_agents/tools/**/*.py"
+---
+# Rule: Middleware for Cross-Cutting Concerns in Tools
+
+To keep our tool logic clean, focused, and free of boilerplate, all cross-cutting concerns MUST be handled by the middleware system (`core/middleware.py`).
+
+## Tool Implementation Guardrails:
+
+1.  **DO NOT Implement Context/Logging/Auth in Tools:**
+    -   A tool's code should focus exclusively on its business logic.
+    -   It should NOT contain code for fetching the company profile, logging to LangSmith, checking user permissions, or rate limiting.
+    -   **Bad:**
+        ```python
+        @tool
+        def save_product(product: Product):
+            # Boilerplate to be avoided!
+            company_profile = get_company_profile()
+            logger.info(f"Saving product for {company_profile.name}")
+            check_permissions()
+            # Actual business logic...
+        ```
+
+2.  **DO Use Middleware Decorators:**
+    -   Apply the appropriate decorators from `core/middleware.py` to any new tool that requires this functionality. The middleware will automatically inject the necessary context or perform the required checks.
+    -   **Good:**
+        ```python
+        from autifyme_agents.core.middleware import company_context_middleware, audit_log_middleware
+
+        @tool
+        @company_context_middleware
+        @audit_log_middleware
+        def save_product(product: Product, company_profile: CompanyProfile = None):
+            # company_profile is auto-injected by the middleware!
+            # The audit log is auto-generated!
+            # Business logic is clean and focused.
+            ...
+        ```

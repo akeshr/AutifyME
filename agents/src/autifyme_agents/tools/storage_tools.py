@@ -2,8 +2,8 @@ from langchain_core.tools import tool
 from typing import Dict, Any
 from uuid import UUID
 
-from ..schemas.models import Product
-from ..integrations.storage.supabase_client import SupabaseStorageClient
+from autifyme_agents.schemas.models import Product
+from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
 
 # Initialize a single, shared instance of our storage client.
 # This is a simple form of dependency injection. In a more complex system,

@@ -125,11 +125,25 @@ To build a production-grade system, the architecture must be resilient to failur
 
 ### Error Handling & Recovery
 
--   **Tool-Level Retries:** All external tool calls (e.g., API requests, database operations) will be wrapped in a "circuit breaker" and retry mechanism (e.g., 3 attempts with exponential backoff). If a tool fails permanently, it will raise a structured exception.
--   **Agent-Level Exception Handling:** When an agent's sub-task fails, the managing agent (e.g., a `Department Head`) will "catch" the exception. Its internal logic will then decide on a course of action, which could be:
-    1.  Retrying the sub-task.
-    2.  Delegating to a different, remedial tool or agent.
-    3.  Pausing the entire workflow and escalating to a human for intervention.
+We leverage **LangChain v1's `ToolStrategy`** for consistent, production-grade error handling:
+
+-   **Critical Operations:** `ToolStrategy.RAISE` - Fail fast for DB writes, irreversible actions
+-   **Self-Healing Operations:** `ToolStrategy.RETRY_WITH_FEEDBACK` - LLM learns from errors and adjusts approach
+-   **Best-Effort Operations:** `ToolStrategy.CONTINUE` - Log error, keep going for optional tasks
+
+```python
+from langchain.agents import create_react_agent, ToolStrategy
+
+agent = create_react_agent(
+    model=llm,
+    tools=tools,
+    handle_errors=ToolStrategy.RETRY_WITH_FEEDBACK  # v1: Self-correction
+)
+```
+
+-   **Tool Exception Pattern:** Tools raise `ToolException` (not generic exceptions) to prevent infinite retry loops and provide structured error feedback to agents.
+
+**Reference:** See [LANGCHAIN_V1_FEATURES.md](./LANGCHAIN_V1_FEATURES.md#enhanced-error-handling--resilience) for details.
 
 ### State Persistence & Resumption
 
@@ -143,13 +157,22 @@ To build a production-grade system, the architecture must be resilient to failur
 
 ### Human-in-the-Loop (HITL) Integration
 
--   **"Paused" State:** The agent state machine will include a dedicated `paused_for_human_input` status.
--   **HITL Workflow:**
-    1.  When a workflow reaches a predefined HITL gate (e.g., budget approval), the agent graph transitions to the "paused" state.
-    2.  A `HumanNotificationTool` is triggered to alert the user that their input is required.
-    3.  The user provides input via an interface (e.g., the Streamlit app).
-    4.  This interaction calls a `ProvideHumanInputTool`, which updates the agent's state with the user's decision.
-    5.  The agent graph transitions out of the "paused" state and resumes the workflow with the new information.
+We use **LangChain v1's native `interrupt_before`** for approval workflows:
+
+```python
+from langchain.agents import create_react_agent
+
+agent = create_react_agent(
+    model=llm,
+    tools=tools,
+    interrupt_before=["save_product", "publish_website", "send_invoice"]  # v1: Auto-pause
+)
+```
+
+-   **Workflow:** Agent plans to call an interrupt-enabled tool → execution pauses → state persisted → user notified → user approves/edits/rejects → execution resumes
+-   **Benefits:** Built-in state management, automatic checkpointing, type-safe resume commands, no custom "paused" state needed
+
+**Reference:** See [LANGCHAIN_V1_FEATURES.md](./LANGCHAIN_V1_FEATURES.md#4-langgraph-runtime-integration) for HITL patterns.
 
 ---
 
@@ -254,3 +277,59 @@ def create_product_with_qa(product_data: dict) -> dict:
 -   Store in `core/evaluators.py`
 -   Register with LangSmith for automated runs
 -   Use for regression testing, A/B testing, and monitoring
+
+---
+
+## 8. Context Engineering Strategy
+
+To ensure our system is efficient, cost-effective, and avoids performance degradation from "context rot," we will adhere to the principles of **Effective Context Engineering**. This is a core architectural pillar.
+
+**Guiding Principle:** Find the smallest possible set of high-signal tokens that maximize the likelihood of the desired outcome.
+
+### Our Implementation Patterns:
+
+1.  **Minimal Context via Sub-Agents (The "Need to Know" Basis):**
+    -   **What:** The hierarchical agent design is our primary tool for context management. A `Specialist` agent receives *only* the specific inputs required for its task, not the entire history from the `Project Manager`.
+    -   **Why:** This prevents context pollution, keeps prompts clean, and allows each agent to operate in a focused environment, drastically reducing token usage and improving reliability.
+
+2.  **Token-Efficient Tools:**
+    -   **What:** Every tool must have a single, well-defined purpose and return concise, structured data (Pydantic models). We will avoid creating generic, overlapping, or "chatty" tools.
+    -   **Why:** This ensures agents can make clear decisions about which tool to use and receive predictable, token-efficient results, preventing the context window from being filled with verbose, low-signal information.
+
+3.  **Just-in-Time Context Retrieval (Middleware):**
+    -   **What:** Instead of front-loading static context (like the company profile) into the main prompt, we will use middleware to inject it into a tool's arguments at the moment of execution.
+    -   **Why:** This keeps the primary agent's "working memory" free to focus on the dynamic task at hand, reducing the token count for every single LLM call in the workflow.
+
+4.  **Strategies for Long-Horizon Tasks:**
+    -   **What:** For future workflows that may exceed the context window, we will employ explicit state management techniques.
+        -   **Structured Note-Taking:** Provide agents with tools to write to and read from an external memory (e.g., a `scratchpad` table in Supabase).
+        -   **Compaction:** Implement steps in our LangGraph workflows to periodically summarize the conversation history, keeping key decisions and discarding intermediate tool calls.
+    -   **Why:** This allows agents to maintain coherence and achieve goals over extended periods without being constrained by the context window limit.
+
+---
+
+## 9. Prompt Management Strategy
+
+To ensure our prompts are stable, version-controlled, and testable, while also allowing for rapid experimentation, we will adopt a hybrid prompt management strategy.
+
+**Guiding Principle:** The production application MUST NOT have a runtime dependency on an external service (like LangSmith Hub) to load its core prompts.
+
+### Our Implementation Patterns:
+
+1.  **Git as the Source of Truth (Production):**
+    -   **What:** All production-ready prompts are stored as plain text files (e.g., `.prompt`) within the `agents/src/autifyme_agents/prompts/` directory. These are committed directly to our Git repository.
+    -   **How:** The application uses the `core.prompt_loader.load_prompt()` function to read these files from the local filesystem at runtime.
+    -   **Why:** This guarantees maximum stability and resilience. The application can start and run without any external network dependency for its core instructions. Prompts are versioned alongside the code that uses them and go through the same review and CI/CD process.
+
+2.  **LangSmith Hub as the Experimentation Platform (Development):**
+    -   **What:** The LangSmith Hub is used as a playground and versioning system for developing and improving prompts.
+    -   **How:** We will maintain a utility script (`scripts/sync_prompts.py`) to push local prompts to the Hub and pull updated versions back down.
+    -   **Why:** This provides a powerful, collaborative environment for A/B testing, evaluating prompt performance against datasets, and iterating on prompt design without requiring code changes for every tweak.
+
+### The Development Workflow:
+
+1.  **Create:** A new prompt is created locally and committed to Git.
+2.  **Push:** The developer pushes the prompt to LangSmith Hub using the sync script.
+3.  **Experiment:** The team iterates on the prompt within the LangSmith UI, creating new versions.
+4.  **Validate:** The new versions are tested against evaluation datasets in LangSmith.
+5.  **Pull & Commit:** Once a superior version is identified, its content is pulled back down, overwriting the local `.prompt` file, and the change is committed to Git to be deployed to production.

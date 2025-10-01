@@ -6,11 +6,13 @@ This document outlines the technology stack for the AutifyME Agentic Service. Ea
 
 ## 1. Core Agentic Logic & Orchestration
 
-- **Choice:** **LangChain, LangGraph, and the `deepagents` library**
+- **Choice:** **LangChain v1, LangGraph v1, and the `deepagents` library**
+- **Version:** v1.0.0-alpha.9+ (latest pre-release)
 - **Reasoning:**
-  - **Version:** We will be utilizing the latest stable v1 releases of these libraries to ensure access to modern features and long-term support.
   - **Core Framework:** LangChain and LangGraph provide the fundamental building blocks for creating stateful agentic systems.
-  - **Advanced Agent Implementation:** The `deepagents` library provides a pre-built, production-ready implementation of the advanced patterns (planning, reflection, sub-agent delegation, HITL) required for our top-level `ProjectManagerAgent`. Adopting it allows us to accelerate development by building on a tested foundation instead of implementing these complex patterns from scratch.
+  - **v1 Features:** Native HITL (`interrupt_before`), structured outputs (`.with_structured_output`), enhanced error handling (`ToolStrategy`), and prompt caching (90% cost reduction).
+  - **Advanced Agent Implementation:** The `deepagents` library provides pre-built planning, reflection, sub-agent delegation, and HITL for our Project Manager Agent.
+  - **Reference:** See [LANGCHAIN_V1_FEATURES.md](./LANGCHAIN_V1_FEATURES.md) for complete v1 feature guide.
 - **Cost Model:** Free (Open Source Libraries).
 
 ---
