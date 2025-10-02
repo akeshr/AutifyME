@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import PlainTextResponse
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.workflows.whatsapp_cataloging_runner import WhatsAppCatalogingRunner
@@ -31,7 +32,7 @@ async def verify(request: Request) -> Any:
     token = params.get("hub.verify_token")
 
     if mode == "subscribe" and challenge and token == settings.WHATSAPP_WEBHOOK_VERIFY_TOKEN:
-        return int(challenge)
+        return PlainTextResponse(challenge)
 
     raise HTTPException(status_code=403, detail="Verification failed")
 
