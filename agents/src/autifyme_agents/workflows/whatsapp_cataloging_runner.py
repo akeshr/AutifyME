@@ -13,8 +13,12 @@ from autifyme_agents.departments.cataloging_department import create_cataloging_
 from autifyme_agents.integrations.communication import WhatsAppClient, WhatsAppMediaClient
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
+from autifyme_agents.schemas.models import CatalogingResult
 
 logger = logging.getLogger(__name__)
+
+
+CATALOGING_PROMPT = "Please share the product details and photo so I can catalog it."  # Minimal triage response
 
 
 class WhatsAppCatalogingRunner:
@@ -43,6 +47,12 @@ class WhatsAppCatalogingRunner:
         return f"whatsapp:{sender}"
 
     def handle_message(self, sender: str, text: str | None, media_id: str | None) -> None:
+        normalized_text = (text or "").strip()
+        if not normalized_text and not media_id:
+            logger.info("Ignoring empty message from %s", sender)
+            self.whatsapp_client.send_text(sender, CATALOGING_PROMPT)
+            return
+
         image_path: Path | None = None
         try:
             if media_id:
@@ -52,7 +62,7 @@ class WhatsAppCatalogingRunner:
                 "messages": [
                     {
                         "type": "human",
-                        "content": text or "Please catalog this product.",
+                        "content": normalized_text or "Please catalog this product.",
                     }
                 ]
             }
@@ -68,14 +78,12 @@ class WhatsAppCatalogingRunner:
                 department = create_cataloging_department(saver, self.storage)
                 try:
                     result = department.invoke(payload, config=config)
-                    structured = result.get("structured_response")
-                    if structured:
-                        self._send_completion(sender, structured)
+                    self._handle_completion(sender, result)
                 except Interrupt as interruption:
                     self._handle_interrupt(sender, interruption)
         finally:
             if image_path and image_path.exists():
-                image_path.unlink()
+                image_path.unlink(missing_ok=True)
 
     def handle_approval(self, sender: str, decision: str) -> None:
         action = decision.strip().lower()
@@ -96,9 +104,23 @@ class WhatsAppCatalogingRunner:
         with get_checkpointer() as saver:
             department = create_cataloging_department(saver, self.storage)
             result = department.invoke({}, config=config)
-            structured = result.get("structured_response")
-            if structured:
-                self._send_completion(sender, structured)
+            self._handle_completion(sender, result)
+
+    def _handle_completion(self, sender: str, result: dict) -> None:
+        if not result:
+            logger.warning("Department returned empty result for %s", sender)
+            return
+        try:
+            structured = CatalogingResult.model_validate(result)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to validate cataloging result: %s", exc)
+            self.whatsapp_client.send_text(sender, "Cataloging finished, but the output was invalid.")
+            return
+
+        status = "Success" if structured.success else "Failed"
+        name = structured.product_name or "Unnamed product"
+        body = f"Cataloging {status}: {name}\n{structured.message}"
+        self.whatsapp_client.send_text(sender, body)
 
     def _handle_interrupt(self, sender: str, interruption: Interrupt) -> None:
         payload = interruption.value or {}
@@ -108,11 +130,3 @@ class WhatsAppCatalogingRunner:
             self.whatsapp_client.send_text(sender, f"Approval needed: {message}\nReply 'approve' or 'reject'.")
         else:
             logger.warning("Received unsupported interrupt from tool %s", tool_name)
-
-    def _send_completion(self, sender: str, structured: dict) -> None:
-        success = structured.get("success")
-        name = structured.get("product_name")
-        message = structured.get("message")
-        status = "Success" if success else "Failed"
-        body = f"Cataloging {status}: {name or 'Unnamed'}\n{message}"
-        self.whatsapp_client.send_text(sender, body)

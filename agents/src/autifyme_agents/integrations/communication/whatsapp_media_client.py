@@ -23,18 +23,36 @@ class WhatsAppMediaClient:
         self.api_version = api_version or settings.WHATSAPP_API_VERSION
         if not self.access_token:
             raise ValueError("WhatsApp access token not configured")
+        self._auth_headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Accept": "application/json",
+        }
 
     def get_media_url(self, media_id: str) -> str:
         url = f"https://graph.facebook.com/{self.api_version}/{media_id}"
-        response = httpx.get(url, headers={"Authorization": f"Bearer {self.access_token}"}, timeout=10.0)
-        response.raise_for_status()
+        logger.debug("Fetching media metadata for %s", media_id)
+        response = httpx.get(url, headers=self._auth_headers, timeout=10.0)
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:  # noqa: BLE001
+            logger.error("Failed to fetch media metadata (status %s): %s", response.status_code, exc)
+            raise
         data: dict[str, Any] = response.json()
-        return data["url"]
+        media_url = data["url"]
+        logger.debug("Resolved media %s to %s", media_id, media_url)
+        return media_url
 
     def download_media(self, media_id: str) -> Path:
         media_url = self.get_media_url(media_id)
-        response = httpx.get(media_url, headers={"Authorization": f"Bearer {self.access_token}"}, timeout=30.0)
-        response.raise_for_status()
+        logger.debug("Downloading media content for %s", media_id)
+        response = httpx.get(media_url, headers=self._auth_headers, timeout=30.0)
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:  # noqa: BLE001
+            logger.error(
+                "Failed to download media (status %s): %s", response.status_code, exc
+            )
+            raise
 
         suffix = self._derive_suffix(response.headers.get("Content-Type"))
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
