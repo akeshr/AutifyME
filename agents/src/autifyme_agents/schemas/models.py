@@ -1,7 +1,7 @@
 """Domain models for core business entities."""
 
 from uuid import UUID, uuid4
-from typing import Optional, List, Literal
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 

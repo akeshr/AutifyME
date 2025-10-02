@@ -54,9 +54,9 @@ def create_analyze_product_image_tool(storage: StorageInterface) -> Callable:
                 field="company_profile",
                 value=None,
             )
-        if not image_url or not image_url.startswith(("http://", "https://")):
+        if not image_url:
             raise ValidationError(
-                "Image URL must be a valid HTTP/HTTPS URL",
+                "Image reference must be provided.",
                 field="image_url",
                 value=image_url,
             )

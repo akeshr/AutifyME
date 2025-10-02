@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+
 from ..schemas.models import Product, CompanyProfile
 
 # Note for Abhi (from our discussion):

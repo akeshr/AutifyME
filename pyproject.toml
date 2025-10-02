@@ -5,33 +5,29 @@ description = "The agentic service for the AutifyME Business OS."
 authors = [{ name = "Abhi", email = "" }]
 requires-python = ">=3.11"
 dependencies = [
-    # Core Agentic Framework (latest pre-release/stable)
-    # Note: Using flexible version specs to get the latest available versions
-    "langchain",
-    "langchain-core",
-    "langgraph",
+    # Core Agentic Framework (LangChain v1 prerelease stack)
+    "langchain==1.0.0a10",
+    "langgraph==1.0.0a4",
+    "langgraph-prebuilt==0.7.0a2",
     "langsmith",
-    
     # Advanced Agent Implementation
     "deepagents",
-    
     # LLM Providers
     "langchain-openai",
     "langchain-google-genai",
-    
     # Database & Storage
     "supabase",
-    
     # Data Validation & Settings
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    
     # Utilities
     "python-dotenv>=1.0.0",
     "tenacity>=8.0.0",
-    
     # UI (MVP)
     "streamlit>=1.30.0",
+    # Webhook stack
+    "fastapi>=0.118.0",
+    "uvicorn>=0.37.0",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +48,9 @@ dev = [
 [tool.uv]
 # uv configuration
 dev-dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["agents/src/autifyme_agents"]
 
 [build-system]
 requires = ["hatchling"]

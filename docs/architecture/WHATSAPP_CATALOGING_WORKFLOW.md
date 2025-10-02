@@ -1,6 +1,17 @@
 # WhatsApp-Based Product Cataloging Workflow
 
-This document outlines the design for the Cataloging MVP feature: enabling Indian small business owners to build a product catalog. The current implementation validates the workflow via scripts; WhatsApp integration is planned once the architecture is proven with customers. Implementation notes are limited to cataloging; broader agent architecture details remain in `AGENTS_DESIGN.md`.
+This document outlines the design for the Cataloging MVP feature: enabling Indian small business owners to build a product catalog. The current implementation validates the workflow via scripts; WhatsApp integration now supports sandbox testing with HITL approvals. Implementation notes are limited to cataloging; broader agent architecture details remain in `AGENTS_DESIGN.md`.
+
+---
+
+## Architecture Snapshot (2025-10)
+
+- **Webhook Entry**: `FastAPI` app in `entrypoints/whatsapp_webhook.py` handles GET verification, POST events, and approval routing
+- **Workflow Runner**: `workflows/whatsapp_cataloging_runner.py` orchestrates cataloging runs, media fetching, and HITL resumes
+- **Messaging Adapter**: `WhatsAppClient` wraps Facebook Graph v23 send endpoint
+- **Media Adapter**: `WhatsAppMediaClient` fetches media IDs and downloads to temporary files
+- **Tooling**: `send_whatsapp_message` in `tools/communication_tools.py`
+- **HITL Strategy**: `create_cataloging_department(... interrupt_before=["save_product"])` pauses before writes; resume handled via WhatsApp replies
 
 ---
 
@@ -23,6 +34,13 @@ The entire user experience is conversational and happens within WhatsApp.
     -   
     -   *"Here is the product draft. Shall I add this to your catalog? (Yes/No)"*
 5.  **Confirmation:** Upon receiving "Yes," the system replies: *"Great! The product has been added to your catalog. You can view your full catalog at [link]."*
+
+### HITL Interaction
+
+1. After specialists produce a cataloging draft, the Department agent attempts `save_product`.
+2. `interrupt_before=["save_product"]` pauses execution. `whatsapp_cataloging_runner` sends an approval request via WhatsApp detailing the draft.
+3. User replies `approve` / `reject`.
+4. Runner resumes the LangGraph thread with the decision. On approval, product is saved and confirmation sent to the user; on rejection, we can extend later to support edits.
 
 ---
 
@@ -71,3 +89,9 @@ This feature requires the creation of several new components in our project stru
 4.  **Supabase Schema:** A new `products` table in our database to store the catalog information.
 5.  **`workflows/product_ingestion.py`:** Planned home for the `Project Manager` agent (post-MVP).
 6.  **`departments/cataloging/`:** Future directory for the full 3-layer structure. For now, `cataloging_department.py` implements the department with direct tool orchestration as an interim step.
+
+## Implementation Notes
+
+- Temporary media files are stored on disk (`tempfile.NamedTemporaryFile`) and deleted after processing. Future enhancement: upload to Supabase storage for persistence.
+- Resume mechanism uses the checkpointer thread ID `whatsapp:{phone_number}` so conversation history is maintained.
+- Approval commands currently support `approve` and `reject`. Extend runner to handle structured edits when the workflow design is finalized.

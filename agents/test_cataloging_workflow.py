@@ -6,6 +6,7 @@ import uuid
 
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.types import Command
 
 from autifyme_agents.departments.cataloging_department import create_cataloging_department
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
@@ -29,7 +30,7 @@ def main():
         
         # Create Department Head agent, passing the checkpointer
         print("\n[2/4] Creating Cataloging Department agent...")
-        department_agent = create_cataloging_department(checkpointer, storage_client)
+        department_agent = create_cataloging_department(checkpointer, storage_client, enable_hitl=False)
         print("✓ Agent ready")
         
         print("\n[3/4] Defining cataloging task...")
@@ -56,7 +57,6 @@ def main():
         
         try:
             initial_input = {"messages": [HumanMessage(content=task)]}
-            
             # Using synchronous `stream` as PostgresSaver doesn't fully support async
             for event in department_agent.stream(initial_input, config=run_config):
                 print("---")

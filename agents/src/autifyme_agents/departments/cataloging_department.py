@@ -10,7 +10,7 @@ from typing import Annotated, Sequence, TypedDict
 import operator
 
 from langchain.agents import create_agent
-from langchain_core.prompts import ChatPromptTemplate
+from langchain.agents.middleware.human_in_the_loop import HumanInTheLoopMiddleware
 from langchain_core.runnables import Runnable
 from langchain_core.messages import BaseMessage
 from langchain_core.tools import tool
@@ -34,12 +34,15 @@ class AgentState(TypedDict):
 def create_cataloging_department(
     checkpointer: BaseCheckpointSaver,
     storage: StorageInterface,
+    *,
+    enable_hitl: bool = True,
 ) -> Runnable:
     """Build the cataloging department head agent with specialist delegation.
 
     Args:
         checkpointer: LangGraph checkpoint saver for state persistence.
         storage: Concrete implementation of the storage port.
+        enable_hitl: When False, skip human approval middleware (used in fast tests).
 
     Returns:
         A runnable department agent that produces a `CatalogingResult`.
@@ -94,14 +97,24 @@ def create_cataloging_department(
         create_save_product_tool(storage),
     ]
 
-    custom_instructions = load_prompt("departments/cataloging_department.prompt")
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", custom_instructions),
-        ("placeholder", "{messages}"),
-    ])
+    prompt = load_prompt("departments/cataloging_department.prompt")
 
     llm = get_llm()
+
+    middleware: tuple[HumanInTheLoopMiddleware, ...] = ()
+    if enable_hitl:
+        hitl_middleware = HumanInTheLoopMiddleware(
+            interrupt_on={
+                "save_product": {
+                    "allow_accept": True,
+                    "allow_edit": True,
+                    "allow_respond": True,
+                    "description": "Approve or modify the product before it is persisted to storage.",
+                }
+            },
+            description_prefix="CatalogingDepartment HITL",
+        )
+        middleware = (hitl_middleware,)
 
     agent_graph = create_agent(
         llm,
@@ -110,6 +123,7 @@ def create_cataloging_department(
         checkpointer=checkpointer,
         name="CatalogingDepartmentAgent",
         response_format=CatalogingResult,
+        middleware=middleware,
     )
 
     return agent_graph.with_config({
