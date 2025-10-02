@@ -2,6 +2,7 @@
 
 from langchain_core.runnables import Runnable, RunnableLambda
 from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.tools import tool
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
@@ -55,3 +56,25 @@ def create_image_analysis_specialist() -> Runnable:
     chain = RunnableLambda(format_messages) | structured_llm
 
     return chain
+
+
+@tool("image_analysis_specialist")
+def image_analysis_specialist_tool(
+    image_url: str,
+    *,
+    company_profile: dict | None = None,
+    config=None,
+) -> ImageAnalysisResult:
+    """Analyze a product image and return structured visual insights."""
+    chain = create_image_analysis_specialist()
+    payload = {
+        "input": {
+            "image_url": image_url,
+            "company_profile": company_profile,
+        }
+    }
+    return chain.invoke(payload, config=config)
+
+
+def create_image_analysis_specialist_tool():
+    return image_analysis_specialist_tool

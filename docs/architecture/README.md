@@ -2,11 +2,13 @@
 
 ## Core Documents
 
-1. **[AGENTS_DESIGN.md](./AGENTS_DESIGN.md)** - Agent hierarchy and patterns
-2. **[LANGCHAIN_V1_FEATURES.md](./LANGCHAIN_V1_FEATURES.md)** - LangChain v1 reference
-3. **[TECH_STACK.md](./TECH_STACK.md)** - Technology choices
-4. **[PROJECT_MANAGER_DESIGN.md](./PROJECT_MANAGER_DESIGN.md)** - PM agent spec
-5. **[WHATSAPP_CATALOGING_WORKFLOW.md](./WHATSAPP_CATALOGING_WORKFLOW.md)** - First workflow
+| Reference | Purpose |
+| --- | --- |
+| **[AGENTS_DESIGN.md](./AGENTS_DESIGN.md)** | Canonical agent hierarchy and context engineering patterns (timeless design blueprint). |
+| **[LANGCHAIN_V1_FEATURES.md](./LANGCHAIN_V1_FEATURES.md)** | Vendor feature reference with links to official resources; implementation status lives in roadmap docs. |
+| **[TECH_STACK.md](./TECH_STACK.md)** | Technology choices organized by architecture layer. |
+| **[PROJECT_MANAGER_DESIGN.md](./PROJECT_MANAGER_DESIGN.md)** | Roadmap specification for the Project Manager agent (explicitly marked future work). |
+| **[WHATSAPP_CATALOGING_WORKFLOW.md](./WHATSAPP_CATALOGING_WORKFLOW.md)** | Workflow-specific design for the cataloging MVP. |
 
 ## Key Principles
 
@@ -18,6 +20,8 @@
 ## Quick Start
 
 Before implementing any feature:
-1. Check [LANGCHAIN_V1_FEATURES.md](./LANGCHAIN_V1_FEATURES.md) for native solutions
-2. Review [AGENTS_DESIGN.md](./AGENTS_DESIGN.md) for patterns
-3. Follow Cursor rules in `../../.cursor/rules/`
+1. Check [LANGCHAIN_V1_FEATURES.md](./LANGCHAIN_V1_FEATURES.md) for native solutions before writing custom logic.
+2. Review [AGENTS_DESIGN.md](./AGENTS_DESIGN.md) for hierarchy and context engineering rules.
+3. For implementation sequencing or status, read `../roadmap/IMPLEMENTATION_ROADMAP.md`.
+4. For pending departments or Project Manager details, consult [PROJECT_MANAGER_DESIGN.md](./PROJECT_MANAGER_DESIGN.md).
+5. Follow Cursor rules in `../../.cursor/rules/`.

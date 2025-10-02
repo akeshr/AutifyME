@@ -7,7 +7,7 @@
 
 AutifyME is building the world’s first **Agentic Business Operating System**: a system that automates and orchestrates end-to-end business functions using AI agents, domain specialists, and deterministic tools. It enables businesses of all sizes—from startups with no online presence to established enterprises needing modernization—to instantly operationalize their catalogs, websites, marketing, CRM, inventory, billing, HR, procurement, production, and compliance.  
 
-This whitepaper outlines the architecture, operating model, roadmap, risks, and strategy for making AutifyME a production-grade system that can be run by a solo founder yet scale to serve millions of businesses.
+This whitepaper outlines the architecture, operating model, roadmap, risks, and strategy for making AutifyME a production-grade system that can be run by a solo founder yet scale to serve millions of businesses. The current implementation focuses on validating the architecture through the **Cataloging Workflow MVP**; subsequent sections call out which capabilities exist today versus those planned for the full Business OS rollout.
 
 ---
 
@@ -23,20 +23,20 @@ The system’s principle: **every business task that can be made agentic, will b
 
 ## 2. Core Design Model
 
-The system is a hierarchical agentic architecture designed for scalability and resilience, mirroring a well-structured company.
+The system is a hierarchical agentic architecture designed for scalability and resilience, mirroring a well-structured company. Architecture descriptions in this section are timeless; workflow status and implementation notes are tracked in dedicated workflow documents.
 
 ### Project Manager Agents
-The top-level orchestrators. A `Project Manager` agent analyzes complex user goals (e.g., "launch a new product"), creates a multi-step, multi-department plan, and manages the execution of the entire workflow.
+The top-level orchestrators. A `Project Manager` agent analyzes complex user goals (e.g., "launch a new product"), creates a multi-step, multi-department plan, and manages the execution of the entire workflow. *(Status: Roadmap – documented in `PROJECT_MANAGER_DESIGN.md` and pending implementation once Cataloging MVP is validated.)*
 
 ### Department Agents
-Domain-specific managers that oversee a particular business function (e.g., Marketing, Cataloging, Operations). A `Department` agent receives a goal from a Project Manager, creates a more granular plan, and delegates tasks to its team of Specialists.
+Domain-specific managers that oversee a particular business function (e.g., Marketing, Cataloging, Operations). A `Department` agent receives a goal from a Project Manager, creates a more granular plan, and delegates tasks to its team of Specialists. The Cataloging Department MVP is implemented today (`agents/src/autifyme_agents/departments/cataloging_department.py`), providing the foundation that later departments will follow.
 
 ### Specialist Agents
 Reusable, task-specific "doers" that execute a single, well-defined task. They are the workhorses of the system.
-Examples: SEO Specialist, Visual Designer, Copywriter, Image Analyzer, Tax Compliance Specialist.
+Examples: SEO Specialist, Visual Designer, Copywriter, Image Analyzer, Tax Compliance Specialist. Cataloging currently uses tool-level implementations while we validate the end-to-end workflow; the multi-layer specialist pattern will be introduced when we expand beyond MVP.
 
 ### Tools
-Deterministic functions that agents invoke to interact with the outside world (e.g., database clients, third-party APIs).
+Deterministic functions that agents invoke to interact with the outside world (e.g., database clients, third-party APIs). Tools are fully implemented and follow the `ports` and `adapters` contracts; see `analysis_tools.py` and `storage_tools.py`.
 
 ---
 
@@ -55,8 +55,8 @@ Deterministic functions that agents invoke to interact with the outside world (e
 The system is built on a modern, production-grade technology stack optimized for rapid development while maintaining enterprise-level reliability.
 
 ### Core Agentic Framework
--   **LangChain v1 & LangGraph v1:** Provides the foundational building blocks for creating stateful, hierarchical agentic systems with native support for complex workflows and state persistence.
--   **deepagents Library:** Pre-built implementation of advanced agent patterns (planning, reflection, self-correction) for the Project Manager agent, accelerating development.
+-   **LangChain v1 & LangGraph v1:** Provides the foundational building blocks for creating stateful, hierarchical agentic systems with native support for complex workflows and state persistence. *(Implemented: Cataloging Department MVP)*
+-   **`deepagents` (Roadmap):** Planned integration for the Project Manager once we expand to multi-department orchestration. Not yet in the repository.
 
 ### Observability & Monitoring
 -   **LangSmith v1:** Purpose-built observability platform for LLM applications, providing automatic tracing, cost tracking, debugging, and offline evaluation capabilities.
@@ -70,7 +70,7 @@ The system is built on a modern, production-grade technology stack optimized for
 -   **Pydantic:** Data validation and settings management for type-safe agent communication.
 
 ### User Interface (Initial)
--   **Streamlit:** Rapid prototyping framework for building initial UI and HITL approval flows, allowing focus on core agent logic.
+-   **Streamlit (Roadmap):** To be used for HITL approval flows during the validation phase. Current testing is script-based.
 
 **Philosophy:** "Production-grade, free-tier first" - selecting modern, well-supported tools that enable rapid development without initial costs while maintaining enterprise reliability.
 
@@ -78,20 +78,22 @@ The system is built on a modern, production-grade technology stack optimized for
 
 ## 5. Workflow Coverage
 
-1. **Company Onboarding** — build profile, brand tokens, starter site, seed CRM/billing.  
-2. **Product Ingestion** — from raw images → product draft → dedupe/taxonomy → studio shots → catalog entry.  
-3. **Website Intelligence** — DOM crawl → section mapping → intelligent per-section screenshots → extracted content.  
-4. **Section Update/Redesign** — plan diffs, run QA, generate previews, HITL approvals, publish with rollback.  
-5. **Marketing Orchestration** — campaign briefs, assets, claims checks, HITL for ad spend, multi-channel posting.  
-6. **CRM Lifecycle** — lead enrichment, segmentation, nurture flows, tickets, retention.  
-7. **Billing & Finance** — invoices, reconciliations, expenses, tax filings, subscriptions.  
-8. **Inventory & Supply** — monitor stock, plan reorders, manage suppliers.  
-9. **Shipping & Fulfillment** — generate labels, track shipments, handle returns.  
-10. **HR & Payroll** — onboarding, contracts, access, payroll HITL approvals.  
-11. **Procurement** — POs, supplier vetting, negotiation assist, SLA tracking.  
-12. **Production & MRP** — forecasts, production runs, work orders, scheduling.  
-13. **Quality Control** — inspection plans, QC records, nonconformance management.  
-14. **Forecasting & Pricing** — seasonality models, elasticity, dynamic pricing recommendations.
+Our long-term system spans the following workflows. Current implementation focuses on **Product Ingestion (Cataloging)**; other workflows remain roadmap items until the architecture is validated with real customers.
+
+1. **Company Onboarding** — build profile, brand tokens, starter site, seed CRM/billing. *(Roadmap)*  
+2. **Product Ingestion** — from raw images → product draft → dedupe/taxonomy → studio shots → catalog entry. *(Cataloging MVP – in progress)*  
+3. **Website Intelligence** — DOM crawl → section mapping → intelligent per-section screenshots → extracted content. *(Roadmap)*  
+4. **Section Update/Redesign** — plan diffs, run QA, generate previews, HITL approvals, publish with rollback. *(Roadmap)*  
+5. **Marketing Orchestration** — campaign briefs, assets, claims checks, HITL for ad spend, multi-channel posting. *(Roadmap)*  
+6. **CRM Lifecycle** — lead enrichment, segmentation, nurture flows, tickets, retention. *(Roadmap)*  
+7. **Billing & Finance** — invoices, reconciliations, expenses, tax filings, subscriptions. *(Roadmap)*  
+8. **Inventory & Supply** — monitor stock, plan reorders, manage suppliers. *(Roadmap)*  
+9. **Shipping & Fulfillment** — generate labels, track shipments, handle returns. *(Roadmap)*  
+10. **HR & Payroll** — onboarding, contracts, access, payroll HITL approvals. *(Roadmap)*  
+11. **Procurement** — POs, supplier vetting, negotiation assist, SLA tracking. *(Roadmap)*  
+12. **Production & MRP** — forecasts, production runs, work orders, scheduling. *(Roadmap)*  
+13. **Quality Control** — inspection plans, QC records, nonconformance management. *(Roadmap)*  
+14. **Forecasting & Pricing** — seasonality models, elasticity, dynamic pricing recommendations. *(Roadmap)*
 
 ---
 

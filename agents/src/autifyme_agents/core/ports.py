@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any
-from ..schemas.models import Product
+from ..schemas.models import Product, CompanyProfile
 
 # Note for Abhi (from our discussion):
 # This is the equivalent of a Java or TypeScript `interface`. It defines a
@@ -19,7 +19,7 @@ class StorageInterface(ABC):
     """
 
     @abstractmethod
-    def get_company_profile(self) -> Dict[str, Any]:
+    def get_company_profile(self) -> CompanyProfile:
         """
         Retrieves the company profile from the storage layer.
 

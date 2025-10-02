@@ -1,8 +1,10 @@
 # Project Manager Agent Design with `deepagents`
 
+> **Roadmap Document** – Timeless architecture reference. Implementation status is tracked in `../roadmap/IMPLEMENTATION_ROADMAP.md`. No production code currently references `deepagents`.
+
 **Date:** September 30, 2025  
 **Purpose:** Define how we use `deepagents` to implement our Project Manager Agent  
-**Status:** Implementation Ready
+**Status:** Roadmap Specification (pending Cataloging validation)
 
 ---
 
@@ -39,7 +41,24 @@ Project Manager Agent (deepagents main agent)
 
 ## Implementation Strategy
 
-### Phase 1: Generic Project Manager (Week 1)
+# Implementation Readiness Checklist
+
+Before starting implementation, ensure the following prerequisites are met:
+
+1. ✅ Cataloging Department MVP validated with real customer (performance + satisfaction).  
+2. ✅ HITL approval loop implemented and battle-tested.  
+3. ✅ Structured department outputs (`CatalogingResult` → PM) finalized.  
+4. ✅ Dependency injection for storage/middleware refactored away from globals.  
+5. ✅ Testing strategy upgraded from scripts to automated assertions (or minimal test harness).  
+6. 🔄 Decide whether to keep `deepagents` or use native LangChain planning once v1 stabilizes.
+
+Only after this checklist is complete should we begin Phase 1.
+
+---
+
+## Implementation Strategy (Post-MVP)
+
+### Phase 1: Generic Project Manager
 
 Build the Project Manager that can orchestrate ANY workflow.
 
@@ -101,7 +120,7 @@ def create_project_manager(company_profile: dict):
 
 ---
 
-### Phase 2: Department Sub-agents (Week 2)
+### Phase 2: Department Sub-agents
 
 Each department is a custom sub-agent with specific instructions and tools.
 

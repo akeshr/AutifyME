@@ -8,7 +8,6 @@ from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.postgres import PostgresSaver
 
 from autifyme_agents.departments.cataloging_department import create_cataloging_department
-from autifyme_agents.tools.storage_tools import initialize_storage
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
 from autifyme_agents.core.config import settings
 
@@ -24,15 +23,13 @@ def main():
     # Use a `with` block to correctly manage the PostgresSaver connection
     # NOTE: Run `python agents/setup_checkpointer_once.py` first to create tables
     with PostgresSaver.from_conn_string(settings.DATABASE_URL) as checkpointer:
-        # Initialize storage adapter (dependency injection)
         print("\n[1/4] Initializing storage adapter...")
         storage_client = SupabaseStorageClient()
-        initialize_storage(storage_client)
         print("✓ Storage initialized")
         
         # Create Department Head agent, passing the checkpointer
         print("\n[2/4] Creating Cataloging Department agent...")
-        department_agent = create_cataloging_department(checkpointer)
+        department_agent = create_cataloging_department(checkpointer, storage_client)
         print("✓ Agent ready")
         
         print("\n[3/4] Defining cataloging task...")

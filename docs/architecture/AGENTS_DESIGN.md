@@ -1,6 +1,6 @@
 # AutifyME Agentic System Design
 
-This document outlines the architectural pattern for the multi-agent system that powers AutifyME. The design prioritizes scalability, reusability, and effective context management within a single-tenant deployment model.
+This document outlines the architectural pattern for the multi-agent system that powers AutifyME. The design prioritizes scalability, reusability, and effective context management within a single-tenant deployment model. It describes the enduring architecture; current implementation status or roadmap commentary lives in workflow-specific documents.
 
 ---
 
@@ -53,7 +53,7 @@ We will model our system after a company's organizational structure. A central r
 
 2.  **Department Head Agents (The Managers):**
     - **Purpose:** To manage a specific business domain (e.g., Marketing, Operations, Website).
-    - **Function:** It receives a high-level goal from the Chief of Staff. It then breaks that goal down into a multi-step plan and delegates each step to one or more Specialist Agents. It orchestrates the specialists, gathers their results, and ensures the overall goal is met.
+    - **Function:** It receives a high-level goal from the Project Manager. It then breaks that goal down into a multi-step plan and delegates each step to one or more Specialist Agents. It orchestrates the specialists, gathers their results, and ensures the overall goal is met.
     - **Example:** The `MarketingDeptAgent` receives the goal "run a campaign." It plans the steps: 1) write copy, 2) generate images, 3) post to platforms. It then delegates step 1 to the `CopywriterAgent`, step 2 to the `VisualDesignerAgent`, and so on.
 
 3.  **Specialist Agents (The Doers):**
@@ -301,7 +301,7 @@ To ensure our system is efficient, cost-effective, and avoids performance degrad
     -   **Why:** This keeps the primary agent's "working memory" free to focus on the dynamic task at hand, reducing the token count for every single LLM call in the workflow.
 
 4.  **Strategies for Long-Horizon Tasks:**
-    -   **What:** For future workflows that may exceed the context window, we will employ explicit state management techniques.
+    -   **What:** For workflows that may exceed the context window, we will employ explicit state management techniques.
         -   **Structured Note-Taking:** Provide agents with tools to write to and read from an external memory (e.g., a `scratchpad` table in Supabase).
         -   **Compaction:** Implement steps in our LangGraph workflows to periodically summarize the conversation history, keeping key decisions and discarding intermediate tool calls.
     -   **Why:** This allows agents to maintain coherence and achieve goals over extended periods without being constrained by the context window limit.

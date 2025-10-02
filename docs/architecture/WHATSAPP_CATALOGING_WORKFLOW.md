@@ -1,6 +1,6 @@
 # WhatsApp-Based Product Cataloging Workflow
 
-This document outlines the design for the MVP feature: enabling Indian small business owners to build a product catalog by sending WhatsApp messages.
+This document outlines the design for the Cataloging MVP feature: enabling Indian small business owners to build a product catalog. The current implementation validates the workflow via scripts; WhatsApp integration is planned once the architecture is proven with customers. Implementation notes are limited to cataloging; broader agent architecture details remain in `AGENTS_DESIGN.md`.
 
 ---
 
@@ -36,12 +36,12 @@ This workflow will be managed by a generic `ProjectManagerAgent` and a new `Cata
     -   It will then fetch the corresponding `company_profile` from the Supabase database.
     -   This `company_profile` object will be passed as initial input to the `ProjectManagerAgent`, making all subsequent actions context-aware.
 
-2.  **`ProjectManagerAgent` (The "Deep" Orchestrator):**
-    -   This is the top-level, generic orchestrator for the entire system. It is designed with advanced capabilities for robust reasoning and planning.
-    -   **Intent Analysis:** Its first step is to analyze the user's raw input (images and text) to determine their fundamental goal (e.g., `create_new_product`, `update_inventory`).
-    -   **Dynamic Planning with Reflection:** It will then create a multi-step plan (DAG) to achieve the goal. Before execution, it will reflect on this plan to check for completeness and opportunities for parallelism.
-    -   **Orchestration:** For this specific workflow, its plan will be to delegate tasks to the `CatalogingDept`, manage the conversational flow with the user (asking for missing info), handle the HITL approval step, and ensure the final data is saved.
-    -   **Self-Correction:** It is responsible for catching errors from its sub-agents and dynamically replanning to recover from failures.
+2.  **`ProjectManagerAgent` (The "Deep" Orchestrator) – Roadmap:**
+    -   This is the top-level, generic orchestrator for the entire system. Implementation begins after Cataloging MVP validation.
+    -   **Intent Analysis:** It will analyze raw input (images and text) to determine the goal (e.g., `create_new_product`, `update_inventory`).
+    -   **Dynamic Planning with Reflection:** It will create a multi-step plan (DAG) to achieve the goal. Before execution, it reflects on the plan for completeness and opportunities for parallelism.
+    -   **Orchestration:** For this workflow, it will delegate tasks to the `CatalogingDept`, manage the conversational flow (asking for missing info), handle the HITL approval step, and ensure the final data is saved.
+    -   **Self-Correction:** It will catch errors from sub-agents and dynamically replan to recover from failures.
 
 3.  **`CatalogingDept` Agent (Department Head):**
     -   **Purpose:** To manage the analysis of unstructured user messages.
@@ -69,5 +69,5 @@ This feature requires the creation of several new components in our project stru
 2.  **`tools/communication_tools.py`:** Will contain a `send_whatsapp_message` tool that the agents can call. This tool will use the `whatsapp_client`.
 3.  **`schemas/models.py`:** Will need a new Pydantic model for a `Product` (e.g., with fields `id`, `name`, `description`, `price`, `sizes`, `colors`, `image_urls`).
 4.  **Supabase Schema:** A new `products` table in our database to store the catalog information.
-5.  **`workflows/product_ingestion.py`:** The home for our new `Project Manager` agent for this workflow.
-6.  **`departments/cataloging/`:** A new department package to house the `department_head.py`, and specialists like `image_analysis.py` and `text_analysis.py`.
+5.  **`workflows/product_ingestion.py`:** Planned home for the `Project Manager` agent (post-MVP).
+6.  **`departments/cataloging/`:** Future directory for the full 3-layer structure. For now, `cataloging_department.py` implements the department with direct tool orchestration as an interim step.

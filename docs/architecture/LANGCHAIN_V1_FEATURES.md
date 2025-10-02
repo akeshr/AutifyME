@@ -1,8 +1,14 @@
 # LangChain v1 (Alpha) - New Features & Capabilities
 
-**Version:** 1.0.0-alpha.9 (as of Oct 2025)  
-**Status:** Alpha Release  
-**Official Docs:** https://docs.langchain.com/oss/python/releases/langchain-v1
+**Installed Baseline (`.venv` snapshot Oct 2025):**  
+LangChain `1.0.0a10` (core `0.3.77`, community `0.3.30`, OpenAI `0.3.34`, Anthropic `0.3.21`)  
+LangGraph `1.0.0a4` (checkpoint-postgres `2.0.24`, prebuilt `0.7.0a2`, sdk `0.2.9`)  
+DeepAgents `0.0.11rc1`
+
+**Reference Materials:**  
+- LangChain OSS v1 release notes: https://docs.langchain.com/oss/python/releases/langchain-v1  
+- LangGraph docs: https://langchain-ai.github.io/langgraph/  
+- DeepAgents overview: https://blog.langchain.dev/deep-agents/
 
 ---
 
@@ -21,7 +27,7 @@ LangChain v1 represents a major evolution focusing on **production-grade agent s
 
 ## 🚀 Major New Features
 
-### 1. Package Restructuring & Modularization
+### 1. Package Restructuring & Modularization (LangChain 1.0.0a10)
 
 **What it is:**  
 LangChain has been refactored from a monolithic library into a set of smaller, more focused packages. This is a foundational change for v1.
@@ -39,7 +45,7 @@ LangChain has been refactored from a monolithic library into a set of smaller, m
 
 ---
 
-### 2. `.content_blocks` Property - Multimodal & Reasoning Support
+### 2. `.content_blocks` Property (LangChain Core 0.3.77)
 
 **What it is:**  
 A fully typed, structured view of LLM message content that standardizes modern features across providers.
@@ -77,48 +83,31 @@ for block in response.content_blocks:
 
 ---
 
-### 3. Prebuilt Agents in `langchain.agents`
+### 3. Prebuilt Agents & Middleware Pipeline
 
 **What Changed:**  
-Agent creation APIs moved from `langgraph.prebuilts` to `langchain.agents` with **major enhancements**.
+`langchain.agents` now exports the v1 agent builders. Under the hood `react_agent.py` constructs LangGraph `StateGraph`s with middleware hooks.
 
-#### **`create_agent` - The Modern Agent Constructor**
-
-**New Features:**
-- **Structured Output Enforcement** - Pydantic models guarantee output schema
-- **Advanced Error Handling** - `handle_errors` argument for custom retry/fallback logic
-- **Tool Configuration** - Per-tool settings (timeouts, retries, approval requirements)
-- **HITL Integration** - Built-in human approval checkpoints via `interrupt_before`/`interrupt_after`
-
-**Migration:**
-```python
-# OLD (v0 - langgraph.prebuilts)
-from langgraph.prebuilts import create_react_agent
-
-agent = create_react_agent(model, tools)
-
-# NEW (v1 - langchain.agents)
-from langchain.agents import create_agent
-
-agent = create_agent(
-    model=model,
-    tools=tools,
-    handle_errors=True,  # Simplified error handling flag
-    interrupt_before=["save_product"],  # NEW: HITL approval
-    state_modifier="You are an expert cataloging agent",  # NEW: Dynamic prompts
-)
+```
+langchain/
+  agents/
+    __init__.py            → exports create_agent
+    react_agent.py         → core builder atop LangGraph
+    middleware_agent.py    → middleware-aware agent graph
+    middleware/            → HITL, summarization, prompt caching, logging, ...
 ```
 
-**Breaking Changes:**
-- **No Pre-Bound Models** - Can't pass `model.bind_tools(tools)` anymore; pass model and tools separately
-- **Return Type** - Now returns `AIMessage` instead of `BaseMessage` (better type hints)
-- **Import Path** - Must update imports from `langgraph.prebuilts` → `langchain.agents`
+**Deep Feature Highlights (package inspection):**
+- Structured outputs handled via `ToolStrategy` (schema → tool binding) or `ProviderStrategy` (provider JSON schema).
+- Middleware lifecycle (`before_model`, `modify_model_request`, `after_model`) allows prompt/context injection, HITL, logging.
+- Automatic `ToolNode` creation merges regular tools, middleware tools, and structured-output tools. Supports parallel execution, `Command` updates, state/store injection (`InjectedState`, `InjectedStore`).
+- State schema validation ensures TypedDict state includes `messages`, `remaining_steps`, and optionally `structured_response`.
+- AI responses can emit `Command(update=..., goto=...)` to adjust state/flow without leaving the agent graph.
 
 **Why This Matters for AutifyME:**
-- **Project Manager Agent** - Use `create_agent` as base for our PM implementation
-- **HITL Workflows** - `interrupt_before` perfect for "approve before publishing" flows
-- **Error Resilience** - Tool-level error handling with `@retry` + ToolNode automatic exception handling
-- **Structured Outputs** - Guarantee `Product` schema compliance via Pydantic
+- Provides a production-ready scaffold for Department/PM agents with composable middleware (HITL, summarization, prompt caching).
+- ToolNode semantics align with ports/adapters: deterministic tools, clear error semantics, structured outputs.
+- Supports typed contracts between agents, matching our architecture requirements.
 
 ---
 
@@ -126,91 +115,29 @@ agent = create_agent(
 
 **New Capabilities:**
 
-#### **A. Structured Output Error Control**
+#### **Error Handling Patterns**
+LangChain v1 centralises error handling at the tool boundary. Use these two tactics aligned with our Architecture-First rule:
+
+1. Tool-level retries keep integration risk encapsulated:
 
 ```python
-from langchain.agents import create_agent
-
-# Strategy 1: Raise exceptions immediately (fail-fast)
-agent = create_agent(
-    model=llm,
-    tools=tools,
-    handle_errors=False # Default behavior
-)
-
-# Strategy 2: Retry with LLM feedback (self-correction)
-# The `handle_errors` parameter can be configured with more complex strategies
-# for retries, but the simple boolean is the most common use case.
-agent = create_agent(
-    model=llm,
-    tools=tools,
-    handle_errors=True 
-)
-
-# Strategy 3: Continue with error message (best-effort)
-# This would require a custom error handler function passed to `handle_errors`
-agent = create_agent(
-    model=llm,
-    tools=tools,
-    handle_errors=True # Simplified for documentation
-)
-```
-
-#### **B. Tool Exception Handling**
-
-**Before (v0):** Agents would retry failed tools indefinitely, risking infinite loops.
-
-**After (v1):** Agents raise `ToolException` by default, preventing loops.
-
-```python
-from langchain.tools import tool, ToolException
-
-@tool
-def risky_api_call(query: str) -> str:
-    """Calls external API that might fail."""
-    try:
-        result = call_external_api(query)
-        return result
-    except APIError as e:
-        # V1: Raise ToolException to halt gracefully
-        raise ToolException(
-            f"API failed: {e}",
-            tool_name="risky_api_call",
-            original_error=e
-        )
-```
-
-**⚠️ CORRECTION (Oct 2025):**  
-The code examples above are INCORRECT. The `handle_errors` parameter does NOT exist in `create_agent()`.
-
-**CORRECT Pattern for Error Handling:**
-
-```python
-# Tool-level error handling with @retry
 from tenacity import retry, stop_after_attempt, retry_if_exception_type
-from langchain.tools import tool
+from langchain_core.tools import tool
 
 @tool
 @retry(
     stop=stop_after_attempt(3),
     retry=retry_if_exception_type(ExternalAPIError),
-    reraise=True
+    reraise=True,
 )
 def my_tool(arg: str) -> str:
-    # Tool implementation
-    result = external_api_call(arg)  # May raise ExternalAPIError
-    return result
+    return external_api_call(arg)
+```
 
-# Agent setup (no handle_errors parameter)
+2. Structured output validation via `ToolStrategy` turns schema violations into ToolMessages that the agent can reason about:
+
+```python
 from langchain.agents import create_agent
-
-agent = create_agent(
-    model=llm,
-    tools=[my_tool],
-    # ToolNode automatically converts exceptions to ToolMessages
-)
-
-# For structured output validation errors:
 from langchain.agents.structured_output import ToolStrategy
 
 agent = create_agent(
@@ -218,230 +145,60 @@ agent = create_agent(
     tools=tools,
     response_format=ToolStrategy(
         schema=MyPydanticModel,
-        handle_errors=True  # ✅ ONLY here, not in create_agent
-    )
+        handle_errors=True,
+    ),
 )
 ```
 
-**Why This Matters for AutifyME:**
-- **WhatsApp Integration** - Prevent retry storms on network failures with tool-level `@retry`
-- **Image Analysis** - Gracefully handle Vision API quota errors with `@retry`
-- **Data Integrity** - ToolNode automatically returns errors as messages for agent reasoning
+These approaches ensure tools remain deterministic while agents focus on reasoning.
 
 ---
 
-### 5. State & Context Management ⭐️ NEW
+### 5. State & Context Management (LangGraph 1.0.0a4 + Checkpoints)
 
-LangChain v1 introduces powerful, native features for managing conversation history and state, which are critical for our context engineering strategy.
+**Key Pieces Observed:**
+- `langgraph.runtime.Runtime`: run-scoped context (context, store, stream_writer, previous result) accessible inside nodes/middleware.
+- `langgraph.checkpoint.postgres`: full Postgres saver with migrations, pipeline support, and pending send recovery.
+- Channel abstractions (`langgraph.channels.*`): `AnyValue`, `LastValue`, `NamedBarrierValue`, etc., for message passing between nodes.
+- Stores (`langgraph.store.*`): memory and Postgres-backed stores for embeddings/memories.
 
-#### **A. Conversation Summarization Middleware**
-
-**What it is:**
-A middleware that automatically manages and compacts conversation history to prevent exceeding the context window. It replaces our previous plan of building a custom compaction node in LangGraph.
-
-**Key Capabilities:**
-- **Automatic Compaction:** Monitors token count and summarizes the oldest messages when a threshold is reached.
-- **Configurable:** Allows setting token limits and providing custom summarization prompts.
-- **Preserves Context:** Replaces old messages with a concise `SystemMessage` containing the summary, maintaining context for long-running conversations.
-
-**Example:**
-```python
-from langchain.memory import ConversationBufferMemory
-from langchain.chains.conversation.base import SummarizationMiddleware
-from langchain_openai import ChatOpenAI
-
-# The LLM to use for summarizing
-summarizer_llm = ChatOpenAI(model="gpt-4o", temperature=0)
-
-# The middleware to attach to the memory
-summarization_middleware = SummarizationMiddleware(
-    llm=summarizer_llm,
-    memory_key="chat_history",
-    prompt="Summarize the key decisions and unresolved questions from this conversation.",
-    max_tokens=8000 # Trigger summarization when history exceeds this many tokens
-)
-
-# The memory object used by the agent
-memory = ConversationBufferMemory(
-    memory_key="chat_history",
-    return_messages=True
-)
-memory.add_middleware(summarization_middleware)
-
-# This memory object can now be used in an agent or chain, and it will
-# automatically handle compaction.
-```
-
-**Why This Matters for AutifyME:**
-- **Long-Horizon Tasks:** Essential for any future complex workflows that might exceed the context window.
-- **Reduced Development:** We can leverage a native, battle-tested feature instead of building our own compaction logic. [[memory:9501042]]
-- **Cost & Performance:** Prevents sending excessively large histories to the LLM, saving costs and reducing latency.
+**Implications:**
+- Supabase Postgres can host state checkpoints via bundled migrations (aligns with our persistence plan).
+- Runtime enables typed dependency injection (user/company context, store handles) inside workflows.
+- Channels/stores unlock advanced multi-node coordination when scaling beyond cataloging.
 
 ---
 
-### 6. Middleware System - Cross-Cutting Concerns ⭐️ NEW in v1.0.0a8
+### 6. Middleware System (HITL, Summaries, Prompt Cache)
 
-**What it is:**  
-A **decorator-based middleware system** for injecting custom logic into agent/tool execution pipelines without modifying core code.
+**Notable Middleware Implementations:**
+- `HumanInTheLoopMiddleware`: constructs typed interrupt requests (allow_accept/edit/respond) and leverages `langgraph.types.interrupt` to pause/resume execution.
+- `SummarizationMiddleware`: token-aware compaction that preserves AI/Tool message pairs; configurable prompt/messages-to-keep.
+- `AnthropicPromptCachingMiddleware`: auto-injects prompt-caching headers for Claude models with TTL, fallback control.
+- DeepAgents adds `PlanningMiddleware`, `FilesystemMiddleware`, `SubAgentMiddleware` for plan tracking, scratchpad file ops via `Command`, and sub-agent delegation.
 
-**Key Capabilities:**
-- **State Injection** - Dynamically inject context (user_id, company_profile, request_id) into tools
-- **Cross-Cutting Concerns** - Logging, authentication, rate limiting, monitoring
-- **Dynamic Tool Behavior** - Modify tool inputs/outputs at runtime
-- **Composable Decorators** - Stack multiple middleware layers
-
-**Example - Authentication & Logging Middleware:**
-```python
-from langchain_core.tools import tool
-from functools import wraps
-
-def company_context_middleware(func):
-    """Auto-inject company profile into every tool call"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        # Get company context from request
-        config = kwargs.get("config", {})
-        company_id = config.get("configurable", {}).get("company_id")
-        
-        # Inject into tool
-        kwargs["company_profile"] = get_company_profile(company_id)
-        
-        # Log execution
-        logger.info(f"Tool {func.__name__} called for company {company_id}")
-        
-        # Execute with enriched context
-        result = func(*args, **kwargs)
-        
-        # Trace completion
-        logger.info(f"Tool {func.__name__} completed successfully")
-        return result
-    return wrapper
-
-def rate_limit_middleware(func):
-    """Apply rate limiting to expensive tools"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        config = kwargs.get("config", {})
-        user_id = config.get("configurable", {}).get("user_id")
-        
-        if not check_rate_limit(user_id, func.__name__):
-            raise RateLimitError(f"Rate limit exceeded for {func.__name__}")
-        
-        return func(*args, **kwargs)
-    return wrapper
-
-# Apply middleware via decorators
-@company_context_middleware
-@rate_limit_middleware
-@tool
-def analyze_product_image(image_url: str, company_profile: dict = None) -> dict:
-    """Analyze product image with company context"""
-    # company_profile automatically injected by middleware!
-    return vision_llm.invoke([
-        {"type": "text", "text": f"Analyze for {company_profile['name']}"},
-        {"type": "image_url", "image_url": image_url}
-    ])
-```
-
-**Advanced: Tool Registration Middleware**
-```python
-from langchain.agents import create_agent
-
-def langsmith_tracing_middleware(tools, workflow_id: str, department: str):
-    """Enrich all tool traces with workflow context"""
-    wrapped_tools = []
-    
-    for tool in tools:
-        original_func = tool.func
-        
-        @wraps(original_func)
-        def traced_wrapper(*args, **kwargs):
-            # Inject LangSmith metadata
-            kwargs.setdefault("config", {})
-            kwargs["config"]["metadata"] = {
-                "workflow_id": workflow_id,
-                "department": department,
-                "specialist": tool.name,
-                "timestamp": datetime.now().isoformat()
-            }
-            return original_func(*args, **kwargs)
-        
-        tool.func = traced_wrapper
-        wrapped_tools.append(tool)
-    
-    return wrapped_tools
-
-# Apply to all department tools
-cataloging_tools = get_cataloging_tools()
-traced_tools = langsmith_tracing_middleware(
-    cataloging_tools,
-    workflow_id="whatsapp_catalog_123",
-    department="cataloging"
-)
-
-agent = create_agent(model, traced_tools)
-```
-
-**Why This Matters for AutifyME:**
-
-1. **Company Context Injection** - Every tool automatically gets company profile without manual passing
-2. **Distributed Tracing** - Auto-inject correlation IDs for LangSmith trace grouping
-3. **Security & Multi-Tenancy** - Centralized auth/isolation checks (future-proofing)
-4. **Cost Control** - Rate limiting for expensive Vision API/LLM calls
-5. **Audit Logging** - Track every DB write/publish action in one place
-6. **Error Enrichment** - Add workflow context to all exceptions automatically
-
-**Our Use Cases:**
-- ✅ Auto-inject `company_profile` into all 20+ cataloging tools (DRY principle)
-- ✅ LangSmith trace tagging (workflow_id, department, specialist) for filtering
-- ✅ Rate limiting Image Analysis Specialist (max 100 images/hour)
-- ✅ Audit middleware for `save_product`, `publish_website` tools
-- ✅ Error context middleware (adds request_id, user_id to all exceptions)
-
-**Implementation Priority:** P0 - Build this in `core/middleware.py` during foundation phase
+**Why This Matters:**
+- Supports our HITL architecture (approval/edit/reject flows before critical tools).
+- Provides built-in context management (summaries) and cost optimization (prompt caching).
+- DeepAgents middleware forms the basis for Project Manager planning workflows once cataloging validates the foundation.
 
 ---
 
-### 7. LangGraph Runtime Integration
+### 7. LangGraph Runtime (1.0.0a4)
 
-**What it means:**  
-All `langchain.agents` are now **backed by LangGraph's stateful runtime**, giving you:
+**Highlights:**
+- `StateGraph` + Pregel executor powering compiled graphs from LangChain.
+- Runtime context merge/override for dependency injection per run.
+- `Command` objects let nodes update state or change flow programmatically.
+- Managed helpers (`langgraph.managed`) such as `is_last_step` for cleanup logic.
 
-- **Automatic Checkpointing** - State persists across interruptions
-- **Human-in-the-Loop** - Built-in approval flows via `interrupt_before`/`interrupt_after`
-- **Streaming Support** - Real-time updates via `astream_events`
-- **Time-Travel Debugging** - Replay/fork execution from any checkpoint
-
-**Example:**
-```python
-from langchain.agents import create_agent
-from langgraph.checkpoint.postgres import PostgresSaver
-
-# Create agent with checkpointing
-checkpointer = PostgresSaver.from_conn_string(settings.DATABASE_URL)
-agent = create_agent(model, tools, checkpointer=checkpointer)
-
-# HITL: Interrupt before dangerous actions
-agent = create_agent(
-    model,
-    tools,
-    checkpointer=checkpointer,
-    interrupt_before=["publish_to_website", "send_invoice"]
-)
-
-# User approves via:
-agent.update_state(thread_id, {"approved": True})
-```
-
-**Why This Matters for AutifyME:**
-- **WhatsApp Conversations** - Persist state across multi-turn chats
-- **Approval Workflows** - PM can pause for human review before publishing
-- **Crash Recovery** - Resume cataloging workflow from last checkpoint
-- **Debugging** - Replay failed workflows in LangSmith with full state
+**Implications for AutifyME:**
+- All agents built with `create_agent` can tap into runtime (context, store) for dependency injection (company profile, tenant metadata).
+- Pregel features (parallelism, retries) are available for future multi-department workflows.
 
 ---
 
-### 8. Improved Type Safety & Developer Experience
+### 8. Improved Type Safety & Developer Experience (LangChain Core 0.3.77)
 
 #### **A. Message Type Updates**
 
@@ -479,76 +236,26 @@ Python 3.9 support dropped. Requires **Python 3.10+**.
 
 ---
 
-### 9. Anthropic & OpenAI Enhancements
+### 9. Anthropic & OpenAI Enhancements (Provider packages)
 
-#### **A. Anthropic Prompt Caching**
-
-**New:** Automatic prompt caching for Claude models (reduces costs & latency).
-
-```python
-from langchain_anthropic import ChatAnthropic
-
-llm = ChatAnthropic(
-    model="claude-3-5-sonnet-20240620",
-    enable_prompt_caching=True  # NEW: Cache system prompts
-)
-
-# First call: Full prompt processing
-response1 = llm.invoke([system_message, user_message])
-
-# Subsequent calls: Cached system prompt (90% cost reduction)
-response2 = llm.invoke([system_message, user_message_2])
-```
-
-**Why This Matters for AutifyME:**
-- **Cost Optimization** - Our PM prompt is ~2K tokens; caching saves 90% on repeated calls
-- **Latency Reduction** - Faster responses for multi-turn WhatsApp chats
-
-#### **B. OpenAI Responses API**
-
-**Breaking Change:**  
-`langchain-openai` now defaults to storing responses in `message.content` instead of custom fields.
-
-**Migration:**
-```python
-# To restore v0 behavior (if needed):
-llm = ChatOpenAI(
-    model="gpt-4o",
-    output_version="v0"  # or set LC_OUTPUT_VERSION=v0 env var
-)
-```
+- `langchain_openai` 0.3.34: native `response_format` passthrough for GPT-4.1/o3 family, SSE streaming, tool routing updates.
+- `langchain_anthropic` 0.3.21: integrates prompt caching middleware, structured output hooks, and multimodal support.
+- DeepAgents defaults to Claude Sonnet 4 (64k tokens) via `get_default_model()` ensuring planning headroom.
 
 ---
 
-### 10. LangSmith Deep Integration
+### 10. DeepAgents Stack (0.0.11rc1)
 
-While not specific to v1, **LangChain v1 + LangSmith** work seamlessly together:
+**Components:**
+- `deepagents.graph.create_deep_agent`: wraps LangChain `create_agent` with default middleware (planning, filesystem, sub-agent routing, summarization, prompt caching, optional HITL tool configs).
+- Built-in tools (`write_todos`, `ls`, `read_file`, `write_file`, `edit_file`) return LangGraph `Command` objects for stateful updates.
+- `SubAgentMiddleware`: allows hierarchical agent delegation with shared tools and optional custom models per sub-agent.
+- `filesystem` state reducer merges file changes; integrates with external long-term storage via environment-configured filesystem API.
 
-#### **A. Automatic Tracing**
-- Every agent call, tool invocation, and LLM request auto-traced
-- No manual instrumentation needed
-
-#### **B. Evaluation Datasets**
-- Export LangSmith traces → test datasets
-- Run regression tests on agent changes
-
-#### **C. Prompt Versioning**
-- Experiment with prompts in LangSmith Hub
-- Pull specific versions in code via `hub.pull("username/prompt-name:v3")`
-
-**Example:**
-```python
-from langchain import hub
-
-# Pull versioned prompt from LangSmith
-project_manager_prompt = hub.pull("autifyme/project-manager:v2")
-
-agent = create_agent(
-    model=llm,
-    tools=tools,
-    prompt=project_manager_prompt # Prompts are now passed directly
-)
-```
+**Why This Matters:**
+- Acts as blueprint for Project Manager orchestration once cataloging workflow is validated.
+- Planning middleware maintains TODOs and plan state without custom code.
+- HITL configs integrate through middleware to enforce approval gates.
 
 ---
 
@@ -569,46 +276,6 @@ agent = create_agent(
 
 ## ✅ Features We'll Leverage in AutifyME
 
-### **Immediate Use (Week 1-2)**
-
-1. **`create_agent`** - Base for Project Manager Agent
-   - Use `interrupt_before` for HITL approval on product publishing
-   - Use `handle_errors=True` for self-correction and resilience.
-   - Use the `prompt` parameter for dynamic prompt injection (company profile)
-
-2. **PostgresSaver Checkpointing** - Multi-turn WhatsApp conversations
-   - Persist conversation state across messages
-   - Resume interrupted workflows
-
-3. **Structured Outputs** - Pydantic validation for all agent responses
-   - Guarantee `Product` schema compliance
-   - Type-safe department → PM communication
-
-4. **`.content_blocks`** - Image analysis results
-   - Extract Vision API confidence scores
-   - Pass structured image metadata between specialists
-
-5. **LangSmith Auto-Tracing** - Observability from day 1
-   - Debug agent decisions in real-time
-   - Build evaluation datasets from production traces
-
-### **Phase 2 (Month 2+)**
-
-6. **Anthropic Prompt Caching** - Cost optimization
-   - Cache long system prompts for PM, Dept Heads
-   - Reduce per-request costs by 90%
-
-7. **SummarizationMiddleware** - Long-running task support
-   - Automatically compact conversation history for complex, multi-day workflows.
-   - Prevents context window overruns and reduces token costs.
-
-8. **LangSmith Prompt Hub** - Collaborative prompt engineering
-   - Version and test prompts independently of code
-   - A/B test different agent instructions
-
-9. **Multi-Provider Support** - Redundancy via `.content_blocks`
-   - Fallback: OpenAI → Anthropic using same API
-   - Avoid vendor lock-in
 
 ---
 

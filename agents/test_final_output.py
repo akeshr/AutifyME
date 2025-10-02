@@ -5,7 +5,6 @@ from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.postgres import PostgresSaver
 
 from autifyme_agents.departments.cataloging_department import create_cataloging_department
-from autifyme_agents.tools.storage_tools import initialize_storage
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
 from autifyme_agents.core.config import settings
 
@@ -13,8 +12,7 @@ from autifyme_agents.core.config import settings
 def main():
     with PostgresSaver.from_conn_string(settings.DATABASE_URL) as checkpointer:
         storage_client = SupabaseStorageClient()
-        initialize_storage(storage_client)
-        
+
         department_agent = create_cataloging_department(checkpointer)
         
         task = "Catalog sneakers: price $79.99, sizes 7-11, image: https://i.imgur.com/325hRIH.jpeg"
@@ -24,7 +22,8 @@ def main():
             "configurable": {
                 "thread_id": thread_id,
                 "company_id": "test_company_id_123"
-            }
+            },
+            "storage_client": storage_client,
         }
         
         initial_input = {"messages": [HumanMessage(content=task)]}

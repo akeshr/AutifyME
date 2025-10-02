@@ -1,24 +1,21 @@
 """Factory for creating and configuring the LangGraph PostgresSaver."""
 
+from contextlib import contextmanager
+
 from langgraph.checkpoint.postgres import PostgresSaver
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from autifyme_agents.core.config import settings
 
 
-def get_checkpointer() -> PostgresSaver:
-    """
-    Creates and returns a PostgresSaver instance for checkpointing agent state.
-    
-    This checkpointer connects to the Supabase Postgres database and allows
-    LangGraph agents to persist their state, enabling resilience and long-running,
-    interruptible workflows.
+@contextmanager
+def get_checkpointer(setup: bool = False):
+    """Yield a PostgresSaver configured from the environment.
 
-    Returns:
-        An instance of PostgresSaver configured with the application's database URL.
+    Args:
+        setup: When True, runs `checkpointer.setup()` before yielding to ensure
+            migrations are applied. Should only be needed once per environment.
     """
-    # Create an async SQLAlchemy engine
-    engine = create_async_engine(settings.DATABASE_URL.get_secret_value())
-    
-    # PostgresSaver can be used to save all steps in the graph
-    return PostgresSaver(engine)
+    with PostgresSaver.from_conn_string(settings.DATABASE_URL) as saver:
+        if setup:
+            saver.setup()
+        yield saver
