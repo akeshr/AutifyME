@@ -317,14 +317,15 @@ class WhatsAppCatalogingRunner:
                 self.storage.delete_pending_approval(thread_id)
                 return
 
-            synthetic_tool_message = ToolMessage(
-                content=draft_summary or "Approval granted.",
-                tool_call_id=tool_call.get("id"),
-                name=tool_call.get("name"),
-            )
-
+            # With interrupt_before=["tools"], the correct flow is:
+            # 1. Interrupt fires BEFORE tool execution (we're here now)
+            # 2. User approves
+            # 3. Resume with Command(resume=...) → Graph continues to tool node
+            # 4. Tool node EXECUTES the tool (save_product) and creates the ToolMessage
+            # 
+            # We do NOT need to synthesize a ToolMessage - that would bypass execution!
+            # Just resume and let the graph's tool node handle it naturally.
             command = Command(
-                update={"messages": [synthetic_tool_message]},
                 resume={
                     interrupt_id: {
                         "type": "accept",
@@ -374,12 +375,12 @@ class WhatsAppCatalogingRunner:
 
         With interrupt_before=["tools"], LangGraph will:
         1. Let the agent emit tool calls (AIMessage with tool_calls)
-        2. Pause execution and emit an __interrupt__ in the state
-        3. Wait for approval/rejection via Command resumption
-        4. Resume and execute the tool node (which synthesizes ToolMessage)
+        2. Pause execution and emit an __interrupt__ in the state (BEFORE tool execution)
+        3. Wait for approval/rejection via Command(resume=...) 
+        4. On resume, continue to tool node which EXECUTES the tool and creates ToolMessage
 
-        This runner simply streams events and detects __interrupt__ naturally.
-        No custom validation error parsing or manual ToolMessage synthesis needed.
+        This runner streams events, detects __interrupt__ naturally, and resumes with
+        Command(resume=...) to let the tool execute. No synthetic ToolMessages needed.
         """
         checkpointer_ctx = self._get_checkpointer()
         
