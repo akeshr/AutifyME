@@ -405,9 +405,19 @@ class WhatsAppCatalogingRunner:
         text: str,
         image_path: Path | None,
     ) -> dict[str, Any]:
-        messages: list[HumanMessage] = [HumanMessage(content=text)]
+        messages: list[HumanMessage] = []
+        
+        # Only include text message if there's actual content
+        # Per WHATSAPP_CATALOGING_WORKFLOW.md, users can send image-only messages
+        if text and text.strip():
+            messages.append(HumanMessage(content=text))
+        
         if image_path:
+            # If no text was provided, add a helpful prompt for the PM
+            if not messages:
+                messages.append(HumanMessage(content="Please catalog the product from this image."))
             messages.append(HumanMessage(content=f"[IMAGE_PATH]{image_path}"))
+        
         return {"messages": messages}
 
     def _handle_pm_completion(self, sender: str, result: dict[str, Any]) -> None:
