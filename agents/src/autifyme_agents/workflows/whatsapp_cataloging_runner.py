@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Optional, Tuple
 
 from langchain_core.messages import HumanMessage
-from langgraph.types import Interrupt
+from langgraph.types import Interrupt, Command
 from langgraph.errors import GraphRecursionError
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
@@ -48,6 +48,8 @@ class WhatsAppCatalogingRunner:
         self.recursion_limit = recursion_limit or settings.AGENT_RECURSION_LIMIT
         self.company_profile: CompanyProfile = self.storage.get_company_profile()
         self._last_pm_state: dict[str, Any] | None = None
+        self._pending_interrupts: dict[str, Interrupt] = {}
+        self._pending_save_requests: dict[str, dict[str, Any]] = {}
 
     def _get_checkpointer(self) -> BaseCheckpointSaver:
         if self.checkpointer:
@@ -89,9 +91,10 @@ class WhatsAppCatalogingRunner:
 
             payload = self._build_project_manager_payload(normalized_text, image_path)
 
+            thread_id = self._thread_id(sender)
             config = {
                 "configurable": {
-                    "thread_id": self._thread_id(sender),
+                    "thread_id": thread_id,
                     "company_id": "default",
                 },
                 "recursion_limit": self.recursion_limit,
@@ -100,18 +103,18 @@ class WhatsAppCatalogingRunner:
             try:
                 result, interruption = self._invoke_project_manager(payload, config)
                 if interruption is not None:
-                    self._handle_interrupt(sender, interruption)
+                    self._handle_interrupt(sender, interruption, thread_id)
                     return
                 self._handle_pm_completion(sender, result)
             except GraphRecursionError as exc:
                 logger.exception("Project Manager recursion detected for %s", sender, exc_info=exc)
-                self.whatsapp_client.send_text(
+                self._safe_send_text(
                     sender,
                     "I'm having trouble finishing this task. A specialist will review and follow up.",
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.exception("Project Manager invocation failed for %s", sender, exc_info=exc)
-                self.whatsapp_client.send_text(
+                self._safe_send_text(
                     sender,
                     "I hit a processing error. Please try resending the details or wait for support.",
                 )
@@ -128,21 +131,67 @@ class WhatsAppCatalogingRunner:
             self.whatsapp_client.send_text(sender, "Please reply with 'approve' or 'reject'.")
             return
 
+        thread_id = self._thread_id(sender)
+        pending_id = next(
+            (
+                req_id
+                for req_id, req in self._pending_save_requests.items()
+                if req.get("thread_id") == thread_id
+            ),
+            None,
+        )
+
+        if pending_id is None:
+            self.whatsapp_client.send_text(
+                sender,
+                "No pending approval found for this thread. Please restart the cataloging request.",
+            )
+            return
+
+        interrupt = self._pending_interrupts.get(pending_id)
+        save_request = self._pending_save_requests.pop(pending_id, None)
+
+        if interrupt is None or save_request is None:
+            self.whatsapp_client.send_text(
+                sender,
+                "Approval context expired. Please restart the cataloging request if needed.",
+            )
+            self._pending_interrupts.pop(pending_id, None)
+            return
+
+        if action == "reject":
+            self._safe_send_text(
+                sender,
+                "Understood. The draft will remain unsaved. Let me know if you’d like updates or a retry.",
+            )
+            self._pending_interrupts.pop(pending_id, None)
+            return
+
+        if action != "approve":
+            self.whatsapp_client.send_text(sender, "Please reply with 'approve' or 'reject'.")
+            return
+
+        command = Command(
+            resume={
+                interrupt.id: {
+                    "type": "accept",
+                    "args": None,
+                }
+            }
+        )
+
         config = {
             "configurable": {
-                "thread_id": self._thread_id(sender),
+                "thread_id": thread_id,
                 "company_id": "default",
-            },
-            "interrupt": {
-                "tool": "save_product",
-                "decision": action,
             },
         }
 
-        payload = {"messages": []}
-        result, interruption = self._invoke_project_manager(payload, config)
+        self._pending_interrupts.pop(pending_id, None)
+
+        result, interruption = self._invoke_project_manager(command, config)
         if interruption is not None:
-            self._handle_interrupt(sender, interruption)
+            self._handle_interrupt(sender, interruption, thread_id)
         elif result is not None:
             self._handle_pm_completion(sender, result)
         else:
@@ -182,11 +231,15 @@ class WhatsAppCatalogingRunner:
             stream_config["configurable"].setdefault("remaining_steps", self.recursion_limit)
 
             # Stream in "values" mode to get full state snapshots.
-            stream = project_manager.stream(payload, config=stream_config, stream_mode="values")
+            stream_input = payload
+            if isinstance(payload, Command):
+                stream_input = payload
+            stream = project_manager.stream(stream_input, config=stream_config, stream_mode="values")
             for event in stream:
                 if isinstance(event, dict):
                     last_event = event
-                    self._last_pm_state = event
+                    if (event.get("messages") or []) and isinstance(event.get("messages"), list):
+                        self._last_pm_state = event
                     self._log_stream_event_summary(last_event, config)
 
                     # Check for native LangGraph interrupt signal
@@ -299,12 +352,12 @@ class WhatsAppCatalogingRunner:
             status = "Success" if structured.success else "Failed"
             product_name = structured.product_name or "Unnamed product"
             summary_lines = [f"Cataloging {status}: {product_name}", structured.message]
-            self.whatsapp_client.send_text(sender, "\n".join(summary_lines))
+            self._safe_send_text(sender, "\n".join(summary_lines))
             return
 
         summary = self._extract_ai_summary(messages)
         if summary:
-            self.whatsapp_client.send_text(sender, summary)
+            self._safe_send_text(sender, summary)
         else:
             logger.warning("Unable to derive completion summary for %s", sender)
 
@@ -348,7 +401,7 @@ class WhatsAppCatalogingRunner:
                 return joined or None
         return None
 
-    def _handle_interrupt(self, sender: str, interruption: Interrupt) -> None:
+    def _handle_interrupt(self, sender: str, interruption: Interrupt, thread_id: str) -> None:
         """Handle native LangGraph interrupt by extracting tool details and requesting approval.
 
         With interrupt_before=["tools"], the interrupt.value contains the pending tool calls.
@@ -374,7 +427,15 @@ class WhatsAppCatalogingRunner:
         if not draft_summary:
             draft_summary = "Cataloging complete. Approve to save the product."
 
-        self.whatsapp_client.send_text(
+        notification_id = interruption.id or save_product_call.get("id") or sender
+        self._pending_interrupts[notification_id] = interruption
+        self._pending_save_requests[notification_id] = {
+            "thread_id": thread_id,
+            "tool_call": save_product_call,
+            "draft_summary": draft_summary,
+        }
+
+        self._safe_send_text(
             sender,
             f"Approval needed:\n{draft_summary}\nReply 'approve' or 'reject'.",
         )
@@ -453,3 +514,17 @@ class WhatsAppCatalogingRunner:
         if description:
             lines.append(f"Description: {description}")
         return "\n".join(lines)
+
+    def _safe_send_text(self, recipient: str, message: str, *, preview_url: bool = False) -> None:
+        try:
+            self.whatsapp_client.send_text(recipient, message, preview_url=preview_url)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(
+                "Failed to send WhatsApp message",
+                extra={
+                    "recipient": recipient,
+                    "preview_url": preview_url,
+                    "message_preview": message[:120],
+                },
+                exc_info=exc,
+            )
