@@ -112,12 +112,12 @@ class WhatsAppCatalogingRunner:
                     sender,
                     "I'm having trouble finishing this task. A specialist will review and follow up.",
                 )
-                except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
                 logger.exception("Project Manager invocation failed for %s", sender, exc_info=exc)
                 self._safe_send_text(
-                        sender,
-                        "I hit a processing error. Please try resending the details or wait for support.",
-                    )
+                    sender,
+                    "I hit a processing error. Please try resending the details or wait for support.",
+                )
         finally:
             if image_path and image_path.exists():
                 image_path.unlink(missing_ok=True)
