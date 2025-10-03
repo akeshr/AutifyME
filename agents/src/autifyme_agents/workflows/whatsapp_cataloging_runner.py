@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 from langgraph.types import Interrupt, Command
 from langgraph.errors import GraphRecursionError
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -77,7 +77,7 @@ class WhatsAppCatalogingRunner:
                 "Skipping department invocation for low-intent message",
                 extra={"sender": sender, "text": normalized_text, "thread_id": self._thread_id(sender)},
             )
-            self.whatsapp_client.send_text(sender, CATALOGING_PROMPT)
+            self._safe_send_text(sender, CATALOGING_PROMPT)
             return
 
         image_path: Path | None = None
@@ -347,6 +347,7 @@ class WhatsAppCatalogingRunner:
             logger.warning("Project Manager produced no messages for %s", sender)
             return
 
+        ai_message = self._find_last_ai_message(messages)
         structured = self._extract_cataloging_result(messages)
         if structured:
             status = "Success" if structured.success else "Failed"
@@ -433,6 +434,7 @@ class WhatsAppCatalogingRunner:
             "thread_id": thread_id,
             "tool_call": save_product_call,
             "draft_summary": draft_summary,
+            "ai_message": self._find_last_ai_message(self._last_pm_state.get("messages", [])) if self._last_pm_state else None,
         }
 
         self._safe_send_text(
@@ -473,6 +475,15 @@ class WhatsAppCatalogingRunner:
         
         logger.warning("No AIMessage with tool_calls found in _last_pm_state during interrupt")
         return []
+
+    def _find_last_ai_message(self, messages: list[Any]) -> Any | None:
+        for message in reversed(messages):
+            message_type = getattr(message, "type", None)
+            if not message_type and hasattr(message, "__class__"):
+                message_type = message.__class__.__name__.replace("Message", "").lower()
+            if message_type == "ai":
+                return message
+        return None
 
     def _draft_summary_from_last_state(self) -> str | None:
         if not self._last_pm_state:
