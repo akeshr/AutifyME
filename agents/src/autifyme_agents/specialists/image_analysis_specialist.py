@@ -1,5 +1,8 @@
 """Image analysis specialist for extracting visual product information."""
 
+import base64
+from pathlib import Path
+
 from langchain_core.runnables import Runnable, RunnableLambda
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.tools import tool
@@ -10,6 +13,45 @@ from autifyme_agents.core.prompt_loader import load_prompt
 
 # Load prompt from version-controlled file
 IMAGE_ANALYSIS_SYSTEM_PROMPT = load_prompt("specialists/image_analysis_specialist.prompt")
+
+
+def _image_to_data_url(image_path: str) -> str:
+    """Convert a local image file to a base64 data URL for OpenAI's multimodal API.
+    
+    Args:
+        image_path: Path to local image file (e.g., /tmp/xyz.jpg)
+        
+    Returns:
+        Data URL string (e.g., data:image/jpeg;base64,...)
+        
+    Raises:
+        FileNotFoundError: If image file doesn't exist
+        ValueError: If image format is unsupported
+    """
+    path = Path(image_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Image file not found: {image_path}")
+    
+    # Infer MIME type from extension
+    suffix = path.suffix.lower()
+    mime_types = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }
+    
+    mime_type = mime_types.get(suffix)
+    if not mime_type:
+        raise ValueError(f"Unsupported image format: {suffix}. Supported: {list(mime_types.keys())}")
+    
+    # Read and encode
+    with open(path, "rb") as f:
+        image_data = f.read()
+    
+    base64_data = base64.b64encode(image_data).decode("utf-8")
+    return f"data:{mime_type};base64,{base64_data}"
 
 
 def create_image_analysis_specialist() -> Runnable:
@@ -28,7 +70,11 @@ def create_image_analysis_specialist() -> Runnable:
 
     # For multimodal messages, we construct them dynamically using a RunnableLambda
     def format_messages(payload: dict) -> list:
-        """Formats the multimodal input as a list of messages for the LLM."""
+        """Formats the multimodal input as a list of messages for the LLM.
+        
+        Handles both web URLs (https://...) and local file paths (/tmp/xyz.jpg)
+        by converting local files to base64 data URLs as required by OpenAI's API.
+        """
         inputs = payload["input"]
         company_profile = inputs.get('company_profile')
         if company_profile:
@@ -36,13 +82,22 @@ def create_image_analysis_specialist() -> Runnable:
         else:
             context_text = "Company Brand Voice: N/A\nTarget Audience: N/A"
         
+        # Handle both web URLs and local file paths
+        image_url = inputs["image_url"]
+        if image_url.startswith("http://") or image_url.startswith("https://"):
+            # Web URL - pass directly
+            image_url_formatted = image_url
+        else:
+            # Local file path - convert to base64 data URL
+            image_url_formatted = _image_to_data_url(image_url)
+        
         return [
             SystemMessage(content=IMAGE_ANALYSIS_SYSTEM_PROMPT),
             HumanMessage(
                 content=[
                     {
                         "type": "image_url",
-                        "image_url": {"url": inputs["image_url"]},
+                        "image_url": {"url": image_url_formatted},
                     },
                     {
                         "type": "text",
