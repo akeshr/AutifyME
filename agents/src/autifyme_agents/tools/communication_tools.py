@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 @tool("send_whatsapp_message")
-def send_whatsapp_message(recipient: str, message: str) -> str:
+def send_whatsapp_message(recipient: str, message: str, *, client: WhatsAppClient | None = None) -> str:
     """Send a WhatsApp message to the specified recipient."""
 
-    client = WhatsAppClient()
+    messaging_client = client or WhatsAppClient()
     try:
-        response = client.send_text(recipient=recipient, message=message)
+        response = messaging_client.send_text(recipient=recipient, message=message)
         message_id = response.get("messages", [{}])[0].get("id")
         return message_id or ""
     except Exception as exc:  # noqa: BLE001
@@ -28,3 +28,7 @@ def send_whatsapp_message(recipient: str, message: str) -> str:
             api_name="WhatsApp Business Cloud",
             original_error=exc,
         )
+
+
+def create_send_whatsapp_message_tool():
+    return send_whatsapp_message

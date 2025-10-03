@@ -1,78 +1,100 @@
-"""End-to-end test for Cataloging Department workflow."""
+"""End-to-end smoke test for the WhatsApp Project Manager orchestration."""
 
-import asyncio
-from pprint import pprint
+from __future__ import annotations
+
+import json
 import uuid
+from pathlib import Path
+from typing import Any
 
-from langchain_core.messages import HumanMessage
-from langgraph.checkpoint.postgres import PostgresSaver
-from langgraph.types import Command
+from dotenv import load_dotenv
 
-from autifyme_agents.departments.cataloging_department import create_cataloging_department
+from autifyme_agents.integrations.communication.whatsapp_media_client import (
+    WhatsAppMediaClient,
+)
+from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
-from autifyme_agents.core.config import settings
+from autifyme_agents.workflows.whatsapp_cataloging_runner import (
+    WhatsAppCatalogingRunner,
+)
 
 
-def main():
-    """
-    Tests the full stateful workflow for the Cataloging Department.
-    """
-    print("=" * 60)
-    print("🚀 CATALOGING DEPARTMENT - STATE PERSISTENCE TEST")
-    print("=" * 60)
-    
-    # Use a `with` block to correctly manage the PostgresSaver connection
-    # NOTE: Run `python agents/setup_checkpointer_once.py` first to create tables
-    with PostgresSaver.from_conn_string(settings.DATABASE_URL) as checkpointer:
-        print("\n[1/4] Initializing storage adapter...")
-        storage_client = SupabaseStorageClient()
-        print("✓ Storage initialized")
-        
-        # Create Department Head agent, passing the checkpointer
-        print("\n[2/4] Creating Cataloging Department agent...")
-        department_agent = create_cataloging_department(checkpointer, storage_client, enable_hitl=False)
-        print("✓ Agent ready")
-        
-        print("\n[3/4] Defining cataloging task...")
-        # NOTE: Using a consistent test - the image shows sneakers, so we catalog sneakers
-        task = """
-        Please catalog a new product.
-        It's a pair of high-top canvas sneakers with a classic design. The price is 79.99.
-        They come in sizes 7, 8, 9, 10, 11.
-        Here is the image for it: https://i.imgur.com/325hRIH.jpeg
-        """
-        print(f"Task:\n{task.strip()}")
-        
-        thread_id = str(uuid.uuid4())
-        print(f"\nGenerated Thread ID for this conversation: {thread_id}")
+class RecordingWhatsAppClient:
+    """Test double that records outbound WhatsApp messages instead of sending them."""
 
-        run_config = {
-            "configurable": {
-                "thread_id": thread_id,
-                "company_id": "test_company_id_123"
-            }
+    def __init__(self) -> None:
+        self.sent_messages: list[dict[str, Any]] = []
+
+    def send_text(self, recipient: str, message: str, *, preview_url: bool = False) -> dict[str, Any]:
+        payload = {
+            "recipient": recipient,
+            "message": message,
+            "preview_url": preview_url,
         }
-        print(f"\n[4/4] Invoking agent with thread_id: {thread_id}...")
-        print("-" * 60)
-        
-        try:
-            initial_input = {"messages": [HumanMessage(content=task)]}
-            # Using synchronous `stream` as PostgresSaver doesn't fully support async
-            for event in department_agent.stream(initial_input, config=run_config):
-                print("---")
-                pprint(event)
+        self.sent_messages.append(payload)
+        print("[WhatsAppClient] Would send:", json.dumps(payload, ensure_ascii=False))
+        return {"status": "mocked"}
 
-            print("\n" + "=" * 60)
-            print("✅ TEST PASSED")
-            print(f"State persisted for thread_id='{thread_id}'")
-            print("=" * 60)
-            
-        except Exception as e:
-            print("-" * 60)
-            print("\n❌ TEST FAILED")
-            print("=" * 60)
-            print(f"\nError: {str(e)}")
-            raise
+
+class NoopWhatsAppMediaClient(WhatsAppMediaClient):
+    """Stub media client that forbids downloads in this smoke test."""
+
+    def __init__(self) -> None:  # pragma: no cover - simple override
+        pass
+
+    def download_media(self, media_id: str) -> Path:  # pragma: no cover - defensive guard
+        raise RuntimeError(
+            "Media downloads are not exercised in this smoke test. Provide a media_id to extend the script."
+        )
+
+
+def _load_env() -> None:
+    load_dotenv(Path.cwd() / ".env")
+
+
+def main() -> None:
+    print("=" * 60)
+    print("🚀 WHATSAPP PROJECT MANAGER - STATEFUL SMOKE TEST")
+    print("=" * 60)
+
+    _load_env()
+
+    storage = SupabaseStorageClient()
+    whatsapp_client = RecordingWhatsAppClient()
+    media_client = NoopWhatsAppMediaClient()
+
+    with get_checkpointer() as checkpointer:
+        runner = WhatsAppCatalogingRunner(
+            storage=storage,
+            checkpointer=checkpointer,
+            whatsapp_client=whatsapp_client,
+            media_client=media_client,
+        )
+        print("✓ Runner ready (Project Manager orchestrated)")
+
+        sender = f"test-user-{uuid.uuid4()}"
+        payload = {
+            "text": "Please catalog a new pair of canvas sneakers. Price 79.99, sizes 7-11.",
+            "media_id": None,
+        }
+
+        print("\n[1/2] Sending synthetic WhatsApp payload:")
+        print(json.dumps(payload, indent=2))
+
+        runner.handle_message(
+            sender=sender,
+            text=payload["text"],
+            media_id=payload["media_id"],
+        )
+
+    print("\n[2/2] Invocation completed. Recorded outbound messages:")
+    if whatsapp_client.sent_messages:
+        for idx, message in enumerate(whatsapp_client.sent_messages, start=1):
+            print(f"  [{idx}] -> {json.dumps(message, ensure_ascii=False)}")
+    else:
+        print("  (No messages were sent)")
+    print("=" * 60)
+
 
 if __name__ == "__main__":
     main()

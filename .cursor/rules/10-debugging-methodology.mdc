@@ -26,4 +26,9 @@ print(f"DEBUG: kwargs = {kwargs}")
 - ❌ Making 5 changes at once
 - ❌ Adding `config=None` everywhere instead of fixing middleware
 
+## Guardrails for Python Execution
+- ✅ Always run ad-hoc Python snippets via `uv run python -c "..."`
+- ✅ If the command spans multiple statements, join them with semicolons inside the quoted string
+- ❌ Do not use here-docs, temporary scripts, or other launchers when a direct `uv run python -c` form is possible
+
 **If stuck >15 min:** Write minimal test case to isolate issue

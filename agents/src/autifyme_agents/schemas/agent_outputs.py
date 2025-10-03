@@ -1,8 +1,10 @@
 """Structured output schemas for agent responses."""
 
 from pydantic import BaseModel, Field
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Dict, Any
 from uuid import UUID
+
+from autifyme_agents.schemas.models import CatalogingResult
 
 
 class AgentOutput(BaseModel):
@@ -16,6 +18,7 @@ class ProductCatalogedOutput(AgentOutput):
     success: Literal[True] = Field(True, description="Always True for successful cataloging.")
     product_id: UUID = Field(..., description="The unique identifier of the saved product.")
     message: str = Field("Product has been successfully saved to the catalog.")
+    product: Dict[str, Any] = Field(..., description="The full product record saved to the catalog.")
 
 
 class ErrorOutput(AgentOutput):
@@ -44,3 +47,10 @@ class ImageAnalysisResult(BaseModel):
         default_factory=list,
         description="Style keywords (e.g., 'vintage', 'modern', 'minimalist')."
     )
+
+
+class CatalogingToolOutput(BaseModel):
+    """Structured message emitted by the save_product tool."""
+
+    tool_name: Literal["save_product"] = Field(..., description="Name of the tool producing the output.")
+    result: CatalogingResult = Field(..., description="Serialized cataloging result payload.")

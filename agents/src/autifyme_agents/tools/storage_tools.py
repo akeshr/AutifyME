@@ -20,7 +20,7 @@ from tenacity import (
     before_sleep_log,
 )
 
-from autifyme_agents.schemas.models import Product, CompanyProfile
+from autifyme_agents.schemas.models import Product, CompanyProfile, CatalogingResult
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.exceptions import (
     StorageError,
@@ -112,9 +112,17 @@ def create_save_product_tool(storage: StorageInterface):
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
-    def save_product(**kwargs) -> Product:
+    def save_product(**kwargs) -> CatalogingResult:
         """Persist a product to the catalog database."""
-        return _save_product(storage, **kwargs)
+        product = _save_product(storage, **kwargs)
+        return CatalogingResult(
+            stage="saved",
+            success=True,
+            product_id=product.id,
+            product_name=product.name,
+            message="Product persisted to catalog",
+            data={"product": product.model_dump()},
+        )
 
     return save_product
 

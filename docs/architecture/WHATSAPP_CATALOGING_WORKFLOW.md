@@ -7,7 +7,8 @@ This document outlines the design for the Cataloging MVP feature: enabling India
 ## Architecture Snapshot (2025-10)
 
 - **Webhook Entry**: `FastAPI` app in `entrypoints/whatsapp_webhook.py` handles GET verification, POST events, and approval routing
-- **Workflow Runner**: `workflows/whatsapp_cataloging_runner.py` orchestrates cataloging runs, media fetching, and HITL resumes
+- **Workflow Runner**: `workflows/whatsapp_cataloging_runner.py` triages intent, enforces recursion guards, orchestrates cataloging runs, media fetching, and HITL resumes
+- **Project Manager (Roadmap)**: DeepAgent-based orchestrator (see `PROJECT_MANAGER_DESIGN.md`) to analyze intent and delegate to departments once implemented
 - **Messaging Adapter**: `WhatsAppClient` wraps Facebook Graph v23 send endpoint
 - **Media Adapter**: `WhatsAppMediaClient` fetches media IDs and downloads to temporary files
 - **Tooling**: `send_whatsapp_message` in `tools/communication_tools.py`
@@ -54,12 +55,11 @@ This workflow will be managed by a generic `ProjectManagerAgent` and a new `Cata
     -   It will then fetch the corresponding `company_profile` from the Supabase database.
     -   This `company_profile` object will be passed as initial input to the `ProjectManagerAgent`, making all subsequent actions context-aware.
 
-2.  **`ProjectManagerAgent` (The "Deep" Orchestrator) – Roadmap:**
-    -   This is the top-level, generic orchestrator for the entire system. Implementation begins after Cataloging MVP validation.
-    -   **Intent Analysis:** It will analyze raw input (images and text) to determine the goal (e.g., `create_new_product`, `update_inventory`).
-    -   **Dynamic Planning with Reflection:** It will create a multi-step plan (DAG) to achieve the goal. Before execution, it reflects on the plan for completeness and opportunities for parallelism.
-    -   **Orchestration:** For this workflow, it will delegate tasks to the `CatalogingDept`, manage the conversational flow (asking for missing info), handle the HITL approval step, and ensure the final data is saved.
-    -   **Self-Correction:** It will catch errors from sub-agents and dynamically replan to recover from failures.
+2.  **`ProjectManagerAgent` (DeepAgent Orchestrator – Roadmap):**
+    -   Will be implemented via `deepagents.create_deep_agent` with the cataloging department registered as a sub-agent once readiness checklist is satisfied.
+    -   **Intent Analysis:** Filters greetings/noise, recognizes cataloging requests, and routes approval commands back to LangGraph.
+    -   **Structured Delegation:** Passes normalized text, media URLs, and `CompanyProfile` context into the cataloging department.
+    -   **Self-Correction:** Applies recursion-limit guards and surfaces failures to human support rather than looping.
 
 3.  **`CatalogingDept` Agent (Department Head):**
     -   **Purpose:** To manage the analysis of unstructured user messages.
@@ -84,7 +84,7 @@ This workflow will be managed by a generic `ProjectManagerAgent` and a new `Cata
 This feature requires the creation of several new components in our project structure.
 
 1.  **`integrations/communication/whatsapp_client.py`:** A new adapter to handle the specifics of sending and receiving messages via the WhatsApp Business Cloud API.
-2.  **`tools/communication_tools.py`:** Will contain a `send_whatsapp_message` tool that the agents can call. This tool will use the `whatsapp_client`.
+2.  **`tools/communication_tools.py`:** Provides `send_whatsapp_message` (factory helper will be added alongside the Project Manager rollout).
 3.  **`schemas/models.py`:** Will need a new Pydantic model for a `Product` (e.g., with fields `id`, `name`, `description`, `price`, `sizes`, `colors`, `image_urls`).
 4.  **Supabase Schema:** A new `products` table in our database to store the catalog information.
 5.  **`workflows/product_ingestion.py`:** Planned home for the `Project Manager` agent (post-MVP).

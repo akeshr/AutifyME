@@ -1,6 +1,6 @@
 # Project Manager Agent Design with `deepagents`
 
-> **Roadmap Document** – Timeless architecture reference. Implementation status is tracked in `../roadmap/IMPLEMENTATION_ROADMAP.md`. No production code currently references `deepagents`.
+> **Roadmap Document** – Timeless architecture reference. Implementation status is tracked in `../roadmap/IMPLEMENTATION_ROADMAP.md`. Production integration begins once WhatsApp PM readiness checklist is satisfied (currently pending automation and stability work).
 
 **Date:** September 30, 2025  
 **Purpose:** Define how we use `deepagents` to implement our Project Manager Agent  
@@ -441,7 +441,10 @@ async def whatsapp_webhook(request: Request):
     company_profile = storage.get_company_profile()
     
     # Create/get Project Manager for this company
-    agent = create_project_manager(company_profile)
+    agent = create_project_manager(
+        company_profile,
+        storage=storage,
+    )
     
     # Process message
     config = {

@@ -1,7 +1,7 @@
 """Domain models for core business entities."""
 
 from uuid import UUID, uuid4
-from typing import Optional, List
+from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
 
 
@@ -53,13 +53,20 @@ class CatalogingResult(BaseModel):
     """
     Structured output from the Cataloging Department.
     
-    This is what the Project Manager receives after a product is cataloged.
-    Provides clean, typed interface for multi-department workflows.
+    Used by the Project Manager to track cataloging progress and approvals.
     """
-    success: bool = Field(..., description="Whether the cataloging operation succeeded.")
-    product_id: Optional[UUID] = Field(None, description="The UUID of the cataloged product.")
+
+    stage: Literal["draft", "awaiting_approval", "saved", "failed"] = Field(
+        ..., description="Current lifecycle stage for the cataloging workflow."
+    )
+    success: bool = Field(..., description="Whether the cataloging operation succeeded for this stage.")
+    product_id: Optional[UUID] = Field(None, description="The UUID of the cataloged product if available.")
     product_name: Optional[str] = Field(None, description="The name of the cataloged product.")
     message: str = Field(..., description="Human-readable summary of what happened.")
-    
+    data: Optional[dict] = Field(
+        default=None,
+        description="Structured payload associated with the stage (draft details or saved record).",
+    )
+
     class Config:
         from_attributes = True

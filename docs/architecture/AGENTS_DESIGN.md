@@ -152,7 +152,7 @@ agent = create_agent(
 
 ### Infinite Loop Prevention
 
--   **Maximum Step Count:** Each workflow will have a configurable maximum number of steps (e.g., 50). If a workflow exceeds this limit, it will be automatically paused and flagged for human review to prevent runaway execution.
+-   **Maximum Step Count:** Each workflow will have a configurable maximum number of steps (e.g., 50). If a workflow exceeds this limit, it will be automatically paused and flagged for human review to prevent runaway execution. We enforce this today by passing `recursion_limit` in the WhatsApp runner before invoking the cataloging department.
 -   **Prompt-Based Safeguards:** The core prompts for manager-level agents (`Project Manager`, `Department Head`) will include explicit instructions to detect and report a lack of progress or cyclical logic, rather than retrying a failed approach indefinitely.
 
 ### Human-in-the-Loop (HITL) Integration

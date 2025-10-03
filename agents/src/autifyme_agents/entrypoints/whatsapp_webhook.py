@@ -12,11 +12,17 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 
 from autifyme_agents.core.config import settings
+from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
 from autifyme_agents.workflows.whatsapp_cataloging_runner import WhatsAppCatalogingRunner
 
 app = FastAPI()
 logger = logging.getLogger(__name__)
-runner = WhatsAppCatalogingRunner(enable_agent=True)
+storage_adapter = SupabaseStorageClient()
+
+runner = WhatsAppCatalogingRunner(
+    storage=storage_adapter,
+    enable_agent=True,
+)
 
 _EVENT_DUMP_DIR = Path("tmp/whatsapp_events")
 

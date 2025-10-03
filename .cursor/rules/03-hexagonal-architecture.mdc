@@ -7,7 +7,7 @@ To maintain a clean, decoupled architecture, we follow the Dependency Inversion 
 
 ## Implementation Guardrails:
 
-1.  **NEVER Import from `integrations`:**
+1.  **NEVER Import from `integrations` inside core layers:**
     -   Files within `core/`, `workflows/`, `departments/`, and `specialists/` MUST NOT directly import any code from the `integrations/` directory.
     -   **Bad:** `from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient`
     -   This would tightly couple our core logic to Supabase.
