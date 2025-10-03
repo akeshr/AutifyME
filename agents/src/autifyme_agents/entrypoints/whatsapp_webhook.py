@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,12 @@ runner = WhatsAppCatalogingRunner(
 
 _EVENT_DUMP_DIR = Path("tmp/whatsapp_events")
 
+# Idempotency tracking: LRU cache of processed message IDs to prevent duplicate processing
+# when WhatsApp retries webhooks. In production, this should be persisted in the database
+# with a TTL (e.g., 24 hours). For now, we use an in-memory cache with max 10,000 entries.
+_MAX_PROCESSED_MESSAGES = 10_000
+_processed_messages: OrderedDict[str, bool] = OrderedDict()
+
 
 def _persist_event(payload: dict[str, Any]) -> Path:
     _EVENT_DUMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -41,6 +48,39 @@ def _is_approval_message(text: str | None) -> bool:
         return False
     lowered = text.strip().lower()
     return lowered in {"approve", "reject"}
+
+
+def _is_duplicate_message(message_id: str) -> bool:
+    """Check if we've already processed this message ID (idempotency check).
+    
+    WhatsApp may retry webhook deliveries, and we need to ensure we don't
+    process the same message multiple times. This uses an in-memory LRU cache.
+    
+    In production, this should be backed by a database table with a TTL
+    (e.g., processed_messages table with 24h expiry) to survive server restarts.
+    """
+    return message_id in _processed_messages
+
+
+def _mark_message_processed(message_id: str) -> None:
+    """Mark a message ID as processed to prevent duplicate processing.
+    
+    Uses an LRU cache with max 10,000 entries to prevent memory leaks.
+    When the cache is full, the oldest entries are automatically evicted.
+    """
+    if message_id in _processed_messages:
+        # Move to end (mark as recently used)
+        _processed_messages.move_to_end(message_id)
+    else:
+        _processed_messages[message_id] = True
+        
+        # Evict oldest entry if cache is full (LRU)
+        if len(_processed_messages) > _MAX_PROCESSED_MESSAGES:
+            _processed_messages.popitem(last=False)
+            logger.debug(
+                "Evicted oldest message from idempotency cache",
+                extra={"cache_size": len(_processed_messages)},
+            )
 
 
 @app.get("/webhook")
@@ -64,38 +104,83 @@ async def receive(request: Request) -> Any:
     logger.debug("Incoming WhatsApp payload: %s", json.dumps(body))
 
     try:
-        entry = body["entry"][0]
-        changes = entry["changes"][0]
-        value = changes["value"]
-        messages = value.get("messages")
+        # WhatsApp can send multiple entries in one payload
+        for entry in body.get("entry", []):
+            for change in entry.get("changes", []):
+                value = change.get("value", {})
+                
+                # WhatsApp sends different event types:
+                # - "messages": incoming messages from users (PROCESS THESE)
+                # - "statuses": delivery/read receipts for outbound messages (IGNORE)
+                # - Other metadata events (IGNORE)
+                
+                # Only process if this is a message event (not status update)
+                messages = value.get("messages")
+                if not messages:
+                    # This is likely a status update or other event type
+                    statuses = value.get("statuses")
+                    if statuses:
+                        logger.debug(
+                            "Ignoring status update event",
+                            extra={"status_count": len(statuses), "event_path": str(event_path)},
+                        )
+                    else:
+                        logger.debug(
+                            "Ignoring non-message event",
+                            extra={"value_keys": list(value.keys()), "event_path": str(event_path)},
+                        )
+                    continue
 
-        if not messages:
-            return {"status": "ignored"}
+                # Process each message (usually just one, but iterate for safety)
+                for message in messages:
+                    message_id = message.get("id")
+                    sender = message.get("from")
+                    msg_type = message.get("type")
+                    timestamp = message.get("timestamp")
+                    
+                    # Skip if essential fields are missing
+                    if not message_id or not sender:
+                        logger.warning(
+                            "Skipping message with missing id or sender",
+                            extra={"message": message, "event_path": str(event_path)},
+                        )
+                        continue
+                    
+                    # Check for duplicate processing using message_id
+                    # (WhatsApp can retry webhooks, and we might get the same message twice)
+                    if _is_duplicate_message(message_id):
+                        logger.info(
+                            "Skipping duplicate message",
+                            extra={"message_id": message_id, "sender": sender, "event_path": str(event_path)},
+                        )
+                        continue
+                    
+                    text = message.get("text", {}).get("body")
+                    
+                    logger.info(
+                        "Processing WhatsApp message",
+                        extra={
+                            "message_id": message_id,
+                            "sender": sender,
+                            "message_type": msg_type,
+                            "has_media": msg_type == "image",
+                            "timestamp": timestamp,
+                            "event_path": str(event_path),
+                        },
+                    )
 
-        message = messages[0]
-        sender = message["from"]
-        msg_type = message.get("type")
-        text = message.get("text", {}).get("body")
+                    if msg_type == "text" and _is_approval_message(text):
+                        runner.handle_approval(sender, text)
+                        _mark_message_processed(message_id)
+                        continue
 
-        logger.info(
-            "Processing WhatsApp message",
-            extra={
-                "sender": sender,
-                "message_type": msg_type,
-                "has_media": msg_type == "image",
-                "event_path": str(event_path),
-            },
-        )
+                    media_id = None
+                    if msg_type == "image":
+                        media_id = message.get("image", {}).get("id")
 
-        if msg_type == "text" and _is_approval_message(text):
-            runner.handle_approval(sender, text)
-            return {"status": "approval_processed"}
-
-        media_id = None
-        if msg_type == "image":
-            media_id = message["image"]["id"]
-
-        runner.handle_message(sender, text, media_id)
+                    runner.handle_message(sender, text, media_id)
+                    _mark_message_processed(message_id)
+        
         return {"status": "processed"}
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to handle webhook: %s", exc, extra={"event_path": str(event_path)})

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from supabase import Client, create_client
@@ -83,10 +83,12 @@ class SupabaseStorageClient(StorageInterface):
         tool_call: dict,
         draft_summary: str,
         ai_message: Optional[dict] = None,
+        image_path: Optional[str] = None,
     ) -> str:
         """Persist a pending HITL approval to the pending_approvals table."""
 
         client = self._ensure_client()
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
         payload = {
             "thread_id": thread_id,
             "interrupt_id": interrupt_id,
@@ -94,6 +96,8 @@ class SupabaseStorageClient(StorageInterface):
             "tool_call": tool_call,
             "draft_summary": draft_summary,
             "ai_message": ai_message,
+            "image_path": image_path,
+            "expires_at": expires_at.isoformat(),
         }
         
         # Upsert to handle duplicate interrupts (e.g., retry scenarios)

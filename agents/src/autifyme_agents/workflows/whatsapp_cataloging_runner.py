@@ -201,7 +201,7 @@ class WhatsAppCatalogingRunner:
                 try:
                     result, interruption = self._invoke_project_manager(payload, config)
                     if interruption is not None:
-                        self._handle_interrupt(sender, interruption, thread_id)
+                        self._handle_interrupt(sender, interruption, thread_id, image_path)
                         return
                     self._handle_pm_completion(sender, result)
                 except ValueError as exc:
@@ -246,8 +246,17 @@ class WhatsAppCatalogingRunner:
                         "I hit a processing error. Please try resending the details or wait for support.",
                     )
             finally:
+                # Only cleanup image if we're NOT waiting for approval
+                # If there's a pending approval, the image will be cleaned up after approve/reject
                 if image_path and image_path.exists():
-                    image_path.unlink(missing_ok=True)
+                    pending = self.storage.get_pending_approval(thread_id)
+                    if not pending:
+                        # No pending approval - safe to delete
+                        image_path.unlink(missing_ok=True)
+                        logger.debug("Cleaned up temp image (no pending approval)", extra={"path": str(image_path)})
+                    else:
+                        # Store image path in approval for cleanup later
+                        logger.debug("Deferring image cleanup until approval resolution", extra={"path": str(image_path)})
 
     def handle_approval(self, sender: str, decision: str) -> None:
         if not self.enable_agent:
@@ -277,6 +286,15 @@ class WhatsAppCatalogingRunner:
                 return
 
             if action == "reject":
+                # Clean up the image file if it exists
+                stored_image_path = pending_approval.get("image_path")
+                if stored_image_path:
+                    try:
+                        Path(stored_image_path).unlink(missing_ok=True)
+                        logger.info("Cleaned up temp image after rejection", extra={"path": stored_image_path})
+                    except Exception as img_exc:  # noqa: BLE001
+                        logger.warning("Failed to clean up temp image", extra={"path": stored_image_path}, exc_info=img_exc)
+                
                 self._safe_send_text(
                     sender,
                     "Understood. The draft will remain unsaved. Let me know if you'd like updates or a retry.",
@@ -326,12 +344,22 @@ class WhatsAppCatalogingRunner:
                 },
             }
 
+            # Clean up the image file if it exists
+            stored_image_path = pending_approval.get("image_path")
+            if stored_image_path:
+                try:
+                    Path(stored_image_path).unlink(missing_ok=True)
+                    logger.info("Cleaned up temp image after approval", extra={"path": stored_image_path})
+                except Exception as img_exc:  # noqa: BLE001
+                    logger.warning("Failed to clean up temp image", extra={"path": stored_image_path}, exc_info=img_exc)
+            
             # Delete the approval record before resuming
             self.storage.delete_pending_approval(thread_id)
 
             result, interruption = self._invoke_project_manager(command, config)
             if interruption is not None:
-                self._handle_interrupt(sender, interruption, thread_id)
+                # No image_path here since we're resuming an existing workflow
+                self._handle_interrupt(sender, interruption, thread_id, image_path=None)
             elif result is not None:
                 self._handle_pm_completion(sender, result)
             else:
@@ -558,7 +586,13 @@ class WhatsAppCatalogingRunner:
                 return joined or None
         return None
 
-    def _handle_interrupt(self, sender: str, interruption: Interrupt, thread_id: str) -> None:
+    def _handle_interrupt(
+        self,
+        sender: str,
+        interruption: Interrupt,
+        thread_id: str,
+        image_path: Path | None = None,
+    ) -> None:
         """Handle native LangGraph interrupt by extracting tool details and requesting approval.
 
         With interrupt_before=["tools"], the interrupt.value contains the pending tool calls.
@@ -566,6 +600,12 @@ class WhatsAppCatalogingRunner:
         
         The interrupt context is persisted to Supabase to survive server restarts,
         honoring the Architecture-First state persistence principle (AGENTS_DESIGN.md § 6.2).
+        
+        Args:
+            sender: WhatsApp sender ID
+            interruption: LangGraph Interrupt object
+            thread_id: Conversation thread ID
+            image_path: Optional temp image file to preserve until approval/rejection
         """
         # The interrupt.value for interrupt_before typically contains a list of tool calls.
         # For deepagents + interrupt_before=["tools"], we expect the last AIMessage's tool_calls
@@ -629,10 +669,11 @@ class WhatsAppCatalogingRunner:
                 tool_call=save_product_call,
                 draft_summary=draft_summary,
                 ai_message=ai_message_data,
+                image_path=str(image_path) if image_path else None,
             )
             logger.info(
                 "Persisted pending approval to storage",
-                extra={"thread_id": thread_id, "interrupt_id": interrupt_id},
+                extra={"thread_id": thread_id, "interrupt_id": interrupt_id, "image_preserved": bool(image_path)},
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("Failed to persist pending approval - clearing checkpoint to prevent orphan", exc_info=exc)
