@@ -78,6 +78,37 @@ class WhatsAppCatalogingRunner:
             self._safe_send_text(sender, CATALOGING_PROMPT)
             return
 
+        thread_id = self._thread_id(sender)
+        
+        # Check for stale pending approvals that would cause INVALID_CHAT_HISTORY.
+        # If found, we interpret the new message as abandoning the previous request
+        # and starting fresh, so we clear both the approval record AND the checkpoint
+        # to remove orphaned tool calls. Otherwise, preserve conversation history.
+        existing_approval = self.storage.get_pending_approval(thread_id)
+        if existing_approval:
+            logger.info(
+                "New message received with pending approval - treating as fresh start",
+                extra={"thread_id": thread_id, "stale_interrupt_id": existing_approval.get("interrupt_id")},
+            )
+            # Clear the approval record
+            self.storage.delete_pending_approval(thread_id)
+            
+            # Clear the checkpoint to remove orphaned AIMessage with tool_calls
+            try:
+                checkpointer_ctx = self._get_checkpointer()
+                saver = checkpointer_ctx.__enter__() if hasattr(checkpointer_ctx, "__enter__") else checkpointer_ctx
+                saver.delete_thread(thread_id)
+                logger.info("Cleared checkpoint state to abandon stale approval", extra={"thread_id": thread_id})
+                if hasattr(checkpointer_ctx, "__exit__"):
+                    checkpointer_ctx.__exit__(None, None, None)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to clear checkpoint, proceeding anyway", exc_info=exc)
+        else:
+            logger.info(
+                "No pending approval found - preserving conversation history",
+                extra={"thread_id": thread_id},
+            )
+
         image_path: Path | None = None
         try:
             if media_id:
@@ -89,7 +120,6 @@ class WhatsAppCatalogingRunner:
 
             payload = self._build_project_manager_payload(normalized_text, image_path)
 
-            thread_id = self._thread_id(sender)
             config = {
                 "configurable": {
                     "thread_id": thread_id,
