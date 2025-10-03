@@ -80,15 +80,15 @@ class WhatsAppCatalogingRunner:
 
         thread_id = self._thread_id(sender)
         
-        # Check for stale pending approvals that would cause INVALID_CHAT_HISTORY.
-        # If found, we interpret the new message as abandoning the previous request
-        # and starting fresh, so we clear both the approval record AND the checkpoint
-        # to remove orphaned tool calls. Otherwise, preserve conversation history.
+        # Proactive Check: Only treat as abandonment if user sends a NEW cataloging request
+        # (with media) while approval is pending. Text-only messages are treated as conversation
+        # continuation (e.g., clarifications, edits) to preserve UX. The reactive recovery layer
+        # will handle any unexpected INVALID_CHAT_HISTORY errors that slip through.
         existing_approval = self.storage.get_pending_approval(thread_id)
-        if existing_approval:
+        if existing_approval and has_media:
             logger.info(
-                "New message received with pending approval - treating as fresh start",
-                extra={"thread_id": thread_id, "stale_interrupt_id": existing_approval.get("interrupt_id")},
+                "User sent NEW product (with media) while approval pending - treating as abandonment",
+                extra={"thread_id": thread_id, "abandoned_interrupt_id": existing_approval.get("interrupt_id")},
             )
             # Clear the approval record
             self.storage.delete_pending_approval(thread_id)
@@ -98,15 +98,15 @@ class WhatsAppCatalogingRunner:
                 checkpointer_ctx = self._get_checkpointer()
                 saver = checkpointer_ctx.__enter__() if hasattr(checkpointer_ctx, "__enter__") else checkpointer_ctx
                 saver.delete_thread(thread_id)
-                logger.info("Cleared checkpoint state to abandon stale approval", extra={"thread_id": thread_id})
+                logger.info("Cleared checkpoint for fresh workflow", extra={"thread_id": thread_id})
                 if hasattr(checkpointer_ctx, "__exit__"):
                     checkpointer_ctx.__exit__(None, None, None)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Failed to clear checkpoint, proceeding anyway", exc_info=exc)
-        else:
+                logger.warning("Failed to clear checkpoint during abandonment, recovery will handle", exc_info=exc)
+        elif existing_approval:
             logger.info(
-                "No pending approval found - preserving conversation history",
-                extra={"thread_id": thread_id},
+                "User sent text-only message during approval - treating as conversation continuation",
+                extra={"thread_id": thread_id, "pending_interrupt_id": existing_approval.get("interrupt_id")},
             )
 
         image_path: Path | None = None
@@ -138,6 +138,37 @@ class WhatsAppCatalogingRunner:
                     self._handle_interrupt(sender, interruption, thread_id)
                     return
                 self._handle_pm_completion(sender, result)
+            except ValueError as exc:
+                # Reactive Recovery: Safety net for unexpected edge cases (server crashes during
+                # interrupt, race conditions, future bugs). This is "defense in depth" - the
+                # proactive check handles known scenarios, this catches everything else.
+                # Production best practice per AGENTS_DESIGN.md § 6 (Resilience & Safeguards).
+                if "INVALID_CHAT_HISTORY" in str(exc) or "do not have a corresponding ToolMessage" in str(exc):
+                    logger.warning(
+                        "Detected orphaned tool calls in checkpoint - auto-recovery triggered",
+                        extra={"thread_id": thread_id, "error": str(exc)[:200]},
+                    )
+                    # Clear both approval and checkpoint, then retry once
+                    self.storage.delete_pending_approval(thread_id)
+                    try:
+                        checkpointer_ctx = self._get_checkpointer()
+                        saver = checkpointer_ctx.__enter__() if hasattr(checkpointer_ctx, "__enter__") else checkpointer_ctx
+                        saver.delete_thread(thread_id)
+                        logger.info("Auto-recovery: cleared orphaned checkpoint, retrying", extra={"thread_id": thread_id})
+                        if hasattr(checkpointer_ctx, "__exit__"):
+                            checkpointer_ctx.__exit__(None, None, None)
+                    except Exception as clear_exc:  # noqa: BLE001
+                        logger.exception("Failed to clear checkpoint during auto-recovery", exc_info=clear_exc)
+                        raise exc from clear_exc
+                    
+                    # Retry with clean state
+                    result, interruption = self._invoke_project_manager(payload, config)
+                    if interruption is not None:
+                        self._handle_interrupt(sender, interruption, thread_id)
+                        return
+                    self._handle_pm_completion(sender, result)
+                else:
+                    raise
             except GraphRecursionError as exc:
                 logger.exception("Project Manager recursion detected for %s", sender, exc_info=exc)
                 self._safe_send_text(
