@@ -108,13 +108,19 @@ class SupabaseStorageClient(StorageInterface):
         return response.data[0]["id"]
 
     def get_pending_approval(self, thread_id: str) -> Optional[dict]:
-        """Retrieve the most recent pending approval for a thread."""
+        """Retrieve the most recent non-expired pending approval for a thread.
+        
+        Filters out approvals past their expires_at timestamp (24h default) to prevent
+        processing stale approval requests and ensure users get clear "no pending approval"
+        messages instead of resuming outdated workflows.
+        """
 
         client = self._ensure_client()
         response = (
             client.table("pending_approvals")
             .select("*")
             .eq("thread_id", thread_id)
+            .gt("expires_at", "now()")  # Only non-expired approvals
             .order("created_at", desc=True)
             .limit(1)
             .execute()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
@@ -26,7 +27,11 @@ CATALOGING_PROMPT = "Please share the product details and photo so I can catalog
 
 
 class WhatsAppCatalogingRunner:
-    """Coordinates the end-to-end WhatsApp cataloging workflow."""
+    """Coordinates the end-to-end WhatsApp cataloging workflow.
+    
+    Thread-safe for concurrent requests from different users. Uses per-thread locks
+    to prevent race conditions when the same user sends multiple messages rapidly.
+    """
 
     def __init__(
         self,
@@ -48,6 +53,9 @@ class WhatsAppCatalogingRunner:
         self.recursion_limit = recursion_limit or settings.AGENT_RECURSION_LIMIT
         self.company_profile: CompanyProfile = self.storage.get_company_profile()
         self._last_pm_state: dict[str, Any] | None = None
+        # Thread locks per user to prevent concurrent message processing for same user
+        self._thread_locks: dict[str, threading.Lock] = {}
+        self._locks_mutex = threading.Lock()  # Protects _thread_locks dict itself
 
     def _get_checkpointer(self) -> BaseCheckpointSaver:
         if self.checkpointer:
@@ -56,6 +64,24 @@ class WhatsAppCatalogingRunner:
 
     def _thread_id(self, sender: str) -> str:
         return f"whatsapp:{sender}"
+
+    def _get_thread_lock(self, thread_id: str) -> threading.Lock:
+        """Get or create a lock for a specific thread_id.
+        
+        Uses double-checked locking to minimize mutex contention while ensuring
+        thread-safe lock creation. This prevents race conditions when the same user
+        sends multiple messages concurrently (e.g., rapid double-tap on WhatsApp).
+        """
+        # Fast path: lock already exists
+        if thread_id in self._thread_locks:
+            return self._thread_locks[thread_id]
+        
+        # Slow path: create lock under mutex protection
+        with self._locks_mutex:
+            # Double-check in case another thread created it while we waited
+            if thread_id not in self._thread_locks:
+                self._thread_locks[thread_id] = threading.Lock()
+            return self._thread_locks[thread_id]
 
     def _should_invoke_department(self, text: str | None, has_media: bool) -> bool:
         """Gate to avoid invoking the department on greetings/empty messages."""
@@ -79,111 +105,122 @@ class WhatsAppCatalogingRunner:
             return
 
         thread_id = self._thread_id(sender)
+        lock = self._get_thread_lock(thread_id)
         
-        # Proactive Check: Only treat as abandonment if user sends a NEW cataloging request
-        # (with media) while approval is pending. Text-only messages are treated as conversation
-        # continuation (e.g., clarifications, edits) to preserve UX. The reactive recovery layer
-        # will handle any unexpected INVALID_CHAT_HISTORY errors that slip through.
-        existing_approval = self.storage.get_pending_approval(thread_id)
-        if existing_approval and has_media:
-            logger.info(
-                "User sent NEW product (with media) while approval pending - treating as abandonment",
-                extra={"thread_id": thread_id, "abandoned_interrupt_id": existing_approval.get("interrupt_id")},
-            )
-            # Clear the approval record
-            self.storage.delete_pending_approval(thread_id)
-            
-            # Clear the checkpoint to remove orphaned AIMessage with tool_calls
-            try:
-                checkpointer_ctx = self._get_checkpointer()
-                saver = checkpointer_ctx.__enter__() if hasattr(checkpointer_ctx, "__enter__") else checkpointer_ctx
-                saver.delete_thread(thread_id)
-                logger.info("Cleared checkpoint for fresh workflow", extra={"thread_id": thread_id})
-                if hasattr(checkpointer_ctx, "__exit__"):
-                    checkpointer_ctx.__exit__(None, None, None)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Failed to clear checkpoint during abandonment, recovery will handle", exc_info=exc)
-        elif existing_approval:
-            logger.info(
-                "User sent text-only message during approval - treating as conversation continuation",
-                extra={"thread_id": thread_id, "pending_interrupt_id": existing_approval.get("interrupt_id")},
-            )
-
-        image_path: Path | None = None
-        try:
-            if media_id:
-                image_path = self.media_client.download_media(media_id)
+        # Serialize message handling for this user to prevent race conditions
+        with lock:
+            # Proactive Check: Only treat as abandonment if user sends a NEW cataloging request
+            # (with media) while approval is pending. Text-only messages are treated as conversation
+            # continuation (e.g., clarifications, edits) to preserve UX. The reactive recovery layer
+            # will handle any unexpected INVALID_CHAT_HISTORY errors that slip through.
+            existing_approval = self.storage.get_pending_approval(thread_id)
+            if existing_approval and has_media:
                 logger.info(
-                    "Media download succeeded",
-                    extra={"sender": sender, "media_id": media_id, "path": str(image_path)},
+                    "User sent NEW product (with media) while approval pending - treating as abandonment",
+                    extra={"thread_id": thread_id, "abandoned_interrupt_id": existing_approval.get("interrupt_id")},
+                )
+                # Clear the approval record
+                self.storage.delete_pending_approval(thread_id)
+                
+                # Clear the checkpoint to remove orphaned AIMessage with tool_calls
+                try:
+                    checkpointer_ctx = self._get_checkpointer()
+                    with checkpointer_ctx as saver:
+                        saver.delete_thread(thread_id)
+                        logger.info("Cleared checkpoint for fresh workflow", extra={"thread_id": thread_id})
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Failed to clear checkpoint during abandonment, recovery will handle", exc_info=exc)
+            elif existing_approval:
+                logger.info(
+                    "User sent text-only message during approval - treating as conversation continuation",
+                    extra={"thread_id": thread_id, "pending_interrupt_id": existing_approval.get("interrupt_id")},
                 )
 
-            payload = self._build_project_manager_payload(normalized_text, image_path)
-
-            config = {
-                "configurable": {
-                    "thread_id": thread_id,
-                    "company_id": "default",
-                },
-                "recursion_limit": self.recursion_limit,
-                "metadata": {
-                    "langsmith.thread_id": thread_id,
-                    "workflow": "cataloging",
-                },
-            }
-
+            image_path: Path | None = None
             try:
-                result, interruption = self._invoke_project_manager(payload, config)
-                if interruption is not None:
-                    self._handle_interrupt(sender, interruption, thread_id)
-                    return
-                self._handle_pm_completion(sender, result)
-            except ValueError as exc:
-                # Reactive Recovery: Safety net for unexpected edge cases (server crashes during
-                # interrupt, race conditions, future bugs). This is "defense in depth" - the
-                # proactive check handles known scenarios, this catches everything else.
-                # Production best practice per AGENTS_DESIGN.md § 6 (Resilience & Safeguards).
-                if "INVALID_CHAT_HISTORY" in str(exc) or "do not have a corresponding ToolMessage" in str(exc):
-                    logger.warning(
-                        "Detected orphaned tool calls in checkpoint - auto-recovery triggered",
-                        extra={"thread_id": thread_id, "error": str(exc)[:200]},
-                    )
-                    # Clear both approval and checkpoint, then retry once
-                    self.storage.delete_pending_approval(thread_id)
+                if media_id:
                     try:
-                        checkpointer_ctx = self._get_checkpointer()
-                        saver = checkpointer_ctx.__enter__() if hasattr(checkpointer_ctx, "__enter__") else checkpointer_ctx
-                        saver.delete_thread(thread_id)
-                        logger.info("Auto-recovery: cleared orphaned checkpoint, retrying", extra={"thread_id": thread_id})
-                        if hasattr(checkpointer_ctx, "__exit__"):
-                            checkpointer_ctx.__exit__(None, None, None)
-                    except Exception as clear_exc:  # noqa: BLE001
-                        logger.exception("Failed to clear checkpoint during auto-recovery", exc_info=clear_exc)
-                        raise exc from clear_exc
-                    
-                    # Retry with clean state
+                        image_path = self.media_client.download_media(media_id)
+                        logger.info(
+                            "Media download succeeded",
+                            extra={"sender": sender, "media_id": media_id, "path": str(image_path)},
+                        )
+                    except Exception as media_exc:  # noqa: BLE001
+                        logger.exception(
+                            "Media download failed",
+                            extra={"sender": sender, "media_id": media_id},
+                            exc_info=media_exc,
+                        )
+                        self._safe_send_text(
+                            sender,
+                            "I couldn't download your image. Please try resending it or check your connection.",
+                        )
+                        return
+
+                payload = self._build_project_manager_payload(normalized_text, image_path)
+
+                config = {
+                    "configurable": {
+                        "thread_id": thread_id,
+                        "company_id": "default",
+                    },
+                    "recursion_limit": self.recursion_limit,
+                    "metadata": {
+                        "langsmith.thread_id": thread_id,
+                        "workflow": "cataloging",
+                    },
+                }
+
+                try:
                     result, interruption = self._invoke_project_manager(payload, config)
                     if interruption is not None:
                         self._handle_interrupt(sender, interruption, thread_id)
                         return
                     self._handle_pm_completion(sender, result)
-                else:
-                    raise
-            except GraphRecursionError as exc:
-                logger.exception("Project Manager recursion detected for %s", sender, exc_info=exc)
-                self._safe_send_text(
-                    sender,
-                    "I'm having trouble finishing this task. A specialist will review and follow up.",
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.exception("Project Manager invocation failed for %s", sender, exc_info=exc)
-                self._safe_send_text(
-                    sender,
-                    "I hit a processing error. Please try resending the details or wait for support.",
-                )
-        finally:
-            if image_path and image_path.exists():
-                image_path.unlink(missing_ok=True)
+                except ValueError as exc:
+                    # Reactive Recovery: Safety net for unexpected edge cases (server crashes during
+                    # interrupt, race conditions, future bugs). This is "defense in depth" - the
+                    # proactive check handles known scenarios, this catches everything else.
+                    # Production best practice per AGENTS_DESIGN.md § 6 (Resilience & Safeguards).
+                    if "INVALID_CHAT_HISTORY" in str(exc) or "do not have a corresponding ToolMessage" in str(exc):
+                        logger.warning(
+                            "Detected orphaned tool calls in checkpoint - auto-recovery triggered",
+                            extra={"thread_id": thread_id, "error": str(exc)[:200]},
+                        )
+                        # Clear both approval and checkpoint, then retry once
+                        self.storage.delete_pending_approval(thread_id)
+                        try:
+                            checkpointer_ctx = self._get_checkpointer()
+                            with checkpointer_ctx as saver:
+                                saver.delete_thread(thread_id)
+                                logger.info("Auto-recovery: cleared orphaned checkpoint, retrying", extra={"thread_id": thread_id})
+                        except Exception as clear_exc:  # noqa: BLE001
+                            logger.exception("Failed to clear checkpoint during auto-recovery", exc_info=clear_exc)
+                            raise exc from clear_exc
+                        
+                        # Retry with clean state
+                        result, interruption = self._invoke_project_manager(payload, config)
+                        if interruption is not None:
+                            self._handle_interrupt(sender, interruption, thread_id)
+                            return
+                        self._handle_pm_completion(sender, result)
+                    else:
+                        raise
+                except GraphRecursionError as exc:
+                    logger.exception("Project Manager recursion detected for %s", sender, exc_info=exc)
+                    self._safe_send_text(
+                        sender,
+                        "I'm having trouble finishing this task. A specialist will review and follow up.",
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.exception("Project Manager invocation failed for %s", sender, exc_info=exc)
+                    self._safe_send_text(
+                        sender,
+                        "I hit a processing error. Please try resending the details or wait for support.",
+                    )
+            finally:
+                if image_path and image_path.exists():
+                    image_path.unlink(missing_ok=True)
 
     def handle_approval(self, sender: str, decision: str) -> None:
         if not self.enable_agent:
@@ -198,77 +235,80 @@ class WhatsAppCatalogingRunner:
             return
 
         thread_id = self._thread_id(sender)
+        lock = self._get_thread_lock(thread_id)
         
-        # Retrieve pending approval from persistent storage
-        pending_approval = self.storage.get_pending_approval(thread_id)
-        
-        if pending_approval is None:
-            self._safe_send_text(
-                sender,
-                "No pending approval found for this thread. Please restart the cataloging request.",
-            )
-            return
+        # Serialize approval handling for this user to prevent race conditions
+        with lock:
+            # Retrieve pending approval from persistent storage
+            pending_approval = self.storage.get_pending_approval(thread_id)
+            
+            if pending_approval is None:
+                self._safe_send_text(
+                    sender,
+                    "No pending approval found for this thread. Please restart the cataloging request.",
+                )
+                return
 
-        if action == "reject":
-            self._safe_send_text(
-                sender,
-                "Understood. The draft will remain unsaved. Let me know if you'd like updates or a retry.",
+            if action == "reject":
+                self._safe_send_text(
+                    sender,
+                    "Understood. The draft will remain unsaved. Let me know if you'd like updates or a retry.",
+                )
+                self.storage.delete_pending_approval(thread_id)
+                return
+
+            # Handle approve
+            interrupt_id = pending_approval.get("interrupt_id")
+            tool_call = pending_approval.get("tool_call")
+            draft_summary = pending_approval.get("draft_summary")
+            ai_message = pending_approval.get("ai_message")
+            
+            if not interrupt_id or not tool_call:
+                logger.warning("Approval resume missing context for %s", sender)
+                self._safe_send_text(
+                    sender,
+                    "Approval context invalid. Please restart the cataloging request if needed.",
+                )
+                self.storage.delete_pending_approval(thread_id)
+                return
+
+            synthetic_tool_message = ToolMessage(
+                content=draft_summary or "Approval granted.",
+                tool_call_id=tool_call.get("id"),
+                name=tool_call.get("name"),
             )
+
+            command = Command(
+                update={"messages": [synthetic_tool_message]},
+                resume={
+                    interrupt_id: {
+                        "type": "accept",
+                        "args": None,
+                    }
+                },
+            )
+
+            config = {
+                "configurable": {
+                    "thread_id": thread_id,
+                    "company_id": "default",
+                },
+                "metadata": {
+                    "langsmith.thread_id": thread_id,
+                    "workflow": "cataloging",
+                },
+            }
+
+            # Delete the approval record before resuming
             self.storage.delete_pending_approval(thread_id)
-            return
 
-        # Handle approve
-        interrupt_id = pending_approval.get("interrupt_id")
-        tool_call = pending_approval.get("tool_call")
-        draft_summary = pending_approval.get("draft_summary")
-        ai_message = pending_approval.get("ai_message")
-        
-        if not interrupt_id or not tool_call:
-            logger.warning("Approval resume missing context for %s", sender)
-            self._safe_send_text(
-                sender,
-                "Approval context invalid. Please restart the cataloging request if needed.",
-            )
-            self.storage.delete_pending_approval(thread_id)
-            return
-
-        synthetic_tool_message = ToolMessage(
-            content=draft_summary or "Approval granted.",
-            tool_call_id=tool_call.get("id"),
-            name=tool_call.get("name"),
-        )
-
-        command = Command(
-            update={"messages": [synthetic_tool_message]},
-            resume={
-                interrupt_id: {
-                    "type": "accept",
-                    "args": None,
-                }
-            },
-        )
-
-        config = {
-            "configurable": {
-                "thread_id": thread_id,
-                "company_id": "default",
-            },
-            "metadata": {
-                "langsmith.thread_id": thread_id,
-                "workflow": "cataloging",
-            },
-        }
-
-        # Delete the approval record before resuming
-        self.storage.delete_pending_approval(thread_id)
-
-        result, interruption = self._invoke_project_manager(command, config)
-        if interruption is not None:
-            self._handle_interrupt(sender, interruption, thread_id)
-        elif result is not None:
-            self._handle_pm_completion(sender, result)
-        else:
-            logger.warning("No result returned while resuming approval for %s", sender)
+            result, interruption = self._invoke_project_manager(command, config)
+            if interruption is not None:
+                self._handle_interrupt(sender, interruption, thread_id)
+            elif result is not None:
+                self._handle_pm_completion(sender, result)
+            else:
+                logger.warning("No result returned while resuming approval for %s", sender)
 
     def _invoke_project_manager(
         self,
@@ -287,18 +327,17 @@ class WhatsAppCatalogingRunner:
         No custom validation error parsing or manual ToolMessage synthesis needed.
         """
         checkpointer_ctx = self._get_checkpointer()
-        saver = checkpointer_ctx.__enter__() if hasattr(checkpointer_ctx, "__enter__") else checkpointer_ctx
+        
+        with checkpointer_ctx as saver:
+            project_manager = create_project_manager(
+                self.company_profile,
+                checkpointer=saver,
+                storage=self.storage,
+            )
 
-        project_manager = create_project_manager(
-            self.company_profile,
-            checkpointer=saver,
-            storage=self.storage,
-        )
+            last_event: Optional[dict[str, Any]] = None
+            interrupt_event: Optional[Interrupt] = None
 
-        last_event: Optional[dict[str, Any]] = None
-        interrupt_event: Optional[Interrupt] = None
-
-        try:
             stream_config = dict(config)
             stream_config.setdefault("configurable", {})
             stream_config["configurable"].setdefault("remaining_steps", self.recursion_limit)
@@ -332,11 +371,8 @@ class WhatsAppCatalogingRunner:
                             # Log the full interrupt structure for debugging
                             logger.debug(f"Full interrupt value: {interrupt_event.value if hasattr(interrupt_event, 'value') else 'N/A'}")
                             break
-        finally:
-            if hasattr(checkpointer_ctx, "__exit__"):
-                checkpointer_ctx.__exit__(None, None, None)
 
-        return last_event, interrupt_event
+            return last_event, interrupt_event
 
     def _log_stream_event_summary(self, event: dict[str, Any], config: dict[str, Any]) -> None:
         thread_id = config.get("configurable", {}).get("thread_id")
@@ -506,7 +542,23 @@ class WhatsAppCatalogingRunner:
                 break
         
         if not save_product_call:
-            logger.warning("Interrupt detected but no save_product tool call found for %s", sender)
+            logger.error(
+                "Interrupt detected but no save_product tool call found - workflow design error",
+                extra={"sender": sender, "thread_id": thread_id, "tool_calls": tool_calls},
+            )
+            self._safe_send_text(
+                sender,
+                "I encountered an unexpected issue while processing your request. A specialist will review this. "
+                "Please try resending your product details.",
+            )
+            # Clear the checkpoint to prevent stuck state
+            try:
+                checkpointer_ctx = self._get_checkpointer()
+                with checkpointer_ctx as saver:
+                    saver.delete_thread(thread_id)
+                    logger.info("Cleared checkpoint after unexpected interrupt", extra={"thread_id": thread_id})
+            except Exception as clear_exc:  # noqa: BLE001
+                logger.exception("Failed to clear checkpoint after unexpected interrupt", exc_info=clear_exc)
             return
 
         tool_args = save_product_call.get("args", {})
@@ -546,10 +598,22 @@ class WhatsAppCatalogingRunner:
                 extra={"thread_id": thread_id, "interrupt_id": interrupt_id},
             )
         except Exception as exc:  # noqa: BLE001
-            logger.exception("Failed to persist pending approval", exc_info=exc)
+            logger.exception("Failed to persist pending approval - clearing checkpoint to prevent orphan", exc_info=exc)
+            
+            # Critical: If we can't persist the approval, we MUST clear the checkpoint
+            # to prevent orphaned tool calls. Otherwise, next message triggers
+            # INVALID_CHAT_HISTORY and user loses conversation context.
+            try:
+                checkpointer_ctx = self._get_checkpointer()
+                with checkpointer_ctx as saver:
+                    saver.delete_thread(thread_id)
+                    logger.info("Cleared checkpoint after storage failure", extra={"thread_id": thread_id})
+            except Exception as clear_exc:  # noqa: BLE001
+                logger.exception("Failed to clear checkpoint after storage failure", exc_info=clear_exc)
+            
             self._safe_send_text(
                 sender,
-                "I encountered an issue saving the approval request. Please try again.",
+                "I encountered an issue saving the approval request. Please resend your product details to try again.",
             )
             return
 
