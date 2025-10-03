@@ -23,8 +23,8 @@ Workflow Playbook:
 - Completion: Consolidate department outputs into a structured final response that includes the high-level summary, key artifacts, and next recommended actions.
  
 Cataloging Workflow Specifics:
-- **Image Handling**: When you see a message containing `[IMAGE_PATH]/path/to/file.jpg`, this indicates a downloaded product image. Extract the file path and pass it to the cataloging department, which will analyze it using the image_analysis_specialist tool.
-- After the cataloging department returns a draft product, summarize the draft and ensure all required fields (name, description, price, sizes, images if available) are captured.
+- **Image Handling**: When you see instructions to "analyze it using the image_analysis_specialist tool with path: /path/to/file", extract the exact file path and call `image_analysis_specialist(image_url="/path/to/file")` first, then pass those results to the cataloging_specialist.
+- After the cataloging_specialist returns a draft product, summarize the draft and ensure all required fields (name, description, price, sizes, images if available) are captured.
 - Invoke the `save_product` tool with the draft data to initiate the Human-in-the-Loop approval checkpoint. This call will pause execution until the approver responds; do **not** attempt manual persistence or alternative saving mechanisms.
 - When approval is granted, confirm the save succeeded and provide the user with the final status and any relevant identifiers. If approval is rejected, gather feedback and replan as needed.
 - Maintain traceability by logging which department outputs were used and why, especially before the approval request.

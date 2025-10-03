@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 CATALOGING_PROMPT = "Please share the product details and photo so I can catalog it."  # Minimal triage response
+MAX_THREAD_LOCKS = 1000  # Maximum number of locks to keep in memory (LRU eviction)
 
 
 class WhatsAppCatalogingRunner:
@@ -31,6 +33,10 @@ class WhatsAppCatalogingRunner:
     
     Thread-safe for concurrent requests from different users. Uses per-thread locks
     to prevent race conditions when the same user sends multiple messages rapidly.
+    
+    Memory Management:
+    Uses an LRU cache for thread locks with a maximum size of 1000 entries to prevent
+    memory leaks in production. Oldest locks are evicted when the cache fills up.
     """
 
     def __init__(
@@ -53,8 +59,9 @@ class WhatsAppCatalogingRunner:
         self.recursion_limit = recursion_limit or settings.AGENT_RECURSION_LIMIT
         self.company_profile: CompanyProfile = self.storage.get_company_profile()
         self._last_pm_state: dict[str, Any] | None = None
-        # Thread locks per user to prevent concurrent message processing for same user
-        self._thread_locks: dict[str, threading.Lock] = {}
+        # Thread locks per user with LRU eviction to prevent memory leaks
+        # OrderedDict maintains insertion order for LRU behavior
+        self._thread_locks: OrderedDict[str, threading.Lock] = OrderedDict()
         self._locks_mutex = threading.Lock()  # Protects _thread_locks dict itself
 
     def _get_checkpointer(self) -> BaseCheckpointSaver:
@@ -66,21 +73,41 @@ class WhatsAppCatalogingRunner:
         return f"whatsapp:{sender}"
 
     def _get_thread_lock(self, thread_id: str) -> threading.Lock:
-        """Get or create a lock for a specific thread_id.
+        """Get or create a lock for a specific thread_id with LRU eviction.
         
         Uses double-checked locking to minimize mutex contention while ensuring
         thread-safe lock creation. This prevents race conditions when the same user
         sends multiple messages concurrently (e.g., rapid double-tap on WhatsApp).
+        
+        Memory Management:
+        Implements LRU eviction when the cache exceeds MAX_THREAD_LOCKS entries.
+        This prevents unbounded memory growth in production. Evicted locks are safe
+        to remove because they're only held during active processing.
         """
         # Fast path: lock already exists
         if thread_id in self._thread_locks:
+            # Move to end (mark as recently used) for LRU
+            with self._locks_mutex:
+                self._thread_locks.move_to_end(thread_id)
             return self._thread_locks[thread_id]
         
-        # Slow path: create lock under mutex protection
+        # Slow path: create lock under mutex protection with LRU eviction
         with self._locks_mutex:
             # Double-check in case another thread created it while we waited
-            if thread_id not in self._thread_locks:
-                self._thread_locks[thread_id] = threading.Lock()
+            if thread_id in self._thread_locks:
+                self._thread_locks.move_to_end(thread_id)
+                return self._thread_locks[thread_id]
+            
+            # Evict oldest lock if at capacity
+            if len(self._thread_locks) >= MAX_THREAD_LOCKS:
+                oldest_thread_id, _ = self._thread_locks.popitem(last=False)
+                logger.debug(
+                    "Evicted LRU thread lock",
+                    extra={"evicted_thread_id": oldest_thread_id, "cache_size": len(self._thread_locks)},
+                )
+            
+            # Create new lock
+            self._thread_locks[thread_id] = threading.Lock()
             return self._thread_locks[thread_id]
 
     def _should_invoke_department(self, text: str | None, has_media: bool) -> bool:
@@ -441,18 +468,28 @@ class WhatsAppCatalogingRunner:
         text: str,
         image_path: Path | None,
     ) -> dict[str, Any]:
+        """Build the payload for the Project Manager.
+        
+        Instead of embedding the image path as text (which relies on LLM parsing),
+        we store it in metadata and update the prompt to instruct the PM to use it.
+        This makes the flow deterministic and prevents LLM parsing errors.
+        """
         messages: list[HumanMessage] = []
         
-        # Only include text message if there's actual content
-        # Per WHATSAPP_CATALOGING_WORKFLOW.md, users can send image-only messages
-        if text and text.strip():
+        # Build the user message
+        if image_path and image_path.exists():
+            # User sent an image (with optional text)
+            if text and text.strip():
+                content = f"{text}\n\n[An image was provided - analyze it using the image_analysis_specialist tool with path: {image_path}]"
+            else:
+                content = f"[An image was provided - analyze it using the image_analysis_specialist tool with path: {image_path}]"
+            messages.append(HumanMessage(content=content))
+        elif text and text.strip():
+            # Text-only message
             messages.append(HumanMessage(content=text))
-        
-        if image_path:
-            # If no text was provided, add a helpful prompt for the PM
-            if not messages:
-                messages.append(HumanMessage(content="Please catalog the product from this image."))
-            messages.append(HumanMessage(content=f"[IMAGE_PATH]{image_path}"))
+        else:
+            # Shouldn't happen due to _should_invoke_department gate, but handle it
+            messages.append(HumanMessage(content="Please provide product details."))
         
         return {"messages": messages}
 

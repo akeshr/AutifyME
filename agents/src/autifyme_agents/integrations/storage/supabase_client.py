@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from supabase import Client, create_client
@@ -116,11 +117,13 @@ class SupabaseStorageClient(StorageInterface):
         """
 
         client = self._ensure_client()
+        now = datetime.now(timezone.utc).isoformat()
+        
         response = (
             client.table("pending_approvals")
             .select("*")
             .eq("thread_id", thread_id)
-            .gt("expires_at", "now()")  # Only non-expired approvals
+            .gt("expires_at", now)  # Only non-expired approvals
             .order("created_at", desc=True)
             .limit(1)
             .execute()
