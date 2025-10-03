@@ -112,12 +112,12 @@ class WhatsAppCatalogingRunner:
                     sender,
                     "I'm having trouble finishing this task. A specialist will review and follow up.",
                 )
-            except Exception as exc:  # noqa: BLE001
+                except Exception as exc:  # noqa: BLE001
                 logger.exception("Project Manager invocation failed for %s", sender, exc_info=exc)
                 self._safe_send_text(
-                    sender,
-                    "I hit a processing error. Please try resending the details or wait for support.",
-                )
+                        sender,
+                        "I hit a processing error. Please try resending the details or wait for support.",
+                    )
         finally:
             if image_path and image_path.exists():
                 image_path.unlink(missing_ok=True)
@@ -171,13 +171,31 @@ class WhatsAppCatalogingRunner:
             self.whatsapp_client.send_text(sender, "Please reply with 'approve' or 'reject'.")
             return
 
+        ai_message = save_request.get("ai_message")
+        tool_call = save_request.get("tool_call")
+        if ai_message is None or tool_call is None:
+            logger.warning("Approval resume missing context for %s", sender)
+            self._safe_send_text(
+                sender,
+                "Approval context invalid. Please restart the cataloging request if needed.",
+            )
+            self._pending_interrupts.pop(pending_id, None)
+            return
+
+        synthetic_tool_message = ToolMessage(
+            content=save_request.get("draft_summary", "Approval granted."),
+            tool_call_id=tool_call.get("id"),
+            name=tool_call.get("name"),
+        )
+
         command = Command(
+            update={"messages": [synthetic_tool_message]},
             resume={
                 interrupt.id: {
                     "type": "accept",
                     "args": None,
                 }
-            }
+            },
         )
 
         config = {
