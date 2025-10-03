@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import logging
 from pathlib import Path
 from typing import Any, Optional, Tuple
@@ -19,7 +18,6 @@ from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
 from autifyme_agents.schemas.agent_outputs import CatalogingToolOutput
 from autifyme_agents.core.config import settings
 from autifyme_agents.workflows.project_manager import create_project_manager
-from autifyme_agents.tools.registry import get_interrupt_config
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +48,6 @@ class WhatsAppCatalogingRunner:
         self.recursion_limit = recursion_limit or settings.AGENT_RECURSION_LIMIT
         self.company_profile: CompanyProfile = self.storage.get_company_profile()
         self._last_pm_state: dict[str, Any] | None = None
-        self._interrupt_tool_names = set(get_interrupt_config().keys())
 
     def _get_checkpointer(self) -> BaseCheckpointSaver:
         if self.checkpointer:
@@ -110,7 +107,7 @@ class WhatsAppCatalogingRunner:
                 logger.exception("Project Manager recursion detected for %s", sender, exc_info=exc)
                 self.whatsapp_client.send_text(
                     sender,
-                    "I’m having trouble finishing this task. A specialist will review and follow up.",
+                    "I'm having trouble finishing this task. A specialist will review and follow up.",
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.exception("Project Manager invocation failed for %s", sender, exc_info=exc)
@@ -156,6 +153,17 @@ class WhatsAppCatalogingRunner:
         payload: dict[str, Any],
         config: dict[str, Any],
     ) -> Tuple[Optional[dict[str, Any]], Optional[Interrupt]]:
+        """Invoke Project Manager and handle native LangGraph interrupts.
+
+        With interrupt_before=["tools"], LangGraph will:
+        1. Let the agent emit tool calls (AIMessage with tool_calls)
+        2. Pause execution and emit an __interrupt__ in the state
+        3. Wait for approval/rejection via Command resumption
+        4. Resume and execute the tool node (which synthesizes ToolMessage)
+
+        This runner simply streams events and detects __interrupt__ naturally.
+        No custom validation error parsing or manual ToolMessage synthesis needed.
+        """
         checkpointer_ctx = self._get_checkpointer()
         saver = checkpointer_ctx.__enter__() if hasattr(checkpointer_ctx, "__enter__") else checkpointer_ctx
 
@@ -173,213 +181,57 @@ class WhatsAppCatalogingRunner:
             stream_config.setdefault("configurable", {})
             stream_config["configurable"].setdefault("remaining_steps", self.recursion_limit)
 
+            # Stream in "values" mode to get full state snapshots.
             stream = project_manager.stream(payload, config=stream_config, stream_mode="values")
-            while True:
-                try:
-                    event = next(stream)
-                except StopIteration:
-                    break
-                except ValueError as err:
-                    action, interrupt_event = self._handle_tool_validation_error(err)
-                    logger.debug(
-                        "Tool validation guard tripped",
-                    extra={
-                        "action": action,
-                        "interrupt": bool(interrupt_event),
-                        "thread_id": config.get("configurable", {}).get("thread_id"),
-                    },
-                    )
-                    if action == "continue":
-                        continue
-                    if action == "interrupt":
-                        break
-                    raise
-                if isinstance(event, dict) and "__interrupt__" in event:
-                    interrupts = event.get("__interrupt__") or []
-                    if interrupts:
-                        interrupt_event = interrupts[0]
-                    break
+            for event in stream:
                 if isinstance(event, dict):
                     last_event = event
                     self._last_pm_state = event
                     self._log_stream_event_summary(last_event, config)
 
-                if interrupt_event is not None:
-                    break
-
-                pending_interrupt = self._detect_interrupt_from_event(last_event or {}, config)
-                if pending_interrupt is not None:
-                    logger.info(
-                        "Interrupt inferred from tool call",
-                    extra={
-                        "tool": pending_interrupt.value.get("tool"),
-                        "thread_id": config.get("configurable", {}).get("thread_id"),
-                    },
-                    )
-                    interrupt_event = pending_interrupt
-                    break
-
-                if self._should_break_after_event(last_event or {}):
-                    logger.debug(
-                        "Stream break condition met",
-                        extra={
-                            "thread_id": config.get("configurable", {}).get("thread_id"),
-                            "unmatched_calls": list(self._find_unmatched_tool_calls(last_event or {})),
-                        },
-                    )
-                    break
+                    # Check for native LangGraph interrupt signal
+                    if "__interrupt__" in event:
+                        interrupts = event.get("__interrupt__") or []
+                        if interrupts:
+                            interrupt_event = interrupts[0]
+                            logger.info(
+                                "Native LangGraph interrupt detected",
+                                extra={
+                                    "thread_id": config.get("configurable", {}).get("thread_id"),
+                                    "interrupt_count": len(interrupts),
+                                    "interrupt_value_type": type(interrupt_event.value).__name__ if hasattr(interrupt_event, "value") else "N/A",
+                                    "interrupt_value_keys": list(interrupt_event.value.keys()) if hasattr(interrupt_event, "value") and isinstance(interrupt_event.value, dict) else "N/A",
+                                },
+                            )
+                            # Log the full interrupt structure for debugging
+                            logger.debug(f"Full interrupt value: {interrupt_event.value if hasattr(interrupt_event, 'value') else 'N/A'}")
+                            break
         finally:
             if hasattr(checkpointer_ctx, "__exit__"):
                 checkpointer_ctx.__exit__(None, None, None)
 
         return last_event, interrupt_event
 
-    def _detect_interrupt_from_event(
-        self,
-        event: dict[str, Any],
-        config: dict[str, Any] | None = None,
-    ) -> Optional[Interrupt]:
-        if not event:
-            return None
-        messages = event.get("messages") or []
-        if not messages:
-            return None
-        # Inspect messages in reverse to catch latest AI tool calls first.
-        for message in reversed(messages):
-            message_type = getattr(message, "type", None)
-            if not message_type and hasattr(message, "__class__"):
-                message_type = message.__class__.__name__.replace("Message", "").lower()
-            if message_type != "ai":
-                continue
-            tool_calls = getattr(message, "tool_calls", None) or []
-            for call in tool_calls:
-                tool_name = call.get("name") if isinstance(call, dict) else None
-                if tool_name != "save_product":
-                    continue
-                logger.info(
-                    "save_product tool call detected in stream",
-                    extra={
-                        "thread_id": (config or {}).get("configurable", {}).get("thread_id"),
-                        "tool_call_id": call.get("id"),
-                    },
-                )
-                interrupt_payload = {
-                    "tool": tool_name,
-                    "args": call.get("args", {}),
-                    "message": "Approval required before executing tool.",
-                }
-                interrupt_id = call.get("id", tool_name)
-                return Interrupt(value=interrupt_payload, id=interrupt_id)
-        return None
-
-    def _handle_tool_validation_error(
-        self,
-        error: ValueError,
-    ) -> tuple[str, Optional[Interrupt]]:
-        message = str(error)
-        marker = "Here are the first few of those tool calls:"
-        if marker not in message:
-            return "raise", None
-        start = message.find("[{", message.find(marker))
-        end = message.find("}]", start)
-        if start == -1 or end == -1:
-            return "raise", None
-        try:
-            tool_calls = ast.literal_eval(message[start : end + 2])
-        except (SyntaxError, ValueError):
-            return "raise", None
-        if not tool_calls:
-            return "raise", None
-
-        tool_call = tool_calls[0]
-        tool_name = tool_call.get("name")
-        if not tool_name:
-            return "raise", None
-
-        if tool_name == "write_todos":
-            return "continue", None
-
-        if tool_name == "get_company_profile":
-            return "continue", None
-
-        if tool_name in self._interrupt_tool_names:
-            return "interrupt", Interrupt(
-                value={
-                    "tool": tool_name,
-                    "args": tool_call.get("args", {}) or {},
-                    "message": "Approval required before executing tool.",
-                },
-                id=tool_call.get("id", tool_name),
-            )
-
-        return "raise", None
-
-    def _last_message_is_tool_message(self, event: dict[str, Any]) -> bool:
-        messages = event.get("messages") or []
-        if not messages:
-            return False
-        last_message = messages[-1]
-        return getattr(last_message, "type", None) == "tool"
-
-    def _find_unmatched_tool_calls(self, event: dict[str, Any]) -> set[str]:
-        messages = event.get("messages") or []
-        requested: set[str] = set()
-        responded: set[str] = set()
-        for message in messages:
-            message_type = getattr(message, "type", None)
-            if not message_type and hasattr(message, "__class__"):
-                message_type = message.__class__.__name__.replace("Message", "").lower()
-            if message_type == "ai":
-                for call in getattr(message, "tool_calls", []) or []:
-                    call_id = call.get("id")
-                    if call_id:
-                        requested.add(call_id)
-            elif message_type == "tool":
-                tool_call_id = getattr(message, "tool_call_id", None)
-                if tool_call_id:
-                    responded.add(tool_call_id)
-        return requested - responded
-
-    def _should_break_after_event(self, event: dict[str, Any]) -> bool:
-        if not event:
-            return False
-        unmatched_calls = self._find_unmatched_tool_calls(event)
-        # Ignore DeepAgents planning helpers that resolve immediately.
-        unmatched_calls = {
-            call_id
-            for call_id in unmatched_calls
-            if not self._is_planning_tool_response(event, call_id)
-        }
-        return not unmatched_calls and self._last_message_is_tool_message(event)
-
-    def _is_planning_tool_response(self, event: dict[str, Any], call_id: str) -> bool:
-        messages = event.get("messages") or []
-        for message in messages:
-            message_type = getattr(message, "type", None)
-            if not message_type and hasattr(message, "__class__"):
-                message_type = message.__class__.__name__.replace("Message", "").lower()
-            if message_type != "ai":
-                continue
-            for call in getattr(message, "tool_calls", []) or []:
-                if call.get("id") == call_id and call.get("name") == "write_todos":
-                    return True
-        return False
-
     def _log_stream_event_summary(self, event: dict[str, Any], config: dict[str, Any]) -> None:
-        if not logger.isEnabledFor(logging.DEBUG):
-            return
-
         thread_id = config.get("configurable", {}).get("thread_id")
         messages = event.get("messages") or []
         last_message_type = None
         tool_previews: list[dict[str, Any]] = []
+        last_message_preview = None
+        
         if messages:
             last_message = messages[-1]
             last_message_type = getattr(last_message, "type", None)
             if not last_message_type and hasattr(last_message, "__class__"):
                 last_message_type = last_message.__class__.__name__.replace("Message", "").lower()
+            
             if last_message_type == "ai":
                 tool_previews = self._summarize_tool_calls(getattr(last_message, "tool_calls", []) or [])
+                # For AI messages without tool calls, show a preview of the content
+                if not tool_previews:
+                    content = getattr(last_message, "content", None)
+                    if isinstance(content, str):
+                        last_message_preview = content[:100]
             elif last_message_type == "tool":
                 tool_previews = [
                     {
@@ -387,18 +239,27 @@ class WhatsAppCatalogingRunner:
                         "name": getattr(last_message, "name", None),
                     }
                 ]
+                # Show tool response preview
+                content = getattr(last_message, "content", None)
+                if isinstance(content, str):
+                    last_message_preview = content[:100]
 
         todos = event.get("todos") or []
         todos_preview = todos[-3:] if isinstance(todos, list) else None
+        
+        # Check if this event has an interrupt signal
+        has_interrupt = "__interrupt__" in event
 
-        logger.debug(
-            "PM stream event",
+        logger.info(
+            f"📊 PM Event #{len(messages)} | Type: {last_message_type or 'none'} | Tools: {len(tool_previews)} | Interrupt: {has_interrupt}",
             extra={
                 "thread_id": thread_id,
                 "message_count": len(messages),
                 "last_message_type": last_message_type,
                 "tool_calls": tool_previews,
                 "todos_tail": todos_preview,
+                "message_preview": last_message_preview,
+                "has_interrupt": has_interrupt,
             },
         )
 
@@ -488,26 +349,69 @@ class WhatsAppCatalogingRunner:
         return None
 
     def _handle_interrupt(self, sender: str, interruption: Interrupt) -> None:
-        payload = interruption.value or {}
-        tool_name = payload.get("tool")
-        if tool_name != "save_product":
-            logger.warning("Received unsupported interrupt from tool %s", tool_name)
+        """Handle native LangGraph interrupt by extracting tool details and requesting approval.
+
+        With interrupt_before=["tools"], the interrupt.value contains the pending tool calls.
+        We inspect them to find save_product and send an approval request to the user.
+        """
+        # The interrupt.value for interrupt_before typically contains a list of tool calls.
+        # For deepagents + interrupt_before=["tools"], we expect the last AIMessage's tool_calls
+        # to be available in the interrupt payload or in _last_pm_state.
+        tool_calls = self._extract_tool_calls_from_interrupt(interruption)
+        
+        save_product_call = None
+        for call in tool_calls:
+            if call.get("name") == "save_product":
+                save_product_call = call
+                break
+        
+        if not save_product_call:
+            logger.warning("Interrupt detected but no save_product tool call found for %s", sender)
             return
 
-        draft_summary = self._draft_summary_from_last_state()
+        tool_args = save_product_call.get("args", {})
+        draft_summary = self._draft_summary_from_tool_args(tool_args)
         if not draft_summary:
-            draft_summary = self._draft_summary_from_payload(payload)
-        if not draft_summary:
-            logger.warning("No draft available to include in approval message for %s", sender)
-            draft_text = "Cataloging complete. Approve to save the product."
-        else:
-            draft_text = draft_summary
+            draft_summary = "Cataloging complete. Approve to save the product."
 
-        message = payload.get("message") or draft_text
         self.whatsapp_client.send_text(
             sender,
-            f"Approval needed:\n{message}\nReply 'approve' or 'reject'.",
+            f"Approval needed:\n{draft_summary}\nReply 'approve' or 'reject'.",
         )
+
+    def _extract_tool_calls_from_interrupt(self, interruption: Interrupt) -> list[dict[str, Any]]:
+        """Extract tool calls from the interrupt payload or the last PM state.
+        
+        DeepAgents' interrupt_config triggers an interrupt when the PM decides to call
+        a configured tool (e.g., save_product). The interrupt.value contains metadata
+        about which tool is being called. The actual AIMessage with tool_calls is still
+        in the stream state but hasn't been added to the final checkpoint yet.
+        """
+        payload = interruption.value or {}
+        
+        # DeepAgents interrupt payload structure: {"tool": "save_product", ...}
+        # We need to extract the tool call from the last AIMessage in _last_pm_state
+        if not self._last_pm_state:
+            logger.debug("No _last_pm_state available to extract tool calls from interrupt")
+            return []
+        
+        messages = self._last_pm_state.get("messages") or []
+        # The last message should be an AIMessage with tool_calls
+        for message in reversed(messages):
+            message_type = getattr(message, "type", None)
+            if not message_type and hasattr(message, "__class__"):
+                message_type = message.__class__.__name__.replace("Message", "").lower()
+            if message_type == "ai":
+                tool_calls = getattr(message, "tool_calls", []) or []
+                if tool_calls:
+                    logger.debug(
+                        "Extracted tool calls from last AIMessage",
+                        extra={"tool_call_count": len(tool_calls), "tool_names": [tc.get("name") for tc in tool_calls]},
+                    )
+                    return tool_calls
+        
+        logger.warning("No AIMessage with tool_calls found in _last_pm_state during interrupt")
+        return []
 
     def _draft_summary_from_last_state(self) -> str | None:
         if not self._last_pm_state:
@@ -531,8 +435,8 @@ class WhatsAppCatalogingRunner:
         ]
         return "\n".join(lines)
 
-    def _draft_summary_from_payload(self, payload: dict[str, Any]) -> str | None:
-        tool_args = payload.get("args")
+    def _draft_summary_from_tool_args(self, tool_args: dict[str, Any]) -> str | None:
+        """Format a human-readable summary from save_product tool arguments."""
         if not isinstance(tool_args, dict):
             return None
         name = tool_args.get("name") or "Unnamed product"

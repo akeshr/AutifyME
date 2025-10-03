@@ -4,6 +4,12 @@ This module adheres to our Architecture-First mandate by centralizing all
 cross-workflow orchestration logic in a single Project Manager agent. The
 implementation closely follows `docs/architecture/PROJECT_MANAGER_DESIGN.md`
 and leverages deepagents for planning, sub-agent delegation, and HITL.
+
+**HITL Strategy**: Uses LangGraph's native `interrupt_before=["tools"]` to pause
+execution after the agent emits tool calls but before the tool node executes them.
+This allows the runner to inspect tool calls (e.g., save_product) and request
+human approval, then resume the graph to execute the tool naturally. No custom
+post-model hooks are needed—LangGraph's tool node handles all ToolMessage synthesis.
 """
 
 from __future__ import annotations
@@ -12,10 +18,7 @@ from typing import Any, Sequence
 
 from deepagents import create_deep_agent
 from deepagents.builder import SerializableSubAgent
-from deepagents.graph import create_interrupt_hook
-from deepagents.tools import write_todos
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import ToolMessage
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
@@ -27,77 +30,6 @@ from autifyme_agents.tools import registry as tools_registry
 
 
 _DEFAULT_BUILTIN_TOOLS: list[str] = ["write_todos"]
-
-
-def _extract_messages(state: Any) -> list[Any]:
-    if state is None:
-        return []
-    if hasattr(state, "messages"):
-        return getattr(state, "messages") or []
-    return state.get("messages", []) if isinstance(state, dict) else []
-
-
-def _has_tool_response(messages: list[Any], tool_call_id: str) -> bool:
-    for message in messages:
-        message_type = getattr(message, "type", None)
-        if not message_type and hasattr(message, "__class__"):
-            message_type = message.__class__.__name__.replace("Message", "").lower()
-        if message_type != "tool":
-            continue
-        if getattr(message, "tool_call_id", None) == tool_call_id:
-            return True
-    return False
-
-
-def _build_post_model_hook(interrupt_config: dict[str, Any] | None):
-    interrupt_hook = create_interrupt_hook(interrupt_config or {}) if interrupt_config else None
-
-    def post_model_hook(state: Any) -> dict[str, Any] | None:
-        messages = _extract_messages(state)
-        if not messages:
-            return interrupt_hook(state) if interrupt_hook else None
-
-        updates: dict[str, Any] = {}
-        last_message = messages[-1]
-        tool_calls = getattr(last_message, "tool_calls", None) or []
-        auto_messages: list[ToolMessage] = []
-        todos_update = None
-
-        for call in tool_calls:
-            tool_name = call.get("name") if isinstance(call, dict) else None
-            if tool_name != "write_todos":
-                continue
-            tool_call_id = call.get("id")
-            if not tool_call_id or _has_tool_response(messages, tool_call_id):
-                continue
-            todos_arg = (call.get("args") or {}).get("todos")
-            if todos_arg is None:
-                continue
-            command = write_todos.func(todos=todos_arg, tool_call_id=tool_call_id)
-            command_update = getattr(command, "update", {}) or {}
-            command_messages = command_update.get("messages") or []
-            auto_messages.extend(command_messages)
-            if "todos" in command_update:
-                todos_update = command_update["todos"]
-
-        if auto_messages:
-            updates.setdefault("messages", []).extend(auto_messages)
-        if todos_update is not None:
-            updates["todos"] = todos_update
-
-        if interrupt_hook is not None:
-            interrupt_updates = interrupt_hook(state)
-            if interrupt_updates:
-                if "messages" in interrupt_updates:
-                    updates.setdefault("messages", []).extend(interrupt_updates["messages"])
-                for key, value in interrupt_updates.items():
-                    if key == "messages":
-                        continue
-                    updates[key] = value
-
-        return updates or None
-
-    return post_model_hook
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
@@ -146,7 +78,7 @@ def create_project_manager(
     tools: Sequence | None = None,
     storage: StorageInterface | None = None,
 ) -> Any:
-    """Create the deepagents-powered Project Manager.
+    """Create the deepagents-powered Project Manager with native LangGraph HITL.
 
     Args:
         company_profile: Single-tenant company context required for all workflows.
@@ -154,9 +86,17 @@ def create_project_manager(
         checkpointer: Optional LangGraph checkpointer for durable state. If not
             provided, the function will create a Postgres-backed saver.
         builtin_tools: Optional subset of deepagents built-ins to enable.
+        tools: Optional explicit tool list (otherwise retrieved from registry).
+        storage: Storage adapter implementing StorageInterface (required).
 
     Returns:
-        Compiled deepagents agent ready for invocation.
+        Compiled deepagents agent with interrupt_before=["tools"] for HITL.
+
+    **Architecture Compliance**:
+    - Uses native LangGraph `interrupt_before` for HITL (per LANGCHAIN_V1_FEATURES.md).
+    - No custom post-model hooks—tool node synthesizes ToolMessages naturally.
+    - Interrupts pause execution after agent emits tool calls, before execution.
+    - Runner inspects tool calls (e.g., save_product), requests approval, resumes.
     """
 
     llm = _resolve_model(model)
@@ -169,15 +109,17 @@ def create_project_manager(
 
     subagents = _build_subagents(company_profile)
 
-    interrupt_config = tools_registry.get_interrupt_config()
-
     if checkpointer is None:
         with get_checkpointer() as saver:
             checkpointer = saver
 
     enabled_builtins = list(builtin_tools) if builtin_tools is not None else _DEFAULT_BUILTIN_TOOLS
 
-    post_model_hook = _build_post_model_hook(interrupt_config)
+    # DeepAgents uses interrupt_config to map tool names to HITL behavior.
+    # Under the hood, this leverages LangGraph's interrupt mechanism to pause
+    # execution after the agent emits tool calls but before the tool node runs.
+    # Setting a tool to `True` in interrupt_config triggers HITL for that tool.
+    interrupt_config = tools_registry.get_interrupt_config()
 
     project_manager = create_deep_agent(
         tools=cataloging_tools,
@@ -185,10 +127,9 @@ def create_project_manager(
         model=llm,
         subagents=subagents,
         builtin_tools=enabled_builtins,
-        interrupt_config=None,
+        interrupt_config=interrupt_config,  # HITL for save_product, etc.
         checkpointer=checkpointer,
         state_schema=ProjectManagerState,
-        post_model_hook=post_model_hook,
     )
 
     initial_state = {
