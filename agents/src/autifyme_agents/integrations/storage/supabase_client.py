@@ -73,3 +73,63 @@ class SupabaseStorageClient(StorageInterface):
             raise RuntimeError("Storage adapter failed to persist product; inspect Supabase response for details.")
 
         return Product.model_validate(response.data[0])
+
+    def save_pending_approval(
+        self,
+        thread_id: str,
+        interrupt_id: str,
+        checkpoint_id: str,
+        tool_call: dict,
+        draft_summary: str,
+        ai_message: Optional[dict] = None,
+    ) -> str:
+        """Persist a pending HITL approval to the pending_approvals table."""
+
+        client = self._ensure_client()
+        payload = {
+            "thread_id": thread_id,
+            "interrupt_id": interrupt_id,
+            "checkpoint_id": checkpoint_id,
+            "tool_call": tool_call,
+            "draft_summary": draft_summary,
+            "ai_message": ai_message,
+        }
+        
+        # Upsert to handle duplicate interrupts (e.g., retry scenarios)
+        response = (
+            client.table("pending_approvals")
+            .upsert(payload, on_conflict="thread_id,interrupt_id")
+            .execute()
+        )
+
+        if not response.data:
+            raise RuntimeError("Failed to persist pending approval; inspect Supabase response for details.")
+
+        return response.data[0]["id"]
+
+    def get_pending_approval(self, thread_id: str) -> Optional[dict]:
+        """Retrieve the most recent pending approval for a thread."""
+
+        client = self._ensure_client()
+        response = (
+            client.table("pending_approvals")
+            .select("*")
+            .eq("thread_id", thread_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+        if not response.data:
+            return None
+
+        return response.data[0]
+
+    def delete_pending_approval(self, thread_id: str) -> bool:
+        """Delete all pending approvals for a thread (handles approve/reject)."""
+
+        client = self._ensure_client()
+        response = client.table("pending_approvals").delete().eq("thread_id", thread_id).execute()
+
+        # Supabase delete returns the deleted rows; if empty, nothing was deleted
+        return bool(response.data)

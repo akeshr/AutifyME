@@ -48,8 +48,6 @@ class WhatsAppCatalogingRunner:
         self.recursion_limit = recursion_limit or settings.AGENT_RECURSION_LIMIT
         self.company_profile: CompanyProfile = self.storage.get_company_profile()
         self._last_pm_state: dict[str, Any] | None = None
-        self._pending_interrupts: dict[str, Interrupt] = {}
-        self._pending_save_requests: dict[str, dict[str, Any]] = {}
 
     def _get_checkpointer(self) -> BaseCheckpointSaver:
         if self.checkpointer:
@@ -139,58 +137,42 @@ class WhatsAppCatalogingRunner:
             return
 
         thread_id = self._thread_id(sender)
-        pending_id = next(
-            (
-                req_id
-                for req_id, req in self._pending_save_requests.items()
-                if req.get("thread_id") == thread_id
-            ),
-            None,
-        )
-
-        if pending_id is None:
+        
+        # Retrieve pending approval from persistent storage
+        pending_approval = self.storage.get_pending_approval(thread_id)
+        
+        if pending_approval is None:
             self._safe_send_text(
                 sender,
                 "No pending approval found for this thread. Please restart the cataloging request.",
             )
             return
 
-        interrupt = self._pending_interrupts.get(pending_id)
-        save_request = self._pending_save_requests.pop(pending_id, None)
-
-        if interrupt is None or save_request is None:
-            self._safe_send_text(
-                sender,
-                "Approval context expired. Please restart the cataloging request if needed.",
-            )
-            self._pending_interrupts.pop(pending_id, None)
-            return
-
         if action == "reject":
             self._safe_send_text(
                 sender,
-                "Understood. The draft will remain unsaved. Let me know if you’d like updates or a retry.",
+                "Understood. The draft will remain unsaved. Let me know if you'd like updates or a retry.",
             )
-            self._pending_interrupts.pop(pending_id, None)
+            self.storage.delete_pending_approval(thread_id)
             return
 
-        if action != "approve":
-            self._safe_send_text(sender, "Please reply with 'approve' or 'reject'.")
-            return
-
-        ai_message = save_request.get("ai_message")
-        tool_call = save_request.get("tool_call")
-        if ai_message is None or tool_call is None:
+        # Handle approve
+        interrupt_id = pending_approval.get("interrupt_id")
+        tool_call = pending_approval.get("tool_call")
+        draft_summary = pending_approval.get("draft_summary")
+        ai_message = pending_approval.get("ai_message")
+        
+        if not interrupt_id or not tool_call:
             logger.warning("Approval resume missing context for %s", sender)
             self._safe_send_text(
                 sender,
                 "Approval context invalid. Please restart the cataloging request if needed.",
             )
-            self._pending_interrupts.pop(pending_id, None)
+            self.storage.delete_pending_approval(thread_id)
             return
 
         synthetic_tool_message = ToolMessage(
-            content=save_request.get("draft_summary", "Approval granted."),
+            content=draft_summary or "Approval granted.",
             tool_call_id=tool_call.get("id"),
             name=tool_call.get("name"),
         )
@@ -198,7 +180,7 @@ class WhatsAppCatalogingRunner:
         command = Command(
             update={"messages": [synthetic_tool_message]},
             resume={
-                interrupt.id: {
+                interrupt_id: {
                     "type": "accept",
                     "args": None,
                 }
@@ -216,7 +198,8 @@ class WhatsAppCatalogingRunner:
             },
         }
 
-        self._pending_interrupts.pop(pending_id, None)
+        # Delete the approval record before resuming
+        self.storage.delete_pending_approval(thread_id)
 
         result, interruption = self._invoke_project_manager(command, config)
         if interruption is not None:
@@ -436,6 +419,9 @@ class WhatsAppCatalogingRunner:
 
         With interrupt_before=["tools"], the interrupt.value contains the pending tool calls.
         We inspect them to find save_product and send an approval request to the user.
+        
+        The interrupt context is persisted to Supabase to survive server restarts,
+        honoring the Architecture-First state persistence principle (AGENTS_DESIGN.md § 6.2).
         """
         # The interrupt.value for interrupt_before typically contains a list of tool calls.
         # For deepagents + interrupt_before=["tools"], we expect the last AIMessage's tool_calls
@@ -457,14 +443,44 @@ class WhatsAppCatalogingRunner:
         if not draft_summary:
             draft_summary = "Cataloging complete. Approve to save the product."
 
-        notification_id = interruption.id or save_product_call.get("id") or sender
-        self._pending_interrupts[notification_id] = interruption
-        self._pending_save_requests[notification_id] = {
-            "thread_id": thread_id,
-            "tool_call": save_product_call,
-            "draft_summary": draft_summary,
-            "ai_message": self._find_last_ai_message(self._last_pm_state.get("messages", [])) if self._last_pm_state else None,
-        }
+        interrupt_id = interruption.id or save_product_call.get("id") or sender
+        
+        # Get checkpoint_id from the last PM state for resumption
+        checkpoint_id = self._last_pm_state.get("checkpoint_id", "unknown") if self._last_pm_state else "unknown"
+        
+        # Extract the AIMessage that initiated the tool call
+        ai_message_data = None
+        if self._last_pm_state:
+            ai_msg = self._find_last_ai_message(self._last_pm_state.get("messages", []))
+            if ai_msg:
+                # Serialize the AIMessage for storage
+                ai_message_data = {
+                    "type": getattr(ai_msg, "type", "ai"),
+                    "content": getattr(ai_msg, "content", ""),
+                    "tool_calls": getattr(ai_msg, "tool_calls", []),
+                }
+        
+        # Persist to Supabase for restart resilience
+        try:
+            self.storage.save_pending_approval(
+                thread_id=thread_id,
+                interrupt_id=interrupt_id,
+                checkpoint_id=checkpoint_id,
+                tool_call=save_product_call,
+                draft_summary=draft_summary,
+                ai_message=ai_message_data,
+            )
+            logger.info(
+                "Persisted pending approval to storage",
+                extra={"thread_id": thread_id, "interrupt_id": interrupt_id},
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to persist pending approval", exc_info=exc)
+            self._safe_send_text(
+                sender,
+                "I encountered an issue saving the approval request. Please try again.",
+            )
+            return
 
         self._safe_send_text(
             sender,
