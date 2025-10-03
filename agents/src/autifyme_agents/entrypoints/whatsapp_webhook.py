@@ -16,7 +16,7 @@ from autifyme_agents.workflows.whatsapp_cataloging_runner import WhatsAppCatalog
 
 app = FastAPI()
 logger = logging.getLogger(__name__)
-runner = WhatsAppCatalogingRunner(enable_agent=False)
+runner = WhatsAppCatalogingRunner(enable_agent=True)
 
 _EVENT_DUMP_DIR = Path("tmp/whatsapp_events")
 

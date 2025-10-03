@@ -95,3 +95,34 @@ This feature requires the creation of several new components in our project stru
 - Temporary media files are stored on disk (`tempfile.NamedTemporaryFile`) and deleted after processing. Future enhancement: upload to Supabase storage for persistence.
 - Resume mechanism uses the checkpointer thread ID `whatsapp:{phone_number}` so conversation history is maintained.
 - Approval commands currently support `approve` and `reject`. Extend runner to handle structured edits when the workflow design is finalized.
+
+---
+
+## 4. Diagnostics & Test Automation Roadmap (2025-10)
+
+To honour our Architecture-First and Context-Efficient principles, we instrumented the WhatsApp adapter so each stage can be validated without invoking the LLM stack. This section documents the current tooling and the planned automated tests that will graduate our manual checks into repeatable scripts.
+
+### 4.1 Runtime Instrumentation
+
+- **Payload capture:** `entrypoints/whatsapp_webhook.py` persists every incoming event under `tmp/whatsapp_events/` and logs the file path. This guarantees lossless replay during debugging sessions (Codespaces or local).
+- **Media diagnostics:** `WhatsAppMediaClient` logs metadata fetch/download status codes with verbose httpx tracing (`--verbose` flag in the helper script). This isolates token/scope issues before cataloging runs.
+- **Agent toggle:** `WhatsAppCatalogingRunner(enable_agent=False)` pauses the LangGraph workflow so we can focus on the adapter. Re-enable once media handling is stable.
+
+### 4.2 Debug Scripts (Manual Workflow)
+
+| Script | Purpose | Example |
+| --- | --- | --- |
+| `agents/scripts/debug_whatsapp_payload.py` | List/inspect captured JSON events | `uv run python agents/scripts/debug_whatsapp_payload.py --list` |
+| `agents/scripts/debug_whatsapp_event.py` | Summarise an event and (optionally) download its media | `uv run python agents/scripts/debug_whatsapp_event.py --download --verbose` |
+| `agents/scripts/run_whatsapp_server.py` | Operate webhook server / tunnels (`serve`, `ngrok`, `cloudflare`) | `uv run python agents/scripts/run_whatsapp_server.py serve --port 8000` |
+
+These tools support the Codespace workflow documented earlier: start the server, expose port 8000, send a WhatsApp message, inspect payloads, download media, then re-enable the agent.
+
+### 4.3 Automated Test Plan (Planned Work)
+
+- **Webhook replay tests:** Use `TestClient` to POST recorded `messages` payloads and assert the handler saves events and calls the runner exactly once. Separate tests confirm `statuses` payloads return `{"status": "ignored"}`.
+- **Media client unit tests:** Mock Graph API responses (e.g., with `respx`/`httpx_mock`) to validate metadata parsing, HTTP headers, and file suffix inference.
+- **Replay harness tests:** Exercise `debug_whatsapp_event.py` with fixture files to ensure summaries and downloads succeed without regressions.
+- **Optional integration smoke test:** Run FastAPI in-process with `enable_agent=False`, inject a synthetic payload, and assert the diagnostic response is returned.
+
+Once implemented, these tests keep the adapter reliable across Codespaces and CI, and they align with our Hexagonal strategy—each port is validated independently before the LLM layer is involved.

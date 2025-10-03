@@ -59,14 +59,10 @@ class WhatsAppCatalogingRunner:
         try:
             if media_id:
                 image_path = self.media_client.download_media(media_id)
-                logger.info("Media download succeeded", extra={"sender": sender, "media_id": media_id, "path": str(image_path)})
-
-            if not self.enable_agent:
-                self.whatsapp_client.send_text(
-                    sender,
-                    "Received your message. The cataloging agent is temporarily paused while we validate media handling.",
+                logger.info(
+                    "Media download succeeded",
+                    extra={"sender": sender, "media_id": media_id, "path": str(image_path)},
                 )
-                return
 
             payload = {
                 "messages": [
