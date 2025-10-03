@@ -98,6 +98,10 @@ class WhatsAppCatalogingRunner:
                     "company_id": "default",
                 },
                 "recursion_limit": self.recursion_limit,
+                "metadata": {
+                    "langsmith.thread_id": thread_id,
+                    "workflow": "cataloging",
+                },
             }
 
             try:
@@ -124,11 +128,14 @@ class WhatsAppCatalogingRunner:
 
     def handle_approval(self, sender: str, decision: str) -> None:
         if not self.enable_agent:
-            self.whatsapp_client.send_text(sender, "Agent approval flow is temporarily disabled while we run diagnostics.")
+            self._safe_send_text(
+                sender,
+                "Agent approval flow is temporarily disabled while we run diagnostics.",
+            )
             return
         action = decision.strip().lower()
         if action not in {"approve", "reject"}:
-            self.whatsapp_client.send_text(sender, "Please reply with 'approve' or 'reject'.")
+            self._safe_send_text(sender, "Please reply with 'approve' or 'reject'.")
             return
 
         thread_id = self._thread_id(sender)
@@ -142,7 +149,7 @@ class WhatsAppCatalogingRunner:
         )
 
         if pending_id is None:
-            self.whatsapp_client.send_text(
+            self._safe_send_text(
                 sender,
                 "No pending approval found for this thread. Please restart the cataloging request.",
             )
@@ -152,7 +159,7 @@ class WhatsAppCatalogingRunner:
         save_request = self._pending_save_requests.pop(pending_id, None)
 
         if interrupt is None or save_request is None:
-            self.whatsapp_client.send_text(
+            self._safe_send_text(
                 sender,
                 "Approval context expired. Please restart the cataloging request if needed.",
             )
@@ -168,7 +175,7 @@ class WhatsAppCatalogingRunner:
             return
 
         if action != "approve":
-            self.whatsapp_client.send_text(sender, "Please reply with 'approve' or 'reject'.")
+            self._safe_send_text(sender, "Please reply with 'approve' or 'reject'.")
             return
 
         ai_message = save_request.get("ai_message")
@@ -202,6 +209,10 @@ class WhatsAppCatalogingRunner:
             "configurable": {
                 "thread_id": thread_id,
                 "company_id": "default",
+            },
+            "metadata": {
+                "langsmith.thread_id": thread_id,
+                "workflow": "cataloging",
             },
         }
 
