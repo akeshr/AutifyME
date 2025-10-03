@@ -31,11 +31,13 @@ class WhatsAppCatalogingRunner:
         checkpointer: BaseCheckpointSaver | None = None,
         whatsapp_client: WhatsAppClient | None = None,
         media_client: WhatsAppMediaClient | None = None,
+        enable_agent: bool = True,
     ) -> None:
         self.storage = storage or SupabaseStorageClient()
         self.checkpointer = checkpointer
         self.whatsapp_client = whatsapp_client or WhatsAppClient()
         self.media_client = media_client or WhatsAppMediaClient()
+        self.enable_agent = enable_agent
 
     def _get_checkpointer(self) -> BaseCheckpointSaver:
         if self.checkpointer:
@@ -57,6 +59,14 @@ class WhatsAppCatalogingRunner:
         try:
             if media_id:
                 image_path = self.media_client.download_media(media_id)
+                logger.info("Media download succeeded", extra={"sender": sender, "media_id": media_id, "path": str(image_path)})
+
+            if not self.enable_agent:
+                self.whatsapp_client.send_text(
+                    sender,
+                    "Received your message. The cataloging agent is temporarily paused while we validate media handling.",
+                )
+                return
 
             payload = {
                 "messages": [
@@ -86,6 +96,9 @@ class WhatsAppCatalogingRunner:
                 image_path.unlink(missing_ok=True)
 
     def handle_approval(self, sender: str, decision: str) -> None:
+        if not self.enable_agent:
+            self.whatsapp_client.send_text(sender, "Agent approval flow is temporarily disabled while we run diagnostics.")
+            return
         action = decision.strip().lower()
         if action not in {"approve", "reject"}:
             self.whatsapp_client.send_text(sender, "Please reply with 'approve' or 'reject'.")

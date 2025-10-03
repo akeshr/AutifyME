@@ -30,27 +30,37 @@ class WhatsAppMediaClient:
 
     def get_media_url(self, media_id: str) -> str:
         url = f"https://graph.facebook.com/{self.api_version}/{media_id}"
-        logger.debug("Fetching media metadata for %s", media_id)
+        logger.info("Fetching media metadata", extra={"media_id": media_id, "url": url})
         response = httpx.get(url, headers=self._auth_headers, timeout=10.0)
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:  # noqa: BLE001
-            logger.error("Failed to fetch media metadata (status %s): %s", response.status_code, exc)
+            logger.error(
+                "Failed to fetch media metadata",
+                extra={"status": response.status_code, "media_id": media_id, "url": url},
+            )
             raise
         data: dict[str, Any] = response.json()
         media_url = data["url"]
-        logger.debug("Resolved media %s to %s", media_id, media_url)
+        logger.info(
+            "Resolved media",
+            extra={"media_id": media_id, "media_url": media_url, "mime_type": data.get("mime_type")},
+        )
         return media_url
 
     def download_media(self, media_id: str) -> Path:
         media_url = self.get_media_url(media_id)
-        logger.debug("Downloading media content for %s", media_id)
+        logger.info(
+            "Downloading media content",
+            extra={"media_id": media_id, "media_url": media_url},
+        )
         response = httpx.get(media_url, headers=self._auth_headers, timeout=30.0)
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:  # noqa: BLE001
             logger.error(
-                "Failed to download media (status %s): %s", response.status_code, exc
+                "Failed to download media",
+                extra={"status": response.status_code, "media_id": media_id, "media_url": media_url},
             )
             raise
 
