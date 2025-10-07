@@ -52,6 +52,7 @@ dev = [
 [tool.uv]
 # uv configuration
 dev-dependencies = []
+prerelease = "allow"  # Required for LangChain v1 alpha packages
 
 [tool.hatch.build.targets.wheel]
 packages = ["agents/src/autifyme_agents"]

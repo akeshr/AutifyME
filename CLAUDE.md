@@ -77,12 +77,27 @@ ruff check agents/src
 ```
 
 **API Verification (CRITICAL - Use Extensively):**
-Always verify library APIs with Python REPL before implementing. Use `uv run python -c "..."` to:
+Always verify library APIs with Python REPL before implementing.
+
+**Correct Pattern (with .env loading):**
+```bash
+cd agents && uv run python -c "
+from dotenv import load_dotenv
+load_dotenv('../.env')  # Load project .env for API keys
+# ... your test code
+"
+```
+
+**Use Cases:**
 - Inspect available methods/signatures before using them
 - Test Pydantic models and serialization
 - Verify LangChain v1 alpha APIs (unstable, frequently change)
 - Prototype patterns before committing to implementation
-- Debug errors in isolation
+- Debug errors in isolation with real API keys
+
+**Important:** Use project mode (`uv run`, not `uv run --no-project`) to load dependencies and environment variables correctly.
+
+**See:** `docs/architecture/UV_REPL_BEST_PRACTICES.md` for complete guide.
 
 Never rely on documentation alone for LangChain v1 alpha stack.
 
