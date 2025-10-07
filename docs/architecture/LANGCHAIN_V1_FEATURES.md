@@ -1,9 +1,9 @@
 # LangChain v1 (Alpha) - New Features & Capabilities
 
-**Installed Baseline (`.venv` snapshot Oct 2025):**
-LangChain `1.0.0a10` (core `0.3.76`, community `0.3.30`, OpenAI `0.3.33`, Anthropic `0.3.21`)
+**Installed Versions (Updated 2025-10-07):**
+LangChain `1.0.0a12` (core `1.0.0a7`, community `0.3.30`, OpenAI `0.3.33`, Anthropic `1.0.0a2`)
 LangGraph `1.0.0a4` (checkpoint-postgres `2.0.24`, prebuilt `0.7.0a2`, sdk `0.2.9`)
-DeepAgents `0.0.5` (Note: Version 0.0.11rc1 exists but not installed; current version has all documented features)
+DeepAgents `0.0.11rc1` ✅ All features verified via REPL (see `LIBRARY_VERIFICATION_REPORT.md`)
 
 **Reference Materials:**  
 - LangChain OSS v1 release notes: https://docs.langchain.com/oss/python/releases/langchain-v1  

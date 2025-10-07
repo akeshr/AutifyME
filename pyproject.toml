@@ -6,14 +6,14 @@ authors = [{ name = "Abhi", email = "" }]
 requires-python = ">=3.11"
 dependencies = [
     # Core Agentic Framework (LangChain v1 prerelease stack)
-    "langchain==1.0.0a10",
+    "langchain==1.0.0a12",
     "langgraph==1.0.0a4",
     "langgraph-prebuilt==0.7.0a2",
     "langgraph-checkpoint==2.1.1",
     "langgraph-checkpoint-postgres==2.0.24",
     "langsmith",
     # Advanced Agent Implementation
-    "deepagents",
+    "deepagents==0.0.11rc1",
     # LLM Providers
     "langchain-openai",
     "langchain-google-genai",
