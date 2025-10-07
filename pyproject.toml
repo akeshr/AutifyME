@@ -14,8 +14,10 @@ dependencies = [
     "langsmith",
     # Advanced Agent Implementation
     "deepagents==0.0.11rc1",
-    # LLM Providers
-    "langchain-openai",
+    # LLM Providers (v1 alpha)
+    "langchain-openai==1.0.0a3",
+    "langchain-anthropic==1.0.0a2",
+    "langchain-aws==1.0.0a1",
     "langchain-google-genai",
     # Database & Storage
     "supabase",

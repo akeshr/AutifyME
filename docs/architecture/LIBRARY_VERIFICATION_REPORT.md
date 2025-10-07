@@ -17,14 +17,20 @@ langchain-anthropic==0.3.21
 langgraph==1.0.0a4
 ```
 
-### After
+### After (Final - 2025-10-07)
 ```
 deepagents==0.0.11rc1
 langchain==1.0.0a12
 langchain-core==1.0.0a7
 langchain-anthropic==1.0.0a2
+langchain-openai==1.0.0a3
+langchain-aws==1.0.0a1
 langgraph==1.0.0a4  (no pre-release available)
 ```
+
+**New Additions:**
+- `langchain-openai` upgraded to v1.0.0a3 (from 0.3.33)
+- `langchain-aws` added at v1.0.0a1 (new package for Bedrock support)
 
 ---
 
