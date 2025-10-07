@@ -1,9 +1,9 @@
 # LangChain v1 (Alpha) - New Features & Capabilities
 
-**Installed Baseline (`.venv` snapshot Oct 2025):**  
-LangChain `1.0.0a10` (core `0.3.77`, community `0.3.30`, OpenAI `0.3.34`, Anthropic `0.3.21`)  
-LangGraph `1.0.0a4` (checkpoint-postgres `2.0.24`, prebuilt `0.7.0a2`, sdk `0.2.9`)  
-DeepAgents `0.0.11rc1`
+**Installed Baseline (`.venv` snapshot Oct 2025):**
+LangChain `1.0.0a10` (core `0.3.76`, community `0.3.30`, OpenAI `0.3.33`, Anthropic `0.3.21`)
+LangGraph `1.0.0a4` (checkpoint-postgres `2.0.24`, prebuilt `0.7.0a2`, sdk `0.2.9`)
+DeepAgents `0.0.5` (Note: Version 0.0.11rc1 exists but not installed; current version has all documented features)
 
 **Reference Materials:**  
 - LangChain OSS v1 release notes: https://docs.langchain.com/oss/python/releases/langchain-v1  
@@ -42,10 +42,12 @@ LangChain has been refactored from a monolithic library into a set of smaller, m
 - **Smaller Dependencies**: We can now install only the providers we need (e.g., `pip install langchain-openai langchain-anthropic`), reducing our dependency footprint.
 - **Clearer Imports**: Imports now reflect the source of the component (e.g., `from langchain_openai import ChatOpenAI`), making the code easier to understand.
 - **Stability**: Changes to a community integration in `langchain-community` won't affect the stability of `langchain-core`.
+- **Backward Compatibility**: New `langchain-legacy` package available for deprecated code that hasn't been migrated yet.
+- **Unified Documentation**: New docs site (docs.langchain.com) centralizes Python and JavaScript documentation in one place.
 
 ---
 
-### 2. `.content_blocks` Property (LangChain Core 0.3.77)
+### 2. `.content_blocks` Property (LangChain Core 0.3.76)
 
 **What it is:**  
 A fully typed, structured view of LLM message content that standardizes modern features across providers.
@@ -85,13 +87,19 @@ for block in response.content_blocks:
 
 ### 3. Prebuilt Agents & Middleware Pipeline
 
-**What Changed:**  
-`langchain.agents` now exports the v1 agent builders. Under the hood `react_agent.py` constructs LangGraph `StateGraph`s with middleware hooks.
+**What Changed:**
+Agents moved from `langgraph.prebuilts` to `langchain.agents` with LangGraph-based implementation. The new `create_agent` function replaces the legacy `create_react_agent`.
+
+**Important Distinction:**
+- **Modern (Recommended):** `langchain.agents.create_agent` - LangGraph-based, production-ready, full middleware support
+- **Legacy (Not Recommended):** `langchain.agents.react.agent.create_react_agent` - Older implementation based on ReAct paper, not suitable for production
+
+**AutifyME uses the modern LangGraph-based version exclusively.**
 
 ```
 langchain/
   agents/
-    __init__.py            → exports create_agent
+    __init__.py            → exports create_agent (modern)
     react_agent.py         → core builder atop LangGraph
     middleware_agent.py    → middleware-aware agent graph
     middleware/            → HITL, summarization, prompt caching, logging, ...
