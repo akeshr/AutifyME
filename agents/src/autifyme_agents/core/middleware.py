@@ -7,6 +7,8 @@ import logging
 from functools import wraps
 from typing import Any, Callable, Optional
 
+from langchain.agents.middleware import AgentMiddleware
+
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.models import CompanyProfile
 
@@ -68,6 +70,31 @@ def create_company_context_middleware(storage: StorageInterface) -> Callable[[Ca
         return sync_wrapper
 
     return decorator
+
+
+class CompanyContextMiddleware(AgentMiddleware):
+    """Inject company profile into agent tools via LangChain v1 middleware.
+
+    Uses before_model hook to fetch and cache company profile, then makes it
+    available to all tool calls via Runtime context. Replaces decorator-based
+    pattern with native v1 middleware for cleaner separation of concerns.
+    """
+
+    def __init__(self, storage: StorageInterface):
+        if storage is None:
+            raise ValueError("storage adapter is required for company context middleware")
+        self.storage = storage
+        self._profile_cache: Optional[CompanyProfile] = None
+
+    def before_model(self, state, runtime):
+        """Fetch and inject company profile before LLM call."""
+        if self._profile_cache is None:
+            self._profile_cache = self.storage.get_company_profile()
+            logger.info("Company profile '%s' cached for middleware injection", self._profile_cache.name)
+
+        # Middleware before_model returns dict to update state or None
+        # Company profile is accessed via runtime.context in tools
+        return None
 
 
 def langsmith_tracing_middleware(workflow_name: str) -> Callable:

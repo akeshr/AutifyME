@@ -9,7 +9,7 @@ Context Engineering strategy.
 
 from __future__ import annotations
 
-from langchain_core.tools import tool
+from langchain_core.tools import tool, ToolException
 
 from autifyme_agents.core.middleware import create_company_context_middleware
 from autifyme_agents.core.ports import StorageInterface
@@ -79,16 +79,21 @@ def create_cataloging_specialist_tool(storage: StorageInterface):
                 "image_analysis": parsed,
             }
         }
-        product: Product = specialist.invoke(payload, config=config)
 
-        return CatalogingResult(
-            stage="draft",
-            success=True,
-            product_id=product.id,
-            product_name=product.name,
-            message="Draft product ready for approval",
-            data={"draft": product.model_dump()},
-        )
+        try:
+            product: Product = specialist.invoke(payload, config=config)
+            return CatalogingResult(
+                stage="draft",
+                success=True,
+                product_id=product.id,
+                product_name=product.name,
+                message="Draft product ready for approval",
+                data={"draft": product.model_dump()},
+            )
+        except Exception as exc:
+            raise ToolException(
+                f"Cataloging specialist failed: {str(exc)}"
+            ) from exc
 
     return cataloging_specialist_tool
 

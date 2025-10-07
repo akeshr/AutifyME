@@ -70,7 +70,7 @@ def main() -> None:
             whatsapp_client=whatsapp_client,
             media_client=media_client,
         )
-        print("✓ Runner ready (Project Manager orchestrated)")
+        print(" Runner ready (Project Manager orchestrated)")
 
         sender = f"test-user-{uuid.uuid4()}"
         payload = {

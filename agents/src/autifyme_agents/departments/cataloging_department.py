@@ -10,7 +10,11 @@ from typing import Annotated, Sequence, TypedDict
 import operator
 
 from langchain.agents import create_agent
-from langchain.agents.middleware.human_in_the_loop import HumanInTheLoopMiddleware
+from langchain.agents.middleware import (
+    HumanInTheLoopMiddleware,
+    SummarizationMiddleware,
+    AnthropicPromptCachingMiddleware,
+)
 from langchain_core.runnables import Runnable
 from langchain_core.messages import BaseMessage
 from langchain_core.tools import tool
@@ -21,10 +25,11 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
 from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
 from autifyme_agents.tools import create_save_product_tool
-from autifyme_agents.core.middleware import create_company_context_middleware
+from autifyme_agents.core.middleware import CompanyContextMiddleware
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 from autifyme_agents.schemas.models import CatalogingResult, Product
+from autifyme_agents.schemas.context import AgentContext
 
 
 class AgentState(TypedDict):
@@ -50,16 +55,15 @@ def create_cataloging_department(
     if storage is None:
         raise ValueError("storage adapter must be provided and implement StorageInterface")
 
-    company_context = create_company_context_middleware(storage)
-
     image_specialist = create_image_analysis_specialist()
     cataloging_specialist = create_cataloging_specialist()
 
-    @tool("image_analysis_specialist")
-    @company_context
-    def image_analysis_tool(image_url: str, *, company_profile, config=None) -> ImageAnalysisResult:
-        """Analyze an image to produce structured product insights."""
+    # Get company profile once for all tools
+    company_profile = storage.get_company_profile()
 
+    @tool("image_analysis_specialist")
+    def image_analysis_tool(image_url: str, *, config=None) -> ImageAnalysisResult:
+        """Analyze an image to produce structured product insights."""
         payload = {
             "input": {
                 "image_url": image_url,
@@ -69,16 +73,13 @@ def create_cataloging_department(
         return image_specialist.invoke(payload, config=config)
 
     @tool("cataloging_specialist")
-    @company_context
     def cataloging_tool(
         user_message: str,
         image_analysis: dict | None = None,
         *,
-        company_profile,
         config=None,
     ) -> Product:
         """Combine user instructions and optional image analysis into a Product."""
-
         parsed_insights = None
         if image_analysis is not None:
             parsed_insights = ImageAnalysisResult.model_validate(image_analysis)
@@ -101,29 +102,48 @@ def create_cataloging_department(
 
     llm = get_llm()
 
-    middleware: tuple[HumanInTheLoopMiddleware, ...] = ()
+    middleware = [CompanyContextMiddleware(storage)]
+
     if enable_hitl:
-        hitl_middleware = HumanInTheLoopMiddleware(
-            interrupt_on={
-                "save_product": {
-                    "allow_accept": True,
-                    "allow_edit": True,
-                    "allow_respond": True,
-                    "description": "Approve or modify the product before it is persisted to storage.",
-                }
-            },
-            description_prefix="CatalogingDepartment HITL",
+        middleware.append(
+            HumanInTheLoopMiddleware(
+                interrupt_on={
+                    "save_product": {
+                        "allow_accept": True,
+                        "allow_edit": True,
+                        "allow_respond": True,
+                        "description": "Approve or modify the product before it is persisted to storage.",
+                    }
+                },
+                description_prefix="Department HITL",
+            )
         )
-        middleware = (hitl_middleware,)
+
+    middleware.append(
+        AnthropicPromptCachingMiddleware(
+            ttl="5m",
+            min_messages_to_cache=2,
+            unsupported_model_behavior="ignore",
+        )
+    )
+
+    middleware.append(
+        SummarizationMiddleware(
+            model=llm,
+            max_tokens_before_summary=4000,
+            messages_to_keep=5,
+        )
+    )
 
     agent_graph = create_agent(
         llm,
         tools,
-        prompt=prompt,
+        system_prompt=prompt,
         checkpointer=checkpointer,
+        context_schema=AgentContext,
         name="CatalogingDepartmentAgent",
         response_format=CatalogingResult,
-        middleware=middleware,
+        middleware=tuple(middleware),
     )
 
     return agent_graph.with_config({

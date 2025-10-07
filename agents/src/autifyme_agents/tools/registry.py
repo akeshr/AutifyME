@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from deepagents.interrupt import HumanInterruptConfig
+from langchain.agents.middleware.human_in_the_loop import ToolConfig
 
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.core.ports import StorageInterface
@@ -68,14 +68,14 @@ def get_cataloging_instructions(company_profile: CompanyProfile) -> str:
     )
 
 
-def get_interrupt_config() -> dict[str, HumanInterruptConfig]:
+def get_interrupt_config() -> dict[str, ToolConfig]:
     return {
-        "save_product": HumanInterruptConfig(
-            allow_accept=True,
-            allow_edit=True,
-            allow_respond=True,
-            description="Approve or modify the product before it is persisted to storage.",
-        )
+        "save_product": {
+            "allow_accept": True,
+            "allow_edit": True,
+            "allow_respond": True,
+            "description": "Approve or modify the product before it is persisted to storage.",
+        }
     }
 
 

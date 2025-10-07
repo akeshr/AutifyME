@@ -382,53 +382,52 @@ class WhatsAppCatalogingRunner:
         This runner streams events, detects __interrupt__ naturally, and resumes with
         Command(resume=...) to let the tool execute. No synthetic ToolMessages needed.
         """
-        checkpointer_ctx = self._get_checkpointer()
-        
-        with checkpointer_ctx as saver:
-            project_manager = create_project_manager(
-                self.company_profile,
-                checkpointer=saver,
-                storage=self.storage,
-            )
+        checkpointer = self._get_checkpointer()
 
-            last_event: Optional[dict[str, Any]] = None
-            interrupt_event: Optional[Interrupt] = None
+        project_manager = create_project_manager(
+            self.company_profile,
+            checkpointer=checkpointer,
+            storage=self.storage,
+        )
 
-            stream_config = dict(config)
-            stream_config.setdefault("configurable", {})
-            stream_config["configurable"].setdefault("remaining_steps", self.recursion_limit)
+        last_event: Optional[dict[str, Any]] = None
+        interrupt_event: Optional[Interrupt] = None
 
-            # Stream in "values" mode to get full state snapshots.
+        stream_config = dict(config)
+        stream_config.setdefault("configurable", {})
+        stream_config["configurable"].setdefault("remaining_steps", self.recursion_limit)
+
+        # Stream in "values" mode to get full state snapshots.
+        stream_input = payload
+        if isinstance(payload, Command):
             stream_input = payload
-            if isinstance(payload, Command):
-                stream_input = payload
-            stream = project_manager.stream(stream_input, config=stream_config, stream_mode="values")
-            for event in stream:
-                if isinstance(event, dict):
-                    last_event = event
-                    if (event.get("messages") or []) and isinstance(event.get("messages"), list):
-                        self._last_pm_state = event
-                    self._log_stream_event_summary(last_event, config)
+        stream = project_manager.stream(stream_input, config=stream_config, stream_mode="values")
+        for event in stream:
+            if isinstance(event, dict):
+                last_event = event
+                if (event.get("messages") or []) and isinstance(event.get("messages"), list):
+                    self._last_pm_state = event
+                self._log_stream_event_summary(last_event, config)
 
-                    # Check for native LangGraph interrupt signal
-                    if "__interrupt__" in event:
-                        interrupts = event.get("__interrupt__") or []
-                        if interrupts:
-                            interrupt_event = interrupts[0]
-                            logger.info(
-                                "Native LangGraph interrupt detected",
-                                extra={
-                                    "thread_id": config.get("configurable", {}).get("thread_id"),
-                                    "interrupt_count": len(interrupts),
-                                    "interrupt_value_type": type(interrupt_event.value).__name__ if hasattr(interrupt_event, "value") else "N/A",
-                                    "interrupt_value_keys": list(interrupt_event.value.keys()) if hasattr(interrupt_event, "value") and isinstance(interrupt_event.value, dict) else "N/A",
-                                },
-                            )
-                            # Log the full interrupt structure for debugging
-                            logger.debug(f"Full interrupt value: {interrupt_event.value if hasattr(interrupt_event, 'value') else 'N/A'}")
-                            break
+                # Check for native LangGraph interrupt signal
+                if "__interrupt__" in event:
+                    interrupts = event.get("__interrupt__") or []
+                    if interrupts:
+                        interrupt_event = interrupts[0]
+                        logger.info(
+                            "Native LangGraph interrupt detected",
+                            extra={
+                                "thread_id": config.get("configurable", {}).get("thread_id"),
+                                "interrupt_count": len(interrupts),
+                                "interrupt_value_type": type(interrupt_event.value).__name__ if hasattr(interrupt_event, "value") else "N/A",
+                                "interrupt_value_keys": list(interrupt_event.value.keys()) if hasattr(interrupt_event, "value") and isinstance(interrupt_event.value, dict) else "N/A",
+                            },
+                        )
+                        # Log the full interrupt structure for debugging
+                        logger.debug(f"Full interrupt value: {interrupt_event.value if hasattr(interrupt_event, 'value') else 'N/A'}")
+                        break
 
-            return last_event, interrupt_event
+        return last_event, interrupt_event
 
     def _log_stream_event_summary(self, event: dict[str, Any], config: dict[str, Any]) -> None:
         thread_id = config.get("configurable", {}).get("thread_id")

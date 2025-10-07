@@ -1,14 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(uv run:*)",
+      "Bash(*uv run:*)",
+      "Bash(*uv run*)",
       "Bash(mkdir:*)",
       "Bash(tree:*)",
       "WebSearch",
       "WebFetch(domain:langchain-ai.github.io)",
       "WebFetch(domain:docs.smith.langchain.com)",
       "WebFetch(domain:docs.langchain.com)",
-      "Bash(uv pip:*)"
+      "Bash(uv pip:*)",
+      "Bash(findstr:*)",
+      "Bash(python:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:*)"
     ],
     "deny": [],
     "ask": []

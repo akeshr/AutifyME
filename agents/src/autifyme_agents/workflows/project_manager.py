@@ -16,8 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from deepagents import create_deep_agent
-from deepagents.builder import SerializableSubAgent
+from deepagents import create_deep_agent, SubAgent
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -54,7 +53,7 @@ def _load_prompt(company_profile: CompanyProfile) -> str:
     )
 
 
-def _build_subagents(company_profile: CompanyProfile) -> list[SerializableSubAgent]:
+def _build_subagents(company_profile: CompanyProfile, storage: StorageInterface) -> list[SubAgent]:
     """Return deepagents sub-agent specifications for all departments."""
 
     cataloging_prompt = tools_registry.get_cataloging_instructions(company_profile)
@@ -64,7 +63,7 @@ def _build_subagents(company_profile: CompanyProfile) -> list[SerializableSubAge
             "name": "cataloging_department",
             "description": "Manages product ingestion and catalog creation workflows.",
             "prompt": cataloging_prompt,
-            "tools": tools_registry.get_cataloging_tool_names(),
+            "tools": tools_registry.get_cataloging_tool_objects(storage),
         }
     ]
 
@@ -107,29 +106,20 @@ def create_project_manager(
 
     cataloging_tools = list(tools) if tools is not None else tools_registry.get_cataloging_tool_objects(storage)
 
-    subagents = _build_subagents(company_profile)
+    subagents = _build_subagents(company_profile, storage)
 
     if checkpointer is None:
-        with get_checkpointer() as saver:
-            checkpointer = saver
+        checkpointer = get_checkpointer()
 
-    enabled_builtins = list(builtin_tools) if builtin_tools is not None else _DEFAULT_BUILTIN_TOOLS
-
-    # DeepAgents uses interrupt_config to map tool names to HITL behavior.
-    # Under the hood, this leverages LangGraph's interrupt mechanism to pause
-    # execution after the agent emits tool calls but before the tool node runs.
-    # Setting a tool to `True` in interrupt_config triggers HITL for that tool.
-    interrupt_config = tools_registry.get_interrupt_config()
+    tool_configs = tools_registry.get_interrupt_config()
 
     project_manager = create_deep_agent(
         tools=cataloging_tools,
         instructions=instructions,
         model=llm,
         subagents=subagents,
-        builtin_tools=enabled_builtins,
-        interrupt_config=interrupt_config,  # HITL for save_product, etc.
+        tool_configs=tool_configs,
         checkpointer=checkpointer,
-        state_schema=ProjectManagerState,
     )
 
     initial_state = {
