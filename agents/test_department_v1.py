@@ -16,37 +16,37 @@ print("CATALOGING DEPARTMENT V1 TEST")
 print("=" * 60)
 
 storage = SupabaseStorageClient()
+checkpointer = get_checkpointer()
 
 print("Creating cataloging department...")
-with get_checkpointer() as checkpointer:
-    department = create_cataloging_department(
-        checkpointer=checkpointer,
-        storage=storage,
-        enable_hitl=False  # Skip HITL for simple test
-    )
+department = create_cataloging_department(
+    checkpointer=checkpointer,
+    storage=storage,
+    enable_hitl=False  # Skip HITL for simple test
+)
 
-    print("Invoking department...")
-    context = AgentContext(
-        thread_id="test-v1",
-        company_id="default",
-        storage=storage
-    )
+print("Invoking department...")
+context = AgentContext(
+    thread_id="test-v1",
+    company_id="default",
+    storage=storage
+)
 
-    result = department.invoke(
-        {"messages": [HumanMessage(content="Catalog: Red cotton t-shirt, size M, price $29.99")]},
-        config={"configurable": {"thread_id": "test-v1"}},
-        context=context
-    )
+result = department.invoke(
+    {"messages": [HumanMessage(content="Catalog: Red cotton t-shirt, size M, price $29.99")]},
+    config={"configurable": {"thread_id": "test-v1"}},
+    context=context
+)
 
-    print("\nResult:")
-    print(f"Type: {type(result)}")
-    print(f"Keys: {result.keys() if hasattr(result, 'keys') else 'N/A'}")
-    if 'messages' in result:
-        print(f"Message count: {len(result['messages'])}")
-        last_msg = result['messages'][-1]
-        print(f"Last message type: {type(last_msg).__name__}")
-        print(f"Content preview: {str(last_msg.content)[:200]}")
+print("\nResult:")
+print(f"Type: {type(result)}")
+print(f"Keys: {result.keys() if hasattr(result, 'keys') else 'N/A'}")
+if 'messages' in result:
+    print(f"Message count: {len(result['messages'])}")
+    last_msg = result['messages'][-1]
+    print(f"Last message type: {type(last_msg).__name__}")
+    print(f"Content preview: {str(last_msg.content)[:200]}")
 
-    print("\n" + "=" * 60)
-    print("V1 FEATURES TEST COMPLETE")
-    print("=" * 60)
+print("\n" + "=" * 60)
+print("V1 FEATURES TEST COMPLETE")
+print("=" * 60)
