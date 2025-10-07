@@ -66,6 +66,104 @@ We will model our system after a company's organizational structure. A central r
     - **Function:** They perform a single, reliable action, like making a database call, sending an email, or calling a third-party API. They do not contain any LLM logic.
     - **Example:** `create_invoice_in_supabase(customer_id, amount)`.
 
+### Agent Implementation Strategy: DeepAgents vs. Standard Agents
+
+**Architectural Decision:** We employ a tiered implementation strategy that reserves DeepAgents complexity for orchestration while keeping execution layers simpler.
+
+**Implementation Layers:**
+
+1.  **Project Manager (DeepAgents):**
+    - **Framework:** `deepagents.create_deep_agent`
+    - **Rationale:** Requires advanced planning, sub-task decomposition, cross-department coordination, and complex state management
+    - **Features Used:**
+      - Planning middleware (task decomposition, dependency tracking)
+      - Filesystem middleware (persistent scratchpad for long-running workflows)
+      - Sub-agent delegation (routing to departments)
+      - Built-in HITL configuration for high-risk operations
+    - **Complexity Justification:** The PM handles the most complex orchestration logic in the system and needs DeepAgents' advanced capabilities
+
+2.  **Department Heads (Standard LangChain Agents):**
+    - **Framework:** `langchain.agents.create_agent`
+    - **Rationale:** Focused domain orchestration with well-defined specialist tools
+    - **Features Used:**
+      - Standard ReAct agent pattern
+      - Middleware (HITL, company context, tracing)
+      - Structured outputs for PM communication
+    - **Why Not DeepAgents:** Department scope is narrower and doesn't require the full planning/sub-agent complexity that DeepAgents provides
+
+3.  **Specialists (Standard LangChain Chains):**
+    - **Framework:** `RunnableLambda` + `with_structured_output`
+    - **Rationale:** Deterministic, single-purpose transformations
+    - **Features Used:**
+      - Structured LLM outputs (Pydantic models)
+      - Simple prompt → LLM → validation chains
+    - **Why Not Agents:** Specialists don't need tool-calling or planning—just input transformation
+
+4.  **Tools (Pure Python Functions):**
+    - **Framework:** `@tool` decorator
+    - **Rationale:** Deterministic operations with zero LLM logic
+    - **Features Used:**
+      - Type-safe arguments (Pydantic schemas)
+      - Error handling with custom exceptions
+      - Retry logic for external APIs
+
+**PM → Department Delegation Pattern:**
+
+Departments are exposed to the PM as **tools**, not DeepAgents sub-agents:
+
+```python
+# Project Manager sees departments as tools
+@tool("cataloging_department")
+def invoke_cataloging_department(user_message: str, image_url: str | None = None) -> CatalogingResult:
+    """Catalog a product from user input and optional image."""
+    # Internally, this tool invokes the cataloging department agent
+    dept_agent = create_cataloging_department(storage=storage, checkpointer=checkpointer)
+    return dept_agent.invoke({"messages": [HumanMessage(content=user_message)]})
+```
+
+This approach:
+- **Simplifies architecture**: Departments don't need DeepAgents' planning/sub-agent machinery
+- **Maintains hierarchy**: PM delegates via tools (standard LangChain pattern)
+- **Preserves flexibility**: Departments can be swapped/upgraded without changing PM
+- **Reduces complexity**: Fewer moving parts, easier debugging
+- **Stays aligned with LangChain v1**: Standard `create_agent` is stable and well-documented
+
+**When to Re-evaluate:**
+
+If a department grows to require multi-step planning across sub-domains (e.g., Marketing needs to coordinate Social, Email, and SEO sub-departments), consider promoting it to DeepAgents. For now, our domain scopes are well-bounded and don't require this level of orchestration.
+
+### Specialist Classification: Simple vs. Complex
+
+Specialists exhibit two distinct patterns based on their orchestration needs:
+
+**Simple Specialists (Transformation-Only):**
+- **Nature:** Single LLM invocation transforming input to structured output
+- **Implementation:** `@tool` function or `RunnableLambda` chain with `with_structured_output`
+- **Characteristics:** No dynamic decision-making, no tool orchestration, deterministic flow
+- **Examples:** Image analysis (vision model → structured data), entity extraction, sentiment scoring
+- **Salesforce Analogy:** Like an Apex `@InvocableMethod` that processes input and returns output without querying multiple objects or calling external services
+
+**Complex Specialists (Multi-Tool Orchestration):**
+- **Nature:** Agents that orchestrate multiple tools with dynamic decision-making
+- **Implementation:** `create_agent` with tool list
+- **Characteristics:** ReAct reasoning loop, conditional tool selection based on intermediate results, multi-step workflows
+- **Examples:** SEO auditor (crawl → performance analysis → ranking checks → synthesis), invoice generator (fetch customer → calculate tax → generate PDF → email), research synthesizer (search → scrape → analyze → summarize)
+- **Salesforce Analogy:** Like a complex Apex service class with `@future` calls, multiple DML operations, and conditional external API callouts—orchestrates multiple operations with governor limit awareness
+
+**Decision Criteria:**
+
+The distinction hinges on **orchestration complexity**, not output complexity:
+- If the specialist can complete its task with one LLM call (possibly with structured output), it's simple
+- If the specialist must decide which tools to invoke based on runtime conditions or intermediate results, it's complex
+
+**Architectural Consistency:**
+
+Both types are exposed to departments as tools. Complex specialists wrap their internal agent runtime within a `@tool` interface, maintaining the hierarchy's clean abstraction layers. This preserves the department's view: "I have tools that do specific jobs," whether those tools are simple transforms or mini-orchestrators.
+
+**Current Implementation Status:**
+- ✅ Simple specialists: Image analysis, cataloging (current implementations align)
+- 🔜 Complex specialists: SEO audit, invoice generation (future workflows will require agent implementation)
+
 ---
 
 ## 4. Advanced Concepts: Handling Complex Workflows
