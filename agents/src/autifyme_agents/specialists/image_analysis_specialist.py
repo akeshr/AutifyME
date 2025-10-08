@@ -5,7 +5,7 @@ from pathlib import Path
 
 from langchain_core.runnables import Runnable, RunnableLambda
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_core.tools import tool
+from langchain_core.tools import ToolException, tool
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
@@ -128,7 +128,12 @@ def image_analysis_specialist_tool(
             "company_profile": company_profile,
         }
     }
-    return chain.invoke(payload, config=config)
+    try:
+        return chain.invoke(payload, config=config)
+    except FileNotFoundError as exc:
+        raise ToolException(
+            f"Image could not be accessed at '{image_url}'. Please resend the media."
+        ) from exc
 
 
 def create_image_analysis_specialist_tool():

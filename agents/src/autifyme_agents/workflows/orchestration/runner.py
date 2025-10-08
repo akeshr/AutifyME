@@ -17,6 +17,11 @@ from langgraph.errors import GraphRecursionError
 from langgraph.types import Interrupt
 from langchain_core.messages import HumanMessage
 
+try:
+    from openai import BadRequestError
+except Exception:  # pragma: no cover - optional dependency
+    BadRequestError = None  # type: ignore
+
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.logging_config import get_logger
 from autifyme_agents.core.ports import StorageInterface
@@ -283,8 +288,24 @@ class WorkflowRunner:
             self.channel.send_error(sender, "recursion")
 
         except Exception as exc:
-            logger.exception("PM invocation failed", exc_info=exc, extra={"thread_id": thread_id})
-            self.channel.send_error(sender, "processing")
+            if BadRequestError and isinstance(exc, BadRequestError):
+                error_text = str(exc)
+                logger.error(
+                    "PM invocation failed due to tool-call mismatch",
+                    extra={
+                        "thread_id": thread_id,
+                        "error": error_text,
+                        "has_tool_call_violation": "tool_call" in error_text,
+                    },
+                )
+                self.channel.send_error(
+                    sender,
+                    "processing",
+                    "I hit a coordination error while prepping your request. Please resend the details so I can try again.",
+                )
+            else:
+                logger.exception("PM invocation failed", exc_info=exc, extra={"thread_id": thread_id})
+                self.channel.send_error(sender, "processing")
 
         finally:
             # Cleanup media unless approval pending
