@@ -102,6 +102,11 @@ def create_cataloging_department(
 
     llm = get_llm()
 
+    # Middleware stack (applied in order):
+    # 1. Company Context - inject company profile into tool calls
+    # 2. HITL - interrupt on save_product for approval (optional)
+    # 3. Prompt Caching - reduce API costs for repeated calls
+    # 4. Summarization - handle long conversations gracefully
     middleware = [CompanyContextMiddleware(storage)]
 
     if enable_hitl:
@@ -119,6 +124,7 @@ def create_cataloging_department(
             )
         )
 
+    # Anthropic prompt caching - 5min TTL, cache after 2 messages
     middleware.append(
         AnthropicPromptCachingMiddleware(
             ttl="5m",
@@ -127,6 +133,7 @@ def create_cataloging_department(
         )
     )
 
+    # Summarization - trigger after 4k tokens, keep last 5 messages
     middleware.append(
         SummarizationMiddleware(
             model=llm,

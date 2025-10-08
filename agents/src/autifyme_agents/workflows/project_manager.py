@@ -54,14 +54,25 @@ def _load_prompt(company_profile: CompanyProfile) -> str:
 
 
 def _build_subagents(company_profile: CompanyProfile, storage: StorageInterface) -> list[SubAgent]:
-    """Return deepagents sub-agent specifications for all departments."""
+    """Return deepagents sub-agent specifications for all departments.
+
+    Each sub-agent is a DeepAgents SubAgent dict that defines:
+    - name: Sub-agent identifier
+    - description: When PM should delegate to this sub-agent
+    - prompt: System prompt for the sub-agent
+    - tools: List of tool objects (not names) the sub-agent can use
+
+    Note: These are NOT the same as department agents. DeepAgents sub-agents
+    are lightweight delegates for the PM, while departments are full LangChain
+    agents with middleware, HITL, and checkpointing.
+    """
 
     cataloging_prompt = tools_registry.get_cataloging_instructions(company_profile)
 
     return [
         {
             "name": "cataloging_department",
-            "description": "Manages product ingestion and catalog creation workflows.",
+            "description": "Manages product ingestion and catalog creation workflows. Delegate here for product cataloging requests with or without images.",
             "prompt": cataloging_prompt,
             "tools": tools_registry.get_cataloging_tool_objects(storage),
         }
@@ -72,44 +83,35 @@ def create_project_manager(
     company_profile: CompanyProfile,
     *,
     model: BaseChatModel | None = None,
-    checkpointer=None,
-    builtin_tools: Sequence[str] | None = None,
+    checkpointer: Any,
+    storage: StorageInterface,
     tools: Sequence | None = None,
-    storage: StorageInterface | None = None,
 ) -> Any:
-    """Create the deepagents-powered Project Manager with native LangGraph HITL.
+    """Create the deepagents-powered Project Manager with native HITL via tool_configs.
 
     Args:
         company_profile: Single-tenant company context required for all workflows.
         model: Optional override for the LLM powering the manager.
-        checkpointer: Optional LangGraph checkpointer for durable state. If not
-            provided, the function will create a Postgres-backed saver.
-        builtin_tools: Optional subset of deepagents built-ins to enable.
-        tools: Optional explicit tool list (otherwise retrieved from registry).
+        checkpointer: LangGraph checkpointer for durable state (required - provided by runner).
         storage: Storage adapter implementing StorageInterface (required).
+        tools: Optional explicit tool list (otherwise retrieved from registry).
 
     Returns:
-        Compiled deepagents agent with interrupt_before=["tools"] for HITL.
+        Compiled deepagents agent with tool_configs for HITL interrupts.
 
     **Architecture Compliance**:
-    - Uses native LangGraph `interrupt_before` for HITL (per LANGCHAIN_V1_FEATURES.md).
-    - No custom post-model hooks—tool node synthesizes ToolMessages naturally.
-    - Interrupts pause execution after agent emits tool calls, before execution.
-    - Runner inspects tool calls (e.g., save_product), requests approval, resumes.
+    - Uses DeepAgents `tool_configs` for HITL (native to deepagents 0.0.11rc1)
+    - Tool configs specify which tools require approval (save_product)
+    - Runner handles interrupt detection and resume via Command API
+    - Sub-agents provide lightweight delegation without full agent overhead
     """
 
     llm = _resolve_model(model)
     instructions = _load_prompt(company_profile)
 
-    if storage is None:
-        raise ValueError("storage adapter implementing StorageInterface is required")
-
     cataloging_tools = list(tools) if tools is not None else tools_registry.get_cataloging_tool_objects(storage)
 
     subagents = _build_subagents(company_profile, storage)
-
-    if checkpointer is None:
-        checkpointer = get_checkpointer()
 
     tool_configs = tools_registry.get_interrupt_config()
 
