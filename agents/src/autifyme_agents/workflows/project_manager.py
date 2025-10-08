@@ -109,8 +109,9 @@ def create_project_manager(
     llm = _resolve_model(model)
     instructions = _load_prompt(company_profile)
 
-    # PM gets NO domain tools - only orchestration tools if explicitly provided
+    # PM gets orchestration tools plus the image analysis fallback for resiliency
     pm_tools = list(tools) if tools is not None else []
+    pm_tools.append(tools_registry.create_image_analysis_tool(storage))
 
     # Departments get domain tools
     subagents = _build_subagents(company_profile, storage)

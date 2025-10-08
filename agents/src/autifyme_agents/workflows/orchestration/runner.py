@@ -257,6 +257,8 @@ class WorkflowRunner:
                 return
 
         # Invoke PM
+        retain_media = False
+
         try:
             result, interrupt = self._invoke_pm(thread_id, text, media_path)
 
@@ -286,6 +288,7 @@ class WorkflowRunner:
         except GraphRecursionError as exc:
             logger.exception("PM recursion limit exceeded", exc_info=exc, extra={"thread_id": thread_id})
             self.channel.send_error(sender, "recursion")
+            retain_media = True
 
         except Exception as exc:
             if BadRequestError and isinstance(exc, BadRequestError):
@@ -303,13 +306,15 @@ class WorkflowRunner:
                     "processing",
                     "I hit a coordination error while prepping your request. Please resend the details so I can try again.",
                 )
+                retain_media = True
             else:
                 logger.exception("PM invocation failed", exc_info=exc, extra={"thread_id": thread_id})
                 self.channel.send_error(sender, "processing")
+                retain_media = True
 
         finally:
             # Cleanup media unless approval pending
-            if media_path and not self.state.has_pending_approval(thread_id):
+            if media_path and not retain_media and not self.state.has_pending_approval(thread_id):
                 self._cleanup_media(media_path)
 
     def _invoke_pm(
