@@ -14,9 +14,8 @@ from autifyme_agents.integrations.communication.whatsapp_media_client import (
 )
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
-from autifyme_agents.workflows.whatsapp_cataloging_runner import (
-    WhatsAppCatalogingRunner,
-)
+from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
+from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
 
 
 class RecordingWhatsAppClient:
@@ -64,13 +63,19 @@ def main() -> None:
     media_client = NoopWhatsAppMediaClient()
     checkpointer = get_checkpointer()
 
-    runner = WhatsAppCatalogingRunner(
-        storage=storage,
-        checkpointer=checkpointer,
+    # Create WhatsApp channel with test doubles
+    whatsapp_channel = WhatsAppChannel(
         whatsapp_client=whatsapp_client,
         media_client=media_client,
     )
-    print(" Runner ready (Project Manager orchestrated)")
+
+    # Create workflow runner with WhatsApp channel
+    runner = WorkflowRunner(
+        channel=whatsapp_channel,
+        storage=storage,
+        checkpointer=checkpointer,
+    )
+    print(" Runner ready (Project Manager orchestrated with refactored architecture)")
 
     sender = f"test-user-{uuid.uuid4()}"
     payload = {

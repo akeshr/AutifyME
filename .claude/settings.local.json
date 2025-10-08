@@ -12,7 +12,9 @@
       "Bash(findstr:*)",
       "Bash(python:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:*)"
+      "WebFetch(domain:*)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:smith.langchain.com)"
     ],
     "deny": [],
     "ask": []

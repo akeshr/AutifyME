@@ -11,21 +11,6 @@ resolution-markers = [
 prerelease-mode = "allow"
 
 [[package]]
-name = "ai-filesystem"
-version = "0.1.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "httpx" },
-    { name = "langchain-core" },
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ee/3c/1659fe6791008bae01b1f6cca0dbbc1b34fbacb5bc355d78bb7ae52cfd0d/ai_filesystem-0.1.4.tar.gz", hash = "sha256:623e75f4f41255f3668eedba24aff76f3732f5252b57769d76ac3d844e3ac5ba", size = 6478, upload-time = "2025-08-05T03:13:53.522Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e3/ec/7f39dd434f0d51e7d1d56461e926b58a2b080aced16d78ffc8247200b868/ai_filesystem-0.1.4-py3-none-any.whl", hash = "sha256:a0efaa0dd17de24e2f4c386da3b0f88de425d42b23784098b4def40514a3b721", size = 7310, upload-time = "2025-08-05T03:13:52.009Z" },
-]
-
-[[package]]
 name = "altair"
 version = "5.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -130,7 +115,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "deepagents", specifier = "==0.0.11rc1" },
+    { name = "deepagents", specifier = "==0.0.11" },
     { name = "fastapi", specifier = ">=0.118.0" },
     { name = "langchain", specifier = "==1.0.0a12" },
     { name = "langchain-anthropic", specifier = "==1.0.0a2" },
@@ -516,18 +501,18 @@ wheels = [
 
 [[package]]
 name = "deepagents"
-version = "0.0.11rc1"
+version = "0.0.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ai-filesystem" },
     { name = "langchain" },
     { name = "langchain-anthropic" },
+    { name = "langchain-core" },
     { name = "langgraph" },
     { name = "langgraph-prebuilt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/bd/5beaea3fc100ebcf8d6e22eac66b72351138370290d95a2c76d357407bae/deepagents-0.0.11rc1.tar.gz", hash = "sha256:6361beae3608cb48d4975b849652f3d095735fa4b51aa747a4e59e509357caa7", size = 24439, upload-time = "2025-09-30T20:58:38.147Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/41/744f75f8fa4877b25b0e627c51aff15a30eed16639d3dedac09d43ed8e8f/deepagents-0.0.11.tar.gz", hash = "sha256:c9eaa8459c1f0fd79646f57f6bc2fb60432ac1f870a5388949c8beed886d12c3", size = 23911, upload-time = "2025-10-07T18:07:45.794Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/4f/6f143e088967d8bb125b60e128e0d4a4403fab140871bf1b19e84263d8ec/deepagents-0.0.11rc1-py3-none-any.whl", hash = "sha256:3faccffc9b0588e576583b94f790f8bf7ac7ec735b715a71cd266ad1288d57e3", size = 27315, upload-time = "2025-09-30T20:58:37.051Z" },
+    { url = "https://files.pythonhosted.org/packages/22/a3/75c63451646d11ecabad684bf79fd0c2226a93f563eb29ea4248dc6a9023/deepagents-0.0.11-py3-none-any.whl", hash = "sha256:2dcdfc9459bcad4bd2c544cbdc1a783722b827141ef171b111cb6f810355ded9", size = 26808, upload-time = "2025-10-07T18:07:44.678Z" },
 ]
 
 [[package]]

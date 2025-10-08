@@ -1,7 +1,7 @@
 # AutifyME - Agentic Business Operating System
 
-**Status:** 🚧 Foundation Layer - 40% Complete (Grade: B-)  
-**Last Updated:** October 1, 2025
+**Status:** 🚧 MVP Development - WhatsApp Cataloging Active
+**Last Updated:** October 8, 2025
 
 ---
 
@@ -9,29 +9,25 @@
 
 | Document | Purpose |
 |----------|---------|
-| **[Implementation Status](IMPLEMENTATION_STATUS.md)** | Current state, progress, blockers |
-| **[Deep Code Analysis](DEEP_CODE_ANALYSIS.md)** | Architectural audit & fixes |
-| **[Architecture Review](docs/architecture/ARCHITECTURE_REVIEW.md)** | Implementation roadmap |
-| **[Whitepaper](docs/whitepaper.md)** | Product vision |
-| **[Architecture Docs](docs/architecture/README.md)** | Full technical design |
+| **[Architecture Docs](docs/architecture/README.md)** | Technical design & implementation |
+| **[CLAUDE.md](CLAUDE.md)** | Development guidelines & standards |
+| **[DeepAgents Fix](DEEPAGENTS_FIX.md)** | Library compatibility notes |
+| **[Critical Bug Fix](CRITICAL_BUG_FIX.md)** | Recent HITL issue resolution |
 
 ---
 
 ## 📊 Current Status
 
-### ✅ Working:
-- Hexagonal Architecture (Grade: A)
-- Type Safety with Pydantic (Grade: A)
-- Middleware System (Grade: A-)
-- LangSmith Integration (Grade: B+)
-- Basic Cataloging Workflow (E2E working)
+### ✅ Completed:
+- Refactored workflow orchestration (multi-channel ready)
+- HITL approval flow with state persistence
+- Error recovery and abandonment detection
+- WhatsApp webhook with idempotency
+- LangSmith observability integration
 
-### ❌ Critical Blockers (P0):
-1. **No Error Handling** - Missing ToolStrategy/ToolException (2-3 days)
-2. **No State Persistence** - Missing PostgresSaver checkpointing (1 day)
-3. **No Testing Framework** - No unit/integration tests (2-3 days)
-
-**Timeline to Production:** 5-6 days
+### 🚧 In Progress:
+- WhatsApp cataloging workflow validation
+- Unit test coverage for orchestration layer
 
 ---
 
@@ -46,28 +42,20 @@
 
 ### Setup:
 ```bash
-# 1. Clone and navigate
-cd AutifyME/agents
-
-# 2. Create virtual environment
+cd agents
 uv venv
+.venv\Scripts\activate  # Windows | source .venv/bin/activate on Unix
+uv pip install -e ".[dev]"
 
-# 3. Activate environment
-# Windows: .venv\Scripts\activate
-# Unix: source .venv/bin/activate
+# Configure .env with your API keys
+# Run smoke test
+uv run python test_cataloging_workflow_clean.py
 
-# 4. Install dependencies
-uv pip install -e .
-
-# 5. Configure environment
-cp .env.example .env
-# Edit .env with your keys
-
-# 6. Run test workflow
-uv run python test_cataloging_workflow.py
+# Start webhook server
+uv run uvicorn autifyme_agents.entrypoints.whatsapp_webhook:app --reload --port 8000
 ```
 
-See [LangSmith Setup](docs/setup/LANGSMITH_SETUP.md) for detailed configuration.
+See [CLAUDE.md](CLAUDE.md) for complete development reference.
 
 ---
 
@@ -98,117 +86,71 @@ Tools (Utilities)
 
 ```
 AutifyME/
-├── agents/                    # Python agentic service
+├── agents/
 │   ├── src/autifyme_agents/
-│   │   ├── core/             # Factories, middleware, config
-│   │   ├── integrations/     # External service adapters
-│   │   ├── tools/            # Agent-accessible operations
-│   │   ├── specialists/      # Single-task agents
-│   │   ├── departments/      # Multi-specialist orchestrators
-│   │   ├── schemas/          # Pydantic models
-│   │   └── prompts/          # Version-controlled prompts
-│   └── test_cataloging_workflow.py
-├── docs/
-│   ├── architecture/         # Technical design docs
-│   ├── setup/               # Configuration guides
-│   └── whitepaper.md        # Product vision
-├── .cursor/rules/           # 11 development guardrails
-├── IMPLEMENTATION_STATUS.md # Current state tracker
-└── DEEP_CODE_ANALYSIS.md   # Architectural audit
+│   │   ├── workflows/
+│   │   │   ├── orchestration/      # Generic workflow coordination
+│   │   │   └── channels/           # Channel-specific adapters
+│   │   ├── entrypoints/            # API webhooks
+│   │   ├── departments/            # Department head agents
+│   │   ├── tools/                  # Reusable tool implementations
+│   │   ├── integrations/           # External service clients
+│   │   ├── schemas/                # Pydantic models
+│   │   └── core/                   # Config, middleware, ports
+│   └── scripts/                    # Utility scripts
+├── docs/architecture/              # Technical specifications
+├── CLAUDE.md                       # Development standards
+└── DEEPAGENTS_FIX.md              # Library compatibility
 ```
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Agentic Framework:** LangChain v1 (latest), LangGraph v1
+- **Framework:** LangChain 1.0.0a12, LangGraph 1.0.0a4, DeepAgents 0.0.11
 - **Observability:** LangSmith
-- **Database:** Supabase (PostgreSQL)
-- **LLMs:** OpenAI (gpt-4o), Anthropic (Claude)
+- **Database:** Supabase + PostgreSQL (LangGraph checkpointer)
+- **LLMs:** OpenAI (gpt-4o)
 - **Package Manager:** `uv`
-- **Type Safety:** Pydantic
-- **Testing:** pytest (to be set up)
+- **Type Safety:** Pydantic v2
 
 ---
 
 ## 🎯 Next Steps
 
-### This Week (P0):
-1. Implement error handling (2-3 days)
-2. Add checkpointing (1 day)
-3. Set up testing framework (2-3 days)
-
-### Following Week:
-4. Structured logging (1 day)
-5. Database migrations (0.5 days)
-6. Memory management (1 day)
+1. Validate refactored architecture in production (1-2 days)
+2. Complete unit test coverage for orchestration layer
+3. Add SMS/Telegram channel adapters (~150 lines each)
+4. Remove deprecated `whatsapp_cataloging_runner.py` after validation
 
 ---
 
 ## 📚 Documentation
 
-### Reading Order:
+### Essential Reading:
 
-**New to the project?**
-1. This README (you are here)
-2. [Implementation Status](IMPLEMENTATION_STATUS.md) - Current state
-3. [Architecture Overview](docs/architecture/README.md) - Navigate all architecture docs
-
-**Setting up?**
-1. [LangSmith Setup](docs/setup/LANGSMITH_SETUP.md) - Configuration guide
-2. Run `test_cataloging_workflow.py` - Verify it works
-
-**Contributing?**
-1. Review all [Cursor Rules](.cursor/rules/) - 11 guardrails
-2. [LangChain v1 Features](docs/architecture/LANGCHAIN_V1_FEATURES.md) - What's available
-3. [Lessons Learned](docs/architecture/LESSONS_LEARNED_OCT_2025.md) - Common pitfalls
-
-**Technical review?**
-1. [Deep Code Analysis](DEEP_CODE_ANALYSIS.md) - Audit results
-2. [Architecture Review](docs/architecture/ARCHITECTURE_REVIEW.md) - Roadmap
+1. **[CLAUDE.md](CLAUDE.md)** - Development standards, commands, architecture canon
+2. **[Architecture Docs](docs/architecture/README.md)** - Complete technical specifications
+3. **[DeepAgents Fix](DEEPAGENTS_FIX.md)** - Library compatibility notes
+4. **[Critical Bug Fix](CRITICAL_BUG_FIX.md)** - Recent HITL issue resolution
 
 ---
 
-## 🔒 Cursor Rules (Guardrails)
+## 🏗️ Architecture Principles
 
-11 active rules enforcing:
-- Architecture-First Philosophy
-- LangChain v1 Best Practices
-- Hexagonal Architecture
-- Type Safety
-- Middleware Patterns
-- Context Engineering
-- Debugging Methodology
-
-See `.cursor/rules/` for details.
+- **Hexagonal Architecture**: Core logic independent of external services
+- **Single Responsibility**: Each component does one thing well
+- **Strategy Pattern**: Channel behavior injected via protocol
+- **Type Safety**: Pydantic models for all data transfer
+- **Observability**: LangSmith tracing on all workflows
 
 ---
 
 ## 🤝 Contributing
 
-**Development Philosophy:**
-1. **Architecture-First:** No shortcuts, production-grade from day 1
-2. **Design-First:** Document in markdown before coding
-3. **Generic-First:** Build for the system, not just one workflow
-4. **Explain the Why:** All decisions must be justified
-
----
-
-## 📊 Progress Tracking
-
-- **Foundation:** 40% (5/10 production criteria met)
-- **Grade:** B- (improved from C-)
-- **Deployment Ready:** No (3 P0 blockers)
-
-See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for detailed tracking.
-
----
-
-## 📄 License
-
-[To be determined]
-
----
-
-**Built with ❤️ for Indian small businesses**
+See [CLAUDE.md](CLAUDE.md) for complete development guidelines:
+- Architecture-first design process
+- LangChain v1 patterns and verification
+- Essential commands and workflows
+- Common gotchas and solutions
 

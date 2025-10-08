@@ -13,7 +13,7 @@ dependencies = [
     "langgraph-checkpoint-postgres==2.0.24",
     "langsmith",
     # Advanced Agent Implementation
-    "deepagents==0.0.11rc1",
+    "deepagents==0.0.11",  # Use stable 0.0.11, not 0.0.11rc1 (has API bug)
     # LLM Providers (v1 alpha)
     "langchain-openai==1.0.0a3",
     "langchain-anthropic==1.0.0a2",

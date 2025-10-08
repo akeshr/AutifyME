@@ -1,9 +1,8 @@
-"""WhatsApp webhook entrypoint."""
+"""WhatsApp webhook entrypoint with comprehensive logging."""
 
 from __future__ import annotations
 
 import json
-import logging
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
@@ -13,17 +12,42 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 
 from autifyme_agents.core.config import settings
+from autifyme_agents.core.logging_config import setup_logging, get_logger
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
-from autifyme_agents.workflows.whatsapp_cataloging_runner import WhatsAppCatalogingRunner
+from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
+from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
+
+# Initialize logging with DEBUG level
+setup_logging(level="DEBUG", enable_file_logging=True)
+logger = get_logger(__name__)
 
 app = FastAPI()
-logger = logging.getLogger(__name__)
-storage_adapter = SupabaseStorageClient()
 
-runner = WhatsAppCatalogingRunner(
-    storage=storage_adapter,
-    enable_agent=True,
-)
+logger.info("=" * 80)
+logger.info("AUTIFYME WHATSAPP WEBHOOK STARTING (REFACTORED ARCHITECTURE)")
+logger.info("=" * 80)
+logger.info(f"SUPABASE_URL: {settings.SUPABASE_URL}")
+logger.info(f"DATABASE_URL: {settings.DATABASE_URL[:20]}...")  # Hide credentials
+logger.info(f"WHATSAPP_PHONE_NUMBER_ID: {settings.WHATSAPP_PHONE_NUMBER_ID}")
+
+storage_adapter = SupabaseStorageClient()
+logger.info("Storage adapter initialized successfully")
+
+logger.info("Initializing WorkflowRunner with WhatsApp channel...")
+try:
+    # Create channel adapter
+    whatsapp_channel = WhatsAppChannel()
+    logger.info("WhatsApp channel adapter created")
+
+    # Create generic workflow runner with WhatsApp channel
+    runner = WorkflowRunner(
+        channel=whatsapp_channel,
+        storage=storage_adapter,
+    )
+    logger.info("✅ WorkflowRunner initialized successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize WorkflowRunner: {e}", exc_info=True)
+    raise
 
 _EVENT_DUMP_DIR = Path("tmp/whatsapp_events")
 

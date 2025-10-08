@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import threading
 from collections import OrderedDict
 from pathlib import Path
@@ -14,6 +13,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.core.logging_config import get_logger
 from autifyme_agents.integrations.communication import WhatsAppClient, WhatsAppMediaClient
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
@@ -21,7 +21,7 @@ from autifyme_agents.schemas.agent_outputs import CatalogingToolOutput
 from autifyme_agents.core.config import settings
 from autifyme_agents.workflows.project_manager import create_project_manager
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 CATALOGING_PROMPT = "Please share the product details and photo so I can catalog it."  # Minimal triage response
@@ -49,20 +49,48 @@ class WhatsAppCatalogingRunner:
         enable_agent: bool = True,
         recursion_limit: int | None = None,
     ) -> None:
+        logger.info("=" * 80)
+        logger.info("INITIALIZING WHATSAPP CATALOGING RUNNER")
+        logger.info("=" * 80)
+
         if storage is None:
             raise ValueError("storage adapter must implement StorageInterface and be provided by the entrypoint")
+
         self.storage = storage
         self.checkpointer = checkpointer
         self.whatsapp_client = whatsapp_client or WhatsAppClient()
         self.media_client = media_client or WhatsAppMediaClient()
         self.enable_agent = enable_agent
         self.recursion_limit = recursion_limit or settings.AGENT_RECURSION_LIMIT
+
+        logger.debug(
+            "Runner configuration",
+            extra={
+                "enable_agent": enable_agent,
+                "recursion_limit": self.recursion_limit,
+                "has_custom_checkpointer": checkpointer is not None,
+            },
+        )
+
+        # Load company profile
+        logger.info("Loading company profile from storage...")
         self.company_profile: CompanyProfile = self.storage.get_company_profile()
+        logger.info(
+            "Company profile loaded",
+            extra={
+                "company_name": self.company_profile.name,
+                "target_audience": self.company_profile.target_audience[:50] if self.company_profile.target_audience else "N/A",
+            },
+        )
+
         self._last_pm_state: dict[str, Any] | None = None
         # Thread locks per user with LRU eviction to prevent memory leaks
         # OrderedDict maintains insertion order for LRU behavior
         self._thread_locks: OrderedDict[str, threading.Lock] = OrderedDict()
         self._locks_mutex = threading.Lock()  # Protects _thread_locks dict itself
+
+        logger.info("WhatsAppCatalogingRunner initialization complete")
+        logger.info("=" * 80)
 
     def _get_checkpointer(self) -> BaseCheckpointSaver:
         if self.checkpointer:

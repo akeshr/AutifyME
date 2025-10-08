@@ -4,15 +4,26 @@ This document outlines the design for the Cataloging MVP feature: enabling India
 
 ---
 
-## Architecture Snapshot (2025-10)
+## Architecture (2025-10-08)
 
-- **Webhook Entry**: `FastAPI` app in `entrypoints/whatsapp_webhook.py` handles GET verification, POST events, and approval routing
-- **Workflow Runner**: `workflows/whatsapp_cataloging_runner.py` triages intent, enforces recursion guards, orchestrates cataloging runs, media fetching, and HITL resumes
-- **Project Manager (Roadmap)**: DeepAgent-based orchestrator (see `PROJECT_MANAGER_DESIGN.md`) to analyze intent and delegate to departments once implemented
-- **Messaging Adapter**: `WhatsAppClient` wraps Facebook Graph v23 send endpoint
-- **Media Adapter**: `WhatsAppMediaClient` fetches media IDs and downloads to temporary files
-- **Tooling**: `send_whatsapp_message` in `tools/communication_tools.py`
-- **HITL Strategy**: `create_cataloging_department(... interrupt_before=["save_product"])` pauses before writes; resume handled via WhatsApp replies
+**Modular, multi-channel architecture.** See [`WORKFLOW_ORCHESTRATION_REFACTOR.md`](./WORKFLOW_ORCHESTRATION_REFACTOR.md) for complete details.
+
+### Components
+
+- **Webhook**: `entrypoints/whatsapp_webhook.py` - FastAPI webhook (verification, events, routing)
+- **Channel Adapter**: `workflows/channels/whatsapp/adapter.py` - WhatsApp-specific (formatting, media, Graph API)
+- **Workflow Orchestrator**: `workflows/orchestration/runner.py` - Generic coordination (channel-agnostic)
+- **Interrupt Coordinator**: `workflows/orchestration/interrupt_coordinator.py` - HITL handling
+- **State Manager**: `workflows/orchestration/state_manager.py` - Approval persistence
+- **Recovery Strategy**: `workflows/orchestration/recovery_strategy.py` - Error recovery
+- **Project Manager**: `workflows/project_manager.py` - DeepAgent orchestrator (delegates to departments)
+
+### Key Features
+
+- ✅ Multi-channel ready (SMS, Telegram via new adapters)
+- ✅ Single Responsibility per component
+- ✅ Unit-testable in isolation
+- ✅ Clean separation: orchestration ≠ messaging ≠ interrupts
 
 ---
 
