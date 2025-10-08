@@ -87,36 +87,38 @@ def create_project_manager(
     storage: StorageInterface,
     tools: Sequence | None = None,
 ) -> Any:
-    """Create the deepagents-powered Project Manager with native HITL via tool_configs.
+    """Create the deepagents-powered Project Manager with proper delegation hierarchy.
 
     Args:
         company_profile: Single-tenant company context required for all workflows.
         model: Optional override for the LLM powering the manager.
         checkpointer: LangGraph checkpointer for durable state (required - provided by runner).
         storage: Storage adapter implementing StorageInterface (required).
-        tools: Optional explicit tool list (otherwise retrieved from registry).
+        tools: Optional explicit tool list for PM orchestration only (NOT domain tools).
 
     Returns:
-        Compiled deepagents agent with tool_configs for HITL interrupts.
+        Compiled deepagents agent with proper delegation to departments.
 
-    **Architecture Compliance**:
-    - Uses DeepAgents `tool_configs` for HITL (native to deepagents 0.0.11rc1)
-    - Tool configs specify which tools require approval (save_product)
-    - Runner handles interrupt detection and resume via Command API
-    - Sub-agents provide lightweight delegation without full agent overhead
+    **Architecture**:
+    - PM has NO direct access to domain tools (analyze_image, save_product, etc.)
+    - PM MUST delegate to departments via 'task' tool
+    - Subagents (departments) have domain tools
+    - Enforces PM → Department → Specialist → Tools hierarchy
     """
 
     llm = _resolve_model(model)
     instructions = _load_prompt(company_profile)
 
-    cataloging_tools = list(tools) if tools is not None else tools_registry.get_cataloging_tool_objects(storage)
+    # PM gets NO domain tools - only orchestration tools if explicitly provided
+    pm_tools = list(tools) if tools is not None else []
 
+    # Departments get domain tools
     subagents = _build_subagents(company_profile, storage)
 
     tool_configs = tools_registry.get_interrupt_config()
 
     project_manager = create_deep_agent(
-        tools=cataloging_tools,
+        tools=pm_tools,  # PM has NO direct domain tools
         instructions=instructions,
         model=llm,
         subagents=subagents,

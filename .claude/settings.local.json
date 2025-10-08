@@ -14,7 +14,8 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:*)",
       "WebFetch(domain:pypi.org)",
-      "WebFetch(domain:smith.langchain.com)"
+      "WebFetch(domain:smith.langchain.com)",
+      "Read(//c/Abhi/personal/**)"
     ],
     "deny": [],
     "ask": []

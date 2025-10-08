@@ -31,9 +31,7 @@ def clear_user_state(phone_number: str, channel: str = "whatsapp") -> None:
     # Clear checkpoint
     try:
         checkpointer = get_checkpointer()
-        with checkpointer as saver:
-            # Delete the checkpoint thread
-            saver.delete_thread(thread_id)
+        checkpointer.delete_thread(thread_id)
         logger.info(f"✅ Cleared checkpoint for {thread_id}")
     except Exception as exc:
         logger.error(f"❌ Failed to clear checkpoint: {exc}")

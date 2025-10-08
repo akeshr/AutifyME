@@ -306,9 +306,13 @@ class InterruptCoordinator:
 
         Returns:
             Product instance
+
+        Note:
+            Product.id is auto-generated via default_factory=uuid4.
+            Do NOT pass 'id' field - let Pydantic generate it.
         """
         return Product(
-            id=tool_args.get("id", "draft"),
+            # id is auto-generated, don't pass it
             name=tool_args.get("name", "Unnamed Product"),
             description=tool_args.get("description"),
             price=tool_args.get("price"),

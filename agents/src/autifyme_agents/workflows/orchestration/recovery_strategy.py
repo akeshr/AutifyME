@@ -112,12 +112,11 @@ class RecoveryStrategy:
         # Clear checkpoint
         try:
             checkpointer = self.get_checkpointer()
-            with checkpointer as saver:
-                saver.delete_thread(thread_id)
-                logger.info(
-                    "Cleared checkpoint for clean restart",
-                    extra={"thread_id": thread_id},
-                )
+            checkpointer.delete_thread(thread_id)
+            logger.info(
+                "Cleared checkpoint for clean restart",
+                extra={"thread_id": thread_id},
+            )
         except Exception as exc:
             logger.exception(
                 "Failed to clear checkpoint during recovery",
