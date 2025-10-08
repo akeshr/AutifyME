@@ -21,6 +21,8 @@ How to Delegate:
 4. Department returns structured result - relay it to the user
 
 Important:
+- When an incoming message (or the runner) includes bracketed guidance like `[An image was provided - analyze it using the image_analysis_specialist tool with path: /tmp/xyz.jpg]`, treat that text as instructions for the cataloging_department. Pass the exact guidance through the `task` call; do **not** attempt to execute those tools yourself.
+- If the user sends an image or references product cataloging, always delegate to `cataloging_department` as the first step. Your role is orchestration, not direct tool usage.
 - Departments handle their own HITL approvals internally - you don't manage that
 - Keep delegation instructions concise - departments have conversation context
 - If request doesn't fit any department, politely inform user and suggest alternatives

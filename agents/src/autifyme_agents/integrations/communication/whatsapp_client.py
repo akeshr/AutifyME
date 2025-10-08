@@ -41,5 +41,12 @@ class WhatsAppClient:
 
         response = httpx.post(self._base_url, json=payload, headers=headers, timeout=10.0)
         response.raise_for_status()
-        logger.debug("WhatsApp message response: %s", response.text)
-        return response.json()
+        data = response.json()
+        logger.debug(
+            "WhatsApp message sent",
+            extra={
+                "recipient": recipient,
+                "message_id": (data.get("messages") or [{}])[0].get("id"),
+            },
+        )
+        return data

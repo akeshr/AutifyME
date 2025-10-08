@@ -18,7 +18,7 @@ from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
 
 # Initialize logging with DEBUG level
-setup_logging(level="DEBUG", enable_file_logging=True)
+setup_logging(level="INFO", enable_file_logging=False)
 logger = get_logger(__name__)
 
 app = FastAPI()
@@ -125,7 +125,13 @@ async def receive(request: Request) -> Any:
     body = await request.json()
     event_path = _persist_event(body)
     logger.info("Incoming WhatsApp payload saved", extra={"event_path": str(event_path)})
-    logger.debug("Incoming WhatsApp payload: %s", json.dumps(body))
+    logger.debug(
+        "Incoming WhatsApp payload keys",
+        extra={
+            "entry_count": len(body.get("entry", [])),
+            "top_level_keys": list(body.keys()),
+        },
+    )
 
     try:
         # WhatsApp can send multiple entries in one payload
