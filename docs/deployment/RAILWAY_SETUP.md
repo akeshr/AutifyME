@@ -79,7 +79,7 @@ Value: your-app-name.up.railway.app
 
 1. **Check Health Endpoint:**
    ```
-   GET https://your-app.railway.app/health
+   GET https://your-app.railway.app/health 
    ```
    Should return: `{"status": "healthy", "service": "autifyme-webhook"}`
 
