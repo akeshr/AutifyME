@@ -344,12 +344,12 @@ class WorkflowRunner:
                     },
                 )
                 # Print full error to console for debugging
-                print(f"\n=== OpenAI BadRequestError Details ===")
+                print("\n=== OpenAI BadRequestError Details ===")
                 print(f"Error type: {type(exc).__name__}")
                 print(f"Error message: {error_text}")
                 if hasattr(exc, 'response'):
                     print(f"Response body: {exc.response.text if hasattr(exc.response, 'text') else 'N/A'}")
-                print(f"======================================\n")
+                print("======================================\n")
                 self.channel.send_error(
                     sender,
                     "processing",

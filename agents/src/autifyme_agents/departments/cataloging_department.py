@@ -28,7 +28,7 @@ from autifyme_agents.tools import create_save_product_tool
 from autifyme_agents.core.middleware import CompanyContextMiddleware
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
-from autifyme_agents.schemas.models import CatalogingResult, Product
+from autifyme_agents.schemas.models import Product
 from autifyme_agents.schemas.context import AgentContext
 
 # Use Union instead of BaseMessage to avoid langchain_core where possible
