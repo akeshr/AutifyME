@@ -59,11 +59,21 @@ uv run uvicorn autifyme_agents.entrypoints.whatsapp_webhook:app --reload --port 
 See **[Deployment Guide](docs/deployment/README.md)** for production deployment options with free tiers and HTTPS support.
 
 **Quick Deploy Options:**
-- **Railway** (Recommended): Automatic HTTPS, PostgreSQL included, $0/month free
+- **Railway** (Recommended): Automatic HTTPS, PostgreSQL included, **custom domains FREE**, $0/month free
 - **Render**: 750 free hours/month, custom domains, $0/month free
 - **Fly.io**: Global deployment, custom domains, $0/month free
 
 All platforms support the included Docker configuration and GitHub Actions CI/CD pipeline.
+
+### 🌐 Custom Domain Setup (Railway)
+Railway provides **free custom domains** with automatic HTTPS:
+
+1. Railway Dashboard → Your Project → Settings → Domains
+2. Add your domain (e.g., `api.autifyme.com`)
+3. Update DNS records as instructed
+4. Railway issues SSL certificates automatically
+
+**Benefits:** Professional URL, better for WhatsApp webhook, improved SEO.
 
 See [CLAUDE.md](CLAUDE.md) for complete development reference.
 

@@ -51,12 +51,29 @@ AGENT_RECURSION_LIMIT=15
 **LangSmith & OpenAI:**
 - Copy from your existing `.env` file
 
-### 4. Set Up Custom Domain (Optional but Recommended)
+### 4. Set Up Custom Domain (Highly Recommended)
 
 1. Go to Railway Dashboard → Your Project → Settings → Domains
-2. Add your custom domain (e.g., `api.autifyme.com`)
-3. Railway provides automatic HTTPS certificates
-4. Update DNS records as instructed
+2. Click "Add Domain"
+3. Enter your domain (e.g., `api.autifyme.com` or `autifyme.com`)
+4. Railway provides automatic HTTPS certificates
+5. Update DNS records as instructed:
+
+**For apex domain (autifyme.com):**
+```
+Type: CNAME
+Name: @
+Value: your-app-name.up.railway.app
+```
+
+**For subdomain (api.autifyme.com):**
+```
+Type: CNAME
+Name: api
+Value: your-app-name.up.railway.app
+```
+
+**Important:** Railway domains are **completely free** and include automatic HTTPS certificates. This is much better than using the default Railway subdomain for production.
 
 ### 5. Verify Deployment
 
