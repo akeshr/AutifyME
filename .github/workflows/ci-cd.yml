@@ -121,18 +121,13 @@ jobs:
     needs: [test, lint]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/InitialDesign'
+    container: ghcr.io/railwayapp/cli:latest
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Railway CLI
-      run: |
-        curl -fsSL https://railway.app/install.sh | sh
-        echo "$HOME/.railway/bin" >> $GITHUB_PATH
-
     - name: Deploy to Railway
       env:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-      run: |
-        railway up
+        SVC_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+      run: railway up --service=${{ env.SVC_ID }}
