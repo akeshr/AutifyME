@@ -128,6 +128,7 @@ jobs:
 
     - name: Deploy to Railway
       env:
-        SVC_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      run: railway up --service=${{ env.SVC_ID }}
+      run: |
+        railway link --project ${{ secrets.RAILWAY_PROJECT_ID }}
+        railway up --service ${{ secrets.RAILWAY_SERVICE_ID }}

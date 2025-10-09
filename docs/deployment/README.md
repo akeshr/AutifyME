@@ -150,7 +150,8 @@ The included `.github/workflows/ci-cd.yml` provides:
 
 ### Required Secrets:
 ```bash
-RAILWAY_TOKEN=your_railway_token
+RAILWAY_TOKEN=your_railway_api_token
+RAILWAY_PROJECT_ID=your_railway_project_id
 RAILWAY_SERVICE_ID=your_railway_service_id
 ```
 
