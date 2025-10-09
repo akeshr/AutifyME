@@ -28,6 +28,7 @@ import sys
 import json
 import time
 from pathlib import Path
+from typing import Any
 from dotenv import load_dotenv
 
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
@@ -50,7 +51,7 @@ class ConsoleChannel(MessagingChannel):
 
     def __init__(self, auto_approve: bool = False):
         self.auto_approve = auto_approve
-        self.messages_sent = []
+        self.messages_sent: list[dict[str, Any]] = []
 
     def format_thread_id(self, sender: str) -> str:
         return f"console:{sender}"

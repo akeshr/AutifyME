@@ -196,7 +196,7 @@ class InterruptCoordinator:
             return None
 
         # Build resume command for LangGraph
-        command = Command(
+        command: Command = Command(
             resume={
                 approval.get("interrupt_id"): {
                     "type": "accept",

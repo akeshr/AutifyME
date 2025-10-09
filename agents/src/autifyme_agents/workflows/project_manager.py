@@ -147,10 +147,10 @@ def create_project_manager(
     pm_tools.extend(_create_department_tools(company_profile, storage, checkpointer))
 
     # No subagents - departments are invoked as tools
-    subagents = []
+    subagents: list[Any] = []
 
     # No tool_configs needed - departments handle their own HITL via middleware
-    tool_configs = {}
+    tool_configs: dict[str, Any] = {}
 
     project_manager = create_deep_agent(
         tools=pm_tools,  # PM has NO direct domain tools

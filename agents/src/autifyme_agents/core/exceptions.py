@@ -11,6 +11,8 @@ Design Philosophy:
 - Domain-specific exceptions help error handling at different layers
 """
 
+from typing import Any
+
 
 class AutifyMEError(Exception):
     """
