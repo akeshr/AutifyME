@@ -127,16 +127,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify Railway authentication
+      - name: Quick auth & env debug (no token printed)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          SVC_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
         run: |
-          railway whoami || echo "Warning: Token might be invalid, continuing for debug."
+          echo "Token length (0 means missing):" && echo -n "$RAILWAY_TOKEN" | wc -c
+          echo "RAILWAY_PROJECT_ID visible? (should be non-empty):" && echo -n "$RAILWAY_PROJECT_ID" | wc -c
+          railway --version || true
+          railway whoami || true
+          railway status || true
 
-      - name: Deploy to Railway (headless)
+      - name: Deploy to Railway (headless, per blog pattern)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          SVC_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
         run: |
-          railway up --detach --service=${{ secrets.RAILWAY_SERVICE_ID }}
+          # blog recommends running inside Railway CLI container and using a project token:
+          # https://blog.railway.com/p/github-actions
+          railway up --detach --service=${{ env.SVC_ID }}
+
