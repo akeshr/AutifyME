@@ -169,6 +169,21 @@ class TestGetCompanyProfileTool:
             def delete_pending_approval(self, thread_id):
                 pass
 
+            def save_workflow_outcome(self, outcome):
+                return "test-outcome-id"
+
+            def get_workflow_outcomes(self, **kwargs):
+                return []
+
+            def get_recent_failures(self, time_window):
+                return []
+
+            def get_success_rates(self, time_window=None):
+                return {"overall": 0.0}
+
+            def get_edge_cases(self, time_window=None):
+                return []
+
         tool = create_get_company_profile_tool(EmptyStorage())
 
         with pytest.raises(DataNotFoundError) as exc_info:

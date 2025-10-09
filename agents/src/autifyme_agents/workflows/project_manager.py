@@ -136,6 +136,9 @@ def create_project_manager(
     - Enforces PM → Department → Specialist → Tools hierarchy
     """
 
+    if checkpointer is None:
+        raise ValueError("checkpointer is required for Project Manager (DeepAgents requirement)")
+
     llm = _resolve_model(model)
     instructions = _load_prompt(company_profile)
 

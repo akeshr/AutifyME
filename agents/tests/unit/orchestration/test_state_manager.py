@@ -3,6 +3,7 @@
 Testing strategy: Mock StorageInterface and verify StateManager delegates correctly.
 """
 
+import uuid
 import pytest
 from unittest.mock import create_autospec, MagicMock
 
@@ -27,7 +28,7 @@ def state_manager(mock_storage):
 def sample_draft():
     """Fixture providing a sample product draft."""
     return Product(
-        id="test-product-1",
+        id=uuid.UUID("12345678-1234-1234-1234-123456789012"),
         name="Test Product",
         description="A test product",
         price=99.99,

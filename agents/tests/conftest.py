@@ -7,9 +7,9 @@ and other dependencies across the test suite.
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock
 
 import pytest
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
@@ -115,6 +115,42 @@ def mock_storage(mock_company_profile: CompanyProfile, mock_product: Product) ->
 
         def delete_pending_approval(self, thread_id: str) -> None:
             self.pending_approvals.pop(thread_id, None)
+
+        def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
+            """Mock implementation for saving workflow outcomes."""
+            return str(uuid.uuid4())
+
+        def get_workflow_outcomes(
+            self,
+            *,
+            workflow_type: str | None = None,
+            success: bool | None = None,
+            limit: int = 100,
+            offset: int = 0,
+        ) -> list[dict[str, Any]]:
+            """Mock implementation for getting workflow outcomes."""
+            return []
+
+        def get_recent_failures(
+            self,
+            time_window: timedelta,
+        ) -> list[dict[str, Any]]:
+            """Mock implementation for getting recent failures."""
+            return []
+
+        def get_success_rates(
+            self,
+            time_window: timedelta | None = None,
+        ) -> dict[str, float]:
+            """Mock implementation for getting success rates."""
+            return {"overall": 0.95}
+
+        def get_edge_cases(
+            self,
+            time_window: timedelta | None = None,
+        ) -> list[dict[str, Any]]:
+            """Mock implementation for getting edge cases."""
+            return []
 
     return MockStorageClient()
 
