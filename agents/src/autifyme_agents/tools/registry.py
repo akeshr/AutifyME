@@ -9,8 +9,6 @@ call sites.
 
 from __future__ import annotations
 
-from typing import Iterable
-
 from langchain.agents.middleware.human_in_the_loop import ToolConfig
 
 from autifyme_agents.core.prompt_loader import load_prompt

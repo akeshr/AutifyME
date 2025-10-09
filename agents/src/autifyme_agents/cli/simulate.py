@@ -28,7 +28,6 @@ import sys
 import json
 import time
 from pathlib import Path
-from typing import Literal
 from dotenv import load_dotenv
 
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
@@ -150,7 +149,7 @@ def run_scenario(
     )
 
     # Display inputs
-    safe_print(f"📝 User Input:")
+    safe_print("📝 User Input:")
     if text:
         print(f"   Text: {text}")
     if image_path:

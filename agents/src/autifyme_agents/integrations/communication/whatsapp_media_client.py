@@ -41,7 +41,7 @@ class WhatsAppMediaClient:
         response = httpx.get(url, headers=self._auth_headers, timeout=10.0)
         try:
             response.raise_for_status()
-        except httpx.HTTPStatusError as exc:  # noqa: BLE001
+        except httpx.HTTPStatusError:  # noqa: BLE001
             logger.error(
                 "Failed to fetch media metadata",
                 extra={"status": response.status_code, "media_id": media_id, "url": url},
@@ -64,7 +64,7 @@ class WhatsAppMediaClient:
         response = httpx.get(media_url, headers=self._auth_headers, timeout=30.0)
         try:
             response.raise_for_status()
-        except httpx.HTTPStatusError as exc:  # noqa: BLE001
+        except httpx.HTTPStatusError:  # noqa: BLE001
             logger.error(
                 "Failed to download media",
                 extra={"status": response.status_code, "media_id": media_id, "media_url": media_url},

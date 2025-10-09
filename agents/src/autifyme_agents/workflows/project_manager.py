@@ -16,16 +16,13 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from deepagents import create_deep_agent, SubAgent
+from deepagents import create_deep_agent
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.schemas.models import CompanyProfile
-from autifyme_agents.schemas.state import ProjectManagerState
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.tools import registry as tools_registry
 
 
 _DEFAULT_BUILTIN_TOOLS: list[str] = ["write_todos"]
