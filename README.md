@@ -40,7 +40,7 @@
 - LangSmith account
 - OpenAI API key
 
-### Setup:
+### Local Development Setup:
 ```bash
 cd agents
 uv venv
@@ -54,6 +54,16 @@ uv run python test_cataloging_workflow_clean.py
 # Start webhook server
 uv run uvicorn autifyme_agents.entrypoints.whatsapp_webhook:app --reload --port 8000
 ```
+
+### 🚀 Production Deployment:
+See **[Deployment Guide](docs/deployment/README.md)** for production deployment options with free tiers and HTTPS support.
+
+**Quick Deploy Options:**
+- **Railway** (Recommended): Automatic HTTPS, PostgreSQL included, $0/month free
+- **Render**: 750 free hours/month, custom domains, $0/month free
+- **Fly.io**: Global deployment, custom domains, $0/month free
+
+All platforms support the included Docker configuration and GitHub Actions CI/CD pipeline.
 
 See [CLAUDE.md](CLAUDE.md) for complete development reference.
 

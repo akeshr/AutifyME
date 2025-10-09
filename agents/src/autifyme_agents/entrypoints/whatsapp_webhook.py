@@ -107,6 +107,12 @@ def _mark_message_processed(message_id: str) -> None:
             )
 
 
+@app.get("/health")
+async def health_check() -> dict[str, str]:
+    """Health check endpoint for load balancers and monitoring."""
+    return {"status": "healthy", "service": "autifyme-webhook"}
+
+
 @app.get("/webhook")
 async def verify(request: Request) -> Any:
     params = dict(request.query_params)
