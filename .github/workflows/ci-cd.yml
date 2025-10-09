@@ -120,7 +120,7 @@ jobs:
   deploy-to-railway:
     needs: [test, lint]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/InitialDesign'
 
     steps:
     - uses: actions/checkout@v4
