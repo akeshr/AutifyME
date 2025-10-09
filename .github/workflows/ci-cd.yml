@@ -1,5 +1,6 @@
 name: CI/CD Pipeline
 
+# CI/CD pipeline for AutifyME agent system
 on:
   push:
     branches: [ main, develop, InitialDesign ]
