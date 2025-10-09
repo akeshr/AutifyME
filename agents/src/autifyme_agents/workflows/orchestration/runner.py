@@ -334,6 +334,7 @@ class WorkflowRunner:
         except Exception as exc:
             if isinstance(exc, BadRequestError):
                 error_text = str(exc)
+                # Log full error details for debugging
                 logger.error(
                     "PM invocation failed due to tool-call mismatch",
                     extra={
@@ -342,6 +343,13 @@ class WorkflowRunner:
                         "has_tool_call_violation": "tool_call" in error_text,
                     },
                 )
+                # Print full error to console for debugging
+                print(f"\n=== OpenAI BadRequestError Details ===")
+                print(f"Error type: {type(exc).__name__}")
+                print(f"Error message: {error_text}")
+                if hasattr(exc, 'response'):
+                    print(f"Response body: {exc.response.text if hasattr(exc.response, 'text') else 'N/A'}")
+                print(f"======================================\n")
                 self.channel.send_error(
                     sender,
                     "processing",

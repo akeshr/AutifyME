@@ -5,7 +5,7 @@
 ### Option 1: Railway (Recommended - Most Beginner Friendly)
 
 **Free Tier:** 512MB RAM, 1GB storage, custom domain with HTTPS
-**Pros:** Automatic HTTPS, GitHub integration, PostgreSQL included
+**Pros:** Automatic HTTPS, GitHub integration, **no Docker required**, PostgreSQL included
 **Cons:** Limited free resources
 
 #### Steps:
@@ -146,14 +146,12 @@ The included `.github/workflows/ci-cd.yml` provides:
 
 - **Automated testing** on every push/PR
 - **Code quality checks** (linting, type checking)
-- **Docker image building** for main branch
-- **Automated deployment** to Railway
+- **Automated deployment** to Railway (no Docker needed)
 
 ### Required Secrets:
 ```bash
-DOCKER_USERNAME=your_docker_username
-DOCKER_PASSWORD=your_docker_password
 RAILWAY_TOKEN=your_railway_token
+RAILWAY_PROJECT_ID=your_railway_project_id
 ```
 
 ## 📈 Scaling Considerations

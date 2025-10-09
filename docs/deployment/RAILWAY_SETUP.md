@@ -14,7 +14,7 @@
 4. Select the **AutifyME** repository
 5. Click **"Deploy"**
 
-Railway will automatically detect the `railway.toml` and `Dockerfile` in your repo.
+Railway will automatically detect your Python project and use Nixpacks for deployment (no Docker needed).
 
 ### 3. Configure Environment Variables
 
@@ -97,8 +97,9 @@ Value: your-app-name.up.railway.app
 
 **1. Build Fails:**
 - Check Railway logs for specific errors
-- Verify `Dockerfile` is in root directory
-- Ensure `railway.toml` is correctly formatted
+- Verify `pyproject.toml` and `uv.lock` are in root directory
+- Ensure `Procfile` has correct start command
+- Railway uses Nixpacks (no Docker needed)
 
 **2. Environment Variables Missing:**
 - Railway Dashboard → Variables → Check all required vars are set
@@ -164,11 +165,12 @@ If you want GitHub Actions to trigger Railway deploys:
 
 ## 💰 Cost Optimization
 
-**Railway Free Tier:**
+**Railway Free Tier (No Docker Required):**
 - 512MB RAM
 - 1GB storage
 - 1GB outbound bandwidth
 - Custom domains included
+- **Docker deployments are FREE** on Railway
 
 **When to Upgrade:**
 - Consistent memory usage > 400MB
@@ -176,6 +178,13 @@ If you want GitHub Actions to trigger Railway deploys:
 - Need for horizontal scaling
 
 **Upgrade Path:** $5/month Hobby plan (8GB RAM, more resources)
+
+**Why No Docker?**
+- Railway uses Nixpacks for automatic Python deployment
+- No Docker build time or complexity
+- Still completely free on Railway
+- Automatic dependency detection from `pyproject.toml`
+- uv package manager support included
 
 ## 🔗 Useful Links
 

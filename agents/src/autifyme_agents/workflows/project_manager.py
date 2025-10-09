@@ -50,63 +50,41 @@ def _load_prompt(company_profile: CompanyProfile) -> str:
     )
 
 
-def _create_department_tools(
-    company_profile: CompanyProfile,
+def _create_cataloging_subagent(
     storage: StorageInterface,
     checkpointer: Any,
-) -> list:
-    """Create tools that wrap full department agents.
+) -> dict:
+    """Create cataloging department as a CustomSubAgent.
 
-    Each department is a complete LangChain agent with middleware, HITL, and
-    checkpointing. We wrap these agents as tools so the PM can invoke them via
-    standard tool calling, preserving all department capabilities.
+    DeepAgents supports two subagent patterns:
+    1. SubAgent: Declare specs, DeepAgents builds agent
+    2. CustomSubAgent: Pass pre-built agent graph
 
-    This is the correct architecture: PM calls department tools, departments execute
-    their workflows with full middleware stack, and return structured results to PM.
+    Our department has complex middleware (HITL, caching, summarization) and
+    response_format, so we use CustomSubAgent to preserve all that logic.
+
+    This is the correct architecture: PM delegates to department subagent,
+    department executes workflow with full middleware stack.
     """
-
-    from langchain.tools import tool
     from autifyme_agents.departments.cataloging_department import create_cataloging_department
 
     # Create FULL department agent with middleware, HITL, checkpointing
-    cataloging_dept_agent = create_cataloging_department(
+    cataloging_dept_graph = create_cataloging_department(
         checkpointer=checkpointer,
         storage=storage,
         enable_hitl=True,
     )
 
-    @tool("cataloging_department")
-    def invoke_cataloging_department(task_description: str) -> dict:
-        """Handle product cataloging workflows.
-
-        Use this tool when user provides product information (text, images, videos, or
-        combinations). Supports single products, batch cataloging, and product updates.
-
-        Args:
-            task_description: Semantic description of what user wants (include text,
-                mention media attachments, relevant context like prices/sizes)
-
-        Returns:
-            Structured cataloging result with product details
-        """
-        from langchain.messages import HumanMessage
-
-        # Invoke department agent with task description
-        result = cataloging_dept_agent.invoke(
-            {"messages": [HumanMessage(content=task_description)]},
-            config={"configurable": {"thread_id": f"dept_{hash(task_description) % 100000}"}},
-        )
-
-        # Extract structured result or summary
-        messages = result.get("messages", [])
-        if messages:
-            last_message = messages[-1]
-            content = getattr(last_message, "content", str(last_message))
-            return {"success": True, "result": content}
-
-        return {"success": False, "error": "Department returned no result"}
-
-    return [invoke_cataloging_department]
+    # Return CustomSubAgent spec for DeepAgents
+    return {
+        "name": "cataloging_department",
+        "description": (
+            "Handles product cataloging workflows including adding new products, "
+            "updating existing products, and batch cataloging. Supports text, images, "
+            "videos, and combinations. Returns structured CatalogingResult."
+        ),
+        "graph": cataloging_dept_graph,
+    }
 
 
 def create_project_manager(
@@ -142,12 +120,13 @@ def create_project_manager(
     llm = _resolve_model(model)
     instructions = _load_prompt(company_profile)
 
-    # PM gets department tools (which wrap full agents) + any additional orchestration tools
+    # PM has NO domain tools - only orchestration tools if provided
     pm_tools = list(tools) if tools is not None else []
-    pm_tools.extend(_create_department_tools(company_profile, storage, checkpointer))
 
-    # No subagents - departments are invoked as tools
-    subagents: list[Any] = []
+    # Departments are subagents (proper delegation hierarchy)
+    subagents: list[Any] = [
+        _create_cataloging_subagent(storage, checkpointer),
+    ]
 
     # No tool_configs needed - departments handle their own HITL via middleware
     tool_configs: dict[str, Any] = {}

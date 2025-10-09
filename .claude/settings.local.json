@@ -19,7 +19,8 @@
       "Bash(ruff check:*)",
       "Bash(cd:*)",
       "Bash(dir:*)",
-      "Read(//c/Users/abhishek.a.keshri/**)"
+      "Read(//c/Users/abhishek.a.keshri/**)",
+      "Bash(timeout 120 uv run:*)"
     ],
     "deny": [],
     "ask": []

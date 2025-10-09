@@ -65,7 +65,7 @@ def create_cataloging_department(
     company_profile = storage.get_company_profile()
 
     @tool("image_analysis_specialist")
-    def image_analysis_tool(image_url: str, *, config=None) -> ImageAnalysisResult:
+    def image_analysis_tool(image_url: str) -> ImageAnalysisResult:
         """Analyze an image to produce structured product insights."""
         payload = {
             "input": {
@@ -73,14 +73,12 @@ def create_cataloging_department(
                 "company_profile": company_profile,
             }
         }
-        return image_specialist.invoke(payload, config=config)
+        return image_specialist(payload)
 
     @tool("cataloging_specialist")
     def cataloging_tool(
         user_message: str,
         image_analysis: dict | None = None,
-        *,
-        config=None,
     ) -> Product:
         """Combine user instructions and optional image analysis into a Product."""
         parsed_insights = None
@@ -93,7 +91,7 @@ def create_cataloging_department(
                 "image_analysis": parsed_insights.model_dump(mode="json") if parsed_insights else None,
             }
         }
-        return cataloging_specialist.invoke(payload, config=config)
+        return cataloging_specialist(payload)
 
     tools = [
         image_analysis_tool,
@@ -145,6 +143,8 @@ def create_cataloging_department(
         )
     )
 
+    # Department coordinates tools and returns final CatalogingResult from save_product
+    # No response_format needed - save_product already returns structured CatalogingResult
     agent_graph = create_agent(  # type: ignore[type-arg]
         llm,
         tools,
@@ -152,7 +152,6 @@ def create_cataloging_department(
         checkpointer=checkpointer,
         context_schema=AgentContext,
         name="CatalogingDepartmentAgent",
-        response_format=CatalogingResult,
         middleware=tuple(middleware),
     )
 

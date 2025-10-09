@@ -161,10 +161,13 @@ def run_scenario(
             safe_print(f"   Image: {image_path} ⚠️ (not found)")
     print()
 
-    # Run scenario
+    # Run scenario with unique sender to avoid checkpoint pollution
+    import uuid
+    unique_sender = f"local_test_{uuid.uuid4().hex[:8]}"
+
     try:
         runner.handle_message(
-            sender="local_test_user",
+            sender=unique_sender,
             text=text,
             media_id=str(image_path) if image_path else None,
         )
