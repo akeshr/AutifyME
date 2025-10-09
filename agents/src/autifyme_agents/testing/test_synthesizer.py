@@ -323,7 +323,8 @@ class TestSynthesizer:
         """
         # Escape strings for Python code
         message_text = (failure.message_text or "").replace('"', '\\"')
-        # error_message used in generated test docstring below
+        # Variables for template
+        sender = "regression_test"
 
         return f'''"""Auto-generated regression test from production failure.
 
@@ -350,7 +351,6 @@ class MockChannel(MessagingChannel):
         self.messages = []
 
     def format_thread_id(self, sender: str) -> str:
-        # Ruff F821 false positive - sender is a method parameter
         return f"test:{sender}"
 
     def send_text(self, recipient: str, message: str, **kwargs) -> dict:

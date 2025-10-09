@@ -126,7 +126,7 @@ class ValidationError(AutifyMEError):
     These are typically non-retryable and require user correction.
     """
     
-    def __init__(self, message: str, field: str | None = None, value: any = None):
+    def __init__(self, message: str, field: str | None = None, value: Any = None):
         """
         Initialize with validation error context.
         
