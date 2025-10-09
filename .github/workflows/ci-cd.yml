@@ -121,25 +121,22 @@ jobs:
     needs: [test, lint]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/InitialDesign'
-    # use the official Railway CLI container so we don't need to install the CLI
     container:
       image: ghcr.io/railwayapp/cli:latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Debug show Railway CLI version & auth (won't expose token)
+      - name: Verify Railway authentication
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
         run: |
-          railway --version || true
-          # whoami will succeed if token is valid; it helps debugging auth in CI
-          railway whoami || true
+          railway whoami || echo "Warning: Token might be invalid, continuing for debug."
 
       - name: Deploy to Railway (headless)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
         run: |
-          # Use headless deploy: pass project and service IDs directly (no interactive link)
-          railway up --project ${{ secrets.RAILWAY_PROJECT_ID }} --service ${{ secrets.RAILWAY_SERVICE_ID }} --detach
-      
+          railway up --detach --service=${{ secrets.RAILWAY_SERVICE_ID }}
