@@ -128,7 +128,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Debug: show Railway CLI version & auth (won't expose token)
+      - name: Debug show Railway CLI version & auth (won't expose token)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
