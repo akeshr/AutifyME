@@ -53,30 +53,63 @@ def _load_prompt(company_profile: CompanyProfile) -> str:
     )
 
 
-def _build_subagents(company_profile: CompanyProfile, storage: StorageInterface) -> list[SubAgent]:
-    """Return deepagents sub-agent specifications for all departments.
+def _create_department_tools(
+    company_profile: CompanyProfile,
+    storage: StorageInterface,
+    checkpointer: Any,
+) -> list:
+    """Create tools that wrap full department agents.
 
-    Each sub-agent is a DeepAgents SubAgent dict that defines:
-    - name: Sub-agent identifier
-    - description: When PM should delegate to this sub-agent
-    - prompt: System prompt for the sub-agent
-    - tools: List of tool objects (not names) the sub-agent can use
+    Each department is a complete LangChain agent with middleware, HITL, and
+    checkpointing. We wrap these agents as tools so the PM can invoke them via
+    standard tool calling, preserving all department capabilities.
 
-    Note: These are NOT the same as department agents. DeepAgents sub-agents
-    are lightweight delegates for the PM, while departments are full LangChain
-    agents with middleware, HITL, and checkpointing.
+    This is the correct architecture: PM calls department tools, departments execute
+    their workflows with full middleware stack, and return structured results to PM.
     """
 
-    cataloging_prompt = tools_registry.get_cataloging_instructions(company_profile)
+    from langchain_core.tools import tool
+    from autifyme_agents.departments.cataloging_department import create_cataloging_department
 
-    return [
-        {
-            "name": "cataloging_department",
-            "description": "Manages product ingestion and catalog creation workflows. Delegate here for product cataloging requests with or without images.",
-            "prompt": cataloging_prompt,
-            "tools": tools_registry.get_cataloging_tool_objects(storage),
-        }
-    ]
+    # Create FULL department agent with middleware, HITL, checkpointing
+    cataloging_dept_agent = create_cataloging_department(
+        checkpointer=checkpointer,
+        storage=storage,
+        enable_hitl=True,
+    )
+
+    @tool("cataloging_department")
+    def invoke_cataloging_department(task_description: str) -> dict:
+        """Handle product cataloging workflows.
+
+        Use this tool when user provides product information (text, images, videos, or
+        combinations). Supports single products, batch cataloging, and product updates.
+
+        Args:
+            task_description: Semantic description of what user wants (include text,
+                mention media attachments, relevant context like prices/sizes)
+
+        Returns:
+            Structured cataloging result with product details
+        """
+        from langchain_core.messages import HumanMessage
+
+        # Invoke department agent with task description
+        result = cataloging_dept_agent.invoke(
+            {"messages": [HumanMessage(content=task_description)]},
+            config={"configurable": {"thread_id": f"dept_{hash(task_description) % 100000}"}},
+        )
+
+        # Extract structured result or summary
+        messages = result.get("messages", [])
+        if messages:
+            last_message = messages[-1]
+            content = getattr(last_message, "content", str(last_message))
+            return {"success": True, "result": content}
+
+        return {"success": False, "error": "Department returned no result"}
+
+    return [invoke_cataloging_department]
 
 
 def create_project_manager(
@@ -109,14 +142,15 @@ def create_project_manager(
     llm = _resolve_model(model)
     instructions = _load_prompt(company_profile)
 
-    # PM gets orchestration tools plus the image analysis fallback for resiliency
+    # PM gets department tools (which wrap full agents) + any additional orchestration tools
     pm_tools = list(tools) if tools is not None else []
-    pm_tools.append(tools_registry.create_image_analysis_tool(storage))
+    pm_tools.extend(_create_department_tools(company_profile, storage, checkpointer))
 
-    # Departments get domain tools
-    subagents = _build_subagents(company_profile, storage)
+    # No subagents - departments are invoked as tools
+    subagents = []
 
-    tool_configs = tools_registry.get_interrupt_config()
+    # No tool_configs needed - departments handle their own HITL via middleware
+    tool_configs = {}
 
     project_manager = create_deep_agent(
         tools=pm_tools,  # PM has NO direct domain tools

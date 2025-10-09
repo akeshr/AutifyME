@@ -3,20 +3,27 @@
 from __future__ import annotations
 
 import logging
-import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import httpx
 
 from autifyme_agents.core.config import settings
+from autifyme_agents.core.logging_config import MEDIA_DIR
 
 
 logger = logging.getLogger(__name__)
 
 
 class WhatsAppMediaClient:
-    """Handles fetching media URLs and downloading content to temp files."""
+    """Handles fetching media URLs and downloading content to persistent media directory.
+
+    Downloaded media is stored in media_downloads/ (next to logs/) with meaningful
+    filenames: {timestamp}_{media_id}.{ext}
+
+    Supports: images, audio/voice, videos, documents
+    """
 
     def __init__(self, *, access_token: str | None = None, api_version: str | None = None) -> None:
         self.access_token = access_token or settings.WHATSAPP_ACCESS_TOKEN
@@ -64,20 +71,50 @@ class WhatsAppMediaClient:
             )
             raise
 
+        # Create meaningful filename with timestamp and media_id
         suffix = self._derive_suffix(response.headers.get("Content-Type"))
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        temp_file.write(response.content)
-        temp_file.flush()
-        temp_file.close()
-        logger.debug("Downloaded media %s to %s", media_id, temp_file.name)
-        return Path(temp_file.name)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{timestamp}_{media_id}{suffix}"
+        media_path = MEDIA_DIR / filename
+
+        # Write media to persistent location next to logs
+        media_path.write_bytes(response.content)
+        logger.info("Downloaded media to %s", media_path)
+        return media_path
 
     @staticmethod
     def _derive_suffix(content_type: str | None) -> str:
+        """Derive file extension from MIME type."""
         if not content_type:
             return ""
-        if content_type == "image/jpeg":
-            return ".jpg"
-        if content_type == "image/png":
-            return ".png"
-        return ""
+
+        # Map MIME types to extensions
+        mime_map = {
+            # Images
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/webp": ".webp",
+            "image/gif": ".gif",
+            # Audio/Voice
+            "audio/ogg": ".ogg",
+            "audio/mpeg": ".mp3",
+            "audio/mp4": ".m4a",
+            "audio/wav": ".wav",
+            "audio/aac": ".aac",
+            # Video
+            "video/mp4": ".mp4",
+            "video/quicktime": ".mov",
+            "video/x-msvideo": ".avi",
+            "video/webm": ".webm",
+            "video/x-matroska": ".mkv",
+            # Documents
+            "application/pdf": ".pdf",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+            "application/vnd.ms-excel": ".xls",
+            "text/csv": ".csv",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+            "application/msword": ".doc",
+            "text/plain": ".txt",
+        }
+
+        return mime_map.get(content_type, "")

@@ -63,29 +63,30 @@ def main() -> None:
     whatsapp_client = RecordingWhatsAppClient()
     media_client = NoopWhatsAppMediaClient()
 
-    with get_checkpointer() as checkpointer:
-        runner = WhatsAppCatalogingRunner(
-            storage=storage,
-            checkpointer=checkpointer,
-            whatsapp_client=whatsapp_client,
-            media_client=media_client,
-        )
-        print("✓ Runner ready (Project Manager orchestrated)")
+    # get_checkpointer() returns PostgresSaver instance, not context manager
+    checkpointer = get_checkpointer()
+    runner = WhatsAppCatalogingRunner(
+        storage=storage,
+        checkpointer=checkpointer,
+        whatsapp_client=whatsapp_client,
+        media_client=media_client,
+    )
+    print("✓ Runner ready (Project Manager orchestrated)")
 
-        sender = f"test-user-{uuid.uuid4()}"
-        payload = {
-            "text": "Please catalog a new pair of canvas sneakers. Price 79.99, sizes 7-11.",
-            "media_id": None,
-        }
+    sender = f"test-user-{uuid.uuid4()}"
+    payload = {
+        "text": "Please catalog a new pair of canvas sneakers. Price 79.99, sizes 7-11.",
+        "media_id": None,
+    }
 
-        print("\n[1/2] Sending synthetic WhatsApp payload:")
-        print(json.dumps(payload, indent=2))
+    print("\n[1/2] Sending synthetic WhatsApp payload:")
+    print(json.dumps(payload, indent=2))
 
-        runner.handle_message(
-            sender=sender,
-            text=payload["text"],
-            media_id=payload["media_id"],
-        )
+    runner.handle_message(
+        sender=sender,
+        text=payload["text"],
+        media_id=payload["media_id"],
+    )
 
     print("\n[2/2] Invocation completed. Recorded outbound messages:")
     if whatsapp_client.sent_messages:

@@ -17,6 +17,12 @@ Project-specific guidance for AutifyME codebase. Communication style is defined 
 - Align with architectural canon: `AGENTS_DESIGN.md`, `LANGCHAIN_V1_FEATURES.md`, workflow docs
 - Validate design preserves hierarchical data flow and context discipline
 
+### Deep Research & Architectural Analysis
+- **Think exhaustively for critical decisions**: Enumerate all permutation combinations, edge cases, platform-specific behaviors
+- **Verify before assuming**: Use REPL extensively to test library capabilities; inspect code to validate assumptions
+- **Challenge and iterate**: When user pushes back, dig deeper with code inspection, API verification, alternative approaches
+- **Document complex findings**: Create architectural analysis docs for multi-platform support, complex workflows, cross-cutting concerns
+
 ### Core Engineering Standards
 - **Production-grade from start**: resilience, observability, recovery, verification baked in
 - **Hexagonal Architecture**: core logic depends only on ports; adapters at edges
@@ -49,6 +55,12 @@ Project-specific guidance for AutifyME codebase. Communication style is defined 
 - Always verify APIs with `inspect`/`dir` before depending on them
 - Capture context-engineering strategies and extension points for reuse
 
+### Documentation Strategy
+- **Check first, then decide**: Review existing docs before creating new ones; update rather than duplicate
+- **Create only when necessary**: Novel topics, complex specifications, long-term architectural impact
+- **Make scannable**: Date/status header, executive summary, tables/schemas/examples, implementation checklists
+- **Connect the dots**: Link related docs, mark open questions, align with architectural canon
+
 ### Quality Standards
 - Treat testing, observability, recovery as foundational (not optional)
 - Debug methodically: full traces, validate APIs, instrument thoughtfully, one variable at a time
@@ -70,11 +82,25 @@ uv pip install -e ".[dev]"
 
 **Running:**
 ```bash
-uv run python test_cataloging_workflow.py
 uv run uvicorn autifyme_agents.entrypoints.whatsapp_webhook:app --reload
 pytest --cov=autifyme_agents
 ruff check agents/src
 ```
+
+**Local Testing (CRITICAL - Use Extensively):**
+Always test locally before WhatsApp. CLI tools available for terminal-based testing without external dependencies.
+
+**Testing Philosophy**:
+- **Iterate locally first**: Test changes in terminal where you have access, not on WhatsApp
+- **Layer your testing**: Quick PM tests → Full workflow → Automated scenarios → Production
+- **Test with real media**: Use local files (images, videos, voice, documents) to simulate realistic flows
+- **Validate end-to-end**: After REPL prototyping, run full workflow to catch integration issues
+
+**Available Tools**:
+- `pm_chat` - Direct PM invocation for rapid prompt/logic iteration (interactive mode recommended)
+- `simulate` - Full workflow simulation with HITL support (use `--auto-approve` for speed)
+
+See `docs/architecture/LOCAL_TESTING_STRATEGY.md` for commands and usage patterns.
 
 **API Verification (CRITICAL - Use Extensively):**
 Always verify library APIs with Python REPL before implementing.
@@ -113,11 +139,24 @@ Never rely on documentation alone for LangChain v1 alpha stack.
 
 ### Architectural Canon (Read Before Changes)
 
+**Core Architecture:**
 1. `docs/architecture/README.md` - Navigation hub
 2. `docs/architecture/AGENTS_DESIGN.md` - Hierarchical model, context engineering
-3. `docs/architecture/LANGCHAIN_V1_FEATURES.md` - Available v1 patterns
-4. `docs/architecture/WHATSAPP_CATALOGING_WORKFLOW.md` - Current implementation
-5. `docs/architecture/PROJECT_MANAGER_DESIGN.md` - Roadmap spec
+3. `docs/architecture/PROJECT_MANAGER_DESIGN.md` - PM role, intent classification, delegation
+
+**Technology & Patterns:**
+4. `docs/architecture/TECH_STACK.md` - Technology decisions
+5. `docs/architecture/LANGCHAIN_V1_FEATURES.md` - LangChain v1 patterns
+6. `docs/architecture/LANGGRAPH_V1_FEATURES.md` - LangGraph orchestration
+7. `docs/architecture/UV_REPL_BEST_PRACTICES.md` - API verification workflow
+
+**Workflows & Implementation:**
+8. `docs/architecture/WHATSAPP_CATALOGING_WORKFLOW.md` - Current cataloging implementation
+9. `docs/architecture/PM_INTENT_ANALYSIS_AND_MESSAGE_HANDLING.md` - Multi-platform message handling
+10. `docs/architecture/LOCAL_TESTING_STRATEGY.md` - Testing philosophy and CLI tools
+11. `docs/architecture/WORKFLOW_ORCHESTRATION_REFACTOR.md` - Runner architecture
+
+**See `docs/architecture/README.md` for complete index and context.**
 
 ### Common Gotchas
 

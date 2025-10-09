@@ -9,9 +9,13 @@ from pathlib import Path
 from datetime import datetime
 from typing import Any
 
-# Create logs directory if it doesn't exist
-LOGS_DIR = Path(__file__).parent.parent.parent.parent / "logs"
+# Create logs and media directories if they don't exist
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+LOGS_DIR = PROJECT_ROOT / "logs"
+MEDIA_DIR = PROJECT_ROOT / "media_downloads"
+
 LOGS_DIR.mkdir(exist_ok=True)
+MEDIA_DIR.mkdir(exist_ok=True)
 
 # Log file with timestamp
 LOG_FILE = LOGS_DIR / f"autifyme_agents_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
@@ -66,7 +70,7 @@ def setup_logging(level: str = "DEBUG", enable_file_logging: bool = True) -> Non
 
         file_format = StructuredFormatter(
             fmt="%(asctime)s | %(levelname)-8s | %(name)-30s | %(funcName)-20s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S.%f",
+            datefmt="%Y-%m-%d %H:%M:%S",  # Removed .%f - not supported by strftime
         )
         file_handler.setFormatter(file_format)
         root_logger.addHandler(file_handler)

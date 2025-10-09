@@ -509,28 +509,36 @@ class WorkflowRunner:
         )
 
     def _build_payload(self, text: str | None, media_path: Path | None) -> dict[str, Any]:
-        """Build PM payload from message.
+        """Build semantic PM payload from message.
+
+        Constructs a semantic, normalized message description that PM can use for
+        intent classification. Avoids prescriptive tool instructions - PM decides
+        how to handle based on content and context.
 
         Args:
             text: Message text (optional)
             media_path: Downloaded media file path (optional)
 
         Returns:
-            PM input payload
+            PM input payload with semantic message description
         """
-        messages = []
+        # Build semantic message description
+        parts = []
+
+        if text and text.strip():
+            parts.append(f"User message: {text}")
 
         if media_path and media_path.exists():
-            if text and text.strip():
-                content = f"{text}\n\n[An image was provided - analyze it using the image_analysis_specialist tool with path: {media_path}]"
-            else:
-                content = f"[An image was provided - analyze it using the image_analysis_specialist tool with path: {media_path}]"
-            messages.append(HumanMessage(content=content))
-        elif text and text.strip():
-            messages.append(HumanMessage(content=text))
-        else:
-            messages.append(HumanMessage(content="Please provide product details."))
+            # Semantic description, not prescriptive tool instructions
+            parts.append(f"User provided an image (path: {media_path})")
 
+        if not parts:
+            # Empty message
+            content = "User sent an empty message. Please ask for product details."
+        else:
+            content = "\n".join(parts)
+
+        messages = [HumanMessage(content=content)]
         return {"messages": messages}
 
     def _build_config(self, thread_id: str) -> dict[str, Any]:
