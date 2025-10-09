@@ -32,6 +32,7 @@ from typing import Any
 from dotenv import load_dotenv
 
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
+from autifyme_agents.schemas.models import Product, CatalogingResult
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -56,7 +57,7 @@ class ConsoleChannel(MessagingChannel):
     def format_thread_id(self, sender: str) -> str:
         return f"console:{sender}"
 
-    def send_text(self, recipient: str, message: str, *, preview_url: bool = False) -> dict:
+    def send_text(self, recipient: str, message: str, *, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
         print(f"\n{'='*60}")
         safe_print(f"📤 MESSAGE TO {recipient}:")
         print(f"{'='*60}")
@@ -66,7 +67,7 @@ class ConsoleChannel(MessagingChannel):
         self.messages_sent.append({"type": "text", "message": message})
         return {"status": "sent"}
 
-    def send_approval_request(self, recipient: str, draft: dict) -> dict:
+    def send_approval_request(self, recipient: str, draft: Product) -> dict[str, Any]:
         print(f"\n{'='*60}")
         safe_print(f"⏸️  APPROVAL REQUEST TO {recipient}:")
         print(f"{'='*60}")
@@ -90,7 +91,7 @@ class ConsoleChannel(MessagingChannel):
             else:
                 print("Please answer 'yes' or 'no'")
 
-    def send_completion(self, recipient: str, result: dict) -> dict:
+    def send_completion(self, recipient: str, result: CatalogingResult) -> dict[str, Any]:
         print(f"\n{'='*60}")
         safe_print(f"✅ COMPLETION MESSAGE TO {recipient}:")
         print(f"{'='*60}")

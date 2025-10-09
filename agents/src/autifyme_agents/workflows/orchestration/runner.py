@@ -16,7 +16,7 @@ from typing import Any, Literal
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.errors import GraphRecursionError
 from langgraph.types import Interrupt
-from langchain_core.messages import HumanMessage
+from langchain.messages import HumanMessage
 
 try:
     from openai import BadRequestError
@@ -167,7 +167,7 @@ class WorkflowRunner:
         )
 
         # Gate check - skip low-intent messages
-        if not self._should_process(text, media_id):
+        if not self._should_process(text, media_id is not None):
             logger.info(
                 "Skipping low-intent message",
                 extra={"sender": sender, "text": text},
@@ -332,7 +332,7 @@ class WorkflowRunner:
             )
 
         except Exception as exc:
-            if BadRequestError and isinstance(exc, BadRequestError):
+            if isinstance(exc, BadRequestError):
                 error_text = str(exc)
                 logger.error(
                     "PM invocation failed due to tool-call mismatch",
@@ -437,6 +437,9 @@ class WorkflowRunner:
         logger.debug("Handling interrupt", extra={"thread_id": thread_id})
 
         try:
+            if self._last_pm_state is None:
+                raise ValueError("Cannot process interrupt without PM state")
+
             approval_request = self.interrupt_coord.process_interrupt(
                 interrupt=interrupt,
                 thread_id=thread_id,

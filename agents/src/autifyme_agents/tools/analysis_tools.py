@@ -7,10 +7,10 @@ Following LangChain v1 patterns:
 - Errors are caught by agent for self-correction
 """
 
-from typing import Callable
+from langchain.tools import BaseTool
 import logging
 
-from langchain_core.tools import tool
+from langchain.tools import tool
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -32,7 +32,7 @@ from autifyme_agents.core.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-def create_analyze_product_image_tool(storage: StorageInterface) -> Callable:
+def create_analyze_product_image_tool(storage: StorageInterface) -> BaseTool:
     company_context_middleware = create_company_context_middleware(storage)
 
     @tool

@@ -1,18 +1,30 @@
 """Cataloging specialist for extracting product details from text."""
 
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import Runnable, RunnableLambda
-from langchain_core.tools import tool
+from typing import Dict, Any
+
+from langchain.messages import SystemMessage, HumanMessage
+from langchain.tools import tool, BaseTool
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.schemas.models import Product
 from autifyme_agents.core.prompt_loader import load_prompt
 
+
+# Alternative to ChatPromptTemplate to avoid langchain_core
+def create_chat_prompt(system_content: str, human_template: str):
+    """Alternative to ChatPromptTemplate.from_messages"""
+    def format_prompt(**kwargs):
+        return [
+            SystemMessage(content=system_content),
+            HumanMessage(content=human_template.format(**kwargs))
+        ]
+    return format_prompt
+
 # Load prompt from version-controlled file
 CATALOGING_SPECIALIST_SYSTEM_PROMPT = load_prompt("specialists/cataloging_specialist.prompt")
 
 
-def create_cataloging_specialist() -> Runnable:
+def create_cataloging_specialist():
     """
     Creates a specialist agent for extracting product info from unstructured text.
     
@@ -31,9 +43,10 @@ def create_cataloging_specialist() -> Runnable:
             "image_analysis": inputs.get("image_analysis") or "No image insights provided.",
         }
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", CATALOGING_SPECIALIST_SYSTEM_PROMPT),
-        ("human", """
+    # Use alternative prompt creation instead of ChatPromptTemplate
+    prompt = create_chat_prompt(
+        CATALOGING_SPECIALIST_SYSTEM_PROMPT,
+        """
 User request:
 {user_message}
 
@@ -41,8 +54,8 @@ Image insights (may be empty):
 {image_analysis}
 
 Produce a complete product record with all available fields populated.
-"""),
-    ])
+"""
+    )
     
     # Use centralized LLM factory with prompt caching
     llm = get_llm(provider="openai", model="gpt-4o")
@@ -50,8 +63,14 @@ Produce a complete product record with all available fields populated.
     # Force structured output (LangChain v1 feature)
     structured_llm = llm.with_structured_output(Product)
     
-    # Compose chain using LCEL
-    return RunnableLambda(prepare_inputs) | prompt | structured_llm
+    # Create a simple function instead of Runnable chains
+    def catalog_product(inputs: Dict[str, Any]) -> Any:
+        """Simple function to catalog products without Runnable dependencies."""
+        prepared = prepare_inputs(inputs)
+        messages = prompt(**prepared)
+        return structured_llm.invoke(messages)
+
+    return catalog_product
 
 
 @tool("cataloging_specialist")
@@ -72,5 +91,5 @@ def cataloging_specialist_tool(
     return chain.invoke(payload, config=config)
 
 
-def create_cataloging_specialist_tool() -> tool:
+def create_cataloging_specialist_tool() -> BaseTool:
     return cataloging_specialist_tool

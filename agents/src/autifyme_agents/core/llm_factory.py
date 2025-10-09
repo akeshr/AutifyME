@@ -1,6 +1,6 @@
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
-from langchain_core.language_models import BaseChatModel
+from langchain.chat_models import BaseChatModel
 
 
 def get_llm(
@@ -27,14 +27,18 @@ def get_llm(
     Raises:
         ValueError: If an unsupported provider is requested.
     """
+    llm: BaseChatModel
+
     if provider == "openai":
         llm = ChatOpenAI(model=model, temperature=temperature)
     elif provider == "anthropic":
         # Enable prompt caching for cost and latency benefits
-        llm = ChatAnthropic(
+        llm = ChatAnthropic(  # type: ignore[call-arg]
             model=model,
             temperature=temperature,
-            enable_prompt_caching=True,
+            model_kwargs={
+                "extra_headers": {"anthropic-beta": "prompt-caching-2024-07-31"}
+            },
         )
     else:
         raise ValueError(f"Unsupported LLM provider: {provider}")

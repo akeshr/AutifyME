@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from deepagents import create_deep_agent
-from langchain_core.language_models.chat_models import BaseChatModel
+from deepagents import create_deep_agent  # type: ignore[import-untyped]
+from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
@@ -65,7 +65,7 @@ def _create_department_tools(
     their workflows with full middleware stack, and return structured results to PM.
     """
 
-    from langchain_core.tools import tool
+    from langchain.tools import tool
     from autifyme_agents.departments.cataloging_department import create_cataloging_department
 
     # Create FULL department agent with middleware, HITL, checkpointing
@@ -89,7 +89,7 @@ def _create_department_tools(
         Returns:
             Structured cataloging result with product details
         """
-        from langchain_core.messages import HumanMessage
+        from langchain.messages import HumanMessage
 
         # Invoke department agent with task description
         result = cataloging_dept_agent.invoke(

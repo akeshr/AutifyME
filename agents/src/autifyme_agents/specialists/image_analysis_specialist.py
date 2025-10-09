@@ -2,10 +2,10 @@
 
 import base64
 from pathlib import Path
+from typing import Any, Dict
 
-from langchain_core.runnables import Runnable, RunnableLambda
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_core.tools import ToolException, tool
+from langchain.messages import SystemMessage, HumanMessage
+from langchain.tools import tool, ToolException
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
@@ -54,16 +54,16 @@ def _image_to_data_url(image_path: str) -> str:
     return f"data:{mime_type};base64,{base64_data}"
 
 
-def create_image_analysis_specialist() -> Runnable:
+def create_image_analysis_specialist():
     """
-    Creates and returns a specialist agent focused on extracting visual
+    Creates and returns a specialist function for extracting visual
     product information from an image URL.
 
     This specialist leverages a multimodal LLM and guarantees a structured,
     Pydantic-based output using LangChain v1's `.with_structured_output()`.
 
     Returns:
-        A Runnable chain that takes a dict `{"input": {"image_url": "...", "company_profile": ...}}` and returns an ImageAnalysisResult.
+        A function that takes a dict `{"input": {"image_url": "...", "company_profile": ...}}` and returns an ImageAnalysisResult.
     """
     llm = get_llm(provider="openai", model="gpt-4o")
     structured_llm = llm.with_structured_output(ImageAnalysisResult)
@@ -107,10 +107,13 @@ def create_image_analysis_specialist() -> Runnable:
             ),
         ]
     
-    # Chain: format inputs → invoke LLM with structured output
-    chain = RunnableLambda(format_messages) | structured_llm
+    # Create a simple function instead of Runnable chains
+    def analyze_image(inputs: Dict[str, Any]) -> Any:
+        """Simple function to analyze images without Runnable dependencies."""
+        formatted_messages = format_messages(inputs)
+        return structured_llm.invoke(formatted_messages)
 
-    return chain
+    return analyze_image
 
 
 @tool("image_analysis_specialist")

@@ -9,7 +9,7 @@ Context Engineering strategy.
 
 from __future__ import annotations
 
-from langchain_core.tools import tool, ToolException
+from langchain.tools import tool, ToolException
 
 from autifyme_agents.core.middleware import create_company_context_middleware
 from autifyme_agents.core.ports import StorageInterface

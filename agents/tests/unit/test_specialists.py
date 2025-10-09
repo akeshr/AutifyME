@@ -8,8 +8,6 @@ import pytest
 from unittest.mock import Mock, patch
 from pathlib import Path
 
-from langchain_core.runnables import Runnable
-
 from autifyme_agents.schemas.models import Product
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
@@ -22,10 +20,10 @@ from autifyme_agents.specialists.image_analysis_specialist import (
 class TestCatalogingSpecialist:
     """Test cataloging specialist chain creation and execution."""
 
-    def test_create_cataloging_specialist_returns_runnable(self):
-        """Factory should return a Runnable chain."""
+    def test_create_cataloging_specialist_returns_callable(self):
+        """Factory should return a callable function."""
         specialist = create_cataloging_specialist()
-        assert isinstance(specialist, Runnable)
+        assert callable(specialist)
 
     @pytest.mark.skip(reason="LCEL chain mocking complex - covered by integration tests")
     def test_cataloging_specialist_with_text_only(self, mock_product):
@@ -83,10 +81,10 @@ class TestCatalogingSpecialist:
 class TestImageAnalysisSpecialist:
     """Test image analysis specialist chain creation and execution."""
 
-    def test_create_image_analysis_specialist_returns_runnable(self):
-        """Factory should return a Runnable chain."""
+    def test_create_image_analysis_specialist_returns_callable(self):
+        """Factory should return a callable function."""
         specialist = create_image_analysis_specialist()
-        assert isinstance(specialist, Runnable)
+        assert callable(specialist)
 
     @pytest.mark.skip(reason="LCEL chain mocking complex - covered by integration tests")
     def test_image_analysis_specialist_with_web_url(

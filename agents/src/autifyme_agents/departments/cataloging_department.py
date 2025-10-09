@@ -6,18 +6,18 @@ the specialists, wraps them as LangChain tools, and exposes a Department Head
 agent with structured outputs for upstream orchestration.
 """
 
-from typing import Annotated, Sequence, TypedDict
+from typing import Annotated, Sequence, TypedDict, Union, Any
 import operator
 
 from langchain.agents import create_agent
+
 from langchain.agents.middleware import (
     HumanInTheLoopMiddleware,
     SummarizationMiddleware,
     AnthropicPromptCachingMiddleware,
 )
-from langchain_core.runnables import Runnable
-from langchain_core.messages import BaseMessage
-from langchain_core.tools import tool
+from langchain.messages import HumanMessage, SystemMessage, AIMessage
+from langchain.tools import tool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -31,9 +31,12 @@ from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 from autifyme_agents.schemas.models import CatalogingResult, Product
 from autifyme_agents.schemas.context import AgentContext
 
+# Use Union instead of BaseMessage to avoid langchain_core where possible
+MessageType = Union[HumanMessage, SystemMessage, AIMessage]
+
 
 class AgentState(TypedDict):
-    messages: Annotated[Sequence[BaseMessage], operator.add]
+    messages: Annotated[Sequence[MessageType], operator.add]
 
 
 def create_cataloging_department(
@@ -41,7 +44,7 @@ def create_cataloging_department(
     storage: StorageInterface,
     *,
     enable_hitl: bool = True,
-) -> Runnable:
+) -> Any:
     """Build the cataloging department head agent with specialist delegation.
 
     Args:
@@ -107,7 +110,7 @@ def create_cataloging_department(
     # 2. HITL - interrupt on save_product for approval (optional)
     # 3. Prompt Caching - reduce API costs for repeated calls
     # 4. Summarization - handle long conversations gracefully
-    middleware = [CompanyContextMiddleware(storage)]
+    middleware: list[Any] = [CompanyContextMiddleware(storage)]
 
     if enable_hitl:
         middleware.append(
@@ -142,7 +145,7 @@ def create_cataloging_department(
         )
     )
 
-    agent_graph = create_agent(
+    agent_graph = create_agent(  # type: ignore[type-arg]
         llm,
         tools,
         system_prompt=prompt,

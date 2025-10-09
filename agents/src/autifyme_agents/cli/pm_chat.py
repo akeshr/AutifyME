@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.workflows.project_manager import create_project_manager
-from langchain_core.messages import HumanMessage
+from langchain.messages import HumanMessage
 
 
 def chat_with_pm(message: str, image_path: Path | None = None, thread_id: str = "local_test"):
