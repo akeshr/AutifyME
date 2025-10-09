@@ -48,7 +48,6 @@ jobs:
 
     - name: Install dependencies
       run: |
-        cd agents
         uv venv
         uv pip install -e ".[dev]"
 
