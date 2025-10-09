@@ -212,10 +212,8 @@ class WorkflowRunner:
                         "Understood. The draft will remain unsaved. Let me know if you'd like updates or a retry.",
                     )
 
-                # Cleanup media if it was stored
-                approval = self.state.get_pending_approval(thread_id)
-                if approval and approval.get("image_path"):
-                    self._cleanup_media(Path(approval["image_path"]))
+                # Media persists in media_downloads/ for audit trail
+                # No cleanup needed
 
             except Exception as exc:
                 logger.exception("Failed to handle approval", exc_info=exc)
@@ -313,9 +311,9 @@ class WorkflowRunner:
                 retain_media = True
 
         finally:
-            # Cleanup media unless approval pending
-            if media_path and not retain_media and not self.state.has_pending_approval(thread_id):
-                self._cleanup_media(media_path)
+            # Media now persists in media_downloads/ for debugging/auditing
+            # No cleanup - files managed separately
+            pass
 
     def _invoke_pm(
         self,
@@ -616,15 +614,5 @@ class WorkflowRunner:
 
         return None
 
-    def _cleanup_media(self, media_path: Path) -> None:
-        """Cleanup temporary media file.
-
-        Args:
-            media_path: Path to media file
-        """
-        try:
-            if media_path.exists():
-                media_path.unlink(missing_ok=True)
-                logger.debug("Cleaned up temp media", extra={"path": str(media_path)})
-        except Exception as exc:
-            logger.warning("Failed to clean up temp media", extra={"path": str(media_path)}, exc_info=exc)
+    # Media cleanup removed - files persist in media_downloads/ for debugging/auditing
+    # Managed separately via scheduled cleanup jobs if needed

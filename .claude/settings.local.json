@@ -15,7 +15,8 @@
       "WebFetch(domain:*)",
       "WebFetch(domain:pypi.org)",
       "WebFetch(domain:smith.langchain.com)",
-      "Read(//c/Abhi/personal/**)"
+      "Read(//c/Abhi/personal/**)",
+      "Bash(ruff check:*)"
     ],
     "deny": [],
     "ask": []
