@@ -8,6 +8,7 @@ Design Principle: Strategy Pattern - channel behavior injected via MessagingChan
 from __future__ import annotations
 
 from collections import OrderedDict
+from datetime import datetime
 from pathlib import Path
 from threading import Lock
 from typing import Any, Literal
@@ -32,6 +33,7 @@ from autifyme_agents.workflows.orchestration.interrupt_coordinator import Interr
 from autifyme_agents.workflows.orchestration.state_manager import StateManager
 from autifyme_agents.workflows.orchestration.recovery_strategy import RecoveryStrategy
 from autifyme_agents.workflows.project_manager import create_project_manager
+from autifyme_agents.workflows.outcome_tracker import OutcomeTracker, IncomingMessage
 
 logger = get_logger(__name__)
 
@@ -134,6 +136,10 @@ class WorkflowRunner:
 
         # PM state tracking
         self._last_pm_state: dict[str, Any] | None = None
+
+        # Phase 1: Outcome tracking for agentic learning
+        self.outcome_tracker = OutcomeTracker(storage)
+        logger.info("OutcomeTracker initialized for agentic learning")
 
         logger.info("WorkflowRunner initialization complete")
         logger.info("=" * 80)
@@ -239,6 +245,16 @@ class WorkflowRunner:
             extra={"thread_id": thread_id, "has_text": text is not None, "has_media": media_id is not None},
         )
 
+        # Phase 1: Track workflow start
+        incoming_message = IncomingMessage(
+            sender_id=sender,
+            text=text,
+            media_id=media_id,
+            platform=self.channel.__class__.__name__.replace("Channel", "").lower(),
+        )
+        tracking_id = self.outcome_tracker.track_workflow_start(thread_id, incoming_message)
+        workflow_start_time = datetime.now()
+
         # Check for abandonment (new request while approval pending)
         if self.recovery.should_clear_state(thread_id, bool(media_id)):
             logger.info("Abandonment detected - clearing orphaned state", extra={"thread_id": thread_id})
@@ -262,8 +278,22 @@ class WorkflowRunner:
 
             if interrupt:
                 self._handle_interrupt(sender, thread_id, interrupt, media_path)
+                # Phase 1: Track workflow end (interrupt = pending approval, mark as success)
+                duration = (datetime.now() - workflow_start_time).total_seconds()
+                self.outcome_tracker.track_workflow_end(
+                    thread_id=thread_id,
+                    success=True,
+                    result={"status": "pending_approval", "tracking_id": tracking_id},
+                )
             elif result:
                 self._handle_completion(sender, result)
+                # Phase 1: Track workflow end (success)
+                duration = (datetime.now() - workflow_start_time).total_seconds()
+                self.outcome_tracker.track_workflow_end(
+                    thread_id=thread_id,
+                    success=True,
+                    result=result,
+                )
 
         except ValueError as exc:
             # Reactive recovery for orphaned state
@@ -287,6 +317,13 @@ class WorkflowRunner:
             logger.exception("PM recursion limit exceeded", exc_info=exc, extra={"thread_id": thread_id})
             self.channel.send_error(sender, "recursion")
             retain_media = True
+            # Phase 1: Track workflow end (failure)
+            self.outcome_tracker.track_workflow_end(
+                thread_id=thread_id,
+                success=False,
+                error=exc,
+                resolution_strategy="user_notified",
+            )
 
         except Exception as exc:
             if BadRequestError and isinstance(exc, BadRequestError):
@@ -305,10 +342,24 @@ class WorkflowRunner:
                     "I hit a coordination error while prepping your request. Please resend the details so I can try again.",
                 )
                 retain_media = True
+                # Phase 1: Track workflow end (failure)
+                self.outcome_tracker.track_workflow_end(
+                    thread_id=thread_id,
+                    success=False,
+                    error=exc,
+                    resolution_strategy="user_notified",
+                )
             else:
                 logger.exception("PM invocation failed", exc_info=exc, extra={"thread_id": thread_id})
                 self.channel.send_error(sender, "processing")
                 retain_media = True
+                # Phase 1: Track workflow end (failure)
+                self.outcome_tracker.track_workflow_end(
+                    thread_id=thread_id,
+                    success=False,
+                    error=exc,
+                    resolution_strategy="user_notified",
+                )
 
         finally:
             # Media now persists in media_downloads/ for debugging/auditing

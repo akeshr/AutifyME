@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import timedelta
 from typing import Any, Optional
 
 from ..schemas.models import Product, CompanyProfile
@@ -94,5 +95,129 @@ class StorageInterface(ABC):
 
         Returns:
             True if deleted, False if not found
+        """
+        pass
+
+    # ========================================================================
+    # Phase 1.2: Workflow Outcome Tracking (Agentic Evolution)
+    # ========================================================================
+
+    @abstractmethod
+    def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
+        """
+        Persist workflow outcome for learning and analytics.
+
+        Args:
+            outcome: Complete workflow record with:
+                - tracking_id: Unique identifier
+                - thread_id: LangGraph thread ID
+                - sender_id: User identifier
+                - message_text: User's message
+                - message_hash: Content hash for similarity
+                - media_id, media_type, platform: Optional media info
+                - received_at: When message was received
+                - intent, department: Routing decision
+                - routing_reasoning: PM's reasoning
+                - routing_confidence: Optional confidence score
+                - alternative_departments: Fallback options
+                - routed_at: When routing occurred
+                - success: Whether workflow succeeded
+                - error_type, error_message: If failed
+                - resolution_strategy: How error was handled
+                - result_data: Structured result if successful
+                - duration_seconds: Execution time
+                - started_at, ended_at: Timestamps
+                - learned_patterns, failure_warnings: Extracted learnings
+                - applied_strategies: Which strategies were used
+
+        Returns:
+            Outcome record ID (UUID)
+        """
+        pass
+
+    @abstractmethod
+    def get_workflow_outcomes(
+        self,
+        *,
+        time_window: Optional[timedelta] = None,
+        intent: Optional[str] = None,
+        department: Optional[str] = None,
+        success: Optional[bool] = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """
+        Retrieve workflow outcomes for analysis.
+
+        Args:
+            time_window: Filter by time (e.g., last 7 days)
+            intent: Filter by intent classification
+            department: Filter by department
+            success: Filter by success/failure
+            limit: Maximum records to return
+
+        Returns:
+            List of outcome records ordered by created_at DESC
+        """
+        pass
+
+    @abstractmethod
+    def get_recent_failures(
+        self,
+        time_window: timedelta,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """
+        Retrieve recent failures for regression test generation.
+
+        Args:
+            time_window: How far back to look
+            limit: Maximum failures to return
+
+        Returns:
+            List of failure records ordered by recency
+        """
+        pass
+
+    @abstractmethod
+    def get_success_rates(
+        self,
+        time_window: Optional[timedelta] = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Get success rate analytics by department and intent.
+
+        Args:
+            time_window: Analysis window (default: 7 days)
+
+        Returns:
+            List of aggregated metrics:
+                - department, intent
+                - total_workflows, successful
+                - success_rate_pct
+                - avg_duration_seconds
+        """
+        pass
+
+    @abstractmethod
+    def get_edge_cases(
+        self,
+        time_window: Optional[timedelta] = None,
+        max_occurrence_count: int = 3,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """
+        Get low-frequency patterns (edge cases) for test synthesis.
+
+        Args:
+            time_window: Analysis window (default: 30 days)
+            max_occurrence_count: Max occurrences to consider edge case
+            limit: Maximum patterns to return
+
+        Returns:
+            List of edge case patterns with:
+                - message_hash, sample_text
+                - occurrence_count, last_seen
+                - intent, department
+                - avg_duration
         """
         pass

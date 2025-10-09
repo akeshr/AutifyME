@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from supabase import Client, create_client
 
@@ -146,3 +146,132 @@ class SupabaseStorageClient(StorageInterface):
 
         # Supabase delete returns the deleted rows; if empty, nothing was deleted
         return bool(response.data)
+
+    # ========================================================================
+    # Phase 1.2: Workflow Outcome Tracking (Agentic Evolution)
+    # ========================================================================
+
+    def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
+        """Persist workflow outcome for learning and analytics."""
+        client = self._ensure_client()
+
+        # Ensure timestamps are ISO strings for Supabase
+        payload = outcome.copy()
+        for ts_field in ["received_at", "routed_at", "started_at", "ended_at"]:
+            if ts_field in payload and isinstance(payload[ts_field], datetime):
+                payload[ts_field] = payload[ts_field].isoformat()
+
+        response = client.table("workflow_outcomes").insert(payload).execute()
+
+        if not response.data:
+            raise RuntimeError(
+                "Failed to persist workflow outcome; inspect Supabase response for details."
+            )
+
+        logger.info(
+            "Persisted workflow outcome",
+            extra={
+                "tracking_id": outcome.get("tracking_id"),
+                "success": outcome.get("success"),
+            },
+        )
+
+        return response.data[0]["id"]
+
+    def get_workflow_outcomes(
+        self,
+        *,
+        time_window: Optional[timedelta] = None,
+        intent: Optional[str] = None,
+        department: Optional[str] = None,
+        success: Optional[bool] = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Retrieve workflow outcomes for analysis."""
+        client = self._ensure_client()
+
+        query = client.table("workflow_outcomes").select("*")
+
+        # Apply filters
+        if time_window:
+            cutoff = (datetime.now(timezone.utc) - time_window).isoformat()
+            query = query.gte("created_at", cutoff)
+
+        if intent:
+            query = query.eq("intent", intent)
+
+        if department:
+            query = query.eq("department", department)
+
+        if success is not None:
+            query = query.eq("success", success)
+
+        # Order and limit
+        query = query.order("created_at", desc=True).limit(limit)
+
+        response = query.execute()
+        return response.data if response.data else []
+
+    def get_recent_failures(
+        self,
+        time_window: timedelta,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Retrieve recent failures for regression test generation."""
+        client = self._ensure_client()
+
+        cutoff = (datetime.now(timezone.utc) - time_window).isoformat()
+
+        response = (
+            client.table("workflow_outcomes")
+            .select("tracking_id, thread_id, message_text, media_id, media_type, "
+                    "error_type, error_message, resolution_strategy, duration_seconds, created_at")
+            .eq("success", False)
+            .gte("created_at", cutoff)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+
+        return response.data if response.data else []
+
+    def get_success_rates(
+        self,
+        time_window: Optional[timedelta] = None,
+    ) -> list[dict[str, Any]]:
+        """Get success rate analytics by department and intent."""
+        client = self._ensure_client()
+
+        # Use the pre-built view
+        # Note: View filters by 7 days by default; we'll use the view as-is for Phase 1
+        # TODO: Make view parameterizable in Phase 2
+
+        response = (
+            client.table("v_success_rates")
+            .select("*")
+            .execute()
+        )
+
+        return response.data if response.data else []
+
+    def get_edge_cases(
+        self,
+        time_window: Optional[timedelta] = None,
+        max_occurrence_count: int = 3,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Get low-frequency patterns (edge cases) for test synthesis."""
+        client = self._ensure_client()
+
+        # Use the pre-built view
+        # Note: View uses 30-day window and occurrence_count <= 3 by default
+        # TODO: Make view parameterizable in Phase 2
+
+        response = (
+            client.table("v_edge_cases")
+            .select("*")
+            .limit(limit)
+            .execute()
+        )
+
+        return response.data if response.data else []
