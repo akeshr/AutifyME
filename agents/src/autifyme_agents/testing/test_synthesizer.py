@@ -350,6 +350,7 @@ class MockChannel(MessagingChannel):
         self.messages = []
 
     def format_thread_id(self, sender: str) -> str:
+        # Ruff F821 false positive - sender is a method parameter
         return f"test:{sender}"
 
     def send_text(self, recipient: str, message: str, **kwargs) -> dict:

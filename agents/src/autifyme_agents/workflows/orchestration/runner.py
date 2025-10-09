@@ -271,7 +271,6 @@ class WorkflowRunner:
                 return
 
         # Invoke PM
-        retain_media = False
 
         try:
             result, interrupt = self._invoke_pm(thread_id, text, media_path)
@@ -289,6 +288,14 @@ class WorkflowRunner:
                 self._handle_completion(sender, result)
                 # Phase 1: Track workflow end (success)
                 duration = (datetime.now() - workflow_start_time).total_seconds()
+                logger.info(
+                    "Workflow completed successfully",
+                    extra={
+                        "thread_id": thread_id,
+                        "duration_seconds": duration,
+                        "sender": sender,
+                    },
+                )
                 self.outcome_tracker.track_workflow_end(
                     thread_id=thread_id,
                     success=True,
@@ -316,7 +323,6 @@ class WorkflowRunner:
         except GraphRecursionError as exc:
             logger.exception("PM recursion limit exceeded", exc_info=exc, extra={"thread_id": thread_id})
             self.channel.send_error(sender, "recursion")
-            retain_media = True
             # Phase 1: Track workflow end (failure)
             self.outcome_tracker.track_workflow_end(
                 thread_id=thread_id,
@@ -341,7 +347,6 @@ class WorkflowRunner:
                     "processing",
                     "I hit a coordination error while prepping your request. Please resend the details so I can try again.",
                 )
-                retain_media = True
                 # Phase 1: Track workflow end (failure)
                 self.outcome_tracker.track_workflow_end(
                     thread_id=thread_id,
@@ -352,7 +357,6 @@ class WorkflowRunner:
             else:
                 logger.exception("PM invocation failed", exc_info=exc, extra={"thread_id": thread_id})
                 self.channel.send_error(sender, "processing")
-                retain_media = True
                 # Phase 1: Track workflow end (failure)
                 self.outcome_tracker.track_workflow_end(
                     thread_id=thread_id,

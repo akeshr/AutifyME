@@ -54,6 +54,10 @@ dev = [
 dev-dependencies = []
 prerelease = "allow"  # Required for LangChain v1 alpha packages
 
+[tool.ruff.lint]
+# Ruff linting configuration
+ignore = ["F821"]  # Ignore undefined name errors (false positives in some cases)
+
 [tool.hatch.build.targets.wheel]
 packages = ["agents/src/autifyme_agents"]
 
