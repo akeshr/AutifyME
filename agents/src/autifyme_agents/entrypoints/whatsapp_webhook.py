@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.logging_config import setup_logging, get_logger
@@ -31,6 +31,19 @@ app = FastAPI()
 
 # Webhook will be initialized lazily on first request
 logger.info("AutifyME WhatsApp webhook serverless function loaded")
+
+
+@app.get("/")
+def read_root():
+    """Root endpoint to confirm the service is running."""
+    return {"status": "ok", "service": "AutifyME WhatsApp Webhook"}
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """Redirects to the static vercel.svg in the public directory."""
+    return RedirectResponse("/vercel.svg", status_code=307)
+
 
 # Lazy initialization for serverless deployment
 _runner = None
