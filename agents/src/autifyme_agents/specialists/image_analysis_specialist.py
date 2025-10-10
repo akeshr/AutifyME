@@ -107,13 +107,23 @@ def create_image_analysis_specialist():
             ),
         ]
     
-    # Create a simple function instead of Runnable chains
-    def analyze_image(inputs: Dict[str, Any]) -> Any:
-        """Simple function to analyze images without Runnable dependencies."""
-        formatted_messages = format_messages(inputs)
-        return structured_llm.invoke(formatted_messages)
+    # Create a simple Runnable-like class instead of plain function
+    class ImageAnalysisChain:
+        """A simple chain class that mimics Runnable behavior."""
+        def __init__(self, format_func, llm):
+            self.format_func = format_func
+            self.llm = llm
 
-    return analyze_image
+        def __call__(self, inputs: Dict[str, Any], config=None) -> Any:
+            """Make the chain callable."""
+            return self.invoke(inputs, config)
+
+        def invoke(self, inputs: Dict[str, Any], config=None) -> Any:
+            """Invoke the chain with inputs."""
+            formatted_messages = self.format_func(inputs)
+            return self.llm.invoke(formatted_messages)
+
+    return ImageAnalysisChain(format_messages, structured_llm)
 
 
 @tool("image_analysis_specialist")

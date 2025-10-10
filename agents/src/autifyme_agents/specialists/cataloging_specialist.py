@@ -63,14 +63,25 @@ Produce a complete product record with all available fields populated.
     # Force structured output (LangChain v1 feature)
     structured_llm = llm.with_structured_output(Product)
     
-    # Create a simple function instead of Runnable chains
-    def catalog_product(inputs: Dict[str, Any]) -> Any:
-        """Simple function to catalog products without Runnable dependencies."""
-        prepared = prepare_inputs(inputs)
-        messages = prompt(**prepared)
-        return structured_llm.invoke(messages)
+    # Create a simple Runnable-like class instead of plain function
+    class CatalogingChain:
+        """A simple chain class that mimics Runnable behavior."""
+        def __init__(self, prepare_func, prompt_func, llm):
+            self.prepare_func = prepare_func
+            self.prompt_func = prompt_func
+            self.llm = llm
 
-    return catalog_product
+        def __call__(self, inputs: Dict[str, Any], config=None) -> Any:
+            """Make the chain callable."""
+            return self.invoke(inputs, config)
+
+        def invoke(self, inputs: Dict[str, Any], config=None) -> Any:
+            """Invoke the chain with inputs."""
+            prepared = self.prepare_func(inputs)
+            messages = self.prompt_func(**prepared)
+            return self.llm.invoke(messages)
+
+    return CatalogingChain(prepare_inputs, prompt, structured_llm)
 
 
 @tool("cataloging_specialist")
