@@ -146,24 +146,75 @@ The included `.github/workflows/ci-cd.yml` provides:
 
 - **Automated testing** on every push/PR
 - **Code quality checks** (linting, type checking)
-- **Automated deployment** to Railway (no Docker needed)
+- **Automated deployment** to Vercel (serverless)
 
 ### Required Secrets:
 ```bash
-RAILWAY_TOKEN=your_railway_api_token
-RAILWAY_PROJECT_ID=your_railway_project_id
-RAILWAY_SERVICE_ID=your_railway_service_id
+# Vercel Deployment
+VERCEL_TOKEN=your_vercel_api_token
 ```
+
+## 🚀 Vercel Deployment
+
+AutifyME uses Vercel for serverless deployment of the FastAPI application.
+
+### Vercel Setup:
+
+1. **Install Vercel CLI:**
+   ```bash
+   npm install -g vercel
+   ```
+
+2. **Link your project:**
+   ```bash
+   cd your-project-directory
+   vercel link
+   ```
+   Follow the prompts to create/select a Vercel project.
+
+3. **Configure environment variables:**
+   ```bash
+   vercel env add SUPABASE_URL
+   vercel env add SUPABASE_ANON_KEY
+   vercel env add WHATSAPP_PHONE_NUMBER_ID
+   vercel env add WHATSAPP_ACCESS_TOKEN
+   vercel env add WHATSAPP_WEBHOOK_VERIFY_TOKEN
+   vercel env add LANGCHAIN_API_KEY
+   vercel env add OPENAI_API_KEY
+   ```
+
+4. **Deploy:**
+   ```bash
+   vercel --prod
+   ```
+
+### Vercel Benefits:
+
+- **Serverless scaling** - Automatic scaling based on demand
+- **Generous free tier** - Perfect for development and small projects
+- **Fast deployments** - Deploy from Git with zero configuration
+- **Global CDN** - Fast response times worldwide
+- **Integrated monitoring** - Built-in logs and analytics
 
 ## 📈 Scaling Considerations
 
-### Vertical Scaling (Bigger instances):
-- Railway: Upgrade to $5/month Hobby plan
-- Render: Upgrade to $7/month Starter plan
+### Function Timeouts:
+- **Free tier**: 10 seconds execution time
+- **Pro tier**: 30 seconds execution time
+- **Enterprise**: 5 minutes execution time
 
-### Horizontal Scaling (Multiple instances):
-- Railway: Pro plan ($10/month) supports horizontal scaling
-- Use load balancer for multiple webhook endpoints
+### Request Limits:
+- **Free tier**: 100 requests/second
+- **Pro tier**: 1000+ requests/second
+
+### Memory Limits:
+- **Free tier**: 1008 MB RAM
+- **Pro tier**: 3008 MB RAM
+
+### Scaling Strategy:
+- Vercel automatically scales based on traffic
+- Consider upgrading to Pro for production workloads
+- Monitor function duration and cold starts
 
 ### Database Scaling:
 - Supabase free tier: 500MB database, 50MB file storage

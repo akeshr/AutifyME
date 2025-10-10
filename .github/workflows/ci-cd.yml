@@ -117,35 +117,28 @@ jobs:
       run: |
         uv run mypy agents/src/autifyme_agents
 
-  deploy-to-railway:
+  deploy-to-vercel:
     needs: [test, lint]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/InitialDesign'
-    container:
-      image: ghcr.io/railwayapp/cli:latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Quick auth & env debug (no token printed)
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-          SVC_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
-        run: |
-          echo "Token length (0 means missing):" && echo -n "$RAILWAY_TOKEN" | wc -c
-          echo "RAILWAY_PROJECT_ID visible? (should be non-empty):" && echo -n "$RAILWAY_PROJECT_ID" | wc -c
-          railway --version || true
-          railway whoami || true
-          railway status || true
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-      - name: Deploy to Railway (headless, per blog pattern)
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-          SVC_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
-        run: |
-          # blog recommends running inside Railway CLI container and using a project token:
-          # https://blog.railway.com/p/github-actions
-          railway up --detach --service=${{ env.SVC_ID }}
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy Project Artifacts to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
