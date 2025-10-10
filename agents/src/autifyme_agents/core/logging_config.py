@@ -9,16 +9,27 @@ from pathlib import Path
 from datetime import datetime
 from typing import Any
 
-# Create logs and media directories if they don't exist
+# Configure directories for different environments
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
-LOGS_DIR = PROJECT_ROOT / "logs"
-MEDIA_DIR = PROJECT_ROOT / "media_downloads"
 
-LOGS_DIR.mkdir(exist_ok=True)
-MEDIA_DIR.mkdir(exist_ok=True)
-
-# Log file with timestamp
-LOG_FILE = LOGS_DIR / f"autifyme_agents_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+# For serverless environments (Vercel), use /tmp for writable directories
+# For local development, use project directories
+try:
+    # Test if we can write to project directories (local development)
+    LOGS_DIR = PROJECT_ROOT / "logs"
+    MEDIA_DIR = PROJECT_ROOT / "media_downloads"
+    LOGS_DIR.mkdir(exist_ok=True)
+    MEDIA_DIR.mkdir(exist_ok=True)
+    LOG_FILE = LOGS_DIR / f"autifyme_agents_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+except (OSError, PermissionError):
+    # Serverless environment - use /tmp and disable file logging
+    import tempfile
+    TMP_DIR = Path(tempfile.gettempdir()) / "autifyme"
+    LOGS_DIR = TMP_DIR / "logs"
+    MEDIA_DIR = TMP_DIR / "media"
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_FILE = None  # Disable file logging in serverless
 
 
 class StructuredFormatter(logging.Formatter):
@@ -63,8 +74,8 @@ def setup_logging(level: str = "DEBUG", enable_file_logging: bool = True) -> Non
     console_handler.setFormatter(console_format)
     root_logger.addHandler(console_handler)
 
-    # File handler with detailed output
-    if enable_file_logging:
+    # File handler with detailed output (disabled in serverless environments)
+    if enable_file_logging and LOG_FILE is not None:
         file_handler = logging.FileHandler(LOG_FILE, mode="a", encoding="utf-8")
         file_handler.setLevel(logging.DEBUG)
 
@@ -77,6 +88,9 @@ def setup_logging(level: str = "DEBUG", enable_file_logging: bool = True) -> Non
 
         # Log startup message
         root_logger.info(f"Logging initialized - file: {LOG_FILE}")
+    elif enable_file_logging and LOG_FILE is None:
+        # Serverless environment - file logging disabled
+        root_logger.info("Logging initialized - file logging disabled (serverless environment)")
 
     # Reduce noise from external libraries
     logging.getLogger("httpx").setLevel(logging.WARNING)
