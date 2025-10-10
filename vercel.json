@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "agents/src/autifyme_agents/entrypoints/whatsapp_webhook.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "agents/src/autifyme_agents/entrypoints/whatsapp_webhook.py"
+    }
+  ],
+  "env": {
+    "PYTHONPATH": "agents/src"
+  }
+}
