@@ -1,0 +1,27 @@
+# Architecture Documentation
+
+## Core Documents
+
+| Reference | Purpose |
+| --- | --- |
+| **[AGENTS_DESIGN.md](./AGENTS_DESIGN.md)** | Canonical agent hierarchy and context engineering patterns (timeless design blueprint). |
+| **[LANGCHAIN_V1_FEATURES.md](./LANGCHAIN_V1_FEATURES.md)** | Vendor feature reference with links to official resources; implementation status lives in roadmap docs. |
+| **[TECH_STACK.md](./TECH_STACK.md)** | Technology choices organized by architecture layer. |
+| **[PROJECT_MANAGER_DESIGN.md](./PROJECT_MANAGER_DESIGN.md)** | Roadmap specification for the Project Manager agent (explicitly marked future work). |
+| **[WHATSAPP_CATALOGING_WORKFLOW.md](./WHATSAPP_CATALOGING_WORKFLOW.md)** | Workflow-specific design for the cataloging MVP. |
+
+## Key Principles
+
+- **Architecture-First:** Production-grade from day 1
+- **LangChain v1 Native:** Use built-in patterns (HITL, error handling, structured outputs)
+- **Hexagonal Architecture:** Core decoupled from external services
+- **Context Engineering:** Minimize LLM context at every step
+
+## Quick Start
+
+Before implementing any feature:
+1. Check [LANGCHAIN_V1_FEATURES.md](./LANGCHAIN_V1_FEATURES.md) for native solutions before writing custom logic.
+2. Review [AGENTS_DESIGN.md](./AGENTS_DESIGN.md) for hierarchy and context engineering rules.
+3. For implementation sequencing or status, read `../roadmap/IMPLEMENTATION_ROADMAP.md`.
+4. For pending departments or Project Manager details, consult [PROJECT_MANAGER_DESIGN.md](./PROJECT_MANAGER_DESIGN.md).
+5. Follow Cursor rules in `../../.cursor/rules/`.

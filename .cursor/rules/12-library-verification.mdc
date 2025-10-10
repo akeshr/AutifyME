@@ -1,0 +1,21 @@
+---
+alwaysApply: true
+---
+# Rule: Library Verification Before Implementation
+
+When you plan to implement or modify functionality that depends on a third-party package (LangChain, LangGraph, deepagents, Supabase, etc.), you MUST verify the installed API surface before writing code. This prevents regressions from stale assumptions and keeps us aligned with Architecture-First discipline. Running workflows, tests, or ad-hoc scripts without code changes does not require this verification step.
+
+## Workflow (follow in order)
+1. **Identify the dependency** – Note the exact module, class, or decorator you plan to use.
+2. **Confirm installation context** – Run `uv run python -c "import pkg, inspect; print(pkg.__file__)"` (or equivalent) to ensure the package is present in `.venv` and discover its version.
+3. **Inspect live API** – Use `inspect.getsource`, `dir()`, or `pkgutil.iter_modules` to confirm signatures, available helpers, and expected kwargs. Prefer this over relying on memory or web snippets.
+4. **Cross-check docs** – If the local inspection is unclear, read the official documentation referenced in `docs/architecture/*.md` before proceeding.
+5. **Record assumptions** – Reference the inspection results (e.g., functions used, interrupt config shape) when explaining the “why” behind code changes.
+
+## Constraints
+- Do NOT write code that depends on unverified interfaces.
+- If inspection reveals drift from our design docs, pause implementation and reconcile the difference with the architecture owner before changing behaviour.
+- Apply this process even for standard libraries when relying on less-common APIs.
+
+## Exceptions
+- Pure refactors that do not touch external APIs (formatting, docstrings) may skip the inspection, but mention the rationale in your explanation.

@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run:*)",
+      "Bash(mkdir:*)",
+      "Bash(tree:*)",
+      "WebSearch",
+      "WebFetch(domain:langchain-ai.github.io)",
+      "WebFetch(domain:docs.smith.langchain.com)",
+      "WebFetch(domain:docs.langchain.com)",
+      "Bash(uv pip:*)",
+      "Bash(findstr:*)",
+      "Bash(python:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:*)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:smith.langchain.com)",
+      "Read(//c/Abhi/personal/**)",
+      "Bash(ruff check:*)",
+      "Bash(cd:*)",
+      "Bash(dir:*)",
+      "Read(//c/Users/abhishek.a.keshri/**)",
+      "Bash(timeout 120 uv run:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "outputStyle": "Jarvis"
+}

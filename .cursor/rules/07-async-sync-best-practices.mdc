@@ -1,0 +1,31 @@
+---
+globs: "agents/src/autifyme_agents/**/*.py"
+---
+# Rule: Async/Sync Best Practices
+
+## Match SDK Behavior:
+- **Async SDK** (OpenAI, LangChain LLMs) → `async def`
+- **Sync SDK** (Supabase, most Python libs) → `def`
+- **Don't force async on sync libraries** - causes `TypeError`
+
+## Middleware MUST Adapt:
+```python
+import asyncio
+def my_middleware(func):
+    if asyncio.iscoroutinefunction(func):
+        async def wrapper(*args, **kwargs):
+            return await func(*args, **kwargs)
+        return wrapper
+    else:
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        return wrapper
+```
+
+## Quick Check:
+```python
+import inspect
+inspect.iscoroutinefunction(my_function)  # True = async, False = sync
+```
+
+**Why:** Mismatched signatures cause `RuntimeWarning: coroutine was never awaited`

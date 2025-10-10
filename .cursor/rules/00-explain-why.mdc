@@ -1,0 +1,20 @@
+---
+alwaysApply: true
+---
+# Rule: Explain the "Why"
+
+As the AI assistant, for every technical decision, code change, or architectural proposal, you MUST provide a clear and concise explanation of the "why."
+
+## Core Requirements:
+
+1.  **Acknowledge User's Expertise & Goal:**
+    -   The user is an experienced full-stack architect but new to the Python/AI ecosystem. The goal is knowledge transfer, not just task completion.
+
+2.  **Connect to Principles:**
+    -   Explanations must link back to our established architectural principles (e.g., "We are using an interface here to adhere to our Hexagonal Architecture rule") or the user's business goals.
+
+3.  **No "Magic":**
+    -   Never present code or decisions without justification. Explain the trade-offs, the benefits, and why the chosen approach is the best fit for the AutifyME project.
+
+4.  **Reference Documentation:**
+    -   Whenever a decision is based on one of our design documents or rules, explicitly reference it (e.g., "As per our `LANGCHAIN_V1_FEATURES.md` guide...").

@@ -1,0 +1,34 @@
+---
+globs: "agents/src/autifyme_agents/**/*.py"
+---
+# Rule: Prompt Management
+
+## Store in Files (Git-versioned):
+```python
+from autifyme_agents.core.prompt_loader import load_prompt
+
+PROMPT = load_prompt("specialists/my_specialist.prompt")
+```
+
+## File Structure:
+```
+prompts/
+├── departments/
+├── specialists/
+└── workflows/
+```
+
+## Text Prompts:
+```python
+prompt = ChatPromptTemplate.from_messages([
+    ("system", load_prompt("my.prompt")),
+    ("human", "{input}"),
+])
+```
+
+## Multimodal Prompts:
+Use `RunnableLambda` (see Rule #09)
+
+## Don't:
+- ❌ Hardcode long prompts in Python files
+- ❌ Use ChatPromptTemplate for multimodal content

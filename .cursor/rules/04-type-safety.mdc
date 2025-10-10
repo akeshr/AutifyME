@@ -1,0 +1,20 @@
+---
+globs: "agents/src/autifyme_agents/**/*.py"
+---
+# Rule: Pydantic for All Data Transfer
+
+To ensure type safety and prevent runtime errors, all data structures passed between agents, tools, and layers of the application MUST be defined using Pydantic models.
+
+## Key Requirements:
+
+1.  **Use Pydantic for Schemas:**
+    -   All data models are defined in `autifyme_agents/schemas/`.
+    -   Agent inputs, agent outputs, and tool arguments/return values must be Pydantic models.
+
+2.  **NO Dictionaries for Data Transfer:**
+    -   Do not pass raw dictionaries between components. Always instantiate a Pydantic model.
+    -   **Bad:** `return {"name": "Product A", "price": 10.0}`
+    -   **Good:** `from autifyme_agents.schemas.models import Product; return Product(name="Product A", price=10.0)`
+
+3.  **Use `.with_structured_output()`:**
+    -   When an agent's final output needs to be a specific data structure, use the `.with_structured_output(Product)` method to guarantee the output conforms to the Pydantic schema. This is a key LangChain v1 feature we must leverage.

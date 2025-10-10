@@ -1,0 +1,17 @@
+---
+alwaysApply: true
+---
+# Rule: Architecture-First Philosophy
+
+This project follows a strict "Architecture-First" development methodology. All implementation MUST adhere to the documented architecture. No shortcuts or temporary solutions are permitted, even for the sake of speed. The goal is a production-grade system from day one.
+
+## Core Documents
+
+Before writing any code, review the relevant architectural documents:
+
+1.  **High-Level Vision**: [`whitepaper.md`](mdc:docs/whitepaper.md)
+2.  **System Architecture**: [`docs/architecture/README.md`](mdc:docs/architecture/README.md)
+3.  **Agent Hierarchy**: [`AGENTS_DESIGN.md`](mdc:docs/architecture/AGENTS_DESIGN.md)
+4.  **First Workflow**: [`WHATSAPP_CATALOGING_WORKFLOW.md`](mdc:docs/architecture/WHATSAPP_CATALOGING_WORKFLOW.md)
+
+Any deviation from these documents must be discussed and approved *before* implementation.

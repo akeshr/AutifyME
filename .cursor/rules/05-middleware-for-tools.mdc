@@ -1,0 +1,105 @@
+---
+globs: "agents/src/autifyme_agents/tools/**/*.py,agents/src/autifyme_agents/core/middleware.py"
+---
+# Rule: Middleware for Cross-Cutting Concerns in Tools
+
+To keep our tool logic clean, focused, and free of boilerplate, all cross-cutting concerns MUST be handled by the middleware system (`core/middleware.py`).
+
+## Tool Implementation Guardrails:
+
+1.  **DO NOT Implement Context/Logging/Auth in Tools:**
+    -   A tool's code should focus exclusively on its business logic.
+    -   It should NOT contain code for fetching the company profile, logging to LangSmith, checking user permissions, or rate limiting.
+    -   **Bad:**
+        ```python
+        @tool
+        def save_product(product: Product):
+            # Boilerplate to be avoided!
+            company_profile = get_company_profile()
+            logger.info(f"Saving product for {company_profile.name}")
+            check_permissions()
+            # Actual business logic...
+        ```
+
+2.  **DO Use Middleware Decorators:**
+    -   Apply the appropriate decorators from `core/middleware.py` to any new tool that requires this functionality. The middleware will automatically inject the necessary context or perform the required checks.
+    -   **Good:**
+        ```python
+        from autifyme_agents.core.middleware import company_context_middleware, langsmith_tracing_middleware
+
+        @tool
+        @langsmith_tracing_middleware(workflow_name="Cataloging")
+        @company_context_middleware
+        async def save_product(product: Product, company_profile: CompanyProfile = None):
+            # company_profile is auto-injected by the middleware!
+            # LangSmith trace is auto-enriched!
+            # Business logic is clean and focused.
+            ...
+        ```
+
+## Critical Middleware Implementation Pattern:
+
+### Middleware MUST Handle Both Sync and Async Tools
+
+When creating middleware that wraps tools, it MUST detect whether the wrapped function is async or sync:
+
+```python
+import asyncio
+from functools import wraps
+from typing import Callable, Any
+
+def my_middleware(workflow_name: str) -> Callable:
+    """Middleware factory that supports both sync and async tools."""
+    
+    def decorator(func: Callable) -> Callable:
+        # Detect if the wrapped function is async
+        if asyncio.iscoroutinefunction(func):
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs) -> Any:
+                # Extract config (LangChain passes this automatically)
+                config = kwargs.pop("config", {})
+                
+                # Middleware logic here (modify config, inject context, etc.)
+                config["tags"] = config.get("tags", []) + [f"workflow:{workflow_name}"]
+                
+                # Call the async tool
+                return await func(*args, **kwargs)
+            return async_wrapper
+        else:
+            @wraps(func)
+            def sync_wrapper(*args, **kwargs) -> Any:
+                # Extract config
+                config = kwargs.pop("config", {})
+                
+                # Same middleware logic
+                config["tags"] = config.get("tags", []) + [f"workflow:{workflow_name}"]
+                
+                # Call the sync tool
+                return func(*args, **kwargs)
+            return sync_wrapper
+    
+    return decorator
+```
+
+### Why This Pattern is Critical:
+
+1. **LangChain passes `config` to all tools** - Middleware must `pop()` it before calling the tool
+2. **Tools can be async or sync** - Middleware must match the tool's signature
+3. **Mismatched signatures cause runtime errors** - `RuntimeWarning: coroutine was never awaited`
+
+### Decorator Order Matters:
+
+```python
+@tool  # ← LangChain's @tool decorator (always outermost)
+@langsmith_tracing_middleware(workflow_name="Cataloging")  # ← Applied second
+@company_context_middleware  # ← Applied first (innermost)
+async def my_tool(...):
+    pass
+```
+
+**Execution order:** `@tool` → `langsmith_tracing_middleware` → `company_context_middleware` → `my_tool`
+
+## Reference:
+- See Rule #07 for async/sync decision-making
+- LangChain v1 middleware docs: `docs/architecture/LANGCHAIN_V1_FEATURES.md`
+- Implementation: `agents/src/autifyme_agents/core/middleware.py`
