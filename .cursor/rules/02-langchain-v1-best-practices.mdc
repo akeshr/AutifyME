@@ -1,0 +1,16 @@
+---
+alwaysApply: true
+---
+# Rule: LangChain v1 Best Practices
+
+This project MUST use LangChain v1's native, production-grade features over custom-built solutions. This ensures our system is robust, maintainable, and tightly integrated with the LangChain ecosystem (especially LangSmith).
+
+**Reference Document:** Before implementing any agent or workflow, you MUST consult the features guide:
+- [`LANGCHAIN_V1_FEATURES.md`](mdc:docs/architecture/LANGCHAIN_V1_FEATURES.md)
+
+## Key Feature Checklist:
+
+- **Human-in-the-Loop (HITL):** ALWAYS use `interrupt_before` or `interrupt_after` for approval workflows. DO NOT build custom state machines for pausing/resuming.
+- **Error Handling:** Use tool-level `@retry` decorators for retryable errors. ToolNode automatically converts exceptions to ToolMessages that the agent can see and reason about. For structured output validation errors, use `ToolStrategy(schema=MyModel, handle_errors=True)` in the `response_format` parameter.
+- **Type Safety:** ALWAYS use `.with_structured_output(PydanticModel)` for agent outputs that need to be consumed by other systems or tools. DO NOT parse dictionaries or unstructured text.
+- **Middleware:** ALWAYS use the middleware pattern for cross-cutting concerns (e.g., injecting company context, tracing, logging, auth). DO NOT add this logic directly into individual tools.

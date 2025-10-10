@@ -1,0 +1,28 @@
+---
+globs: "agents/src/autifyme_agents/specialists/**/*.py"
+---
+# Rule: Multimodal Prompts (Vision/Audio)
+
+## Use RunnableLambda (NOT ChatPromptTemplate):
+```python
+from langchain_core.runnables import RunnableLambda
+from langchain_core.messages import SystemMessage, HumanMessage
+
+def format_messages(inputs: dict) -> list:
+    return [
+        SystemMessage(content="System prompt"),
+        HumanMessage(content=[
+            {"type": "image_url", "image_url": {"url": inputs["image_url"]}},
+            {"type": "text", "text": inputs.get("context", "")},
+        ])
+    ]
+
+chain = RunnableLambda(format_messages) | llm
+```
+
+## Critical Format:
+- Image URL: `{"url": "https://..."}` (nested, not bare string)
+- Pydantic models: Use `model.attribute` (NOT `model.get('attribute')`)
+
+## Why:
+`ChatPromptTemplate` can't interpolate variables in nested structures → sends literal `"{image_url}"` to API

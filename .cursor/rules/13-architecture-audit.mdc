@@ -1,0 +1,16 @@
+---
+alwaysApply: true
+---
+# Rule: Architecture Compliance Discipline
+
+Before adding or refactoring workflow logic you MUST explicitly snapshot the architecture documents that govern the change:
+- `docs/architecture/README.md`
+- `docs/architecture/AGENTS_DESIGN.md`
+- Relevant workflow doc (e.g., `WHATSAPP_CATALOGING_WORKFLOW.md`)
+
+For each change, document in your explanation how the implementation upholds:
+1. Hierarchy & Delegation (Project Manager → Department → Specialist → Tool)
+2. Context Engineering (minimal payloads, middleware-based injection)
+3. Hexagonal ports/adapters (all external touch points behind interfaces)
+
+If any part of the proposed change deviates from the architecture docs, stop and secure design approval before code.

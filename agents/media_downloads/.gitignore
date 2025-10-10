@@ -1,0 +1,6 @@
+# Ignore all media files
+*
+
+# But keep this directory structure
+!.gitignore
+!README.md

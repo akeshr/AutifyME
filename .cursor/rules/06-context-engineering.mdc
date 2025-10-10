@@ -1,0 +1,29 @@
+---
+alwaysApply: true
+---
+# Rule: Effective Context Engineering
+
+This project follows a strict "Context-First" development methodology. To build an efficient, scalable, and cost-effective agentic system, all components MUST be designed to minimize the context provided to an LLM at any given step.
+
+## Core Principles
+
+Before writing any agent or tool, you MUST adhere to the following principles, derived from our architectural design and industry best practices.
+
+1.  **Minimal Context (The "Need to Know" Principle):**
+    -   An agent (especially a `Specialist`) should ONLY receive the context and data essential for its immediate task.
+    -   DO NOT pass the entire conversation history or project state down the agent hierarchy.
+
+2.  **Token-Efficient Tools:**
+    -   Tools MUST have a single, well-defined purpose. Avoid overlapping functionality.
+    -   Tools MUST return concise, structured data (e.g., Pydantic models), not verbose natural language.
+    -   DO NOT create "chatty" tools that fill the context window with low-signal information.
+
+3.  **Just-in-Time Retrieval:**
+    -   Prefer using **middleware** or dedicated **retrieval tools** to fetch context *when it's needed* by a tool.
+    -   DO NOT front-load large, static context blocks (e.g., company profiles, brand guides) into the initial system prompt if they are only needed for specific tool calls.
+
+4.  **Explicit State Management:**
+    -   For long-running tasks that may exceed the context window, use explicit strategies like **structured note-taking** (e.g., writing to a scratchpad tool) or **compaction** (summarizing history).
+    -   DO NOT assume the context window is infinite. Plan for state management from the start.
+
+**Reference:** The full strategy is documented in [`docs/architecture/AGENTS_DESIGN.md`](./docs/architecture/AGENTS_DESIGN.md#8-context-engineering-strategy).
