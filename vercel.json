@@ -17,6 +17,10 @@
       "dest": "/api/debug.py"
     },
     {
+      "src": "/simple",
+      "dest": "/api/simple.py"
+    },
+    {
       "src": "/(.*)",
       "dest": "/api/index.py"
     }
