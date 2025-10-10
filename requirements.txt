@@ -1,28 +1,5 @@
-# Core requirements for Vercel deployment (webhook + AI agents)
 fastapi>=0.118.0
-uvicorn>=0.37.0
+uvicorn>=0.17.0
 pydantic>=2.0.0
-pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
-supabase
-tenacity>=8.0.0
-
-# Core Agentic Framework (LangChain v1 prerelease stack)
-langchain==1.0.0a12
-langgraph==1.0.0a4
-langgraph-prebuilt==0.7.0a2
-langgraph-checkpoint==2.1.1
-langgraph-checkpoint-postgres==2.0.24
-langsmith
-
-# Advanced Agent Implementation
-deepagents==0.0.11
-
-# LLM Providers (v1 alpha)
-langchain-openai==1.0.0a3
-langchain-anthropic==1.0.0a2
-langchain-aws==1.0.0a1
-langchain-google-genai
-
-# Exclude heavy UI dependencies for serverless deployment
-# streamlit>=1.30.0
+-e ./agents/src
