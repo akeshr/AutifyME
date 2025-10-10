@@ -115,3 +115,16 @@ jobs:
         OPENAI_API_KEY: dummy_openai_key
       run: |
         uv run mypy agents/src/autifyme_agents
+
+  notify-vercel:
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/InitialDesign'
+    steps:
+      - name: Notify Vercel of successful tests and linting
+        uses: 'vercel/repository-dispatch/actions/status@v1'
+        with:
+          name: Vercel - InitialDesign
+          status: success
+          sha: ${{ github.sha }}
+          checks: '[{"name": "test", "conclusion": "success"}, {"name": "lint", "conclusion": "success"}]'
