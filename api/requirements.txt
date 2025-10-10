@@ -1,17 +1,1 @@
-# Minimal requirements for Vercel webhook deployment
-fastapi>=0.118.0
-uvicorn>=0.37.0
-pydantic>=2.0.0
-pydantic-settings>=2.0.0
-python-dotenv>=1.0.0
-supabase
-tenacity>=8.0.0
-
-# Basic LangChain for workflow runner
-langchain==1.0.0a12
-langgraph==1.0.0a4
-langgraph-prebuilt==0.7.0a2
-langsmith
-
-# Agent framework
-deepagents==0.0.11
+fastapi==0.104.1
