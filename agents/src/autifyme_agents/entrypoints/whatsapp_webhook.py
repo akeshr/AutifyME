@@ -17,8 +17,14 @@ from autifyme_agents.integrations.storage.supabase_client import SupabaseStorage
 from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
 
-# Initialize logging with DEBUG level
-setup_logging(level="INFO", enable_file_logging=False)
+# Initialize logging for serverless environment
+try:
+    setup_logging(level="INFO", enable_file_logging=False)
+except Exception as e:
+    # Fallback to basic logging if setup fails
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logging.warning(f"Failed to setup structured logging: {e}")
 logger = get_logger(__name__)
 
 app = FastAPI()
@@ -58,7 +64,7 @@ def _get_runner():
 
     return _runner
 
-_EVENT_DUMP_DIR = Path("tmp/whatsapp_events")
+_EVENT_DUMP_DIR = Path("/tmp/whatsapp_events")
 
 # Idempotency tracking: LRU cache of processed message IDs to prevent duplicate processing
 # when WhatsApp retries webhooks. In production, this should be persisted in the database

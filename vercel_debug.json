@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "vercel_debug.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "vercel_debug.py"
+    }
+  ],
+  "env": {
+    "PYTHONPATH": "agents/src"
+  }
+}
