@@ -7,10 +7,15 @@ import logging
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 # Configure directories for different environments
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+
+# Initialize variables that may be None in serverless environments
+LOGS_DIR: Path
+MEDIA_DIR: Path
+LOG_FILE: Optional[Path]
 
 # For serverless environments (Vercel), use /tmp for writable directories
 # For local development, use project directories

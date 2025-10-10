@@ -51,7 +51,6 @@ dev = [
 
 [tool.uv]
 # uv configuration
-dev-dependencies = []
 prerelease = "allow"  # Required for LangChain v1 alpha packages
 
 [tool.ruff.lint]
