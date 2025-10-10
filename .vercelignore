@@ -1,0 +1,24 @@
+# Exclude test files and documentation
+agents/tests/
+docs/
+database/
+scripts/
+samples/
+
+# Exclude development files
+*.md
+*.txt
+.git/
+.github/
+
+# Exclude large files
+*.log
+*.xml
+htmlcov/
+
+# Exclude unnecessary Python cache
+__pycache__/
+*.pyc
+
+# Exclude development dependencies (if not needed for runtime)
+# Note: This doesn't actually exclude them from the bundle, just from upload

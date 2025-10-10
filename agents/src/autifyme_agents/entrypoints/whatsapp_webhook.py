@@ -23,31 +23,40 @@ logger = get_logger(__name__)
 
 app = FastAPI()
 
-logger.info("=" * 80)
-logger.info("AUTIFYME WHATSAPP WEBHOOK STARTING (REFACTORED ARCHITECTURE)")
-logger.info("=" * 80)
-logger.info(f"SUPABASE_URL: {settings.SUPABASE_URL}")
-logger.info(f"DATABASE_URL: {settings.DATABASE_URL[:20]}...")  # Hide credentials
-logger.info(f"WHATSAPP_PHONE_NUMBER_ID: {settings.WHATSAPP_PHONE_NUMBER_ID}")
+# Webhook will be initialized lazily on first request
+logger.info("AutifyME WhatsApp webhook serverless function loaded")
 
-storage_adapter = SupabaseStorageClient()
-logger.info("Storage adapter initialized successfully")
+# Lazy initialization for serverless deployment
+_runner = None
+_storage_adapter = None
+_whatsapp_channel = None
 
-logger.info("Initializing WorkflowRunner with WhatsApp channel...")
-try:
-    # Create channel adapter
-    whatsapp_channel = WhatsAppChannel()
-    logger.info("WhatsApp channel adapter created")
+def _get_runner():
+    """Lazy initialization of WorkflowRunner for serverless deployment."""
+    global _runner, _storage_adapter, _whatsapp_channel
 
-    # Create generic workflow runner with WhatsApp channel
-    runner = WorkflowRunner(
-        channel=whatsapp_channel,
-        storage=storage_adapter,
-    )
-    logger.info("✅ WorkflowRunner initialized successfully")
-except Exception as e:
-    logger.error(f"❌ Failed to initialize WorkflowRunner: {e}", exc_info=True)
-    raise
+    if _runner is None:
+        logger.info("Initializing WorkflowRunner with WhatsApp channel...")
+        try:
+            # Create storage adapter
+            _storage_adapter = SupabaseStorageClient()
+            logger.info("Storage adapter initialized successfully")
+
+            # Create channel adapter
+            _whatsapp_channel = WhatsAppChannel()
+            logger.info("WhatsApp channel adapter created")
+
+            # Create generic workflow runner with WhatsApp channel
+            _runner = WorkflowRunner(
+                channel=_whatsapp_channel,
+                storage=_storage_adapter,
+            )
+            logger.info("✅ WorkflowRunner initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize WorkflowRunner: {e}", exc_info=True)
+            raise
+
+    return _runner
 
 _EVENT_DUMP_DIR = Path("tmp/whatsapp_events")
 
@@ -206,7 +215,7 @@ async def receive(request: Request) -> Any:
                     )
 
                     if msg_type == "text" and _is_approval_message(text):
-                        runner.handle_approval(sender, text)
+                        _get_runner().handle_approval(sender, text)
                         _mark_message_processed(message_id)
                         continue
 
@@ -214,7 +223,7 @@ async def receive(request: Request) -> Any:
                     if msg_type == "image":
                         media_id = message.get("image", {}).get("id")
 
-                    runner.handle_message(sender, text, media_id)
+                    _get_runner().handle_message(sender, text, media_id)
                     _mark_message_processed(message_id)
         
         return {"status": "processed"}
