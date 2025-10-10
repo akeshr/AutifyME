@@ -7,7 +7,13 @@
     "dev": "python -m autifyme_agents.cli.simulate",
     "start": "python -m uvicorn autifyme_agents.entrypoints.whatsapp_webhook:app --host 0.0.0.0 --port $PORT"
   },
-  "keywords": ["whatsapp", "ai", "agents", "automation"],
+  "keywords": [
+    "whatsapp",
+    "ai",
+    "agents",
+    "automation"
+  ],
   "author": "AutifyME Team",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {}
 }

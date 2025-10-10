@@ -61,3 +61,6 @@ htmlcov/
 # OS
 Thumbs.db
 
+# Node.js
+node_modules/
+
