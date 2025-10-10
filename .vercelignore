@@ -21,8 +21,8 @@ __pycache__/
 *.pyc
 
 # Exclude uv.lock and pyproject.toml to force Vercel to use requirements.txt instead
-# uv.lock
-# pyproject.toml
+uv.lock
+pyproject.toml
 
 # Exclude development dependencies (if not needed for runtime)
 # Note: This doesn't actually exclude them from the bundle, just from upload
