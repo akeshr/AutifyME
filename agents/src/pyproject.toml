@@ -12,6 +12,8 @@ dependencies = [
     "langgraph-checkpoint==2.1.1",
     "langgraph-checkpoint-postgres==2.0.24",
     "langsmith",
+    # PostgreSQL client with binary libraries for Vercel compatibility
+    "psycopg[binary]",
     # Advanced Agent Implementation
     "deepagents==0.0.11",
     # LLM Providers (v1 alpha)
