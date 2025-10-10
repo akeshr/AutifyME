@@ -1,0 +1,36 @@
+[project]
+name = "autifyme_agents"
+version = "0.1.0"
+description = "The agentic service for the AutifyME Business OS."
+authors = [{ name = "Abhi", email = "" }]
+requires-python = ">=3.11"
+dependencies = [
+    # Core Agentic Framework (LangChain v1 prerelease stack)
+    "langchain==1.0.0a12",
+    "langgraph==1.0.0a4",
+    "langgraph-prebuilt==0.7.0a2",
+    "langgraph-checkpoint==2.1.1",
+    "langgraph-checkpoint-postgres==2.0.24",
+    "langsmith",
+    # Advanced Agent Implementation
+    "deepagents==0.0.11",
+    # LLM Providers (v1 alpha)
+    "langchain-openai==1.0.0a3",
+    "langchain-anthropic==1.0.0a2",
+    "langchain-aws==1.0.0a1",
+    "langchain-google-genai",
+    # Database & Storage
+    "supabase",
+    # Data Validation & Settings
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "tenacity>=8.0.0",
+    # Webhook stack
+    "fastapi>=0.118.0",
+    "uvicorn>=0.37.0",
+]
+
+[tool.uv]
+prerelease = "allow"

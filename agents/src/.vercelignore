@@ -1,0 +1,13 @@
+# Exclude development and testing files
+autifyme_agents/testing/
+autifyme_agents/cli/
+
+# Exclude cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Exclude development artifacts
+*.log
+*.tmp
+.cache/
