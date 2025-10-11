@@ -219,17 +219,32 @@ class InterruptCoordinator:
 
         logger.debug("Streaming PM for workflow resumption", extra={"thread_id": thread_id})
         last_event = None
-        for event in pm.stream(command, config=config, stream_mode="values"):
-            last_event = event
+        try:
+            for event in pm.stream(command, config=config, stream_mode="values"):
+                last_event = event
 
-            # Check for nested interrupts (shouldn't happen for save_product, but handle gracefully)
-            if "__interrupt__" in event:
-                logger.warning(
-                    "Nested interrupt detected during resumption",
-                    extra={"thread_id": thread_id},
-                )
-                # Return None - caller should handle as incomplete workflow
-                return None
+                # Check for nested interrupts (shouldn't happen for save_product, but handle gracefully)
+                if "__interrupt__" in event:
+                    logger.warning(
+                        "Nested interrupt detected during resumption",
+                        extra={"thread_id": thread_id},
+                    )
+                    # Return None - caller should handle as incomplete workflow
+                    return None
+        except GeneratorExit:
+            # GeneratorExit is raised when the consumer (webhook request) times out
+            # This is expected in serverless environments during approval workflows
+            logger.warning(
+                "GeneratorExit during workflow resumption - likely due to request timeout",
+                extra={"thread_id": thread_id},
+            )
+            raise
+        except Exception as e:
+            logger.exception(
+                "Unexpected error during workflow resumption",
+                extra={"thread_id": thread_id, "error_type": type(e).__name__},
+            )
+            raise
 
         # Extract result from final event
         if last_event:
