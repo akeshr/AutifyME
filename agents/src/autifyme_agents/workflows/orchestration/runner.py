@@ -427,12 +427,15 @@ class WorkflowRunner:
                         break
         except GeneratorExit:
             # GeneratorExit is raised when the consumer (webhook request) times out
-            # This is expected in serverless environments - log and re-raise
+            # This is expected in serverless environments - the workflow may have succeeded
+            # but the client timed out before receiving the response
             logger.warning(
-                "GeneratorExit during workflow streaming - likely due to request timeout",
+                "GeneratorExit during workflow streaming - HTTP request timed out",
                 extra={"thread_id": thread_id},
             )
-            raise
+            # Don't re-raise - this is expected in serverless environments
+            # Return None to indicate the workflow may have been interrupted mid-stream
+            return None, None
         except Exception as e:
             logger.exception(
                 "Unexpected error during workflow streaming",

@@ -46,7 +46,7 @@ def main():
     print(f"LANGCHAIN_ENDPOINT: {endpoint}")
 
     # Latest trace ID provided by user
-    run_id = '85dad845-4b27-49aa-bd00-eb0a3775c04b'
+    run_id = 'fe56408c-a8df-4f17-ad82-85308c9b871c'
     print(f"Attempting to fetch run: {run_id}")
 
     if not api_key:
