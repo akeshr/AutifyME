@@ -40,6 +40,8 @@ class StateManager:
         thread_id: str,
         approval_data: Any,  # ApprovalRequest (avoid circular import)
         media_path: str | None = None,
+        agent_source: str = "cataloging_department",
+        checkpoint_ns: str | None = None,
     ) -> None:
         """Persist approval request for restart resilience.
 
@@ -47,6 +49,8 @@ class StateManager:
             thread_id: Conversation thread ID
             approval_data: Structured approval request with interrupt/tool/draft data
             media_path: Optional media file path to preserve until resolution
+            agent_source: Agent source identifier for resumption
+            checkpoint_ns: Checkpoint namespace for resumption
         """
         # Format draft for storage (human-readable summary)
         draft_summary = self._format_draft(approval_data.draft)
@@ -60,6 +64,8 @@ class StateManager:
             draft_summary=draft_summary,
             ai_message=approval_data.ai_message,
             image_path=media_path,
+            agent_source=agent_source,
+            checkpoint_ns=checkpoint_ns,
         )
 
     def get_pending_approval(self, thread_id: str) -> dict[str, Any] | None:

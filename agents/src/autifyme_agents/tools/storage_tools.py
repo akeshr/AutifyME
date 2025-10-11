@@ -104,6 +104,17 @@ def _get_company_profile(storage: StorageInterface) -> CompanyProfile:
 
 
 def create_save_product_tool(storage: StorageInterface):
+    """Create a tool that saves products to the catalog database.
+
+    Factory function that creates a LangChain tool with retry logic and proper error handling.
+    The returned tool persists products to storage with automatic retry on transient failures.
+
+    Args:
+        storage: Storage adapter for persisting products
+
+    Returns:
+        LangChain tool function that accepts product fields and returns CatalogingResult
+    """
     @tool(args_schema=SaveProductArgs)
     @retry(
         stop=stop_after_attempt(3),
@@ -128,6 +139,17 @@ def create_save_product_tool(storage: StorageInterface):
 
 
 def create_get_company_profile_tool(storage: StorageInterface):
+    """Create a tool that retrieves the company profile from storage.
+
+    Factory function that creates a LangChain tool with retry logic and proper error handling.
+    The returned tool fetches company context including brand voice and target audience.
+
+    Args:
+        storage: Storage adapter for retrieving company profile
+
+    Returns:
+        LangChain tool function that returns CompanyProfile
+    """
     @tool
     @retry(
         stop=stop_after_attempt(3),

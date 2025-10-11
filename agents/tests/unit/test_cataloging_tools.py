@@ -7,7 +7,7 @@ import pytest
 from unittest.mock import Mock, patch
 from langchain_core.tools import ToolException
 
-from autifyme_agents.schemas.models import Product, CatalogingResult
+from autifyme_agents.schemas.models import Product
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 from autifyme_agents.tools.cataloging_tools import (
     create_cataloging_specialist_tool,
@@ -115,7 +115,7 @@ class TestCatalogingSpecialistTool:
         mock_company_profile,
         mock_product,
     ):
-        """Tool should invoke specialist and return CatalogingResult."""
+        """Tool should invoke specialist and return Product."""
         # Mock specialist chain
         mock_chain = Mock()
         mock_chain.invoke.return_value = mock_product
@@ -134,13 +134,10 @@ class TestCatalogingSpecialistTool:
         assert "input" in call_args
         assert call_args["input"]["user_message"] == "Red t-shirt, size M, price $29.99"
 
-        # Verify result structure
-        assert isinstance(result, CatalogingResult)
-        assert result.success is True
-        assert result.stage == "draft"
-        assert result.product_name == mock_product.name
-        assert result.product_id == mock_product.id
-        assert "draft" in result.data
+        # Verify result structure - tool now returns Product directly
+        assert isinstance(result, Product)
+        assert result.name == mock_product.name
+        assert result.id == mock_product.id
 
     @patch("autifyme_agents.tools.cataloging_tools.create_cataloging_specialist")
     def test_cataloging_specialist_tool_with_image_analysis(
@@ -168,9 +165,8 @@ class TestCatalogingSpecialistTool:
         call_args = mock_chain.invoke.call_args[0][0]
         assert call_args["input"]["image_analysis"] is not None
 
-        # Verify result
-        assert result.success is True
-        assert isinstance(result, CatalogingResult)
+        # Verify result - tool now returns Product directly
+        assert isinstance(result, Product)
 
     @patch("autifyme_agents.tools.cataloging_tools.create_cataloging_specialist")
     def test_cataloging_specialist_tool_raises_tool_exception_on_failure(
@@ -221,4 +217,5 @@ class TestCatalogingSpecialistTool:
         call_args = mock_chain.invoke.call_args[0][0]
         assert call_args["input"]["image_analysis"] is None
 
-        assert result.success is True
+        # Verify result - tool now returns Product directly
+        assert isinstance(result, Product)

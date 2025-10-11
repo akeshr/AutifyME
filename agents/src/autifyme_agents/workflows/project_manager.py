@@ -72,7 +72,6 @@ def _create_cataloging_subagent(
     cataloging_dept_graph = create_cataloging_department(
         checkpointer=checkpointer,
         storage=storage,
-        enable_hitl=True,
     )
 
     # Return CustomSubAgent spec for DeepAgents
