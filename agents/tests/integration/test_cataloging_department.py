@@ -100,7 +100,7 @@ class TestCatalogingDepartmentIntegration:
                 enable_hitl=False,
             )
 
-        assert "storage adapter must be provided" in str(exc_info.value)
+        assert "storage adapter required" in str(exc_info.value)
 
     def test_cataloging_department_requires_checkpointer(self, mock_storage):
         """Department creation should succeed with None checkpointer (uses memory saver default)."""

@@ -4,7 +4,7 @@ Tests the company context injection middleware and LangSmith tracing middleware.
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock
 
 from autifyme_agents.core.middleware import (
     CompanyContextMiddleware,

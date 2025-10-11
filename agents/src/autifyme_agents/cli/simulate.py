@@ -208,11 +208,11 @@ class ConsoleChannel(MessagingChannel):
                     # Try to set the field
                     if hasattr(draft, field):
                         # Type conversion based on field type
-                        field_type = type(getattr(draft, field))
+                        field_value = getattr(draft, field)
                         try:
-                            if field_type == float:
+                            if isinstance(field_value, float):
                                 value = float(value)
-                            elif field_type == int:
+                            elif isinstance(field_value, int):
                                 value = int(value)
                             setattr(draft, field, value)
                             safe_print(f"\n✏️  Edited {field}: {value}")
@@ -315,7 +315,7 @@ def run_scenario(
         safe_print(f"   Media ({media_type}): {image_path} (no caption)")
 
     if image_path and not image_path.exists():
-        safe_print(f"   ⚠️  Warning: Media file not found")
+        safe_print("   ⚠️  Warning: Media file not found")
     print()
 
     # Run scenario with unique sender to avoid checkpoint pollution
@@ -593,7 +593,7 @@ def main():
                 print("Use --help for usage information")
                 sys.exit(1)
 
-        message = " ".join(arg for arg in sys.argv[1:] if not arg.startswith("-") and not arg in ["interactive", "auto_approve", "auto_reject", "auto_edit", "question"])
+        message = " ".join(arg for arg in sys.argv[1:] if not arg.startswith("-") and arg not in ["interactive", "auto_approve", "auto_reject", "auto_edit", "question"])
         if message:
             run_scenario("Custom", message, auto_approve=auto_approve, hitl_mode=hitl_mode)
     else:

@@ -17,8 +17,6 @@ dependencies = [
     # LLM Providers (v1 alpha)
     "langchain-openai==1.0.0a3",
     "langchain-anthropic==1.0.0a2",
-    "langchain-aws==1.0.0a1",
-    "langchain-google-genai",
     # Database & Storage
     "supabase",
     # Data Validation & Settings
@@ -27,8 +25,6 @@ dependencies = [
     # Utilities
     "python-dotenv>=1.0.0",
     "tenacity>=8.0.0",
-    # UI (MVP)
-    "streamlit>=1.30.0",
     # Webhook stack
     "fastapi>=0.118.0",
     "uvicorn>=0.37.0",
