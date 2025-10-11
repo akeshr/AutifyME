@@ -77,6 +77,8 @@ class InterruptCoordinator:
         thread_id: str,
         pm_state: dict[str, Any],
         media_path: Path | None = None,
+        agent_source: str = "cataloging_department",
+        checkpoint_ns: str | None = None,
     ) -> ApprovalRequest:
         """Extract tool calls and create approval request.
 
@@ -125,6 +127,10 @@ class InterruptCoordinator:
         # Get checkpoint ID if available
         checkpoint_id = pm_state.get("checkpoint_id", "unknown") if pm_state else "unknown"
 
+        # Determine checkpoint namespace for resume
+        if checkpoint_ns is None:
+            checkpoint_ns = f"task:{agent_source}"
+
         # Create approval request
         request = ApprovalRequest(
             thread_id=thread_id,
@@ -139,8 +145,14 @@ class InterruptCoordinator:
         try:
             self.state.save_pending_approval(
                 thread_id=thread_id,
-                approval_data=request,
-                media_path=str(media_path) if media_path else None,
+                interrupt_id=request.interrupt_id,
+                checkpoint_id=request.checkpoint_id or "unknown",
+                tool_call=request.tool_call,
+                draft_summary=f"{request.draft.name} - ${request.draft.price}",
+                ai_message=request.ai_message,
+                image_path=str(media_path) if media_path else None,
+                agent_source=agent_source,
+                checkpoint_ns=checkpoint_ns,
             )
             logger.info(
                 "Persisted pending approval to storage",
@@ -165,14 +177,17 @@ class InterruptCoordinator:
         self,
         thread_id: str,
         decision: Literal["approve", "reject"],
-        pm_factory: Callable,
+        pm_factory: Callable,  # Kept for backward compat
     ) -> CatalogingResult | None:
         """Resume workflow after approval decision.
+
+        Library-Native Pattern: Resume at DEPARTMENT level, not PM level.
+        This avoids DeepAgents task tool's state reset bug.
 
         Args:
             thread_id: Conversation thread ID
             decision: User's decision (approve or reject)
-            pm_factory: Factory function to create PM instance
+            pm_factory: Factory (kept for compat, not used)
 
         Returns:
             Cataloging result if completed (approval), None if rejected
@@ -198,52 +213,61 @@ class InterruptCoordinator:
         # Build resume command for LangGraph
         command: Command = Command(
             resume={
-                approval.get("interrupt_id"): {
+                approval["interrupt_id"]: {
                     "type": "accept",
                     "args": None,
                 }
             }
         )
 
-        # Delete approval before resuming (prevent re-processing)
+        # Delete approval BEFORE resuming (prevent re-processing)
         self.state.delete_pending_approval(thread_id)
 
-        # Resume PM
-        pm = pm_factory()
+        # Resume at DEPARTMENT level, not PM level
+        agent_source = approval.get("agent_source", "cataloging_department")
+        checkpoint_ns = approval.get("checkpoint_ns", f"task:{agent_source}")
+
+        dept = self._create_department(agent_source)
+
         config = {
             "configurable": {
                 "thread_id": thread_id,
-                "company_id": "default",  # Single-tenant for now
+                "checkpoint_ns": checkpoint_ns,  # ← Target dept's checkpoint
             }
         }
 
-        logger.debug("Streaming PM for workflow resumption", extra={"thread_id": thread_id})
+        logger.debug(
+            "Streaming department for workflow resumption",
+            extra={
+                "thread_id": thread_id,
+                "agent_source": agent_source,
+                "checkpoint_ns": checkpoint_ns,
+            }
+        )
+
         last_event = None
         try:
-            for event in pm.stream(command, config=config, stream_mode="values"):
+            for event in dept.stream(command, config=config, stream_mode="values"):
                 last_event = event
 
-                # Check for nested interrupts (shouldn't happen for save_product, but handle gracefully)
+                # Check for nested interrupts
                 if "__interrupt__" in event:
                     logger.warning(
-                        "Nested interrupt detected during resumption",
-                        extra={"thread_id": thread_id},
+                        "Nested interrupt during resumption",
+                        extra={"thread_id": thread_id}
                     )
-                    # Return None - caller should handle as incomplete workflow
                     return None
+
         except GeneratorExit:
-            # GeneratorExit during approval resumption - this happens when the HTTP request times out
-            # during approval processing. The workflow actually succeeded but the client timed out.
             logger.warning(
-                "GeneratorExit during workflow resumption - HTTP request timed out during approval processing",
-                extra={"thread_id": thread_id},
+                "GeneratorExit during workflow resumption",
+                extra={"thread_id": thread_id}
             )
-            # Don't re-raise - this is expected in serverless environments
             return None
         except BaseException as e:
             logger.exception(
                 "Unexpected BaseException during workflow resumption",
-                extra={"thread_id": thread_id, "error_type": type(e).__name__},
+                extra={"thread_id": thread_id, "error_type": type(e).__name__}
             )
             raise
 
@@ -252,12 +276,27 @@ class InterruptCoordinator:
             result = self._extract_result(last_event)
             logger.info(
                 "Workflow resumed successfully",
-                extra={"thread_id": thread_id, "has_result": result is not None},
+                extra={"thread_id": thread_id, "has_result": result is not None}
             )
             return result
 
         logger.warning("No result after workflow resumption", extra={"thread_id": thread_id})
         return None
+
+    def _create_department(self, agent_source: str):
+        """Factory to create department agent by source."""
+        if agent_source == "cataloging_department":
+            from autifyme_agents.departments.cataloging_department import create_cataloging_department
+            from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
+            from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
+
+            return create_cataloging_department(
+                checkpointer=get_checkpointer(),
+                storage=SupabaseStorageClient(),
+                enable_hitl=True,
+            )
+
+        raise ValueError(f"Unknown agent source: {agent_source}")
 
     def _extract_tool_calls(
         self,

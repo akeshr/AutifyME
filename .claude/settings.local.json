@@ -20,7 +20,9 @@
       "Bash(cd:*)",
       "Bash(dir:*)",
       "Read(//c/Users/abhishek.a.keshri/**)",
-      "Bash(timeout 120 uv run:*)"
+      "Bash(timeout 120 uv run:*)",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__execute_sql"
     ],
     "deny": [],
     "ask": []

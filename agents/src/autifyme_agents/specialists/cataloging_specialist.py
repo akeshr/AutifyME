@@ -1,106 +1,82 @@
-"""Cataloging specialist for extracting product details from text."""
+"""Cataloging specialist using create_agent for consistency.
 
-from typing import Dict, Any
+Replaces simple chain with full agent for observability and middleware support.
+"""
 
-from langchain.messages import SystemMessage, HumanMessage
-from langchain.tools import tool, BaseTool
+from typing import Any
+
+from langchain.agents import create_agent
+from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
-from autifyme_agents.schemas.models import Product
 from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.schemas.models import Product
 
 
-# Alternative to ChatPromptTemplate to avoid langchain_core
-def create_chat_prompt(system_content: str, human_template: str):
-    """Alternative to ChatPromptTemplate.from_messages"""
-    def format_prompt(**kwargs):
-        return [
-            SystemMessage(content=system_content),
-            HumanMessage(content=human_template.format(**kwargs))
-        ]
-    return format_prompt
+def create_cataloging_specialist(
+    model: BaseChatModel | None = None,
+    checkpointer: Any | None = None,
+) -> Any:
+    """Create cataloging specialist as full agent with structured output.
 
-# Load prompt from version-controlled file
-CATALOGING_SPECIALIST_SYSTEM_PROMPT = load_prompt("specialists/cataloging_specialist.prompt")
+    Uses create_agent instead of simple chain for:
+    - LangSmith observability (traced as agent)
+    - Middleware support (caching, summarization)
+    - Future extensibility (can add tools)
+    - Architectural consistency (agents all the way down)
 
+    Args:
+        model: Optional LLM override
+        checkpointer: Optional checkpointer for stateful specialist
 
-def create_cataloging_specialist():
-    """
-    Creates a specialist agent for extracting product info from unstructured text.
-    
-    This is a simple chain (not a ReAct agent) that:
-    1. Takes text as input
-    2. Extracts product details using an LLM
-    3. Returns structured Product model via .with_structured_output()
-    
     Returns:
-        A Runnable chain that takes {"input": {"user_message": str, "image_analysis": dict | None}} and returns Product.
+        Agent that takes input and returns Product model
     """
-    def prepare_inputs(payload: dict) -> dict:
-        inputs = payload.get("input", {})
-        return {
-            "user_message": inputs.get("user_message", ""),
-            "image_analysis": inputs.get("image_analysis") or "No image insights provided.",
-        }
 
-    # Use alternative prompt creation instead of ChatPromptTemplate
-    prompt = create_chat_prompt(
-        CATALOGING_SPECIALIST_SYSTEM_PROMPT,
-        """
-User request:
-{user_message}
+    llm = model or get_llm(provider="openai", model="gpt-4o")
+    system_prompt = load_prompt("specialists/cataloging_specialist.prompt")
 
-Image insights (may be empty):
-{image_analysis}
-
-Produce a complete product record with all available fields populated.
-"""
+    # ✅ Use create_agent with response_format for structured output
+    agent = create_agent(
+        model=llm,
+        tools=[],  # No tools needed - pure extraction
+        system_prompt=system_prompt,
+        response_format=Product,  # ✅ Structured output (replaces with_structured_output)
+        checkpointer=checkpointer,  # Optional: stateful if needed
+        name="CatalogingSpecialist",
     )
-    
-    # Use centralized LLM factory with prompt caching
-    llm = get_llm(provider="openai", model="gpt-4o")
-    
-    # Force structured output (LangChain v1 feature)
-    structured_llm = llm.with_structured_output(Product)
-    
-    # Create a simple Runnable-like class instead of plain function
-    class CatalogingChain:
-        """A simple chain class that mimics Runnable behavior."""
-        def __init__(self, prepare_func, prompt_func, llm):
-            self.prepare_func = prepare_func
-            self.prompt_func = prompt_func
-            self.llm = llm
 
-        def __call__(self, inputs: Dict[str, Any], config=None) -> Any:
-            """Make the chain callable."""
-            return self.invoke(inputs, config)
-
-        def invoke(self, inputs: Dict[str, Any], config=None) -> Any:
-            """Invoke the chain with inputs."""
-            prepared = self.prepare_func(inputs)
-            messages = self.prompt_func(**prepared)
-            return self.llm.invoke(messages)
-
-    return CatalogingChain(prepare_inputs, prompt, structured_llm)
+    return agent
 
 
-@tool("cataloging_specialist")
-def cataloging_specialist_tool(
+# Adapter for backward compatibility with tool invocation
+def cataloging_specialist_invoke(
     user_message: str,
     image_analysis: dict | None = None,
-    *,
-    config=None,
+    config: dict | None = None,
 ) -> Product:
-    """Combine user text and optional image insights into a structured Product."""
-    chain = create_cataloging_specialist()
-    payload = {
-        "input": {
-            "user_message": user_message,
-            "image_analysis": image_analysis,
-        }
-    }
-    return chain.invoke(payload, config=config)
+    """Invoke cataloging specialist with simplified interface.
 
+    This maintains compatibility with existing tool wrappers while
+    using the new agent-based implementation underneath.
+    """
 
-def create_cataloging_specialist_tool() -> BaseTool:
-    return cataloging_specialist_tool
+    agent = create_cataloging_specialist()
+
+    # Build input message
+    content_parts = [f"User request:\n{user_message}"]
+
+    if image_analysis:
+        content_parts.append(f"\nImage insights:\n{image_analysis}")
+    else:
+        content_parts.append("\nNo image insights provided.")
+
+    content_parts.append("\nProduce a complete product record with all available fields populated.")
+
+    messages = [{"role": "human", "content": "\n".join(content_parts)}]
+
+    # Invoke agent
+    result = agent.invoke({"messages": messages}, config=config or {})
+
+    # Extract structured response (Product model)
+    return result["response"]  # create_agent with response_format returns {"response": Product}

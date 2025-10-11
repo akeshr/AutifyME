@@ -406,6 +406,7 @@ class WorkflowRunner:
         interrupt = None
 
         try:
+            # Fully consume the stream to avoid GeneratorExit
             for event in pm.stream(payload, config=config, stream_mode="values"):
                 last_event = event
 
@@ -426,14 +427,28 @@ class WorkflowRunner:
                                 "interrupt_count": len(interrupts),
                             },
                         )
-                        break
+                        # Don't break - continue consuming to avoid GeneratorExit
+                        # The interrupt is captured, we'll return it after full consumption
+
+            # Stream fully consumed without interruption
+            logger.debug(
+                "PM stream fully consumed",
+                extra={
+                    "thread_id": thread_id,
+                    "had_interrupt": interrupt is not None,
+                },
+            )
+
         except GeneratorExit:
-            # GeneratorExit is raised when the consumer (webhook request) times out
+            # GeneratorExit is raised when the generator is closed prematurely
+            # This can happen in testing or when HTTP requests timeout
             logger.warning(
-                "GeneratorExit during workflow streaming - HTTP request timed out",
+                "GeneratorExit during workflow streaming - generator closed prematurely",
                 extra={"thread_id": thread_id},
             )
+            # Return what we have so far
             return last_event, interrupt
+
         except BaseException as e:
             logger.exception(
                 "Unexpected BaseException during workflow streaming",
@@ -474,6 +489,8 @@ class WorkflowRunner:
                 thread_id=thread_id,
                 pm_state=self._last_pm_state,
                 media_path=media_path,
+                agent_source="cataloging_department",
+                checkpoint_ns="task:cataloging_department",
             )
 
             # Send approval request via channel

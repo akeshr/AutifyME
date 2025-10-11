@@ -54,6 +54,8 @@ class StorageInterface(ABC):
         draft_summary: str,
         ai_message: Optional[dict[str, Any]] = None,
         image_path: Optional[str] = None,
+        agent_source: str = "cataloging_department",
+        checkpoint_ns: Optional[str] = None,
     ) -> str:
         """
         Persists a pending HITL approval to survive server restarts.
@@ -66,6 +68,8 @@ class StorageInterface(ABC):
             draft_summary: Human-readable summary sent to user
             ai_message: The AIMessage that initiated the tool call (for Command resume)
             image_path: Optional path to temp image file for cleanup after approval/rejection
+            agent_source: Agent that triggered the interrupt (e.g., 'cataloging_department')
+            checkpoint_ns: Checkpoint namespace for resumption (e.g., 'task:cataloging_department')
 
         Returns:
             The approval record ID (UUID)
