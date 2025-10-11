@@ -84,6 +84,8 @@ class SupabaseStorageClient(StorageInterface):
         draft_summary: str,
         ai_message: Optional[dict] = None,
         image_path: Optional[str] = None,
+        agent_source: str = "cataloging_department",
+        checkpoint_ns: Optional[str] = None,
     ) -> str:
         """Persist a pending HITL approval to the pending_approvals table."""
 
@@ -97,9 +99,11 @@ class SupabaseStorageClient(StorageInterface):
             "draft_summary": draft_summary,
             "ai_message": ai_message,
             "image_path": image_path,
+            "agent_source": agent_source,
+            "checkpoint_ns": checkpoint_ns,
             "expires_at": expires_at.isoformat(),
         }
-        
+
         # Upsert to handle duplicate interrupts (e.g., retry scenarios)
         response = (
             client.table("pending_approvals")

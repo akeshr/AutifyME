@@ -219,20 +219,50 @@ async def receive(request: Request) -> Any:
                         )
                         continue
                     
-                    text = message.get("text", {}).get("body")
-                    
+                    # Extract text and media based on message type
+                    # WhatsApp API structure varies by type:
+                    # - text: {"text": {"body": "..."}}
+                    # - image: {"image": {"id": "...", "caption": "..."}}
+                    # - video: {"video": {"id": "...", "caption": "..."}}
+                    # - document: {"document": {"id": "...", "caption": "...", "filename": "..."}}
+                    # - audio/voice: {"audio|voice": {"id": "..."}} (no caption)
+                    text = None
+                    media_id = None
+
+                    if msg_type == "text":
+                        text = message.get("text", {}).get("body")
+                    elif msg_type == "image":
+                        media_obj = message.get("image", {})
+                        media_id = media_obj.get("id")
+                        text = media_obj.get("caption")  # Extract caption
+                    elif msg_type == "video":
+                        media_obj = message.get("video", {})
+                        media_id = media_obj.get("id")
+                        text = media_obj.get("caption")  # Extract caption
+                    elif msg_type == "document":
+                        media_obj = message.get("document", {})
+                        media_id = media_obj.get("id")
+                        text = media_obj.get("caption")  # Extract caption
+                    elif msg_type in ("audio", "voice"):
+                        media_obj = message.get(msg_type, {})
+                        media_id = media_obj.get("id")
+                        # Audio/voice don't have captions
+
                     logger.info(
                         "Processing WhatsApp message",
                         extra={
                             "message_id": message_id,
                             "sender": sender,
                             "message_type": msg_type,
-                            "has_media": msg_type == "image",
+                            "has_media": media_id is not None,
+                            "has_text": text is not None,
+                            "has_caption": media_id is not None and text is not None,
                             "timestamp": timestamp,
                             "event_path": str(event_path),
                         },
                     )
 
+                    # Handle approval messages (text only)
                     if msg_type == "text" and _is_approval_message(text):
                         try:
                             _get_runner().handle_approval(sender, text)
@@ -261,10 +291,6 @@ async def receive(request: Request) -> Any:
                             )
                             _mark_message_processed(message_id)
                         continue
-
-                    media_id = None
-                    if msg_type == "image":
-                        media_id = message.get("image", {}).get("id")
 
                     try:
                         _get_runner().handle_message(sender, text, media_id)
