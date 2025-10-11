@@ -1,0 +1,22 @@
+name: "Greeting to Cataloging Flow"
+description: "User greets PM, then requests product cataloging - tests conversation continuity"
+sender: "test_user_greeting_catalog"
+hitl_mode: "auto_approve"
+
+turns:
+  - turn: 1
+    text: "Hi, how are you?"
+    wait: 0.5
+    expected_intent: "conversational"
+    validate_context:
+      - conversation_history_length: 1  # PM response tracked
+      - no_pending_approval: true
+
+  - turn: 2
+    text: "Can you catalog these canvas sneakers for me? They're priced at $79.99 and available in sizes 7-11"
+    media: "test_images/sneaker.jpg"
+    media_type: "image"
+    wait: 1.0
+    expected_intent: "cataloging"
+    validate_context:
+      - pending_approval: true

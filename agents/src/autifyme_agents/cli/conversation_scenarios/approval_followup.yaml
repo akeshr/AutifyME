@@ -1,0 +1,23 @@
+name: "Approval with Follow-up Question"
+description: "User catalogs product, approves it, then asks follow-up question about the product"
+sender: "test_user_approval_followup"
+hitl_mode: "auto_approve"
+
+turns:
+  - turn: 1
+    text: "Catalog these sneakers: Canvas material, white, $79.99, sizes 7-11"
+    media: "test_images/sneaker.jpg"
+    media_type: "image"
+    wait: 1.0
+    expected_intent: "cataloging"
+    validate_context:
+      - pending_approval: true
+
+  # Note: Approval happens automatically in auto_approve mode
+
+  - turn: 2
+    text: "Great! Can you tell me what SKU was assigned to those sneakers?"
+    wait: 0.5
+    expected_intent: "inquiry"
+    validate_context:
+      - no_pending_approval: true
