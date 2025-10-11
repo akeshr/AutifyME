@@ -234,17 +234,70 @@ async def receive(request: Request) -> Any:
                     )
 
                     if msg_type == "text" and _is_approval_message(text):
-                        _get_runner().handle_approval(sender, text)
-                        _mark_message_processed(message_id)
+                        try:
+                            _get_runner().handle_approval(sender, text)
+                            _mark_message_processed(message_id)
+                        except GeneratorExit:
+                            # GeneratorExit during approval resumption
+                            logger.warning(
+                                "Approval workflow streaming timed out (GeneratorExit)",
+                                extra={
+                                    "message_id": message_id,
+                                    "sender": sender,
+                                    "event_path": str(event_path)
+                                },
+                            )
+                            # Don't mark as processed - approval may be retried
+                            continue
+                        except Exception as approval_exc:
+                            logger.exception(
+                                "Approval processing failed",
+                                extra={
+                                    "message_id": message_id,
+                                    "sender": sender,
+                                    "event_path": str(event_path),
+                                    "error_type": type(approval_exc).__name__
+                                },
+                            )
+                            _mark_message_processed(message_id)
                         continue
 
                     media_id = None
                     if msg_type == "image":
                         media_id = message.get("image", {}).get("id")
 
-                    _get_runner().handle_message(sender, text, media_id)
-                    _mark_message_processed(message_id)
-        
+                    try:
+                        _get_runner().handle_message(sender, text, media_id)
+                        _mark_message_processed(message_id)
+                    except GeneratorExit:
+                        # GeneratorExit occurs when workflow streaming times out
+                        # This is expected in serverless environments for long-running workflows
+                        logger.warning(
+                            "Workflow streaming timed out (GeneratorExit)",
+                            extra={
+                                "message_id": message_id,
+                                "sender": sender,
+                                "event_path": str(event_path)
+                            },
+                        )
+                        # Don't mark as processed - workflow may resume later
+                        # Return success to WhatsApp to avoid retries
+                        continue
+                    except Exception as workflow_exc:
+                        logger.exception(
+                            "Workflow execution failed",
+                            extra={
+                                "message_id": message_id,
+                                "sender": sender,
+                                "event_path": str(event_path),
+                                "error_type": type(workflow_exc).__name__
+                            },
+                        )
+                        # Mark as processed to avoid infinite retries
+                        _mark_message_processed(message_id)
+                        # Continue processing other messages in the payload
+                        continue
+
         return {"status": "processed"}
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to handle webhook: %s", exc, extra={"event_path": str(event_path)})

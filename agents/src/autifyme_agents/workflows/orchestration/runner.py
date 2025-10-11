@@ -404,26 +404,41 @@ class WorkflowRunner:
         last_event = None
         interrupt = None
 
-        for event in pm.stream(payload, config=config, stream_mode="values"):
-            last_event = event
+        try:
+            for event in pm.stream(payload, config=config, stream_mode="values"):
+                last_event = event
 
-            # Track PM state for interrupt handling
-            if isinstance(event, dict) and event.get("messages"):
-                self._last_pm_state = event
+                # Track PM state for interrupt handling
+                if isinstance(event, dict) and event.get("messages"):
+                    self._last_pm_state = event
 
-            # Detect native LangGraph interrupt
-            if "__interrupt__" in event:
-                interrupts = event.get("__interrupt__") or []
-                if interrupts:
-                    interrupt = interrupts[0]
-                    logger.info(
-                        "Native LangGraph interrupt detected",
-                        extra={
-                            "thread_id": thread_id,
-                            "interrupt_count": len(interrupts),
-                        },
-                    )
-                    break
+                # Detect native LangGraph interrupt
+                if "__interrupt__" in event:
+                    interrupts = event.get("__interrupt__") or []
+                    if interrupts:
+                        interrupt = interrupts[0]
+                        logger.info(
+                            "Native LangGraph interrupt detected",
+                            extra={
+                                "thread_id": thread_id,
+                                "interrupt_count": len(interrupts),
+                            },
+                        )
+                        break
+        except GeneratorExit:
+            # GeneratorExit is raised when the consumer (webhook request) times out
+            # This is expected in serverless environments - log and re-raise
+            logger.warning(
+                "GeneratorExit during workflow streaming - likely due to request timeout",
+                extra={"thread_id": thread_id},
+            )
+            raise
+        except Exception as e:
+            logger.exception(
+                "Unexpected error during workflow streaming",
+                extra={"thread_id": thread_id, "error_type": type(e).__name__},
+            )
+            raise
 
         return last_event, interrupt
 
