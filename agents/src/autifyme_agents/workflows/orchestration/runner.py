@@ -136,6 +136,7 @@ class WorkflowRunner:
 
         # PM state tracking
         self._last_pm_state: dict[str, Any] | None = None
+        self._last_interrupt: Interrupt | None = None
 
         # Phase 1: Outcome tracking for agentic learning
         self.outcome_tracker = OutcomeTracker(storage)
@@ -417,6 +418,7 @@ class WorkflowRunner:
                     interrupts = event.get("__interrupt__") or []
                     if interrupts:
                         interrupt = interrupts[0]
+                        self._last_interrupt = interrupt
                         logger.info(
                             "Native LangGraph interrupt detected",
                             extra={
@@ -427,15 +429,11 @@ class WorkflowRunner:
                         break
         except GeneratorExit:
             # GeneratorExit is raised when the consumer (webhook request) times out
-            # This is expected in serverless environments - the workflow may have succeeded
-            # but the client timed out before receiving the response
             logger.warning(
                 "GeneratorExit during workflow streaming - HTTP request timed out",
                 extra={"thread_id": thread_id},
             )
-            # Don't re-raise - this is expected in serverless environments
-            # Return None to indicate the workflow may have been interrupted mid-stream
-            return None, None
+            return last_event, interrupt
         except Exception as e:
             logger.exception(
                 "Unexpected error during workflow streaming",
@@ -466,8 +464,13 @@ class WorkflowRunner:
             if self._last_pm_state is None:
                 raise ValueError("Cannot process interrupt without PM state")
 
+            # If interrupt was captured earlier in streaming, prefer cached copy
+            interrupt_for_processing = interrupt or self._last_interrupt
+            if interrupt_for_processing is None:
+                raise ValueError("No interrupt available for processing")
+
             approval_request = self.interrupt_coord.process_interrupt(
-                interrupt=interrupt,
+                interrupt=interrupt_for_processing,
                 thread_id=thread_id,
                 pm_state=self._last_pm_state,
                 media_path=media_path,
