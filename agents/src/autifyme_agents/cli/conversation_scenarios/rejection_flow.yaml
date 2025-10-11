@@ -1,0 +1,23 @@
+name: "Rejection and Retry Flow"
+description: "User catalogs product, rejects draft, then retries with corrections"
+sender: "test_user_rejection"
+hitl_mode: "auto_reject"  # Reject first attempt
+
+turns:
+  - turn: 1
+    text: "Catalog these sneakers: Canvas material, white, $79.99"
+    media: "test_images/sneaker.jpg"
+    media_type: "image"
+    wait: 1.0
+    expected_intent: "cataloging"
+    validate_context:
+      - pending_approval: true
+
+  # Approval rejected automatically in auto_reject mode
+
+  - turn: 2
+    text: "Let me try again with more details: Canvas sneakers, white, $79.99, sizes 7-11, casual style"
+    media: "test_images/sneaker.jpg"
+    media_type: "image"
+    wait: 1.0
+    expected_intent: "cataloging"

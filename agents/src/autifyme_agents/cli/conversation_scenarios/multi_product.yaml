@@ -1,0 +1,32 @@
+name: "Multi-Product Cataloging"
+description: "User catalogs multiple products in sequence - tests context isolation"
+sender: "test_user_multi_product"
+hitl_mode: "auto_approve"
+
+turns:
+  - turn: 1
+    text: "Catalog these white canvas sneakers, price $79.99"
+    media: "test_images/sneaker.jpg"
+    media_type: "image"
+    wait: 1.0
+    expected_intent: "cataloging"
+    validate_context:
+      - pending_approval: true
+
+  # First product approved automatically
+
+  - turn: 2
+    text: "Now catalog this blue cotton t-shirt, price $29.99, sizes S-XL"
+    wait: 0.5
+    expected_intent: "cataloging"
+    validate_context:
+      - conversation_history_length: 3  # Previous messages preserved
+
+  # Second product details provided, might request approval
+
+  - turn: 3
+    text: "And finally, add these running shorts: $39.99, moisture-wicking fabric"
+    wait: 0.5
+    expected_intent: "cataloging"
+    validate_context:
+      - conversation_history_length: 4  # All messages preserved
