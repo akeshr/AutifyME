@@ -232,13 +232,15 @@ class InterruptCoordinator:
                     # Return None - caller should handle as incomplete workflow
                     return None
         except GeneratorExit:
-            # GeneratorExit is raised when the consumer (webhook request) times out
-            # This is expected in serverless environments during approval workflows
+            # GeneratorExit during approval resumption - this happens when the HTTP request times out
+            # during approval processing. The workflow actually succeeded but the client timed out.
             logger.warning(
-                "GeneratorExit during workflow resumption - likely due to request timeout",
+                "GeneratorExit during workflow resumption - HTTP request timed out during approval processing",
                 extra={"thread_id": thread_id},
             )
-            raise
+            # Don't re-raise - this is expected in serverless environments
+            # The workflow succeeded, user just needs to retry the approval
+            return None
         except Exception as e:
             logger.exception(
                 "Unexpected error during workflow resumption",
