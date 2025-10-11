@@ -14,7 +14,7 @@ from langchain.tools import tool, ToolException
 from autifyme_agents.core.middleware import create_company_context_middleware
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
-from autifyme_agents.schemas.models import CatalogingResult, Product
+from autifyme_agents.schemas.models import Product
 from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
 from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
 
@@ -66,8 +66,12 @@ def create_cataloging_specialist_tool(storage: StorageInterface):
         *,
         company_profile,
         config=None,
-    ) -> CatalogingResult:
-        """Transform user instructions (and optional image insights) into a catalog-ready product summary."""
+    ) -> Product:
+        """Transform user instructions (and optional image insights) into a structured Product model.
+
+        Returns the Product directly so the department can access fields like name, price, sizes, colors
+        to call save_product with individual field values.
+        """
 
         parsed = None
         if image_analysis is not None:
@@ -82,14 +86,7 @@ def create_cataloging_specialist_tool(storage: StorageInterface):
 
         try:
             product: Product = specialist.invoke(payload, config=config)
-            return CatalogingResult(
-                stage="draft",
-                success=True,
-                product_id=product.id,
-                product_name=product.name,
-                message="Draft product ready for approval",
-                data={"draft": product.model_dump()},
-            )
+            return product  # Return Product directly, not wrapped in CatalogingResult
         except Exception as exc:
             raise ToolException(
                 f"Cataloging specialist failed: {str(exc)}"

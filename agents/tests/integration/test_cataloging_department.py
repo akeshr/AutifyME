@@ -15,22 +15,20 @@ class TestCatalogingDepartmentIntegration:
     """Integration tests for cataloging department end-to-end workflows."""
 
     def test_create_cataloging_department_without_hitl(self, mock_storage, memory_checkpointer):
-        """Department should be created successfully without HITL."""
+        """Department should be created successfully."""
         department = create_cataloging_department(
             storage=mock_storage,
             checkpointer=memory_checkpointer,
-            enable_hitl=False,
         )
 
         assert department is not None
         assert hasattr(department, "invoke")
 
     def test_create_cataloging_department_with_hitl(self, mock_storage, memory_checkpointer):
-        """Department should be created successfully with HITL enabled."""
+        """Department should be created successfully."""
         department = create_cataloging_department(
             storage=mock_storage,
             checkpointer=memory_checkpointer,
-            enable_hitl=True,
         )
 
         assert department is not None
@@ -46,7 +44,6 @@ class TestCatalogingDepartmentIntegration:
         department = create_cataloging_department(
             storage=mock_storage,
             checkpointer=memory_checkpointer,
-            enable_hitl=False,
         )
 
         messages = [
@@ -75,7 +72,6 @@ class TestCatalogingDepartmentIntegration:
         department = create_cataloging_department(
             storage=mock_storage,
             checkpointer=memory_checkpointer,
-            enable_hitl=False,
         )
 
         # Simulate a message with image attachment metadata
@@ -97,7 +93,6 @@ class TestCatalogingDepartmentIntegration:
             create_cataloging_department(
                 storage=None,
                 checkpointer=memory_checkpointer,
-                enable_hitl=False,
             )
 
         assert "storage adapter required" in str(exc_info.value)
@@ -108,7 +103,6 @@ class TestCatalogingDepartmentIntegration:
         department = create_cataloging_department(
             storage=mock_storage,
             checkpointer=None,
-            enable_hitl=False,
         )
 
         assert department is not None

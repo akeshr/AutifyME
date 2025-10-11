@@ -145,12 +145,8 @@ class InterruptCoordinator:
         try:
             self.state.save_pending_approval(
                 thread_id=thread_id,
-                interrupt_id=request.interrupt_id,
-                checkpoint_id=request.checkpoint_id or "unknown",
-                tool_call=request.tool_call,
-                draft_summary=f"{request.draft.name} - ${request.draft.price}",
-                ai_message=request.ai_message,
-                image_path=str(media_path) if media_path else None,
+                approval_data=request,
+                media_path=str(media_path) if media_path else None,
                 agent_source=agent_source,
                 checkpoint_ns=checkpoint_ns,
             )
@@ -293,7 +289,6 @@ class InterruptCoordinator:
             return create_cataloging_department(
                 checkpointer=get_checkpointer(),
                 storage=SupabaseStorageClient(),
-                enable_hitl=True,
             )
 
         raise ValueError(f"Unknown agent source: {agent_source}")

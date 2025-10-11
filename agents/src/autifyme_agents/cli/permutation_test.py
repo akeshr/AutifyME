@@ -123,7 +123,7 @@ class PermutationTestFramework:
         else:  # none
             return None
 
-    def _get_media_path(self, media_type: str) -> str:
+    def _get_media_path(self, media_type: str) -> str | None:
         """Get test media path for media type."""
 
         media_paths = {
@@ -168,7 +168,7 @@ class PermutationTestFramework:
 
             # Add variations for approve_with_edits
             if intent == "approve_with_edits":
-                test["edits"] = {"price": 89.99, "name": "Updated Sneakers"}
+                test["edits"] = {"price": 89.99, "name": "Updated Sneakers"}  # type: ignore[assignment]
 
             tests.append(test)
 

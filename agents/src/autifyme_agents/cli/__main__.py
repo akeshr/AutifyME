@@ -13,11 +13,13 @@ def main():
         print("  python -m autifyme_agents.cli.permutation_test - Systematic permutation testing")
         print("  python -m autifyme_agents.cli.inspect         - State inspection tools")
         print("  python -m autifyme_agents.cli.debug           - Interactive workflow debugger")
+        print("  python -m autifyme_agents.cli.capture         - Capture webhook scenarios")
+        print("  python -m autifyme_agents.cli.replay          - Replay captured scenarios")
         print()
         print("For help on specific command:")
         print("  python -m autifyme_agents.cli.pm_chat --help")
         print("  python -m autifyme_agents.cli.conversation --help")
-        print("  python -m autifyme_agents.cli.inspect --help")
+        print("  python -m autifyme_agents.cli.replay --help")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -40,6 +42,12 @@ def main():
     elif command == "debug":
         from autifyme_agents.cli.debug import main as debug_main
         debug_main()
+    elif command == "capture":
+        from autifyme_agents.cli.capture import main as capture_main
+        capture_main()
+    elif command == "replay":
+        from autifyme_agents.cli.replay import main as replay_main
+        replay_main()
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)

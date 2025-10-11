@@ -383,9 +383,9 @@ class ConversationPlayer:
         Returns:
             Turn result with validations
         """
-        print(f"\n{'─'*70}")
+        print(f"\n{'-'*70}")
         safe_print(f"🔵 TURN {turn_number}")
-        print(f"{'─'*70}")
+        print(f"{'-'*70}")
 
         text = turn_config.get('text')
         media = turn_config.get('media')
@@ -584,9 +584,9 @@ class ConversationPlayer:
 
         safe_print(f"⏱️  Total time: {report['elapsed_time']:.2f}s")
 
-        print(f"\n{'─'*70}")
+        print(f"\n{'-'*70}")
         safe_print("📋 Turn-by-Turn Breakdown:")
-        print(f"{'─'*70}\n")
+        print(f"{'-'*70}\n")
 
         for turn in report['turns']:
             icon = "✅" if turn['status'] == 'success' else "❌"
