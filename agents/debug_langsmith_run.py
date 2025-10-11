@@ -5,6 +5,7 @@ import os
 import sys
 import requests
 from pathlib import Path
+from langsmith import Client
 
 def load_env_file():
     """Load .env file from project root."""
@@ -45,8 +46,55 @@ def main():
     endpoint = os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
     print(f"LANGCHAIN_ENDPOINT: {endpoint}")
 
-    # Latest trace ID provided by user
-    run_id = '3901952c-3068-470d-9f2c-1286392a10e5'
+    # Get the latest run automatically
+    print("Fetching latest runs...")
+
+    # Try to get project info first to get project ID
+    projects_url = f"{endpoint}/projects"
+    projects_response = requests.get(projects_url, headers={"x-api-key": api_key, "Content-Type": "application/json"})
+
+    project_id = None
+    if projects_response.status_code == 200:
+        projects = projects_response.json()
+        print(f"Available projects: {[p.get('name') for p in projects]}")
+        for project in projects:
+            if project.get('name') == 'autifyme-agents':
+                project_id = project.get('id')
+                print(f"✅ Found project ID: {project_id}")
+                break
+
+    if not project_id:
+        print("❌ Could not find autifyme-agents project")
+        return
+
+    # Get runs for this project
+    runs_url = f"{endpoint}/runs"
+    params = {
+        "project_id": project_id,
+        "limit": 5,
+        "order_by": "start_time DESC"
+    }
+
+    runs_response = requests.get(runs_url, headers={"x-api-key": api_key, "Content-Type": "application/json"}, params=params)
+
+    run_id = None
+    if runs_response.status_code == 200:
+        runs = runs_response.json()
+        if runs:
+            latest_run = runs[0]
+            run_id = latest_run['id']
+            print(f"✅ Found latest run: {run_id}")
+            print(f"   Name: {latest_run.get('name', 'N/A')}")
+            print(f"   Status: {latest_run.get('status', 'N/A')}")
+            print(f"   Start Time: {latest_run.get('start_time', 'N/A')}")
+        else:
+            print("❌ No runs found for project 'autifyme-agents'")
+            return
+    else:
+        print(f"❌ Failed to fetch runs: {runs_response.status_code}")
+        print(f"Response: {runs_response.text}")
+        return
+
     print(f"Attempting to fetch run: {run_id}")
 
     if not api_key:

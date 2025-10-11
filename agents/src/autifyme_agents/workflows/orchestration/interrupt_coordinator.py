@@ -239,11 +239,10 @@ class InterruptCoordinator:
                 extra={"thread_id": thread_id},
             )
             # Don't re-raise - this is expected in serverless environments
-            # The workflow succeeded, user just needs to retry the approval
             return None
-        except Exception as e:
+        except BaseException as e:
             logger.exception(
-                "Unexpected error during workflow resumption",
+                "Unexpected BaseException during workflow resumption",
                 extra={"thread_id": thread_id, "error_type": type(e).__name__},
             )
             raise
@@ -274,6 +273,34 @@ class InterruptCoordinator:
         Returns:
             List of tool call dicts
         """
+        # First, try to extract tool calls directly from the interrupt object
+        if hasattr(interrupt, 'value') and interrupt.value:
+            # interrupt.value might be a list of tool calls or a dict with tool_calls
+            if isinstance(interrupt.value, list):
+                tool_calls = []
+                for item in interrupt.value:
+                    # Check if this is a HITL interrupt with action_request
+                    if isinstance(item, dict) and "action_request" in item:
+                        action_request = item["action_request"]
+                        if action_request.get("action") == "save_product":
+                            # Convert HITL format to tool call format
+                            tool_call = {
+                                "name": "save_product",
+                                "args": action_request.get("args", {}),
+                                "id": f"hitl_{action_request.get('action')}"
+                            }
+                            tool_calls.append(tool_call)
+                    # Also check for direct tool call format (legacy)
+                    elif isinstance(item, dict) and item.get("name") == "save_product":
+                        tool_calls.append(item)
+                if tool_calls:
+                    return tool_calls
+            elif isinstance(interrupt.value, dict) and "tool_calls" in interrupt.value:
+                tool_calls = interrupt.value.get("tool_calls", [])
+                if tool_calls:
+                    return tool_calls
+
+        # Fallback: extract from PM state messages
         if not pm_state:
             logger.debug("No PM state available to extract tool calls")
             return []
@@ -298,7 +325,7 @@ class InterruptCoordinator:
                     )
                     return tool_calls
 
-        logger.warning("No AIMessage with tool_calls found in PM state")
+        logger.warning("No tool calls found in interrupt or PM state")
         return []
 
     def _find_save_product(self, tool_calls: list[dict[str, Any]]) -> dict[str, Any] | None:

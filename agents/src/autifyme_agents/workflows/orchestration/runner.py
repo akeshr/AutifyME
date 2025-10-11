@@ -434,9 +434,9 @@ class WorkflowRunner:
                 extra={"thread_id": thread_id},
             )
             return last_event, interrupt
-        except Exception as e:
+        except BaseException as e:
             logger.exception(
-                "Unexpected error during workflow streaming",
+                "Unexpected BaseException during workflow streaming",
                 extra={"thread_id": thread_id, "error_type": type(e).__name__},
             )
             raise
