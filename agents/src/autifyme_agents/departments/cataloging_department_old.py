@@ -22,8 +22,6 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
-from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
 from autifyme_agents.tools import create_save_product_tool
 from autifyme_agents.core.middleware import CompanyContextMiddleware
 from autifyme_agents.core.ports import StorageInterface

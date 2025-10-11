@@ -7,7 +7,7 @@ import pytest
 from unittest.mock import Mock, patch
 from langchain_core.tools import ToolException
 
-from autifyme_agents.schemas.models import Product, CatalogingResult
+from autifyme_agents.schemas.models import CatalogingResult
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 from autifyme_agents.tools.cataloging_tools import (
     create_cataloging_specialist_tool,

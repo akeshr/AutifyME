@@ -31,7 +31,6 @@ import sys
 import json
 import time
 from pathlib import Path
-from typing import Any
 from itertools import product
 from dotenv import load_dotenv
 
@@ -334,7 +333,7 @@ class PermutationTestFramework:
             tests.extend(self.generate_workflow_path_tests())
 
         print(f"\n{'='*60}")
-        safe_print(f"🧪 PERMUTATION TEST FRAMEWORK")
+        safe_print("🧪 PERMUTATION TEST FRAMEWORK")
         print(f"{'='*60}")
         safe_print(f"Category: {category}")
         safe_print(f"Total tests: {len(tests)}")
@@ -380,7 +379,7 @@ class PermutationTestFramework:
         safe_print(f"⏱️  Avg time: {avg_time:.2f}s per test")
 
         if failed > 0:
-            print(f"\nFailed tests:")
+            print("\nFailed tests:")
             for result in results:
                 if result["status"] == "FAILED":
                     safe_print(f"  ❌ {result['test_name']}: {result['error_type']}")

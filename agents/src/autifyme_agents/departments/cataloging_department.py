@@ -14,8 +14,6 @@ from typing import Any
 from deepagents import create_deep_agent
 from langchain.agents.middleware import (
     HumanInTheLoopMiddleware,
-    SummarizationMiddleware,
-    AnthropicPromptCachingMiddleware,
 )
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
