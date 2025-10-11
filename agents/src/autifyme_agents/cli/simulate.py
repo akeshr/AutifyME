@@ -71,7 +71,16 @@ class ConsoleChannel(MessagingChannel):
         print(f"\n{'='*60}")
         safe_print(f"⏸️  APPROVAL REQUEST TO {recipient}:")
         print(f"{'='*60}")
-        print(json.dumps(draft, indent=2, ensure_ascii=False))
+        # Convert Pydantic model to dict for JSON serialization
+        draft_dict = draft.model_dump() if hasattr(draft, 'model_dump') else draft
+
+        # Custom JSON encoder to handle UUID objects
+        def json_encoder(obj):
+            if hasattr(obj, '__str__'):
+                return str(obj)
+            raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+        print(json.dumps(draft_dict, indent=2, ensure_ascii=False, default=json_encoder))
         print(f"{'='*60}")
 
         if self.auto_approve:
