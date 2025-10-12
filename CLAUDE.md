@@ -74,7 +74,6 @@ Project-specific guidance for AutifyME codebase. Communication style is defined 
 
 **Setup:**
 ```bash
-cd agents
 uv venv
 .venv\Scripts\activate  # Windows
 uv pip install -e ".[dev]"

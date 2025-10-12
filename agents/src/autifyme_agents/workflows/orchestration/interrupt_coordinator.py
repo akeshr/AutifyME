@@ -173,17 +173,17 @@ class InterruptCoordinator:
         self,
         thread_id: str,
         decision: Literal["approve", "reject"],
-        pm_factory: Callable,  # Kept for backward compat
+        pm_factory: Callable,
     ) -> CatalogingResult | None:
         """Resume workflow after approval decision.
 
-        Library-Native Pattern: Resume at DEPARTMENT level, not PM level.
-        This avoids DeepAgents task tool's state reset bug.
+        Library-Native Pattern: Resume at PM level using Command.resume.
+        The PM will continue from the interrupt point and execute the approved tool.
 
         Args:
             thread_id: Conversation thread ID
             decision: User's decision (approve or reject)
-            pm_factory: Factory (kept for compat, not used)
+            pm_factory: Factory to create PM instance
 
         Returns:
             Cataloging result if completed (approval), None if rejected
@@ -218,37 +218,25 @@ class InterruptCoordinator:
         # Delete approval BEFORE resuming (prevent re-processing)
         self.state.delete_pending_approval(thread_id)
 
-        # Resume at DEPARTMENT level, not PM level
-        agent_source = approval.get("agent_source", "cataloging_department")
-        checkpoint_ns = approval.get("checkpoint_ns", f"task:{agent_source}")
-
-        # Use state manager's storage (already has cached profile)
-        from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-        dept = self._create_department(
-            agent_source=agent_source,
-            storage=self.state.storage,  # Reuse runner's storage with cached profile
-            checkpointer=get_checkpointer(),
-        )
+        # Resume at PM level (where interrupt occurred)
+        # PM will continue from checkpoint and execute the approved tool
+        pm = pm_factory()
 
         config = {
             "configurable": {
                 "thread_id": thread_id,
-                "checkpoint_ns": checkpoint_ns,  # ← Target dept's checkpoint
             }
         }
 
         logger.debug(
-            "Streaming department for workflow resumption",
-            extra={
-                "thread_id": thread_id,
-                "agent_source": agent_source,
-                "checkpoint_ns": checkpoint_ns,
-            }
+            "Streaming PM for workflow resumption",
+            extra={"thread_id": thread_id}
         )
 
         last_event = None
         try:
-            for event in dept.stream(command, config=config, stream_mode="values"):
+            # Fully consume stream to avoid GeneratorExit
+            for event in pm.stream(command, config=config, stream_mode="values"):
                 last_event = event
 
                 # Check for nested interrupts
@@ -264,7 +252,12 @@ class InterruptCoordinator:
                 "GeneratorExit during workflow resumption",
                 extra={"thread_id": thread_id}
             )
+            # Return what we have
+            if last_event:
+                result = self._extract_result(last_event)
+                return result
             return None
+
         except BaseException as e:
             logger.exception(
                 "Unexpected BaseException during workflow resumption",
