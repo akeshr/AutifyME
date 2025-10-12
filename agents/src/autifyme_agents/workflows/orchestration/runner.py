@@ -636,6 +636,11 @@ class WorkflowRunner:
                 platform="whatsapp",  # Current platform
                 download_strategy="none",  # Already downloaded
                 local_path=media_path,
+                platform_url=None,
+                size_bytes=None,
+                caption=None,
+                filename=media_path.name,
+                expires_at=None,
             )
             media_refs.append(media_ref)
 
@@ -647,6 +652,9 @@ class WorkflowRunner:
             sender_id="placeholder",  # Not needed for semantic description
             thread_id="placeholder",  # Not needed for semantic description
             timestamp=datetime.now(),
+            reply_to_message_id=None,
+            forwarded_from=None,
+            conversation_history=None,
         )
 
         # Use canonical to_semantic_description() method
