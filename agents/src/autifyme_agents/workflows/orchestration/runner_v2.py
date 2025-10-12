@@ -2,23 +2,23 @@
 
 Runner is a BLIND EXECUTOR - forwards messages to PM, which handles checkpoint state naturally.
 
-## CRITICAL FIX: Subgraph Interrupt Handling
+## CRITICAL FIX: DeepAgents HITL Interrupt Handling
 
-**Problem**: Manual Command construction caused message sequence errors with OpenAI API.
-**Solution**: Let LangGraph's checkpoint flow handle resumption automatically.
+**Problem**: Was checking for tool calls instead of deepagents HITL interrupts.
+**Solution**: Check for interrupts at checkpoint level and use Command resume.
 
 ## How It Works Now
 
 1. User sends message → Runner forwards to PM
 2. PM processes with checkpoint context (sees pending interrupts automatically)
 3. If interrupt occurs → Runner sends to user via channel
-4. User responds → Runner forwards to PM (with ToolMessage if needed)
+4. User responds → Runner checks for pending interrupt and uses Command resume
 5. PM sees checkpoint state and resumes naturally
 6. LangGraph handles message sequence synthesis correctly
 
 **Benefits**:
-- No manual Command construction
-- No checkpoint namespace handling needed
+- Correct interrupt detection for deepagents HITL
+- Command-based resumption (not ToolMessage)
 - No message sequence validation errors
 - Truly generic for ANY workflow
 """
@@ -34,6 +34,7 @@ from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.errors import GraphRecursionError, GraphInterrupt
+from langgraph.types import Command
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
@@ -58,17 +59,17 @@ class WorkflowRunner:
     - Forward raw messages to PM
     - Detect interrupts from stream
     - Send interrupts to user via channel
-    - Forward user responses back to PM (with correct message type)
+    - Forward user responses back to PM (with Command for deepagents HITL)
     
     PM + LangGraph handles:
     - Checkpoint state management
     - Interrupt resumption logic
     - Message sequence synthesis
-    - Command construction (if needed)
+    - Command execution
     
     ## FIX APPLIED:
-    - Check checkpoint for pending tool calls
-    - Create ToolMessage when responding to tool calls
+    - Check checkpoint for pending HITL interrupts (not tool calls)
+    - Use Command resume for deepagents HITL middleware
     - Create HumanMessage for new conversations
     
     PM sees checkpoint context and handles everything naturally.
@@ -91,7 +92,7 @@ class WorkflowRunner:
             recursion_limit: Max PM recursion depth
         """
         logger.info("=" * 80)
-        logger.info("INITIALIZING GENERIC HITL FRAMEWORK (Simplified Checkpoint Flow)")
+        logger.info("INITIALIZING GENERIC HITL FRAMEWORK (DeepAgents HITL)")
         logger.info("=" * 80)
 
         self.channel = channel
@@ -126,7 +127,7 @@ class WorkflowRunner:
         self.outcome_tracker = OutcomeTracker(storage)
         logger.info("OutcomeTracker initialized")
 
-        logger.info("Generic HITL Framework initialized - simplified architecture")
+        logger.info("Generic HITL Framework initialized - deepagents architecture")
         logger.info("=" * 80)
 
     def handle_message(
@@ -167,7 +168,7 @@ class WorkflowRunner:
     ) -> None:
         """Execute workflow: forward message to PM, handle any interrupts.
 
-        ✅ SIMPLIFIED: No Command construction, PM handles checkpoint state.
+        ✅ SIMPLIFIED: Command resume for deepagents HITL.
 
         Args:
             thread_id: Conversation thread ID
@@ -268,7 +269,7 @@ class WorkflowRunner:
     ) -> tuple[dict[str, Any] | None, Any | None]:
         """Invoke PM with raw message payload.
 
-        ✅ FIXED: Check for pending tool calls before adding messages.
+        ✅ FIXED: Check for pending HITL interrupts and use Command resume.
 
         Args:
             thread_id: Conversation thread ID
@@ -282,87 +283,136 @@ class WorkflowRunner:
         pm = self._create_project_manager()
         config = self._build_config(thread_id)
 
-        # ✅ FIX: Check checkpoint for pending tool calls
+        # ✅ FIX: Check checkpoint for pending HITL interrupts (deepagents)
         checkpointer = self._get_checkpointer()
         state = checkpointer.get_tuple(config)
         
-        pending_tool_call_id = None
+        pending_interrupt = None
         if state:
-            state_values = state.checkpoint.get("channel_values", {})
-            messages = state_values.get("messages", [])
+            # Interrupts are at checkpoint level, not in channel_values
+            checkpoint = state.checkpoint
+            interrupts = checkpoint.get("__interrupt__", [])
             
-            # Find last assistant message with tool calls
-            for msg in reversed(messages):
-                if hasattr(msg, "tool_calls") and msg.tool_calls:
-                    # Check if there's already a tool response
-                    tool_call_id = msg.tool_calls[0]["id"]
-                    has_response = any(
-                        hasattr(m, "tool_call_id") and m.tool_call_id == tool_call_id
-                        for m in messages[messages.index(msg)+1:]
-                    )
-                    if not has_response:
-                        pending_tool_call_id = tool_call_id
-                        logger.info(
-                            "Found pending tool call",
-                            extra={
-                                "thread_id": thread_id,
-                                "tool_call_id": tool_call_id,
-                            }
-                        )
-                        break
-
-        # Build payload based on checkpoint state
-        if pending_tool_call_id:
-            # There's a pending tool call - provide tool response
-            from langchain.messages import ToolMessage
-            
-            # Parse user's response to determine tool result
-            user_text = raw_payload.get("text", "").lower().strip()
-            
-            if any(word in user_text for word in ["approve", "approved", "yes", "confirmed", "ok", "okay", "good", "looks good"]):
-                tool_content = json.dumps({"status": "approved"})
+            if interrupts:
+                pending_interrupt = interrupts[0]
                 logger.info(
-                    "User approved - creating approval tool response",
-                    extra={"thread_id": thread_id, "user_text": user_text[:50]}
-                )
-            elif any(word in user_text for word in ["reject", "rejected", "no", "cancel", "discard"]):
-                tool_content = json.dumps({"status": "rejected"})
-                logger.info(
-                    "User rejected - creating rejection tool response",
-                    extra={"thread_id": thread_id, "user_text": user_text[:50]}
+                    "Found pending HITL interrupt",
+                    extra={
+                        "thread_id": thread_id,
+                        "interrupt_id": pending_interrupt.id if hasattr(pending_interrupt, 'id') else 'unknown',
+                    }
                 )
             else:
-                # Ambiguous - treat as clarification request
-                tool_content = json.dumps({"status": "clarification", "message": user_text})
-                logger.info(
-                    "Ambiguous response - creating clarification tool response",
-                    extra={"thread_id": thread_id, "user_text": user_text[:50]}
+                logger.debug(
+                    "No pending interrupts found",
+                    extra={"thread_id": thread_id}
                 )
+
+        # Build payload based on checkpoint state
+        if pending_interrupt:
+            # There's a pending HITL interrupt - use Command resume
+            # Parse user's response to determine resume value
+            user_text = raw_payload.get("text", "").lower().strip()
             
-            payload = {
-                "messages": [
-                    ToolMessage(
-                        content=tool_content,
-                        tool_call_id=pending_tool_call_id,
-                    )
-                ]
-            }
+            if any(word in user_text for word in ["approve", "approved", "yes", "confirmed", "ok", "okay", "good", "looks good", "go ahead"]):
+                # HumanInTheLoopMiddleware expects: {interrupt_id: {"type": "accept"}}
+                resume_value = {"type": "accept"}
+                logger.info(
+                    "User approved - creating Command resume",
+                    extra={
+                        "thread_id": thread_id,
+                        "user_text": user_text[:50],
+                    }
+                )
+            elif any(word in user_text for word in ["reject", "rejected", "no", "cancel", "discard", "don't save"]):
+                resume_value = {"type": "reject"}
+                logger.info(
+                    "User rejected - creating Command resume",
+                    extra={
+                        "thread_id": thread_id,
+                        "user_text": user_text[:50],
+                    }
+                )
+            else:
+                # Ambiguous - send clarification instead of resuming
+                logger.warning(
+                    "Ambiguous approval response - sending clarification",
+                    extra={"thread_id": thread_id, "user_text": user_text}
+                )
+                
+                self.channel.send_text(
+                    raw_payload.get("sender", ""),
+                    "Please confirm: Reply 'approve' to save this product, or 'reject' to discard."
+                )
+                return None, None
+            
+            # Create Command to resume HITL interrupt
+            interrupt_id = pending_interrupt.id if hasattr(pending_interrupt, 'id') else str(pending_interrupt)
+            command = Command(resume={interrupt_id: resume_value})
             
             logger.info(
-                "Resuming with tool response",
+                "Resuming HITL with Command",
                 extra={
                     "thread_id": thread_id,
-                    "tool_call_id": pending_tool_call_id,
-                    "tool_content": tool_content[:100],
+                    "interrupt_id": interrupt_id,
+                    "resume_type": resume_value["type"],
                 }
             )
+            
+            # For Command resume, stream the command directly
+            last_event = None
+            interrupt_value = None
+            
+            try:
+                for event in pm.stream(command, config=config, stream_mode="values"):
+                    last_event = event
+
+                    # Check for new interrupts
+                    if "__interrupt__" in event:
+                        interrupts = event.get("__interrupt__") or []
+                        if interrupts:
+                            interrupt_value = interrupts[0].value
+                            logger.warning(
+                                "Nested interrupt during resumption",
+                                extra={"thread_id": thread_id}
+                            )
+
+                logger.info(
+                    "Command resume completed",
+                    extra={
+                        "thread_id": thread_id,
+                        "had_new_interrupt": interrupt_value is not None,
+                    }
+                )
+
+                return last_event, interrupt_value
+
+            except GraphInterrupt as interrupt_exc:
+                logger.info(
+                    "Interrupt detected via exception during resume",
+                    extra={
+                        "thread_id": thread_id,
+                        "interrupt_count": len(interrupt_exc.interrupts),
+                    },
+                )
+                if interrupt_exc.interrupts:
+                    return last_event, interrupt_exc.interrupts[0].value
+                return last_event, None
+
+            except Exception as e:
+                logger.exception(
+                    "PM streaming error during Command resume",
+                    extra={"thread_id": thread_id, "error_type": type(e).__name__},
+                )
+                raise
+        
         else:
-            # No pending tool call - normal message flow
+            # No pending interrupt - normal message flow
             from langchain.messages import HumanMessage
             payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
             
             logger.debug(
-                "Adding new message (no pending tool call)",
+                "Adding new message (no pending interrupt)",
                 extra={
                     "thread_id": thread_id,
                     "has_text": raw_payload.get("text") is not None,
@@ -370,56 +420,55 @@ class WorkflowRunner:
                 }
             )
 
-        last_event = None
-        interrupt_value = None
+            last_event = None
+            interrupt_value = None
 
-        try:
-            for event in pm.stream(payload, config=config, stream_mode="values"):
-                last_event = event
+            try:
+                for event in pm.stream(payload, config=config, stream_mode="values"):
+                    last_event = event
 
-                # Detect interrupt in stream (from subgraph or PM)
-                if "__interrupt__" in event:
-                    interrupts = event.get("__interrupt__") or []
-                    if interrupts:
-                        interrupt_value = interrupts[0].value
-                        logger.info(
-                            "Interrupt detected",
-                            extra={
-                                "thread_id": thread_id,
-                                "interrupt_count": len(interrupts),
-                                "has_checkpoint_ns": hasattr(interrupts[0], 'checkpoint_ns'),
-                            },
-                        )
+                    # Detect interrupt in stream (from subgraph or PM)
+                    if "__interrupt__" in event:
+                        interrupts = event.get("__interrupt__") or []
+                        if interrupts:
+                            interrupt_value = interrupts[0].value
+                            logger.info(
+                                "Interrupt detected",
+                                extra={
+                                    "thread_id": thread_id,
+                                    "interrupt_count": len(interrupts),
+                                },
+                            )
 
-            logger.debug(
-                "PM stream completed",
-                extra={
-                    "thread_id": thread_id,
-                    "had_interrupt": interrupt_value is not None,
-                },
-            )
+                logger.debug(
+                    "PM stream completed",
+                    extra={
+                        "thread_id": thread_id,
+                        "had_interrupt": interrupt_value is not None,
+                    },
+                )
 
-            return last_event, interrupt_value
+                return last_event, interrupt_value
 
-        except GraphInterrupt as interrupt_exc:
-            # Alternative interrupt detection via exception
-            logger.info(
-                "Interrupt detected via exception",
-                extra={
-                    "thread_id": thread_id,
-                    "interrupt_count": len(interrupt_exc.interrupts),
-                },
-            )
-            if interrupt_exc.interrupts:
-                return last_event, interrupt_exc.interrupts[0].value
-            return last_event, None
+            except GraphInterrupt as interrupt_exc:
+                # Alternative interrupt detection via exception
+                logger.info(
+                    "Interrupt detected via exception",
+                    extra={
+                        "thread_id": thread_id,
+                        "interrupt_count": len(interrupt_exc.interrupts),
+                    },
+                )
+                if interrupt_exc.interrupts:
+                    return last_event, interrupt_exc.interrupts[0].value
+                return last_event, None
 
-        except Exception as e:
-            logger.exception(
-                "PM streaming error",
-                extra={"thread_id": thread_id, "error_type": type(e).__name__},
-            )
-            raise
+            except Exception as e:
+                logger.exception(
+                    "PM streaming error",
+                    extra={"thread_id": thread_id, "error_type": type(e).__name__},
+                )
+                raise
 
     def _handle_interrupt(
         self,
