@@ -9,7 +9,6 @@ from unittest.mock import Mock
 from autifyme_agents.core.middleware import (
     CompanyContextMiddleware,
     create_company_context_middleware,
-    langsmith_tracing_middleware,
 )
 from autifyme_agents.schemas.models import CompanyProfile
 
@@ -122,75 +121,3 @@ class TestCompanyContextDecoratorMiddleware:
 
         assert result.id == "custom"
         assert result.name == "Custom Co"
-
-
-class TestLangSmithTracingMiddleware:
-    """Test LangSmith tracing middleware decorator."""
-
-    def test_tracing_middleware_adds_metadata_sync(self):
-        """Middleware should add workflow metadata to config."""
-        @langsmith_tracing_middleware("cataloging")
-        def test_tool(*, config=None):
-            return config
-
-        config = test_tool(config={})
-
-        assert "metadata" in config
-        assert config["metadata"]["workflow"] == "cataloging"
-        assert config["metadata"]["tool_name"] == "test_tool"
-
-    def test_tracing_middleware_adds_tags_sync(self):
-        """Middleware should add workflow tags."""
-        @langsmith_tracing_middleware("cataloging")
-        def test_tool(*, config=None):
-            return config
-
-        config = test_tool(config={})
-
-        assert "tags" in config
-        assert "workflow:cataloging" in config["tags"]
-
-    def test_tracing_middleware_adds_run_name_sync(self):
-        """Middleware should prefix run_name with workflow."""
-        @langsmith_tracing_middleware("cataloging")
-        def test_tool(*, config=None):
-            return config
-
-        config = test_tool(config={})
-
-        assert "run_name" in config
-        assert config["run_name"] == "cataloging-test_tool"
-
-    @pytest.mark.asyncio
-    async def test_tracing_middleware_works_async(self):
-        """Middleware should work with async functions."""
-        @langsmith_tracing_middleware("cataloging")
-        async def async_test_tool(*, config=None):
-            return config
-
-        config = await async_test_tool(config={})
-
-        assert config["metadata"]["workflow"] == "cataloging"
-        assert "workflow:cataloging" in config["tags"]
-
-    def test_tracing_middleware_preserves_existing_metadata(self):
-        """Middleware should merge with existing config."""
-        @langsmith_tracing_middleware("cataloging")
-        def test_tool(*, config=None):
-            return config
-
-        existing_config = {
-            "metadata": {"custom_field": "custom_value"},
-            "tags": ["existing-tag"],
-        }
-
-        config = test_tool(config=existing_config)
-
-        # Should preserve existing metadata
-        assert config["metadata"]["custom_field"] == "custom_value"
-        # Should add workflow metadata
-        assert config["metadata"]["workflow"] == "cataloging"
-        # Should preserve existing tags
-        assert "existing-tag" in config["tags"]
-        # Should add workflow tag
-        assert "workflow:cataloging" in config["tags"]

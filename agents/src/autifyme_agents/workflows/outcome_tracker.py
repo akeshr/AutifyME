@@ -1,24 +1,26 @@
-"""Outcome Tracking Infrastructure - Capture workflow outcomes for learning.
+"""Outcome Tracking Infrastructure - Capture BUSINESS outcomes for learning.
 
-This module implements Phase 1.2 of the Agentic Evolution roadmap. It tracks
-workflow execution from start to finish, capturing routing decisions, outcomes,
-and performance metrics for continuous learning.
+**Simplified Design** (Post-Refactor):
+- LangSmith handles ALL technical observability (traces, latency, errors, tokens)
+- OutcomeTracker focuses on BUSINESS-SPECIFIC metrics only
+- Delegates to LangSmith API for technical queries
 
-**Architecture**:
-- Hexagonal: Uses StorageInterface port for persistence
-- Type-safe: Pydantic models for all tracked data
-- Observability: Structured logging for all tracking events
-- Future-ready: Schema supports vector embeddings for similarity search (Phase 2)
+**What This Tracker Does**:
+- Business KPIs: approval rates, user patterns, product categories
+- Custom learning signals for Phase 2 (adaptive routing)
+- Domain-specific metrics not captured by LangSmith
 
-**Learning Flow**:
-1. track_workflow_start() - Record incoming message
-2. track_routing_decision() - Capture PM's delegation choice
-3. track_workflow_end() - Record outcome and trigger learning
+**What LangSmith Does** (Automatic):
+- Workflow start/end timestamps
+- Duration per step
+- Errors with full stack traces
+- Token costs
+- Complete trace trees
 
 **Integration**:
-- WorkflowRunner: Wraps workflow execution with tracking
-- AdaptivePromptManager: Learns from tracked outcomes
-- AdaptiveRouter (Phase 2): Optimizes routing from history
+- WorkflowRunner: Wraps execution with business metric tracking
+- LangSmith: Query for all technical observability via API
+- AdaptiveRouter (Phase 2): Learn from combined business + technical metrics
 """
 
 from __future__ import annotations
@@ -105,18 +107,18 @@ class TrackedWorkflow(BaseModel):
 
 
 class OutcomeTracker:
-    """Tracks workflow outcomes for continuous learning.
+    """Tracks BUSINESS-SPECIFIC workflow outcomes for learning.
 
-    This tracker captures the complete workflow lifecycle:
-    - Incoming message (what user wanted)
-    - Routing decision (how PM delegated)
-    - Final outcome (success/failure with metrics)
+    **Simplified Post-Refactor**:
+    - Business metrics ONLY (approval rates, user patterns, categories)
+    - Technical observability delegated to LangSmith
+    - Lightweight, focused on domain-specific signals
 
     **Design Principles**:
     - Non-blocking: Tracking failures don't crash workflows
-    - Structured: All data in Pydantic models for type safety
-    - Observable: All tracking events logged
-    - Future-ready: Schema supports Phase 2 features (embeddings, ML)
+    - Business-focused: No technical metrics (LangSmith has those)
+    - Structured: Pydantic models for type safety
+    - Integration-ready: Combines with LangSmith data for Phase 2 learning
     """
 
     def __init__(self, storage: StorageInterface):
@@ -283,59 +285,45 @@ class OutcomeTracker:
     # --- Internal Methods ---
 
     def _persist_outcome(self, workflow: TrackedWorkflow) -> None:
-        """Persist workflow outcome to storage.
+        """Persist BUSINESS-SPECIFIC workflow outcome.
+
+        **Note**: Technical metrics (duration, errors, traces) are in LangSmith.
+        This persists only business-relevant data for domain learning.
 
         Args:
             workflow: Complete workflow record
         """
-        # Serialize result_data (handle non-JSON-serializable objects)
+        # Extract business-relevant result data
         result_data = None
         if workflow.result and workflow.result.result_data:
             result_data = self._make_json_serializable(workflow.result.result_data)
 
-        # Build outcome payload
+        # Build lightweight business outcome payload
         outcome_payload = {
             "tracking_id": workflow.tracking_id,
             "thread_id": workflow.thread_id,
-            # Message data
+            # Business context
             "sender_id": workflow.message.sender_id,
-            "message_text": workflow.message.text,
-            "message_hash": workflow.message_hash,
-            "media_id": workflow.message.media_id,
-            "media_type": workflow.message.media_type,
             "platform": workflow.message.platform,
-            "received_at": workflow.message.received_at,
-            # Routing data
+            "message_hash": workflow.message_hash,  # For similarity matching
+            # Routing decision (business logic)
             "intent": workflow.routing.intent if workflow.routing else None,
             "department": workflow.routing.department if workflow.routing else None,
-            "routing_reasoning": workflow.routing.reasoning if workflow.routing else None,
-            "routing_confidence": workflow.routing.confidence if workflow.routing else None,
-            "alternative_departments": (
-                workflow.routing.alternative_departments if workflow.routing else []
-            ),
-            "routed_at": workflow.routing.decided_at if workflow.routing else None,
-            # Outcome data
+            # Outcome (business success/failure)
             "success": workflow.result.success if workflow.result else False,
-            "error_type": workflow.result.error_type if workflow.result else None,
-            "error_message": workflow.result.error_message if workflow.result else None,
-            "resolution_strategy": (
-                workflow.result.resolution_strategy if workflow.result else None
-            ),
-            "result_data": result_data,
-            # Performance
-            "duration_seconds": workflow.duration_seconds,
+            "result_data": result_data,  # Cataloging result with product details
+            # Timestamps (reference for joining with LangSmith)
             "started_at": workflow.started_at,
             "ended_at": workflow.ended_at,
-            # Learning metadata (populated by adaptive components in Phase 2)
+            # Phase 2: Learning metadata
             "learned_patterns": [],
-            "failure_warnings": [],
             "applied_strategies": [],
         }
 
         try:
             outcome_id = self.storage.save_workflow_outcome(outcome_payload)
             logger.info(
-                "Workflow outcome persisted",
+                "Business outcome persisted (technical metrics in LangSmith)",
                 extra={
                     "tracking_id": workflow.tracking_id,
                     "outcome_id": outcome_id,
@@ -345,7 +333,7 @@ class OutcomeTracker:
         except Exception as e:
             # Non-blocking: Don't crash workflow if persistence fails
             logger.error(
-                "Failed to persist workflow outcome",
+                "Failed to persist business outcome",
                 extra={
                     "tracking_id": workflow.tracking_id,
                     "error": str(e),

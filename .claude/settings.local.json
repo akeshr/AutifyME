@@ -24,7 +24,9 @@
       "mcp__supabase__list_tables",
       "mcp__supabase__execute_sql",
       "WebFetch(domain:blog.langchain.com)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "WebFetch(domain:python.langchain.com)",
+      "WebFetch(domain:changelog.langchain.com)"
     ],
     "deny": [],
     "ask": []
