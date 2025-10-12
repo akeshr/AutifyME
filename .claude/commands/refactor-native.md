@@ -16,9 +16,10 @@
 
 2. **API Verification via REPL**
    ```bash
-   cd agents && uv run python -c "
+   # From root directory - uv auto-detects agents/pyproject.toml
+   uv run python -c "
    from dotenv import load_dotenv
-   load_dotenv('../.env')
+   load_dotenv('.env')
 
    import inspect
    # Inspect every API we're considering
@@ -54,14 +55,15 @@
 
 7. **Quality Checks**
    ```bash
+   # From root directory - uv auto-detects project
    # Lint
-   cd agents && uv run ruff check src/ --fix
+   uv run ruff check . --fix
 
    # Import verification
-   cd agents && uv run python -c "from autifyme_agents.workflows.orchestration import WorkflowRunner; print('OK')"
+   uv run python -c "from autifyme_agents.workflows.orchestration import WorkflowRunner; print('OK')"
 
    # Type checks
-   cd agents && uv run mypy src/ --ignore-missing-imports
+   uv run mypy .
    ```
 
 ### Phase 3: Documentation

@@ -79,11 +79,12 @@ uv venv
 uv pip install -e ".[dev]"
 ```
 
-**Running:**
+**Running (from root directory):**
 ```bash
 uv run uvicorn autifyme_agents.entrypoints.whatsapp_webhook:app --reload
-pytest --cov=autifyme_agents
-ruff check agents/src
+uv run pytest agents/tests/ --cov=autifyme_agents
+uv run ruff check .
+uv run mypy .
 ```
 
 **Local Testing (CRITICAL - Use Extensively):**
@@ -104,12 +105,18 @@ See `docs/architecture/LOCAL_TESTING_STRATEGY.md` for commands and usage pattern
 **API Verification (CRITICAL - Use Extensively):**
 Always verify library APIs with Python REPL before implementing.
 
-**Correct Pattern (with .env loading):**
+**Correct Pattern (from root directory):**
 ```bash
-cd agents && uv run python -c "
+# uv auto-detects agents/pyproject.toml
+uv run python -c "
 from dotenv import load_dotenv
-load_dotenv('../.env')  # Load project .env for API keys
+load_dotenv('.env')
 # ... your test code
+"
+
+# With automatic .env loading
+uv run --env-file .env python -c "
+# ... your test code (env already loaded)
 "
 ```
 
@@ -120,7 +127,7 @@ load_dotenv('../.env')  # Load project .env for API keys
 - Prototype patterns before committing to implementation
 - Debug errors in isolation with real API keys
 
-**Important:** Use project mode (`uv run`, not `uv run --no-project`) to load dependencies and environment variables correctly.
+**Important:** Always run from project root - `uv` auto-detects the project.
 
 **See:** `docs/architecture/UV_REPL_BEST_PRACTICES.md` for complete guide.
 

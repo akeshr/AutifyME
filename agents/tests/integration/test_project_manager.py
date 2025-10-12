@@ -171,7 +171,7 @@ class TestProjectManagerConfiguration:
         from autifyme_agents.core.llm_factory import get_llm
 
         checkpointer = MemorySaver()
-        custom_model = get_llm(model="gpt-5-mini-2025-08-07", temperature=0.5)
+        custom_model = get_llm(model="gpt-5-nano-2025-08-07", temperature=0.5)
 
         pm = create_project_manager(
             company_profile=sample_company_profile,

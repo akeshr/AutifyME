@@ -50,7 +50,7 @@ def run_interactive_command(
     safe_print(f"▶️  {description}")
     safe_print(f"{'='*70}")
     safe_print(f"   Command: {' '.join(cmd)}")
-    safe_print(f"\n⏸️  This test will pause for your input at HITL prompts")
+    safe_print("\n⏸️  This test will pause for your input at HITL prompts")
     safe_print(f"{'='*70}\n")
 
     start = time.time()

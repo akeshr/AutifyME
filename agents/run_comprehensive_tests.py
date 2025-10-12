@@ -61,7 +61,7 @@ def run_command(cmd: list[str], description: str, timeout: int = 300) -> tuple[b
             return True, result.stdout
         else:
             safe_print(f"❌ FAILED in {elapsed:.2f}s")
-            safe_print(f"\nError output:")
+            safe_print("\nError output:")
             safe_print(result.stderr[:1000])  # Show first 1000 chars
             return False, result.stderr
 

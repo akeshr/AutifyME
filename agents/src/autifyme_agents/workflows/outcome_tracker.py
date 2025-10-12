@@ -299,7 +299,7 @@ class OutcomeTracker:
             result_data = self._make_json_serializable(workflow.result.result_data)
 
         # Build lightweight business outcome payload
-        outcome_payload = {
+        outcome_payload: dict[str, Any] = {
             "tracking_id": workflow.tracking_id,
             "thread_id": workflow.thread_id,
             # Business context

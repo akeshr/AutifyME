@@ -22,9 +22,7 @@ Commands:
     > @quit                          - Exit monitor
 """
 
-import sys
 import json
-import time
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -47,7 +45,7 @@ class LiveMonitorChannel:
 
     def send_text(self, recipient: str, message: str, *, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
         safe_print(f"\n{'='*60}")
-        safe_print(f"📤 SYSTEM MESSAGE:")
+        safe_print("📤 SYSTEM MESSAGE:")
         safe_print(f"{'='*60}")
         safe_print(message)
         safe_print(f"{'='*60}\n")
@@ -55,7 +53,7 @@ class LiveMonitorChannel:
 
     def send_approval_request(self, recipient: str, draft: Any) -> dict[str, Any]:
         safe_print(f"\n{'='*60}")
-        safe_print(f"⏸️  APPROVAL REQUEST:")
+        safe_print("⏸️  APPROVAL REQUEST:")
         safe_print(f"{'='*60}")
 
         # Convert to dict for display
@@ -94,18 +92,19 @@ class LiveMonitorChannel:
                 # Parse simple edits
                 parts = edits.split(maxsplit=1)
                 if len(parts) == 2:
-                    field, value = parts
+                    field, value_str = parts
                     if hasattr(draft, field):
                         try:
                             field_value = getattr(draft, field)
+                            converted_value: Any = value_str
                             if isinstance(field_value, float):
-                                value = float(value)
+                                converted_value = float(value_str)
                             elif isinstance(field_value, int):
-                                value = int(value)
-                            setattr(draft, field, value)
-                            safe_print(f"   Updated {field}: {value}")
+                                converted_value = int(value_str)
+                            setattr(draft, field, converted_value)
+                            safe_print(f"   Updated {field}: {converted_value}")
                         except ValueError:
-                            safe_print(f"   Warning: Could not convert {value} to correct type")
+                            safe_print(f"   Warning: Could not convert {value_str} to correct type")
 
                 return {"status": "approved", "draft": draft}
 
@@ -114,7 +113,7 @@ class LiveMonitorChannel:
 
     def send_completion(self, recipient: str, result: Any) -> dict[str, Any]:
         safe_print(f"\n{'='*60}")
-        safe_print(f"✅ WORKFLOW COMPLETE:")
+        safe_print("✅ WORKFLOW COMPLETE:")
         safe_print(f"{'='*60}")
         safe_print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
         safe_print(f"{'='*60}\n")
@@ -122,7 +121,7 @@ class LiveMonitorChannel:
 
     def send_error(self, recipient: str, error_type: str, custom_message: str | None = None) -> dict:
         safe_print(f"\n{'='*60}")
-        safe_print(f"❌ ERROR:")
+        safe_print("❌ ERROR:")
         safe_print(f"{'='*60}")
         safe_print(f"Type: {error_type}")
         if custom_message:

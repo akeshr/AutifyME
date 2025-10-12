@@ -121,7 +121,7 @@ def verify_phase1():
                         LIMIT 1
                     """)
                     row = cur.fetchone()
-                    print(f"\n   Latest tracked workflow:")
+                    print("\n   Latest tracked workflow:")
                     print(f"     Tracking ID: {row[0]}")
                     print(f"     Sender: {row[1]}")
                     print(f"     Success: {row[2]}")
@@ -135,11 +135,11 @@ def verify_phase1():
             return True
 
     except psycopg.OperationalError as e:
-        print(f"\nERROR: Database connection failed:")
+        print("\nERROR: Database connection failed:")
         print(f"  {e}")
         return False
     except Exception as e:
-        print(f"\nERROR: Verification failed:")
+        print("\nERROR: Verification failed:")
         print(f"  {e}")
         import traceback
         traceback.print_exc()
