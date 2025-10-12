@@ -2,7 +2,8 @@
 
 Channel-agnostic workflow coordination for all messaging platforms.
 
-Design Principle: Strategy Pattern - channel behavior injected via MessagingChannel.
+Design: Uses native LangGraph interrupt handling - no custom coordinators needed.
+Framework handles all checkpoint persistence, interrupt state, and recovery.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from typing import Any, Literal
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.errors import GraphRecursionError
-from langgraph.types import Interrupt
+from langgraph.types import Command
 from langchain.messages import HumanMessage
 
 try:
@@ -27,11 +28,8 @@ from autifyme_agents.core.config import settings
 from autifyme_agents.core.logging_config import get_logger
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-from autifyme_agents.schemas.models import CompanyProfile, CatalogingResult
+from autifyme_agents.schemas.models import CompanyProfile, CatalogingResult, Product
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
-from autifyme_agents.workflows.orchestration.interrupt_coordinator import InterruptCoordinator
-from autifyme_agents.workflows.orchestration.state_manager import StateManager
-from autifyme_agents.workflows.orchestration.recovery_strategy import RecoveryStrategy
 from autifyme_agents.workflows.project_manager import create_project_manager
 from autifyme_agents.workflows.outcome_tracker import OutcomeTracker, IncomingMessage
 
@@ -43,26 +41,25 @@ MAX_THREAD_LOCKS = 1000  # LRU cache size for thread locks
 
 
 class WorkflowRunner:
-    """Generic, channel-agnostic workflow orchestration.
+    """Generic, channel-agnostic workflow orchestration with native LangGraph HITL.
 
     Responsibilities:
     - Accept user messages and coordinate processing
     - Invoke Project Manager
-    - Stream events and detect interrupts
-    - Delegate to specialized coordinators
+    - Stream events and detect interrupts (native LangGraph)
+    - Send approval requests to user
+    - Resume workflows after approval
     - Thread-safe handling of concurrent requests
 
     NOT responsible for:
     - Channel-specific logic (delegates to MessagingChannel)
     - Media handling (delegates to MessagingChannel)
     - Message formatting (delegates to MessagingChannel)
-    - Interrupt logic (delegates to InterruptCoordinator)
-    - State persistence (delegates to StateManager)
-    - Recovery logic (delegates to RecoveryStrategy)
+    - Interrupt state persistence (LangGraph checkpointer handles this)
+    - Recovery logic (framework checkpoint consistency)
 
-    Design Note: This is the orchestration layer - clean business logic
-    with no channel-specific code. All channel operations go through
-    self.channel (Strategy Pattern).
+    Design Note: Massively simplified from original - removed 700+ lines of custom
+    interrupt coordination. Framework handles all state management via checkpoints.
     """
 
     def __init__(
@@ -70,9 +67,6 @@ class WorkflowRunner:
         *,
         channel: MessagingChannel,
         storage: StorageInterface,
-        interrupt_coordinator: InterruptCoordinator | None = None,
-        state_manager: StateManager | None = None,
-        recovery_strategy: RecoveryStrategy | None = None,
         checkpointer: BaseCheckpointSaver | None = None,
         recursion_limit: int | None = None,
     ):
@@ -81,14 +75,11 @@ class WorkflowRunner:
         Args:
             channel: Messaging channel adapter (WhatsApp, SMS, etc.)
             storage: Storage adapter for company profile and products
-            interrupt_coordinator: HITL interrupt handler (creates default if None)
-            state_manager: Approval state manager (creates default if None)
-            recovery_strategy: Error recovery logic (creates default if None)
             checkpointer: LangGraph checkpointer (creates default if None)
             recursion_limit: Max PM recursion depth
         """
         logger.info("=" * 80)
-        logger.info("INITIALIZING WORKFLOW RUNNER")
+        logger.info("INITIALIZING WORKFLOW RUNNER (Native LangGraph HITL)")
         logger.info("=" * 80)
 
         self.channel = channel
@@ -117,16 +108,6 @@ class WorkflowRunner:
             },
         )
 
-        # Initialize coordinators (allow injection for testing)
-        self.state = state_manager or StateManager(storage)
-        self.recovery = recovery_strategy or RecoveryStrategy(
-            state_manager=self.state,
-            checkpointer_factory=lambda: self._get_checkpointer(),
-        )
-        self.interrupt_coord = interrupt_coordinator or InterruptCoordinator(
-            state_manager=self.state,
-        )
-
         # Checkpointer management
         self._checkpointer = checkpointer
 
@@ -134,15 +115,15 @@ class WorkflowRunner:
         self._thread_locks: OrderedDict[str, Lock] = OrderedDict()
         self._locks_mutex = Lock()
 
-        # PM state tracking
-        self._last_pm_state: dict[str, Any] | None = None
-        self._last_interrupt: Interrupt | None = None
+        # In-memory pending approvals (ephemeral - survives during runtime only)
+        # For persistence across restarts, extract from checkpoint on demand
+        self._pending_approvals: dict[str, dict[str, Any]] = {}
 
         # Phase 1: Outcome tracking for agentic learning
         self.outcome_tracker = OutcomeTracker(storage)
         logger.info("OutcomeTracker initialized for agentic learning")
 
-        logger.info("WorkflowRunner initialization complete")
+        logger.info("WorkflowRunner initialization complete (simplified architecture)")
         logger.info("=" * 80)
 
     def handle_message(
@@ -204,26 +185,123 @@ class WorkflowRunner:
 
         with lock:
             try:
-                result = self.interrupt_coord.resume_workflow(
-                    thread_id=thread_id,
-                    decision=decision,
-                    pm_factory=lambda: self._create_project_manager(),
-                )
+                # Get pending approval from memory
+                pending = self._pending_approvals.get(thread_id)
+                if not pending:
+                    logger.warning(
+                        "No pending approval found in memory",
+                        extra={"thread_id": thread_id}
+                    )
+                    self.channel.send_text(
+                        sender,
+                        "No pending approval found. Please resend your product details."
+                    )
+                    return
 
-                if result:
-                    self.channel.send_completion(sender, result)
-                else:
-                    # Rejection - send friendly message
+                if decision == "reject":
+                    logger.info("User rejected approval", extra={"thread_id": thread_id})
+                    del self._pending_approvals[thread_id]
                     self.channel.send_text(
                         sender,
                         "Understood. The draft will remain unsaved. Let me know if you'd like updates or a retry.",
                     )
+                    return
 
-                # Media persists in media_downloads/ for audit trail
-                # No cleanup needed
+                # Get current checkpoint state to extract interrupt_id
+                config = {"configurable": {"thread_id": thread_id}}
+                checkpointer = self._get_checkpointer()
+                state = checkpointer.get_tuple(config)
+
+                if not state:
+                    logger.error("No checkpoint found for thread", extra={"thread_id": thread_id})
+                    self.channel.send_error(sender, "processing")
+                    return
+
+                # Extract interrupt info from checkpoint
+                state_values = state.checkpoint.get("channel_values", {})
+                interrupts = state_values.get("__interrupt__", [])
+
+                if not interrupts:
+                    logger.warning("No interrupts in checkpoint state", extra={"thread_id": thread_id})
+                    self.channel.send_error(sender, "processing")
+                    return
+
+                interrupt_id = interrupts[0].id
+
+                # Build Command to resume with accept payload
+                # HumanInTheLoopMiddleware expects: {interrupt_id: {"type": "accept"}}
+                command = Command(resume={interrupt_id: {"type": "accept"}})
+
+                logger.debug(
+                    "Resuming workflow with approval",
+                    extra={"thread_id": thread_id, "interrupt_id": interrupt_id}
+                )
+
+                # Resume PM from checkpoint
+                pm = self._create_project_manager()
+                last_event = None
+
+                try:
+                    # Fully consume stream to avoid GeneratorExit
+                    for event in pm.stream(command, config=config, stream_mode="values"):
+                        last_event = event
+
+                        # Check for nested interrupts
+                        if "__interrupt__" in event:
+                            logger.warning(
+                                "Nested interrupt during resumption",
+                                extra={"thread_id": thread_id}
+                            )
+                            # This shouldn't happen with save_product, but handle gracefully
+                            self.channel.send_error(sender, "processing")
+                            return
+
+                except GeneratorExit:
+                    logger.warning(
+                        "GeneratorExit during approval resumption",
+                        extra={"thread_id": thread_id}
+                    )
+                    # Try to extract result from what we got
+                    if last_event:
+                        result = self._extract_cataloging_result(last_event.get("messages", []))
+                        if result:
+                            self.channel.send_completion(sender, result)
+                    del self._pending_approvals[thread_id]
+                    return
+
+                except BaseException as e:
+                    logger.exception(
+                        "Unexpected error during approval resumption",
+                        extra={"thread_id": thread_id, "error_type": type(e).__name__}
+                    )
+                    self.channel.send_error(sender, "processing")
+                    del self._pending_approvals[thread_id]
+                    return
+
+                # Extract result from final event
+                if last_event:
+                    result = self._extract_cataloging_result(last_event.get("messages", []))
+                    if result:
+                        logger.info(
+                            "Workflow resumed successfully",
+                            extra={"thread_id": thread_id, "has_result": result is not None}
+                        )
+                        self.channel.send_completion(sender, result)
+                    else:
+                        logger.warning("No result after resumption", extra={"thread_id": thread_id})
+                        self.channel.send_error(sender, "processing")
+                else:
+                    logger.warning("No final event after resumption", extra={"thread_id": thread_id})
+                    self.channel.send_error(sender, "processing")
+
+                # Cleanup
+                del self._pending_approvals[thread_id]
 
             except Exception as exc:
                 logger.exception("Failed to handle approval", exc_info=exc)
+                # Cleanup on error
+                if thread_id in self._pending_approvals:
+                    del self._pending_approvals[thread_id]
                 self.channel.send_error(sender, "processing")
 
     def _execute_workflow(
@@ -256,10 +334,20 @@ class WorkflowRunner:
         tracking_id = self.outcome_tracker.track_workflow_start(thread_id, incoming_message)
         workflow_start_time = datetime.now()
 
-        # Check for abandonment (new request while approval pending)
-        if self.recovery.should_clear_state(thread_id, bool(media_id)):
-            logger.info("Abandonment detected - clearing orphaned state", extra={"thread_id": thread_id})
-            self.recovery.clear_orphaned_state(thread_id)
+        # Abandonment detection: new media = fresh start (delete old checkpoint)
+        if media_id and thread_id in self._pending_approvals:
+            logger.info(
+                "Abandonment detected - user sent new media while approval pending",
+                extra={"thread_id": thread_id}
+            )
+            # Clear old workflow state
+            del self._pending_approvals[thread_id]
+            try:
+                checkpointer = self._get_checkpointer()
+                checkpointer.delete_thread(thread_id)
+                logger.info("Cleared old checkpoint for fresh start", extra={"thread_id": thread_id})
+            except Exception as e:
+                logger.warning("Failed to clear checkpoint", exc_info=e, extra={"thread_id": thread_id})
 
         # Download media if present
         media_path = None
@@ -272,13 +360,13 @@ class WorkflowRunner:
                 return
 
         # Invoke PM
-
         try:
-            result, interrupt = self._invoke_pm(thread_id, text, media_path)
+            result, interrupt_value = self._invoke_pm(thread_id, text, media_path)
 
-            if interrupt:
-                self._handle_interrupt(sender, thread_id, interrupt, media_path)
-                # Phase 1: Track workflow end (interrupt = pending approval, mark as success)
+            if interrupt_value:
+                # HITL approval required
+                self._handle_interrupt(sender, thread_id, interrupt_value, media_path)
+                # Track as pending approval (workflow continues after user input)
                 duration = (datetime.now() - workflow_start_time).total_seconds()
                 self.outcome_tracker.track_workflow_end(
                     thread_id=thread_id,
@@ -286,8 +374,8 @@ class WorkflowRunner:
                     result={"status": "pending_approval", "tracking_id": tracking_id},
                 )
             elif result:
+                # Direct completion without interrupt
                 self._handle_completion(sender, result)
-                # Phase 1: Track workflow end (success)
                 duration = (datetime.now() - workflow_start_time).total_seconds()
                 logger.info(
                     "Workflow completed successfully",
@@ -303,28 +391,9 @@ class WorkflowRunner:
                     result=result,
                 )
 
-        except ValueError as exc:
-            # Reactive recovery for orphaned state
-            if "INVALID_CHAT_HISTORY" in str(exc) or "do not have a corresponding ToolMessage" in str(exc):
-                logger.warning(
-                    "Detected orphaned tool calls - auto-recovery triggered",
-                    extra={"thread_id": thread_id, "error": str(exc)[:200]},
-                )
-                self.recovery.auto_recover(thread_id)
-
-                # Retry once
-                result, interrupt = self._invoke_pm(thread_id, text, media_path)
-                if interrupt:
-                    self._handle_interrupt(sender, thread_id, interrupt, media_path)
-                elif result:
-                    self._handle_completion(sender, result)
-            else:
-                raise
-
         except GraphRecursionError as exc:
             logger.exception("PM recursion limit exceeded", exc_info=exc, extra={"thread_id": thread_id})
             self.channel.send_error(sender, "recursion")
-            # Phase 1: Track workflow end (failure)
             self.outcome_tracker.track_workflow_end(
                 thread_id=thread_id,
                 success=False,
@@ -335,7 +404,6 @@ class WorkflowRunner:
         except Exception as exc:
             if isinstance(exc, BadRequestError):
                 error_text = str(exc)
-                # Log full error details for debugging
                 logger.error(
                     "PM invocation failed due to tool-call mismatch",
                     extra={
@@ -344,7 +412,6 @@ class WorkflowRunner:
                         "has_tool_call_violation": "tool_call" in error_text,
                     },
                 )
-                # Print full error to console for debugging
                 print("\n=== OpenAI BadRequestError Details ===")
                 print(f"Error type: {type(exc).__name__}")
                 print(f"Error message: {error_text}")
@@ -356,27 +423,19 @@ class WorkflowRunner:
                     "processing",
                     "I hit a coordination error while prepping your request. Please resend the details so I can try again.",
                 )
-                # Phase 1: Track workflow end (failure)
-                self.outcome_tracker.track_workflow_end(
-                    thread_id=thread_id,
-                    success=False,
-                    error=exc,
-                    resolution_strategy="user_notified",
-                )
             else:
                 logger.exception("PM invocation failed", exc_info=exc, extra={"thread_id": thread_id})
                 self.channel.send_error(sender, "processing")
-                # Phase 1: Track workflow end (failure)
-                self.outcome_tracker.track_workflow_end(
-                    thread_id=thread_id,
-                    success=False,
-                    error=exc,
-                    resolution_strategy="user_notified",
-                )
+
+            self.outcome_tracker.track_workflow_end(
+                thread_id=thread_id,
+                success=False,
+                error=exc,
+                resolution_strategy="user_notified",
+            )
 
         finally:
-            # Media now persists in media_downloads/ for debugging/auditing
-            # No cleanup - files managed separately
+            # Media persists in media_downloads/ for debugging/auditing
             pass
 
     def _invoke_pm(
@@ -384,8 +443,8 @@ class WorkflowRunner:
         thread_id: str,
         text: str | None,
         media_path: Path | None,
-    ) -> tuple[dict[str, Any] | None, Interrupt | None]:
-        """Invoke PM and detect interrupts.
+    ) -> tuple[dict[str, Any] | None, Any | None]:
+        """Invoke PM and detect interrupts using native LangGraph patterns.
 
         Args:
             thread_id: Conversation thread ID
@@ -393,33 +452,28 @@ class WorkflowRunner:
             media_path: Downloaded media file path (optional)
 
         Returns:
-            Tuple of (final_result, interrupt) - exactly one will be non-None
+            Tuple of (final_result, interrupt_value) - exactly one will be non-None
         """
         logger.debug("Invoking Project Manager", extra={"thread_id": thread_id})
 
         pm = self._create_project_manager()
-
         payload = self._build_payload(text, media_path)
         config = self._build_config(thread_id)
 
         last_event = None
-        interrupt = None
+        interrupt_value = None
 
         try:
             # Fully consume the stream to avoid GeneratorExit
             for event in pm.stream(payload, config=config, stream_mode="values"):
                 last_event = event
 
-                # Track PM state for interrupt handling
-                if isinstance(event, dict) and event.get("messages"):
-                    self._last_pm_state = event
-
                 # Detect native LangGraph interrupt
                 if "__interrupt__" in event:
                     interrupts = event.get("__interrupt__") or []
                     if interrupts:
-                        interrupt = interrupts[0]
-                        self._last_interrupt = interrupt
+                        # Extract interrupt value from first interrupt
+                        interrupt_value = interrupts[0].value
                         logger.info(
                             "Native LangGraph interrupt detected",
                             extra={
@@ -427,27 +481,23 @@ class WorkflowRunner:
                                 "interrupt_count": len(interrupts),
                             },
                         )
-                        # Don't break - continue consuming to avoid GeneratorExit
-                        # The interrupt is captured, we'll return it after full consumption
+                        # Continue consuming to avoid GeneratorExit
 
-            # Stream fully consumed without interruption
             logger.debug(
                 "PM stream fully consumed",
                 extra={
                     "thread_id": thread_id,
-                    "had_interrupt": interrupt is not None,
+                    "had_interrupt": interrupt_value is not None,
                 },
             )
 
         except GeneratorExit:
-            # GeneratorExit is raised when the generator is closed prematurely
-            # This can happen in testing or when HTTP requests timeout
+            # GeneratorExit in serverless - workflow continues via checkpoint
             logger.warning(
-                "GeneratorExit during workflow streaming - generator closed prematurely",
+                "GeneratorExit during workflow streaming",
                 extra={"thread_id": thread_id},
             )
-            # Return what we have so far
-            return last_event, interrupt
+            return last_event, interrupt_value
 
         except BaseException as e:
             logger.exception(
@@ -456,60 +506,110 @@ class WorkflowRunner:
             )
             raise
 
-        return last_event, interrupt
+        return last_event, interrupt_value
 
     def _handle_interrupt(
         self,
         sender: str,
         thread_id: str,
-        interrupt: Interrupt,
+        interrupt_value: Any,
         media_path: Path | None,
     ) -> None:
-        """Delegate interrupt handling to coordinator.
+        """Handle HITL interrupt - extract draft and send approval request.
 
         Args:
             sender: Channel-specific sender ID
             thread_id: Conversation thread ID
-            interrupt: LangGraph interrupt object
+            interrupt_value: Value from LangGraph interrupt (emitted by HumanInTheLoopMiddleware)
             media_path: Optional media file to preserve
         """
         logger.debug("Handling interrupt", extra={"thread_id": thread_id})
 
         try:
-            if self._last_pm_state is None:
-                raise ValueError("Cannot process interrupt without PM state")
+            # Extract draft from interrupt value
+            # HumanInTheLoopMiddleware format: list of dicts with "action_request"
+            draft = self._parse_interrupt_draft(interrupt_value)
 
-            # If interrupt was captured earlier in streaming, prefer cached copy
-            interrupt_for_processing = interrupt or self._last_interrupt
-            if interrupt_for_processing is None:
-                raise ValueError("No interrupt available for processing")
+            if not draft:
+                logger.error("Failed to parse draft from interrupt", extra={"thread_id": thread_id})
+                self.channel.send_error(
+                    sender,
+                    "processing",
+                    "I encountered an issue preparing your product for approval. Please try again."
+                )
+                return
 
-            approval_request = self.interrupt_coord.process_interrupt(
-                interrupt=interrupt_for_processing,
-                thread_id=thread_id,
-                pm_state=self._last_pm_state,
-                media_path=media_path,
-                agent_source="cataloging_department",
-                checkpoint_ns="task:cataloging_department",
+            # Store in memory for approval handling
+            self._pending_approvals[thread_id] = {
+                "draft": draft,
+                "media_path": str(media_path) if media_path else None,
+                "timestamp": datetime.now(),
+            }
+
+            logger.info(
+                "Pending approval stored",
+                extra={"thread_id": thread_id, "product_name": draft.name}
             )
 
             # Send approval request via channel
-            self.channel.send_approval_request(sender, approval_request.draft)
+            self.channel.send_approval_request(sender, draft)
 
         except Exception as exc:
             logger.exception("Failed to handle interrupt", exc_info=exc, extra={"thread_id": thread_id})
-
-            # Critical: clear checkpoint to prevent stuck state
-            try:
-                self.recovery.clear_orphaned_state(thread_id)
-            except Exception as clear_exc:
-                logger.exception("Failed to clear checkpoint after interrupt error", exc_info=clear_exc)
-
             self.channel.send_error(
                 sender,
                 "processing",
                 "I encountered an unexpected issue. Please try resending your product details.",
             )
+
+    def _parse_interrupt_draft(self, interrupt_value: Any) -> Product | None:
+        """Parse Product draft from interrupt value.
+
+        Args:
+            interrupt_value: Value from interrupt (format varies by middleware)
+
+        Returns:
+            Product instance if parsed successfully, None otherwise
+        """
+        try:
+            # HumanInTheLoopMiddleware format: list of action requests
+            if isinstance(interrupt_value, list):
+                for item in interrupt_value:
+                    if isinstance(item, dict) and "action_request" in item:
+                        action_request = item["action_request"]
+                        if action_request.get("action") == "save_product":
+                            args = action_request.get("args", {})
+                            return Product(
+                                name=args.get("name", "Unnamed Product"),
+                                description=args.get("description"),
+                                price=args.get("price"),
+                                sizes=args.get("sizes"),
+                                colors=args.get("colors"),
+                                image_urls=args.get("image_urls"),
+                            )
+
+            # Fallback: try direct tool call format
+            if isinstance(interrupt_value, dict):
+                args = interrupt_value.get("args", {})
+                if args:
+                    return Product(
+                        name=args.get("name", "Unnamed Product"),
+                        description=args.get("description"),
+                        price=args.get("price"),
+                        sizes=args.get("sizes"),
+                        colors=args.get("colors"),
+                        image_urls=args.get("image_urls"),
+                    )
+
+            logger.warning(
+                "Unknown interrupt value format",
+                extra={"interrupt_type": type(interrupt_value).__name__}
+            )
+            return None
+
+        except Exception as e:
+            logger.exception("Failed to parse interrupt draft", exc_info=e)
+            return None
 
     def _handle_completion(self, sender: str, result: dict[str, Any]) -> None:
         """Handle PM completion without interrupt.
@@ -613,10 +713,6 @@ class WorkflowRunner:
     def _build_payload(self, text: str | None, media_path: Path | None) -> dict[str, Any]:
         """Build semantic PM payload using IncomingMessage schema.
 
-        Constructs a semantic, normalized message description that PM can use for
-        intent classification. Uses IncomingMessage.to_semantic_description() for
-        consistent, platform-agnostic formatting.
-
         Args:
             text: Message text (optional)
             media_path: Downloaded media file path (optional)
@@ -630,11 +726,11 @@ class WorkflowRunner:
         media_refs = []
         if media_path and media_path.exists():
             media_ref = MediaReference(
-                media_id=media_path.name,  # Use filename as ID
-                media_type="image",  # Default to image (could be enhanced)
-                mime_type="image/jpeg",  # Default MIME type
-                platform="whatsapp",  # Current platform
-                download_strategy="none",  # Already downloaded
+                media_id=media_path.name,
+                media_type="image",
+                mime_type="image/jpeg",
+                platform="whatsapp",
+                download_strategy="none",
                 local_path=media_path,
                 platform_url=None,
                 size_bytes=None,
@@ -649,8 +745,8 @@ class WorkflowRunner:
             text=text,
             media=media_refs,
             platform=self.channel.__class__.__name__.replace("Channel", "").lower(),
-            sender_id="placeholder",  # Not needed for semantic description
-            thread_id="placeholder",  # Not needed for semantic description
+            sender_id="placeholder",
+            thread_id="placeholder",
             timestamp=datetime.now(),
             reply_to_message_id=None,
             forwarded_from=None,
@@ -737,6 +833,3 @@ class WorkflowRunner:
                 return content
 
         return None
-
-    # Media cleanup removed - files persist in media_downloads/ for debugging/auditing
-    # Managed separately via scheduled cleanup jobs if needed

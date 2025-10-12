@@ -1,15 +1,14 @@
 """Workflow orchestration components.
 
 This package contains channel-agnostic workflow coordination logic:
-- WorkflowRunner: Generic orchestrator
-- InterruptCoordinator: HITL interrupt handling
-- StateManager: Approval state persistence
-- RecoveryStrategy: Error recovery and abandonment detection
+- WorkflowRunner: Generic orchestrator with native LangGraph HITL support
+
+Design: Simplified architecture - removed 700+ lines of custom interrupt handling.
+Framework handles all state management via checkpointers.
 """
 
-from autifyme_agents.workflows.orchestration.state_manager import StateManager
+from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
 
-# RecoveryStrategy and InterruptCoordinator will be added as we implement them
 __all__ = [
-    "StateManager",
+    "WorkflowRunner",
 ]
