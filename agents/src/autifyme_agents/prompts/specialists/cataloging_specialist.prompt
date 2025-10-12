@@ -5,5 +5,9 @@ Based on the following text, extract the product information and format it EXACT
 Pay close attention to data types. Prices should be numbers, and sizes/colors should be lists of strings.
 If a piece of information is not available in the text, omit the field entirely from the output.
 
+**IMPORTANT**:
+- DO NOT include the 'id' field in your response - it will be auto-generated
+- Only extract fields that are explicitly mentioned or can be inferred from the user's message
+
 User's message:
 {user_message}

@@ -79,4 +79,4 @@ def cataloging_specialist_invoke(
     result = agent.invoke({"messages": messages}, config=config or {})
 
     # Extract structured response (Product model)
-    return result["response"]  # create_agent with response_format returns {"response": Product}
+    return result["structured_response"]  # create_agent with response_format returns {"structured_response": Product}

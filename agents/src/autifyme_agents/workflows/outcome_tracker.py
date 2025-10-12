@@ -306,6 +306,7 @@ class OutcomeTracker:
             "sender_id": workflow.message.sender_id,
             "platform": workflow.message.platform,
             "message_hash": workflow.message_hash,  # For similarity matching
+            "received_at": workflow.message.received_at,  # Message timestamp
             # Routing decision (business logic)
             "intent": workflow.routing.intent if workflow.routing else None,
             "department": workflow.routing.department if workflow.routing else None,
