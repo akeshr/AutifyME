@@ -17,15 +17,13 @@ from __future__ import annotations
 from typing import Any, Sequence
 
 from deepagents import create_deep_agent  # type: ignore[import-untyped]
+from deepagents.tools import write_todos
 from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.core.ports import StorageInterface
-
-
-_DEFAULT_BUILTIN_TOOLS: list[str] = ["write_todos"]
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
@@ -120,7 +118,10 @@ def create_project_manager(
     instructions = _load_prompt(company_profile)
 
     # PM has NO domain tools - only orchestration tools if provided
-    pm_tools = list(tools) if tools is not None else []
+    # DeepAgents planning tool is always available for multi-step coordination
+    pm_tools = [write_todos]
+    if tools is not None:
+        pm_tools.extend(tools)
 
     # Departments are subagents (proper delegation hierarchy)
     subagents: list[Any] = [
