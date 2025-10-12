@@ -48,7 +48,7 @@ def create_message_intent_specialist(
     Returns:
         Agent that interprets raw messages into structured MessageInterpretation
     """
-    llm = model or get_llm(model="gpt-4o-mini", temperature=0.1)
+    llm = model or get_llm(model="gpt-5-nano-2025-08-07", temperature=0.1)
     system_prompt = load_prompt("specialists/message_intent_specialist.prompt")
 
     # ✅ Use create_agent with response_format for structured output + tools
@@ -138,7 +138,7 @@ def message_intent_specialist_invoke(
         result = agent.invoke({"messages": messages}, config=config or {})
 
         # Extract structured response (MessageInterpretation model)
-        interpretation = result["response"]  # create_agent with response_format returns {"response": MessageInterpretation}
+        interpretation = result["structured_response"]  # create_agent with response_format returns {"structured_response": MessageInterpretation}
 
     except Exception as e:
         logger.exception(
