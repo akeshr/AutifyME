@@ -17,6 +17,7 @@ import logging
 from typing import Any, TYPE_CHECKING
 
 from langchain.agents import create_agent
+from langchain.agents.structured_output import ToolStrategy
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
@@ -48,20 +49,19 @@ def create_message_intent_specialist(
     Returns:
         Agent that interprets raw messages into structured MessageInterpretation
     """
+    # Use ToolStrategy for structured output (compatible with tools + middleware)
+    # ToolStrategy treats structured output as artificial tool call, avoiding
+    # JSONDecodeError with complex nested schemas
     llm = model or get_llm(model="gpt-4.1-nano-2025-04-14", temperature=0.1)
     system_prompt = load_prompt("specialists/message_intent_specialist.prompt")
 
-    # ✅ Use with_structured_output for complex nested schemas
-    # Note: response_format with create_agent fails for complex nested TypedDicts
-    # with JSONDecodeError: Extra data. Using with_structured_output is more robust.
-    structured_llm = llm.with_structured_output(MessageInterpretation, method="json_schema")
-
-    # Create agent without response_format, will handle structured output via llm
+    # ✅ ToolStrategy enables: structured output + real tools + HITL middleware
     agent = create_agent(
-        model=structured_llm,
+        model=llm,
         tools=platform_tools,  # Platform-specific media download tools
         system_prompt=system_prompt,
         name="MessageIntentSpecialist",
+        response_format=ToolStrategy(MessageInterpretation),  # Wrap in ToolStrategy
     )
 
     return agent
