@@ -109,34 +109,51 @@ def message_intent_specialist_invoke(
         )
 
     # Build input for specialist
-    user_input = f"""Raw Platform Message:
-Platform: {parsed_message.platform}
-Sender: {parsed_message.sender}
-Text: {parsed_message.text or "[no text]"}
-Media ID: {parsed_message.media_id or "[no media]"}
-Timestamp: {parsed_message.timestamp}
+    user_input = f"""**Raw Platform Message**:
+- Platform: {parsed_message.platform}
+- Sender: {parsed_message.sender}
+- Text: {parsed_message.text or "[no text]"}
+- Media ID: {parsed_message.media_id or "[no media]"}
+- Timestamp: {parsed_message.timestamp}
 
-Instructions:
-1. Review the conversation history above to understand current context
-2. Check if there's a pending approval request (look for product drafts awaiting user confirmation)
-3. If media_id is present, call download_{parsed_message.platform}_media to get the local path
-4. Interpret the user's intent based on their message + conversation context
-5. Return structured MessageInterpretation with your reasoning
+**Your Task**:
+1. **Review conversation history above** - Look for pending interrupts, previous AI responses, workflow context
+2. **Download media if present**: If media_id provided, call `download_{parsed_message.platform}_media(media_id)` to get local path
+3. **Interpret user intent** based on message + full conversation context
+4. **Construct Commands if resuming** - Build exact resume_value structure for pending interrupts
+5. **Return structured interpretation** with clear reasoning
 
-Remember:
-- If you see a recent approval request and user responds with affirmation → approval_response
-- If user sends new media during pending approval → workflow_abandonment
-- If user asks about pending draft details → clarification_request
-- If no context and user provides product info → new_cataloging_request
+**Key Reminders**:
+- If there's a pending interrupt and user wants to proceed → intent="resume_workflow" with command field
+- Extract interrupt_id from conversation context (NOT from user message)
+- Construct resume_value based on interrupt structure and user response
+- For clarifications, compose response in clarification_response field
+- Always explain your reasoning for observability
 """
 
     messages = [{"role": "human", "content": user_input}]
 
-    # Invoke agent with conversation history from PM
-    result = agent.invoke({"messages": messages}, config=config or {})
+    try:
+        # Invoke agent with conversation history from PM (via config)
+        result = agent.invoke({"messages": messages}, config=config or {})
 
-    # Extract structured response (MessageInterpretation model)
-    interpretation = result["response"]  # create_agent with response_format returns {"response": MessageInterpretation}
+        # Extract structured response (MessageInterpretation model)
+        interpretation = result["response"]  # create_agent with response_format returns {"response": MessageInterpretation}
+
+    except Exception as e:
+        logger.exception(
+            "Specialist invocation failed",
+            extra={"error": str(e), "raw_message": str(message_data)[:200]}
+        )
+        # Robust fallback
+        return MessageInterpretation(
+            intent="error",
+            reasoning=f"Specialist failed to interpret message: {str(e)}. Asking user for clarification.",
+            clarification_response="I'm having trouble understanding. Could you please rephrase?",
+            platform=parsed_message.platform,
+            raw_text=parsed_message.text,
+            has_media=parsed_message.media_id is not None,
+        )
 
     logger.info(
         "Message intent interpreted",
