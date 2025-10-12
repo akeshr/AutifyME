@@ -222,7 +222,13 @@ class InterruptCoordinator:
         agent_source = approval.get("agent_source", "cataloging_department")
         checkpoint_ns = approval.get("checkpoint_ns", f"task:{agent_source}")
 
-        dept = self._create_department(agent_source)
+        # Use state manager's storage (already has cached profile)
+        from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
+        dept = self._create_department(
+            agent_source=agent_source,
+            storage=self.state.storage,  # Reuse runner's storage with cached profile
+            checkpointer=get_checkpointer(),
+        )
 
         config = {
             "configurable": {
@@ -278,16 +284,23 @@ class InterruptCoordinator:
         logger.warning("No result after workflow resumption", extra={"thread_id": thread_id})
         return None
 
-    def _create_department(self, agent_source: str):
-        """Factory to create department agent by source."""
+    def _create_department(self, agent_source: str, storage, checkpointer):
+        """Factory to create department agent by source.
+
+        Args:
+            agent_source: Department name
+            storage: Storage adapter (reuses runner's cached instance)
+            checkpointer: Checkpointer for state persistence
+
+        Returns:
+            Department agent graph
+        """
         if agent_source == "cataloging_department":
             from autifyme_agents.departments.cataloging_department import create_cataloging_department
-            from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-            from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
 
             return create_cataloging_department(
-                checkpointer=get_checkpointer(),
-                storage=SupabaseStorageClient(),
+                checkpointer=checkpointer,
+                storage=storage,  # Reuse runner's storage (already has cached profile)
             )
 
         raise ValueError(f"Unknown agent source: {agent_source}")
