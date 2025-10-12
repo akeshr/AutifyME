@@ -611,11 +611,11 @@ class WorkflowRunner:
         )
 
     def _build_payload(self, text: str | None, media_path: Path | None) -> dict[str, Any]:
-        """Build semantic PM payload from message.
+        """Build semantic PM payload using IncomingMessage schema.
 
         Constructs a semantic, normalized message description that PM can use for
-        intent classification. Avoids prescriptive tool instructions - PM decides
-        how to handle based on content and context.
+        intent classification. Uses IncomingMessage.to_semantic_description() for
+        consistent, platform-agnostic formatting.
 
         Args:
             text: Message text (optional)
@@ -624,21 +624,33 @@ class WorkflowRunner:
         Returns:
             PM input payload with semantic message description
         """
-        # Build semantic message description
-        parts = []
+        from autifyme_agents.schemas.messages import IncomingMessage, MediaReference
 
-        if text and text.strip():
-            parts.append(f"User message: {text}")
-
+        # Build MediaReference if media present
+        media_refs = []
         if media_path and media_path.exists():
-            # Semantic description, not prescriptive tool instructions
-            parts.append(f"User provided an image (path: {media_path})")
+            media_ref = MediaReference(
+                media_id=media_path.name,  # Use filename as ID
+                media_type="image",  # Default to image (could be enhanced)
+                mime_type="image/jpeg",  # Default MIME type
+                platform="whatsapp",  # Current platform
+                download_strategy="none",  # Already downloaded
+                local_path=media_path,
+            )
+            media_refs.append(media_ref)
 
-        if not parts:
-            # Empty message
-            content = "User sent an empty message. Please ask for product details."
-        else:
-            content = "\n".join(parts)
+        # Create canonical IncomingMessage
+        incoming_msg = IncomingMessage(
+            text=text,
+            media=media_refs,
+            platform=self.channel.__class__.__name__.replace("Channel", "").lower(),
+            sender_id="placeholder",  # Not needed for semantic description
+            thread_id="placeholder",  # Not needed for semantic description
+            timestamp=datetime.now(),
+        )
+
+        # Use canonical to_semantic_description() method
+        content = incoming_msg.to_semantic_description()
 
         messages = [HumanMessage(content=content)]
         return {"messages": messages}
