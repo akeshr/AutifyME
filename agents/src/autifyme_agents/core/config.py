@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     WHATSAPP_ACCESS_TOKEN: str | None = Field(default=None, env="WHATSAPP_ACCESS_TOKEN")  # type: ignore[call-overload]
     WHATSAPP_API_VERSION: str = Field(default="v20.0", env="WHATSAPP_API_VERSION")  # type: ignore[call-overload]
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: str | None = Field(default=None, env="WHATSAPP_WEBHOOK_VERIFY_TOKEN")  # type: ignore[call-overload]
-    AGENT_RECURSION_LIMIT: int = Field(default=15, env="AGENT_RECURSION_LIMIT")  # type: ignore[call-overload]
+    AGENT_RECURSION_LIMIT: int = Field(default=50, env="AGENT_RECURSION_LIMIT")  # type: ignore[call-overload]
 
 
 # Create a single, globally accessible instance of the settings.

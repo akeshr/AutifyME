@@ -60,7 +60,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 
 # This simple call should automatically be traced in LangSmith
-llm = ChatOpenAI(model="gpt-5-nano-2025-08-07")
+llm = ChatOpenAI(model="gpt-4.1-nano-2025-04-14")
 response = llm.invoke([HumanMessage(content="Hello from AutifyME!")])
 
 print("Response:", response.content)

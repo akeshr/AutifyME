@@ -201,12 +201,12 @@ IncomingMessage(
 | Approach | Pros | Cons |
 |----------|------|------|
 | **Tool-based** (`analyze_intent` tool) | Explicit, traceable, can use specialized models | Adds latency, over-engineering for capable LLMs |
-| **LLM reasoning** (gpt-5-nano-2025-08-07 native intelligence) | Fast, flexible, handles nuance well | Less explicit control, harder to debug |
+| **LLM reasoning** (gpt-4.1-nano-2025-04-14 native intelligence) | Fast, flexible, handles nuance well | Less explicit control, harder to debug |
 
 **Decision**: **LLM reasoning** with structured prompts.
 
 **Rationale**:
-- gpt-5-nano-2025-08-07 is sophisticated enough to classify intents from semantic descriptions
+- gpt-4.1-nano-2025-04-14 is sophisticated enough to classify intents from semantic descriptions
 - Adding an `analyze_intent` tool just wraps another LLM call (redundant)
 - PM's prompt can be engineered to elicit correct classification
 - Multi-step reasoning (chain-of-thought) can be prompted without tools

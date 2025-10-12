@@ -88,7 +88,7 @@ from dotenv import load_dotenv
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
 from autifyme_agents.schemas.models import Product, CatalogingResult
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
+from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 
 
@@ -134,12 +134,20 @@ class ConsoleChannel(MessagingChannel):
         self.messages_sent.append({"type": "text", "message": message})
         return {"status": "sent"}
 
-    def send_approval_request(self, recipient: str, draft: Product) -> dict[str, Any]:
+    def send_hitl_request(self, recipient: str, interrupt_value: Any) -> dict[str, Any]:
+        """Generic HITL request handler - works for ANY interrupt type."""
         print(f"\n{'='*60}")
-        safe_print(f"⏸️  APPROVAL REQUEST TO {recipient}:")
+        safe_print(f"⏸️  HITL REQUEST TO {recipient}:")
         print(f"{'='*60}")
-        # Convert Pydantic model to dict for JSON serialization
-        draft_dict = draft.model_dump() if hasattr(draft, 'model_dump') else draft
+
+        # Handle different interrupt value types
+        if hasattr(interrupt_value, 'model_dump'):
+            # Pydantic model (Product, etc.)
+            draft_dict = interrupt_value.model_dump()
+        elif isinstance(interrupt_value, dict):
+            draft_dict = interrupt_value
+        else:
+            draft_dict = {"value": str(interrupt_value)}
 
         # Custom JSON encoder to handle UUID objects
         def json_encoder(obj):
@@ -154,7 +162,7 @@ class ConsoleChannel(MessagingChannel):
         if self.hitl_mode == "auto_approve":
             print("\n[AUTO-APPROVE MODE: Approving automatically]\n")
             time.sleep(0.5)
-            return {"status": "approved", "draft": draft}
+            return {"status": "approved", "value": interrupt_value}
 
         elif self.hitl_mode == "auto_reject":
             print("\n[AUTO-REJECT MODE: Rejecting automatically]\n")
@@ -164,13 +172,13 @@ class ConsoleChannel(MessagingChannel):
         elif self.hitl_mode == "auto_edit":
             print("\n[AUTO-EDIT MODE: Approving with edits]\n")
             # Apply predefined edits
-            if self.predefined_edits:
+            if self.predefined_edits and hasattr(interrupt_value, '__dict__'):
                 for field, value in self.predefined_edits.items():
-                    if hasattr(draft, field):
-                        setattr(draft, field, value)
+                    if hasattr(interrupt_value, field):
+                        setattr(interrupt_value, field, value)
                         safe_print(f"  ✏️  Edited {field}: {value}")
             time.sleep(0.5)
-            return {"status": "approved", "draft": draft}
+            return {"status": "approved", "value": interrupt_value}
 
         elif self.hitl_mode == "question":
             print("\n[QUESTION MODE: Simulating clarification question]\n")
@@ -192,7 +200,7 @@ class ConsoleChannel(MessagingChannel):
             # Parse decision
             if decision in ["yes", "y", "approve", "1"]:
                 print("\n[APPROVED]\n")
-                return {"status": "approved", "draft": draft}
+                return {"status": "approved", "value": interrupt_value}
 
             elif decision in ["no", "n", "reject", "2"]:
                 print("\n[REJECTED]\n")
@@ -206,22 +214,22 @@ class ConsoleChannel(MessagingChannel):
                     value = parts[2]
 
                     # Try to set the field
-                    if hasattr(draft, field):
+                    if hasattr(interrupt_value, field):
                         # Type conversion based on field type
-                        field_value = getattr(draft, field)
+                        field_value = getattr(interrupt_value, field)
                         try:
                             if isinstance(field_value, float):
                                 value = float(value)
                             elif isinstance(field_value, int):
                                 value = int(value)
-                            setattr(draft, field, value)
+                            setattr(interrupt_value, field, value)
                             safe_print(f"\n✏️  Edited {field}: {value}")
                             print("[APPROVED WITH EDITS]\n")
-                            return {"status": "approved", "draft": draft}
+                            return {"status": "approved", "value": interrupt_value}
                         except ValueError:
                             print(f"Error: Invalid value type for {field}")
                     else:
-                        print(f"Error: Field '{field}' not found in draft")
+                        print(f"Error: Field '{field}' not found in interrupt value")
                 else:
                     print("Usage: edit <field> <value>")
 

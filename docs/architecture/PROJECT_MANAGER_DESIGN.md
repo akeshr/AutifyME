@@ -95,7 +95,7 @@ def create_project_manager(company_profile: dict):
             brand_voice=company_profile["brand_voice"],
             target_audience=company_profile["target_audience"],
         ),
-        model=ChatOpenAI(model="gpt-5-nano-2025-08-07", temperature=0.2),
+        model=ChatOpenAI(model="gpt-4.1-nano-2025-04-14", temperature=0.2),
         tool_configs={
             # HITL for critical operations
             "save_product": True,
@@ -280,7 +280,7 @@ def image_analysis_specialist(image_url: str, company_context: dict) -> ImageAna
     Returns:
         ImageAnalysisResult: Type-safe Pydantic model (v1 structured output)
     """
-    llm = ChatOpenAI(model="gpt-5-nano-2025-08-07")
+    llm = ChatOpenAI(model="gpt-4.1-nano-2025-04-14")
     
     # v1: .with_structured_output() guarantees schema compliance
     structured_llm = llm.with_structured_output(ImageAnalysisResult)
