@@ -14,7 +14,7 @@ post-model hooks are needed—LangGraph's tool node handles all ToolMessage synt
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Any, Sequence, TYPE_CHECKING
 
 from deepagents import create_deep_agent  # type: ignore[import-untyped]
 from deepagents.tools import write_todos  # type: ignore[import-untyped]
@@ -24,6 +24,9 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.core.ports import StorageInterface
+
+if TYPE_CHECKING:
+    from autifyme_agents.workflows.channels.protocol import MessagingChannel
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
@@ -90,6 +93,7 @@ def create_project_manager(
     model: BaseChatModel | None = None,
     checkpointer: Any,
     storage: StorageInterface,
+    channel: MessagingChannel | None = None,
     tools: Sequence | None = None,
 ) -> Any:
     """Create the deepagents-powered Project Manager with proper delegation hierarchy.
@@ -99,16 +103,18 @@ def create_project_manager(
         model: Optional override for the LLM powering the manager.
         checkpointer: LangGraph checkpointer for durable state (required - provided by runner).
         storage: Storage adapter implementing StorageInterface (required).
+        channel: Optional messaging channel for MessageIntentTool (enables agentic message interpretation).
         tools: Optional explicit tool list for PM orchestration only (NOT domain tools).
 
     Returns:
         Compiled deepagents agent with proper delegation to departments.
 
     **Architecture**:
+    - PM uses MessageIntentTool to interpret raw user messages in context
     - PM has NO direct access to domain tools (analyze_image, save_product, etc.)
     - PM MUST delegate to departments via 'task' tool
     - Subagents (departments) have domain tools
-    - Enforces PM → Department → Specialist → Tools hierarchy
+    - Enforces PM → MessageIntent → Department → Specialist → Tools hierarchy
     """
 
     if checkpointer is None:
@@ -117,9 +123,22 @@ def create_project_manager(
     llm = _resolve_model(model)
     instructions = _load_prompt(company_profile)
 
-    # PM has NO domain tools - only orchestration tools if provided
-    # DeepAgents planning tool is always available for multi-step coordination
+    # PM orchestration tools
     pm_tools = [write_todos]
+
+    # Add MessageIntentTool if channel provided (enables agentic interpretation)
+    if channel is not None:
+        from autifyme_agents.tools.platform_tools import create_platform_media_tools
+        from autifyme_agents.tools.message_intent_tool import create_message_intent_tool
+
+        # Create platform-specific tools for media download
+        platform_tools = create_platform_media_tools(channel)
+
+        # Create message intent tool with platform tools
+        message_intent_tool = create_message_intent_tool(channel, platform_tools)
+        pm_tools.append(message_intent_tool)
+
+    # Add any additional explicit tools
     if tools is not None:
         pm_tools.extend(tools)
 
