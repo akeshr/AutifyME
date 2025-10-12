@@ -15,16 +15,23 @@ import argparse
 from collections import deque
 from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv
 from langsmith import Client
 from langsmith.schemas import Run
+
+# Load environment variables
+load_dotenv("../.env")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Dump LangSmith run details for a thread")
     parser.add_argument(
         "--thread",
-        required=True,
         help="Thread ID associated with the LangGraph run (configurable.thread_id)",
+    )
+    parser.add_argument(
+        "--run-id",
+        help="Direct LangSmith run/trace ID",
     )
     parser.add_argument(
         "--limit",
@@ -47,7 +54,7 @@ def resolve_run(thread_id: str, limit: int) -> Optional[Run]:
 
 
 def fetch_run_tree(client: Client, root_run: Run) -> Run:
-    return client.get_run(root_run.id, include_children=True)
+    return client.read_run(root_run.id, load_child_runs=True)
 
 
 def format_messages(run: Run) -> List[str]:
@@ -62,10 +69,17 @@ def format_messages(run: Run) -> List[str]:
         inputs = run.inputs
         if "messages" in inputs:
             messages.append("Input Messages:")
-            for msg in inputs["messages"]:
-                role = msg.get("role")
-                content = msg.get("content")
-                messages.append(f"  - {role}: {content}")
+            msgs = inputs["messages"]
+            if isinstance(msgs, list):
+                for msg in msgs:
+                    if isinstance(msg, dict):
+                        role = msg.get("role")
+                        content = msg.get("content")
+                        messages.append(f"  - {role}: {content}")
+                    else:
+                        messages.append(f"  - {msg}")
+            else:
+                messages.append(f"  {msgs}")
     return messages
 
 
@@ -91,13 +105,24 @@ def dump_run_tree(root: Run) -> None:
 
 def main() -> None:
     args = parse_args()
-    thread_id: str = args.thread
-    print(f"Searching for LangSmith run with thread_id={thread_id}")
     client = Client()
-    root_run = resolve_run(thread_id, args.limit)
-    if not root_run:
-        raise SystemExit(f"No run found for thread_id={thread_id}")
-    print(f"Found run: {root_run.id} ({root_run.name})")
+
+    if args.run_id:
+        # Direct run ID lookup
+        print(f"Fetching LangSmith run with run_id={args.run_id}")
+        root_run = client.read_run(args.run_id)
+        print(f"Found run: {root_run.id} ({root_run.name})")
+    elif args.thread:
+        # Search by thread ID
+        thread_id: str = args.thread
+        print(f"Searching for LangSmith run with thread_id={thread_id}")
+        root_run = resolve_run(thread_id, args.limit)
+        if not root_run:
+            raise SystemExit(f"No run found for thread_id={thread_id}")
+        print(f"Found run: {root_run.id} ({root_run.name})")
+    else:
+        raise SystemExit("Either --thread or --run-id must be specified")
+
     run_tree = fetch_run_tree(client, root_run)
     dump_run_tree(run_tree)
 

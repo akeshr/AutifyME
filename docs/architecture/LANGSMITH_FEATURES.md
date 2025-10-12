@@ -139,7 +139,7 @@ Compare two outputs side-by-side to determine which is better.
 
 **Use Cases:**
 - A/B testing prompt variations
-- Model comparison (GPT-4 vs Claude)
+- Model comparison (GPT-5 vs Claude)
 - Ranking multiple candidate responses
 
 **5. Self-Improving Evaluators:**
@@ -216,7 +216,7 @@ Configure rules to automatically evaluate traces matching criteria (e.g., all ca
 **Interactive environment for prompt experimentation.**
 
 **Capabilities:**
-- Test prompts with different models (GPT-4, Claude, etc.)
+- Test prompts with different models (GPT-5, Claude, etc.)
 - Run over dataset examples (no code needed)
 - Compare outputs side-by-side
 - Add evaluators and see scores in real-time
@@ -225,7 +225,7 @@ Configure rules to automatically evaluate traces matching criteria (e.g., all ca
 **Why This Matters:**
 - Iterate on PM instructions without redeployment
 - Test cataloging prompts on edge cases quickly
-- Compare Claude vs. GPT-4 for specialist tasks
+- Compare Claude vs. GPT-5 for specialist tasks
 
 ### Prompt Comparison
 
@@ -391,7 +391,7 @@ Send spans via standard OpenTelemetry client—works with Datadog, Grafana, Jaeg
 
 **Granular cost visibility:**
 - Per trace, per user, per workflow
-- Model-specific costs (GPT-4 vs. Claude)
+- Model-specific costs (GPT-5 vs. Claude)
 - Tool execution costs (API calls)
 
 **Cost Attribution:**
@@ -491,7 +491,7 @@ Identify expensive operations, compare model costs, detect waste (redundant call
 - **Error Rate:** % of traces with errors
 - **User Satisfaction:** Average user feedback score
 - **Token Usage:** Total tokens consumed per day/week/month
-- **Model Distribution:** Usage across GPT-4, Claude, etc.
+- **Model Distribution:** Usage across GPT-5, Claude, etc.
 
 ---
 
