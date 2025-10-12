@@ -48,7 +48,7 @@ def create_message_intent_specialist(
     Returns:
         Agent that interprets raw messages into structured MessageInterpretation
     """
-    llm = model or get_llm(model="gpt-5-nano-2025-08-07", temperature=0.1)
+    llm = model or get_llm(model="gpt-4.1-nano-2025-04-14", temperature=0.1)
     system_prompt = load_prompt("specialists/message_intent_specialist.prompt")
 
     # ✅ Use create_agent with response_format for structured output + tools

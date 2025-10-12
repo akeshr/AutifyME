@@ -5,7 +5,7 @@ from langchain.chat_models import BaseChatModel
 
 def get_llm(
     provider: str = "openai",
-    model: str = "gpt-5-nano-2025-08-07",
+    model: str = "gpt-4.1-nano-2025-04-14",
     temperature: float = 0.0,
     tags: list[str] | None = None,
 ) -> BaseChatModel:

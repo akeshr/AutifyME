@@ -6,7 +6,7 @@
 |  | LangGraph v1 (`langgraph`, `langgraph.checkpoint.postgres`) | State machines, runtime context, checkpointing. |
 |  | DeepAgents (`deepagents`) | Planning-oriented middleware for future Project Manager agent. |
 | **Observability** | LangSmith | Tracing, evaluation, prompt management. |
-| **LLM Providers** | OpenAI (`langchain-openai`) | gpt-5-nano-2025-08-07 models with structured output support. |
+| **LLM Providers** | OpenAI (`langchain-openai`) | gpt-4.1-nano-2025-04-14 models with structured output support. |
 |  | Anthropic (`langchain-anthropic`) | Claude models with prompt caching middleware. |
 | **Data & Storage** | Supabase (PostgreSQL) | Single-tenant database hosting checkpoints and business data. |
 |  | PostgresSaver | LangGraph checkpoint implementation aligned with Supabase. |

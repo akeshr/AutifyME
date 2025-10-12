@@ -216,7 +216,7 @@ SummarizationMiddleware(
 from langchain.agents.middleware import SummarizationMiddleware
 
 summarization = SummarizationMiddleware(
-    model="gpt-5-nano-2025-08-07",  # Cheaper model for summaries
+    model="gpt-4.1-nano-2025-04-14",  # Cheaper model for summaries
     max_tokens_before_summary=100000,
     messages_to_keep=20  # Keep recent context
 )
