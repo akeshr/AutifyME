@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Any, Sequence
 
 from deepagents import create_deep_agent  # type: ignore[import-untyped]
-from deepagents.tools import write_todos
+from deepagents.tools import write_todos  # type: ignore[import-untyped]
 from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm

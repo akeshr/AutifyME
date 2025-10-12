@@ -65,7 +65,7 @@ Available Scenarios:
 import sys
 import json
 import time
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pathlib import Path
 from typing import Any
 from dotenv import load_dotenv

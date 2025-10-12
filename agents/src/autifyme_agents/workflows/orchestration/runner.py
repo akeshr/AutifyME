@@ -208,9 +208,9 @@ class WorkflowRunner:
                     return
 
                 # Get current checkpoint state to extract interrupt_id
-                config = {"configurable": {"thread_id": thread_id}}
+                config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
                 checkpointer = self._get_checkpointer()
-                state = checkpointer.get_tuple(config)
+                state = checkpointer.get_tuple(config)  # type: ignore[arg-type]
 
                 if not state:
                     logger.error("No checkpoint found for thread", extra={"thread_id": thread_id})
@@ -230,7 +230,7 @@ class WorkflowRunner:
 
                 # Build Command to resume with accept payload
                 # HumanInTheLoopMiddleware expects: {interrupt_id: {"type": "accept"}}
-                command = Command(resume={interrupt_id: {"type": "accept"}})
+                command: Command = Command(resume={interrupt_id: {"type": "accept"}})
 
                 logger.debug(
                     "Resuming workflow with approval",
