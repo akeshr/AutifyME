@@ -98,7 +98,7 @@ Always test locally before WhatsApp. CLI tools available for terminal-based test
 
 **Available Tools**:
 - `pm_chat` - Direct PM invocation for rapid prompt/logic iteration (interactive mode recommended)
-- `simulate` - Full workflow simulation with HITL support (use `--auto-approve` for speed)
+- `simulate` - Full workflow simulation with HITL support
 
 See `docs/architecture/LOCAL_TESTING_STRATEGY.md` for commands and usage patterns.
 

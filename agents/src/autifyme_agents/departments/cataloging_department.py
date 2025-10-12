@@ -13,6 +13,7 @@ from typing import Any
 
 from deepagents import create_deep_agent  # type: ignore[import-untyped]
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langchain.agents.middleware.human_in_the_loop import ToolConfig
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
@@ -62,6 +63,17 @@ def create_cataloging_department(
     # Load department instructions
     instructions = load_prompt("departments/cataloging_department.prompt")
 
+    # Configure HITL for save_product tool
+    # This enables human approval before persisting products to database
+    tool_configs = {
+        "save_product": ToolConfig(
+            allow_accept=True,  # User can approve without changes
+            allow_edit=True,    # User can approve with modifications
+            allow_respond=True,  # User can reject with feedback
+            description="Please review this product before saving to the catalog database."
+        )
+    }
+
     # Create DeepAgent department
     department = create_deep_agent(
         model=llm,
@@ -69,6 +81,7 @@ def create_cataloging_department(
         tools=tools,  # All specialists are now tools, not subagents
         middleware=middleware,
         checkpointer=checkpointer,  # Department-level checkpointing for HITL
+        tool_configs=tool_configs,  # ✅ Enable HITL for save_product
     )
 
     return department.with_config({
