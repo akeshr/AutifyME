@@ -3,6 +3,8 @@
 Replaces simple chain with full agent for observability and middleware support.
 """
 
+import base64
+from pathlib import Path
 from typing import Any
 
 from langchain.agents import create_agent
@@ -11,6 +13,37 @@ from langchain.chat_models import BaseChatModel
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
+
+
+def _encode_image_to_data_uri(image_path: str) -> str:
+    """Convert local image file to base64 data URI for vision models.
+
+    OpenAI Vision API requires either HTTPS URLs or base64 data URIs.
+    Local file paths won't work.
+
+    Args:
+        image_path: Path to local image file
+
+    Returns:
+        Base64 data URI (e.g., "data:image/jpeg;base64,...")
+    """
+    path = Path(image_path)
+
+    # Determine MIME type from extension
+    ext = path.suffix.lower()
+    mime_type = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+    }.get(ext, 'image/jpeg')  # Default to jpeg
+
+    # Read and encode
+    with open(path, 'rb') as f:
+        encoded = base64.b64encode(f.read()).decode('utf-8')
+
+    return f"data:{mime_type};base64,{encoded}"
 
 
 def create_image_analysis_specialist(
@@ -59,12 +92,16 @@ def image_analysis_specialist_invoke(
     brand_voice = company_profile.get("brand_voice") if company_profile else "professional"
     target_audience = company_profile.get("target_audience") if company_profile else "general"
 
+    # Convert local file paths to base64 data URIs
+    # OpenAI Vision API cannot access local file system
+    if image_url and not image_url.startswith(('http://', 'https://', 'data:')):
+        # Local file path - convert to base64
+        image_url = _encode_image_to_data_uri(image_url)
+
     content = f"""Analyze this product image in the context of our brand.
 
 Brand Voice: {brand_voice}
 Target Audience: {target_audience}
-
-Image URL: {image_url}
 
 Extract all visual product attributes including colors, materials, sizes, style, and features."""
 
