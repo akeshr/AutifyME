@@ -7,7 +7,7 @@ Design: Simplified architecture - removed 700+ lines of custom interrupt handlin
 Framework handles all state management via checkpointers.
 """
 
-from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
+from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 
 __all__ = [
     "WorkflowRunner",
