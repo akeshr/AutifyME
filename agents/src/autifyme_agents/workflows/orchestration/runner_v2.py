@@ -442,9 +442,9 @@ class WorkflowRunner:
         # User approved - resume workflow
         try:
             # Query checkpoint for interrupt_id
-            config = {"configurable": {"thread_id": thread_id}}
+            config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
             checkpointer = self._get_checkpointer()
-            state = checkpointer.get_tuple(config)
+            state = checkpointer.get_tuple(config)  # type: ignore[arg-type]
 
             if not state:
                 logger.error("No checkpoint found", extra={"thread_id": thread_id})
@@ -467,7 +467,7 @@ class WorkflowRunner:
 
             # Build Command to resume
             from langgraph.types import Command
-            command = Command(resume={interrupt_id: {"type": "accept"}})
+            command: Command = Command(resume={interrupt_id: {"type": "accept"}})
 
             logger.info(
                 "Resuming workflow with approval",

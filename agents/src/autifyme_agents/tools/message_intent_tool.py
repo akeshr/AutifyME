@@ -6,14 +6,15 @@ to understand user intent based on conversation history and platform context.
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.tools import tool
+from langchain.tools import tool, BaseTool
 
-from autifyme_agents.specialists.message_intent_specialist import create_message_intent_specialist
-from autifyme_agents.schemas.message_intent import MessageInterpretation
+from autifyme_agents.specialists.message_intent_specialist import (
+    create_message_intent_specialist,
+    message_intent_specialist_invoke,
+)
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 def create_message_intent_tool(
     channel: MessagingChannel,
     platform_tools: list,
-) -> callable:
+) -> BaseTool:
     """Create message intent interpretation tool for PM.
 
     Args:
@@ -34,8 +35,8 @@ def create_message_intent_tool(
     Returns:
         LangChain tool that PM can invoke to interpret raw messages
     """
-    # Create the specialist with platform tools
-    specialist = create_message_intent_specialist(platform_tools=platform_tools)
+    # Create the specialist agent with platform tools
+    specialist_agent = create_message_intent_specialist(platform_tools=platform_tools)
 
     @tool
     def interpret_incoming_message(raw_message: str) -> dict[str, Any]:
@@ -69,8 +70,12 @@ def create_message_intent_tool(
         try:
             logger.info("PM invoking MessageIntentSpecialist", extra={"raw_message": raw_message[:100]})
 
-            # Specialist has access to conversation history via config
-            interpretation = specialist(raw_message)
+            # Invoke specialist agent (has access to conversation history via config)
+            interpretation = message_intent_specialist_invoke(
+                raw_message=raw_message,
+                agent=specialist_agent,
+                config=None,  # Config passed through by LangChain's tool invocation
+            )
 
             # Convert Pydantic model to dict for tool output
             result = interpretation.model_dump(mode="json")

@@ -7,10 +7,9 @@ messaging platforms without hardcoding platform logic in the Runner.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from langchain_core.tools import tool
+from langchain.tools import tool
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -49,7 +48,7 @@ def create_platform_media_tools(channel: MessagingChannel) -> list:
             )
             media_path = channel.download_media(media_id)
             logger.info(
-                f"Media downloaded successfully",
+                "Media downloaded successfully",
                 extra={"media_id": media_id, "local_path": str(media_path)}
             )
             return str(media_path)

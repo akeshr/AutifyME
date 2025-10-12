@@ -14,10 +14,9 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
-from langchain_core.messages import HumanMessage
-from langchain_core.runnables import RunnableConfig
+from langchain.agents import create_agent
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
@@ -33,69 +32,84 @@ def create_message_intent_specialist(
     *,
     platform_tools: list,
     model: BaseChatModel | None = None,
-) -> callable:
-    """Create message intent specialist with platform tools.
+) -> Any:
+    """Create message intent specialist with platform tools using create_agent.
+
+    Uses create_agent for:
+    - LangSmith observability (traced as agent)
+    - Structured outputs (response_format)
+    - Tool calling (platform media download)
+    - Architectural consistency (agents all the way down)
 
     Args:
         platform_tools: Platform-specific tools (e.g., download_whatsapp_media)
         model: Optional LLM override (defaults to fast model for efficiency)
 
     Returns:
-        Callable that interprets raw messages into structured MessageInterpretation
+        Agent that interprets raw messages into structured MessageInterpretation
     """
     llm = model or get_llm(model="gpt-4o-mini", temperature=0.1)
+    system_prompt = load_prompt("specialists/message_intent_specialist.prompt")
 
-    # Bind structured output for type-safe responses
-    llm_with_structure = llm.with_structured_output(MessageInterpretation)
+    # ✅ Use create_agent with response_format for structured output + tools
+    agent = create_agent(
+        model=llm,
+        tools=platform_tools,  # Platform-specific media download tools
+        system_prompt=system_prompt,
+        response_format=MessageInterpretation,  # ✅ Structured output
+        name="MessageIntentSpecialist",
+    )
 
-    # Bind platform tools for media downloading
-    llm_with_tools = llm_with_structure.bind_tools(platform_tools)
+    return agent
 
-    def interpret_message(
-        raw_message: str | dict,
-        config: RunnableConfig | None = None,
-    ) -> MessageInterpretation:
-        """Interpret raw platform message in conversational context.
 
-        Args:
-            raw_message: JSON string or dict of RawPlatformMessage
-            config: Runnable config (provides conversation history via PM context)
+def message_intent_specialist_invoke(
+    raw_message: str | dict,
+    agent: Any,
+    config: dict[str, Any] | None = None,
+) -> MessageInterpretation:
+    """Invoke message intent specialist agent with raw platform message.
 
-        Returns:
-            Structured interpretation of user intent
-        """
-        # Parse raw message
-        if isinstance(raw_message, str):
-            try:
-                message_data = json.loads(raw_message)
-            except json.JSONDecodeError:
-                # Treat as plain text if not JSON
-                message_data = {"text": raw_message, "platform": "unknown"}
-        else:
-            message_data = raw_message
+    This maintains compatibility with tool wrapper while using agent-based
+    implementation underneath.
 
-        # Validate with Pydantic
+    Args:
+        raw_message: JSON string or dict of RawPlatformMessage
+        agent: Pre-created agent from create_message_intent_specialist
+        config: Runnable config (provides conversation history via PM context)
+
+    Returns:
+        Structured interpretation of user intent
+    """
+    # Parse raw message
+    if isinstance(raw_message, str):
         try:
-            parsed_message = RawPlatformMessage.model_validate(message_data)
-        except Exception as e:
-            logger.warning(
-                "Failed to parse raw message, using fallback",
-                extra={"error": str(e), "raw": message_data}
-            )
-            # Fallback for malformed messages
-            return MessageInterpretation(
-                intent="off_topic",
-                reasoning=f"Could not parse message format: {e}",
-                platform=message_data.get("platform", "unknown"),
-                raw_text=message_data.get("text"),
-                has_media=False,
-            )
+            message_data = json.loads(raw_message)
+        except json.JSONDecodeError:
+            # Treat as plain text if not JSON
+            message_data = {"text": raw_message, "platform": "unknown"}
+    else:
+        message_data = raw_message
 
-        # Load specialist prompt
-        system_prompt = load_prompt("specialists/message_intent_specialist.prompt")
+    # Validate with Pydantic
+    try:
+        parsed_message = RawPlatformMessage.model_validate(message_data)
+    except Exception as e:
+        logger.warning(
+            "Failed to parse raw message, using fallback",
+            extra={"error": str(e), "raw": message_data}
+        )
+        # Fallback for malformed messages
+        return MessageInterpretation(
+            intent="off_topic",
+            reasoning=f"Could not parse message format: {e}",
+            platform=message_data.get("platform", "unknown"),
+            raw_text=message_data.get("text"),
+            has_media=False,
+        )
 
-        # Build input for specialist
-        user_input = f"""Raw Platform Message:
+    # Build input for specialist
+    user_input = f"""Raw Platform Message:
 Platform: {parsed_message.platform}
 Sender: {parsed_message.sender}
 Text: {parsed_message.text or "[no text]"}
@@ -116,24 +130,21 @@ Remember:
 - If no context and user provides product info → new_cataloging_request
 """
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_input},
-        ]
+    messages = [{"role": "human", "content": user_input}]
 
-        # Invoke with conversation history from PM
-        # PM passes history via config, specialist has full context
-        result = llm_with_tools.invoke(messages, config=config)
+    # Invoke agent with conversation history from PM
+    result = agent.invoke({"messages": messages}, config=config or {})
 
-        logger.info(
-            "Message intent interpreted",
-            extra={
-                "intent": result.intent,
-                "has_media": result.has_media,
-                "reasoning": result.reasoning[:100],
-            }
-        )
+    # Extract structured response (MessageInterpretation model)
+    interpretation = result["response"]  # create_agent with response_format returns {"response": MessageInterpretation}
 
-        return result
+    logger.info(
+        "Message intent interpreted",
+        extra={
+            "intent": interpretation.intent,
+            "has_media": interpretation.has_media,
+            "reasoning": interpretation.reasoning[:100],
+        }
+    )
 
-    return interpret_message
+    return interpretation

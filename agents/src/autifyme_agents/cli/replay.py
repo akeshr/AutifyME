@@ -338,11 +338,9 @@ class ScenarioReplay:
         # Validate checkpoint state
         safe_print("\n✓ Checking checkpoint state...")
         try:
-            from langchain_core.runnables import RunnableConfig
-
             thread_id = channel.format_thread_id(sender)
-            config: RunnableConfig = {"configurable": {"thread_id": thread_id}}  # type: ignore[typeddict-item]
-            checkpoint_tuple = self.checkpointer.get_tuple(config)
+            config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
+            checkpoint_tuple = self.checkpointer.get_tuple(config)  # type: ignore[arg-type]
 
             if checkpoint_tuple:
                 validations.append({
