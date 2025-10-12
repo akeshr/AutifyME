@@ -148,20 +148,50 @@ class WorkflowRunner:
             },
         )
 
-        # Gate check - skip low-intent messages
-        if not self._should_process(text, media_id is not None):
-            logger.info(
-                "Skipping low-intent message",
-                extra={"sender": sender, "text": text},
-            )
-            self.channel.send_text(sender, CATALOGING_PROMPT)
-            return
-
-        # Thread safety - serialize per sender
+        # Thread safety - serialize per sender (move up before gate check to access pending approvals)
         thread_id = self.channel.format_thread_id(sender)
         lock = self._get_lock(sender)
 
         with lock:
+            # Check for pending approval FIRST - if user sends text while approval pending, treat as approval response
+            if thread_id in self._pending_approvals and not media_id:
+                logger.info(
+                    "Detected approval-pending state, routing text response as approval decision",
+                    extra={"sender": sender, "thread_id": thread_id, "text": text[:50] if text else None}
+                )
+
+                # Parse approval decision from text
+                decision = self._parse_approval_decision(text)
+
+                if decision:
+                    logger.info(
+                        "Parsed approval decision from user text",
+                        extra={"sender": sender, "decision": decision}
+                    )
+                    # Call internal method - we already have the lock
+                    self._execute_approval_internal(sender, thread_id, decision)
+                else:
+                    # Ambiguous response - ask for clarification
+                    logger.warning(
+                        "Ambiguous approval response, requesting clarification",
+                        extra={"sender": sender, "text": text}
+                    )
+                    self.channel.send_text(
+                        sender,
+                        "Please confirm: Reply 'approve' to save this product, or 'reject' to discard."
+                    )
+                return
+
+            # Gate check - skip low-intent messages (only for non-approval flows)
+            if not self._should_process(text, media_id is not None):
+                logger.info(
+                    "Skipping low-intent message",
+                    extra={"sender": sender, "text": text},
+                )
+                self.channel.send_text(sender, CATALOGING_PROMPT)
+                return
+
+            # Normal workflow execution
             self._execute_workflow(thread_id, sender, text, media_id)
 
     def handle_approval(
@@ -169,7 +199,7 @@ class WorkflowRunner:
         sender: str,
         decision: Literal["approve", "reject"],
     ) -> None:
-        """Process approval/rejection from user.
+        """Process approval/rejection from user (public API with locking).
 
         Args:
             sender: Channel-specific sender ID
@@ -184,125 +214,140 @@ class WorkflowRunner:
         lock = self._get_lock(sender)
 
         with lock:
-            try:
-                # Get pending approval from memory
-                pending = self._pending_approvals.get(thread_id)
-                if not pending:
-                    logger.warning(
-                        "No pending approval found in memory",
-                        extra={"thread_id": thread_id}
-                    )
-                    self.channel.send_text(
-                        sender,
-                        "No pending approval found. Please resend your product details."
-                    )
-                    return
+            self._execute_approval_internal(sender, thread_id, decision)
 
-                if decision == "reject":
-                    logger.info("User rejected approval", extra={"thread_id": thread_id})
-                    del self._pending_approvals[thread_id]
-                    self.channel.send_text(
-                        sender,
-                        "Understood. The draft will remain unsaved. Let me know if you'd like updates or a retry.",
-                    )
-                    return
+    def _execute_approval_internal(
+        self,
+        sender: str,
+        thread_id: str,
+        decision: Literal["approve", "reject"],
+    ) -> None:
+        """Execute approval logic (internal, assumes lock is held).
 
-                # Get current checkpoint state to extract interrupt_id
-                config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
-                checkpointer = self._get_checkpointer()
-                state = checkpointer.get_tuple(config)  # type: ignore[arg-type]
-
-                if not state:
-                    logger.error("No checkpoint found for thread", extra={"thread_id": thread_id})
-                    self.channel.send_error(sender, "processing")
-                    return
-
-                # Extract interrupt info from checkpoint
-                state_values = state.checkpoint.get("channel_values", {})
-                interrupts = state_values.get("__interrupt__", [])
-
-                if not interrupts:
-                    logger.warning("No interrupts in checkpoint state", extra={"thread_id": thread_id})
-                    self.channel.send_error(sender, "processing")
-                    return
-
-                interrupt_id = interrupts[0].id
-
-                # Build Command to resume with accept payload
-                # HumanInTheLoopMiddleware expects: {interrupt_id: {"type": "accept"}}
-                command: Command = Command(resume={interrupt_id: {"type": "accept"}})
-
-                logger.debug(
-                    "Resuming workflow with approval",
-                    extra={"thread_id": thread_id, "interrupt_id": interrupt_id}
+        Args:
+            sender: Channel-specific sender ID
+            thread_id: Conversation thread ID
+            decision: User's decision
+        """
+        try:
+            # Get pending approval from memory
+            pending = self._pending_approvals.get(thread_id)
+            if not pending:
+                logger.warning(
+                    "No pending approval found in memory",
+                    extra={"thread_id": thread_id}
                 )
+                self.channel.send_text(
+                    sender,
+                    "No pending approval found. Please resend your product details."
+                )
+                return
 
-                # Resume PM from checkpoint
-                pm = self._create_project_manager()
-                last_event = None
+            if decision == "reject":
+                logger.info("User rejected approval", extra={"thread_id": thread_id})
+                del self._pending_approvals[thread_id]
+                self.channel.send_text(
+                    sender,
+                    "Understood. The draft will remain unsaved. Let me know if you'd like updates or a retry.",
+                )
+                return
 
-                try:
-                    # Fully consume stream to avoid GeneratorExit
-                    for event in pm.stream(command, config=config, stream_mode="values"):
-                        last_event = event
+            # Get current checkpoint state to extract interrupt_id
+            config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
+            checkpointer = self._get_checkpointer()
+            state = checkpointer.get_tuple(config)  # type: ignore[arg-type]
 
-                        # Check for nested interrupts
-                        if "__interrupt__" in event:
-                            logger.warning(
-                                "Nested interrupt during resumption",
-                                extra={"thread_id": thread_id}
-                            )
-                            # This shouldn't happen with save_product, but handle gracefully
-                            self.channel.send_error(sender, "processing")
-                            return
+            if not state:
+                logger.error("No checkpoint found for thread", extra={"thread_id": thread_id})
+                self.channel.send_error(sender, "processing")
+                return
 
-                except GeneratorExit:
-                    logger.warning(
-                        "GeneratorExit during approval resumption",
-                        extra={"thread_id": thread_id}
-                    )
-                    # Try to extract result from what we got
-                    if last_event:
-                        result = self._extract_cataloging_result(last_event.get("messages", []))
-                        if result:
-                            self.channel.send_completion(sender, result)
-                    del self._pending_approvals[thread_id]
-                    return
+            # Extract interrupt info from checkpoint
+            state_values = state.checkpoint.get("channel_values", {})
+            interrupts = state_values.get("__interrupt__", [])
 
-                except BaseException as e:
-                    logger.exception(
-                        "Unexpected error during approval resumption",
-                        extra={"thread_id": thread_id, "error_type": type(e).__name__}
-                    )
-                    self.channel.send_error(sender, "processing")
-                    del self._pending_approvals[thread_id]
-                    return
+            if not interrupts:
+                logger.warning("No interrupts in checkpoint state", extra={"thread_id": thread_id})
+                self.channel.send_error(sender, "processing")
+                return
 
-                # Extract result from final event
+            interrupt_id = interrupts[0].id
+
+            # Build Command to resume with accept payload
+            # HumanInTheLoopMiddleware expects: {interrupt_id: {"type": "accept"}}
+            command: Command = Command(resume={interrupt_id: {"type": "accept"}})
+
+            logger.debug(
+                "Resuming workflow with approval",
+                extra={"thread_id": thread_id, "interrupt_id": interrupt_id}
+            )
+
+            # Resume PM from checkpoint
+            pm = self._create_project_manager()
+            last_event = None
+
+            try:
+                # Fully consume stream to avoid GeneratorExit
+                for event in pm.stream(command, config=config, stream_mode="values"):
+                    last_event = event
+
+                    # Check for nested interrupts
+                    if "__interrupt__" in event:
+                        logger.warning(
+                            "Nested interrupt during resumption",
+                            extra={"thread_id": thread_id}
+                        )
+                        # This shouldn't happen with save_product, but handle gracefully
+                        self.channel.send_error(sender, "processing")
+                        return
+
+            except GeneratorExit:
+                logger.warning(
+                    "GeneratorExit during approval resumption",
+                    extra={"thread_id": thread_id}
+                )
+                # Try to extract result from what we got
                 if last_event:
                     result = self._extract_cataloging_result(last_event.get("messages", []))
                     if result:
-                        logger.info(
-                            "Workflow resumed successfully",
-                            extra={"thread_id": thread_id, "has_result": result is not None}
-                        )
                         self.channel.send_completion(sender, result)
-                    else:
-                        logger.warning("No result after resumption", extra={"thread_id": thread_id})
-                        self.channel.send_error(sender, "processing")
-                else:
-                    logger.warning("No final event after resumption", extra={"thread_id": thread_id})
-                    self.channel.send_error(sender, "processing")
-
-                # Cleanup
                 del self._pending_approvals[thread_id]
+                return
 
-            except Exception as exc:
-                logger.exception("Failed to handle approval", exc_info=exc)
-                # Cleanup on error
-                if thread_id in self._pending_approvals:
-                    del self._pending_approvals[thread_id]
+            except BaseException as e:
+                logger.exception(
+                    "Unexpected error during approval resumption",
+                    extra={"thread_id": thread_id, "error_type": type(e).__name__}
+                )
                 self.channel.send_error(sender, "processing")
+                del self._pending_approvals[thread_id]
+                return
+
+            # Extract result from final event
+            if last_event:
+                result = self._extract_cataloging_result(last_event.get("messages", []))
+                if result:
+                    logger.info(
+                        "Workflow resumed successfully",
+                        extra={"thread_id": thread_id, "has_result": result is not None}
+                    )
+                    self.channel.send_completion(sender, result)
+                else:
+                    logger.warning("No result after resumption", extra={"thread_id": thread_id})
+                    self.channel.send_error(sender, "processing")
+            else:
+                logger.warning("No final event after resumption", extra={"thread_id": thread_id})
+                self.channel.send_error(sender, "processing")
+
+            # Cleanup
+            del self._pending_approvals[thread_id]
+
+        except Exception as exc:
+            logger.exception("Failed to handle approval", exc_info=exc)
+            # Cleanup on error
+            if thread_id in self._pending_approvals:
+                del self._pending_approvals[thread_id]
+            self.channel.send_error(sender, "processing")
 
     def _execute_workflow(
         self,
@@ -661,6 +706,50 @@ class WorkflowRunner:
 
         # Skip common greetings
         return normalized not in {"hi", "hello", "hey", "thanks", "thank you"}
+
+    def _parse_approval_decision(self, text: str | None) -> Literal["approve", "reject"] | None:
+        """Parse user text into approval decision.
+
+        Args:
+            text: User's text message
+
+        Returns:
+            "approve", "reject", or None if ambiguous
+
+        Examples:
+            - "approve", "approved", "go ahead", "yes", "confirm" → "approve"
+            - "reject", "rejected", "no", "cancel", "discard" → "reject"
+            - "maybe later" → None (ambiguous)
+        """
+        if not text:
+            return None
+
+        normalized = text.strip().lower()
+
+        # Approval patterns
+        approval_keywords = {
+            "approve", "approved", "go ahead", "yes", "yep", "yeah", "confirm",
+            "confirmed", "ok", "okay", "good", "looks good", "save", "save it",
+            "proceed", "continue", "accept", "accepted"
+        }
+
+        # Rejection patterns
+        rejection_keywords = {
+            "reject", "rejected", "no", "nope", "cancel", "discard", "delete",
+            "don't save", "do not save", "abort", "stop", "skip", "not good"
+        }
+
+        # Check for exact matches or partial matches
+        for keyword in approval_keywords:
+            if keyword in normalized:
+                return "approve"
+
+        for keyword in rejection_keywords:
+            if keyword in normalized:
+                return "reject"
+
+        # Ambiguous
+        return None
 
     def _get_lock(self, sender: str) -> Lock:
         """Get or create thread lock with LRU eviction.
