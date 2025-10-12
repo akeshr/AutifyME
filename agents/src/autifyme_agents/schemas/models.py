@@ -8,13 +8,15 @@ from pydantic import BaseModel, Field
 class Product(BaseModel):
     """
     Represents a product in the catalog.
-    
+
     Note: No company_id field - single-tenant architecture means each
     deployed instance serves exactly one company.
+
+    The `id` field is None for drafts and populated by the database on INSERT.
     """
-    id: UUID = Field(
-        default_factory=uuid4,
-        description="The unique identifier for the product."
+    id: Optional[UUID] = Field(
+        default=None,
+        description="The unique identifier for the product (database-generated)."
     )
     name: Optional[str] = Field(None, description="The name of the product.")
     description: Optional[str] = Field(None, description="A detailed description of the product.")
