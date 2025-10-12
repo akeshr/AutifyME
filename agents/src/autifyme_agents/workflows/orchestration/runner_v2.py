@@ -49,7 +49,7 @@ from threading import Lock
 from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.errors import GraphRecursionError
+from langgraph.errors import GraphRecursionError, GraphInterrupt
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
@@ -200,7 +200,8 @@ class WorkflowRunner:
             extra={"thread_id": thread_id, "has_text": text is not None, "has_media": media_id is not None},
         )
 
-        # Track workflow start
+        workflow_start_time = datetime.now()
+
         incoming_message = IncomingMessage(
             sender_id=sender,
             text=text,
@@ -208,23 +209,19 @@ class WorkflowRunner:
             platform=self.channel.__class__.__name__.replace("Channel", "").lower(),
         )
         tracking_id = self.outcome_tracker.track_workflow_start(thread_id, incoming_message)
-        workflow_start_time = datetime.now()
 
-        # Build raw platform message payload
         raw_payload = {
-            "platform": self.channel.__class__.__name__.replace("Channel", "").lower(),
+            "platform": incoming_message.platform,
             "sender": sender,
             "text": text,
             "media_id": media_id,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": incoming_message.received_at.isoformat(),
         }
 
-        # Invoke PM to interpret message (PM uses MessageIntentSpecialist)
         try:
             result, interrupt_value = self._invoke_pm(thread_id, raw_payload)
 
             if interrupt_value:
-                # Generic HITL interrupt detected
                 self._handle_interrupt(sender, thread_id, interrupt_value)
                 duration = (datetime.now() - workflow_start_time).total_seconds()
                 self.outcome_tracker.track_workflow_end(
@@ -232,40 +229,34 @@ class WorkflowRunner:
                     success=True,
                     result={"status": "pending_hitl", "tracking_id": tracking_id},
                 )
+                return
 
-            elif result:
-                # Extract specialist's interpretation
-                interpretation = self._extract_interpretation(result.get("messages", []))
+            if not result:
+                return
 
-                if interpretation and interpretation.get("intent") == "resume_workflow":
-                    # Specialist says resume - execute Command it constructed
-                    self._handle_workflow_resumption(sender, thread_id, interpretation)
+            interpretation = self._extract_interpretation(result.get("messages", []))
+            if interpretation:
+                self._handle_interpretation(sender, thread_id, interpretation)
+                return
 
-                elif interpretation and interpretation.get("clarification_response"):
-                    # Specialist composed clarification response
-                    self.channel.send_text(sender, interpretation["clarification_response"])
+            cataloging_result = self._extract_cataloging_result(result.get("messages", []))
+            if cataloging_result:
+                self.channel.send_completion(sender, cataloging_result)
+                duration = (datetime.now() - workflow_start_time).total_seconds()
+                logger.info(
+                    "Workflow completed successfully",
+                    extra={"thread_id": thread_id, "duration_seconds": duration},
+                )
+                self.outcome_tracker.track_workflow_end(
+                    thread_id=thread_id,
+                    success=True,
+                    result=cataloging_result.model_dump(),
+                )
+                return
 
-                else:
-                    # Check for workflow completion
-                    cataloging_result = self._extract_cataloging_result(result.get("messages", []))
-
-                    if cataloging_result:
-                        self.channel.send_completion(sender, cataloging_result)
-                        duration = (datetime.now() - workflow_start_time).total_seconds()
-                        logger.info(
-                            "Workflow completed successfully",
-                            extra={"thread_id": thread_id, "duration_seconds": duration},
-                        )
-                        self.outcome_tracker.track_workflow_end(
-                            thread_id=thread_id,
-                            success=True,
-                            result=cataloging_result.model_dump(),
-                        )
-                    else:
-                        # Check for AI response
-                        summary = self._extract_ai_summary(result.get("messages", []))
-                        if summary:
-                            self.channel.send_text(sender, summary)
+            summary = self._extract_ai_summary(result.get("messages", []))
+            if summary:
+                self.channel.send_text(sender, summary)
 
         except GraphRecursionError as exc:
             logger.exception("PM recursion limit exceeded", exc_info=exc, extra={"thread_id": thread_id})
@@ -323,17 +314,16 @@ class WorkflowRunner:
         interrupt_value = None
 
         try:
-            # Stream PM execution and detect interrupts
             for event in pm.stream(payload, config=config, stream_mode="values"):
                 last_event = event
 
-                # Detect interrupt (propagates from department)
+                # Detect interrupt in stream (legacy pattern)
                 if "__interrupt__" in event:
                     interrupts = event.get("__interrupt__") or []
                     if interrupts:
                         interrupt_value = interrupts[0].value
                         logger.info(
-                            "Interrupt detected from department",
+                            "Interrupt detected from department (in stream)",
                             extra={
                                 "thread_id": thread_id,
                                 "interrupt_count": len(interrupts),
@@ -350,6 +340,18 @@ class WorkflowRunner:
 
             return last_event, interrupt_value
 
+        except GraphInterrupt as interrupt_exc:
+            logger.info(
+                "Interrupt detected from department (via exception)",
+                extra={
+                    "thread_id": thread_id,
+                    "interrupt_count": len(interrupt_exc.interrupts),
+                },
+            )
+            if interrupt_exc.interrupts:
+                return last_event, interrupt_exc.interrupts[0].value
+            return last_event, None
+
         except Exception as e:
             logger.exception(
                 "PM streaming error",
@@ -363,29 +365,16 @@ class WorkflowRunner:
         thread_id: str,
         interrupt_value: Any,
     ) -> None:
-        """Handle generic HITL interrupt by forwarding to user.
-
-        Generic handler - no workflow-specific knowledge. Just forwards interrupt
-        context to user via channel. Channel decides presentation format.
-
-        Args:
-            sender: Channel-specific sender ID
-            thread_id: Conversation thread ID
-            interrupt_value: Interrupt value from department (generic structure)
-        """
         logger.debug("Handling HITL interrupt", extra={"thread_id": thread_id})
 
         try:
-            # Forward interrupt to channel - channel decides how to present
-            # Could be approval request, form, clarification, etc.
             self.channel.send_hitl_request(sender, interrupt_value)
-
             logger.info(
                 "Interrupt forwarded to user",
                 extra={
                     "thread_id": thread_id,
-                    "interrupt_type": type(interrupt_value).__name__
-                }
+                    "interrupt_type": type(interrupt_value).__name__,
+                },
             )
 
         except Exception as exc:
@@ -409,13 +398,10 @@ class WorkflowRunner:
 
             if message_type == "tool":
                 content = getattr(message, "content", None)
-                if isinstance(content, dict):
-                    tool_name = content.get("tool_name")
-                    if tool_name == "interpret_incoming_message":
-                        # Extract interpretation result
-                        result = content.get("result")
-                        if isinstance(result, dict):
-                            return result
+                if isinstance(content, dict) and content.get("tool_name") == "interpret_incoming_message":
+                    result = content.get("result")
+                    if isinstance(result, dict):
+                        return result
 
         return None
 
@@ -442,65 +428,153 @@ class WorkflowRunner:
         logger.debug("Handling workflow resumption", extra={"thread_id": thread_id})
 
         try:
-            # Extract Command spec from specialist
             command_spec = interpretation.get("command")
-
             if not command_spec:
                 logger.error(
-                    "Specialist returned resume_workflow without command spec",
-                    extra={"thread_id": thread_id, "interpretation": str(interpretation)[:200]}
+                    "resume_workflow intent without command spec",
+                    extra={"thread_id": thread_id},
                 )
                 self.channel.send_error(sender, "processing", "I couldn't determine how to proceed.")
                 return
 
             interrupt_id = command_spec.get("interrupt_id")
             resume_value = command_spec.get("resume_value")
-
             if not interrupt_id or not resume_value:
                 logger.error(
                     "Invalid command spec from specialist",
-                    extra={"thread_id": thread_id, "command_spec": command_spec}
+                    extra={"thread_id": thread_id, "command_spec": command_spec},
                 )
                 self.channel.send_error(sender, "processing", "I couldn't determine how to proceed.")
                 return
 
-            # Build Command exactly as specialist instructed
             from langgraph.types import Command
-            command: Command = Command(resume={interrupt_id: resume_value})
 
+            command = Command(resume={interrupt_id: resume_value})
             logger.info(
                 "Resuming workflow with specialist-constructed Command",
                 extra={
                     "thread_id": thread_id,
                     "interrupt_id": interrupt_id,
-                    "resume_type": resume_value.get("type", "unknown")
-                }
+                    "resume_type": resume_value.get("type", "unknown"),
+                },
             )
 
-            # Resume PM with Command (blind execution)
-            result, _ = self._invoke_pm(thread_id, command=command)
+            result, interrupt_value = self._invoke_pm(thread_id, command=command)
+            if interrupt_value:
+                logger.warning(
+                    "Secondary interrupt during resumption",
+                    extra={"thread_id": thread_id},
+                )
+                self.channel.send_error(sender, "processing", "Workflow needs attention before it can continue.")
+                return
 
-            if result:
-                # Extract and send final result
-                cataloging_result = self._extract_cataloging_result(result.get("messages", []))
-
-                if cataloging_result:
-                    self.channel.send_completion(sender, cataloging_result)
-                    logger.info("Workflow resumed and completed", extra={"thread_id": thread_id})
-                else:
-                    # Check for AI response
-                    summary = self._extract_ai_summary(result.get("messages", []))
-                    if summary:
-                        self.channel.send_text(sender, summary)
-                    else:
-                        logger.warning("No result or response after resumption", extra={"thread_id": thread_id})
-                        self.channel.send_error(sender, "processing", "Workflow resumed but no result returned.")
-            else:
+            if not result:
                 logger.warning("No final event after resumption", extra={"thread_id": thread_id})
                 self.channel.send_error(sender, "processing", "Workflow resumed but failed to complete.")
+                return
+
+            cataloging_result = self._extract_cataloging_result(result.get("messages", []))
+            if cataloging_result:
+                self.channel.send_completion(sender, cataloging_result)
+                logger.info("Workflow resumed and completed", extra={"thread_id": thread_id})
+                return
+
+            summary = self._extract_ai_summary(result.get("messages", []))
+            if summary:
+                self.channel.send_text(sender, summary)
+                return
+
+            logger.warning("No result or response after resumption", extra={"thread_id": thread_id})
+            self.channel.send_error(sender, "processing", "Workflow resumed but no result returned.")
 
         except Exception as exc:
             logger.exception("Failed to handle workflow resumption", exc_info=exc, extra={"thread_id": thread_id})
+            self.channel.send_error(sender, "processing", "An error occurred while resuming the workflow.")
+
+    def _handle_interpretation(
+        self,
+        sender: str,
+        thread_id: str,
+        interpretation: dict[str, Any],
+    ) -> None:
+        """Handle generic interpretation - execute Command specialist constructed.
+
+        Fully generic - no workflow-specific logic. Specialist has already:
+        - Analyzed interrupt context
+        - Interpreted user's response
+        - Constructed appropriate resume_value
+
+        Runner just blindly executes the Command.
+
+        Args:
+            sender: Channel-specific sender ID
+            thread_id: Conversation thread ID
+            interpretation: MessageInterpretation with command field
+        """
+        logger.debug("Handling interpretation", extra={"thread_id": thread_id})
+
+        try:
+            command_spec = interpretation.get("command")
+            if not command_spec:
+                logger.error(
+                    "interpret_incoming_message intent without command spec",
+                    extra={"thread_id": thread_id},
+                )
+                self.channel.send_error(sender, "processing", "I couldn't determine how to proceed.")
+                return
+
+            interrupt_id = command_spec.get("interrupt_id")
+            resume_value = command_spec.get("resume_value")
+            if not interrupt_id or not resume_value:
+                logger.error(
+                    "Invalid command spec from specialist",
+                    extra={"thread_id": thread_id, "command_spec": command_spec},
+                )
+                self.channel.send_error(sender, "processing", "I couldn't determine how to proceed.")
+                return
+
+            from langgraph.types import Command
+
+            command = Command(resume={interrupt_id: resume_value})
+            logger.info(
+                "Resuming workflow with specialist-constructed Command",
+                extra={
+                    "thread_id": thread_id,
+                    "interrupt_id": interrupt_id,
+                    "resume_type": resume_value.get("type", "unknown"),
+                },
+            )
+
+            result, interrupt_value = self._invoke_pm(thread_id, command=command)
+            if interrupt_value:
+                logger.warning(
+                    "Secondary interrupt during resumption",
+                    extra={"thread_id": thread_id},
+                )
+                self.channel.send_error(sender, "processing", "Workflow needs attention before it can continue.")
+                return
+
+            if not result:
+                logger.warning("No final event after resumption", extra={"thread_id": thread_id})
+                self.channel.send_error(sender, "processing", "Workflow resumed but failed to complete.")
+                return
+
+            cataloging_result = self._extract_cataloging_result(result.get("messages", []))
+            if cataloging_result:
+                self.channel.send_completion(sender, cataloging_result)
+                logger.info("Workflow resumed and completed", extra={"thread_id": thread_id})
+                return
+
+            summary = self._extract_ai_summary(result.get("messages", []))
+            if summary:
+                self.channel.send_text(sender, summary)
+                return
+
+            logger.warning("No result or response after resumption", extra={"thread_id": thread_id})
+            self.channel.send_error(sender, "processing", "Workflow resumed but no result returned.")
+
+        except Exception as exc:
+            logger.exception("Failed to handle interpretation", exc_info=exc, extra={"thread_id": thread_id})
             self.channel.send_error(sender, "processing", "An error occurred while resuming the workflow.")
 
     def _get_lock(self, sender: str) -> Lock:
@@ -582,8 +656,6 @@ class WorkflowRunner:
         Returns:
             CatalogingResult if found, None otherwise
         """
-        from autifyme_agents.schemas.agent_outputs import CatalogingToolOutput
-
         for message in messages:
             message_type = getattr(message, "type", None)
             if not message_type and hasattr(message, "__class__"):
@@ -598,10 +670,12 @@ class WorkflowRunner:
                 continue
 
             try:
+                from autifyme_agents.schemas.agent_outputs import CatalogingToolOutput
+
                 tool_output = CatalogingToolOutput.model_validate(content)
-                return tool_output.result
             except ValueError:
                 continue
+            return tool_output.result
 
         return None
 
