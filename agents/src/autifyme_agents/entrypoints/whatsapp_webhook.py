@@ -218,7 +218,16 @@ async def receive(request: Request) -> Any:
                             extra={"message_id": message_id, "sender": sender, "event_path": str(event_path)},
                         )
                         continue
-                    
+
+                    # Mark as processed IMMEDIATELY to prevent race conditions
+                    # WhatsApp retries webhooks if response takes >20-30s (e.g., slow image processing)
+                    # Marking early ensures retries are idempotent even if workflow times out
+                    _mark_message_processed(message_id)
+                    logger.debug(
+                        "Message marked as processed (idempotency guard)",
+                        extra={"message_id": message_id, "sender": sender},
+                    )
+
                     # Extract text and media based on message type
                     # WhatsApp API structure varies by type:
                     # - text: {"text": {"body": "..."}}
@@ -266,9 +275,9 @@ async def receive(request: Request) -> Any:
                     if msg_type == "text" and _is_approval_message(text):
                         try:
                             _get_runner().handle_approval(sender, text)
-                            _mark_message_processed(message_id)
                         except GeneratorExit:
                             # GeneratorExit during approval resumption
+                            # Message already marked as processed above for idempotency
                             logger.warning(
                                 "Approval workflow streaming timed out (GeneratorExit)",
                                 extra={
@@ -277,9 +286,9 @@ async def receive(request: Request) -> Any:
                                     "event_path": str(event_path)
                                 },
                             )
-                            # Don't mark as processed - approval may be retried
                             continue
                         except Exception as approval_exc:
+                            # Message already marked as processed above for idempotency
                             logger.exception(
                                 "Approval processing failed",
                                 extra={
@@ -289,15 +298,14 @@ async def receive(request: Request) -> Any:
                                     "error_type": type(approval_exc).__name__
                                 },
                             )
-                            _mark_message_processed(message_id)
                         continue
 
                     try:
                         _get_runner().handle_message(sender, text, media_id)
-                        _mark_message_processed(message_id)
                     except GeneratorExit:
                         # GeneratorExit occurs when workflow streaming times out
-                        # This is expected in serverless environments for long-running workflows
+                        # Message already marked as processed above for idempotency
+                        # This prevents WhatsApp retries from creating duplicate threads
                         logger.warning(
                             "Workflow streaming timed out (GeneratorExit)",
                             extra={
@@ -306,10 +314,9 @@ async def receive(request: Request) -> Any:
                                 "event_path": str(event_path)
                             },
                         )
-                        # Don't mark as processed - workflow may resume later
-                        # Return success to WhatsApp to avoid retries
                         continue
                     except Exception as workflow_exc:
+                        # Message already marked as processed above for idempotency
                         logger.exception(
                             "Workflow execution failed",
                             extra={
@@ -319,8 +326,6 @@ async def receive(request: Request) -> Any:
                                 "error_type": type(workflow_exc).__name__
                             },
                         )
-                        # Mark as processed to avoid infinite retries
-                        _mark_message_processed(message_id)
                         # Continue processing other messages in the payload
                         continue
 
