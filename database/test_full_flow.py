@@ -8,7 +8,6 @@ Usage:
 
 import sys
 from pathlib import Path
-from datetime import datetime
 from dotenv import load_dotenv
 import os
 import time
@@ -68,7 +67,7 @@ def verify_outcome_in_db(test_name: str, expected_sender: str = "local_test_user
 
                 result = cur.fetchone()
                 if result:
-                    print(f"  [OK] Found outcome in database:")
+                    print("  [OK] Found outcome in database:")
                     print(f"    Tracking ID: {result[0]}")
                     print(f"    Message: {result[1][:50] if result[1] else 'None'}...")
                     print(f"    Success: {result[2]}")
@@ -97,10 +96,15 @@ def get_workflow_count() -> int:
     try:
         import psycopg
         db_url = os.getenv("DATABASE_URL")
+        if not db_url:
+            return -1
         with psycopg.connect(db_url, connect_timeout=5) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) FROM workflow_outcomes")
-                return cur.fetchone()[0]
+                result = cur.fetchone()
+                if result:
+                    return result[0]
+                return -1
     except Exception:
         return -1
 
@@ -124,7 +128,7 @@ def run_test_case(case_number: int, description: str, command: str) -> bool:
 
     # Run test
     print(f"\n[EXECUTING] {command}\n")
-    result = os.system(command)
+    os.system(command)
 
     # Wait a moment for database write
     time.sleep(2)
@@ -144,7 +148,7 @@ def run_test_case(case_number: int, description: str, command: str) -> bool:
             print(f"\n[RESULT] Test Case {case_number}: FAILED (outcome not verified)")
             return False
     else:
-        print(f"[FAIL] No new outcome tracked")
+        print("[FAIL] No new outcome tracked")
         print(f"\n[RESULT] Test Case {case_number}: FAILED ✗")
         return False
 
@@ -206,7 +210,7 @@ def main():
         print(f"\n[RESULT] Test Case 4: {'PASSED ✓' if hitl_approval_success else 'FAILED'}")
     else:
         hitl_approval_success = False
-        print(f"\n[RESULT] Test Case 4: FAILED ✗")
+        print("\n[RESULT] Test Case 4: FAILED ✗")
 
     results.append(("HITL Approval", hitl_approval_success))
 
@@ -233,7 +237,7 @@ def main():
         print(f"\n[RESULT] Test Case 5: {'PASSED ✓' if hitl_rejection_success else 'FAILED'}")
     else:
         hitl_rejection_success = False
-        print(f"\n[RESULT] Test Case 5: FAILED ✗")
+        print("\n[RESULT] Test Case 5: FAILED ✗")
 
     results.append(("HITL Rejection", hitl_rejection_success))
 

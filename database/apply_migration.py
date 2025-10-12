@@ -47,7 +47,7 @@ def apply_migration(migration_file: Path) -> None:
         print("ERROR: DATABASE_URL not found in environment")
         sys.exit(1)
 
-    print(f"Connecting to database...")
+    print("Connecting to database...")
 
     try:
         with psycopg.connect(db_url) as conn:
@@ -88,7 +88,7 @@ def apply_migration(migration_file: Path) -> None:
             # Show new tables
             new_tables = set(tables_after) - set(tables_before)
             if new_tables:
-                print(f"\nNew tables created:")
+                print("\nNew tables created:")
                 for table in sorted(new_tables):
                     print(f"  + {table}")
 
@@ -127,11 +127,11 @@ def apply_migration(migration_file: Path) -> None:
             print(f"{'='*60}\n")
 
     except psycopg.Error as e:
-        print(f"\nERROR: Database error occurred:")
+        print("\nERROR: Database error occurred:")
         print(f"  {e}")
         sys.exit(1)
     except Exception as e:
-        print(f"\nERROR: Unexpected error:")
+        print("\nERROR: Unexpected error:")
         print(f"  {e}")
         import traceback
         traceback.print_exc()
