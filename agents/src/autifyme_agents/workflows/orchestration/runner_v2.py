@@ -1,14 +1,42 @@
-"""Simplified workflow runner - truly agentic architecture.
+"""Generic HITL Framework - Truly Agentic Architecture.
 
-This runner is a thin routing layer that forwards raw platform messages to PM.
-PM uses MessageIntentSpecialist to interpret messages in context, eliminating:
-- Hardcoded approval parsing (was ~60 lines)
-- Duplicate approval state (was _pending_approvals dict)
-- Media download logic (moved to specialist tools)
-- Low-intent filtering (moved to specialist)
-- Abandonment detection (moved to specialist)
+Runner is a BLIND EXECUTOR with ZERO workflow knowledge.
 
-Total reduction: ~400 lines → ~150 lines
+## Core Principles
+
+**1. Runner Has NO Knowledge Of:**
+- What interrupts mean (approval, form, budget, etc.)
+- What user responses mean ("go ahead", "change X", etc.)
+- Workflow-specific logic
+- How to interpret intent
+
+**2. Specialist Has FULL Intelligence:**
+- Sees full conversation context + pending interrupts
+- Interprets ANY user phrasing
+- Constructs exact Commands for resumption
+- Decides intent freely (not limited to predefined literals)
+
+**3. Generic HITL Works For:**
+- Product approvals ✅
+- Budget approvals ✅
+- Multi-step wizards ✅
+- File upload confirmations ✅
+- Payment verifications ✅
+- ANY future workflow ✅
+
+## Architecture
+
+```
+User: "go ahead"
+→ Runner: Forward raw message to PM
+→ PM: Call MessageIntentSpecialist tool
+→ Specialist: Analyze context + construct Command
+→ Specialist: Return {intent: "resume_workflow", command: {interrupt_id, resume_value}}
+→ Runner: Blindly execute Command(resume={interrupt_id: resume_value})
+→ PM: Resume from interrupt
+```
+
+**No hardcoded patterns. No workflow assumptions. Fully generic.**
 """
 
 from __future__ import annotations
@@ -38,22 +66,34 @@ MAX_THREAD_LOCKS = 1000  # LRU cache size for thread locks
 
 
 class WorkflowRunner:
-    """Thin routing layer - forwards raw messages to PM for agentic interpretation.
+    """Blind executor - forwards messages and executes Commands from specialist.
 
-    Responsibilities:
+    ## Runner Responsibilities (Blind Executor):
     - Accept raw platform messages
     - Forward to PM with thread management
-    - Extract and relay final results
+    - Detect interrupts from PM stream
+    - Forward interrupts to user via channel
+    - Execute Commands specialist constructs
+    - Relay final results
 
-    NOT responsible for (delegated to PM + MessageIntentSpecialist):
-    - Message interpretation (PM uses MessageIntentSpecialist)
-    - Media downloading (specialist uses platform tools)
-    - Approval state management (checkpoint is single source of truth)
-    - Intent classification (specialist with conversation context)
-    - Abandonment detection (specialist sees history)
+    ## Runner Has ZERO Knowledge Of:
+    - What interrupts mean (approval, form, budget, wizard, etc.)
+    - What user responses mean ("go ahead", "change price", "reject")
+    - How to construct Commands (specialist does this)
+    - Workflow-specific logic
+    - Intent classification
 
-    Design: Massively simplified from 700+ lines to ~150 lines by making PM
-    truly agentic with MessageIntentSpecialist.
+    ## Delegated to MessageIntentSpecialist:
+    - Message interpretation with full conversation context
+    - Interrupt detection from history
+    - Command construction for resumption
+    - Intent classification (not limited to literals)
+    - Media downloading via platform tools
+    - Clarification composition
+
+    ## Design Philosophy:
+    Generic HITL framework that works for ANY workflow without Runner changes.
+    Specialist has full intelligence. Runner blindly executes.
     """
 
     def __init__(
@@ -73,7 +113,7 @@ class WorkflowRunner:
             recursion_limit: Max PM recursion depth
         """
         logger.info("=" * 80)
-        logger.info("INITIALIZING WORKFLOW RUNNER V2 (Truly Agentic)")
+        logger.info("INITIALIZING GENERIC HITL FRAMEWORK (Blind Executor)")
         logger.info("=" * 80)
 
         self.channel = channel
@@ -108,7 +148,7 @@ class WorkflowRunner:
         self.outcome_tracker = OutcomeTracker(storage)
         logger.info("OutcomeTracker initialized")
 
-        logger.info("WorkflowRunner V2 initialization complete")
+        logger.info("Generic HITL Framework initialized - Runner is blind executor")
         logger.info("=" * 80)
 
     def handle_message(
@@ -184,24 +224,29 @@ class WorkflowRunner:
             result, interrupt_value = self._invoke_pm(thread_id, raw_payload)
 
             if interrupt_value:
-                # Department interrupted for approval
+                # Generic HITL interrupt detected
                 self._handle_interrupt(sender, thread_id, interrupt_value)
                 duration = (datetime.now() - workflow_start_time).total_seconds()
                 self.outcome_tracker.track_workflow_end(
                     thread_id=thread_id,
                     success=True,
-                    result={"status": "pending_approval", "tracking_id": tracking_id},
+                    result={"status": "pending_hitl", "tracking_id": tracking_id},
                 )
 
             elif result:
-                # Check if PM's interpretation indicates approval response
+                # Extract specialist's interpretation
                 interpretation = self._extract_interpretation(result.get("messages", []))
 
-                if interpretation and interpretation.get("intent") == "approval_response":
-                    # User is responding to approval - handle resumption
-                    self._handle_approval_response(sender, thread_id, interpretation)
+                if interpretation and interpretation.get("intent") == "resume_workflow":
+                    # Specialist says resume - execute Command it constructed
+                    self._handle_workflow_resumption(sender, thread_id, interpretation)
+
+                elif interpretation and interpretation.get("clarification_response"):
+                    # Specialist composed clarification response
+                    self.channel.send_text(sender, interpretation["clarification_response"])
+
                 else:
-                    # Normal completion or clarification
+                    # Check for workflow completion
                     cataloging_result = self._extract_cataloging_result(result.get("messages", []))
 
                     if cataloging_result:
@@ -217,7 +262,7 @@ class WorkflowRunner:
                             result=cataloging_result.model_dump(),
                         )
                     else:
-                        # PM responded with text (clarification, etc.)
+                        # Check for AI response
                         summary = self._extract_ai_summary(result.get("messages", []))
                         if summary:
                             self.channel.send_text(sender, summary)
@@ -318,77 +363,35 @@ class WorkflowRunner:
         thread_id: str,
         interrupt_value: Any,
     ) -> None:
-        """Handle interrupt by sending approval request to user.
+        """Handle generic HITL interrupt by forwarding to user.
+
+        Generic handler - no workflow-specific knowledge. Just forwards interrupt
+        context to user via channel. Channel decides presentation format.
 
         Args:
             sender: Channel-specific sender ID
             thread_id: Conversation thread ID
-            interrupt_value: Interrupt value from department
+            interrupt_value: Interrupt value from department (generic structure)
         """
-        logger.debug("Handling interrupt", extra={"thread_id": thread_id})
+        logger.debug("Handling HITL interrupt", extra={"thread_id": thread_id})
 
         try:
-            # Parse Product draft from interrupt
-            draft = self._parse_interrupt_draft(interrupt_value)
-
-            if not draft:
-                logger.error("Failed to parse draft from interrupt", extra={"thread_id": thread_id})
-                self.channel.send_error(
-                    sender,
-                    "processing",
-                    "I encountered an issue preparing your product for approval."
-                )
-                return
+            # Forward interrupt to channel - channel decides how to present
+            # Could be approval request, form, clarification, etc.
+            self.channel.send_hitl_request(sender, interrupt_value)
 
             logger.info(
-                "Sending approval request",
-                extra={"thread_id": thread_id, "product_name": draft.name}
+                "Interrupt forwarded to user",
+                extra={
+                    "thread_id": thread_id,
+                    "interrupt_type": type(interrupt_value).__name__
+                }
             )
-
-            # Send approval request via channel
-            self.channel.send_approval_request(sender, draft)
 
         except Exception as exc:
             logger.exception("Failed to handle interrupt", exc_info=exc, extra={"thread_id": thread_id})
-            self.channel.send_error(sender, "processing")
+            self.channel.send_error(sender, "processing", "I encountered an issue requesting your input.")
 
-    def _parse_interrupt_draft(self, interrupt_value: Any) -> Any:
-        """Parse Product draft from interrupt value.
-
-        Args:
-            interrupt_value: Value from interrupt (HumanInTheLoopRequest format)
-
-        Returns:
-            Product instance if parsed successfully, None otherwise
-        """
-        from autifyme_agents.schemas.models import Product
-
-        try:
-            # HumanInTheLoopMiddleware format: list[HumanInTheLoopRequest]
-            if isinstance(interrupt_value, list):
-                for item in interrupt_value:
-                    if isinstance(item, dict) and "action_request" in item:
-                        action_request = item["action_request"]
-                        if action_request.get("action") == "save_product":
-                            args = action_request.get("args", {})
-                            return Product(
-                                name=args.get("name", "Unnamed Product"),
-                                description=args.get("description"),
-                                price=args.get("price"),
-                                sizes=args.get("sizes"),
-                                colors=args.get("colors"),
-                                image_urls=args.get("image_urls"),
-                            )
-
-            logger.warning(
-                "Unknown interrupt value format",
-                extra={"interrupt_type": type(interrupt_value).__name__}
-            )
-            return None
-
-        except Exception as e:
-            logger.exception("Failed to parse interrupt draft", exc_info=e)
-            return None
 
     def _extract_interpretation(self, messages: list) -> dict[str, Any] | None:
         """Extract MessageInterpretation from PM's tool call result.
@@ -416,83 +419,89 @@ class WorkflowRunner:
 
         return None
 
-    def _handle_approval_response(
+    def _handle_workflow_resumption(
         self,
         sender: str,
         thread_id: str,
         interpretation: dict[str, Any],
     ) -> None:
-        """Handle approval response by resuming workflow with Command.
+        """Handle generic workflow resumption - execute Command specialist constructed.
+
+        Fully generic - no workflow-specific logic. Specialist has already:
+        - Analyzed interrupt context
+        - Interpreted user's response
+        - Constructed appropriate resume_value
+
+        Runner just blindly executes the Command.
 
         Args:
             sender: Channel-specific sender ID
             thread_id: Conversation thread ID
-            interpretation: MessageInterpretation from PM
+            interpretation: MessageInterpretation with command field
         """
-        decision = interpretation.get("approval_decision")
+        logger.debug("Handling workflow resumption", extra={"thread_id": thread_id})
 
-        if decision == "reject":
-            logger.info("User rejected approval", extra={"thread_id": thread_id})
-            self.channel.send_text(
-                sender,
-                "Understood. Draft discarded. Send new details to retry."
-            )
-            return
-
-        # User approved - resume workflow
         try:
-            # Query checkpoint for interrupt_id
-            config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
-            checkpointer = self._get_checkpointer()
-            state = checkpointer.get_tuple(config)  # type: ignore[arg-type]
+            # Extract Command spec from specialist
+            command_spec = interpretation.get("command")
 
-            if not state:
-                logger.error("No checkpoint found", extra={"thread_id": thread_id})
-                self.channel.send_error(sender, "processing")
-                return
-
-            # Extract interrupt info
-            state_values = state.checkpoint.get("channel_values", {})
-            interrupts = state_values.get("__interrupt__", [])
-
-            if not interrupts:
-                logger.warning("No interrupts in checkpoint", extra={"thread_id": thread_id})
-                self.channel.send_text(
-                    sender,
-                    "I don't see a pending approval. What would you like to catalog?"
+            if not command_spec:
+                logger.error(
+                    "Specialist returned resume_workflow without command spec",
+                    extra={"thread_id": thread_id, "interpretation": str(interpretation)[:200]}
                 )
+                self.channel.send_error(sender, "processing", "I couldn't determine how to proceed.")
                 return
 
-            interrupt_id = interrupts[0].id
+            interrupt_id = command_spec.get("interrupt_id")
+            resume_value = command_spec.get("resume_value")
 
-            # Build Command to resume
+            if not interrupt_id or not resume_value:
+                logger.error(
+                    "Invalid command spec from specialist",
+                    extra={"thread_id": thread_id, "command_spec": command_spec}
+                )
+                self.channel.send_error(sender, "processing", "I couldn't determine how to proceed.")
+                return
+
+            # Build Command exactly as specialist instructed
             from langgraph.types import Command
-            command: Command = Command(resume={interrupt_id: {"type": "accept"}})
+            command: Command = Command(resume={interrupt_id: resume_value})
 
             logger.info(
-                "Resuming workflow with approval",
-                extra={"thread_id": thread_id, "interrupt_id": interrupt_id}
+                "Resuming workflow with specialist-constructed Command",
+                extra={
+                    "thread_id": thread_id,
+                    "interrupt_id": interrupt_id,
+                    "resume_type": resume_value.get("type", "unknown")
+                }
             )
 
-            # Resume PM with Command
+            # Resume PM with Command (blind execution)
             result, _ = self._invoke_pm(thread_id, command=command)
 
             if result:
-                # Extract final result
+                # Extract and send final result
                 cataloging_result = self._extract_cataloging_result(result.get("messages", []))
+
                 if cataloging_result:
                     self.channel.send_completion(sender, cataloging_result)
                     logger.info("Workflow resumed and completed", extra={"thread_id": thread_id})
                 else:
-                    logger.warning("No result after resumption", extra={"thread_id": thread_id})
-                    self.channel.send_error(sender, "processing")
+                    # Check for AI response
+                    summary = self._extract_ai_summary(result.get("messages", []))
+                    if summary:
+                        self.channel.send_text(sender, summary)
+                    else:
+                        logger.warning("No result or response after resumption", extra={"thread_id": thread_id})
+                        self.channel.send_error(sender, "processing", "Workflow resumed but no result returned.")
             else:
                 logger.warning("No final event after resumption", extra={"thread_id": thread_id})
-                self.channel.send_error(sender, "processing")
+                self.channel.send_error(sender, "processing", "Workflow resumed but failed to complete.")
 
         except Exception as exc:
-            logger.exception("Failed to handle approval response", exc_info=exc, extra={"thread_id": thread_id})
-            self.channel.send_error(sender, "processing")
+            logger.exception("Failed to handle workflow resumption", exc_info=exc, extra={"thread_id": thread_id})
+            self.channel.send_error(sender, "processing", "An error occurred while resuming the workflow.")
 
     def _get_lock(self, sender: str) -> Lock:
         """Get or create thread lock with LRU eviction.
