@@ -51,12 +51,16 @@ def create_message_intent_specialist(
     llm = model or get_llm(model="gpt-4.1-nano-2025-04-14", temperature=0.1)
     system_prompt = load_prompt("specialists/message_intent_specialist.prompt")
 
-    # ✅ Use create_agent with response_format for structured output + tools
+    # ✅ Use with_structured_output for complex nested schemas
+    # Note: response_format with create_agent fails for complex nested TypedDicts
+    # with JSONDecodeError: Extra data. Using with_structured_output is more robust.
+    structured_llm = llm.with_structured_output(MessageInterpretation, method="json_schema")
+
+    # Create agent without response_format, will handle structured output via llm
     agent = create_agent(
-        model=llm,
+        model=structured_llm,
         tools=platform_tools,  # Platform-specific media download tools
         system_prompt=system_prompt,
-        response_format=MessageInterpretation,  # ✅ Structured output
         name="MessageIntentSpecialist",
     )
 

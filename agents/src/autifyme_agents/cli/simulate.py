@@ -337,6 +337,33 @@ def run_scenario(
             media_id=str(image_path) if image_path else None,
         )
 
+        # If auto-approve/reject/edit mode, send follow-up approval message
+        # This simulates user responding to HITL interrupt
+        if hitl_mode in ["auto_approve", "auto_reject", "auto_edit"]:
+            time.sleep(0.5)  # Brief pause to simulate user thinking
+            print(f"\n{'='*60}")
+            print(f"📨 AUTO-MODE: Sending follow-up {'approval' if hitl_mode != 'auto_reject' else 'rejection'} message")
+            print(f"{'='*60}\n")
+
+            # Send appropriate follow-up message
+            if hitl_mode == "auto_approve":
+                follow_up_text = "approve"
+            elif hitl_mode == "auto_reject":
+                follow_up_text = "reject"
+            elif hitl_mode == "auto_edit":
+                # Apply predefined edits in the follow-up
+                if predefined_edits:
+                    edits = ", ".join(f"{k}={v}" for k, v in predefined_edits.items())
+                    follow_up_text = f"approve with edits: {edits}"
+                else:
+                    follow_up_text = "approve"
+
+            runner.handle_message(
+                sender=unique_sender,
+                text=follow_up_text,
+                media_id=None,
+            )
+
         elapsed = time.time() - start_time
         print(f"\n{'#'*60}")
         safe_print(f"✅ SCENARIO COMPLETE: {name}")
