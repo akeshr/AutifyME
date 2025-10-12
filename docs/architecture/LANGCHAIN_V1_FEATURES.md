@@ -62,7 +62,7 @@ A fully typed, structured view of LLM message content that standardizes modern f
 ```python
 from langchain_openai import ChatOpenAI
 
-llm = ChatOpenAI(model="gpt-4o")
+llm = ChatOpenAI(model="gpt-5-mini-2025-08-07")
 response = llm.invoke("Analyze this image and cite sources")
 
 # Old way (v0): response.content (plain string)
@@ -246,7 +246,7 @@ Python 3.9 support dropped. Requires **Python 3.10+**.
 
 ### 9. Anthropic & OpenAI Enhancements (Provider packages)
 
-- `langchain_openai` 0.3.34: native `response_format` passthrough for GPT-4.1/o3 family, SSE streaming, tool routing updates.
+- `langchain_openai` 0.3.34: native `response_format` passthrough for GPT-5 family, SSE streaming, tool routing updates.
 - `langchain_anthropic` 0.3.21: integrates prompt caching middleware, structured output hooks, and multimodal support.
 - DeepAgents defaults to Claude Sonnet 4 (64k tokens) via `get_default_model()` ensuring planning headroom.
 
@@ -316,7 +316,7 @@ def create_project_manager(company_profile: dict):
             company_name=company_profile["name"],
             brand_voice=company_profile["brand_voice"],
         ),
-        model=ChatOpenAI(model="gpt-4o", temperature=0.2),
+        model=ChatOpenAI(model="gpt-5-mini-2025-08-07", temperature=0.2),
         tool_configs={
             "save_product": True,      # Require approval
             "publish_website": True,    # Require approval
