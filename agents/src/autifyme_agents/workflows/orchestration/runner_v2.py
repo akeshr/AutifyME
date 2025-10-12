@@ -12,7 +12,7 @@ Runner is a BLIND EXECUTOR - forwards messages to PM, which handles checkpoint s
 1. User sends message → Runner forwards to PM
 2. PM processes with checkpoint context (sees pending interrupts automatically)
 3. If interrupt occurs → Runner sends to user via channel
-4. User responds → Runner forwards to PM (NO Command construction)
+4. User responds → Runner forwards to PM (with ToolMessage if needed)
 5. PM sees checkpoint state and resumes naturally
 6. LangGraph handles message sequence synthesis correctly
 
@@ -58,7 +58,7 @@ class WorkflowRunner:
     - Forward raw messages to PM
     - Detect interrupts from stream
     - Send interrupts to user via channel
-    - Forward user responses back to PM
+    - Forward user responses back to PM (with correct message type)
     
     PM + LangGraph handles:
     - Checkpoint state management
@@ -66,11 +66,10 @@ class WorkflowRunner:
     - Message sequence synthesis
     - Command construction (if needed)
     
-    ## NO MORE:
-    - Manual Command construction
-    - Interrupt ID extraction
-    - Checkpoint namespace handling
-    - Resume value creation
+    ## FIX APPLIED:
+    - Check checkpoint for pending tool calls
+    - Create ToolMessage when responding to tool calls
+    - Create HumanMessage for new conversations
     
     PM sees checkpoint context and handles everything naturally.
     """
@@ -201,7 +200,7 @@ class WorkflowRunner:
         }
 
         try:
-            # ✅ ALWAYS invoke PM with new message - it handles checkpoint state
+            # ✅ ALWAYS invoke PM with message - it handles checkpoint state
             result, interrupt_value = self._invoke_pm(thread_id, raw_payload)
 
             if interrupt_value:
@@ -269,7 +268,7 @@ class WorkflowRunner:
     ) -> tuple[dict[str, Any] | None, Any | None]:
         """Invoke PM with raw message payload.
 
-        ✅ SIMPLIFIED: No Command support needed - PM handles checkpoint state.
+        ✅ FIXED: Check for pending tool calls before adding messages.
 
         Args:
             thread_id: Conversation thread ID
@@ -283,9 +282,93 @@ class WorkflowRunner:
         pm = self._create_project_manager()
         config = self._build_config(thread_id)
 
-        # Build message payload
-        from langchain.messages import HumanMessage
-        payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
+        # ✅ FIX: Check checkpoint for pending tool calls
+        checkpointer = self._get_checkpointer()
+        state = checkpointer.get_tuple(config)
+        
+        pending_tool_call_id = None
+        if state:
+            state_values = state.checkpoint.get("channel_values", {})
+            messages = state_values.get("messages", [])
+            
+            # Find last assistant message with tool calls
+            for msg in reversed(messages):
+                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                    # Check if there's already a tool response
+                    tool_call_id = msg.tool_calls[0]["id"]
+                    has_response = any(
+                        hasattr(m, "tool_call_id") and m.tool_call_id == tool_call_id
+                        for m in messages[messages.index(msg)+1:]
+                    )
+                    if not has_response:
+                        pending_tool_call_id = tool_call_id
+                        logger.info(
+                            "Found pending tool call",
+                            extra={
+                                "thread_id": thread_id,
+                                "tool_call_id": tool_call_id,
+                            }
+                        )
+                        break
+
+        # Build payload based on checkpoint state
+        if pending_tool_call_id:
+            # There's a pending tool call - provide tool response
+            from langchain.messages import ToolMessage
+            
+            # Parse user's response to determine tool result
+            user_text = raw_payload.get("text", "").lower().strip()
+            
+            if any(word in user_text for word in ["approve", "approved", "yes", "confirmed", "ok", "okay", "good", "looks good"]):
+                tool_content = json.dumps({"status": "approved"})
+                logger.info(
+                    "User approved - creating approval tool response",
+                    extra={"thread_id": thread_id, "user_text": user_text[:50]}
+                )
+            elif any(word in user_text for word in ["reject", "rejected", "no", "cancel", "discard"]):
+                tool_content = json.dumps({"status": "rejected"})
+                logger.info(
+                    "User rejected - creating rejection tool response",
+                    extra={"thread_id": thread_id, "user_text": user_text[:50]}
+                )
+            else:
+                # Ambiguous - treat as clarification request
+                tool_content = json.dumps({"status": "clarification", "message": user_text})
+                logger.info(
+                    "Ambiguous response - creating clarification tool response",
+                    extra={"thread_id": thread_id, "user_text": user_text[:50]}
+                )
+            
+            payload = {
+                "messages": [
+                    ToolMessage(
+                        content=tool_content,
+                        tool_call_id=pending_tool_call_id,
+                    )
+                ]
+            }
+            
+            logger.info(
+                "Resuming with tool response",
+                extra={
+                    "thread_id": thread_id,
+                    "tool_call_id": pending_tool_call_id,
+                    "tool_content": tool_content[:100],
+                }
+            )
+        else:
+            # No pending tool call - normal message flow
+            from langchain.messages import HumanMessage
+            payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
+            
+            logger.debug(
+                "Adding new message (no pending tool call)",
+                extra={
+                    "thread_id": thread_id,
+                    "has_text": raw_payload.get("text") is not None,
+                    "has_media": raw_payload.get("media_id") is not None,
+                }
+            )
 
         last_event = None
         interrupt_value = None
