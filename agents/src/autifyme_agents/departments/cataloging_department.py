@@ -12,6 +12,7 @@ Architecture:
 from typing import Any
 
 from deepagents import create_deep_agent  # type: ignore[import-untyped]
+from deepagents.tools import write_todos
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langchain.agents.middleware.human_in_the_loop import ToolConfig
 
@@ -48,6 +49,7 @@ def create_cataloging_department(
     # Department's tools - all specialists are now regular tools that return structured data
     # This allows the LLM to access Product fields directly and call save_product properly
     tools = [
+        write_todos,  # ✅ DeepAgents planning tool for coordinating multi-step workflows
         create_image_analysis_tool(storage),  # Returns ImageAnalysisResult directly
         create_cataloging_specialist_tool(storage),  # Returns Product directly
         create_save_product_tool(storage),  # Accepts individual Product fields

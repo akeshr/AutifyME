@@ -23,7 +23,8 @@
       "Bash(timeout 120 uv run:*)",
       "mcp__supabase__list_tables",
       "mcp__supabase__execute_sql",
-      "WebFetch(domain:blog.langchain.com)"
+      "WebFetch(domain:blog.langchain.com)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
