@@ -338,7 +338,6 @@ class ScenarioReplay:
         # Validate checkpoint state
         safe_print("\n✓ Checking checkpoint state...")
         try:
-            from langgraph.checkpoint.base import CheckpointTuple
             from langchain_core.runnables import RunnableConfig
 
             thread_id = channel.format_thread_id(sender)

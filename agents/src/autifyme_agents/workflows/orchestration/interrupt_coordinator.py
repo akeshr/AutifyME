@@ -206,13 +206,12 @@ class InterruptCoordinator:
             self.state.delete_pending_approval(thread_id)
             return None
 
-        # Build resume command for LangGraph
+        # Build resume command for LangGraph HITL middleware
+        # HumanInTheLoopMiddleware expects AcceptPayload format: {"type": "accept"}
+        # No 'args' field for accept - that's only for edit/response types
         command: Command = Command(
             resume={
-                approval["interrupt_id"]: {
-                    "type": "accept",
-                    "args": None,
-                }
+                approval["interrupt_id"]: {"type": "accept"}
             }
         )
 
