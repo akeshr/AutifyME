@@ -30,13 +30,13 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     """Return the configured chat model for the Project Manager.
 
     Follows the Architecture-First rule by centralizing model selection through
-    our LLM factory. Default configuration favours gpt-5-mini-2025-08-07 with low temperature
+    our LLM factory. Default configuration favours gpt-5-nano-2025-08-07 with low temperature
     for deterministic planning.
     """
 
     if model is not None:
         return model
-    return get_llm(model="gpt-5-mini-2025-08-07", temperature=0.2)
+    return get_llm(model="gpt-5-nano-2025-08-07", temperature=0.2)
 
 
 def _load_prompt(company_profile: CompanyProfile) -> str:

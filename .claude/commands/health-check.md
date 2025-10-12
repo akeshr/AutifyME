@@ -78,7 +78,7 @@ try:
 
     # Test with minimal request
     response = client.chat.completions.create(
-        model='gpt-5-mini-2025-08-07',
+        model='gpt-5-nano-2025-08-07',
         messages=[{'role': 'user', 'content': 'test'}],
         max_tokens=5
     )
@@ -164,8 +164,8 @@ try:
     print(f'✅ Default LLM: {llm.model_name if hasattr(llm, \"model_name\") else \"configured\"}')
 
     # Test vision LLM
-    vision_llm = get_llm(provider='openai', model='gpt-5-mini-2025-08-07')
-    print(f'✅ Vision LLM: {vision_llm.model_name if hasattr(vision_llm, \"model_name\") else \"gpt-5-mini-2025-08-07\"}')
+    vision_llm = get_llm(provider='openai', model='gpt-5-nano-2025-08-07')
+    print(f'✅ Vision LLM: {vision_llm.model_name if hasattr(vision_llm, \"model_name\") else \"gpt-5-nano-2025-08-07\"}')
 
 except Exception as e:
     print(f'❌ LLM Configuration: {str(e)[:150]}')

@@ -466,7 +466,7 @@ class ApprovalIntentClassifier:
     """Classifies user messages during approval conversations."""
 
     def __init__(self, llm: BaseChatModel | None = None):
-        self.llm = llm or get_llm(model="gpt-5-mini-2025-08-07", temperature=0.1)
+        self.llm = llm or get_llm(model="gpt-5-nano-2025-08-07", temperature=0.1)
         self.structured_llm = self.llm.with_structured_output(ApprovalDecision)
 
     def classify(
