@@ -1,8 +1,8 @@
 """Domain models for core business entities."""
 
 from uuid import UUID, uuid4
-from typing import Optional, List, Literal
-from pydantic import BaseModel, Field
+from typing import Optional, List, Literal, Any
+from pydantic import BaseModel, Field, field_validator
 
 
 class Product(BaseModel):
@@ -24,6 +24,26 @@ class Product(BaseModel):
     sizes: Optional[List[str]] = Field(default_factory=list, description="Available sizes.")
     colors: Optional[List[str]] = Field(default_factory=list, description="Available colors.")
     image_urls: Optional[List[str]] = Field(default_factory=list, description="Product image URLs.")
+
+    @field_validator('id', mode='before')
+    @classmethod
+    def validate_id(cls, v: Any) -> Optional[UUID]:
+        """
+        Handle invalid UUID strings from LLM by treating them as None (draft).
+
+        Valid UUIDs pass through, invalid strings become None (database will generate).
+        """
+        if v is None:
+            return None
+        if isinstance(v, UUID):
+            return v
+        if isinstance(v, str):
+            try:
+                return UUID(v)
+            except (ValueError, AttributeError):
+                # Invalid UUID string from LLM - treat as draft (no ID yet)
+                return None
+        return None
 
     class Config:
         from_attributes = True
