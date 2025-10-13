@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
+    from autifyme_agents.core.ports import StorageInterface
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +17,23 @@ class IdempotencyChecker:
 
     Prevents duplicate webhook processing by tracking message_id in database.
     Survives server restarts and works across distributed containers.
+
+    Depends on StorageInterface (hexagonal architecture - port, not adapter).
     """
 
-    def __init__(self, storage: "SupabaseStorageClient"):
+    def __init__(self, storage: "StorageInterface"):
         """Initialize idempotency checker.
 
         Args:
-            storage: Supabase storage client for database access
+            storage: Storage interface for database access (port, not concrete adapter)
         """
         self.storage = storage
-        self._client = storage.supabase
+        # Access Supabase client directly (storage adapter provides it)
+        # This is acceptable because idempotency is Supabase-specific (uses RPC)
+        # If we swap storage backend, IdempotencyChecker would need refactoring
+        self._client = getattr(storage, 'supabase', None)
+        if self._client is None:
+            raise ValueError("IdempotencyChecker requires Supabase storage adapter (needs .supabase attribute)")
 
     def is_processed_and_mark(
         self,

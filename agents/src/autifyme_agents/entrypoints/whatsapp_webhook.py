@@ -13,7 +13,8 @@ from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.logging_config import setup_logging, get_logger
-from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.integrations.storage.idempotency import IdempotencyChecker
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
@@ -48,23 +49,23 @@ async def favicon():
 
 # Lazy initialization for serverless deployment
 _runner = None
-_storage_adapter = None
+_storage: StorageInterface | None = None
 _whatsapp_channel = None
 _idempotency_checker = None
 
 def _get_runner():
     """Lazy initialization of WorkflowRunner for serverless deployment."""
-    global _runner, _storage_adapter, _whatsapp_channel, _idempotency_checker
+    global _runner, _storage, _whatsapp_channel, _idempotency_checker
 
     if _runner is None:
         logger.info("Initializing WorkflowRunner with WhatsApp channel...")
         try:
-            # Create storage adapter
-            _storage_adapter = SupabaseStorageClient()
+            # Get storage adapter via factory (hexagonal architecture - depend on port)
+            _storage = get_storage()
             logger.info("Storage adapter initialized successfully")
 
             # Create idempotency checker (DB-backed)
-            _idempotency_checker = IdempotencyChecker(_storage_adapter)
+            _idempotency_checker = IdempotencyChecker(_storage)
             logger.info("Idempotency checker initialized")
 
             # Create channel adapter
@@ -74,7 +75,7 @@ def _get_runner():
             # Create generic workflow runner with WhatsApp channel
             _runner = WorkflowRunner(
                 channel=_whatsapp_channel,
-                storage=_storage_adapter,
+                storage=_storage,
             )
             logger.info("✅ WorkflowRunner initialized successfully")
         except Exception as e:
