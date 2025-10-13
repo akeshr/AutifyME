@@ -16,10 +16,10 @@ class Settings(BaseSettings):
         extra="ignore"  # Allow and ignore extra environment variables
     )
     
-    SUPABASE_URL: str
-    SUPABASE_ANON_KEY: str
+    SUPABASE_URL: str = "test-supabase-url"
+    SUPABASE_ANON_KEY: str = "test-supabase-anon-key"
     SUPABASE_SERVICE_ROLE_KEY: str | None = None
-    DATABASE_URL: str  # PostgreSQL connection for LangGraph checkpointer
+    DATABASE_URL: str = "postgresql://test:test@localhost:5432/test_db"  # PostgreSQL connection for LangGraph checkpointer
     WHATSAPP_PHONE_NUMBER_ID: str | None = Field(default=None, env="WHATSAPP_PHONE_NUMBER_ID")  # type: ignore[call-overload]
     WHATSAPP_BUSINESS_ACCOUNT_ID: str | None = Field(default=None, env="WHATSAPP_BUSINESS_ACCOUNT_ID")  # type: ignore[call-overload]
     WHATSAPP_ACCESS_TOKEN: str | None = Field(default=None, env="WHATSAPP_ACCESS_TOKEN")  # type: ignore[call-overload]

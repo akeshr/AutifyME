@@ -7,7 +7,7 @@ and other dependencies across the test suite.
 from __future__ import annotations
 
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +57,111 @@ def mock_image_analysis() -> ImageAnalysisResult:
     )
 
 
+class MockStorageClient(StorageInterface):
+    """Mock storage adapter for testing."""
+    
+    def __init__(self, company_profile: CompanyProfile, product: Product):
+        self.saved_products: list[Product] = []
+        self.pending_approvals: dict[str, Any] = {}
+        self.company_profile = company_profile
+        self.product = product
+
+    def get_company_profile(self) -> CompanyProfile:
+        return self.company_profile
+
+    def save_product(self, product: Product) -> Product:
+        # Simulate database save (generate ID if not present)
+        if product.id is None:
+            product.id = uuid.uuid4()
+        self.saved_products.append(product)
+        return product
+
+    def get_product(self, product_id: uuid.UUID) -> Product | None:
+        for p in self.saved_products:
+            if p.id == product_id:
+                return p
+        return None
+
+    def list_products(self, limit: int = 100, offset: int = 0) -> list[Product]:
+        return self.saved_products[offset : offset + limit]
+
+    def save_pending_approval(
+        self,
+        thread_id: str,
+        interrupt_id: str,
+        checkpoint_id: str,
+        tool_call: dict,
+        draft_summary: str,
+        ai_message: dict | None = None,
+        image_path: str | None = None,
+    ) -> None:
+        self.pending_approvals[thread_id] = {
+            "interrupt_id": interrupt_id,
+            "checkpoint_id": checkpoint_id,
+            "tool_call": tool_call,
+            "draft_summary": draft_summary,
+            "ai_message": ai_message,
+            "image_path": image_path,
+        }
+
+    def get_pending_approval(self, thread_id: str) -> dict[str, Any] | None:
+        return self.pending_approvals.get(thread_id)
+
+    def delete_pending_approval(self, thread_id: str) -> None:
+        self.pending_approvals.pop(thread_id, None)
+
+    def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
+        """Mock implementation for saving workflow outcomes."""
+        return str(uuid.uuid4())
+
+    def get_workflow_outcomes(
+        self,
+        *,
+        time_window: timedelta | None = None,
+        intent: str | None = None,
+        department: str | None = None,
+        success: bool | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Mock implementation for getting workflow outcomes."""
+        return []
+
+    def get_recent_failures(
+        self,
+        time_window: timedelta,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Mock implementation for getting recent failures."""
+        return []
+
+    def get_success_rates(
+        self,
+        time_window: timedelta | None = None,
+    ) -> list[dict[str, Any]]:
+        """Mock implementation for getting success rates."""
+        return [{"department": "cataloging", "intent": "catalog_product", "total_workflows": 10, "successful": 9, "success_rate_pct": 90.0, "avg_duration_seconds": 5.2}]
+
+    def get_edge_cases(
+        self,
+        time_window: timedelta | None = None,
+        max_occurrence_count: int = 3,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Mock implementation for getting edge cases."""
+        return []
+
+    def check_and_mark_message_processed(
+        self,
+        message_id: str,
+        sender_id: str,
+        thread_id: str,
+        received_at: datetime,
+    ) -> bool:
+        """Mock implementation for message deduplication."""
+        # For testing, always return False (not duplicate)
+        return False
+
+
 @pytest.fixture
 def mock_storage(mock_company_profile: CompanyProfile, mock_product: Product) -> StorageInterface:
     """Return a mock storage adapter with standard test data.
@@ -66,93 +171,7 @@ def mock_storage(mock_company_profile: CompanyProfile, mock_product: Product) ->
     - save_product() -> mock_product (with updated fields)
     - get_pending_approval() -> None (no pending approvals)
     """
-
-    class MockStorageClient(StorageInterface):
-        def __init__(self):
-            self.saved_products: list[Product] = []
-            self.pending_approvals: dict[str, Any] = {}
-
-        def get_company_profile(self) -> CompanyProfile:
-            return mock_company_profile
-
-        def save_product(self, product: Product) -> Product:
-            # Simulate database save (generate ID if not present)
-            if product.id is None:
-                product.id = uuid.uuid4()
-            self.saved_products.append(product)
-            return product
-
-        def get_product(self, product_id: uuid.UUID) -> Product | None:
-            for p in self.saved_products:
-                if p.id == product_id:
-                    return p
-            return None
-
-        def list_products(self, limit: int = 100, offset: int = 0) -> list[Product]:
-            return self.saved_products[offset : offset + limit]
-
-        def save_pending_approval(
-            self,
-            thread_id: str,
-            interrupt_id: str,
-            checkpoint_id: str,
-            tool_call: dict,
-            draft_summary: str,
-            ai_message: dict | None = None,
-            image_path: str | None = None,
-        ) -> None:
-            self.pending_approvals[thread_id] = {
-                "interrupt_id": interrupt_id,
-                "checkpoint_id": checkpoint_id,
-                "tool_call": tool_call,
-                "draft_summary": draft_summary,
-                "ai_message": ai_message,
-                "image_path": image_path,
-            }
-
-        def get_pending_approval(self, thread_id: str) -> dict[str, Any] | None:
-            return self.pending_approvals.get(thread_id)
-
-        def delete_pending_approval(self, thread_id: str) -> None:
-            self.pending_approvals.pop(thread_id, None)
-
-        def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
-            """Mock implementation for saving workflow outcomes."""
-            return str(uuid.uuid4())
-
-        def get_workflow_outcomes(
-            self,
-            *,
-            workflow_type: str | None = None,
-            success: bool | None = None,
-            limit: int = 100,
-            offset: int = 0,
-        ) -> list[dict[str, Any]]:
-            """Mock implementation for getting workflow outcomes."""
-            return []
-
-        def get_recent_failures(
-            self,
-            time_window: timedelta,
-        ) -> list[dict[str, Any]]:
-            """Mock implementation for getting recent failures."""
-            return []
-
-        def get_success_rates(
-            self,
-            time_window: timedelta | None = None,
-        ) -> dict[str, float]:
-            """Mock implementation for getting success rates."""
-            return {"overall": 0.95}
-
-        def get_edge_cases(
-            self,
-            time_window: timedelta | None = None,
-        ) -> list[dict[str, Any]]:
-            """Mock implementation for getting edge cases."""
-            return []
-
-    return MockStorageClient()
+    return MockStorageClient(mock_company_profile, mock_product)
 
 
 @pytest.fixture
