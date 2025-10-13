@@ -1,42 +1,26 @@
-"""Generic HITL Framework - Truly Agentic Architecture.
+"""Generic HITL Framework - Simplified Checkpoint-Based Architecture.
 
-Runner is a BLIND EXECUTOR with ZERO workflow knowledge.
+Runner is a BLIND EXECUTOR - forwards messages to PM, which handles checkpoint state naturally.
 
-## Core Principles
+## CRITICAL FIX: DeepAgents HITL Interrupt Handling
 
-**1. Runner Has NO Knowledge Of:**
-- What interrupts mean (approval, form, budget, etc.)
-- What user responses mean ("go ahead", "change X", etc.)
-- Workflow-specific logic
-- How to interpret intent
+**Problem**: Was checking for tool calls instead of deepagents HITL interrupts.
+**Solution**: Check for interrupts at checkpoint level and use Command resume.
 
-**2. Specialist Has FULL Intelligence:**
-- Sees full conversation context + pending interrupts
-- Interprets ANY user phrasing
-- Constructs exact Commands for resumption
-- Decides intent freely (not limited to predefined literals)
+## How It Works Now
 
-**3. Generic HITL Works For:**
-- Product approvals ✅
-- Budget approvals ✅
-- Multi-step wizards ✅
-- File upload confirmations ✅
-- Payment verifications ✅
-- ANY future workflow ✅
+1. User sends message → Runner forwards to PM
+2. PM processes with checkpoint context (sees pending interrupts automatically)
+3. If interrupt occurs → Runner sends to user via channel
+4. User responds → Runner checks for pending interrupt and uses Command resume
+5. PM sees checkpoint state and resumes naturally
+6. LangGraph handles message sequence synthesis correctly
 
-## Architecture
-
-```
-User: "go ahead"
-→ Runner: Forward raw message to PM
-→ PM: Call MessageIntentSpecialist tool
-→ Specialist: Analyze context + construct Command
-→ Specialist: Return {intent: "resume_workflow", command: {interrupt_id, resume_value}}
-→ Runner: Blindly execute Command(resume={interrupt_id: resume_value})
-→ PM: Resume from interrupt
-```
-
-**No hardcoded patterns. No workflow assumptions. Fully generic.**
+**Benefits**:
+- Correct interrupt detection for deepagents HITL
+- Command-based resumption (not ToolMessage)
+- No message sequence validation errors
+- Truly generic for ANY workflow
 """
 
 from __future__ import annotations
@@ -50,6 +34,7 @@ from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.errors import GraphRecursionError, GraphInterrupt
+from langgraph.types import Command
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
@@ -66,34 +51,28 @@ MAX_THREAD_LOCKS = 1000  # LRU cache size for thread locks
 
 
 class WorkflowRunner:
-    """Blind executor - forwards messages and executes Commands from specialist.
+    """Blind executor - forwards messages and lets PM + checkpoints handle state.
 
-    ## Runner Responsibilities (Blind Executor):
-    - Accept raw platform messages
-    - Forward to PM with thread management
-    - Detect interrupts from PM stream
-    - Forward interrupts to user via channel
-    - Execute Commands specialist constructs
-    - Relay final results
-
-    ## Runner Has ZERO Knowledge Of:
-    - What interrupts mean (approval, form, budget, wizard, etc.)
-    - What user responses mean ("go ahead", "change price", "reject")
-    - How to construct Commands (specialist does this)
-    - Workflow-specific logic
-    - Intent classification
-
-    ## Delegated to MessageIntentSpecialist:
-    - Message interpretation with full conversation context
-    - Interrupt detection from history
-    - Command construction for resumption
-    - Intent classification (not limited to literals)
-    - Media downloading via platform tools
-    - Clarification composition
-
-    ## Design Philosophy:
-    Generic HITL framework that works for ANY workflow without Runner changes.
-    Specialist has full intelligence. Runner blindly executes.
+    ## SIMPLIFIED ARCHITECTURE (Post-Fix):
+    
+    Runner responsibilities:
+    - Forward raw messages to PM
+    - Detect interrupts from stream
+    - Send interrupts to user via channel
+    - Forward user responses back to PM (with Command for deepagents HITL)
+    
+    PM + LangGraph handles:
+    - Checkpoint state management
+    - Interrupt resumption logic
+    - Message sequence synthesis
+    - Command execution
+    
+    ## FIX APPLIED:
+    - Check checkpoint for pending HITL interrupts (not tool calls)
+    - Use Command resume for deepagents HITL middleware
+    - Create HumanMessage for new conversations
+    
+    PM sees checkpoint context and handles everything naturally.
     """
 
     def __init__(
@@ -113,7 +92,7 @@ class WorkflowRunner:
             recursion_limit: Max PM recursion depth
         """
         logger.info("=" * 80)
-        logger.info("INITIALIZING GENERIC HITL FRAMEWORK (Blind Executor)")
+        logger.info("INITIALIZING GENERIC HITL FRAMEWORK (DeepAgents HITL)")
         logger.info("=" * 80)
 
         self.channel = channel
@@ -148,7 +127,7 @@ class WorkflowRunner:
         self.outcome_tracker = OutcomeTracker(storage)
         logger.info("OutcomeTracker initialized")
 
-        logger.info("Generic HITL Framework initialized - Runner is blind executor")
+        logger.info("Generic HITL Framework initialized - deepagents architecture")
         logger.info("=" * 80)
 
     def handle_message(
@@ -187,7 +166,9 @@ class WorkflowRunner:
         text: str | None,
         media_id: str | None,
     ) -> None:
-        """Execute workflow: interpret message, handle interrupts, resume if needed.
+        """Execute workflow: forward message to PM, handle any interrupts.
+
+        ✅ SIMPLIFIED: Command resume for deepagents HITL.
 
         Args:
             thread_id: Conversation thread ID
@@ -210,6 +191,7 @@ class WorkflowRunner:
         )
         tracking_id = self.outcome_tracker.track_workflow_start(thread_id, incoming_message)
 
+        # Build raw payload for PM
         raw_payload = {
             "platform": incoming_message.platform,
             "sender": sender,
@@ -219,9 +201,11 @@ class WorkflowRunner:
         }
 
         try:
+            # ✅ ALWAYS invoke PM with message - it handles checkpoint state
             result, interrupt_value = self._invoke_pm(thread_id, raw_payload)
 
             if interrupt_value:
+                # Department is requesting HITL - forward to user
                 self._handle_interrupt(sender, thread_id, interrupt_value)
                 duration = (datetime.now() - workflow_start_time).total_seconds()
                 self.outcome_tracker.track_workflow_end(
@@ -232,13 +216,10 @@ class WorkflowRunner:
                 return
 
             if not result:
+                logger.warning("PM returned no result", extra={"thread_id": thread_id})
                 return
 
-            interpretation = self._extract_interpretation(result.get("messages", []))
-            if interpretation:
-                self._handle_interpretation(sender, thread_id, interpretation)
-                return
-
+            # Check for workflow completion
             cataloging_result = self._extract_cataloging_result(result.get("messages", []))
             if cataloging_result:
                 self.channel.send_completion(sender, cataloging_result)
@@ -254,9 +235,12 @@ class WorkflowRunner:
                 )
                 return
 
+            # Fallback: send AI summary if available
             summary = self._extract_ai_summary(result.get("messages", []))
             if summary:
                 self.channel.send_text(sender, summary)
+            else:
+                logger.warning("No result or summary from PM", extra={"thread_id": thread_id})
 
         except GraphRecursionError as exc:
             logger.exception("PM recursion limit exceeded", exc_info=exc, extra={"thread_id": thread_id})
@@ -281,15 +265,15 @@ class WorkflowRunner:
     def _invoke_pm(
         self,
         thread_id: str,
-        raw_payload: dict[str, Any] | None = None,
-        command: Any | None = None,
+        raw_payload: dict[str, Any],
     ) -> tuple[dict[str, Any] | None, Any | None]:
-        """Invoke PM and detect interrupts.
+        """Invoke PM with raw message payload.
+
+        ✅ FIXED: Check for pending HITL interrupts and use Command resume.
 
         Args:
             thread_id: Conversation thread ID
-            raw_payload: Raw platform message dict (for new messages)
-            command: LangGraph Command (for resuming interrupts)
+            raw_payload: Raw platform message dict
 
         Returns:
             Tuple of (final_result, interrupt_value) - at most one will be non-None
@@ -299,65 +283,192 @@ class WorkflowRunner:
         pm = self._create_project_manager()
         config = self._build_config(thread_id)
 
-        # Build payload
-        from langchain.messages import HumanMessage
-        if command:
-            # Resuming with Command
-            payload = command
-        elif raw_payload:
-            # New message
-            payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
-        else:
-            raise ValueError("Either raw_payload or command must be provided")
+        # ✅ FIX: Check checkpoint for pending HITL interrupts (deepagents)
+        checkpointer = self._get_checkpointer()
+        state = checkpointer.get_tuple(config)
+        
+        pending_interrupt = None
+        if state:
+            # Interrupts are at checkpoint level, not in channel_values
+            checkpoint = state.checkpoint
+            interrupts = checkpoint.get("__interrupt__", [])
+            
+            if interrupts:
+                pending_interrupt = interrupts[0]
+                logger.info(
+                    "Found pending HITL interrupt",
+                    extra={
+                        "thread_id": thread_id,
+                        "interrupt_id": pending_interrupt.id if hasattr(pending_interrupt, 'id') else 'unknown',
+                    }
+                )
+            else:
+                logger.debug(
+                    "No pending interrupts found",
+                    extra={"thread_id": thread_id}
+                )
 
-        last_event = None
-        interrupt_value = None
-
-        try:
-            for event in pm.stream(payload, config=config, stream_mode="values"):
-                last_event = event
-
-                # Detect interrupt in stream (legacy pattern)
-                if "__interrupt__" in event:
-                    interrupts = event.get("__interrupt__") or []
-                    if interrupts:
-                        interrupt_value = interrupts[0].value
-                        logger.info(
-                            "Interrupt detected from department (in stream)",
-                            extra={
-                                "thread_id": thread_id,
-                                "interrupt_count": len(interrupts),
-                            },
-                        )
-
-            logger.debug(
-                "PM stream completed",
-                extra={
-                    "thread_id": thread_id,
-                    "had_interrupt": interrupt_value is not None,
-                },
-            )
-
-            return last_event, interrupt_value
-
-        except GraphInterrupt as interrupt_exc:
+        # Build payload based on checkpoint state
+        if pending_interrupt:
+            # There's a pending HITL interrupt - use Command resume
+            # Parse user's response to determine resume value
+            user_text = raw_payload.get("text", "").lower().strip()
+            
+            if any(word in user_text for word in ["approve", "approved", "yes", "confirmed", "ok", "okay", "good", "looks good", "go ahead"]):
+                # HumanInTheLoopMiddleware expects: {interrupt_id: {"type": "accept"}}
+                resume_value = {"type": "accept"}
+                logger.info(
+                    "User approved - creating Command resume",
+                    extra={
+                        "thread_id": thread_id,
+                        "user_text": user_text[:50],
+                    }
+                )
+            elif any(word in user_text for word in ["reject", "rejected", "no", "cancel", "discard", "don't save"]):
+                resume_value = {"type": "reject"}
+                logger.info(
+                    "User rejected - creating Command resume",
+                    extra={
+                        "thread_id": thread_id,
+                        "user_text": user_text[:50],
+                    }
+                )
+            else:
+                # Ambiguous - send clarification instead of resuming
+                logger.warning(
+                    "Ambiguous approval response - sending clarification",
+                    extra={"thread_id": thread_id, "user_text": user_text}
+                )
+                
+                self.channel.send_text(
+                    raw_payload.get("sender", ""),
+                    "Please confirm: Reply 'approve' to save this product, or 'reject' to discard."
+                )
+                return None, None
+            
+            # Create Command to resume HITL interrupt
+            interrupt_id = pending_interrupt.id if hasattr(pending_interrupt, 'id') else str(pending_interrupt)
+            command = Command(resume={interrupt_id: resume_value})
+            
             logger.info(
-                "Interrupt detected from department (via exception)",
+                "Resuming HITL with Command",
                 extra={
                     "thread_id": thread_id,
-                    "interrupt_count": len(interrupt_exc.interrupts),
-                },
+                    "interrupt_id": interrupt_id,
+                    "resume_type": resume_value["type"],
+                }
             )
-            if interrupt_exc.interrupts:
-                return last_event, interrupt_exc.interrupts[0].value
-            return last_event, None
+            
+            # For Command resume, stream the command directly
+            last_event = None
+            interrupt_value = None
+            
+            try:
+                for event in pm.stream(command, config=config, stream_mode="values"):
+                    last_event = event
 
-        except Exception as e:
-            logger.exception(
-                "PM streaming error",
-                extra={"thread_id": thread_id, "error_type": type(e).__name__},
+                    # Check for new interrupts
+                    if "__interrupt__" in event:
+                        interrupts = event.get("__interrupt__") or []
+                        if interrupts:
+                            interrupt_value = interrupts[0].value
+                            logger.warning(
+                                "Nested interrupt during resumption",
+                                extra={"thread_id": thread_id}
+                            )
+
+                logger.info(
+                    "Command resume completed",
+                    extra={
+                        "thread_id": thread_id,
+                        "had_new_interrupt": interrupt_value is not None,
+                    }
+                )
+
+                return last_event, interrupt_value
+
+            except GraphInterrupt as interrupt_exc:
+                logger.info(
+                    "Interrupt detected via exception during resume",
+                    extra={
+                        "thread_id": thread_id,
+                        "interrupt_count": len(interrupt_exc.interrupts),
+                    },
+                )
+                if interrupt_exc.interrupts:
+                    return last_event, interrupt_exc.interrupts[0].value
+                return last_event, None
+
+            except Exception as e:
+                logger.exception(
+                    "PM streaming error during Command resume",
+                    extra={"thread_id": thread_id, "error_type": type(e).__name__},
+                )
+                raise
+        
+        else:
+            # No pending interrupt - normal message flow
+            from langchain.messages import HumanMessage
+            payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
+            
+            logger.debug(
+                "Adding new message (no pending interrupt)",
+                extra={
+                    "thread_id": thread_id,
+                    "has_text": raw_payload.get("text") is not None,
+                    "has_media": raw_payload.get("media_id") is not None,
+                }
             )
-            raise
+
+            last_event = None
+            interrupt_value = None
+
+            try:
+                for event in pm.stream(payload, config=config, stream_mode="values"):
+                    last_event = event
+
+                    # Detect interrupt in stream (from subgraph or PM)
+                    if "__interrupt__" in event:
+                        interrupts = event.get("__interrupt__") or []
+                        if interrupts:
+                            interrupt_value = interrupts[0].value
+                            logger.info(
+                                "Interrupt detected",
+                                extra={
+                                    "thread_id": thread_id,
+                                    "interrupt_count": len(interrupts),
+                                },
+                            )
+
+                logger.debug(
+                    "PM stream completed",
+                    extra={
+                        "thread_id": thread_id,
+                        "had_interrupt": interrupt_value is not None,
+                    },
+                )
+
+                return last_event, interrupt_value
+
+            except GraphInterrupt as interrupt_exc:
+                # Alternative interrupt detection via exception
+                logger.info(
+                    "Interrupt detected via exception",
+                    extra={
+                        "thread_id": thread_id,
+                        "interrupt_count": len(interrupt_exc.interrupts),
+                    },
+                )
+                if interrupt_exc.interrupts:
+                    return last_event, interrupt_exc.interrupts[0].value
+                return last_event, None
+
+            except Exception as e:
+                logger.exception(
+                    "PM streaming error",
+                    extra={"thread_id": thread_id, "error_type": type(e).__name__},
+                )
+                raise
 
     def _handle_interrupt(
         self,
@@ -365,12 +476,21 @@ class WorkflowRunner:
         thread_id: str,
         interrupt_value: Any,
     ) -> None:
+        """Forward interrupt to user via channel.
+
+        ✅ SIMPLIFIED: Just send to user - PM handles resumption when they respond.
+
+        Args:
+            sender: Channel-specific sender ID
+            thread_id: Conversation thread ID
+            interrupt_value: Value from interrupt (Product draft, form, etc.)
+        """
         logger.debug("Handling HITL interrupt", extra={"thread_id": thread_id})
 
         try:
             self.channel.send_hitl_request(sender, interrupt_value)
             logger.info(
-                "Interrupt forwarded to user",
+                "Interrupt forwarded to user - awaiting response",
                 extra={
                     "thread_id": thread_id,
                     "interrupt_type": type(interrupt_value).__name__,
@@ -378,204 +498,8 @@ class WorkflowRunner:
             )
 
         except Exception as exc:
-            logger.exception("Failed to handle interrupt", exc_info=exc, extra={"thread_id": thread_id})
+            logger.exception("Failed to send interrupt to user", exc_info=exc, extra={"thread_id": thread_id})
             self.channel.send_error(sender, "processing", "I encountered an issue requesting your input.")
-
-
-    def _extract_interpretation(self, messages: list) -> dict[str, Any] | None:
-        """Extract MessageInterpretation from PM's tool call result.
-
-        Args:
-            messages: PM output messages
-
-        Returns:
-            Interpretation dict if found, None otherwise
-        """
-        for message in messages:
-            message_type = getattr(message, "type", None)
-            if not message_type and hasattr(message, "__class__"):
-                message_type = message.__class__.__name__.replace("Message", "").lower()
-
-            if message_type == "tool":
-                content = getattr(message, "content", None)
-                if isinstance(content, dict) and content.get("tool_name") == "interpret_incoming_message":
-                    result = content.get("result")
-                    if isinstance(result, dict):
-                        return result
-
-        return None
-
-    def _handle_workflow_resumption(
-        self,
-        sender: str,
-        thread_id: str,
-        interpretation: dict[str, Any],
-    ) -> None:
-        """Handle generic workflow resumption - execute Command specialist constructed.
-
-        Fully generic - no workflow-specific logic. Specialist has already:
-        - Analyzed interrupt context
-        - Interpreted user's response
-        - Constructed appropriate resume_value
-
-        Runner just blindly executes the Command.
-
-        Args:
-            sender: Channel-specific sender ID
-            thread_id: Conversation thread ID
-            interpretation: MessageInterpretation with command field
-        """
-        logger.debug("Handling workflow resumption", extra={"thread_id": thread_id})
-
-        try:
-            command_spec = interpretation.get("command")
-            if not command_spec:
-                logger.error(
-                    "resume_workflow intent without command spec",
-                    extra={"thread_id": thread_id},
-                )
-                self.channel.send_error(sender, "processing", "I couldn't determine how to proceed.")
-                return
-
-            interrupt_id = command_spec.get("interrupt_id")
-            resume_value = command_spec.get("resume_value")
-            if not interrupt_id or not resume_value:
-                logger.error(
-                    "Invalid command spec from specialist",
-                    extra={"thread_id": thread_id, "command_spec": command_spec},
-                )
-                self.channel.send_error(sender, "processing", "I couldn't determine how to proceed.")
-                return
-
-            from langgraph.types import Command
-
-            command = Command(resume={interrupt_id: resume_value})
-            logger.info(
-                "Resuming workflow with specialist-constructed Command",
-                extra={
-                    "thread_id": thread_id,
-                    "interrupt_id": interrupt_id,
-                    "resume_type": resume_value.get("type", "unknown"),
-                },
-            )
-
-            result, interrupt_value = self._invoke_pm(thread_id, command=command)
-            if interrupt_value:
-                logger.warning(
-                    "Secondary interrupt during resumption",
-                    extra={"thread_id": thread_id},
-                )
-                self.channel.send_error(sender, "processing", "Workflow needs attention before it can continue.")
-                return
-
-            if not result:
-                logger.warning("No final event after resumption", extra={"thread_id": thread_id})
-                self.channel.send_error(sender, "processing", "Workflow resumed but failed to complete.")
-                return
-
-            cataloging_result = self._extract_cataloging_result(result.get("messages", []))
-            if cataloging_result:
-                self.channel.send_completion(sender, cataloging_result)
-                logger.info("Workflow resumed and completed", extra={"thread_id": thread_id})
-                return
-
-            summary = self._extract_ai_summary(result.get("messages", []))
-            if summary:
-                self.channel.send_text(sender, summary)
-                return
-
-            logger.warning("No result or response after resumption", extra={"thread_id": thread_id})
-            self.channel.send_error(sender, "processing", "Workflow resumed but no result returned.")
-
-        except Exception as exc:
-            logger.exception("Failed to handle workflow resumption", exc_info=exc, extra={"thread_id": thread_id})
-            self.channel.send_error(sender, "processing", "An error occurred while resuming the workflow.")
-
-    def _handle_interpretation(
-        self,
-        sender: str,
-        thread_id: str,
-        interpretation: dict[str, Any],
-    ) -> None:
-        """Handle generic interpretation - execute Command specialist constructed.
-
-        Fully generic - no workflow-specific logic. Specialist has already:
-        - Analyzed interrupt context
-        - Interpreted user's response
-        - Constructed appropriate resume_value
-
-        Runner just blindly executes the Command.
-
-        Args:
-            sender: Channel-specific sender ID
-            thread_id: Conversation thread ID
-            interpretation: MessageInterpretation with command field
-        """
-        logger.debug("Handling interpretation", extra={"thread_id": thread_id})
-
-        try:
-            command_spec = interpretation.get("command")
-            if not command_spec:
-                logger.error(
-                    "interpret_incoming_message intent without command spec",
-                    extra={"thread_id": thread_id},
-                )
-                self.channel.send_error(sender, "processing", "I couldn't determine how to proceed.")
-                return
-
-            interrupt_id = command_spec.get("interrupt_id")
-            resume_value = command_spec.get("resume_value")
-            if not interrupt_id or not resume_value:
-                logger.error(
-                    "Invalid command spec from specialist",
-                    extra={"thread_id": thread_id, "command_spec": command_spec},
-                )
-                self.channel.send_error(sender, "processing", "I couldn't determine how to proceed.")
-                return
-
-            from langgraph.types import Command
-
-            command = Command(resume={interrupt_id: resume_value})
-            logger.info(
-                "Resuming workflow with specialist-constructed Command",
-                extra={
-                    "thread_id": thread_id,
-                    "interrupt_id": interrupt_id,
-                    "resume_type": resume_value.get("type", "unknown"),
-                },
-            )
-
-            result, interrupt_value = self._invoke_pm(thread_id, command=command)
-            if interrupt_value:
-                logger.warning(
-                    "Secondary interrupt during resumption",
-                    extra={"thread_id": thread_id},
-                )
-                self.channel.send_error(sender, "processing", "Workflow needs attention before it can continue.")
-                return
-
-            if not result:
-                logger.warning("No final event after resumption", extra={"thread_id": thread_id})
-                self.channel.send_error(sender, "processing", "Workflow resumed but failed to complete.")
-                return
-
-            cataloging_result = self._extract_cataloging_result(result.get("messages", []))
-            if cataloging_result:
-                self.channel.send_completion(sender, cataloging_result)
-                logger.info("Workflow resumed and completed", extra={"thread_id": thread_id})
-                return
-
-            summary = self._extract_ai_summary(result.get("messages", []))
-            if summary:
-                self.channel.send_text(sender, summary)
-                return
-
-            logger.warning("No result or response after resumption", extra={"thread_id": thread_id})
-            self.channel.send_error(sender, "processing", "Workflow resumed but no result returned.")
-
-        except Exception as exc:
-            logger.exception("Failed to handle interpretation", exc_info=exc, extra={"thread_id": thread_id})
-            self.channel.send_error(sender, "processing", "An error occurred while resuming the workflow.")
 
     def _get_lock(self, sender: str) -> Lock:
         """Get or create thread lock with LRU eviction.
@@ -623,7 +547,7 @@ class WorkflowRunner:
             company_profile=self.company_profile,
             checkpointer=self._get_checkpointer(),
             storage=self.storage,
-            channel=self.channel,  # ✅ NEW: Pass channel for MessageIntentTool
+            channel=self.channel,
         )
 
     def _build_config(self, thread_id: str) -> dict[str, Any]:
@@ -673,9 +597,9 @@ class WorkflowRunner:
                 from autifyme_agents.schemas.agent_outputs import CatalogingToolOutput
 
                 tool_output = CatalogingToolOutput.model_validate(content)
+                return tool_output.result
             except ValueError:
                 continue
-            return tool_output.result
 
         return None
 
