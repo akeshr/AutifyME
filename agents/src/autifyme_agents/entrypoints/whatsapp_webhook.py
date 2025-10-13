@@ -16,6 +16,7 @@ from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
+from autifyme_agents.workflows.channels.mock.adapter import MockChannel
 
 # Initialize logging for serverless environment
 try:
@@ -55,17 +56,29 @@ def _get_runner():
     global _runner, _storage, _whatsapp_channel
 
     if _runner is None:
-        logger.info("Initializing WorkflowRunner with WhatsApp channel...")
+        logger.info("Initializing WorkflowRunner...")
         try:
             # Get storage adapter via factory (hexagonal architecture - depend on port)
             _storage = get_storage()
             logger.info("Storage adapter initialized successfully")
 
-            # Create channel adapter
-            _whatsapp_channel = WhatsAppChannel()
-            logger.info("WhatsApp channel adapter created")
+            # Create channel adapter - try WhatsApp first, fallback to mock
+            try:
+                _whatsapp_channel = WhatsAppChannel()
+                logger.info("✅ WhatsApp channel adapter created")
+            except ValueError as e:
+                if "WhatsApp credentials are not configured" in str(e):
+                    logger.warning(
+                        "WhatsApp credentials not configured - using mock channel for testing",
+                        extra={"error": str(e)}
+                    )
+                    _whatsapp_channel = MockChannel("whatsapp")
+                    logger.info("✅ Mock WhatsApp channel adapter created")
+                else:
+                    # Re-raise if it's a different ValueError
+                    raise
 
-            # Create generic workflow runner with WhatsApp channel
+            # Create generic workflow runner with channel
             _runner = WorkflowRunner(
                 channel=_whatsapp_channel,
                 storage=_storage,
@@ -234,7 +247,15 @@ async def receive(request: Request) -> Any:
                     # Handle approval messages (text only)
                     if msg_type == "text" and _is_approval_message(text):
                         try:
-                            _get_runner().handle_approval(sender, text)
+                            # Check if channel supports approval handling
+                            if hasattr(_whatsapp_channel, 'handle_approval'):
+                                _whatsapp_channel.handle_approval(sender, text)
+                            else:
+                                # For mock channel, just log the approval
+                                logger.info(
+                                    "Approval message received but channel doesn't support approval handling",
+                                    extra={"sender": sender, "text": text}
+                                )
                         except GeneratorExit:
                             # GeneratorExit during approval resumption
                             # Message already marked as processed above for idempotency
