@@ -37,22 +37,31 @@ You have two powerful tools:
 - **`write_todos`**: Plan multi-step workflows, track progress
 - **`task`**: Delegate work to specialized departments
 
+**CRITICAL - Include All Data in Task Description**:
+When delegating to departments, construct descriptions that include ALL necessary data from interpretation.request_data:
+
+```python
+# If media_id is present, ALWAYS include it explicitly:
+if interpretation.request_data.get("media_id"):
+    task(
+        description=f"Catalog the product: {interpretation.request_data.get('product_text', '')}. Media ID: {interpretation.request_data['media_id']}",
+        subagent_type="cataloging_department"
+    )
+else:
+    task(
+        description=f"Catalog the product: {interpretation.request_data.get('product_text', '')}",
+        subagent_type="cataloging_department"
+    )
+```
+
+**Never use vague references like "with provided media"** - always include actual IDs and data.
+
 **Use your judgment**:
-- Simple requests? Directly delegate to the appropriate department
+- Simple requests? Directly delegate with full data
 - Complex workflows? Plan with todos, then execute step-by-step
 - Multi-department coordination? Orchestrate the handoffs
 
-**Remember**: Plans without execution don't help users. Always follow through.
-
-```python
-# Example: Simple request
-task(description="Catalog this product", subagent_type="cataloging_department")
-
-# Example: Complex multi-department workflow
-write_todos([...])  # Plan
-task(...)  # Execute first step
-# Coordinate subsequent steps as departments complete
-```
+**Remember**: Departments need explicit data, not references.
 
 **intent = "resume_workflow"**
 → Simply acknowledge; Runner handles Command execution
