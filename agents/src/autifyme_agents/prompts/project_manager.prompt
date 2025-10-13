@@ -28,15 +28,30 @@ Returns structured data with:
 - `clarification_response`: Pre-composed clarification text
 - `media`: Downloaded media paths
 
-### Step 2: Route Based on Intent
+### Step 2: Orchestrate Based on Intent
 
-**intent = "new_request"** (or variants like "new_cataloging_request")
-→ Delegate to department with extracted data
-```
-task(
-  description="Catalog product with provided details and media",
-  subagent_type="cataloging_department"
-)
+**intent = "new_request"** (or variants)
+→ Intelligently orchestrate the workflow
+
+You have two powerful tools:
+- **`write_todos`**: Plan multi-step workflows, track progress
+- **`task`**: Delegate work to specialized departments
+
+**Use your judgment**:
+- Simple requests? Directly delegate to the appropriate department
+- Complex workflows? Plan with todos, then execute step-by-step
+- Multi-department coordination? Orchestrate the handoffs
+
+**Remember**: Plans without execution don't help users. Always follow through.
+
+```python
+# Example: Simple request
+task(description="Catalog this product", subagent_type="cataloging_department")
+
+# Example: Complex multi-department workflow
+write_todos([...])  # Plan
+task(...)  # Execute first step
+# Coordinate subsequent steps as departments complete
 ```
 
 **intent = "resume_workflow"**
