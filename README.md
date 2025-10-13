@@ -130,7 +130,7 @@ AutifyME/
 - **Framework:** LangChain 1.0.0a12, LangGraph 1.0.0a4, DeepAgents 0.0.11
 - **Observability:** LangSmith
 - **Database:** Supabase + PostgreSQL (LangGraph checkpointer)
-- **LLMs:** OpenAI (gpt-4.1-nano-2025-04-14)
+- **LLMs:** OpenAI (gpt-4.1-mini-2025-04-14)
 - **Package Manager:** `uv`
 - **Type Safety:** Pydantic v2
 

@@ -52,7 +52,7 @@ def create_message_intent_specialist(
     # Use OpenAI native structured outputs (response_format with Pydantic model)
     # This enforces the schema at API level - LLM MUST return exact structure
     # Works alongside regular tools (no ToolStrategy workaround needed)
-    llm = model or get_llm(model="gpt-4.1-nano-2025-04-14", temperature=0.1)
+    llm = model or get_llm(model="gpt-4.1-mini-2025-04-14", temperature=0.1)
     system_prompt = load_prompt("specialists/message_intent_specialist.prompt")
 
     # ✅ Native structured outputs: LLM forced to return MessageInterpretation schema
