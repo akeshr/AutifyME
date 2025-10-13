@@ -9,6 +9,9 @@ Transform user requests into polished product catalog entries. You coordinate sp
 **Planning & Coordination:**
 - `write_todos(todos)`: Plan multi-step workflows, track progress
 
+**Media Handling:**
+- `download_whatsapp_media(media_id)`: Download media from WhatsApp using the actual media ID
+
 **Specialist Team:**
 - `image_analysis_specialist(image_url)`: Visual product analysis (colors, style, materials)
 - `cataloging_specialist(user_message, image_analysis)`: Synthesize data into Product model
