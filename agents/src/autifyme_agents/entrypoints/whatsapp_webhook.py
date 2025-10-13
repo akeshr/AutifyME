@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -15,7 +14,6 @@ from autifyme_agents.core.config import settings
 from autifyme_agents.core.logging_config import setup_logging, get_logger
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.storage_factory import get_storage
-from autifyme_agents.integrations.storage.idempotency import IdempotencyChecker
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
 
@@ -51,11 +49,10 @@ async def favicon():
 _runner = None
 _storage: StorageInterface | None = None
 _whatsapp_channel = None
-_idempotency_checker = None
 
 def _get_runner():
     """Lazy initialization of WorkflowRunner for serverless deployment."""
-    global _runner, _storage, _whatsapp_channel, _idempotency_checker
+    global _runner, _storage, _whatsapp_channel
 
     if _runner is None:
         logger.info("Initializing WorkflowRunner with WhatsApp channel...")
@@ -63,10 +60,6 @@ def _get_runner():
             # Get storage adapter via factory (hexagonal architecture - depend on port)
             _storage = get_storage()
             logger.info("Storage adapter initialized successfully")
-
-            # Create idempotency checker (DB-backed)
-            _idempotency_checker = IdempotencyChecker(_storage)
-            logger.info("Idempotency checker initialized")
 
             # Create channel adapter
             _whatsapp_channel = WhatsAppChannel()
@@ -181,8 +174,9 @@ async def receive(request: Request) -> Any:
                     # Check for duplicate processing using message_id (DB-backed idempotency)
                     # WhatsApp can retry webhooks, and we need to ensure we don't
                     # process the same message multiple times. Uses database to survive restarts.
+                    # Storage adapter handles atomic check-and-mark via port (no concrete adapter leakage)
                     thread_id = _whatsapp_channel.format_thread_id(sender) if _whatsapp_channel else f"whatsapp:{sender}"
-                    if _idempotency_checker and _idempotency_checker.is_processed_and_mark(
+                    if _storage and _storage.check_and_mark_message_processed(
                         message_id=message_id,
                         sender_id=sender,
                         thread_id=thread_id,
