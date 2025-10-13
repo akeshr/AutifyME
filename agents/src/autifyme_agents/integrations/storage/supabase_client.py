@@ -64,11 +64,20 @@ class SupabaseStorageClient(StorageInterface):
         return CompanyProfile.model_validate(response.data)
 
     def save_product(self, product: Product) -> Product:
-        """Persist a product record using an idempotent upsert operation."""
+        """Persist a product record using insert for new products or update for existing."""
 
         client = self._ensure_client()
         product_payload = product.model_dump(mode="json")
-        response = client.table("products").upsert(product_payload).execute()
+
+        # For new products (no ID), use insert and let database generate UUID
+        # For existing products (with ID), use upsert for idempotency
+        if product.id is None:
+            # Remove None id from payload - database will generate it
+            product_payload.pop("id", None)
+            response = client.table("products").insert(product_payload).execute()
+        else:
+            # Existing product - use upsert for idempotency
+            response = client.table("products").upsert(product_payload).execute()
 
         if not response.data:
             raise RuntimeError("Storage adapter failed to persist product; inspect Supabase response for details.")
