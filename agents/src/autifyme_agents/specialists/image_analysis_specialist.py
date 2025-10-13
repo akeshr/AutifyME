@@ -172,4 +172,4 @@ Extract all visual product attributes including colors, materials, sizes, style,
     # Invoke agent
     result = agent.invoke({"messages": messages}, config=config or {})
 
-    return result["response"]  # ImageAnalysisResult model
+    return result["structured_response"]  # ImageAnalysisResult model

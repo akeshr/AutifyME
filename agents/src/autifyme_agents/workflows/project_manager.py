@@ -54,6 +54,7 @@ def _load_prompt(company_profile: CompanyProfile) -> str:
 def _create_cataloging_subagent(
     storage: StorageInterface,
     checkpointer: Any,
+    channel: MessagingChannel | None = None,
 ) -> dict:
     """Create cataloging department as a CustomSubAgent.
 
@@ -73,6 +74,7 @@ def _create_cataloging_subagent(
     cataloging_dept_graph = create_cataloging_department(
         checkpointer=checkpointer,
         storage=storage,
+        channel=channel,  # Pass channel for media download tools
     )
 
     # Return CustomSubAgent spec for DeepAgents
@@ -128,14 +130,12 @@ def create_project_manager(
 
     # Add MessageIntentTool if channel provided (enables agentic interpretation)
     if channel is not None:
-        from autifyme_agents.tools.platform_tools import create_platform_media_tools
         from autifyme_agents.tools.message_intent_tool import create_message_intent_tool
 
-        # Create platform-specific tools for media download
-        platform_tools = create_platform_media_tools(channel)
-
-        # Create message intent tool with platform tools
-        message_intent_tool = create_message_intent_tool(channel, platform_tools)
+        # Create message intent tool WITHOUT platform tools
+        # Intent specialist only needs to classify, not download media
+        # Media download happens in departments/specialists that need it
+        message_intent_tool = create_message_intent_tool(channel)
         pm_tools.append(message_intent_tool)
 
     # Add any additional explicit tools
@@ -144,7 +144,7 @@ def create_project_manager(
 
     # Departments are subagents (proper delegation hierarchy)
     subagents: list[Any] = [
-        _create_cataloging_subagent(storage, checkpointer),
+        _create_cataloging_subagent(storage, checkpointer, channel),
     ]
 
     # No tool_configs needed - departments handle their own HITL via middleware

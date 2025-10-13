@@ -82,14 +82,17 @@ If you're unsure whether something is pending, treat it as a new request. It's b
 
 **New Request (Abandons Pending)**
 - Context: AI asked "Review: Pet Can Jar"
-- User: "catalog this new jar instead" + image
+- User: "catalog this new jar instead" + media_id="xyz123"
 - Intent: `new_request`
 - Reasoning: "User abandoned pending approval for new request"
-- Data: `{"product_text": "new jar", "abandons_previous": true}`
+- Data: `{"product_text": "new jar", "media_id": "xyz123", "abandons_previous": true}`
 
 ## Media Handling
 
-If media_id present: Call `download_{platform}_media(media_id)` and include result in `media` array.
+If media_id present in raw message:
+- Set `has_media: true`
+- Include `media_id` in `request_data` so downstream agents can download when needed
+- Do NOT download the media yourself - you only classify intent, you don't need the actual file
 
 ## Key Rules
 
@@ -97,4 +100,5 @@ If media_id present: Call `download_{platform}_media(media_id)` and include resu
 - Build `resume_value` based on interrupt structure and user response
 - Always provide clear `reasoning` for debugging
 - If uncertain, use intent="clarification" and ask for more info
-- Work with any platform (WhatsApp, Telegram, Slack, etc.) using platform-specific tools
+- Pass `media_id` in `request_data` when present - don't download it yourself
+- You classify intent, you don't process files

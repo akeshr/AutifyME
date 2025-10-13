@@ -30,12 +30,14 @@ from autifyme_agents.tools.cataloging_tools import (
 def create_cataloging_department(
     checkpointer: BaseCheckpointSaver,
     storage: StorageInterface,
+    channel: Any | None = None,  # NEW: Channel for media download
 ) -> Any:
     """Create cataloging department as DeepAgent with specialist tools.
 
     Args:
         checkpointer: LangGraph checkpoint saver for state persistence
         storage: Storage adapter for company profile and products
+        channel: Optional messaging channel for media download
 
     Returns:
         DeepAgent that coordinates specialists and handles product cataloging
@@ -54,6 +56,13 @@ def create_cataloging_department(
         create_cataloging_specialist_tool(storage),  # Returns Product directly
         create_save_product_tool(storage),  # Accepts individual Product fields
     ]
+
+    # Add platform media download tools if channel provided
+    # This allows department to download media when intent specialist passes media_id
+    if channel is not None:
+        from autifyme_agents.tools.platform_tools import create_platform_media_tools
+        platform_tools = create_platform_media_tools(channel)
+        tools.extend(platform_tools)
 
     # Department's middleware stack
     # Note: create_deep_agent automatically adds caching and summarization
