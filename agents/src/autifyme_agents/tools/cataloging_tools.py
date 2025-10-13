@@ -25,26 +25,33 @@ def create_image_analysis_tool(storage: StorageInterface):
     if storage is None:
         raise ValueError("storage adapter must be provided and implement StorageInterface")
 
+    from autifyme_agents.specialists.image_analysis_specialist import image_analysis_specialist_invoke
+
     middleware = create_company_context_middleware(storage)
-    specialist = create_image_analysis_specialist()
 
     @tool("image_analysis_specialist")
     @middleware
     def image_analysis_specialist_tool(
-        image_url: str,
+        image_url: str | None = None,
+        image_bytes: bytes | None = None,
+        mime_type: str | None = None,
         *,
         company_profile,
         config=None,
     ) -> ImageAnalysisResult:
-        """Analyze product imagery to produce structured visual insights."""
+        """Analyze product imagery to produce structured visual insights.
 
-        payload = {
-            "input": {
-                "image_url": image_url,
-                "company_profile": company_profile,
-            }
-        }
-        return specialist.invoke(payload, config=config)
+        Accepts either image_url OR image_bytes+mime_type (preferred for serverless).
+        Using image_bytes avoids /tmp filesystem issues on serverless platforms.
+        """
+
+        return image_analysis_specialist_invoke(
+            image_url=image_url,
+            image_bytes=image_bytes,
+            mime_type=mime_type,
+            company_profile=company_profile,
+            config=config,
+        )
 
     return image_analysis_specialist_tool
 

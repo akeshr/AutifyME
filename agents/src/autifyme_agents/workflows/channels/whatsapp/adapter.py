@@ -194,14 +194,17 @@ class WhatsAppChannel:
 
         return self.send_text(recipient, error_message)
 
-    def download_media(self, media_id: str) -> Path | None:
+    def download_media(self, media_id: str) -> tuple[Path, bytes, str]:
         """Download media file via WhatsApp Graph API.
+
+        Returns tuple of (path, bytes, mime_type) for serverless compatibility.
+        Always use bytes for production to avoid /tmp ephemerality issues.
 
         Args:
             media_id: WhatsApp media ID from message
 
         Returns:
-            Path to downloaded temporary file, or None if not found
+            Tuple of (path, bytes, mime_type)
 
         Raises:
             ChannelError: If download fails
@@ -209,14 +212,19 @@ class WhatsAppChannel:
         try:
             logger.debug("Downloading WhatsApp media", extra={"media_id": media_id})
 
-            media_path = self.media.download_media(media_id)
+            media_path, media_bytes, mime_type = self.media.download_media(media_id)
 
             logger.info(
                 "WhatsApp media downloaded successfully",
-                extra={"media_id": media_id, "path": str(media_path)},
+                extra={
+                    "media_id": media_id,
+                    "path": str(media_path),
+                    "size_bytes": len(media_bytes),
+                    "mime_type": mime_type,
+                },
             )
 
-            return media_path
+            return media_path, media_bytes, mime_type
 
         except Exception as exc:
             logger.exception("Failed to download WhatsApp media", exc_info=exc)

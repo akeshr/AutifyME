@@ -57,7 +57,16 @@ class WhatsAppMediaClient:
         )
         return media_url
 
-    def download_media(self, media_id: str) -> Path:
+    def download_media(self, media_id: str) -> tuple[Path, bytes, str]:
+        """Download media from WhatsApp and return Path, bytes, and MIME type.
+
+        Returns tuple of (path, bytes, mime_type) to support both:
+        - Serverless: use bytes directly (no /tmp persistence issues)
+        - Local: use path for debugging
+
+        On serverless platforms like Vercel, /tmp is ephemeral and unreliable.
+        Always use the returned bytes for production code.
+        """
         media_url = self.get_media_url(media_id)
         logger.info(
             "Downloading media content",
@@ -73,16 +82,23 @@ class WhatsAppMediaClient:
             )
             raise
 
+        content_bytes = response.content
+        mime_type = response.headers.get("Content-Type", "application/octet-stream")
+
         # Create meaningful filename with timestamp and media_id
-        suffix = self._derive_suffix(response.headers.get("Content-Type"))
+        suffix = self._derive_suffix(mime_type)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{media_id}{suffix}"
         media_path = MEDIA_DIR / filename
 
-        # Write media to persistent location next to logs
-        media_path.write_bytes(response.content)
-        logger.info("Downloaded media to %s", media_path)
-        return media_path
+        # Write to /tmp for local debugging (optional, may fail on serverless)
+        try:
+            media_path.write_bytes(content_bytes)
+            logger.info("Downloaded media to %s (ephemeral on serverless)", media_path)
+        except Exception as e:
+            logger.warning(f"Could not write to {media_path}: {e}. Using bytes only.")
+
+        return media_path, content_bytes, mime_type
 
     @staticmethod
     def _derive_suffix(content_type: str | None) -> str:
