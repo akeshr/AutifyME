@@ -14,7 +14,7 @@ from fastapi.responses import PlainTextResponse, RedirectResponse
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.logging_config import setup_logging, get_logger
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
-from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
+from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
 
 # Initialize logging for serverless environment
