@@ -31,19 +31,17 @@ class TestImageAnalysisTool:
 
         assert "storage adapter must be provided" in str(exc_info.value)
 
-    @patch("autifyme_agents.tools.cataloging_tools.create_image_analysis_specialist")
+    @patch("autifyme_agents.specialists.image_analysis_specialist.image_analysis_specialist_invoke")
     def test_image_analysis_tool_invokes_specialist(
         self,
-        mock_specialist_factory,
+        mock_specialist_invoke,
         mock_storage,
         mock_company_profile,
         mock_image_analysis,
     ):
         """Tool should invoke specialist with correct payload."""
-        # Mock specialist chain
-        mock_chain = Mock()
-        mock_chain.invoke.return_value = mock_image_analysis
-        mock_specialist_factory.return_value = mock_chain
+        # Mock specialist invoke to return result directly
+        mock_specialist_invoke.return_value = mock_image_analysis
 
         tool = create_image_analysis_tool(mock_storage)
 
@@ -53,30 +51,31 @@ class TestImageAnalysisTool:
             "company_profile": mock_company_profile,
         })
 
-        # Verify specialist was invoked with correct structure
-        mock_chain.invoke.assert_called_once()
-        call_args = mock_chain.invoke.call_args[0][0]
-        assert "input" in call_args
-        assert call_args["input"]["image_url"] == "https://example.com/product.jpg"
-        assert call_args["input"]["company_profile"] == mock_company_profile
+        # Verify specialist was invoked with correct arguments
+        mock_specialist_invoke.assert_called_once_with(
+            image_url="https://example.com/product.jpg",
+            image_bytes=None,
+            mime_type=None,
+            company_profile=mock_company_profile,
+            config=None,
+        )
 
         # Verify result
         assert isinstance(result, ImageAnalysisResult)
         assert result == mock_image_analysis
 
-    @patch("autifyme_agents.tools.cataloging_tools.create_image_analysis_specialist")
+    @patch("autifyme_agents.specialists.image_analysis_specialist.image_analysis_specialist_invoke")
     def test_image_analysis_tool_with_local_file_path(
         self,
-        mock_specialist_factory,
+        mock_specialist_invoke,
         mock_storage,
         mock_company_profile,
         temp_image_file,
         mock_image_analysis,
     ):
         """Tool should handle local file paths."""
-        mock_chain = Mock()
-        mock_chain.invoke.return_value = mock_image_analysis
-        mock_specialist_factory.return_value = mock_chain
+        # Mock specialist invoke to return result directly
+        mock_specialist_invoke.return_value = mock_image_analysis
 
         tool = create_image_analysis_tool(mock_storage)
 
@@ -87,8 +86,10 @@ class TestImageAnalysisTool:
 
         assert isinstance(result, ImageAnalysisResult)
         # Specialist should be called with the file path
-        call_args = mock_chain.invoke.call_args[0][0]
-        assert str(temp_image_file) in call_args["input"]["image_url"]
+        mock_specialist_invoke.assert_called_once()
+        call_kwargs = mock_specialist_invoke.call_args.kwargs
+        assert call_kwargs["image_url"] == str(temp_image_file)
+        assert call_kwargs["company_profile"] == mock_company_profile
 
 
 class TestCatalogingSpecialistTool:

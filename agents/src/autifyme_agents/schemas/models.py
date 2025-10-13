@@ -1,6 +1,6 @@
 """Domain models for core business entities."""
 
-from uuid import UUID, uuid4
+from uuid import UUID
 from typing import Optional, List, Literal, Any
 from pydantic import BaseModel, Field, field_validator
 

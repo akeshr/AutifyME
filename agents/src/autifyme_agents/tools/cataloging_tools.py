@@ -16,7 +16,6 @@ from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 from autifyme_agents.schemas.models import Product
 from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
-from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
 
 
 def create_image_analysis_tool(storage: StorageInterface):
