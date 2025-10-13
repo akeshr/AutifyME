@@ -24,19 +24,18 @@ logger = logging.getLogger(__name__)
 
 def create_message_intent_tool(
     channel: MessagingChannel,
-    platform_tools: list,
 ) -> BaseTool:
     """Create message intent interpretation tool for PM.
 
     Args:
         channel: Messaging channel for context
-        platform_tools: Platform-specific tools (media download, etc.)
 
     Returns:
         LangChain tool that PM can invoke to interpret raw messages
     """
-    # Create the specialist agent with platform tools
-    specialist_agent = create_message_intent_specialist(platform_tools=platform_tools)
+    # Create the specialist agent WITHOUT platform tools
+    # Intent classification doesn't need to download media - just needs to know it exists
+    specialist_agent = create_message_intent_specialist(platform_tools=[])
 
     @tool
     def interpret_incoming_message(raw_message: str) -> dict[str, Any]:
