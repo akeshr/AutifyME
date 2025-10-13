@@ -163,7 +163,7 @@ def message_intent_specialist_invoke(
         if has_catalog_keywords or parsed_message.media_id:
             return MessageInterpretation(
                 intent="new_request",
-                reasoning=f"Specialist recursion limit reached. Defaulting to cataloging request based on keywords/media presence.",
+                reasoning="Specialist recursion limit reached. Defaulting to cataloging request based on keywords/media presence.",
                 request_data={"product_text": text} if text else {},
                 platform=parsed_message.platform,
                 raw_text=parsed_message.text,
@@ -172,7 +172,7 @@ def message_intent_specialist_invoke(
         else:
             return MessageInterpretation(
                 intent="clarification",
-                reasoning=f"Specialist recursion limit reached. Asking for clarification.",
+                reasoning="Specialist recursion limit reached. Asking for clarification.",
                 clarification_response="I'm having trouble processing your message. Could you please provide more details about what you'd like to catalog?",
                 platform=parsed_message.platform,
                 raw_text=parsed_message.text,

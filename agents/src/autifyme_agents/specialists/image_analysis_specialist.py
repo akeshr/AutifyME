@@ -13,6 +13,7 @@ from langchain.chat_models import BaseChatModel
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
+from autifyme_agents.schemas.models import CompanyProfile
 
 
 def _encode_bytes_to_data_uri(image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
@@ -104,7 +105,7 @@ def image_analysis_specialist_invoke(
     image_url: str | None = None,
     image_bytes: bytes | None = None,
     mime_type: str | None = None,
-    company_profile: dict | None = None,
+    company_profile: "CompanyProfile | dict | None" = None,
     config: dict | None = None,
 ) -> ImageAnalysisResult:
     """Invoke image analysis specialist with serverless-safe interface.
@@ -138,9 +139,18 @@ def image_analysis_specialist_invoke(
 
     agent = create_image_analysis_specialist()
 
-    # Build vision input
-    brand_voice = company_profile.get("brand_voice") if company_profile else "professional"
-    target_audience = company_profile.get("target_audience") if company_profile else "general"
+    # Build vision input - handle both Pydantic model (production) and dict (tests)
+    if company_profile:
+        if isinstance(company_profile, CompanyProfile):
+            brand_voice = company_profile.brand_voice
+            target_audience = company_profile.target_audience
+        else:
+            # Dict interface for backward compatibility with tests
+            brand_voice = company_profile.get("brand_voice", "professional")
+            target_audience = company_profile.get("target_audience", "general")
+    else:
+        brand_voice = "professional"
+        target_audience = "general"
 
     content = f"""Analyze this product image in the context of our brand.
 

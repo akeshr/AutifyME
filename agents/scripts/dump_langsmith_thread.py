@@ -12,6 +12,7 @@ the LangSmith documentation on tracing entire applications.
 from __future__ import annotations
 
 import argparse
+import sys
 from collections import deque
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +22,10 @@ from langsmith.schemas import Run
 
 # Load environment variables
 load_dotenv("../.env")
+
+# Fix Windows console encoding issues
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8")
 
 
 def parse_args() -> argparse.Namespace:
