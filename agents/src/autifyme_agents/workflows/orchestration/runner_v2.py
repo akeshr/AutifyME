@@ -351,7 +351,7 @@ class WorkflowRunner:
             
             # Create Command to resume HITL interrupt
             interrupt_id = pending_interrupt.id if hasattr(pending_interrupt, 'id') else str(pending_interrupt)
-            command = Command(resume={interrupt_id: resume_value})
+            command: Command = Command(resume={interrupt_id: resume_value})
             
             logger.info(
                 "Resuming HITL with Command",
@@ -391,15 +391,17 @@ class WorkflowRunner:
                 return last_event, interrupt_value
 
             except GraphInterrupt as interrupt_exc:
+                # GraphInterrupt stores interrupts in args[0]
+                interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
                 logger.info(
                     "Interrupt detected via exception during resume",
                     extra={
                         "thread_id": thread_id,
-                        "interrupt_count": len(interrupt_exc.interrupts),
+                        "interrupt_count": len(interrupts_list),
                     },
                 )
-                if interrupt_exc.interrupts:
-                    return last_event, interrupt_exc.interrupts[0].value
+                if interrupts_list:
+                    return last_event, interrupts_list[0].value
                 return last_event, None
 
             except Exception as e:
@@ -455,15 +457,17 @@ class WorkflowRunner:
 
             except GraphInterrupt as interrupt_exc:
                 # Alternative interrupt detection via exception
+                # GraphInterrupt stores interrupts in args[0]
+                interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
                 logger.info(
                     "Interrupt detected via exception",
                     extra={
                         "thread_id": thread_id,
-                        "interrupt_count": len(interrupt_exc.interrupts),
+                        "interrupt_count": len(interrupts_list),
                     },
                 )
-                if interrupt_exc.interrupts:
-                    return last_event, interrupt_exc.interrupts[0].value
+                if interrupts_list:
+                    return last_event, interrupts_list[0].value
                 return last_event, None
 
             except Exception as e:
@@ -491,7 +495,7 @@ class WorkflowRunner:
         logger.debug("Handling HITL interrupt", extra={"thread_id": thread_id})
 
         try:
-            self.channel.send_hitl_request(sender, interrupt_value)
+            self.channel.send_approval_request(sender, interrupt_value)
             logger.info(
                 "Interrupt forwarded to user - awaiting response",
                 extra={
