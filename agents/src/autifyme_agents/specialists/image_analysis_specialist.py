@@ -15,19 +15,41 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 
 
+def _encode_bytes_to_data_uri(image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
+    """Convert image bytes to base64 data URI for vision models.
+
+    This is serverless-safe - works directly with bytes in memory without filesystem access.
+
+    Args:
+        image_bytes: Raw image bytes
+        mime_type: MIME type (e.g., "image/jpeg", "image/png")
+
+    Returns:
+        Base64 data URI (e.g., "data:image/jpeg;base64,...")
+    """
+    encoded = base64.b64encode(image_bytes).decode('utf-8')
+    return f"data:{mime_type};base64,{encoded}"
+
+
 def _encode_image_to_data_uri(image_path: str) -> str:
     """Convert local image file to base64 data URI for vision models.
 
-    OpenAI Vision API requires either HTTPS URLs or base64 data URIs.
-    Local file paths won't work.
+    DEPRECATED: Use _encode_bytes_to_data_uri for serverless compatibility.
+    This function is kept for backward compatibility with local testing only.
 
     Args:
         image_path: Path to local image file
 
     Returns:
         Base64 data URI (e.g., "data:image/jpeg;base64,...")
+
+    Raises:
+        FileNotFoundError: If image file doesn't exist
     """
     path = Path(image_path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"Image file not found: {image_path}")
 
     # Determine MIME type from extension
     ext = path.suffix.lower()
@@ -37,13 +59,12 @@ def _encode_image_to_data_uri(image_path: str) -> str:
         '.png': 'image/png',
         '.gif': 'image/gif',
         '.webp': 'image/webp',
-    }.get(ext, 'image/jpeg')  # Default to jpeg
+    }.get(ext, 'image/jpeg')
 
-    # Read and encode
     with open(path, 'rb') as f:
-        encoded = base64.b64encode(f.read()).decode('utf-8')
+        image_bytes = f.read()
 
-    return f"data:{mime_type};base64,{encoded}"
+    return _encode_bytes_to_data_uri(image_bytes, mime_type)
 
 
 def create_image_analysis_specialist(
@@ -80,23 +101,46 @@ def create_image_analysis_specialist(
 
 
 def image_analysis_specialist_invoke(
-    image_url: str,
+    image_url: str | None = None,
+    image_bytes: bytes | None = None,
+    mime_type: str | None = None,
     company_profile: dict | None = None,
     config: dict | None = None,
 ) -> ImageAnalysisResult:
-    """Invoke image analysis specialist with simplified interface."""
+    """Invoke image analysis specialist with serverless-safe interface.
+
+    Args:
+        image_url: HTTPS URL or data URI (optional if image_bytes provided)
+        image_bytes: Raw image bytes - PREFERRED for serverless (bypasses /tmp)
+        mime_type: MIME type when using image_bytes (e.g., "image/jpeg")
+        company_profile: Company context for brand-aware analysis
+        config: Runtime config
+
+    Returns:
+        Structured image analysis result
+
+    Raises:
+        ValueError: If neither image_url nor image_bytes provided
+    """
+    # Serverless-first approach: prefer bytes over file paths
+    if image_bytes:
+        # Use bytes directly - serverless-safe, no /tmp dependency
+        if not mime_type:
+            mime_type = "image/jpeg"  # Default
+        image_url = _encode_bytes_to_data_uri(image_bytes, mime_type)
+
+    elif image_url:
+        # Convert local file paths to base64 (for local testing only)
+        if not image_url.startswith(('http://', 'https://', 'data:')):
+            image_url = _encode_image_to_data_uri(image_url)
+    else:
+        raise ValueError("Either image_url or image_bytes must be provided")
 
     agent = create_image_analysis_specialist()
 
     # Build vision input
     brand_voice = company_profile.get("brand_voice") if company_profile else "professional"
     target_audience = company_profile.get("target_audience") if company_profile else "general"
-
-    # Convert local file paths to base64 data URIs
-    # OpenAI Vision API cannot access local file system
-    if image_url and not image_url.startswith(('http://', 'https://', 'data:')):
-        # Local file path - convert to base64
-        image_url = _encode_image_to_data_uri(image_url)
 
     content = f"""Analyze this product image in the context of our brand.
 
