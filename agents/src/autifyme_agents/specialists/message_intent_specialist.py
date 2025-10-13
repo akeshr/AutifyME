@@ -17,7 +17,6 @@ import logging
 from typing import Any, TYPE_CHECKING
 
 from langchain.agents import create_agent
-from langchain.agents.structured_output import ToolStrategy
 from langgraph.errors import GraphRecursionError
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -50,19 +49,19 @@ def create_message_intent_specialist(
     Returns:
         Agent that interprets raw messages into structured MessageInterpretation
     """
-    # Use ToolStrategy for structured output (compatible with tools + middleware)
-    # ToolStrategy treats structured output as artificial tool call, avoiding
-    # JSONDecodeError with complex nested schemas
+    # Use OpenAI native structured outputs (response_format with Pydantic model)
+    # This enforces the schema at API level - LLM MUST return exact structure
+    # Works alongside regular tools (no ToolStrategy workaround needed)
     llm = model or get_llm(model="gpt-4.1-nano-2025-04-14", temperature=0.1)
     system_prompt = load_prompt("specialists/message_intent_specialist.prompt")
 
-    # ✅ ToolStrategy enables: structured output + real tools + HITL middleware
+    # ✅ Native structured outputs: LLM forced to return MessageInterpretation schema
     agent = create_agent(
         model=llm,
         tools=platform_tools,  # Platform-specific media download tools
         system_prompt=system_prompt,
         name="MessageIntentSpecialist",
-        response_format=ToolStrategy(MessageInterpretation),  # Wrap in ToolStrategy
+        response_format=MessageInterpretation,  # Direct Pydantic model - OpenAI native structured outputs
     )
 
     return agent
@@ -140,17 +139,17 @@ def message_intent_specialist_invoke(
 
     try:
         # Invoke agent with conversation history from PM (via config)
-        # Set reasonable recursion limit for specialist (simpler agent, fewer steps needed):
-        # 1. Download media (if present) - 1 step
-        # 2. Generate structured output - 1-2 steps
-        # Total: ~5 steps should be plenty
+        # Set reasonable recursion limit for specialist:
+        # - Download media (if present): 1 step
+        # - Generate structured output: 1-2 steps
+        # - With explicit schema in prompt, should not loop on validation
         specialist_config = (config or {}).copy()
-        specialist_config["recursion_limit"] = 10  # Explicit limit for specialist (parent's limit doesn't apply here)
+        specialist_config["recursion_limit"] = 5  # Reasonable limit with explicit schema guidance
 
         result = agent.invoke({"messages": messages}, config=specialist_config)
 
-        # Extract structured response (MessageInterpretation model)
-        interpretation = result["structured_response"]  # create_agent with response_format returns {"structured_response": MessageInterpretation}
+        # Extract structured response
+        interpretation = result["structured_response"]
 
     except GraphRecursionError as e:
         logger.warning(
