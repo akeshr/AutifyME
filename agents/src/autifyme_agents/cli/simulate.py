@@ -85,7 +85,8 @@ from pathlib import Path
 from typing import Any
 from dotenv import load_dotenv
 
-from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.schemas.models import CatalogingResult
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
@@ -299,7 +300,7 @@ def run_scenario(
     start_time = time.time()
 
     # Setup
-    storage = SupabaseStorageClient()
+    storage: StorageInterface = get_storage()
     channel = ConsoleChannel(auto_approve=auto_approve, hitl_mode=hitl_mode)
     if predefined_edits:
         channel.predefined_edits = predefined_edits

@@ -161,6 +161,72 @@ class SupabaseStorageClient(StorageInterface):
         return bool(response.data)
 
     # ========================================================================
+    # Webhook Idempotency (Duplicate Message Detection)
+    # ========================================================================
+
+    def check_and_mark_message_processed(
+        self,
+        message_id: str,
+        sender_id: str,
+        thread_id: str,
+        received_at: datetime,
+    ) -> bool:
+        """Atomically check if message is duplicate AND mark as processed.
+
+        Uses PostgreSQL stored procedure for atomic INSERT ON CONFLICT to prevent
+        race conditions. Fail-open strategy: if DB check fails, allow processing
+        to prevent webhook blocking.
+
+        Args:
+            message_id: WhatsApp message ID (unique across retries)
+            sender_id: Phone number
+            thread_id: LangGraph thread ID
+            received_at: When webhook was received
+
+        Returns:
+            True if duplicate (already processed), False if new (now marked as processed)
+        """
+        try:
+            client = self._ensure_client()
+            result = client.rpc("check_and_mark_processed", {
+                "p_message_id": message_id,
+                "p_sender_id": sender_id,
+                "p_thread_id": thread_id,
+                "p_received_at": received_at.isoformat(),
+            }).execute()
+
+            is_duplicate = result.data.get("is_duplicate", False)
+
+            if is_duplicate:
+                logger.info(
+                    "Duplicate message detected (DB idempotency)",
+                    extra={
+                        "message_id": message_id,
+                        "sender_id": sender_id,
+                        "thread_id": thread_id,
+                    },
+                )
+            else:
+                logger.debug(
+                    "New message marked as processed",
+                    extra={"message_id": message_id},
+                )
+
+            return is_duplicate
+
+        except Exception as exc:
+            # Fail OPEN (allow processing) if DB check fails to prevent webhook blocking
+            logger.exception(
+                "Idempotency check failed - allowing processing (fail open)",
+                exc_info=exc,
+                extra={
+                    "message_id": message_id,
+                    "error_type": type(exc).__name__,
+                },
+            )
+            return False  # Process the message (risk: potential duplicate)
+
+    # ========================================================================
     # Phase 1.2: Workflow Outcome Tracking (Agentic Evolution)
     # ========================================================================
 

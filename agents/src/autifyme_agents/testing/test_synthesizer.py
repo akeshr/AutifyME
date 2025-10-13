@@ -339,7 +339,8 @@ This test ensures the failure is resolved and doesn't reoccur.
 import pytest
 
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
-from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 
@@ -380,7 +381,7 @@ def {test_func_name}():
     Expected: Should not raise {failure.error_type}
     """
     # Setup
-    storage = SupabaseStorageClient()
+    storage: StorageInterface = get_storage()
     channel = MockChannel()
     checkpointer = get_checkpointer()
 
