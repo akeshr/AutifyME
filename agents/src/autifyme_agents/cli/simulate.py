@@ -134,7 +134,7 @@ class ConsoleChannel(MessagingChannel):
         self.messages_sent.append({"type": "text", "message": message})
         return {"status": "sent"}
 
-    def send_hitl_request(self, recipient: str, interrupt_value: Any) -> dict[str, Any]:
+    def send_approval_request(self, recipient: str, interrupt_value: Any) -> dict[str, Any]:
         """Generic HITL request handler - works for ANY interrupt type."""
         print(f"\n{'='*60}")
         safe_print(f"⏸️  HITL REQUEST TO {recipient}:")
