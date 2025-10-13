@@ -18,6 +18,7 @@ from typing import Any, TYPE_CHECKING
 
 from langchain.agents import create_agent
 from langchain.agents.structured_output import ToolStrategy
+from langgraph.errors import GraphRecursionError
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
@@ -139,10 +140,45 @@ def message_intent_specialist_invoke(
 
     try:
         # Invoke agent with conversation history from PM (via config)
-        result = agent.invoke({"messages": messages}, config=config or {})
+        # Set reasonable recursion limit for specialist (simpler agent, fewer steps needed):
+        # 1. Download media (if present) - 1 step
+        # 2. Generate structured output - 1-2 steps
+        # Total: ~5 steps should be plenty
+        specialist_config = (config or {}).copy()
+        specialist_config["recursion_limit"] = 10  # Explicit limit for specialist (parent's limit doesn't apply here)
+
+        result = agent.invoke({"messages": messages}, config=specialist_config)
 
         # Extract structured response (MessageInterpretation model)
         interpretation = result["structured_response"]  # create_agent with response_format returns {"structured_response": MessageInterpretation}
+
+    except GraphRecursionError as e:
+        logger.warning(
+            "Message intent specialist hit recursion limit - likely looping. Using fallback interpretation.",
+            extra={"error": str(e), "raw_message": str(message_data)[:200]}
+        )
+        # Fallback: Assume new cataloging request if message has content
+        text = parsed_message.text or ""
+        has_catalog_keywords = any(word in text.lower() for word in ["catalog", "add", "new", "product", "item", "price"])
+
+        if has_catalog_keywords or parsed_message.media_id:
+            return MessageInterpretation(
+                intent="new_request",
+                reasoning=f"Specialist recursion limit reached. Defaulting to cataloging request based on keywords/media presence.",
+                request_data={"product_text": text} if text else {},
+                platform=parsed_message.platform,
+                raw_text=parsed_message.text,
+                has_media=parsed_message.media_id is not None,
+            )
+        else:
+            return MessageInterpretation(
+                intent="clarification",
+                reasoning=f"Specialist recursion limit reached. Asking for clarification.",
+                clarification_response="I'm having trouble processing your message. Could you please provide more details about what you'd like to catalog?",
+                platform=parsed_message.platform,
+                raw_text=parsed_message.text,
+                has_media=False,
+            )
 
     except Exception as e:
         logger.exception(

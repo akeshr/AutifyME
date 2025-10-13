@@ -351,7 +351,7 @@ class WorkflowRunner:
                 extra={
                     "thread_id": thread_id,
                     "interrupt_id": interrupt_id,
-                    "resume_type": resume_value["type"],
+                    "resume_type": resume_value[0]["type"] if resume_value else "unknown",
                 }
             )
             

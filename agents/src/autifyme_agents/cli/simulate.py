@@ -342,7 +342,7 @@ def run_scenario(
         if hitl_mode in ["auto_approve", "auto_reject", "auto_edit"]:
             time.sleep(0.5)  # Brief pause to simulate user thinking
             print(f"\n{'='*60}")
-            print(f"📨 AUTO-MODE: Sending follow-up {'approval' if hitl_mode != 'auto_reject' else 'rejection'} message")
+            safe_print(f"📨 AUTO-MODE: Sending follow-up {'approval' if hitl_mode != 'auto_reject' else 'rejection'} message")
             print(f"{'='*60}\n")
 
             # Send appropriate follow-up message
