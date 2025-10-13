@@ -407,25 +407,25 @@ def get_predefined_scenarios():
         "image_with_clear_caption": {
             "name": "Image + Clear Caption",
             "text": "Catalog these canvas sneakers. Price $79.99, sizes 7-11.",
-            "image": "test_images/sneaker.jpg",
+            "image": "agents/test_images/sneaker.jpg",
             "media_type": "image",
         },
         "image_with_ambiguous_caption": {
             "name": "Image + Ambiguous Caption",
             "text": "What do you think?",
-            "image": "test_images/sneaker.jpg",
+            "image": "agents/test_images/sneaker.jpg",
             "media_type": "image",
         },
         "image_with_minimal_caption": {
             "name": "Image + Minimal Caption",
             "text": "Catalog this",
-            "image": "test_images/sneaker.jpg",
+            "image": "agents/test_images/sneaker.jpg",
             "media_type": "image",
         },
         "image_no_caption": {
             "name": "Image Only (no caption)",
             "text": None,
-            "image": "test_images/sneaker.jpg",
+            "image": "agents/test_images/sneaker.jpg",
             "media_type": "image",
         },
 
@@ -483,7 +483,7 @@ def get_predefined_scenarios():
         "cataloging_with_image": {
             "name": "Legacy - Cataloging with Text + Image",
             "text": "Catalog these canvas sneakers. Price $79.99, sizes 7-11.",
-            "image": "test_images/sneaker.jpg",
+            "image": "agents/test_images/sneaker.jpg",
             "media_type": "image",
         },
         "cataloging_text_only": {
