@@ -283,40 +283,36 @@ class WorkflowRunner:
         pm = self._create_project_manager()
         config = self._build_config(thread_id)
 
-        # ✅ FIX: Check checkpoint for pending HITL interrupts (deepagents)
-        checkpointer = self._get_checkpointer()
-        state = checkpointer.get_tuple(config)
-        
+        # ✅ FIX: Check for pending HITL interrupts using graph.get_state()
+        # StateSnapshot has .interrupts field, not checkpoint dict
+        state_snapshot = pm.get_state(config)
+
         pending_interrupt = None
-        if state:
-            # Interrupts are at checkpoint level, not in channel_values
-            checkpoint = state.checkpoint
-            interrupts = checkpoint.get("__interrupt__", [])
-            
-            if interrupts:
-                pending_interrupt = interrupts[0]
-                logger.info(
-                    "Found pending HITL interrupt",
-                    extra={
-                        "thread_id": thread_id,
-                        "interrupt_id": pending_interrupt.id if hasattr(pending_interrupt, 'id') else 'unknown',
-                    }
-                )
-            else:
-                logger.debug(
-                    "No pending interrupts found",
-                    extra={"thread_id": thread_id}
-                )
+        if state_snapshot and state_snapshot.interrupts:
+            pending_interrupt = state_snapshot.interrupts[0]
+            logger.info(
+                "Found pending HITL interrupt",
+                extra={
+                    "thread_id": thread_id,
+                    "interrupt_id": pending_interrupt.id if hasattr(pending_interrupt, 'id') else 'unknown',
+                }
+            )
+        else:
+            logger.debug(
+                "No pending interrupts found",
+                extra={"thread_id": thread_id}
+            )
 
         # Build payload based on checkpoint state
         if pending_interrupt:
             # There's a pending HITL interrupt - use Command resume
             # Parse user's response to determine resume value
             user_text = raw_payload.get("text", "").lower().strip()
-            
+
             if any(word in user_text for word in ["approve", "approved", "yes", "confirmed", "ok", "okay", "good", "looks good", "go ahead"]):
-                # HumanInTheLoopMiddleware expects: {interrupt_id: {"type": "accept"}}
-                resume_value = {"type": "accept"}
+                # HumanInTheLoopMiddleware expects list of responses: [{"type": "accept"}]
+                # Multiple responses are needed when multiple tools are interrupted
+                resume_value = [{"type": "accept"}]
                 logger.info(
                     "User approved - creating Command resume",
                     extra={
@@ -325,7 +321,7 @@ class WorkflowRunner:
                     }
                 )
             elif any(word in user_text for word in ["reject", "rejected", "no", "cancel", "discard", "don't save"]):
-                resume_value = {"type": "reject"}
+                resume_value = [{"type": "response", "args": "User rejected this action"}]
                 logger.info(
                     "User rejected - creating Command resume",
                     extra={
