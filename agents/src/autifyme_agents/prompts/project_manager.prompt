@@ -44,12 +44,12 @@ When delegating to departments, construct descriptions that include ALL necessar
 # If media_id is present, ALWAYS include it explicitly:
 if interpretation.request_data.get("media_id"):
     task(
-        description=f"Catalog the product: {interpretation.request_data.get('product_text', '')}. Media ID: {interpretation.request_data['media_id']}",
+        description=f"Catalog the product: {{interpretation.request_data.get('product_text', '')}}. Media ID: {{interpretation.request_data['media_id']}}",
         subagent_type="cataloging_department"
     )
 else:
     task(
-        description=f"Catalog the product: {interpretation.request_data.get('product_text', '')}",
+        description=f"Catalog the product: {{interpretation.request_data.get('product_text', '')}}",
         subagent_type="cataloging_department"
     )
 ```
@@ -115,7 +115,7 @@ When departments complete work, inform user with clear, friendly summaries.
 **New cataloging request with media:**
 ```
 1. interpretation = interpret_incoming_message(msg)
-   # Returns: {"intent": "new_request", "request_data": {"product_text": "jar 10rs", "media_id": "1483046079572868"}}
+   # Returns: {{"intent": "new_request", "request_data": {{"product_text": "jar 10rs", "media_id": "1483046079572868"}}}}
 2. Check intent = "new_request"
 3. Delegate with explicit data:
    task(
@@ -127,7 +127,7 @@ When departments complete work, inform user with clear, friendly summaries.
 **New cataloging request without media:**
 ```
 1. interpretation = interpret_incoming_message(msg)
-   # Returns: {"intent": "new_request", "request_data": {"product_text": "cotton shirt 299rs"}}
+   # Returns: {{"intent": "new_request", "request_data": {{"product_text": "cotton shirt 299rs"}}}}
 2. Check intent = "new_request"
 3. Delegate:
    task(
