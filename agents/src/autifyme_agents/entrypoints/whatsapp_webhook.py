@@ -13,7 +13,9 @@ from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.logging_config import setup_logging, get_logger
-from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.integrations.storage.storage_factory import get_storage
+from autifyme_agents.integrations.storage.idempotency import IdempotencyChecker
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
 
@@ -47,19 +49,24 @@ async def favicon():
 
 # Lazy initialization for serverless deployment
 _runner = None
-_storage_adapter = None
+_storage: StorageInterface | None = None
 _whatsapp_channel = None
+_idempotency_checker = None
 
 def _get_runner():
     """Lazy initialization of WorkflowRunner for serverless deployment."""
-    global _runner, _storage_adapter, _whatsapp_channel
+    global _runner, _storage, _whatsapp_channel, _idempotency_checker
 
     if _runner is None:
         logger.info("Initializing WorkflowRunner with WhatsApp channel...")
         try:
-            # Create storage adapter
-            _storage_adapter = SupabaseStorageClient()
+            # Get storage adapter via factory (hexagonal architecture - depend on port)
+            _storage = get_storage()
             logger.info("Storage adapter initialized successfully")
+
+            # Create idempotency checker (DB-backed)
+            _idempotency_checker = IdempotencyChecker(_storage)
+            logger.info("Idempotency checker initialized")
 
             # Create channel adapter
             _whatsapp_channel = WhatsAppChannel()
@@ -68,7 +75,7 @@ def _get_runner():
             # Create generic workflow runner with WhatsApp channel
             _runner = WorkflowRunner(
                 channel=_whatsapp_channel,
-                storage=_storage_adapter,
+                storage=_storage,
             )
             logger.info("✅ WorkflowRunner initialized successfully")
         except Exception as e:
@@ -78,12 +85,6 @@ def _get_runner():
     return _runner
 
 _EVENT_DUMP_DIR = Path("/tmp/whatsapp_events")
-
-# Idempotency tracking: LRU cache of processed message IDs to prevent duplicate processing
-# when WhatsApp retries webhooks. In production, this should be persisted in the database
-# with a TTL (e.g., 24 hours). For now, we use an in-memory cache with max 10,000 entries.
-_MAX_PROCESSED_MESSAGES = 10_000
-_processed_messages: OrderedDict[str, bool] = OrderedDict()
 
 
 def _persist_event(payload: dict[str, Any]) -> Path:
@@ -100,39 +101,6 @@ def _is_approval_message(text: str | None) -> bool:
         return False
     lowered = text.strip().lower()
     return lowered in {"approve", "reject"}
-
-
-def _is_duplicate_message(message_id: str) -> bool:
-    """Check if we've already processed this message ID (idempotency check).
-    
-    WhatsApp may retry webhook deliveries, and we need to ensure we don't
-    process the same message multiple times. This uses an in-memory LRU cache.
-    
-    In production, this should be backed by a database table with a TTL
-    (e.g., processed_messages table with 24h expiry) to survive server restarts.
-    """
-    return message_id in _processed_messages
-
-
-def _mark_message_processed(message_id: str) -> None:
-    """Mark a message ID as processed to prevent duplicate processing.
-    
-    Uses an LRU cache with max 10,000 entries to prevent memory leaks.
-    When the cache is full, the oldest entries are automatically evicted.
-    """
-    if message_id in _processed_messages:
-        # Move to end (mark as recently used)
-        _processed_messages.move_to_end(message_id)
-    else:
-        _processed_messages[message_id] = True
-        
-        # Evict oldest entry if cache is full (LRU)
-        if len(_processed_messages) > _MAX_PROCESSED_MESSAGES:
-            _processed_messages.popitem(last=False)
-            logger.debug(
-                "Evicted oldest message from idempotency cache",
-                extra={"cache_size": len(_processed_messages)},
-            )
 
 
 @app.get("/health")
@@ -209,24 +177,22 @@ async def receive(request: Request) -> Any:
                             extra={"message": message, "event_path": str(event_path)},
                         )
                         continue
-                    
-                    # Check for duplicate processing using message_id
-                    # (WhatsApp can retry webhooks, and we might get the same message twice)
-                    if _is_duplicate_message(message_id):
+
+                    # Check for duplicate processing using message_id (DB-backed idempotency)
+                    # WhatsApp can retry webhooks, and we need to ensure we don't
+                    # process the same message multiple times. Uses database to survive restarts.
+                    thread_id = _whatsapp_channel.format_thread_id(sender) if _whatsapp_channel else f"whatsapp:{sender}"
+                    if _idempotency_checker and _idempotency_checker.is_processed_and_mark(
+                        message_id=message_id,
+                        sender_id=sender,
+                        thread_id=thread_id,
+                        received_at=datetime.fromtimestamp(int(timestamp)),
+                    ):
                         logger.info(
-                            "Skipping duplicate message",
+                            "Skipping duplicate message (DB idempotency)",
                             extra={"message_id": message_id, "sender": sender, "event_path": str(event_path)},
                         )
                         continue
-
-                    # Mark as processed IMMEDIATELY to prevent race conditions
-                    # WhatsApp retries webhooks if response takes >20-30s (e.g., slow image processing)
-                    # Marking early ensures retries are idempotent even if workflow times out
-                    _mark_message_processed(message_id)
-                    logger.debug(
-                        "Message marked as processed (idempotency guard)",
-                        extra={"message_id": message_id, "sender": sender},
-                    )
 
                     # Extract text and media based on message type
                     # WhatsApp API structure varies by type:

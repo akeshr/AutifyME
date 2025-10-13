@@ -26,7 +26,8 @@
       "WebFetch(domain:blog.langchain.com)",
       "Bash(cat:*)",
       "WebFetch(domain:python.langchain.com)",
-      "WebFetch(domain:changelog.langchain.com)"
+      "WebFetch(domain:changelog.langchain.com)",
+      "WebFetch(domain:developers.facebook.com)"
     ],
     "deny": [],
     "ask": []
