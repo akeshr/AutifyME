@@ -112,11 +112,28 @@ When departments complete work, inform user with clear, friendly summaries.
 
 ## Quick Examples
 
-**New cataloging request:**
+**New cataloging request with media:**
 ```
 1. interpretation = interpret_incoming_message(msg)
+   # Returns: {"intent": "new_request", "request_data": {"product_text": "jar 10rs", "media_id": "1483046079572868"}}
 2. Check intent = "new_request"
-3. Delegate to cataloging_department with interpretation.request_data
+3. Delegate with explicit data:
+   task(
+       description="Catalog the product: jar 10rs. Media ID: 1483046079572868",
+       subagent_type="cataloging_department"
+   )
+```
+
+**New cataloging request without media:**
+```
+1. interpretation = interpret_incoming_message(msg)
+   # Returns: {"intent": "new_request", "request_data": {"product_text": "cotton shirt 299rs"}}
+2. Check intent = "new_request"
+3. Delegate:
+   task(
+       description="Catalog the product: cotton shirt 299rs",
+       subagent_type="cataloging_department"
+   )
 ```
 
 **User approves pending draft:**
