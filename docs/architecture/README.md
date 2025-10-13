@@ -17,6 +17,22 @@
 - **Hexagonal Architecture:** Core decoupled from external services
 - **Context Engineering:** Minimize LLM context at every step
 
+## ⚠️ Critical Gotchas
+
+### LangGraph Interrupt Detection in Subgraphs
+
+**If you're working with HITL/interrupts in subgraphs (DeepAgents, departments):**
+
+❌ **DO NOT** use `checkpointer.get_tuple(config).checkpoint.get("__interrupt__")` - it doesn't work!
+
+✅ **USE** `graph.get_state(config).interrupts` instead.
+
+The Checkpoint dict has no `__interrupt__` field. You must use the StateSnapshot API via `get_state()`.
+
+**Details:** See [LANGGRAPH_V1_FEATURES.md § Critical: Interrupt Detection in Subgraphs](./LANGGRAPH_V1_FEATURES.md#️-critical-interrupt-detection-in-subgraphs)
+
+This gotcha cost us 3 days of debugging (Oct 2025). Learn from our pain.
+
 ## Quick Start
 
 Before implementing any feature:

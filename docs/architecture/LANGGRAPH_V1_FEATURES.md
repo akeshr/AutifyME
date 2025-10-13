@@ -171,6 +171,100 @@ Execution resumes via `Command(resume=...)` which can inject human input and con
 
 ---
 
+### ⚠️ CRITICAL: Interrupt Detection in Subgraphs
+
+**Problem Discovered:** October 13, 2025 (3-day debugging effort)
+
+When interrupts occur in **subgraphs** (e.g., DeepAgents HITL middleware in department), the interrupt state is NOT accessible via `checkpointer.get_tuple(config).checkpoint`.
+
+**WRONG APPROACH (causes bugs):**
+```python
+# ❌ DOES NOT WORK - checkpoint dict has no __interrupt__ field!
+state = checkpointer.get_tuple(config)
+checkpoint = state.checkpoint
+interrupts = checkpoint.get("__interrupt__", [])  # Always returns []
+```
+
+**Correct Checkpoint Structure:**
+The `Checkpoint` TypedDict has these fields:
+- `v`, `id`, `ts` (metadata)
+- `channel_values` (state data)
+- `channel_versions`, `versions_seen` (internal tracking)
+
+**NO `__interrupt__` field exists in checkpoint!**
+
+---
+
+**CORRECT APPROACH:**
+```python
+# ✅ Use graph.get_state() to access StateSnapshot
+state_snapshot = graph.get_state(config)
+
+if state_snapshot and state_snapshot.interrupts:
+    pending_interrupt = state_snapshot.interrupts[0]
+    interrupt_id = pending_interrupt.id
+    # Resume with Command
+    command = Command(resume={interrupt_id: resume_value})
+```
+
+**StateSnapshot Structure (langgraph.types):**
+```python
+class StateSnapshot(NamedTuple):
+    values: dict[str, Any]           # Current state
+    next: tuple[str, ...]            # Next nodes to execute
+    config: RunnableConfig           # Graph config
+    metadata: CheckpointMetadata     # Checkpoint metadata
+    created_at: str | None           # Timestamp
+    parent_config: RunnableConfig    # Parent checkpoint
+    tasks: tuple[PregelTask, ...]    # Pending tasks
+    interrupts: tuple[Interrupt, ...] # ✅ INTERRUPTS HERE!
+```
+
+---
+
+**Resume Value Format:**
+
+For LangChain's `HumanInTheLoopMiddleware` (DeepAgents HITL):
+```python
+# ❌ WRONG - middleware expects a LIST
+resume_value = {"type": "accept"}
+
+# ✅ CORRECT - must be list of HumanInTheLoopResponse
+resume_value = [{"type": "accept"}]
+# Or: [{"type": "response", "args": "User rejected"}]
+# Or: [{"type": "edit", "args": {"action": "save_product", "args": {...}}}]
+```
+
+**Why:** Middleware may handle multiple tool call interrupts simultaneously, so it expects `list[HumanInTheLoopResponse]`.
+
+---
+
+**Error Symptoms:**
+
+If you detect interrupts incorrectly:
+1. No pending interrupt found when there should be one
+2. User approval treated as new message
+3. OpenAI error: `"An assistant message with 'tool_calls' must be followed by tool messages"`
+4. State becomes corrupted with dangling tool calls
+
+**Fix Applied:** `runner_v2.py:286-304`, October 13, 2025
+
+---
+
+**Key Learnings:**
+
+1. **Never inspect checkpoint dict directly for interrupts** - use `graph.get_state().interrupts`
+2. **StateSnapshot is the API** - checkpoint dict is internal structure
+3. **Subgraph interrupts propagate** - parent can detect child interrupts via `get_state()`
+4. **Resume values must match middleware expectations** - check middleware source for correct format
+5. **Test HITL flows end-to-end** - interrupt handling is complex and easy to break
+
+**Documentation:**
+- API Reference: https://langchain-ai.github.io/langgraph/reference/types/#statesnapshot
+- HITL Guide: https://langchain-ai.github.io/langgraph/concepts/agentic_concepts/#human-in-the-loop
+
+---
+
 ## 🎯 Dynamic Control Flow
 
 ### Command API
@@ -484,6 +578,14 @@ LangGraph powers LangChain v1 agents under the hood:
 
 ---
 
-**Last Updated:** 2025-10-07
+## 📝 Changelog
+
+**2025-10-13:** Added critical section on interrupt detection in subgraphs after 3-day debugging effort. Documents correct usage of `graph.get_state().interrupts` vs incorrect `checkpoint.get("__interrupt__")`.
+
+**2025-10-07:** Initial comprehensive documentation of LangGraph v1 features and AutifyME usage strategy.
+
+---
+
+**Last Updated:** 2025-10-13
 **Author:** AutifyME Team
 **Status:** Production-Ready for v1 Alpha Features

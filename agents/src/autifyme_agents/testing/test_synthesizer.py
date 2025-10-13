@@ -338,7 +338,7 @@ This test ensures the failure is resolved and doesn't reoccur.
 
 import pytest
 
-from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
+from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
