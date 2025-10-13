@@ -81,7 +81,7 @@ This workflow will be managed by a generic `ProjectManagerAgent` and a new `Cata
 4.  **Specialist Agents:**
     -   **`ImageAnalysisSpecialist`:**
         -   **Purpose:** To extract product information from an image.
-        -   **Tools:** It will use a multimodal LLM (like gpt-4.1-nano-2025-04-14 or Gemini) via our `integrations` layer.
+        -   **Tools:** It will use a multimodal LLM (like gpt-4.1-mini-2025-04-14 or Gemini) via our `integrations` layer.
         -   **Output:** Returns a structured JSON object with fields like `product_category`, `color`, `pattern`, `description_from_image`.
     -   **`TextAnalysisSpecialist`:**
         -   **Purpose:** To extract product information from a text message.

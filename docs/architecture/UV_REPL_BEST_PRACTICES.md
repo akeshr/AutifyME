@@ -30,7 +30,7 @@ When running REPL tests with `uv run --no-project`, the `.env` file at project r
 # This failed with "OPENAI_API_KEY not set"
 cd agents && uv run --no-project python -c "
 from langchain_openai import ChatOpenAI
-llm = ChatOpenAI(model='gpt-4.1-nano-2025-04-14')  # ❌ Error: API key not set
+llm = ChatOpenAI(model='gpt-4.1-mini-2025-04-14')  # ❌ Error: API key not set
 "
 ```
 
@@ -106,7 +106,7 @@ load_dotenv('../.env')
 
 from langchain_openai import ChatOpenAI
 
-llm = ChatOpenAI(model='gpt-4.1-nano-2025-04-14')
+llm = ChatOpenAI(model='gpt-4.1-mini-2025-04-14')
 response = llm.invoke('Say hello')
 print(f'Response: {response.content}')
 "
@@ -257,7 +257,7 @@ load_dotenv('../.env')
 from langchain_openai import ChatOpenAI
 
 try:
-    llm = ChatOpenAI(model='gpt-4.1-nano-2025-04-14')
+    llm = ChatOpenAI(model='gpt-4.1-mini-2025-04-14')
     print('✅ ChatOpenAI initialized successfully')
     print(f'Model: {llm.model_name}')
 except Exception as e:

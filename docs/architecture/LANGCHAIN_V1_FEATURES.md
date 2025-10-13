@@ -62,7 +62,7 @@ A fully typed, structured view of LLM message content that standardizes modern f
 ```python
 from langchain_openai import ChatOpenAI
 
-llm = ChatOpenAI(model="gpt-4.1-nano-2025-04-14")
+llm = ChatOpenAI(model="gpt-4.1-mini-2025-04-14")
 response = llm.invoke("Analyze this image and cite sources")
 
 # Old way (v0): response.content (plain string)
@@ -316,7 +316,7 @@ def create_project_manager(company_profile: dict):
             company_name=company_profile["name"],
             brand_voice=company_profile["brand_voice"],
         ),
-        model=ChatOpenAI(model="gpt-4.1-nano-2025-04-14", temperature=0.2),
+        model=ChatOpenAI(model="gpt-4.1-mini-2025-04-14", temperature=0.2),
         tool_configs={
             "save_product": True,      # Require approval
             "publish_website": True,    # Require approval

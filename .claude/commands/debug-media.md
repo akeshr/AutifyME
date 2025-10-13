@@ -125,7 +125,7 @@ data_uri = f'data:image/jpeg;base64,{encoded}'
 
 try:
     response = client.chat.completions.create(
-        model='gpt-4.1-nano-2025-04-14',
+        model='gpt-4.1-mini-2025-04-14',
         messages=[
             {
                 'role': 'user',
@@ -146,7 +146,7 @@ except Exception as e:
 # Test 2: Direct file path (should fail)
 try:
     response = client.chat.completions.create(
-        model='gpt-4.1-nano-2025-04-14',
+        model='gpt-4.1-mini-2025-04-14',
         messages=[
             {
                 'role': 'user',
