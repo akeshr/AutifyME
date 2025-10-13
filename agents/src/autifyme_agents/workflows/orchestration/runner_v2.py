@@ -285,23 +285,30 @@ class WorkflowRunner:
 
         # ✅ FIX: Check for pending HITL interrupts using graph.get_state()
         # StateSnapshot has .interrupts field, not checkpoint dict
-        state_snapshot = pm.get_state(config)
-
         pending_interrupt = None
-        if state_snapshot and state_snapshot.interrupts:
-            pending_interrupt = state_snapshot.interrupts[0]
-            logger.info(
-                "Found pending HITL interrupt",
-                extra={
-                    "thread_id": thread_id,
-                    "interrupt_id": pending_interrupt.id if hasattr(pending_interrupt, 'id') else 'unknown',
-                }
+        try:
+            state_snapshot = pm.get_state(config)
+
+            if state_snapshot and state_snapshot.interrupts:
+                pending_interrupt = state_snapshot.interrupts[0]
+                logger.info(
+                    "Found pending HITL interrupt",
+                    extra={
+                        "thread_id": thread_id,
+                        "interrupt_id": pending_interrupt.id if hasattr(pending_interrupt, 'id') else 'unknown',
+                    }
+                )
+            else:
+                logger.debug(
+                    "No pending interrupts found",
+                    extra={"thread_id": thread_id}
+                )
+        except Exception as e:
+            logger.warning(
+                "Failed to check for pending interrupts - treating as new message",
+                extra={"thread_id": thread_id, "error": str(e)}
             )
-        else:
-            logger.debug(
-                "No pending interrupts found",
-                extra={"thread_id": thread_id}
-            )
+            # Continue as if no interrupt exists
 
         # Build payload based on checkpoint state
         if pending_interrupt:
