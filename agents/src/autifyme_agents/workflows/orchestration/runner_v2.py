@@ -695,12 +695,23 @@ class WorkflowRunner:
                         }
                     )
 
-            self.channel.send_approval_request(sender, clean_value)
+            # Convert dict args to Product object for channel (channel expects typed objects, not dicts)
+            if isinstance(clean_value, dict):
+                from autifyme_agents.schemas.models import Product
+                draft = Product.model_validate(clean_value)
+                logger.debug(
+                    "Converted interrupt args to Product object",
+                    extra={"thread_id": thread_id, "product_name": draft.name}
+                )
+            else:
+                draft = clean_value
+
+            self.channel.send_approval_request(sender, draft)
             logger.info(
                 "Interrupt forwarded to user - awaiting response",
                 extra={
                     "thread_id": thread_id,
-                    "interrupt_type": type(clean_value).__name__,
+                    "interrupt_type": type(draft).__name__,
                 },
             )
 
