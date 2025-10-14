@@ -4,11 +4,14 @@ Replaces simple chain with full agent for observability and middleware support.
 """
 
 import base64
+import re
 from pathlib import Path
 from typing import Any
 
 from langchain.agents import create_agent
 from langchain.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.runnables import RunnableLambda
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
@@ -173,3 +176,132 @@ Extract all visual product attributes including colors, materials, sizes, style,
     result = agent.invoke({"messages": messages}, config=config or {})
 
     return result["structured_response"]  # ImageAnalysisResult model
+
+
+def create_image_analysis_specialist_graph(
+    company_profile: CompanyProfile | dict | None = None,
+) -> RunnableLambda:
+    """Create image analysis specialist as CustomSubAgent graph.
+
+    This creates a Runnable graph that bridges the gap between:
+    - Department delegation (passes file path string in message)
+    - Vision model requirements (needs bytes or data URI)
+
+    The graph:
+    1. Extracts file path from delegation message
+    2. Reads bytes from REAL OS filesystem (Python open())
+    3. Invokes specialist with bytes (no virtual filesystem)
+    4. Returns structured result in LangGraph state format
+
+    Args:
+        company_profile: Company context for brand-aware analysis
+
+    Returns:
+        RunnableLambda suitable for DeepAgents CustomSubAgent["graph"]
+
+    Example:
+        >>> # In cataloging_department.py
+        >>> subagents = [{
+        ...     "name": "image_analysis_specialist",
+        ...     "description": "Analyze product images...",
+        ...     "graph": create_image_analysis_specialist_graph(company_profile)
+        ... }]
+    """
+
+    def analyze_image_from_state(state: dict) -> dict:
+        """Process image analysis from department delegation state.
+
+        Extracts file path from delegation message, reads bytes from real OS filesystem,
+        and invokes vision analysis.
+
+        Args:
+            state: LangGraph state with messages containing file path in delegation text
+
+        Returns:
+            Updated state with analysis result
+
+        Raises:
+            ValueError: If no file path found in delegation message
+            FileNotFoundError: If file path doesn't exist on filesystem
+        """
+        # Extract delegation message
+        messages = state.get("messages", [])
+        if not messages:
+            raise ValueError("No messages in state - cannot extract file path")
+
+        # Get last human message content
+        last_message = messages[-1]
+        content = last_message.content if hasattr(last_message, "content") else str(last_message)
+
+        # Extract file path from delegation text
+        # Supports both Unix (/tmp/...) and Windows (C:\tmp\...) paths
+        patterns = [
+            r'/tmp/media_downloads/[^\s]+\.(jpg|jpeg|png|gif|webp)',  # Unix specific
+            r'[A-Za-z]:[/\\]tmp[/\\]media_downloads[/\\][^\s]+\.(jpg|jpeg|png|gif|webp)',  # Windows specific
+            r'/tmp/[^\s]+\.(jpg|jpeg|png|gif|webp)',  # Unix generic
+            r'[A-Za-z]:[/\\]tmp[/\\][^\s]+\.(jpg|jpeg|png|gif|webp)',  # Windows generic
+            r'[A-Za-z]:[/\\][^\s]+\.(jpg|jpeg|png|gif|webp)',  # Windows any path
+        ]
+
+        match = None
+        for pattern in patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                break
+
+        if not match:
+            raise ValueError(
+                f"No image file path found in delegation message. "
+                f"Expected file path like '/tmp/media_downloads/xyz.jpg' or 'C:\\tmp\\xyz.jpg'. "
+                f"Got: {content[:200]}"
+            )
+
+        file_path = match.group(0)
+
+        # Read bytes from REAL OS filesystem (not DeepAgents virtual state["files"])
+        # This is efficient: bytes only live in memory during vision API call
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Image file not found on filesystem: {file_path}. "
+                f"Ensure download_whatsapp_media completed successfully."
+            )
+
+        # Determine MIME type from extension
+        ext = path.suffix.lower()
+        mime_type = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp',
+        }.get(ext, 'image/jpeg')
+
+        with open(path, 'rb') as f:
+            image_bytes = f.read()
+
+        # Invoke specialist function with bytes
+        # Bytes are converted to base64 data URI internally, then sent to vision model
+        # No state bloat - bytes discarded after API call
+        result = image_analysis_specialist_invoke(
+            image_bytes=image_bytes,
+            mime_type=mime_type,
+            company_profile=company_profile
+        )
+
+        # Return result in LangGraph state format
+        # DeepAgents expects either:
+        # - messages: list of new messages
+        # - structured_response: Pydantic model
+        return {
+            "messages": [
+                AIMessage(
+                    content=f"Analyzed product image at {file_path}. "
+                    f"Visual description: {result.visual_description[:100]}..."
+                )
+            ],
+            "structured_response": result,
+        }
+
+    # Wrap function as Runnable for DeepAgents compatibility
+    return RunnableLambda(analyze_image_from_state)

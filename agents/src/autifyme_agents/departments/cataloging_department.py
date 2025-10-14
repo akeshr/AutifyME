@@ -27,6 +27,9 @@ from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.tools import create_save_product_tool
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 from autifyme_agents.schemas.models import Product
+from autifyme_agents.specialists.image_analysis_specialist import (
+    create_image_analysis_specialist_graph,
+)
 
 
 def create_cataloging_department(
@@ -50,6 +53,9 @@ def create_cataloging_department(
 
     llm = get_llm()
 
+    # Get company profile for brand-aware specialist configuration
+    company_profile = storage.get_company_profile()
+
     # TOOLS: Only utility functions, not specialists
     tools = [
         write_todos,  # Planning tool for multi-step coordination
@@ -63,21 +69,21 @@ def create_cataloging_department(
         tools.extend(platform_tools)
 
     # SUBAGENTS: Specialists that perform focused transformations
-    # Using DeepAgents SubAgent pattern (not CustomSubAgent)
-    # IMPORTANT: Explicitly set tools=[] AND middleware=[] to prevent defaults
+    # ARCHITECTURE: Using CustomSubAgent for image specialist to bypass virtual filesystem
+    # DeepAgents SubAgent pattern injects default filesystem tools that conflict with real OS files
     subagents = [
+        # CustomSubAgent: Pre-built graph with full control (no tool injection)
         {
             "name": "image_analysis_specialist",
             "description": (
                 "Analyze product images to extract visual attributes including colors, "
-                "materials, style, and features. Returns ImageAnalysisResult with "
-                "visual_description, identified_colors, and style_tags."
+                "materials, style, and features. Provide the file path in your delegation "
+                "message (e.g., 'Analyze /tmp/media_downloads/xyz.jpg'). Returns "
+                "ImageAnalysisResult with visual_description, identified_colors, and style_tags."
             ),
-            "response_format": ImageAnalysisResult,  # Structured output
-            "prompt": load_prompt("specialists/image_analysis_specialist.prompt"),
-            "tools": [],  # ✅ No tools - pure vision analysis
-            "middleware": [],  # ✅ Disable default middleware (filesystem, write_todos)
+            "graph": create_image_analysis_specialist_graph(company_profile),  # ✅ Custom graph
         },
+        # SubAgent: Simple spec-based (no file access needed)
         {
             "name": "cataloging_specialist",
             "description": (
