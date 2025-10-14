@@ -1,12 +1,16 @@
-"""Cataloging Department as DeepAgent with specialist tools.
+"""Cataloging Department as DeepAgent with specialist subagents.
 
-Department coordinates specialists (as tools) to gather product information,
+Department coordinates specialist subagents to gather product information,
 structure it into Product models, and persist to the database.
 
-Architecture:
+Architecture (Correct Hierarchy):
 - Department: DeepAgent (coordinates workflow)
-- Specialists: Tools that return structured data (ImageAnalysisResult, Product)
-- Persistence: save_product tool writes to database
+- Specialists: SubAgents that perform focused transformations
+  - image_analysis_specialist: Vision analysis → ImageAnalysisResult
+  - cataloging_specialist: Product extraction → Product
+- Tools: Utility functions only
+  - save_product: Database persistence
+  - write_todos: Planning
 """
 
 from typing import Any
@@ -21,18 +25,18 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.core.middleware import CompanyContextMiddleware
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.tools import create_save_product_tool
-from autifyme_agents.tools.cataloging_tools import (
-    create_cataloging_specialist_tool,
-    create_image_analysis_tool,
-)
+from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
+from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
+from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
+from autifyme_agents.schemas.models import Product
 
 
 def create_cataloging_department(
     checkpointer: BaseCheckpointSaver,
     storage: StorageInterface,
-    channel: Any | None = None,  # NEW: Channel for media download
+    channel: Any | None = None,
 ) -> Any:
-    """Create cataloging department as DeepAgent with specialist tools.
+    """Create cataloging department as DeepAgent with specialist subagents.
 
     Args:
         checkpointer: LangGraph checkpoint saver for state persistence
@@ -40,7 +44,7 @@ def create_cataloging_department(
         channel: Optional messaging channel for media download
 
     Returns:
-        DeepAgent that coordinates specialists and handles product cataloging
+        DeepAgent that coordinates specialist subagents and handles product cataloging
     """
 
     if storage is None:
@@ -48,25 +52,44 @@ def create_cataloging_department(
 
     llm = get_llm()
 
-    # Department's tools - all specialists are now regular tools that return structured data
-    # This allows the LLM to access Product fields directly and call save_product properly
+    # TOOLS: Only utility functions, not specialists
     tools = [
-        write_todos,  # ✅ DeepAgents planning tool for coordinating multi-step workflows
-        create_image_analysis_tool(storage),  # Returns ImageAnalysisResult directly
-        create_cataloging_specialist_tool(storage),  # Returns Product directly
-        create_save_product_tool(storage),  # Accepts individual Product fields
+        write_todos,  # Planning tool for multi-step coordination
+        create_save_product_tool(storage),  # Database persistence
     ]
 
     # Add platform media download tools if channel provided
-    # This allows department to download media when intent specialist passes media_id
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
         platform_tools = create_platform_media_tools(channel)
         tools.extend(platform_tools)
 
+    # SUBAGENTS: Specialists that perform focused transformations
+    # Using DeepAgents SubAgent pattern (not CustomSubAgent)
+    subagents = [
+        {
+            "name": "image_analysis_specialist",
+            "description": (
+                "Analyze product images to extract visual attributes including colors, "
+                "materials, style, and features. Returns ImageAnalysisResult with "
+                "visual_description, identified_colors, and style_tags."
+            ),
+            "response_format": ImageAnalysisResult,  # Structured output
+            "prompt": load_prompt("specialists/image_analysis_specialist.prompt"),
+        },
+        {
+            "name": "cataloging_specialist",
+            "description": (
+                "Transform user descriptions and optional image insights into complete "
+                "Product models. Synthesizes information, fills reasonable gaps, ensures "
+                "brand alignment. Returns Product with all catalog fields."
+            ),
+            "response_format": Product,  # Structured output
+            "prompt": load_prompt("specialists/cataloging_specialist.prompt"),
+        },
+    ]
+
     # Department's middleware stack
-    # Note: create_deep_agent automatically adds caching and summarization
-    # HITL approval happens at the draft stage via channel.send_approval_request()
     middleware: list[Any] = [
         CompanyContextMiddleware(storage),  # Inject company context
     ]
@@ -75,24 +98,24 @@ def create_cataloging_department(
     instructions = load_prompt("departments/cataloging_department.prompt")
 
     # Configure HITL for save_product tool
-    # This enables human approval before persisting products to database
     tool_configs = {
         "save_product": ToolConfig(
-            allow_accept=True,  # User can approve without changes
-            allow_edit=True,    # User can approve with modifications
-            allow_respond=True,  # User can reject with feedback
+            allow_accept=True,
+            allow_edit=True,
+            allow_respond=True,
             description="Please review this product before saving to the catalog database."
         )
     }
 
-    # Create DeepAgent department
+    # Create DeepAgent department with proper hierarchy
     department = create_deep_agent(
         model=llm,
         instructions=instructions,
-        tools=tools,  # All specialists are now tools, not subagents
+        tools=tools,  # ✅ Only utilities
+        subagents=subagents,  # ✅ Specialists as subagents
         middleware=middleware,
-        checkpointer=checkpointer,  # Department-level checkpointing for HITL
-        tool_configs=tool_configs,  # ✅ Enable HITL for save_product
+        checkpointer=checkpointer,
+        tool_configs=tool_configs,
     )
 
     return department.with_config({

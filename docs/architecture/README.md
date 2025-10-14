@@ -5,6 +5,7 @@
 | Reference | Purpose |
 | --- | --- |
 | **[AGENTS_DESIGN.md](./AGENTS_DESIGN.md)** | Canonical agent hierarchy and context engineering patterns (timeless design blueprint). |
+| **[ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./ACTUAL_IMPLEMENTATION_ARCHITECTURE.md)** | ✅ **As-built reference** - actual implementation verified from code (ground truth for prompts). |
 | **[PROMPT_ENGINEERING_STANDARDS.md](./PROMPT_ENGINEERING_STANDARDS.md)** | Production-grade prompt design standards for all agents (Anthropic/Claude best practices). |
 | **[LANGCHAIN_V1_FEATURES.md](./LANGCHAIN_V1_FEATURES.md)** | Vendor feature reference with links to official resources; implementation status lives in roadmap docs. |
 | **[TECH_STACK.md](./TECH_STACK.md)** | Technology choices organized by architecture layer. |

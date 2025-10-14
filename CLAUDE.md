@@ -149,20 +149,21 @@ Never rely on documentation alone for LangChain v1 alpha stack.
 **Core Architecture:**
 1. `docs/architecture/README.md` - Navigation hub
 2. `docs/architecture/AGENTS_DESIGN.md` - Hierarchical model, context engineering
-3. `docs/architecture/PROMPT_ENGINEERING_STANDARDS.md` - **[CRITICAL]** Prompt design standards (no code, right altitude, examples)
-4. `docs/architecture/PROJECT_MANAGER_DESIGN.md` - PM role, intent classification, delegation
+3. `docs/architecture/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md` - **[GROUND TRUTH]** As-built implementation verified from code
+4. `docs/architecture/PROMPT_ENGINEERING_STANDARDS.md` - **[CRITICAL]** Prompt design standards (no code, right altitude, examples)
+5. `docs/architecture/PROJECT_MANAGER_DESIGN.md` - PM role, intent classification, delegation
 
 **Technology & Patterns:**
-5. `docs/architecture/TECH_STACK.md` - Technology decisions
-6. `docs/architecture/LANGCHAIN_V1_FEATURES.md` - LangChain v1 patterns
-7. `docs/architecture/LANGGRAPH_V1_FEATURES.md` - LangGraph orchestration
-8. `docs/architecture/UV_REPL_BEST_PRACTICES.md` - API verification workflow
+6. `docs/architecture/TECH_STACK.md` - Technology decisions
+7. `docs/architecture/LANGCHAIN_V1_FEATURES.md` - LangChain v1 patterns
+8. `docs/architecture/LANGGRAPH_V1_FEATURES.md` - LangGraph orchestration
+9. `docs/architecture/UV_REPL_BEST_PRACTICES.md` - API verification workflow
 
 **Workflows & Implementation:**
-9. `docs/architecture/WHATSAPP_CATALOGING_WORKFLOW.md` - Current cataloging implementation
-10. `docs/architecture/PM_INTENT_ANALYSIS_AND_MESSAGE_HANDLING.md` - Multi-platform message handling
-11. `docs/architecture/LOCAL_TESTING_STRATEGY.md` - Testing philosophy and CLI tools
-12. `docs/architecture/WORKFLOW_ORCHESTRATION_REFACTOR.md` - Runner architecture
+10. `docs/architecture/WHATSAPP_CATALOGING_WORKFLOW.md` - Current cataloging implementation
+11. `docs/architecture/PM_INTENT_ANALYSIS_AND_MESSAGE_HANDLING.md` - Multi-platform message handling
+12. `docs/architecture/LOCAL_TESTING_STRATEGY.md` - Testing philosophy and CLI tools
+13. `docs/architecture/WORKFLOW_ORCHESTRATION_REFACTOR.md` - Runner architecture
 
 **See `docs/architecture/README.md` for complete index and context.**
 
