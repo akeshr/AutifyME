@@ -113,9 +113,9 @@ def create_project_manager(
 
     **Architecture**:
     - PM handles intent detection directly (no specialist)
-    - PM has media download tools for analyzing user messages
-    - PM delegates to departments via 'task' tool
-    - Departments have domain tools (analyze_image, save_product, etc.)
+    - PM delegates with media_id (no download tools - keeps PM simple)
+    - Departments download media when needed (lazy loading)
+    - Departments have domain tools (analyze_image, save_product, download_media)
     - Enforces PM → Department → Specialist → Tools hierarchy
     """
 
@@ -128,13 +128,9 @@ def create_project_manager(
     # PM orchestration tools
     pm_tools = [write_todos]
 
-    # Add media download tools if channel provided
-    # PM needs these to download media BEFORE delegating to departments
-    if channel is not None:
-        from autifyme_agents.tools.platform_tools import create_platform_media_tools
-
-        media_tools = create_platform_media_tools(channel)
-        pm_tools.extend(media_tools)
+    # Note: Media download tools NOT included in PM
+    # PM delegates media_id to departments, departments download when needed
+    # This keeps PM focused on orchestration, not domain operations
 
     # Add any additional explicit tools
     if tools is not None:
