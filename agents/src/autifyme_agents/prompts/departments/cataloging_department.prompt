@@ -165,17 +165,21 @@ Before calling `save_product`, verify:
 
 <example>
 <user_request>
-PM assigned: "Catalog product from user request: jar 500ml priced at 30 Rs. Product image available at /media/xyz123.jpg. Analyze image for visual details and create complete catalog entry."
+PM assigned: "Catalog product from user request: jar 500ml priced at 30 Rs. Product image media_id: xyz123. Download, analyze image for visual details, and create complete catalog entry."
 </user_request>
 
 <your_reasoning>
 - **Type**: Image-based workflow
-- **Inputs**: Text description (jar 500ml 30 Rs) + image path
-- **Strategy**: Visual analysis first, then synthesis
+- **Inputs**: Text description (jar 500ml 30 Rs) + media_id
+- **Strategy**: Download media, then visual analysis, then synthesis
 </your_reasoning>
 
 <your_workflow>
-Step 1: Delegate to image_analysis_specialist
+Step 1: Download media
+Call download_whatsapp_media with media_id: xyz123
+Receive local file path: /media/xyz123.jpg
+
+Step 2: Delegate to image_analysis_specialist
 "Analyze product image at /media/xyz123.jpg. Extract visual attributes including colors, materials, and style for catalog entry."
 
 Result: ImageAnalysisResult
@@ -183,7 +187,7 @@ Result: ImageAnalysisResult
 - identified_colors: ["clear", "silver"]
 - style_tags: ["minimalist", "kitchen-storage"]
 
-Step 2: Delegate to cataloging_specialist
+Step 3: Delegate to cataloging_specialist
 "Create product entry: User described 'jar 500ml priced at 30 Rs'. Visual analysis shows: clear glass cylindrical jar with silver metal lid, minimalist kitchen storage style. Synthesize complete Product."
 
 Result: Product
@@ -193,13 +197,13 @@ Result: Product
 - colors: ["clear", "silver"]
 - image_urls: ["/media/xyz123.jpg"]
 
-Step 3: Quality check
+Step 4: Quality check
 ✓ Name present
 ✓ Price matches user input (30 Rs)
 ✓ Description blends text + visual insights
 ✓ Colors from image analysis
 
-Step 4: Persist with save_product tool
+Step 5: Persist with save_product tool
 Call save_product with Product fields:
 - name: "Glass Storage Jar 500ml"
 - description: "Clear glass cylindrical jar..."
@@ -270,7 +274,7 @@ Product cataloged from text description.
 
 <example>
 <user_request>
-PM assigned: "Catalog two variants: First call will be 500ml jar @ 30 Rs with image at /media/abc.jpg. Second call will follow after first completes."
+PM assigned: "Catalog first variant: 500ml jar @ 30 Rs with image media_id: abc456. Download, analyze, and catalog. Second variant will be assigned after this completes."
 </user_request>
 
 <your_reasoning>
@@ -281,10 +285,11 @@ PM assigned: "Catalog two variants: First call will be 500ml jar @ 30 Rs with im
 
 <your_workflow>
 Process first variant:
-1. Delegate to image_analysis_specialist for /media/abc.jpg
-2. Delegate to cataloging_specialist with "jar 500ml 30 Rs" + image insights
-3. Quality check Product model
-4. Call save_product
+1. Download media using download_whatsapp_media with media_id: abc456
+2. Delegate to image_analysis_specialist with downloaded file path
+3. Delegate to cataloging_specialist with "jar 500ml 30 Rs" + image insights
+4. Quality check Product model
+5. Call save_product
 
 PM will assign second variant as new request after this completes.
 </your_workflow>
