@@ -58,6 +58,7 @@ htmlcov/
 # Logs
 *.log
 nul
+*.txt
 
 # OS
 Thumbs.db
