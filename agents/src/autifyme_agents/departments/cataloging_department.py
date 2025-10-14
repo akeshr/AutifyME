@@ -25,7 +25,6 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.core.middleware import CompanyContextMiddleware
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.tools import create_save_product_tool
-from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 from autifyme_agents.schemas.models import Product
 from autifyme_agents.specialists.image_analysis_specialist import (
     create_image_analysis_specialist_graph,

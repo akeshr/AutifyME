@@ -181,6 +181,9 @@ class TestGetCompanyProfileTool:
             def get_edge_cases(self, time_window=None):
                 return []
 
+            def check_and_mark_message_processed(self, message_id, sender_id, thread_id, received_at):
+                return False
+
         tool = create_get_company_profile_tool(EmptyStorage())
 
         with pytest.raises(DataNotFoundError) as exc_info:
