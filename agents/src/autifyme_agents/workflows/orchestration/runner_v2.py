@@ -331,19 +331,68 @@ class WorkflowRunner:
             state_snapshot = pm.get_state(config)
 
             if state_snapshot and state_snapshot.interrupts:
-                # Extract interrupt info for PM's state
-                for idx, interrupt_obj in enumerate(state_snapshot.interrupts):
-                    interrupt_info = {
-                        "interrupt_id": interrupt_obj.id if hasattr(interrupt_obj, 'id') else f"interrupt_{idx}",
-                        "description": str(interrupt_obj.value) if hasattr(interrupt_obj, 'value') else "Pending approval",
-                    }
-                    # Try to extract tool info if available
-                    if hasattr(interrupt_obj, 'value') and isinstance(interrupt_obj.value, dict):
-                        interrupt_info.update({
-                            "tool_name": interrupt_obj.value.get("tool_name", "unknown"),
-                            "tool_args": interrupt_obj.value.get("tool_args", {}),
-                        })
-                    pending_interrupts_list.append(interrupt_info)
+                # Extract interrupt info for approval analyzer
+                # IMPORTANT: interrupt_obj.value can be:
+                # - A list of actions (parallel tool calls from same agent)
+                # - A single dict (single action)
+                # We need N interrupt_info objects for approval analyzer (1 response per action)
+
+                for base_idx, interrupt_obj in enumerate(state_snapshot.interrupts):
+                    interrupt_id = interrupt_obj.id if hasattr(interrupt_obj, 'id') else f"interrupt_{base_idx}"
+                    interrupt_value = interrupt_obj.value if hasattr(interrupt_obj, 'value') else None
+
+                    # Check if value is a list of actions (parallel tool calls)
+                    if isinstance(interrupt_value, list):
+                        logger.debug(
+                            "Unpacking list-valued interrupt into individual actions",
+                            extra={
+                                "thread_id": thread_id,
+                                "interrupt_id": interrupt_id,
+                                "action_count": len(interrupt_value),
+                            }
+                        )
+
+                        # Create one interrupt_info per action
+                        for action_idx, action in enumerate(interrupt_value):
+                            # Extract metadata from action
+                            if isinstance(action, dict):
+                                action_request = action.get("action_request", {})
+                                tool_name = action_request.get("action", "unknown")
+                                tool_args = action_request.get("args", {})
+                                description = action.get("description", f"Action {action_idx + 1}")
+                            else:
+                                tool_name = "unknown"
+                                tool_args = {}
+                                description = str(action)[:100]
+
+                            interrupt_info = {
+                                "interrupt_id": f"{interrupt_id}_{action_idx}",
+                                "original_interrupt_id": interrupt_id,  # Track original for Command building
+                                "tool_name": tool_name,
+                                "tool_args": tool_args,
+                                "description": description,
+                            }
+                            pending_interrupts_list.append(interrupt_info)
+
+                    # Single dict value (single action)
+                    elif isinstance(interrupt_value, dict):
+                        interrupt_info = {
+                            "interrupt_id": interrupt_id,
+                            "tool_name": interrupt_value.get("tool_name", "unknown"),
+                            "tool_args": interrupt_value.get("tool_args", {}),
+                            "description": str(interrupt_value)[:100],
+                        }
+                        pending_interrupts_list.append(interrupt_info)
+
+                    # Fallback for unknown format
+                    else:
+                        interrupt_info = {
+                            "interrupt_id": interrupt_id,
+                            "tool_name": "unknown",
+                            "tool_args": {},
+                            "description": str(interrupt_value)[:100] if interrupt_value else "Pending approval",
+                        }
+                        pending_interrupts_list.append(interrupt_info)
 
                 logger.info(
                     "Found pending HITL interrupts",
@@ -557,6 +606,10 @@ class WorkflowRunner:
         Takes the Pydantic BatchApprovalResponse from approval analyzer and
         constructs a LangGraph Command object for resuming interrupted workflows.
 
+        IMPORTANT: Handles both single and parallel interrupts:
+        - Single interrupt: interrupt_id → [response]
+        - Parallel (list-valued): original_interrupt_id → [response_0, response_1, ...]
+
         Args:
             approval_response: Structured approval response from analyzer
             pending_interrupts: List of pending interrupt contexts
@@ -564,40 +617,43 @@ class WorkflowRunner:
         Returns:
             Command object ready for execution
 
-        Example:
+        Example (Parallel):
             approval_response.responses = [
                 {"type": "accept", "args": None},
                 {"type": "edit", "args": {"price": 45.0}}
             ]
             pending_interrupts = [
-                {"interrupt_id": "int_1", ...},
-                {"interrupt_id": "int_2", ...}
+                {"interrupt_id": "int_1_0", "original_interrupt_id": "int_1", ...},
+                {"interrupt_id": "int_1_1", "original_interrupt_id": "int_1", ...}
             ]
             →
             Command(resume={
-                "int_1": [{"type": "accept", "args": None}],
-                "int_2": [{"type": "edit", "args": {"price": 45.0}}]
+                "int_1": [{"type": "accept", "args": None}, {"type": "edit", "args": {"price": 45.0}}]
             })
         """
-        resume_dict = {}
+        # Group responses by original_interrupt_id (for parallel actions)
+        # or by interrupt_id (for single actions)
+        from collections import defaultdict
+        interrupt_responses = defaultdict(list)
 
         for idx, interrupt_info in enumerate(pending_interrupts):
-            interrupt_id = interrupt_info["interrupt_id"]
+            # Use original_interrupt_id if available (parallel case), otherwise use interrupt_id
+            original_id = interrupt_info.get("original_interrupt_id", interrupt_info["interrupt_id"])
             response = approval_response.responses[idx]
 
-            # HITL middleware expects list of responses per interrupt
-            # Convert Pydantic model to dict for Command
-            resume_dict[interrupt_id] = [response.model_dump()]
+            # Convert Pydantic model to dict
+            interrupt_responses[original_id].append(response.model_dump())
 
         logger.info(
             "Built Command from structured approval",
             extra={
-                "interrupt_count": len(pending_interrupts),
-                "interrupt_ids": list(resume_dict.keys()),
+                "total_responses": len(pending_interrupts),
+                "interrupt_count": len(interrupt_responses),
+                "interrupt_ids": list(interrupt_responses.keys()),
             }
         )
 
-        return Command(resume=resume_dict)
+        return Command(resume=dict(interrupt_responses))
 
     def _handle_interrupt(
         self,
