@@ -19,7 +19,7 @@ from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
 
 # Initialize logging for serverless environment
 try:
-    setup_logging(level="INFO", enable_file_logging=False)
+    setup_logging(level="DEBUG", enable_file_logging=False)
 except Exception as e:
     # Fallback to basic logging if setup fails
     import logging
