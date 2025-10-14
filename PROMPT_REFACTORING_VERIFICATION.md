@@ -158,6 +158,45 @@
 
 ---
 
+### Approval Analyzer Prompt (`prompts/approval_analyzer.prompt`)
+
+#### Structure
+- [x] Uses XML tags for sections
+- [x] Has background, instructions, examples, output
+- [x] Sections ordered logically
+- [x] Clear visual hierarchy
+
+#### Content
+- [x] No Python/code snippets (removed JSON blocks)
+- [x] Right altitude (HITL response parsing)
+- [x] Simple, direct language
+- [x] Minimal tokens
+- [x] Clear decision framework
+
+#### Examples
+- [x] 6 canonical examples (approve all, selective edit, multi-field edit, reject all, ambiguous, selective approval)
+- [x] Diverse approval scenarios covered
+- [x] Includes reasoning process
+- [x] Shows structured BatchApprovalResponse generation
+- [x] Demonstrates critical count/order preservation rules
+
+#### Alignment
+- [x] Matches specialist role (invoked by workflow runner)
+- [x] Context-light (receives pending_interrupts + user_message)
+- [x] Returns structured BatchApprovalResponse
+- [x] Handles ambiguity with clarification requests
+
+#### Technical
+- [x] References BatchApprovalResponse and HumanInTheLoopResponse models
+- [x] Response type signatures correct (accept/edit/response)
+- [x] Field extraction rules documented (type conversion)
+- [x] Critical count/order preservation emphasized
+- [x] Validation checklist included
+
+**Status:** ✅ **PASS** - Production-ready for HITL workflows
+
+---
+
 ## Cross-Cutting Verification
 
 ### Architectural Consistency
@@ -196,8 +235,9 @@
 | **Department** | 319 | 0 | 3 | ✅ Pass |
 | **Image Specialist** | 133 | 0 | 2 | ✅ Pass |
 | **Cataloging Specialist** | 249 | 0 | 3 | ✅ Pass |
+| **Approval Analyzer** | 352 | 0 | 6 | ✅ Pass |
 
-**Total:** 4 prompts, 1041 lines, **0 code blocks**, 14 canonical examples
+**Total:** 5 prompts, 1393 lines, **0 code blocks**, 20 canonical examples
 
 ---
 
@@ -208,17 +248,19 @@
 3. **Department Prompt:** Refined save_product calls to be descriptive
 4. **Image Specialist:** Added 2 examples with reasoning
 5. **Cataloging Specialist:** Fixed XML error, added 3 examples including anti-hallucination demo
+6. **Approval Analyzer:** Removed JSON code blocks, added XML structure, 6 canonical examples with reasoning
 
 ---
 
 ## Production Readiness
 
-✅ **All prompts are production-ready:**
+✅ **All 5 prompts are production-ready:**
 - Follow Anthropic/Claude best practices
 - Align with actual implementation architecture
 - Zero code in prompts (patterns shown via examples)
 - Strong anti-hallucination guardrails
 - Proper hierarchical delegation (PM → Dept → Specialist → Tools)
+- HITL workflows fully supported (approval_analyzer)
 - Reusable across workflows
 
 **Next Step:** Test with local CLI tools (pm_chat, simulate)
