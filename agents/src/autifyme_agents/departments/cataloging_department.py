@@ -66,6 +66,7 @@ def create_cataloging_department(
 
     # SUBAGENTS: Specialists that perform focused transformations
     # Using DeepAgents SubAgent pattern (not CustomSubAgent)
+    # IMPORTANT: Explicitly set tools=[] to prevent inheriting parent tools
     subagents = [
         {
             "name": "image_analysis_specialist",
@@ -76,6 +77,7 @@ def create_cataloging_department(
             ),
             "response_format": ImageAnalysisResult,  # Structured output
             "prompt": load_prompt("specialists/image_analysis_specialist.prompt"),
+            "tools": [],  # ✅ Explicitly no tools - pure vision analysis
         },
         {
             "name": "cataloging_specialist",
@@ -86,6 +88,7 @@ def create_cataloging_department(
             ),
             "response_format": Product,  # Structured output
             "prompt": load_prompt("specialists/cataloging_specialist.prompt"),
+            "tools": [],  # ✅ Explicitly no tools - pure synthesis
         },
     ]
 
