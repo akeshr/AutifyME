@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project-specific guidance for AutifyME codebase. Communication style is defined in `.claude/output-styles/jarvis.md`.
+Project-specific guidance for AutifyME codebase. Communication style is defined in `.claude/output-styles/jarvis.md`. **CRITICAL** DO NOT USE EMOJIS.
 
 ---
 
