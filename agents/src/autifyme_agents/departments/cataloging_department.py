@@ -25,8 +25,6 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.core.middleware import CompanyContextMiddleware
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.tools import create_save_product_tool
-from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
-from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 from autifyme_agents.schemas.models import Product
 
@@ -66,7 +64,7 @@ def create_cataloging_department(
 
     # SUBAGENTS: Specialists that perform focused transformations
     # Using DeepAgents SubAgent pattern (not CustomSubAgent)
-    # IMPORTANT: Explicitly set tools=[] to prevent inheriting parent tools
+    # IMPORTANT: Explicitly set tools=[] AND middleware=[] to prevent defaults
     subagents = [
         {
             "name": "image_analysis_specialist",
@@ -77,7 +75,8 @@ def create_cataloging_department(
             ),
             "response_format": ImageAnalysisResult,  # Structured output
             "prompt": load_prompt("specialists/image_analysis_specialist.prompt"),
-            "tools": [],  # ✅ Explicitly no tools - pure vision analysis
+            "tools": [],  # ✅ No tools - pure vision analysis
+            "middleware": [],  # ✅ Disable default middleware (filesystem, write_todos)
         },
         {
             "name": "cataloging_specialist",
@@ -88,7 +87,8 @@ def create_cataloging_department(
             ),
             "response_format": Product,  # Structured output
             "prompt": load_prompt("specialists/cataloging_specialist.prompt"),
-            "tools": [],  # ✅ Explicitly no tools - pure synthesis
+            "tools": [],  # ✅ No tools - pure synthesis
+            "middleware": [],  # ✅ Disable default middleware (filesystem, write_todos)
         },
     ]
 
