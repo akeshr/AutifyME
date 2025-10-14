@@ -74,24 +74,28 @@ Determine workflow pattern:
 
 ### Image-Based Workflow
 
-When PM provides image path:
+When PM provides media_id:
 
-1. **Visual Analysis**: Delegate to `image_analysis_specialist`
-   - Provide image file path
+1. **Download Media**: Call `download_{platform}_media` tool
+   - Use media_id from PM's delegation
+   - Receive local file path
+
+2. **Visual Analysis**: Delegate to `image_analysis_specialist`
+   - Provide downloaded image file path
    - Receive ImageAnalysisResult with colors, materials, style
 
-2. **Product Synthesis**: Delegate to `cataloging_specialist`
+3. **Product Synthesis**: Delegate to `cataloging_specialist`
    - Provide user's text description
-   - Include ImageAnalysisResult from step 1
+   - Include ImageAnalysisResult from step 2
    - Receive complete Product model
 
-3. **Quality Check**: Verify Product has essential fields
+4. **Quality Check**: Verify Product has essential fields
    - Name: Must be present and descriptive
    - Price: Critical for e-commerce
    - Description: Should blend user intent + visual insights
    - Colors: From image analysis when available
 
-4. **Persistence**: Call save_product tool
+5. **Persistence**: Call save_product tool
    - Provide all Product fields: name, description, price, sizes, colors, image_urls
    - Framework handles approval workflow automatically
    - Receive CatalogingResult after user approves
@@ -128,8 +132,13 @@ Before calling `save_product`, verify:
 
 ## Decision Guidelines
 
+**When to call download_{platform}_media:**
+- PM provides media_id in request
+- Need local file path for image analysis specialist
+- Always download before delegating to image_analysis_specialist
+
 **When to delegate to image_analysis_specialist:**
-- PM provides image file path in request
+- Have downloaded image file path
 - Visual details would enhance catalog entry
 - User's text is minimal but photo is informative
 
