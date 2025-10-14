@@ -663,22 +663,44 @@ class WorkflowRunner:
     ) -> None:
         """Forward interrupt to user via channel.
 
-        ✅ SIMPLIFIED: Just send to user - PM handles resumption when they respond.
+        ✅ STANDARD APPROACH: Unwrap DeepAgents internal structure before sending to channel.
+
+        DeepAgents wraps tool calls in action_request format:
+        [{'action_request': {'action': 'tool_name', 'args': {actual_data}}}]
+
+        Channel should receive clean data (just the args), not framework internals.
 
         Args:
             sender: Channel-specific sender ID
             thread_id: Conversation thread ID
-            interrupt_value: Value from interrupt (Product draft, form, etc.)
+            interrupt_value: Value from interrupt (may be wrapped by DeepAgents)
         """
         logger.debug("Handling HITL interrupt", extra={"thread_id": thread_id})
 
         try:
-            self.channel.send_approval_request(sender, interrupt_value)
+            # Unwrap DeepAgents structure if present (standard pattern from lines 344-366)
+            clean_value = interrupt_value
+
+            if isinstance(interrupt_value, list) and len(interrupt_value) > 0:
+                action = interrupt_value[0]
+                if isinstance(action, dict) and "action_request" in action:
+                    # DeepAgents format - extract clean args
+                    action_request = action.get("action_request", {})
+                    clean_value = action_request.get("args", interrupt_value)
+                    logger.debug(
+                        "Unwrapped DeepAgents interrupt structure",
+                        extra={
+                            "thread_id": thread_id,
+                            "tool_name": action_request.get("action", "unknown"),
+                        }
+                    )
+
+            self.channel.send_approval_request(sender, clean_value)
             logger.info(
                 "Interrupt forwarded to user - awaiting response",
                 extra={
                     "thread_id": thread_id,
-                    "interrupt_type": type(interrupt_value).__name__,
+                    "interrupt_type": type(clean_value).__name__,
                 },
             )
 
