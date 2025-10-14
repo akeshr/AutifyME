@@ -26,7 +26,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.schemas.approval import BatchApprovalResponse, InterruptContext
+from autifyme_agents.schemas.approval import BatchApprovalResponse
 
 logger = logging.getLogger(__name__)
 

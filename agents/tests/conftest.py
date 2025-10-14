@@ -152,6 +152,19 @@ def mock_storage(mock_company_profile: CompanyProfile, mock_product: Product) ->
             """Mock implementation for getting edge cases."""
             return []
 
+        def check_and_mark_message_processed(
+            self,
+            message_id: str,
+            sender_id: str,
+            thread_id: str,
+            received_at: Any,
+        ) -> bool:
+            """Mock implementation for webhook idempotency check.
+
+            Returns False (not duplicate) for all messages in tests.
+            """
+            return False
+
     return MockStorageClient()
 
 

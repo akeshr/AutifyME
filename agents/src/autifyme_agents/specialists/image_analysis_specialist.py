@@ -10,7 +10,7 @@ from typing import Any
 
 from langchain.agents import create_agent
 from langchain.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 
 from autifyme_agents.core.llm_factory import get_llm

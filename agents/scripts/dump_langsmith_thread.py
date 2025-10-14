@@ -68,7 +68,7 @@ def resolve_run(thread_id: str, limit: int, timeout: int) -> Optional[Run]:
 
 
 def fetch_run_tree(client: Client, root_run: Run) -> Run:
-    print(f"Fetching run tree (this may take time for large traces)...")
+    print("Fetching run tree (this may take time for large traces)...")
     return client.read_run(root_run.id, load_child_runs=True)
 
 
