@@ -158,8 +158,8 @@ Incomplete information: "change price" (which item? to what?)
 <example>
 <input>
 pending_interrupts:
-1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}
-2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}
+1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}}
+2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}}
 
 user_message: "approve both"
 </input>
@@ -175,8 +175,8 @@ user_message: "approve both"
 <your_output>
 BatchApprovalResponse:
 - responses:
-  - {{type: "accept", args: null}
-  - {{type: "accept", args: null}
+  - {{type: "accept", args: null}}
+  - {{type: "accept", args: null}}
 - reasoning: "User approved all 2 pending items without modifications"
 </your_output>
 </example>
@@ -186,8 +186,8 @@ BatchApprovalResponse:
 <example>
 <input>
 pending_interrupts:
-1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}
-2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}
+1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}}
+2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}}
 
 user_message: "approve first, change second to 45 Rs"
 </input>
@@ -203,8 +203,8 @@ user_message: "approve first, change second to 45 Rs"
 <your_output>
 BatchApprovalResponse:
 - responses:
-  - {{type: "accept", args: null}
-  - {{type: "edit", args: {{price: 45.0}}
+  - {{type: "accept", args: null}}
+  - {{type: "edit", args: {{price: 45.0}}}}
 - reasoning: "User approved first item as-is, requested price edit to 45 Rs for second item"
 </your_output>
 </example>
@@ -214,7 +214,7 @@ BatchApprovalResponse:
 <example>
 <input>
 pending_interrupts:
-1. tool_name: "save_product", tool_args: {{name: "Jar", price: 30, description: "..."}
+1. tool_name: "save_product", tool_args: {{name: "Jar", price: 30, description: "..."}}
 
 user_message: "change price to 40 and name to Glass Jar"
 </input>
@@ -230,7 +230,7 @@ user_message: "change price to 40 and name to Glass Jar"
 <your_output>
 BatchApprovalResponse:
 - responses:
-  - {{type: "edit", args: {{price: 40.0, name: "Glass Jar"}}
+  - {{type: "edit", args: {{price: 40.0, name: "Glass Jar"}}}}
 - reasoning: "User requested edits to price (40) and name (Glass Jar)"
 </your_output>
 </example>
@@ -240,8 +240,8 @@ BatchApprovalResponse:
 <example>
 <input>
 pending_interrupts:
-1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}
-2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}
+1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}}
+2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}}
 
 user_message: "no, reject these"
 </input>
@@ -256,8 +256,8 @@ user_message: "no, reject these"
 <your_output>
 BatchApprovalResponse:
 - responses:
-  - {{type: "response", args: "User rejected this item"}
-  - {{type: "response", args: "User rejected this item"}
+  - {{type: "response", args: "User rejected this item"}}
+  - {{type: "response", args: "User rejected this item"}}
 - reasoning: "User rejected all 2 pending items"
 </your_output>
 </example>
@@ -267,8 +267,8 @@ BatchApprovalResponse:
 <example>
 <input>
 pending_interrupts:
-1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}
-2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}
+1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}}
+2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}}
 
 user_message: "maybe change the price"
 </input>
@@ -286,8 +286,8 @@ user_message: "maybe change the price"
 <your_output>
 BatchApprovalResponse:
 - responses:
-  - {{type: "response", args: "Please clarify: which product's price should be changed, and to what value?"}
-  - {{type: "response", args: "Please clarify: which product's price should be changed, and to what value?"}
+  - {{type: "response", args: "Please clarify: which product's price should be changed, and to what value?"}}
+  - {{type: "response", args: "Please clarify: which product's price should be changed, and to what value?"}}
 - reasoning: "User intent ambiguous - unclear which product or what new price value. Requesting clarification."
 </your_output>
 </example>
@@ -297,8 +297,8 @@ BatchApprovalResponse:
 <example>
 <input>
 pending_interrupts:
-1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}
-2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}
+1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}}
+2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}}
 
 user_message: "approve first only"
 </input>
@@ -314,8 +314,8 @@ user_message: "approve first only"
 <your_output>
 BatchApprovalResponse:
 - responses:
-  - {{type: "accept", args: null}
-  - {{type: "response", args: "User wants to review this item separately"}
+  - {{type: "accept", args: null}}
+  - {{type: "response", args: "User wants to review this item separately"}}
 - reasoning: "User explicitly approved only the first item, second item needs separate review"
 </your_output>
 </example>
