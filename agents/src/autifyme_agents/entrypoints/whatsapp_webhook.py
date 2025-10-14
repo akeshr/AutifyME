@@ -89,11 +89,9 @@ def _persist_event(payload: dict[str, Any]) -> Path:
     return path
 
 
-def _is_approval_message(text: str | None) -> bool:
-    if not text:
-        return False
-    lowered = text.strip().lower()
-    return lowered in {"approve", "reject"}
+# REMOVED: _is_approval_message() helper
+# runner_v2 uses native LangGraph patterns - ALL messages go through handle_message()
+# Runner automatically detects pending interrupts via pm.get_state() and invokes approval_analyzer
 
 
 @app.get("/health")
@@ -231,35 +229,9 @@ async def receive(request: Request) -> Any:
                         },
                     )
 
-                    # Handle approval messages (text only)
-                    if msg_type == "text" and _is_approval_message(text):
-                        try:
-                            _get_runner().handle_approval(sender, text)
-                        except GeneratorExit:
-                            # GeneratorExit during approval resumption
-                            # Message already marked as processed above for idempotency
-                            logger.warning(
-                                "Approval workflow streaming timed out (GeneratorExit)",
-                                extra={
-                                    "message_id": message_id,
-                                    "sender": sender,
-                                    "event_path": str(event_path)
-                                },
-                            )
-                            continue
-                        except Exception as approval_exc:
-                            # Message already marked as processed above for idempotency
-                            logger.exception(
-                                "Approval processing failed",
-                                extra={
-                                    "message_id": message_id,
-                                    "sender": sender,
-                                    "event_path": str(event_path),
-                                    "error_type": type(approval_exc).__name__
-                                },
-                            )
-                        continue
-
+                    # ✅ NATIVE LANGGRAPH PATTERN: ALL messages go through handle_message()
+                    # runner_v2 auto-detects pending interrupts via pm.get_state() and invokes approval_analyzer
+                    # No special routing needed - the runner knows the context automatically
                     try:
                         _get_runner().handle_message(sender, text, media_id)
                     except GeneratorExit:
