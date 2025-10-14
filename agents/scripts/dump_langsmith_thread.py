@@ -14,14 +14,17 @@ from __future__ import annotations
 import argparse
 import sys
 from collections import deque
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from langsmith import Client
 from langsmith.schemas import Run
 
-# Load environment variables
-load_dotenv("../.env")
+# Load environment variables from project root
+project_root = Path(__file__).parent.parent.parent
+env_path = project_root / ".env"
+load_dotenv(env_path)
 
 # Fix Windows console encoding issues
 if sys.platform == "win32":
@@ -44,11 +47,17 @@ def parse_args() -> argparse.Namespace:
         default=200,
         help="Maximum number of recent runs to search (default: 200)",
     )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=120,
+        help="Timeout in seconds for LangSmith API calls (default: 120)",
+    )
     return parser.parse_args()
 
 
-def resolve_run(thread_id: str, limit: int) -> Optional[Run]:
-    client = Client()
+def resolve_run(thread_id: str, limit: int, timeout: int) -> Optional[Run]:
+    client = Client(timeout_ms=timeout * 1000)
     runs = client.list_runs(order="desc", limit=limit)
     for run in runs:
         config_meta: Dict[str, Any] = (run.inputs or {}).get("config", {}) if run.inputs else {}
@@ -59,6 +68,7 @@ def resolve_run(thread_id: str, limit: int) -> Optional[Run]:
 
 
 def fetch_run_tree(client: Client, root_run: Run) -> Run:
+    print(f"Fetching run tree (this may take time for large traces)...")
     return client.read_run(root_run.id, load_child_runs=True)
 
 
@@ -110,18 +120,18 @@ def dump_run_tree(root: Run) -> None:
 
 def main() -> None:
     args = parse_args()
-    client = Client()
+    client = Client(timeout_ms=args.timeout * 1000)
 
     if args.run_id:
         # Direct run ID lookup
-        print(f"Fetching LangSmith run with run_id={args.run_id}")
+        print(f"Fetching LangSmith run with run_id={args.run_id} (timeout={args.timeout}s)")
         root_run = client.read_run(args.run_id)
         print(f"Found run: {root_run.id} ({root_run.name})")
     elif args.thread:
         # Search by thread ID
         thread_id: str = args.thread
-        print(f"Searching for LangSmith run with thread_id={thread_id}")
-        root_run = resolve_run(thread_id, args.limit)
+        print(f"Searching for LangSmith run with thread_id={thread_id} (timeout={args.timeout}s)")
+        root_run = resolve_run(thread_id, args.limit, args.timeout)
         if not root_run:
             raise SystemExit(f"No run found for thread_id={thread_id}")
         print(f"Found run: {root_run.id} ({root_run.name})")

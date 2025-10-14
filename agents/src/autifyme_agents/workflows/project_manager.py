@@ -112,11 +112,11 @@ def create_project_manager(
         Compiled deepagents agent with proper delegation to departments.
 
     **Architecture**:
-    - PM uses MessageIntentTool to interpret raw user messages in context
-    - PM has NO direct access to domain tools (analyze_image, save_product, etc.)
-    - PM MUST delegate to departments via 'task' tool
-    - Subagents (departments) have domain tools
-    - Enforces PM → MessageIntent → Department → Specialist → Tools hierarchy
+    - PM handles intent detection directly (no specialist)
+    - PM has media download tools for analyzing user messages
+    - PM delegates to departments via 'task' tool
+    - Departments have domain tools (analyze_image, save_product, etc.)
+    - Enforces PM → Department → Specialist → Tools hierarchy
     """
 
     if checkpointer is None:
@@ -128,15 +128,13 @@ def create_project_manager(
     # PM orchestration tools
     pm_tools = [write_todos]
 
-    # Add MessageIntentTool if channel provided (enables agentic interpretation)
+    # Add media download tools if channel provided
+    # PM needs these to download media BEFORE delegating to departments
     if channel is not None:
-        from autifyme_agents.tools.message_intent_tool import create_message_intent_tool
+        from autifyme_agents.tools.platform_tools import create_platform_media_tools
 
-        # Create message intent tool WITHOUT platform tools
-        # Intent specialist only needs to classify, not download media
-        # Media download happens in departments/specialists that need it
-        message_intent_tool = create_message_intent_tool(channel)
-        pm_tools.append(message_intent_tool)
+        media_tools = create_platform_media_tools(channel)
+        pm_tools.extend(media_tools)
 
     # Add any additional explicit tools
     if tools is not None:
@@ -167,6 +165,7 @@ def create_project_manager(
         "department_results": {},
         "todos": [],
         "remaining_steps": 8,
+        "pending_interrupts": [],  # HITL interrupt context for PM
     }
 
     return project_manager.with_config(
