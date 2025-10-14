@@ -27,7 +27,10 @@
       "Bash(cat:*)",
       "WebFetch(domain:python.langchain.com)",
       "WebFetch(domain:changelog.langchain.com)",
-      "WebFetch(domain:developers.facebook.com)"
+      "WebFetch(domain:developers.facebook.com)",
+      "WebFetch(domain:www.anthropic.com)",
+      "Bash(timeout 30 uv run python:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

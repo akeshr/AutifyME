@@ -23,6 +23,15 @@ class ProjectMetadata(TypedDict, total=False):  # type: ignore[call-arg]
     workflow_type: str
 
 
+class InterruptInfo(TypedDict, total=False):  # type: ignore[call-arg]
+    """Information about a pending HITL interrupt."""
+
+    interrupt_id: str
+    tool_name: str
+    tool_args: dict
+    description: str
+
+
 class ProjectManagerState(DeepAgentState):  # type: ignore[misc]
     """Structured state carried by the Project Manager deep agent."""
 
@@ -34,3 +43,4 @@ class ProjectManagerState(DeepAgentState):  # type: ignore[misc]
     status: Literal["idle", "planning", "awaiting_approval", "completed", "blocked"]
     last_error: Optional[str]
     metadata: ProjectMetadata
+    pending_interrupts: list[InterruptInfo]  # HITL interrupt context for PM

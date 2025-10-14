@@ -13,7 +13,7 @@ Analyze one or more LangSmith trace IDs to identify issues and patterns.
 You are analyzing LangSmith traces for the AutifyME agentic workflow system. For each trace ID provided:
 
 1. **Dump the trace**:
-   - Run: `uv run python scripts/dump_langsmith_thread.py --run-id <trace-id> > ../trace_<trace-id>.txt`
+   - Run: `timeout 120 uv run python --env-path ../.env scripts/dump_langsmith_thread.py --run-id <trace-id> > ../trace_<trace-id>.txt`
    - Save output to project root with trace ID in filename
 
 2. **Analyze each trace** for common issues:
