@@ -82,7 +82,7 @@ except Exception as exc:
 ---
 
 ### 3. Implement Pytest Test Framework
-**Directory:** `agents/tests/` (to be created)
+**Directory:** `tests/` (to be created)
 **Severity:** P0 - No CI/CD, no regression detection
 
 **Status:** `pyproject.toml` already has pytest dependencies ✅, but no test suite exists.
@@ -90,7 +90,7 @@ except Exception as exc:
 **Tasks:**
 1. Create directory structure:
    ```
-   agents/tests/
+   tests/
    ├── __init__.py
    ├── conftest.py          # Shared fixtures
    ├── unit/
@@ -539,14 +539,14 @@ _processed_messages: OrderedDict[str, bool] = OrderedDict()  # ← In-memory onl
 ---
 
 ### 9. Implement Prompt Versioning with LangSmith Hub
-**Directory:** `agents/scripts/` (create `sync_prompts.py`)
+**Directory:** `tests/scripts/` (create `sync_prompts.py`)
 **Severity:** P2 - Slows experimentation velocity
 
 **Issue:** AGENTS_DESIGN.md § 9 specifies LangSmith Hub integration, but no sync tooling exists.
 
 **Create:**
 ```python
-# agents/scripts/sync_prompts.py
+# tests/scripts/sync_prompts.py
 """Sync local prompt files with LangSmith Hub for A/B testing and versioning."""
 
 import argparse
@@ -599,10 +599,10 @@ if __name__ == "__main__":
 **Usage:**
 ```bash
 # Push all local prompts to LangSmith Hub
-uv run python agents/scripts/sync_prompts.py push
+uv run python tests/scripts/sync_prompts.py push
 
 # Pull updated prompt from Hub after A/B testing
-uv run python agents/scripts/sync_prompts.py pull \
+uv run python tests/scripts/sync_prompts.py pull \
     --name autifyme/departments/cataloging_department \
     --output agents/src/autifyme_agents/prompts/departments/cataloging_department.prompt
 ```
