@@ -129,7 +129,7 @@ Explain your interpretation clearly:
 "approve", "approved", "yes", "ok", "okay", "confirm", "confirmed", "good", "looks good", "go ahead", "proceed", "save", "save it"
 
 **Bulk approval:**
-"approve all", "approve both", "yes to all", "all good", "approve all products", "approve everything"
+"approve all", "approve both", "yes to all", "all good"
 
 **Rejection keywords:**
 "no", "nope", "reject", "rejected", "cancel", "discard", "delete", "don't save", "do not save"
@@ -145,8 +145,6 @@ Explain your interpretation clearly:
 "approve [ordinal]" (e.g., "approve first", "approve the second one")
 "[ordinal] only" (e.g., "first only", "second one only")
 "change [ordinal] to X" (e.g., "change first to 45 Rs")
-"approve [numbers]" (e.g., "approve 1,3", "approve 1 and 3")
-"reject [numbers]" (e.g., "reject 2", "reject 2,4")
 
 **Ambiguous patterns requiring clarification:**
 "maybe", "not sure", "let me think", "can you", "what about", "hmm"
@@ -319,66 +317,6 @@ BatchApprovalResponse:
   - {{type: "accept", args: null}}
   - {{type: "response", args: "User wants to review this item separately"}}
 - reasoning: "User explicitly approved only the first item, second item needs separate review"
-</your_output>
-</example>
-
-## Example 7: Number-Based Selective Approval
-
-<example>
-<input>
-pending_interrupts:
-1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}}
-2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}}
-3. tool_name: "save_product", tool_args: {{name: "Jar 2L", price: 80}}
-
-user_message: "approve 1,3"
-</input>
-
-<your_reasoning>
-- User referenced specific product numbers: "1,3"
-- Product 1 (first): accept
-- Product 2 (second): not mentioned, needs separate handling
-- Product 3 (third): accept
-- 3 interrupts, need 3 responses
-</your_reasoning>
-
-<your_output>
-BatchApprovalResponse:
-- responses:
-  - {{type: "accept", args: null}}
-  - {{type: "response", args: "User wants to review this item separately"}}
-  - {{type: "accept", args: null}}
-- reasoning: "User approved products 1 and 3, product 2 needs separate review"
-</your_output>
-</example>
-
-## Example 8: Number-Based Selective Rejection
-
-<example>
-<input>
-pending_interrupts:
-1. tool_name: "save_product", tool_args: {{name: "Jar 500ml", price: 30}}
-2. tool_name: "save_product", tool_args: {{name: "Jar 1L", price: 50}}
-3. tool_name: "save_product", tool_args: {{name: "Jar 2L", price: 80}}
-
-user_message: "reject 2"
-</input>
-
-<your_reasoning>
-- User rejected product 2 specifically
-- Product 1: not mentioned, needs separate handling
-- Product 2: reject
-- Product 3: not mentioned, needs separate handling
-- 3 interrupts, need 3 responses
-</your_reasoning>
-
-<your_output>
-BatchApprovalResponse:
-- responses:
-  - {{type: "response", args: "User wants to review this item separately"}}
-  - {{type: "response", args: "User rejected this item"}}
-  - {{type: "response", args: "User wants to review this item separately"}}
-- reasoning: "User rejected product 2, products 1 and 3 need separate review"
 </your_output>
 </example>
 
