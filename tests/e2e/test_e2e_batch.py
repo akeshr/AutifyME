@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.integrations.storage.storage_factory import get_storage
 from langgraph.checkpoint.memory import MemorySaver
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -81,15 +80,15 @@ class TestChannel(MessagingChannel):
         return None
 
 
-def test_end_to_end_single_product():
+def test_end_to_end_single_product(mock_storage, memory_checkpointer):
     """Test E2E: Single product cataloging with HITL."""
     print("\n" + "="*80)
     print("E2E TEST 1: Single Product with HITL")
     print("="*80)
 
-    storage = get_storage()
+    storage = mock_storage
     channel = TestChannel()
-    checkpointer = MemorySaver()
+    checkpointer = memory_checkpointer
 
     runner = WorkflowRunner(
         channel=channel,
@@ -142,15 +141,15 @@ def test_end_to_end_single_product():
         return False
 
 
-def test_end_to_end_multi_product_decomposed():
+def test_end_to_end_multi_product_decomposed(mock_storage, memory_checkpointer):
     """Test E2E: Multi-product request - verify PM decomposes correctly."""
     print("\n" + "="*80)
     print("E2E TEST 2: Multi-Product Request (PM Should Decompose)")
     print("="*80)
 
-    storage = get_storage()
+    storage = mock_storage
     channel = TestChannel()
-    checkpointer = MemorySaver()
+    checkpointer = memory_checkpointer
 
     runner = WorkflowRunner(
         channel=channel,
@@ -230,17 +229,94 @@ if __name__ == "__main__":
     print("# Testing FULL workflow: Runner -> PM -> Department -> HITL -> Resume")
     print("#"*80)
 
+    # Create mock storage and checkpointer for standalone execution
+    import sys
+    import uuid
+    from datetime import timedelta
+    from typing import Any
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+
+    from autifyme_agents.schemas.models import CompanyProfile, Product
+
+    # Create test fixtures manually
+    mock_company = CompanyProfile(
+        id="test-company-001",
+        name="Test Retail Co",
+        brand_voice="Professional, friendly, and informative",
+        target_audience="Budget-conscious millennial shoppers",
+        style_preferences=["minimalist", "modern", "sustainable"],
+        industry="Fashion & Apparel",
+    )
+
+    class MockStorageClient(StorageInterface):
+        def __init__(self):
+            self.saved_products = []
+            self.pending_approvals = {}
+
+        def get_company_profile(self) -> CompanyProfile:
+            return mock_company
+
+        def save_product(self, product: Product) -> Product:
+            if product.id is None:
+                product.id = uuid.uuid4()
+            self.saved_products.append(product)
+            return product
+
+        def get_product(self, product_id: uuid.UUID) -> Product | None:
+            return next((p for p in self.saved_products if p.id == product_id), None)
+
+        def list_products(self, limit: int = 100, offset: int = 0) -> list[Product]:
+            return self.saved_products[offset : offset + limit]
+
+        def save_pending_approval(self, thread_id: str, interrupt_id: str, checkpoint_id: str,
+                                   tool_call: dict, draft_summary: str, ai_message: dict | None = None,
+                                   image_path: str | None = None) -> None:
+            self.pending_approvals[thread_id] = {
+                "interrupt_id": interrupt_id, "checkpoint_id": checkpoint_id,
+                "tool_call": tool_call, "draft_summary": draft_summary,
+                "ai_message": ai_message, "image_path": image_path,
+            }
+
+        def get_pending_approval(self, thread_id: str) -> dict[str, Any] | None:
+            return self.pending_approvals.get(thread_id)
+
+        def delete_pending_approval(self, thread_id: str) -> None:
+            self.pending_approvals.pop(thread_id, None)
+
+        def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
+            return str(uuid.uuid4())
+
+        def get_workflow_outcomes(self, *, workflow_type: str | None = None, success: bool | None = None,
+                                  limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+            return []
+
+        def get_recent_failures(self, time_window: timedelta) -> list[dict[str, Any]]:
+            return []
+
+        def get_success_rates(self, time_window: timedelta | None = None) -> dict[str, float]:
+            return {"overall": 0.95}
+
+        def get_edge_cases(self, time_window: timedelta | None = None) -> list[dict[str, Any]]:
+            return []
+
+        def check_and_mark_message_processed(self, message_id: str, sender_id: str,
+                                              thread_id: str, received_at: Any) -> bool:
+            return False
+
+    storage = MockStorageClient()
+    checkpointer = MemorySaver()
+
     results = []
 
     # Test 1: Single product
     print("\n[INFO] Running Test 1...")
-    results.append(("Single Product E2E", test_end_to_end_single_product()))
+    results.append(("Single Product E2E", test_end_to_end_single_product(storage, checkpointer)))
 
     time.sleep(2)  # Brief pause between tests
 
     # Test 2: Multi-product
     print("\n[INFO] Running Test 2...")
-    results.append(("Multi-Product E2E", test_end_to_end_multi_product_decomposed()))
+    results.append(("Multi-Product E2E", test_end_to_end_multi_product_decomposed(storage, checkpointer)))
 
     # Summary
     print("\n" + "#"*80)

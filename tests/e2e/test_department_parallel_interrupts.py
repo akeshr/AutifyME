@@ -15,21 +15,20 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.departments.cataloging_department import create_cataloging_department
 from langchain.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
 
-def test_department_parallel_interrupts():
+def test_department_parallel_interrupts(mock_storage, memory_checkpointer):
     """Test department handling 2 variants in one message - should create 2 interrupts."""
     print("\n" + "="*80)
     print("DEPARTMENT PARALLEL INTERRUPT TEST")
     print("Testing: Department receives multi-variant request -> Makes 2 save_product calls")
     print("="*80)
 
-    storage = get_storage()
-    checkpointer = MemorySaver()
+    storage = mock_storage
+    checkpointer = memory_checkpointer
 
     # Create department directly
     print("\n[TEST] Creating cataloging department...")
@@ -182,7 +181,80 @@ if __name__ == "__main__":
     print("# Replicating original '1 != 2' error scenario")
     print("#"*80)
 
-    result = test_department_parallel_interrupts()
+    # Create mock storage and checkpointer for standalone execution
+    import uuid
+    from datetime import timedelta
+    from typing import Any
+    from autifyme_agents.schemas.models import CompanyProfile, Product
+
+    mock_company = CompanyProfile(
+        id="test-company-001",
+        name="Test Retail Co",
+        brand_voice="Professional, friendly, and informative",
+        target_audience="Budget-conscious millennial shoppers",
+        style_preferences=["minimalist", "modern", "sustainable"],
+        industry="Fashion & Apparel",
+    )
+
+    class MockStorageClient(StorageInterface):
+        def __init__(self):
+            self.saved_products = []
+            self.pending_approvals = {}
+
+        def get_company_profile(self) -> CompanyProfile:
+            return mock_company
+
+        def save_product(self, product: Product) -> Product:
+            if product.id is None:
+                product.id = uuid.uuid4()
+            self.saved_products.append(product)
+            return product
+
+        def get_product(self, product_id: uuid.UUID) -> Product | None:
+            return next((p for p in self.saved_products if p.id == product_id), None)
+
+        def list_products(self, limit: int = 100, offset: int = 0) -> list[Product]:
+            return self.saved_products[offset : offset + limit]
+
+        def save_pending_approval(self, thread_id: str, interrupt_id: str, checkpoint_id: str,
+                                   tool_call: dict, draft_summary: str, ai_message: dict | None = None,
+                                   image_path: str | None = None) -> None:
+            self.pending_approvals[thread_id] = {
+                "interrupt_id": interrupt_id, "checkpoint_id": checkpoint_id,
+                "tool_call": tool_call, "draft_summary": draft_summary,
+                "ai_message": ai_message, "image_path": image_path,
+            }
+
+        def get_pending_approval(self, thread_id: str) -> dict[str, Any] | None:
+            return self.pending_approvals.get(thread_id)
+
+        def delete_pending_approval(self, thread_id: str) -> None:
+            self.pending_approvals.pop(thread_id, None)
+
+        def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
+            return str(uuid.uuid4())
+
+        def get_workflow_outcomes(self, *, workflow_type: str | None = None, success: bool | None = None,
+                                  limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+            return []
+
+        def get_recent_failures(self, time_window: timedelta) -> list[dict[str, Any]]:
+            return []
+
+        def get_success_rates(self, time_window: timedelta | None = None) -> dict[str, float]:
+            return {"overall": 0.95}
+
+        def get_edge_cases(self, time_window: timedelta | None = None) -> list[dict[str, Any]]:
+            return []
+
+        def check_and_mark_message_processed(self, message_id: str, sender_id: str,
+                                              thread_id: str, received_at: Any) -> bool:
+            return False
+
+    storage = MockStorageClient()
+    checkpointer = MemorySaver()
+
+    result = test_department_parallel_interrupts(storage, checkpointer)
 
     print("\n" + "#"*80)
     if result:
