@@ -1,16 +1,16 @@
 # Actual Implementation Architecture (As-Built Reference)
 
-**Date:** January 2025
+**Date:** October 2025
 **Status:** ✅ Verified from Codebase
-**Purpose:** Ground truth for prompt refactoring - actual implementation, not planned design
+**Purpose:** Ground truth - actual implementation as coded
 
 ---
 
 ## Executive Summary
 
-This document captures the **actual implemented architecture** by analyzing production code, not documentation. Use this as source of truth when writing/updating prompts.
+This document captures the **actual implemented architecture** verified from production code.
 
-**Critical Finding:** Current implementation uses DeepAgents with CustomSubAgents pattern - **NOT** the tools-as-subagents pattern described in some design docs.
+**Architecture:** Full DeepAgents hierarchy using CustomSubAgents for PM → Department delegation and SubAgents/CustomSubAgents for Department → Specialist delegation.
 
 ---
 
@@ -62,7 +62,7 @@ project_manager = create_deep_agent(
 **Implementation:** `departments/cataloging_department.py`
 
 ```python
-# Actual code pattern (CORRECTED):
+# Actual code pattern:
 department = create_deep_agent(
     model=llm,
     instructions=load_prompt("departments/cataloging_department.prompt"),
@@ -71,18 +71,21 @@ department = create_deep_agent(
         create_save_product_tool(storage),  # Database persistence
         *platform_media_tools,  # Optional media download
     ],
-    subagents=[  # ✅ Specialists as subagents (proper hierarchy)
+    subagents=[  # ✅ Specialists as SubAgents (proper hierarchy)
+        # CustomSubAgent: Pre-built graph (bypasses virtual filesystem)
         {
             "name": "image_analysis_specialist",
             "description": "Analyze product images...",
-            "response_format": ImageAnalysisResult,
-            "system_prompt": load_prompt("specialists/image_analysis_specialist.prompt"),
+            "graph": create_image_analysis_specialist_graph(company_profile),
         },
+        # Standard SubAgent: Spec-based (pure synthesis)
         {
             "name": "cataloging_specialist",
-            "description": "Transform user descriptions into Product models...",
+            "description": "Transform descriptions into Product models...",
             "response_format": Product,
-            "system_prompt": load_prompt("specialists/cataloging_specialist.prompt"),
+            "prompt": load_prompt("specialists/cataloging_specialist.prompt"),
+            "tools": [],
+            "middleware": [],
         },
     ],
     middleware=[CompanyContextMiddleware(storage)],

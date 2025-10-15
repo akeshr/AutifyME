@@ -25,10 +25,7 @@ Workflow-specific designs and orchestration patterns.
 | --- | --- |
 | **[WHATSAPP_CATALOGING_WORKFLOW.md](./workflows/WHATSAPP_CATALOGING_WORKFLOW.md)** | Current cataloging implementation (end-to-end) |
 | **[PM_INTENT_ANALYSIS_AND_MESSAGE_HANDLING.md](./workflows/PM_INTENT_ANALYSIS_AND_MESSAGE_HANDLING.md)** | Multi-platform message handling and intent classification |
-| **[DEPARTMENT_DELEGATION_ARCHITECTURE.md](./workflows/DEPARTMENT_DELEGATION_ARCHITECTURE.md)** | Department delegation patterns and state management |
 | **[WORKFLOW_ORCHESTRATION_REFACTOR.md](./workflows/WORKFLOW_ORCHESTRATION_REFACTOR.md)** | Runner architecture and orchestration patterns |
-| **[AGENTIC_APPROVAL_DESIGN.md](./workflows/AGENTIC_APPROVAL_DESIGN.md)** | HITL approval workflow design |
-| **[AGENTIC_APPROVAL_IMPLEMENTATION.md](./workflows/AGENTIC_APPROVAL_IMPLEMENTATION.md)** | HITL implementation details |
 | **[WEBHOOK_IDEMPOTENCY_ANALYSIS.md](./workflows/WEBHOOK_IDEMPOTENCY_ANALYSIS.md)** | WhatsApp webhook idempotency handling |
 | **[WEBHOOK_IDEMPOTENCY_DEEP_DIVE.md](./workflows/WEBHOOK_IDEMPOTENCY_DEEP_DIVE.md)** | In-depth webhook deduplication analysis |
 | **[MONITORING_QUERIES.md](./workflows/MONITORING_QUERIES.md)** | Database queries for monitoring and debugging |

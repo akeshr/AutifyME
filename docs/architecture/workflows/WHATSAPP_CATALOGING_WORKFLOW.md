@@ -4,26 +4,26 @@ This document outlines the design for the Cataloging MVP feature: enabling India
 
 ---
 
-## Architecture (2025-10-08)
+## Architecture (2025-10-15)
 
-**Modular, multi-channel architecture.** See [`WORKFLOW_ORCHESTRATION_REFACTOR.md`](./WORKFLOW_ORCHESTRATION_REFACTOR.md) for complete details.
+**Native LangGraph HITL with DeepAgents hierarchy.**
 
 ### Components
 
-- **Webhook**: `entrypoints/whatsapp_webhook.py` - FastAPI webhook (verification, events, routing)
-- **Channel Adapter**: `workflows/channels/whatsapp/adapter.py` - WhatsApp-specific (formatting, media, Graph API)
-- **Workflow Orchestrator**: `workflows/orchestration/runner.py` - Generic coordination (channel-agnostic)
-- **Interrupt Coordinator**: `workflows/orchestration/interrupt_coordinator.py` - HITL handling
-- **State Manager**: `workflows/orchestration/state_manager.py` - Approval persistence
-- **Recovery Strategy**: `workflows/orchestration/recovery_strategy.py` - Error recovery
-- **Project Manager**: `workflows/project_manager.py` - DeepAgent orchestrator (delegates to departments)
+- **Webhook**: `entrypoints/whatsapp_webhook.py` - FastAPI webhook (verification, routing)
+- **Channel Adapter**: `integrations/communication/whatsapp_client.py` - WhatsApp Graph API client
+- **Workflow Runner**: `workflows/orchestration/runner_v2.py` - Generic orchestrator (PM invocation, HITL detection)
+- **Approval Analyzer**: `workflows/approval_analyzer.py` - HITL interpretation with structured output
+- **Project Manager**: `workflows/project_manager.py` - DeepAgent (delegates to departments via CustomSubAgents)
+- **Cataloging Department**: `departments/cataloging_department.py` - DeepAgent (coordinates specialists via SubAgents)
+- **Specialists**: `specialists/` - SubAgent specs or CustomSubAgent graphs
 
 ### Key Features
 
-- ✅ Multi-channel ready (SMS, Telegram via new adapters)
-- ✅ Single Responsibility per component
-- ✅ Unit-testable in isolation
-- ✅ Clean separation: orchestration ≠ messaging ≠ interrupts
+- ✅ Native LangGraph interrupt handling (no custom coordinators)
+- ✅ Full DeepAgents hierarchy (PM → Dept → Specialist)
+- ✅ Structured approval interpretation (BatchApprovalResponse)
+- ✅ Type-safe via Pydantic throughout
 
 ---
 
@@ -49,10 +49,15 @@ The entire user experience is conversational and happens within WhatsApp.
 
 ### HITL Interaction
 
-1. After specialists produce a cataloging draft, the Department agent attempts `save_product`.
-2. `interrupt_before=["save_product"]` pauses execution. `whatsapp_cataloging_runner` sends an approval request via WhatsApp detailing the draft.
-3. User replies `approve` / `reject`.
-4. Runner resumes the LangGraph thread with the decision. On approval, product is saved and confirmation sent to the user; on rejection, we can extend later to support edits.
+1. Department attempts `save_product` after specialists complete draft
+2. `tool_configs` triggers native LangGraph interrupt (HumanInTheLoopMiddleware)
+3. Runner detects `__interrupt__` in event stream, extracts draft from interrupt value
+4. Runner sends approval request to user via channel
+5. User responds (approve/reject/edits)
+6. Approval analyzer interprets response → BatchApprovalResponse (structured)
+7. Runner builds Command from structured response
+8. Runner invokes PM/Department with Command to resume
+9. Tool executes, returns CatalogingResult
 
 ---
 
