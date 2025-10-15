@@ -78,15 +78,19 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
     prompt_text = load_prompt("approval_analyzer.prompt")
 
     # Build prompt template
-    # Input variables: pending_interrupts, user_message
+    # Input variables: pending_interrupts, user_message, conversation_history
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", prompt_text),
-        ("human", """**Pending Interrupts:**
+        ("human", """**Conversation History:**
+{conversation_history_formatted}
+
+**Pending Interrupts:**
 {pending_interrupts_formatted}
 
-**User Message:**
+**Current User Message:**
 {user_message}
 
+Use the conversation history to understand context and resolve references (e.g., "the cheaper one", "same description", "make it 25").
 Analyze the user's response and return BatchApprovalResponse with exactly {interrupt_count} responses (one per interrupt)."""),
     ])
 
@@ -95,6 +99,7 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
         """Format inputs for prompt template."""
         pending_interrupts = inputs["pending_interrupts"]
         user_message = inputs.get("user_message", "")
+        conversation_history = inputs.get("conversation_history", [])
 
         # Format interrupts for display
         interrupt_lines = []
@@ -104,7 +109,29 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
                 f"Args: {interrupt.get('tool_args', {})}"
             )
 
+        # Format conversation history for context
+        history_lines = []
+        if conversation_history:
+            for msg in conversation_history[-10:]:  # Last 10 messages for context
+                msg_type = getattr(msg, 'type', None)
+                if not msg_type and hasattr(msg, '__class__'):
+                    msg_type = msg.__class__.__name__.replace('Message', '').lower()
+
+                # Ensure msg_type is not None
+                if msg_type is None:
+                    msg_type = 'unknown'
+
+                content = getattr(msg, 'content', str(msg))
+                if isinstance(content, str) and len(content) > 0:
+                    # Truncate long messages
+                    preview = content[:200] + "..." if len(content) > 200 else content
+                    history_lines.append(f"[{msg_type.upper()}]: {preview}")
+
         formatted = {
+            "conversation_history_formatted": (
+                "\n".join(history_lines) if history_lines
+                else "(No prior conversation)"
+            ),
             "pending_interrupts_formatted": "\n".join(interrupt_lines),
             "user_message": user_message,
             "interrupt_count": len(pending_interrupts),
@@ -123,6 +150,7 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
 def analyze_approval(
     pending_interrupts: list[dict[str, Any]],
     user_message: str,
+    conversation_history: list | None = None,
     llm: BaseChatModel | None = None,
 ) -> BatchApprovalResponse:
     """Convenience function to analyze approval with validation.
@@ -130,6 +158,7 @@ def analyze_approval(
     Args:
         pending_interrupts: List of interrupt context dicts
         user_message: User's approval/rejection message
+        conversation_history: Full conversation history for context (NEW)
         llm: Optional LLM override
 
     Returns:
@@ -140,10 +169,11 @@ def analyze_approval(
     """
     analyzer = create_approval_analyzer(llm)
 
-    # Invoke analyzer
+    # Invoke analyzer with conversation history
     result: BatchApprovalResponse = analyzer.invoke({
         "pending_interrupts": pending_interrupts,
         "user_message": user_message,
+        "conversation_history": conversation_history or [],
     })
 
     # Validate count
@@ -154,6 +184,7 @@ def analyze_approval(
         extra={
             "interrupt_count": len(pending_interrupts),
             "response_count": len(result.responses),
+            "has_conversation_history": len(conversation_history or []) > 0,
             "reasoning": result.reasoning,
         }
     )

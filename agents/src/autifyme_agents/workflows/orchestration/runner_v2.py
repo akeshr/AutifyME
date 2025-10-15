@@ -79,23 +79,28 @@ MAX_THREAD_LOCKS = 1000  # LRU cache size for thread locks
 class WorkflowRunner:
     """Blind executor - forwards messages to PM for intelligent orchestration.
 
-    ## PM-ONLY ARCHITECTURE:
+    ## CONTEXT-AWARE APPROVAL ARCHITECTURE:
 
     Runner responsibilities:
-    - Forward raw messages to PM
+    - Forward messages to PM for orchestration
     - Extract interrupt context from checkpoints
-    - Populate state["pending_interrupts"] for PM
-    - Parse PM's COMMAND output for resumption
-    - Execute PM-constructed Command objects
+    - Extract conversation history from PM state
+    - Use approval analyzer with full conversation history for context-aware decisions
+    - Execute Command objects for approval resumption
     - Send interrupts/results to user via channel
 
-    PM handles (NEW - no specialist!):
-    - Intent detection (new_request, resume_workflow, clarification, etc.)
-    - Data extraction from messages
-    - Media download before delegation
-    - Batch approval interpretation (N responses for N interrupts)
-    - Command construction with state access
-    - Task orchestration and delegation
+    PM handles:
+    - Intent detection for new requests
+    - Task orchestration and delegation to departments
+    - Media download and processing
+    - Overall workflow management
+
+    Approval Analyzer handles (with conversation history):
+    - Batch approval interpretation using full conversation context
+    - Multi-turn approval conversations (resolves "make it 25" from prior clarification)
+    - Contextual reference resolution ("the cheaper one", "use same description")
+    - Natural language approval patterns
+    - Returns structured BatchApprovalResponse
 
     LangGraph + DeepAgents handle:
     - Checkpoint state management
@@ -104,10 +109,11 @@ class WorkflowRunner:
     - Tool execution
 
     ## KEY BENEFITS:
-    - 56% token savings (no specialist overhead)
-    - Batch approval works (PM sees pending_interrupts)
-    - PM has state access for correct Command construction
-    - Single LLM call per message (faster, cheaper)
+    - Approval analyzer has full conversation context (fixes context-blind issue)
+    - Minimal architectural changes (just pass conversation_history parameter)
+    - Type-safe communication via BatchApprovalResponse structured outputs
+    - Separation of concerns (PM orchestrates, analyzer interprets approvals)
+    - Works with existing DeepAgents PM architecture
     """
 
     def __init__(
@@ -414,26 +420,46 @@ class WorkflowRunner:
 
         # Build payload based on checkpoint state
         if pending_interrupts_list:
-            # === STRUCTURED OUTPUT APPROACH ===
-            # Pending interrupts exist - use approval analyzer for intelligent interpretation
-            # Approval analyzer returns BatchApprovalResponse (Pydantic) - type-safe, no text parsing!
+            # === APPROVAL ANALYZER WITH CONVERSATION HISTORY ===
+            # Extract conversation history from PM state for context-aware approval analysis
 
             user_message = raw_payload.get("text", "")
 
+            # Extract conversation history from PM state
+            conversation_history = []
+            try:
+                state_snapshot = pm.get_state(config)
+                if state_snapshot and hasattr(state_snapshot, 'values'):
+                    conversation_history = state_snapshot.values.get("messages", [])
+                    logger.debug(
+                        "Extracted conversation history",
+                        extra={
+                            "thread_id": thread_id,
+                            "history_length": len(conversation_history)
+                        }
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Could not extract conversation history",
+                    extra={"thread_id": thread_id, "error": str(e)}
+                )
+
             logger.info(
-                "Analyzing approval response with structured output",
+                "Analyzing approval with conversation history",
                 extra={
                     "thread_id": thread_id,
                     "interrupt_count": len(pending_interrupts_list),
                     "user_message": user_message[:50],
+                    "has_history": len(conversation_history) > 0,
                 }
             )
 
             try:
-                # Invoke approval analyzer - returns structured BatchApprovalResponse
+                # Invoke approval analyzer with conversation history
                 approval_response: BatchApprovalResponse = analyze_approval(
                     pending_interrupts=pending_interrupts_list,
                     user_message=user_message,
+                    conversation_history=conversation_history,  # NEW: Full context
                 )
 
                 logger.info(
@@ -446,7 +472,6 @@ class WorkflowRunner:
                 )
 
             except ValueError as e:
-                # Validation error (e.g., response count mismatch)
                 logger.error(
                     "Approval analysis validation failed",
                     extra={"thread_id": thread_id, "error": str(e)}
@@ -476,17 +501,13 @@ class WorkflowRunner:
             # Execute Command to resume workflow
             logger.info(
                 "Executing Command to resume workflow",
-                extra={
-                    "thread_id": thread_id,
-                    "command_type": "resume",
-                }
+                extra={"thread_id": thread_id}
             )
 
             last_event = None
             interrupt_value = None
 
             try:
-                # Stream Command execution
                 for event in pm.stream(command_obj, config=config, stream_mode="values"):
                     last_event = event
 
@@ -496,7 +517,7 @@ class WorkflowRunner:
                         if interrupts:
                             interrupt_value = interrupts[0].value
                             logger.info(
-                                "Nested interrupt detected during resume",
+                                "Nested interrupt during resume",
                                 extra={"thread_id": thread_id}
                             )
 
@@ -534,7 +555,7 @@ class WorkflowRunner:
             # No pending interrupt - normal message flow
             from langchain.messages import HumanMessage
             payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
-            
+
             logger.debug(
                 "Adding new message (no pending interrupt)",
                 extra={
@@ -551,7 +572,7 @@ class WorkflowRunner:
                 for event in pm.stream(payload, config=config, stream_mode="values"):
                     last_event = event
 
-                    # Detect interrupt in stream (from subgraph or PM)
+                    # Detect interrupt in stream
                     if "__interrupt__" in event:
                         interrupts = event.get("__interrupt__") or []
                         if interrupts:
@@ -575,8 +596,6 @@ class WorkflowRunner:
                 return last_event, interrupt_value
 
             except GraphInterrupt as interrupt_exc:
-                # Alternative interrupt detection via exception
-                # GraphInterrupt stores interrupts in args[0]
                 interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
                 logger.info(
                     "Interrupt detected via exception",
