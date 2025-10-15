@@ -30,7 +30,9 @@
       "WebFetch(domain:developers.facebook.com)",
       "WebFetch(domain:www.anthropic.com)",
       "Bash(timeout 30 uv run python:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(find:*)",
+      "Bash(uv tree:*)"
     ],
     "deny": [],
     "ask": []

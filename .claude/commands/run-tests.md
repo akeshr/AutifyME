@@ -12,119 +12,65 @@ Run pytest test suite with coverage analysis.
 
 ## Task
 
-Execute test suite and analyze results.
+Execute test suite and analyze results:
 
 ### 1. Run Full Suite with Coverage
-
-```bash
-cd agents
-uv run pytest --cov=autifyme_agents --cov-report=term-missing --cov-report=html -v
-```
+- Run pytest with `--cov=autifyme_agents --cov-report=term-missing --cov-report=html -v`
+- Generate coverage report
 
 ### 2. Run Specific Test Categories
-
-**Unit Tests Only**:
-```bash
-uv run pytest tests/unit/ -v
-```
-
-**Integration Tests**:
-```bash
-uv run pytest tests/integration/ -v
-```
-
-**Specific Module**:
-```bash
-uv run pytest tests/test_cataloging_department.py -v
-```
-
-**Failed Tests Only** (rerun last failures):
-```bash
-uv run pytest --lf -v
-```
+Options:
+- Unit tests only: `tests/unit/`
+- Integration tests: `tests/integration/`
+- Specific module: `tests/test_cataloging_department.py`
+- Failed tests only: `pytest --lf -v`
 
 ### 3. Analyze Coverage
-
-```bash
-# Generate coverage report
-uv run pytest --cov=autifyme_agents --cov-report=html
-
-# Open in browser (Windows)
-start htmlcov/index.html
-
-# Check critical files
-uv run pytest --cov=autifyme_agents --cov-report=term-missing | grep -E "(project_manager|interrupt_coordinator|runner)"
-```
+- Generate HTML report
+- Check critical files coverage:
+  - PM >80%
+  - interrupt_coordinator >85%
+  - runner >75%
+  - departments >70%
+  - specialists >70%
 
 ### 4. Identify Gaps
-
-Check coverage for:
-- `workflows/project_manager.py` - Should be >80%
-- `workflows/orchestration/interrupt_coordinator.py` - Should be >85%
-- `workflows/orchestration/runner.py` - Should be >75%
-- `departments/cataloging_department.py` - Should be >70%
-- `specialists/` - Should be >70%
+List uncovered:
+- Critical code paths
+- Error handlers
+- HITL scenarios
+- Specialist invocations
 
 ### 5. Run Specific Test Patterns
-
-```bash
-# All HITL tests
-uv run pytest -k "hitl" -v
-
-# All interrupt tests
-uv run pytest -k "interrupt" -v
-
-# All approval tests
-uv run pytest -k "approval" -v
-
-# All image analysis tests
-uv run pytest -k "image_analysis" -v
-```
+Filter tests:
+- HITL tests: `pytest -k "hitl"`
+- Interrupt tests: `pytest -k "interrupt"`
+- Approval tests: `pytest -k "approval"`
+- Image analysis: `pytest -k "image_analysis"`
 
 ### 6. Check Test Quality
-
 Verify tests exist for:
-- ✅ HITL interrupt triggering
-- ✅ HITL approval/rejection
-- ✅ PM delegation to departments
-- ✅ Department tool coordination
-- ✅ Image specialist base64 conversion
-- ✅ State persistence
-- ✅ Error recovery
-- ✅ Media download
+- HITL interrupt/approval/rejection
+- PM delegation
+- Department tool coordination
+- Image specialist base64 conversion
+- State persistence
+- Error recovery
+- Media download
 
-### 7. Report
+## Output
 
-```markdown
-## Test Results
-
-**Total Tests**: [count]
-**Passed**: [count] ✅
-**Failed**: [count] ❌
-**Skipped**: [count] ⚠️
-
-**Coverage**: [percentage]%
-
-### Failed Tests
-[List with failure reasons]
-
-### Coverage Gaps
-**Files Below Target**:
-- `file.py`: [current]% (target: [target]%)
-
-**Uncovered Critical Paths**:
-- [List important uncovered code sections]
-
-### Missing Tests
-- [Areas that need test coverage]
-
-### Recommendations
-- [Suggested improvements]
-```
+Generate test results report with:
+- **Total Tests**: Passed/Failed/Skipped counts
+- **Coverage**: Percentage
+- **Failed Tests**: List with failure reasons
+- **Coverage Gaps**: Files below target with percentages
+- **Missing Tests**: Areas needing coverage
+- **Recommendations**: Suggested improvements
 
 ## Notes
 
-- Tests should pass before merging to main
+- Tests should pass before merging
 - Coverage should not decrease
 - Run tests locally before pushing
-- Check `agents/tests/README.md` for test writing guidelines
+- Check `tests/README.md` for writing guidelines

@@ -1,403 +1,68 @@
 # Health Check
 
-System health and connectivity check.
+Comprehensive system health validation.
 
 ## Usage
 
 ```
-/health-check
+/health-check [component]
 ```
+
+**Components**: `all`, `db`, `api`, `agents`, `services`
 
 ## Task
 
-Verify all system components are healthy and accessible.
-
-### 1. Check Database Connections
-
-```bash
-cd agents
-uv run python -c "
-from dotenv import load_dotenv
-load_dotenv('../.env')
-
-print('=== Database Health Check ===')
-
-# Supabase
-try:
-    from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
-    storage = SupabaseStorageClient()
-
-    # Test read
-    profile = storage.get_company_profile()
-
-    # Test table access
-    result = storage.supabase.table('products').select('id').limit(1).execute()
-
-    print('✅ Supabase: Connected and responsive')
-    print(f'   Company: {profile.name}')
-    print(f'   Products table: Accessible')
-except Exception as e:
-    print(f'❌ Supabase: {str(e)[:150]}')
-
-# PostgreSQL
-try:
-    from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-    import psycopg
-    from autifyme_agents.core.config import settings
-
-    # Test checkpointer
-    checkpointer = get_checkpointer()
-
-    # Test direct connection
-    with psycopg.connect(settings.DATABASE_URL) as conn:
-        with conn.cursor() as cur:
-            cur.execute('SELECT COUNT(*) FROM checkpoints')
-            count = cur.fetchone()[0]
-
-    print('✅ PostgreSQL: Connected and responsive')
-    print(f'   Checkpoints: {count}')
-except Exception as e:
-    print(f'❌ PostgreSQL: {str(e)[:150]}')
-"
-```
-
-### 2. Check API Services
-
-```bash
-cd agents
-uv run python -c "
-from dotenv import load_dotenv
-load_dotenv('../.env')
-
-print('=== API Services Health Check ===')
-
-# OpenAI
-try:
-    from openai import OpenAI
-    client = OpenAI()
-
-    # Test with minimal request
-    response = client.chat.completions.create(
-        model='gpt-4.1-mini-2025-04-14',
-        messages=[{'role': 'user', 'content': 'test'}],
-        max_tokens=5
-    )
-
-    print('✅ OpenAI: Accessible and responsive')
-except Exception as e:
-    print(f'❌ OpenAI: {str(e)[:150]}')
-
-# LangSmith
-try:
-    from langsmith import Client
-    client = Client()
-
-    # Test with minimal query
-    runs = list(client.list_runs(limit=1))
-
-    print('✅ LangSmith: Accessible and responsive')
-except Exception as e:
-    print(f'⚠️  LangSmith: {str(e)[:150]}')
-    print('   (Non-critical - tracing will be unavailable)')
-"
-```
-
-### 3. Check WhatsApp Integration
-
-```bash
-cd agents
-uv run python -c "
-from dotenv import load_dotenv
-load_dotenv('../.env')
-from autifyme_agents.core.config import settings
-
-print('=== WhatsApp Integration Health Check ===')
-
-# Check configuration
-required_vars = [
-    'WHATSAPP_PHONE_NUMBER_ID',
-    'WHATSAPP_ACCESS_TOKEN',
-    'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
-]
-
-all_set = True
-for var in required_vars:
-    value = getattr(settings, var, None)
-    if not value:
-        print(f'❌ {var}: Not set')
-        all_set = False
-    else:
-        # Show masked value
-        masked = value[:4] + '...' + value[-4:] if len(value) > 8 else '***'
-        print(f'✅ {var}: {masked}')
-
-if all_set:
-    print('✅ WhatsApp: Configuration complete')
-
-    # Test client initialization
-    try:
-        from autifyme_agents.integrations.communication.whatsapp_client import WhatsAppClient
-        client = WhatsAppClient()
-        print('✅ WhatsApp: Client initialized')
-    except Exception as e:
-        print(f'⚠️  WhatsApp: Client error: {str(e)[:100]}')
-else:
-    print('❌ WhatsApp: Incomplete configuration')
-"
-```
-
-### 4. Check LLM Configuration
-
-```bash
-cd agents
-uv run python -c "
-from dotenv import load_dotenv
-load_dotenv('../.env')
-
-print('=== LLM Configuration Health Check ===')
-
-try:
-    from autifyme_agents.core.llm_factory import get_llm
-
-    # Test default LLM
-    llm = get_llm()
-    print(f'✅ Default LLM: {llm.model_name if hasattr(llm, \"model_name\") else \"configured\"}')
-
-    # Test vision LLM
-    vision_llm = get_llm(provider='openai', model='gpt-4.1-mini-2025-04-14')
-    print(f'✅ Vision LLM: {vision_llm.model_name if hasattr(vision_llm, \"model_name\") else \"gpt-4.1-mini-2025-04-14\"}')
-
-except Exception as e:
-    print(f'❌ LLM Configuration: {str(e)[:150]}')
-"
-```
-
-### 5. Check Workflow Components
-
-```bash
-cd agents
-uv run python -c "
-from dotenv import load_dotenv
-load_dotenv('../.env')
-
-print('=== Workflow Components Health Check ===')
-
-# Check PM creation
-try:
-    from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
-    from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-    from autifyme_agents.workflows.project_manager import create_project_manager
-
-    storage = SupabaseStorageClient()
-    profile = storage.get_company_profile()
-    checkpointer = get_checkpointer()
-
-    pm = create_project_manager(
-        company_profile=profile,
-        checkpointer=checkpointer,
-        storage=storage
-    )
-
-    print('✅ Project Manager: Initialized successfully')
-except Exception as e:
-    print(f'❌ Project Manager: {str(e)[:150]}')
-
-# Check department creation
-try:
-    from autifyme_agents.departments.cataloging_department import create_cataloging_department
-
-    dept = create_cataloging_department(
-        checkpointer=checkpointer,
-        storage=storage
-    )
-
-    print('✅ Cataloging Department: Initialized successfully')
-except Exception as e:
-    print(f'❌ Cataloging Department: {str(e)[:150]}')
-
-# Check specialists
-try:
-    from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
-    from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
-
-    image_spec = create_image_analysis_specialist()
-    cat_spec = create_cataloging_specialist()
-
-    print('✅ Specialists: Initialized successfully')
-except Exception as e:
-    print(f'❌ Specialists: {str(e)[:150]}')
-"
-```
-
-### 6. Check Storage Health
-
-```bash
-cd agents
-uv run python -c "
-from dotenv import load_dotenv
-load_dotenv('../.env')
-
-print('=== Storage Health Check ===')
-
-# Check pending approvals
-try:
-    from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
-    from autifyme_agents.workflows.orchestration.state_manager import StateManager
-
-    storage = SupabaseStorageClient()
-    state = StateManager(storage)
-
-    # Count pending approvals
-    result = storage.supabase.table('pending_approvals').select('*', count='exact').execute()
-    count = result.count
-
-    print(f'✅ Pending Approvals: {count} active')
-
-    if count > 10:
-        print(f'   ⚠️  High number of pending approvals - review and clear old ones')
-
-except Exception as e:
-    print(f'❌ State Manager: {str(e)[:150]}')
-
-# Check checkpoint storage
-try:
-    import psycopg
-    from autifyme_agents.core.config import settings
-
-    with psycopg.connect(settings.DATABASE_URL) as conn:
-        with conn.cursor() as cur:
-            cur.execute('SELECT COUNT(*) FROM checkpoints')
-            checkpoint_count = cur.fetchone()[0]
-
-    print(f'✅ Checkpoints: {checkpoint_count} stored')
-
-    if checkpoint_count > 10000:
-        print(f'   ⚠️  High checkpoint count - consider cleanup')
-
-except Exception as e:
-    print(f'❌ Checkpoint Storage: {str(e)[:150]}')
-"
-```
-
-### 7. Check Media Storage
-
-```bash
-echo "=== Media Storage Health Check ==="
-
-# Check media directory
-if [ -d "/tmp/media_downloads" ]; then
-    FILE_COUNT=$(ls -1 /tmp/media_downloads/ 2>/dev/null | wc -l)
-    DISK_USAGE=$(du -sh /tmp/media_downloads/ 2>/dev/null | cut -f1)
-
-    echo "✅ Media Directory: Exists"
-    echo "   Files: $FILE_COUNT"
-    echo "   Disk usage: $DISK_USAGE"
-
-    if [ "$FILE_COUNT" -gt 100 ]; then
-        echo "   ⚠️  High file count - consider cleanup"
-    fi
-else
-    echo "⚠️  Media Directory: Not found (will be created on first use)"
-fi
-```
-
-### 8. Check System Resources
-
-```bash
-echo "=== System Resources Health Check ==="
-
-# Memory usage (works on macOS and Linux)
-if command -v free &> /dev/null; then
-    free -h
-elif command -v vm_stat &> /dev/null; then
-    vm_stat
-fi
-
-# Disk space
-echo "Disk usage:"
-df -h | grep -E "Filesystem|/$"
-
-# Check /tmp space
-echo ""
-echo "/tmp space:"
-df -h /tmp | tail -1
-```
-
-### 9. Generate Health Report
-
-```markdown
-## System Health Report
-
-**Generated**: [timestamp]
-
-### 🟢 Healthy Components
-
-#### Databases
-- ✅ Supabase: Connected (company: [name])
-- ✅ PostgreSQL: Connected (checkpoints: [count])
-
-#### APIs
-- ✅ OpenAI: Accessible
-- ✅ LangSmith: Accessible
-
-#### Integrations
-- ✅ WhatsApp: Configured
-- ✅ LLM Factory: Working
-
-#### Workflows
-- ✅ Project Manager: Initialized
-- ✅ Cataloging Department: Initialized
-- ✅ Specialists: Initialized
-
-### ⚠️  Warnings
-
-- [Component]: [Issue - non-critical]
-
-### ❌ Critical Issues
-
-- [Component]: [Issue - requires immediate attention]
-
-### 📊 Statistics
-
-- Pending approvals: [count]
-- Checkpoints stored: [count]
-- Media files: [count] ([size])
-- Disk usage: [percentage]%
-
-### 🔧 Recommendations
-
-- [Action item if needed]
-
----
-
-**Overall Status**: 🟢 Healthy / ⚠️  Degraded / ❌ Critical
-
-**Action Required**: [Yes/No]
-```
-
-## Quick Health Check
-
-For rapid validation:
-```bash
-cd agents && uv run python -c "
-from dotenv import load_dotenv
-load_dotenv('../.env')
-from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
-from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-from openai import OpenAI
-
-# Quick checks
-storage = SupabaseStorageClient()
-checkpointer = get_checkpointer()
-client = OpenAI()
-
-print('✅ All critical systems healthy')
-" && echo "✅ Quick health check passed"
-```
+Validate system health across all critical components:
+
+### 1. Database Connections
+- **Supabase**: Test connection, query company profile, check products table access
+- **PostgreSQL**: Test checkpointer connection, verify tables exist, count checkpoints
+- Check connection pool health
+
+### 2. External APIs
+- **OpenAI**: Verify API key, test with minimal completion request
+- **WhatsApp**: Check credentials (phone_number_id, access_token, verify_token)
+- **LangSmith**: Test tracing connection (non-critical, should warn not fail)
+
+### 3. Agent System
+- **PM Factory**: Verify PM can be instantiated with checkpointer + storage
+- **Departments**: Test cataloging department creation
+- **Specialists**: Verify image_analysis_specialist, cataloging_specialist initialization
+- **Tools**: Check tool registration and availability
+
+### 4. Configuration
+- Verify all required environment variables set
+- Check file permissions on temp directories (/tmp/media_downloads)
+- Validate webhook tokens and secrets (show masked values)
+
+### 5. Dependencies
+- Check critical library versions (langchain, langgraph, deepagents)
+- Verify no import errors
+- Test LLM factory configuration (default LLM, vision LLM)
+
+### 6. Runtime State
+- Check pending approvals count (warn if >10)
+- Verify checkpoint count (warn if >10,000)
+- Check media downloads directory (file count, disk usage)
+- Test media download directory writable
+
+### 7. System Resources
+- Check disk space (especially /tmp)
+- Memory usage (if available)
+
+## Output
+
+Generate health report with:
+- 🟢 Healthy Components (✅ checkmarks)
+- ⚠️ Warnings (degraded but functional)
+- ❌ Critical Issues (requires immediate attention)
+- 📊 Statistics (counts, sizes, usage)
+- 🔧 Recommendations (action items)
+- **Overall Status**: Healthy / Degraded / Critical
 
 ## Notes
 
-- Run regularly to catch issues early
-- Automate as part of monitoring
-- Check after deployments
-- Verify after infrastructure changes
+- Run before deployments or after incidents
+- Non-critical failures (LangSmith) should warn, not fail
+- Include actionable remediation steps for failures
+- Show masked credentials (first 4 + last 4 chars)
