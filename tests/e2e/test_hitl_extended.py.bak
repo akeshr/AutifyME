@@ -32,7 +32,7 @@ print("EXTENDED HITL TESTING - Various Scenarios and Phrasings")
 print("=" * 80)
 print()
 
-from tests.cli.simulate import run_scenario
+from autifyme_agents.cli.simulate import run_scenario
 
 test_cases = [
     # Approval variations

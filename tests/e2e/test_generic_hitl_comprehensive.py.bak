@@ -32,7 +32,7 @@ print("GENERIC HITL COMPREHENSIVE END-TO-END TESTING")
 print("=" * 80)
 print()
 
-from tests.cli.simulate import run_scenario
+from autifyme_agents.cli.simulate import run_scenario
 from pathlib import Path
 
 # Test scenarios with different HITL responses

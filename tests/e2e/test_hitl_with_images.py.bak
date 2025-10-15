@@ -30,7 +30,7 @@ print("HITL TESTING WITH ACTUAL IMAGE INPUTS")
 print("=" * 80)
 print()
 
-from tests.cli.simulate import run_scenario
+from autifyme_agents.cli.simulate import run_scenario
 
 # Get absolute paths to test images
 test_images_dir = Path(__file__).parent / "agents" / "test_images"
