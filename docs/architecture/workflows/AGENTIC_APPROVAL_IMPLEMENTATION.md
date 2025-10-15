@@ -771,7 +771,7 @@ def _execute_workflow(
 **Comprehensive Intent Test Matrix**:
 
 ```python
-# Create test file: agents/tests/integration/test_approval_intents.py
+# Create test file: tests/integration/test_approval_intents.py
 
 import pytest
 from autifyme_agents.workflows.orchestration.approval_classifier import ApprovalIntentClassifier

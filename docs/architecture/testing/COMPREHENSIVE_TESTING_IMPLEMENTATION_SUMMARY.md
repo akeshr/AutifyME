@@ -82,7 +82,7 @@ Your decision: edit price 89.99
 **Tests WhatsApp caption extraction fix** by supporting caption + media combinations:
 ```bash
 # Image + caption
-uv run python -m autifyme_agents.cli.simulate "Catalog this, price $79" --media test_images/sneaker.jpg
+uv run python -m autifyme_agents.cli.simulate "Catalog this, price $79" --media tests/fixtures/images/sneaker.jpg
 
 # Video + caption
 uv run python -m autifyme_agents.cli.simulate "Product demo" --media test_media/demo.mp4
@@ -147,7 +147,7 @@ cd agents && uv run python -m autifyme_agents.cli.simulate --all --hitl-mode aut
 
 **Custom message with media**:
 ```bash
-cd agents && uv run python -m autifyme_agents.cli.simulate "Catalog this, price $79" --media test_images/product.jpg
+cd agents && uv run python -m autifyme_agents.cli.simulate "Catalog this, price $79" --media tests/fixtures/images/product.jpg
 ```
 
 ---
@@ -156,7 +156,7 @@ cd agents && uv run python -m autifyme_agents.cli.simulate "Catalog this, price 
 
 ### Framework Overview
 
-**Created**: `agents/src/autifyme_agents/cli/permutation_test.py`
+**Created**: `tests/cli/permutation_test.py`
 
 **Purpose**: Systematically generate and test ALL permutation combinations
 
@@ -321,8 +321,8 @@ cd agents && uv run python -m autifyme_agents.cli.simulate --scenario text_clear
 ### Code Changes
 
 **Modified Files**:
-1. `agents/src/autifyme_agents/cli/simulate.py` - Enhanced with HITL modes, caption support, 16 scenarios
-2. **Created** `agents/src/autifyme_agents/cli/permutation_test.py` - Permutation test framework
+1. `tests/cli/simulate.py` - Enhanced with HITL modes, caption support, 16 scenarios
+2. **Created** `tests/cli/permutation_test.py` - Permutation test framework
 
 **Key Enhancements**:
 - `ConsoleChannel.__init__()` - Added `hitl_mode` parameter
@@ -431,7 +431,7 @@ cd agents && uv run python -m autifyme_agents.cli.simulate --all --hitl-mode aut
 
 **Custom message + media**:
 ```bash
-cd agents && uv run python -m autifyme_agents.cli.simulate "Catalog this, price $79" --media test_images/sneaker.jpg
+cd agents && uv run python -m autifyme_agents.cli.simulate "Catalog this, price $79" --media tests/fixtures/images/sneaker.jpg
 ```
 
 **Run permutation tests**:

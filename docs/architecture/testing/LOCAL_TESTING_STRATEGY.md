@@ -13,28 +13,28 @@
 ### 1. PM Chat (fastest iteration)
 ```bash
 # Simple message
-uv run python -m autifyme_agents.cli.pm_chat "Catalog these sneakers, price $79"
+uv run python -m tests.cli.pm_chat "Catalog these sneakers, price $79"
 
 # With image
-uv run python -m autifyme_agents.cli.pm_chat --image test_images/sneaker.jpg "Catalog this"
+uv run python -m tests.cli.pm_chat --image tests/fixtures/images/sneaker.jpg "Catalog this"
 
 # Interactive mode (best for rapid iteration)
-uv run python -m autifyme_agents.cli.pm_chat --interactive
+uv run python -m tests.cli.pm_chat --interactive
 ```
 
 ### 2. Full Workflow Simulator (realistic testing with HITL)
 ```bash
 # Single scenario with auto-approve
-uv run python -m autifyme_agents.cli.simulate "Catalog sneakers, $79" --auto-approve
+uv run python -m tests.cli.simulate "Catalog sneakers, $79" --auto-approve
 
 # With image
-uv run python -m autifyme_agents.cli.simulate "Catalog this product" --image test_images/sneaker.jpg
+uv run python -m tests.cli.simulate "Catalog this product" --image tests/fixtures/images/sneaker.jpg
 
 # Run predefined scenario
-uv run python -m autifyme_agents.cli.simulate --scenario cataloging_with_image
+uv run python -m tests.cli.simulate --scenario cataloging_with_image
 
 # Run all scenarios
-uv run python -m autifyme_agents.cli.simulate --all
+uv run python -m tests.cli.simulate --all
 ```
 
 **All media types supported**:
@@ -74,13 +74,13 @@ Use `--media <path>` for all types (or legacy `--image` for images).
 
 ```bash
 # Simple chat with PM
-uv run python -m autifyme_agents.cli.pm_chat "Catalog these sneakers, price $79"
+uv run python -m tests.cli.pm_chat "Catalog these sneakers, price $79"
 
 # With image
-uv run python -m autifyme_agents.cli.pm_chat "Catalog this product" --image test_images/sneaker.jpg
+uv run python -m tests.cli.pm_chat "Catalog this product" --image tests/fixtures/images/sneaker.jpg
 
 # Interactive mode
-uv run python -m autifyme_agents.cli.pm_chat --interactive
+uv run python -m tests.cli.pm_chat --interactive
 ```
 
 **What it tests**:
@@ -108,19 +108,19 @@ uv run python -m autifyme_agents.cli.pm_chat --interactive
 
 ```bash
 # Custom message with HITL (interactive approval)
-uv run python -m autifyme_agents.cli.simulate "Catalog these sneakers, $79"
+uv run python -m tests.cli.simulate "Catalog these sneakers, $79"
 
 # Auto-approve mode (skip HITL prompts)
-uv run python -m autifyme_agents.cli.simulate "Catalog sneakers" --auto-approve
+uv run python -m tests.cli.simulate "Catalog sneakers" --auto-approve
 
 # Predefined scenario
-uv run python -m autifyme_agents.cli.simulate --scenario cataloging_with_image
+uv run python -m tests.cli.simulate --scenario cataloging_with_image
 
 # All predefined scenarios
-uv run python -m autifyme_agents.cli.simulate --all
+uv run python -m tests.cli.simulate --all
 
 # With image (supports all media types)
-uv run python -m autifyme_agents.cli.simulate "Catalog this" --image test_images/product.jpg
+uv run python -m tests.cli.simulate "Catalog this" --image tests/fixtures/images/product.jpg
 ```
 
 **What it tests**:
@@ -148,13 +148,13 @@ uv run python -m autifyme_agents.cli.simulate "Catalog this" --image test_images
 
 ```bash
 # Run all scenarios
-pytest agents/tests/scenarios/
+pytest tests/scenarios/
 
 # Run specific category
-pytest agents/tests/scenarios/test_cataloging_scenarios.py
+pytest tests/scenarios/test_cataloging_scenarios.py
 
 # With coverage
-pytest agents/tests/scenarios/ --cov=autifyme_agents
+pytest tests/scenarios/ --cov=autifyme_agents
 ```
 
 **What it tests**:
@@ -177,7 +177,7 @@ pytest agents/tests/scenarios/ --cov=autifyme_agents
 
 ```bash
 # Launch local UI
-uv run streamlit run agents/src/autifyme_agents/cli/streamlit_tester.py
+uv run streamlit run tests/cli/streamlit_tester.py
 ```
 
 **What it provides**:
@@ -198,7 +198,7 @@ uv run streamlit run agents/src/autifyme_agents/cli/streamlit_tester.py
 
 ### 1. Simple PM Chat CLI ✅ IMPLEMENTED
 
-**File**: `agents/src/autifyme_agents/cli/pm_chat.py`
+**File**: `tests/cli/pm_chat.py`
 
 ```python
 """Simple CLI for chatting with PM directly."""
@@ -297,9 +297,9 @@ def main():
             chat_with_pm(message)
     else:
         print("Usage:")
-        print("  uv run python -m autifyme_agents.cli.pm_chat 'Your message'")
-        print("  uv run python -m autifyme_agents.cli.pm_chat --image path/to/image.jpg 'Catalog this'")
-        print("  uv run python -m autifyme_agents.cli.pm_chat --interactive")
+        print("  uv run python -m tests.cli.pm_chat 'Your message'")
+        print("  uv run python -m tests.cli.pm_chat --image path/to/image.jpg 'Catalog this'")
+        print("  uv run python -m tests.cli.pm_chat --interactive")
 
 
 if __name__ == "__main__":
@@ -310,7 +310,7 @@ if __name__ == "__main__":
 
 ### 2. Full Workflow Simulator ✅ IMPLEMENTED
 
-**File**: `agents/src/autifyme_agents/cli/simulate.py`
+**File**: `tests/cli/simulate.py`
 
 **Key features**:
 - `ConsoleChannel` - Platform-agnostic messaging adapter for console testing
@@ -428,7 +428,7 @@ def run_all_scenarios():
         {
             "name": "Cataloging with Image",
             "text": "Catalog these canvas sneakers. Price $79.99, sizes 7-11.",
-            "image": Path("test_images/sneaker.jpg") if Path("test_images/sneaker.jpg").exists() else None,
+            "image": Path("tests/fixtures/images/sneaker.jpg") if Path("tests/fixtures/images/sneaker.jpg").exists() else None,
         },
         {
             "name": "Cataloging Text Only",
@@ -438,7 +438,7 @@ def run_all_scenarios():
         {
             "name": "Ambiguous Image",
             "text": None,
-            "image": Path("test_images/product.jpg") if Path("test_images/product.jpg").exists() else None,
+            "image": Path("tests/fixtures/images/product.jpg") if Path("tests/fixtures/images/product.jpg").exists() else None,
         },
         {
             "name": "Conversational",
@@ -472,8 +472,8 @@ def main():
             print("Unknown option")
     else:
         print("Usage:")
-        print("  uv run python -m autifyme_agents.cli.simulate_workflow --run-all-scenarios")
-        print("  uv run python -m autifyme_agents.cli.simulate_workflow --scenario 'Your message' [image_path]")
+        print("  uv run python -m tests.cli.simulate_workflow --run-all-scenarios")
+        print("  uv run python -m tests.cli.simulate_workflow --scenario 'Your message' [image_path]")
 
 
 if __name__ == "__main__":
@@ -484,7 +484,7 @@ if __name__ == "__main__":
 
 ### 3. Scenario Test Suite
 
-**File**: `agents/tests/scenarios/test_cataloging_scenarios.py`
+**File**: `tests/scenarios/test_cataloging_scenarios.py`
 
 ```python
 """Automated scenario tests for cataloging workflows."""
@@ -618,30 +618,30 @@ def test_product_inquiry(pm_agent):
 # Edit: agents/src/autifyme_agents/prompts/project_manager.prompt
 
 # 2. Quick test with PM CLI (fastest)
-uv run python -m autifyme_agents.cli.pm_chat "Catalog these sneakers, $79"
+uv run python -m tests.cli.pm_chat "Catalog these sneakers, $79"
 
 # 3. Test with image
-uv run python -m autifyme_agents.cli.pm_chat --image test_images/sneaker.jpg "Catalog this"
+uv run python -m tests.cli.pm_chat --image tests/fixtures/images/sneaker.jpg "Catalog this"
 
 # 4. Interactive testing (best for rapid iteration)
-uv run python -m autifyme_agents.cli.pm_chat --interactive
+uv run python -m tests.cli.pm_chat --interactive
 # > Catalog sneakers
-# > image test_images/sneaker.jpg
+# > image tests/fixtures/images/sneaker.jpg
 # > Catalog this product
 # > exit
 
 # 5. Full workflow test with HITL
-uv run python -m autifyme_agents.cli.simulate "Catalog these sneakers, $79"
+uv run python -m tests.cli.simulate "Catalog these sneakers, $79"
 # (Approve interactively when prompted)
 
 # 6. Full workflow with auto-approve (faster iteration)
-uv run python -m autifyme_agents.cli.simulate "Catalog sneakers" --auto-approve
+uv run python -m tests.cli.simulate "Catalog sneakers" --auto-approve
 
 # 7. Run all predefined scenarios
-uv run python -m autifyme_agents.cli.simulate --all --auto-approve
+uv run python -m tests.cli.simulate --all --auto-approve
 
 # 8. Run regression tests (when implemented)
-pytest agents/tests/scenarios/ -v
+pytest tests/scenarios/ -v
 
 # 9. Once confident, test on WhatsApp
 ```
@@ -650,10 +650,10 @@ pytest agents/tests/scenarios/ -v
 
 ```bash
 # Run all predefined scenarios with auto-approve
-uv run python -m autifyme_agents.cli.simulate --all --auto-approve
+uv run python -m tests.cli.simulate --all --auto-approve
 
 # Run automated tests (when implemented)
-pytest agents/tests/scenarios/ --cov=autifyme_agents
+pytest tests/scenarios/ --cov=autifyme_agents
 
 # If all pass, commit
 git commit -m "Update PM intent classification"
@@ -667,7 +667,7 @@ git commit -m "Update PM intent classification"
 
 ```
 agents/
-├── test_images/          # Product images (README with guidance)
+├── tests/fixtures/images/          # Product images (README with guidance)
 │   ├── README.md
 │   ├── sneaker.jpg       # (add your test images)
 │   ├── tshirt.jpg
@@ -701,14 +701,14 @@ Each test media directory contains a README with:
 
 ```bash
 # Add your own test files to appropriate directories
-# Images: agents/test_images/
-# Voice: agents/test_audio/
-# Videos: agents/test_videos/
-# Docs: agents/test_documents/
+# Images: tests/fixtures/images/
+# Voice: tests/fixtures/audio/
+# Videos: tests/fixtures/videos/
+# Docs: tests/fixtures/documents/
 
 # Test with any media type
-uv run python -m autifyme_agents.cli.pm_chat "Catalog this" --media test_images/your_product.jpg
-uv run python -m autifyme_agents.cli.simulate "Transcribe" --media test_audio/voice_note.ogg
+uv run python -m tests.cli.pm_chat "Catalog this" --media tests/fixtures/images/your_product.jpg
+uv run python -m tests.cli.simulate "Transcribe" --media test_audio/voice_note.ogg
 ```
 
 ---

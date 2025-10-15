@@ -14,7 +14,7 @@ Project-specific guidance for AutifyME codebase. Communication style is defined 
 
 ### Design-First Process
 - Create/update specs under `docs/architecture/` before implementation (user flow, agent interplay, components, schemas)
-- Align with architectural canon: `AGENTS_DESIGN.md`, `LANGCHAIN_V1_FEATURES.md`, workflow docs
+- Align with architectural canon (see below)
 - Validate design preserves hierarchical data flow and context discipline
 
 ### Deep Research & Architectural Analysis
@@ -83,56 +83,49 @@ uv pip install -e ".[dev]"
 **Running (from root directory):**
 ```bash
 uv run uvicorn autifyme_agents.entrypoints.whatsapp_webhook:app --reload
-uv run pytest agents/tests/ --cov=autifyme_agents
+uv run pytest tests/ --cov=autifyme_agents
 uv run ruff check .
 uv run mypy .
 ```
 
-**Local Testing (CRITICAL - Use Extensively):**
-Always test locally before WhatsApp. CLI tools available for terminal-based testing without external dependencies.
+### Repository Structure
 
-**Testing Philosophy**:
-- **Iterate locally first**: Test changes in terminal where you have access, not on WhatsApp
-- **Layer your testing**: Quick PM tests → Full workflow → Automated scenarios → Production
-- **Test with real media**: Use local files (images, videos, voice, documents) to simulate realistic flows
-- **Validate end-to-end**: After REPL prototyping, run full workflow to catch integration issues
+**Production**: `agents/src/autifyme_agents/` - Core, departments, specialists, tools, workflows, entrypoints, integrations, schemas, prompts
 
-**Available Tools**:
-- `pm_chat` - Direct PM invocation for rapid prompt/logic iteration (interactive mode recommended)
-- `simulate` - Full workflow simulation with HITL support
+**Testing**: `tests/` - unit, integration, e2e, cli (testing tools), scripts, scenarios, fixtures
 
-See `docs/architecture/LOCAL_TESTING_STRATEGY.md` for commands and usage patterns.
+**Documentation**: `docs/architecture/` organized by concern (core/, workflows/, tech/, testing/), plus `historical/`, `deployment/`, `roadmap/`
 
-**API Verification (CRITICAL - Use Extensively):**
-Always verify library APIs with Python REPL before implementing.
+**Database**: `database/migrations/` - SQL migration files
 
-**Correct Pattern (from root directory):**
+**Critical**: CLI tools (pm_chat, simulate) are in `tests/cli/`, NOT in agents package. They're test infrastructure.
+
+### Local Testing
+
+**Philosophy**: Iterate locally first (terminal) → Automated scenarios → Production (WhatsApp)
+
+**CLI Tools** (all in `tests/cli/`):
 ```bash
-# uv auto-detects agents/pyproject.toml
-uv run python -c "
-from dotenv import load_dotenv
-load_dotenv('.env')
-# ... your test code
-"
+# Fastest: Direct PM testing
+uv run python tests/cli/pm_chat.py --interactive
 
-# With automatic .env loading
-uv run --env-file .env python -c "
-# ... your test code (env already loaded)
-"
+# Full workflow with HITL
+uv run python tests/cli/simulate.py "Catalog these sneakers"
+
+# Multi-turn scenarios
+uv run python tests/cli/conversation.py --scenario greeting_to_cataloging
 ```
 
-**Use Cases:**
-- Inspect available methods/signatures before using them
-- Test Pydantic models and serialization
-- Verify LangChain v1 alpha APIs (unstable, frequently change)
-- Prototype patterns before committing to implementation
-- Debug errors in isolation with real API keys
+**Complete guide**: `docs/architecture/testing/LOCAL_TESTING_STRATEGY.md`
 
-**Important:** Always run from project root - `uv` auto-detects the project.
+### API Verification
 
-**See:** `docs/architecture/UV_REPL_BEST_PRACTICES.md` for complete guide.
+Always verify library APIs with REPL before implementing (LangChain v1 alpha is unstable):
+```bash
+uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test code"
+```
 
-Never rely on documentation alone for LangChain v1 alpha stack.
+**Complete guide**: `docs/architecture/tech/UV_REPL_BEST_PRACTICES.md`
 
 ### Configuration
 
@@ -144,48 +137,38 @@ Never rely on documentation alone for LangChain v1 alpha stack.
 
 **Prerequisites**: Python 3.11+, `uv`, PostgreSQL
 
-### Architectural Canon (Read Before Changes)
+### Architectural Canon
 
-**Core Architecture:**
-1. `docs/architecture/README.md` - Navigation hub
-2. `docs/architecture/AGENTS_DESIGN.md` - Hierarchical model, context engineering
-3. `docs/architecture/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md` - **[GROUND TRUTH]** As-built implementation verified from code
-4. `docs/architecture/PROMPT_ENGINEERING_STANDARDS.md` - **[CRITICAL]** Prompt design standards (no code, right altitude, examples)
-5. `docs/architecture/PROJECT_MANAGER_DESIGN.md` - PM role, intent classification, delegation
+**Navigation hub**: `docs/architecture/README.md` - All docs categorized by concern
 
-**Technology & Patterns:**
-6. `docs/architecture/TECH_STACK.md` - Technology decisions
-7. `docs/architecture/LANGCHAIN_V1_FEATURES.md` - LangChain v1 patterns
-8. `docs/architecture/LANGGRAPH_V1_FEATURES.md` - LangGraph orchestration
-9. `docs/architecture/UV_REPL_BEST_PRACTICES.md` - API verification workflow
+**Must-read before changes**:
+- `core/AGENTS_DESIGN.md` - Hierarchical model, context engineering
+- `core/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md` - **[GROUND TRUTH]** As-built implementation
+- `tech/PROMPT_ENGINEERING_STANDARDS.md` - **[CRITICAL]** Prompt design standards
+- `tech/LANGCHAIN_V1_FEATURES.md` - LangChain v1 native patterns
+- `workflows/WHATSAPP_CATALOGING_WORKFLOW.md` - Current implementation
 
-**Workflows & Implementation:**
-10. `docs/architecture/WHATSAPP_CATALOGING_WORKFLOW.md` - Current cataloging implementation
-11. `docs/architecture/PM_INTENT_ANALYSIS_AND_MESSAGE_HANDLING.md` - Multi-platform message handling
-12. `docs/architecture/LOCAL_TESTING_STRATEGY.md` - Testing philosophy and CLI tools
-13. `docs/architecture/WORKFLOW_ORCHESTRATION_REFACTOR.md` - Runner architecture
-
-**See `docs/architecture/README.md` for complete index and context.**
+**Complete index with 25+ docs**: See `docs/architecture/README.md`
 
 ### Common Gotchas
 
-**LangChain v1 Alpha:**
-- Prerelease stack (`langchain==1.0.0a10`, `langgraph==1.0.0a4`, `deepagents==0.0.11rc1`)
+**LangChain v1 Alpha**:
+- Prerelease stack (`langchain==1.0.0a10`, `langgraph==1.0.0a4`, `deepagents==0.0.11`)
 - APIs unstable; verify with `inspect`/`dir` before use
 
-**Windows:**
+**Windows**:
 - Use `.venv\Scripts\activate` (not `source`)
 - Git line endings: LF (`.gitattributes`)
 
-**Database:**
+**Database**:
 - LangGraph needs raw PostgreSQL string (`postgresql://...`)
 - Supabase may need `?sslmode=require`
 
-**Error Handling:**
+**Error Handling**:
 - Tools must raise `ToolException` (prevents infinite loops)
 - `handle_errors=True` for self-healing, `False` for fail-fast
 
-**Context Management:**
+**Context Management**:
 - Never pass full conversation history to specialists
 - Middleware injects context; tools stay context-light
 - Use `{messages}` / `{agent_scratchpad}` contract
@@ -193,6 +176,6 @@ Never rely on documentation alone for LangChain v1 alpha stack.
 ### Quick Navigation
 
 - **Project Status**: `README.md`
-- **Architecture**: `docs/architecture/`
+- **Architecture Docs**: `docs/architecture/README.md` (navigation hub)
 - **LangSmith Traces**: https://smith.langchain.com
 - **Roadmap**: `docs/roadmap/IMPLEMENTATION_ROADMAP.md`

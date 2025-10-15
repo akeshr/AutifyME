@@ -123,9 +123,9 @@ To honour our Architecture-First and Context-Efficient principles, we instrument
 
 | Script | Purpose | Example |
 | --- | --- | --- |
-| `agents/scripts/debug_whatsapp_payload.py` | List/inspect captured JSON events | `uv run python agents/scripts/debug_whatsapp_payload.py --list` |
-| `agents/scripts/debug_whatsapp_event.py` | Summarise an event and (optionally) download its media | `uv run python agents/scripts/debug_whatsapp_event.py --download --verbose` |
-| `agents/scripts/run_whatsapp_server.py` | Operate webhook server / tunnels (`serve`, `ngrok`, `cloudflare`) | `uv run python agents/scripts/run_whatsapp_server.py serve --port 8000` |
+| `tests/scripts/debug_whatsapp_payload.py` | List/inspect captured JSON events | `uv run python tests/scripts/debug_whatsapp_payload.py --list` |
+| `tests/scripts/debug_whatsapp_event.py` | Summarise an event and (optionally) download its media | `uv run python tests/scripts/debug_whatsapp_event.py --download --verbose` |
+| `tests/scripts/run_whatsapp_server.py` | Operate webhook server / tunnels (`serve`, `ngrok`, `cloudflare`) | `uv run python tests/scripts/run_whatsapp_server.py serve --port 8000` |
 
 These tools support the Codespace workflow documented earlier: start the server, expose port 8000, send a WhatsApp message, inspect payloads, download media, then re-enable the agent.
 

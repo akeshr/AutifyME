@@ -182,7 +182,7 @@ python -m autifyme_agents.cli conversation --scenario greeting_to_cataloging
 🔵 TURN 2
 ──────────────────────────────────────────
 👤 User: Can you catalog these canvas sneakers...
-📎 Media (image): test_images/sneaker.jpg
+📎 Media (image): tests/fixtures/images/sneaker.jpg
 🎯 Expected Intent: cataloging
 
 ⏸️  [TURN 2] APPROVAL REQUEST TO test_user_greeting_catalog:
@@ -335,21 +335,21 @@ python -m autifyme_agents.cli conversation --scenario greeting_to_cataloging
 ## Files Created
 
 ### Core Implementation
-- `agents/src/autifyme_agents/cli/conversation.py` (739 lines)
+- `tests/cli/conversation.py` (739 lines)
   - ConversationPlayer class
   - ConversationChannel class
   - CLI entry point
 
 ### Conversation Scenarios
-- `agents/src/autifyme_agents/cli/conversation_scenarios/greeting_to_cataloging.yaml`
-- `agents/src/autifyme_agents/cli/conversation_scenarios/clarification_flow.yaml`
-- `agents/src/autifyme_agents/cli/conversation_scenarios/approval_followup.yaml`
-- `agents/src/autifyme_agents/cli/conversation_scenarios/multi_product.yaml`
-- `agents/src/autifyme_agents/cli/conversation_scenarios/conversation_mixed.yaml`
-- `agents/src/autifyme_agents/cli/conversation_scenarios/rejection_flow.yaml`
+- `tests/cli/scenarios/greeting_to_cataloging.yaml`
+- `tests/cli/scenarios/clarification_flow.yaml`
+- `tests/cli/scenarios/approval_followup.yaml`
+- `tests/cli/scenarios/multi_product.yaml`
+- `tests/cli/scenarios/conversation_mixed.yaml`
+- `tests/cli/scenarios/rejection_flow.yaml`
 
 ### Modified Files
-- `agents/src/autifyme_agents/cli/__main__.py` - Added conversation command
+- `tests/cli/__main__.py` - Added conversation command
 
 ### Documentation
 - `docs/architecture/PHASE_2_2_MULTI_TURN_CONVERSATION_TESTING.md` (this document)
@@ -429,14 +429,14 @@ python -m autifyme_agents.cli conversation --scenario greeting_to_cataloging
 ### Adding New Scenarios
 
 **Steps**:
-1. Create YAML file in `cli/conversation_scenarios/`
+1. Create YAML file in `cli/scenarios/`
 2. Define conversation turns with validations
 3. Run with `--scenario <name>`
 
 **Example**:
 ```bash
 # Create new scenario
-vi cli/conversation_scenarios/my_scenario.yaml
+vi cli/scenarios/my_scenario.yaml
 
 # Run it
 uv run python -m autifyme_agents.cli.conversation --scenario my_scenario

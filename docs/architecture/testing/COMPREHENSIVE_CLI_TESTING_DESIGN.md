@@ -260,7 +260,7 @@ uv run python -m autifyme_agents.cli.simulate --replay-all scenarios/recorded/
       "type": "message",
       "sender": "test_user_123",
       "text": "Catalog these sneakers, price $79",
-      "media_id": "test_images/sneaker.jpg",
+      "media_id": "tests/fixtures/images/sneaker.jpg",
       "media_type": "image"
     },
     {
@@ -376,7 +376,7 @@ uv run python -m autifyme_agents.cli.conversation \
 
 # YAML format:
 # - user: "Catalog this"
-#   media: test_images/product.jpg
+#   media: tests/fixtures/images/product.jpg
 #   expect: clarification_request
 # - user: "It's a t-shirt, price $29"
 #   expect: hitl_approval
