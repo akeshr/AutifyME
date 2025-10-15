@@ -682,12 +682,13 @@ class WorkflowRunner:
     ) -> None:
         """Forward interrupt to user via channel.
 
-        ✅ STANDARD APPROACH: Unwrap DeepAgents internal structure before sending to channel.
+        ✅ BATCH INTERRUPT SUPPORT: Handle both single and batch interrupts properly.
 
         DeepAgents wraps tool calls in action_request format:
         [{'action_request': {'action': 'tool_name', 'args': {actual_data}}}]
 
-        Channel should receive clean data (just the args), not framework internals.
+        For batch interrupts (multiple products), we need to send ALL products
+        for approval, not just the first one.
 
         Args:
             sender: Channel-specific sender ID
@@ -697,29 +698,78 @@ class WorkflowRunner:
         logger.debug("Handling HITL interrupt", extra={"thread_id": thread_id})
 
         try:
-            # Unwrap DeepAgents structure if present (standard pattern from lines 344-366)
-            clean_value = interrupt_value
-
+            # Handle batch interrupts (multiple products)
             if isinstance(interrupt_value, list) and len(interrupt_value) > 0:
-                action = interrupt_value[0]
-                if isinstance(action, dict) and "action_request" in action:
-                    # DeepAgents format - extract clean args
-                    action_request = action.get("action_request", {})
-                    clean_value = action_request.get("args", interrupt_value)
-                    logger.debug(
-                        "Unwrapped DeepAgents interrupt structure",
-                        extra={
-                            "thread_id": thread_id,
-                            "tool_name": action_request.get("action", "unknown"),
-                        }
-                    )
+                logger.info(
+                    "Processing batch interrupt",
+                    extra={
+                        "thread_id": thread_id,
+                        "action_count": len(interrupt_value)
+                    }
+                )
+                
+                # Process ALL actions in the batch, not just the first one
+                products = []
+                for action_idx, action in enumerate(interrupt_value):
+                    if isinstance(action, dict) and "action_request" in action:
+                        # DeepAgents format - extract clean args
+                        action_request = action.get("action_request", {})
+                        clean_args = action_request.get("args", {})
+                        
+                        logger.debug(
+                            "Unwrapped DeepAgents action",
+                            extra={
+                                "thread_id": thread_id,
+                                "action_idx": action_idx,
+                                "tool_name": action_request.get("action", "unknown"),
+                            }
+                        )
+                        
+                        # Convert to Product object
+                        if isinstance(clean_args, dict):
+                            from autifyme_agents.schemas.models import Product
+                            try:
+                                product = Product.model_validate(clean_args)
+                                products.append(product)
+                                logger.debug(
+                                    "Converted action to Product",
+                                    extra={
+                                        "thread_id": thread_id,
+                                        "action_idx": action_idx,
+                                        "product_name": product.name
+                                    }
+                                )
+                            except Exception as e:
+                                logger.warning(
+                                    "Failed to convert action to Product",
+                                    extra={
+                                        "thread_id": thread_id,
+                                        "action_idx": action_idx,
+                                        "error": str(e)
+                                    }
+                                )
+                                # Continue with other products even if one fails
+                                continue
+                
+                if products:
+                    # Send batch approval request with ALL products
+                    self._send_batch_approval_request(sender, products, thread_id)
+                else:
+                    logger.warning("No valid products found in batch interrupt", extra={"thread_id": thread_id})
+                    self.channel.send_error(sender, "processing", "I couldn't process the product details.")
+                return
 
-            # Convert dict args to Product object for channel (channel expects typed objects, not dicts)
+            # Handle single interrupt (legacy support)
+            clean_value = interrupt_value
+            if isinstance(interrupt_value, dict):
+                clean_value = interrupt_value
+
+            # Convert dict args to Product object for channel
             if isinstance(clean_value, dict):
                 from autifyme_agents.schemas.models import Product
                 draft = Product.model_validate(clean_value)
                 logger.debug(
-                    "Converted interrupt args to Product object",
+                    "Converted single interrupt to Product object",
                     extra={"thread_id": thread_id, "product_name": draft.name}
                 )
             else:
@@ -727,7 +777,7 @@ class WorkflowRunner:
 
             self.channel.send_approval_request(sender, draft)
             logger.info(
-                "Interrupt forwarded to user - awaiting response",
+                "Single interrupt forwarded to user - awaiting response",
                 extra={
                     "thread_id": thread_id,
                     "interrupt_type": type(draft).__name__,
@@ -737,6 +787,75 @@ class WorkflowRunner:
         except Exception as exc:
             logger.exception("Failed to send interrupt to user", exc_info=exc, extra={"thread_id": thread_id})
             self.channel.send_error(sender, "processing", "I encountered an issue requesting your input.")
+
+    def _send_batch_approval_request(
+        self,
+        sender: str,
+        products: list,
+        thread_id: str,
+    ) -> None:
+        """Send batch approval request for multiple products.
+
+        Args:
+            sender: Channel-specific sender ID
+            products: List of Product objects requiring approval
+            thread_id: Conversation thread ID
+        """
+        try:
+            if len(products) == 1:
+                # Single product - use standard approval request
+                self.channel.send_approval_request(sender, products[0])
+                logger.info(
+                    "Single product approval request sent",
+                    extra={
+                        "thread_id": thread_id,
+                        "product_name": products[0].name
+                    }
+                )
+                return
+
+            # Multiple products - send batch approval request
+            message_lines = ["*Batch Approval Needed*\n"]
+            message_lines.append(f"I've prepared {len(products)} products for your review:\n")
+
+            for idx, product in enumerate(products, 1):
+                message_lines.append(f"*Product {idx}:* {product.name}")
+                if product.price is not None:
+                    message_lines.append(f"  Price: {product.price}")
+                if product.sizes:
+                    sizes_text = ", ".join(str(s) for s in product.sizes if s)
+                    message_lines.append(f"  Sizes: {sizes_text}")
+                if product.colors:
+                    colors_text = ", ".join(str(c) for c in product.colors if c)
+                    message_lines.append(f"  Colors: {colors_text}")
+                if product.description:
+                    # Truncate long descriptions
+                    desc = product.description[:100] + "..." if len(product.description) > 100 else product.description
+                    message_lines.append(f"  Description: {desc}")
+                message_lines.append("")  # Empty line between products
+
+            message_lines.append("Reply with:")
+            message_lines.append("• *approve all* - to approve all products")
+            message_lines.append("• *reject all* - to reject all products")
+            message_lines.append("• *approve 1,3* - to approve specific products (e.g., 1 and 3)")
+            message_lines.append("• *reject 2* - to reject specific products (e.g., 2)")
+
+            batch_message = "\n".join(message_lines)
+            
+            logger.info(
+                "Sending batch approval request",
+                extra={
+                    "thread_id": thread_id,
+                    "product_count": len(products),
+                    "product_names": [p.name for p in products]
+                }
+            )
+
+            self.channel.send_text(sender, batch_message)
+
+        except Exception as exc:
+            logger.exception("Failed to send batch approval request", exc_info=exc, extra={"thread_id": thread_id})
+            self.channel.send_error(sender, "processing", "I encountered an issue requesting your approval.")
 
     def _get_lock(self, sender: str) -> Lock:
         """Get or create thread lock with LRU eviction.
