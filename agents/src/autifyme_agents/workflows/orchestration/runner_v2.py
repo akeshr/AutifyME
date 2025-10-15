@@ -701,36 +701,49 @@ class WorkflowRunner:
             clean_value = interrupt_value
 
             if isinstance(interrupt_value, list) and len(interrupt_value) > 0:
-                action = interrupt_value[0]
-                if isinstance(action, dict) and "action_request" in action:
-                    # DeepAgents format - extract clean args
-                    action_request = action.get("action_request", {})
-                    clean_value = action_request.get("args", interrupt_value)
+                # FIXED: Process ALL actions in batch, not just the first one
+                for action in interrupt_value:
+                    if isinstance(action, dict) and "action_request" in action:
+                        # DeepAgents format - extract clean args
+                        action_request = action.get("action_request", {})
+                        clean_value = action_request.get("args", interrupt_value)
+                        logger.debug(
+                            "Unwrapped DeepAgents interrupt structure",
+                            extra={
+                                "thread_id": thread_id,
+                                "tool_name": action_request.get("action", "unknown"),
+                            }
+                        )
+                        # Convert to Product and send for approval
+                        if isinstance(clean_value, dict):
+                            from autifyme_agents.schemas.models import Product
+                            draft = Product.model_validate(clean_value)
+                            logger.debug(
+                                "Converted interrupt args to Product object",
+                                extra={"thread_id": thread_id, "product_name": draft.name}
+                            )
+                            self.channel.send_approval_request(sender, draft)
+
+            # Handle single interrupt case
+            elif isinstance(interrupt_value, dict):
+                clean_value = interrupt_value
+                # Convert dict args to Product object for channel
+                if isinstance(clean_value, dict):
+                    from autifyme_agents.schemas.models import Product
+                    draft = Product.model_validate(clean_value)
                     logger.debug(
-                        "Unwrapped DeepAgents interrupt structure",
-                        extra={
-                            "thread_id": thread_id,
-                            "tool_name": action_request.get("action", "unknown"),
-                        }
+                        "Converted single interrupt to Product object",
+                        extra={"thread_id": thread_id, "product_name": draft.name}
                     )
+                else:
+                    draft = clean_value
+                self.channel.send_approval_request(sender, draft)
 
-            # Convert dict args to Product object for channel (channel expects typed objects, not dicts)
-            if isinstance(clean_value, dict):
-                from autifyme_agents.schemas.models import Product
-                draft = Product.model_validate(clean_value)
-                logger.debug(
-                    "Converted interrupt args to Product object",
-                    extra={"thread_id": thread_id, "product_name": draft.name}
-                )
-            else:
-                draft = clean_value
-
-            self.channel.send_approval_request(sender, draft)
             logger.info(
-                "Interrupt forwarded to user - awaiting response",
+                "Interrupt(s) forwarded to user - awaiting response",
                 extra={
                     "thread_id": thread_id,
-                    "interrupt_type": type(draft).__name__,
+                    "interrupt_type": type(interrupt_value).__name__,
                 },
             )
 
