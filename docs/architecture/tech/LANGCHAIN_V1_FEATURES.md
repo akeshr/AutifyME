@@ -1,9 +1,9 @@
 # LangChain v1 (Alpha) - New Features & Capabilities
 
-**Installed Versions (Updated 2025-10-07):**
-LangChain `1.0.0a12` (core `1.0.0a7`, community `0.3.30`, OpenAI `0.3.33`, Anthropic `1.0.0a2`)
-LangGraph `1.0.0a4` (checkpoint-postgres `2.0.24`, prebuilt `0.7.0a2`, sdk `0.2.9`)
-DeepAgents `0.0.11rc1` ✅ All features verified via REPL (see `LIBRARY_VERIFICATION_REPORT.md`)
+**Installed Versions (Updated 2025-10-15):**
+LangChain `1.0.0a12` (core `1.0.0a7`, OpenAI `1.0.0a3`, Anthropic `1.0.0a2`)
+LangGraph `1.0.0a4` (checkpoint-postgres `2.0.24`)
+DeepAgents `0.0.11` ✅ All features verified via REPL
 
 **Reference Materials:**  
 - LangChain OSS v1 release notes: https://docs.langchain.com/oss/python/releases/langchain-v1  
@@ -252,10 +252,11 @@ Python 3.9 support dropped. Requires **Python 3.10+**.
 
 ---
 
-### 10. DeepAgents Stack (0.0.11rc1)
+### 10. DeepAgents Stack (0.0.11)
 
 **Components:**
-- `deepagents.graph.create_deep_agent`: wraps LangChain `create_agent` with default middleware (planning, filesystem, sub-agent routing, summarization, prompt caching, optional HITL tool configs).
+- `deepagents.create_deep_agent`: wraps LangChain `create_agent` with default middleware (planning, filesystem, sub-agent routing, summarization, prompt caching, optional HITL tool configs).
+  - **Note:** Import directly from `deepagents`, not `deepagents.graph`
 - Built-in tools (`write_todos`, `ls`, `read_file`, `write_file`, `edit_file`) return LangGraph `Command` objects for stateful updates.
 - `SubAgentMiddleware`: allows hierarchical agent delegation with shared tools and optional custom models per sub-agent.
 - `filesystem` state reducer merges file changes; integrates with external long-term storage via environment-configured filesystem API.

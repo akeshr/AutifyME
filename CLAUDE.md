@@ -41,8 +41,9 @@ Project-specific guidance for AutifyME codebase. Communication style is defined 
 - Keep architectural debt visible
 
 ### LangChain & Agent Patterns
-- Default to LangChain v1 native patterns (`interrupt_before/after`, ToolStrategy, structured outputs)
-- Use `create_agent`, maintain `{messages}`/`{agent_scratchpad}` contract
+- Default to LangChain v1 native patterns (structured outputs, ToolStrategy, middleware-based HITL)
+- Use `create_agent` for specialists, `create_deep_agent` for orchestrators, maintain `{messages}`/`{agent_scratchpad}` contract
+- HITL via DeepAgents `tool_configs` + HumanInTheLoopMiddleware (not interrupt_before/after)
 - Delegate cross-cutting concerns to middleware (tools stay focused, reusable, context-light)
 - Design specialists/tools for single responsibility and cross-department reuse
 - Keep department outputs structured and composable for DeepAgents orchestration
@@ -153,7 +154,7 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 ### Common Gotchas
 
 **LangChain v1 Alpha**:
-- Prerelease stack (`langchain==1.0.0a10`, `langgraph==1.0.0a4`, `deepagents==0.0.11`)
+- Prerelease stack (`langchain==1.0.0a12`, `langgraph==1.0.0a4`, `deepagents==0.0.11`)
 - APIs unstable; verify with `inspect`/`dir` before use
 
 **Windows**:

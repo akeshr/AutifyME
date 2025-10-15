@@ -165,7 +165,7 @@ async def receive(request: Request) -> Any:
                     if not message_id or not sender:
                         logger.warning(
                             "Skipping message with missing id or sender",
-                            extra={"message": message, "event_path": str(event_path)},
+                            extra={"whatsapp_message": message, "event_path": str(event_path)},
                         )
                         continue
 

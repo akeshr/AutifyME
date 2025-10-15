@@ -24,10 +24,7 @@ Workflow-specific designs and orchestration patterns.
 | Document | Purpose |
 | --- | --- |
 | **[WHATSAPP_CATALOGING_WORKFLOW.md](./workflows/WHATSAPP_CATALOGING_WORKFLOW.md)** | Current cataloging implementation (end-to-end) |
-| **[PM_INTENT_ANALYSIS_AND_MESSAGE_HANDLING.md](./workflows/PM_INTENT_ANALYSIS_AND_MESSAGE_HANDLING.md)** | Multi-platform message handling and intent classification |
-| **[WORKFLOW_ORCHESTRATION_REFACTOR.md](./workflows/WORKFLOW_ORCHESTRATION_REFACTOR.md)** | Runner architecture and orchestration patterns |
-| **[WEBHOOK_IDEMPOTENCY_ANALYSIS.md](./workflows/WEBHOOK_IDEMPOTENCY_ANALYSIS.md)** | WhatsApp webhook idempotency handling |
-| **[WEBHOOK_IDEMPOTENCY_DEEP_DIVE.md](./workflows/WEBHOOK_IDEMPOTENCY_DEEP_DIVE.md)** | In-depth webhook deduplication analysis |
+| **[WEBHOOK_IDEMPOTENCY_DEEP_DIVE.md](./workflows/WEBHOOK_IDEMPOTENCY_DEEP_DIVE.md)** | Webhook idempotency and deduplication patterns |
 | **[MONITORING_QUERIES.md](./workflows/MONITORING_QUERIES.md)** | Database queries for monitoring and debugging |
 
 ---
@@ -43,7 +40,6 @@ Library patterns, prompt engineering, and development practices.
 | **[LANGGRAPH_V1_FEATURES.md](./tech/LANGGRAPH_V1_FEATURES.md)** | LangGraph orchestration patterns and gotchas |
 | **[LANGSMITH_FEATURES.md](./tech/LANGSMITH_FEATURES.md)** | LangSmith tracing and debugging |
 | **[PROMPT_ENGINEERING_STANDARDS.md](./tech/PROMPT_ENGINEERING_STANDARDS.md)** | **[CRITICAL]** Prompt design standards (Anthropic best practices) |
-| **[PROMPT_DESIGN_PRINCIPLES.md](./tech/PROMPT_DESIGN_PRINCIPLES.md)** | Prompt design philosophy |
 | **[LIBRARY_NATIVE_PATTERNS.md](./tech/LIBRARY_NATIVE_PATTERNS.md)** | Prefer library-native solutions over custom code |
 | **[UV_REPL_BEST_PRACTICES.md](./tech/UV_REPL_BEST_PRACTICES.md)** | API verification workflow using Python REPL |
 
@@ -55,10 +51,8 @@ Testing strategy, CLI tools, and development workflows.
 
 | Document | Purpose |
 | --- | --- |
-| **[LOCAL_TESTING_STRATEGY.md](./testing/LOCAL_TESTING_STRATEGY.md)** | Testing philosophy and CLI tools guide |
-| **[COMPREHENSIVE_CLI_TESTING_DESIGN.md](./testing/COMPREHENSIVE_CLI_TESTING_DESIGN.md)** | CLI testing framework design |
-| **[COMPREHENSIVE_TESTING_IMPLEMENTATION_SUMMARY.md](./testing/COMPREHENSIVE_TESTING_IMPLEMENTATION_SUMMARY.md)** | Testing implementation status |
-| **[PHASE_2_2_MULTI_TURN_CONVERSATION_TESTING.md](./testing/PHASE_2_2_MULTI_TURN_CONVERSATION_TESTING.md)** | Multi-turn conversation testing patterns |
+| **[LOCAL_TESTING_STRATEGY.md](./testing/LOCAL_TESTING_STRATEGY.md)** | Testing philosophy and CLI tools guide (canonical) |
+| **[COMPREHENSIVE_CLI_TESTING_DESIGN.md](./testing/COMPREHENSIVE_CLI_TESTING_DESIGN.md)** | CLI testing framework design for future enhancements |
 
 ---
 
@@ -106,7 +100,8 @@ Before implementing any feature:
 
 Old debugging sessions, bug fixes, and refactor docs moved to `../historical/`:
 - `historical/bug-fixes/` - Bug fix summaries and post-mortems
-- `historical/refactors/` - Refactoring session notes
+- `historical/refactors/` - Refactoring session notes and implementation summaries
 - `historical/debug-sessions/` - Debugging analyses and audits
+- `historical/design-specs/` - Unimplemented design specifications
 
 These are kept for reference but don't clutter active navigation.

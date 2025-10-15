@@ -54,9 +54,12 @@ The entire user experience is conversational and happens within WhatsApp.
 3. Runner detects `__interrupt__` in event stream, extracts draft from interrupt value
 4. Runner sends approval request to user via channel
 5. User responds (approve/reject/edits)
-6. Approval analyzer interprets response → BatchApprovalResponse (structured)
-7. Runner builds Command from structured response
-8. Runner invokes PM/Department with Command to resume
+6. **Approval analyzer interprets response** → `BatchApprovalResponse` (structured Pydantic output)
+   - Handles batch approvals (N responses for N interrupts)
+   - Type-safe interpretation (no text parsing)
+   - Returns structured approval/edit/reject decisions
+7. Runner builds LangGraph `Command` from structured response
+8. Runner invokes PM with Command to resume workflow
 9. Tool executes, returns CatalogingResult
 
 ---
@@ -71,27 +74,28 @@ This workflow will be managed by a generic `ProjectManagerAgent` and a new `Cata
     -   It will then fetch the corresponding `company_profile` from the Supabase database.
     -   This `company_profile` object will be passed as initial input to the `ProjectManagerAgent`, making all subsequent actions context-aware.
 
-2.  **`ProjectManagerAgent` (DeepAgent Orchestrator – Roadmap):**
-    -   Will be implemented via `deepagents.create_deep_agent` with the cataloging department registered as a sub-agent once readiness checklist is satisfied.
-    -   **Intent Analysis:** Filters greetings/noise, recognizes cataloging requests, and routes approval commands back to LangGraph.
-    -   **Structured Delegation:** Passes normalized text, media URLs, and `CompanyProfile` context into the cataloging department.
+2.  **`ProjectManagerAgent` (DeepAgent Orchestrator):**
+    -   Implemented via `deepagents.create_deep_agent` with the cataloging department registered as a CustomSubAgent (pre-built graph).
+    -   **Intent Analysis:** Filters greetings/noise, recognizes cataloging requests, and detects pending interrupts for workflow resumption.
+    -   **Structured Delegation:** Passes raw platform messages (JSON payload) to departments with complete context.
     -   **Self-Correction:** Applies recursion-limit guards and surfaces failures to human support rather than looping.
 
 3.  **`CatalogingDept` Agent (Department Head):**
-    -   **Purpose:** To manage the analysis of unstructured user messages.
-    -   **Plan:** When it receives a message, it will delegate to the appropriate specialist based on the content type.
-        -   If the message contains images -> `ImageAnalysisSpecialist`.
-        -   If the message contains text -> `TextAnalysisSpecialist`.
+    -   **Purpose:** Orchestrate product cataloging workflow by coordinating specialist subagents.
+    -   **Workflow:** Adaptive delegation based on available data:
+        -   If images present → delegate to `ImageAnalysisSpecialist` for visual extraction
+        -   Delegate to `CatalogingSpecialist` to synthesize data into Product model
+        -   Call `save_product` tool (triggers HITL approval via tool_configs)
 
 4.  **Specialist Agents:**
     -   **`ImageAnalysisSpecialist`:**
-        -   **Purpose:** To extract product information from an image.
-        -   **Tools:** It will use a multimodal LLM (like gpt-4.1-mini-2025-04-14 or Gemini) via our `integrations` layer.
-        -   **Output:** Returns a structured JSON object with fields like `product_category`, `color`, `pattern`, `description_from_image`.
-    -   **`TextAnalysisSpecialist`:**
-        -   **Purpose:** To extract product information from a text message.
-        -   **Tools:** Uses an LLM to parse the user's text and extract entities like `price`, `sizes`, `colors`, etc.
-        -   **Output:** Returns a structured JSON object with the extracted fields.
+        -   **Purpose:** Extract visual product attributes from images.
+        -   **Implementation:** Vision-capable LLM (gpt-4.1-mini-2025-04-14) with structured output (ImageAnalysisResult).
+        -   **Output:** `ImageAnalysisResult` with visual_description, identified_colors, style_tags.
+    -   **`CatalogingSpecialist`:**
+        -   **Purpose:** Transform user descriptions and image insights into complete Product models.
+        -   **Implementation:** LLM with structured output (Product), brand-aware via company context middleware.
+        -   **Output:** `Product` with all catalog fields (name, description, price, sizes, colors, image_urls).
 
 ---
 
