@@ -16,9 +16,9 @@ load_dotenv()
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.storage_factory import get_storage
-from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.departments.cataloging_department import create_cataloging_department
 from langchain.messages import HumanMessage
+from langgraph.checkpoint.memory import MemorySaver
 
 
 def test_department_parallel_interrupts():
@@ -29,7 +29,7 @@ def test_department_parallel_interrupts():
     print("="*80)
 
     storage = get_storage()
-    checkpointer = get_checkpointer()
+    checkpointer = MemorySaver()
 
     # Create department directly
     print("\n[TEST] Creating cataloging department...")

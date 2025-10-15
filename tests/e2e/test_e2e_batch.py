@@ -15,7 +15,7 @@ load_dotenv()
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.storage_factory import get_storage
-from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
+from langgraph.checkpoint.memory import MemorySaver
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 
@@ -89,7 +89,7 @@ def test_end_to_end_single_product():
 
     storage = get_storage()
     channel = TestChannel()
-    checkpointer = get_checkpointer()
+    checkpointer = MemorySaver()
 
     runner = WorkflowRunner(
         channel=channel,
@@ -150,7 +150,7 @@ def test_end_to_end_multi_product_decomposed():
 
     storage = get_storage()
     channel = TestChannel()
-    checkpointer = get_checkpointer()
+    checkpointer = MemorySaver()
 
     runner = WorkflowRunner(
         channel=channel,
