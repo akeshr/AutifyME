@@ -117,6 +117,10 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
                 if not msg_type and hasattr(msg, '__class__'):
                     msg_type = msg.__class__.__name__.replace('Message', '').lower()
 
+                # Ensure msg_type is not None
+                if msg_type is None:
+                    msg_type = 'unknown'
+
                 content = getattr(msg, 'content', str(msg))
                 if isinstance(content, str) and len(content) > 0:
                     # Truncate long messages
