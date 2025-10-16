@@ -8,6 +8,7 @@ Following LangChain v1 patterns:
 """
 
 import logging
+from typing import Any
 
 from langchain.tools import BaseTool, tool
 from tenacity import (
@@ -43,7 +44,7 @@ def create_analyze_product_image_tool(storage: StorageInterface) -> BaseTool:
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
-    def analyze_product_image(image_url: str, **kwargs) -> ImageAnalysisResult:
+    def analyze_product_image(image_url: str, **kwargs: Any) -> ImageAnalysisResult:
         """Analyze a product image and return structured visual insights."""
         company_profile = kwargs.get("company_profile")
 
@@ -64,7 +65,7 @@ def create_analyze_product_image_tool(storage: StorageInterface) -> BaseTool:
             specialist = create_image_analysis_specialist()
 
             invoke_config = kwargs.get("config", {})
-            result = specialist.invoke(
+            result: ImageAnalysisResult = specialist.invoke(
                 {
                     "input": {
                         "image_url": image_url,

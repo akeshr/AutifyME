@@ -29,5 +29,5 @@ def send_whatsapp_message(recipient: str, message: str, *, client: WhatsAppClien
         ) from exc
 
 
-def create_send_whatsapp_message_tool():
+def create_send_whatsapp_message_tool() -> object:
     return send_whatsapp_message

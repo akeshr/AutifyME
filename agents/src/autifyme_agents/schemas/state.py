@@ -14,21 +14,21 @@ from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
 MessageType = HumanMessage | SystemMessage | AIMessage
 
 
-class DepartmentResults(TypedDict, total=False):  # type: ignore[call-arg]
+class DepartmentResults(TypedDict, total=False):
     cataloging: CatalogingResult
 
 
-class ProjectMetadata(TypedDict, total=False):  # type: ignore[call-arg]
+class ProjectMetadata(TypedDict, total=False):
     workflow_id: str
     workflow_type: str
 
 
-class InterruptInfo(TypedDict, total=False):  # type: ignore[call-arg]
+class InterruptInfo(TypedDict, total=False):
     """Information about a pending HITL interrupt."""
 
     interrupt_id: str
     tool_name: str
-    tool_args: dict
+    tool_args: dict[str, object]
     description: str
 
 
@@ -37,7 +37,7 @@ class ProjectManagerState(DeepAgentState):  # type: ignore[misc]
 
     messages: Annotated[Sequence[MessageType], add_messages]
     company_profile: CompanyProfile
-    plan: list[dict]
+    plan: list[dict[str, object]]
     current_step: int
     department_results: DepartmentResults
     status: Literal["idle", "planning", "awaiting_approval", "completed", "blocked"]

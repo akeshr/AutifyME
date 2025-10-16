@@ -8,6 +8,7 @@ Following LangChain v1 patterns:
 """
 
 import logging
+from typing import Any
 
 from langchain.tools import tool
 from pydantic import BaseModel, Field
@@ -41,7 +42,7 @@ class SaveProductArgs(BaseModel):
     image_urls: list[str] | None = Field(None, description="A list of URLs for the product images.")
 
 
-def _save_product(storage: StorageInterface, **kwargs) -> Product:
+def _save_product(storage: StorageInterface, **kwargs: Any) -> Product:
     if storage is None:
         raise ConfigurationError(
             "Storage client not provided via config.",
@@ -102,7 +103,7 @@ def _get_company_profile(storage: StorageInterface) -> CompanyProfile:
         ) from e
 
 
-def create_save_product_tool(storage: StorageInterface):
+def create_save_product_tool(storage: StorageInterface) -> object:
     """Create a tool that saves products to the catalog database.
 
     Factory function that creates a LangChain tool with retry logic and proper error handling.
@@ -122,7 +123,7 @@ def create_save_product_tool(storage: StorageInterface):
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
-    def save_product(**kwargs) -> CatalogingResult:
+    def save_product(**kwargs: Any) -> CatalogingResult:
         """Persist a product to the catalog database."""
         product = _save_product(storage, **kwargs)
         return CatalogingResult(
@@ -137,7 +138,7 @@ def create_save_product_tool(storage: StorageInterface):
     return save_product
 
 
-def create_get_company_profile_tool(storage: StorageInterface):
+def create_get_company_profile_tool(storage: StorageInterface) -> object:
     """Create a tool that retrieves the company profile from storage.
 
     Factory function that creates a LangChain tool with retry logic and proper error handling.
