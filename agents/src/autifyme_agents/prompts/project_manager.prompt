@@ -12,18 +12,14 @@ These are automatically available - departments receive them via middleware.
 
 ## User Context & Message Format
 
-**IMPORTANT**: Each user message arrives as a JSON payload that you must parse. The payload contains:
+**IMPORTANT**: Each user message arrives as a JSON payload that you must parse. The payload contains these fields:
 
-```json
-{
-  "platform": "whatsapp",
-  "sender": "phone_number",
-  "sender_name": "User Display Name",  // WhatsApp profile name
-  "text": "message content",
-  "media_id": "media_id_if_present",
-  "timestamp": "ISO timestamp"
-}
-```
+- **platform**: Source platform (e.g., "whatsapp")
+- **sender**: User's phone number or ID
+- **sender_name**: User's display name from WhatsApp profile (may be null)
+- **text**: Message text content (may be null for media-only messages)
+- **media_id**: Attached media ID if present (may be null)
+- **timestamp**: ISO timestamp of when message was received
 
 **Using sender_name for personalization:**
 - Extract `sender_name` from the JSON payload (may be null if unavailable)
@@ -281,23 +277,12 @@ User provides price, then you delegate with complete information.
 
 <example>
 <user_input>
-User sent a message via WhatsApp.
-
-JSON Payload:
-```json
-{
-  "platform": "whatsapp",
-  "sender": "919876543210",
-  "sender_name": "Abhi",
-  "text": "Hi",
-  "media_id": null,
-  "timestamp": "2025-10-16T10:30:00Z"
-}
-```
+User sent: "Hi"
+Platform: WhatsApp
+Sender name: "Abhi" (from WhatsApp profile)
 </user_input>
 
 <your_reasoning>
-- Parse JSON to extract fields
 - Domain: Social interaction
 - Intent: Greeting, no workflow requested
 - User context: sender_name is "Abhi" (from WhatsApp profile)
