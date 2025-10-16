@@ -161,6 +161,15 @@ async def receive(request: Request) -> Any:
                 if contacts and len(contacts) > 0:
                     profile = contacts[0].get("profile", {})
                     sender_name = profile.get("name")
+                    logger.debug(
+                        "Extracted sender profile name",
+                        extra={"sender_name": sender_name, "event_path": str(event_path)}
+                    )
+                else:
+                    logger.warning(
+                        "No contacts array in WhatsApp payload - personalization unavailable",
+                        extra={"value_keys": list(value.keys()), "event_path": str(event_path)}
+                    )
 
                 # Process each message (usually just one, but iterate for safety)
                 for message in messages:
@@ -177,11 +186,15 @@ async def receive(request: Request) -> Any:
                         )
                         continue
 
+                    # Initialize runner (and channel) before using it for thread_id
+                    # This ensures _whatsapp_channel is available for format_thread_id()
+                    runner = _get_runner()
+
                     # Check for duplicate processing using message_id (DB-backed idempotency)
                     # WhatsApp can retry webhooks, and we need to ensure we don't
                     # process the same message multiple times. Uses database to survive restarts.
                     # Storage adapter handles atomic check-and-mark via port (no concrete adapter leakage)
-                    thread_id = _whatsapp_channel.format_thread_id(sender) if _whatsapp_channel else f"whatsapp:{sender}"
+                    thread_id = runner.channel.format_thread_id(sender)
                     if _storage and _storage.check_and_mark_message_processed(
                         message_id=message_id,
                         sender_id=sender,
@@ -242,7 +255,7 @@ async def receive(request: Request) -> Any:
                     # runner_v2 auto-detects pending interrupts via pm.get_state() and invokes approval_analyzer
                     # No special routing needed - the runner knows the context automatically
                     try:
-                        _get_runner().handle_message(sender, text, media_id, sender_name=sender_name)
+                        runner.handle_message(sender, text, media_id, sender_name=sender_name)
                     except GeneratorExit:
                         # GeneratorExit occurs when workflow streaming times out
                         # Message already marked as processed above for idempotency
