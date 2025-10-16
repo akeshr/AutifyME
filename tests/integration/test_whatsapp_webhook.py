@@ -396,6 +396,105 @@ class TestMessageReception:
             sender_name=None,
         )
 
+    def test_text_message_with_sender_name(self, client, mock_runner_globally):
+        """Text message with contacts array extracts sender_name for personalization."""
+        payload = {
+            "object": "whatsapp_business_account",
+            "entry": [
+                {
+                    "id": "entry123",
+                    "changes": [
+                        {
+                            "value": {
+                                "messaging_product": "whatsapp",
+                                "contacts": [
+                                    {
+                                        "profile": {
+                                            "name": "Abhi"
+                                        },
+                                        "wa_id": "1234567890"
+                                    }
+                                ],
+                                "messages": [
+                                    {
+                                        "id": "msg_007",
+                                        "from": "1234567890",
+                                        "timestamp": "1234567890",
+                                        "type": "text",
+                                        "text": {"body": "Hi, catalog this for me"},
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+
+        with patch('autifyme_agents.entrypoints.whatsapp_webhook._persist_event') as mock_persist:
+            mock_persist.return_value = Path("/tmp/test_event.json")
+            response = client.post("/webhook", json=payload)
+
+        assert response.status_code == 200
+        # Verify sender_name was extracted from contacts array
+        mock_runner_globally['runner'].handle_message.assert_called_once_with(
+            "1234567890",
+            "Hi, catalog this for me",
+            None,
+            sender_name="Abhi",
+        )
+
+    def test_image_with_sender_name(self, client, mock_runner_globally):
+        """Image message with contacts array includes sender_name."""
+        payload = {
+            "object": "whatsapp_business_account",
+            "entry": [
+                {
+                    "id": "entry123",
+                    "changes": [
+                        {
+                            "value": {
+                                "messaging_product": "whatsapp",
+                                "contacts": [
+                                    {
+                                        "profile": {
+                                            "name": "John Doe"
+                                        },
+                                        "wa_id": "9876543210"
+                                    }
+                                ],
+                                "messages": [
+                                    {
+                                        "id": "msg_008",
+                                        "from": "9876543210",
+                                        "timestamp": "1234567890",
+                                        "type": "image",
+                                        "image": {
+                                            "id": "media_personalized",
+                                            "caption": "Check out this product",
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+
+        with patch('autifyme_agents.entrypoints.whatsapp_webhook._persist_event') as mock_persist:
+            mock_persist.return_value = Path("/tmp/test_event.json")
+            response = client.post("/webhook", json=payload)
+
+        assert response.status_code == 200
+        # Verify sender_name was extracted
+        mock_runner_globally['runner'].handle_message.assert_called_once_with(
+            "9876543210",
+            "Check out this product",
+            "media_personalized",
+            sender_name="John Doe",
+        )
+
 
 class TestEventFiltering:
     """Test filtering of non-message events."""
