@@ -42,6 +42,9 @@ class IncomingMessage(BaseModel):
     """Structured representation of incoming user message."""
 
     sender_id: str = Field(description="User/sender identifier")
+    sender_name: str | None = Field(
+        default=None, description="User display name for personalization (e.g., WhatsApp profile name)"
+    )
     text: str | None = Field(default=None, description="Message text content")
     media_id: str | None = Field(default=None, description="Media attachment ID")
     media_type: str | None = Field(default=None, description="Media MIME type")

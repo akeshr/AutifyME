@@ -231,6 +231,7 @@ class WorkflowRunner:
 
         incoming_message = IncomingMessage(
             sender_id=sender,
+            sender_name=sender_name,
             text=text,
             media_id=media_id,
             platform=self.channel.__class__.__name__.replace("Channel", "").lower(),
