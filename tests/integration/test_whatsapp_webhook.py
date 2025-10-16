@@ -184,6 +184,7 @@ class TestMessageReception:
             "1234567890",
             "Hello, I need help cataloging a product",
             None,  # No media
+            sender_name=None,
         )
 
     def test_image_with_caption(self, client, mock_runner_globally):
@@ -225,6 +226,7 @@ class TestMessageReception:
             "1234567890",
             "Catalog this jar",
             "media_abc123",
+            sender_name=None,
         )
 
     def test_image_without_caption(self, client, mock_runner_globally):
@@ -265,6 +267,7 @@ class TestMessageReception:
             "1234567890",
             None,  # No caption
             "media_xyz789",
+            sender_name=None,
         )
 
     def test_video_with_caption(self, client, mock_runner_globally):
@@ -306,6 +309,7 @@ class TestMessageReception:
             "1234567890",
             "Product demo video",
             "video_123",
+            sender_name=None,
         )
 
     def test_document_with_caption(self, client, mock_runner_globally):
@@ -348,6 +352,7 @@ class TestMessageReception:
             "1234567890",
             "Price list",
             "doc_456",
+            sender_name=None,
         )
 
     def test_audio_message(self, client, mock_runner_globally):
@@ -388,6 +393,7 @@ class TestMessageReception:
             "1234567890",
             None,  # Audio has no caption
             "audio_789",
+            sender_name=None,
         )
 
 
