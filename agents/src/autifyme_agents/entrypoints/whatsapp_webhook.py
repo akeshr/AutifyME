@@ -34,13 +34,13 @@ logger.info("AutifyME WhatsApp webhook serverless function loaded")
 
 
 @app.get("/")
-def read_root():
+def read_root() -> dict[str, str]:
     """Root endpoint to confirm the service is running."""
     return {"status": "ok", "service": "AutifyME WhatsApp Webhook"}
 
 
 @app.get("/favicon.ico", include_in_schema=False)
-async def favicon():
+async def favicon() -> RedirectResponse:
     """Redirects to the static vercel.svg in the public directory."""
     return RedirectResponse("/vercel.svg", status_code=307)
 
@@ -50,7 +50,7 @@ _runner = None
 _storage: StorageInterface | None = None
 _whatsapp_channel = None
 
-def _get_runner():
+def _get_runner() -> WorkflowRunner:
     """Lazy initialization of WorkflowRunner for serverless deployment."""
     global _runner, _storage, _whatsapp_channel
 
@@ -188,7 +188,7 @@ async def receive(request: Request) -> Any:
 
                     # Initialize runner (and channel) before using it for thread_id
                     # This ensures _whatsapp_channel is available for format_thread_id()
-                    runner = _get_runner()
+                    runner: WorkflowRunner = _get_runner()
 
                     # Check for duplicate processing using message_id (DB-backed idempotency)
                     # WhatsApp can retry webhooks, and we need to ensure we don't

@@ -15,8 +15,8 @@ Architecture (Correct Hierarchy):
 
 from typing import Any
 
-from deepagents import create_deep_agent  # type: ignore[import-untyped]
-from deepagents.tools import write_todos  # type: ignore[import-untyped]
+from deepagents import create_deep_agent
+from deepagents.tools import write_todos
 from langchain.agents.middleware.human_in_the_loop import ToolConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
@@ -32,7 +32,7 @@ from autifyme_agents.tools import create_save_product_tool
 
 
 def create_cataloging_department(
-    checkpointer: BaseCheckpointSaver,
+    checkpointer: BaseCheckpointSaver[Any],
     storage: StorageInterface,
     channel: Any | None = None,
 ) -> Any:

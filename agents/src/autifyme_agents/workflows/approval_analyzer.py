@@ -150,7 +150,7 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
 def analyze_approval(
     pending_interrupts: list[dict[str, Any]],
     user_message: str,
-    conversation_history: list | None = None,
+    conversation_history: list[Any] | None = None,
     llm: BaseChatModel | None = None,
 ) -> BatchApprovalResponse:
     """Convenience function to analyze approval with validation.

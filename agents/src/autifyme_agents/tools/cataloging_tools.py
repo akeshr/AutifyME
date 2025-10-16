@@ -9,16 +9,18 @@ Context Engineering strategy.
 
 from __future__ import annotations
 
+from typing import Any
+
 from langchain.tools import ToolException, tool
 
 from autifyme_agents.core.middleware import create_company_context_middleware
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
-from autifyme_agents.schemas.models import Product
+from autifyme_agents.schemas.models import CompanyProfile, Product
 from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
 
 
-def create_image_analysis_tool(storage: StorageInterface):
+def create_image_analysis_tool(storage: StorageInterface) -> Any:
     """Create the image analysis specialist tool with middleware injection."""
 
     if storage is None:
@@ -37,8 +39,8 @@ def create_image_analysis_tool(storage: StorageInterface):
         image_bytes: bytes | None = None,
         mime_type: str | None = None,
         *,
-        company_profile,
-        config=None,
+        company_profile: CompanyProfile,
+        config: dict[str, Any] | None = None,
     ) -> ImageAnalysisResult:
         """Analyze product imagery to produce structured visual insights.
 
@@ -57,7 +59,7 @@ def create_image_analysis_tool(storage: StorageInterface):
     return image_analysis_specialist_tool
 
 
-def create_cataloging_specialist_tool(storage: StorageInterface):
+def create_cataloging_specialist_tool(storage: StorageInterface) -> Any:
     """Create the cataloging specialist tool with middleware injection."""
 
     if storage is None:
@@ -70,10 +72,10 @@ def create_cataloging_specialist_tool(storage: StorageInterface):
     @middleware
     def cataloging_specialist_tool(
         user_message: str,
-        image_analysis: dict | None = None,
+        image_analysis: dict[str, Any] | None = None,
         *,
-        company_profile,
-        config=None,
+        company_profile: CompanyProfile,
+        config: dict[str, Any] | None = None,
     ) -> Product:
         """Transform user instructions (and optional image insights) into a structured Product model.
 

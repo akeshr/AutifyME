@@ -51,7 +51,7 @@ class WhatsAppMediaClient:
             )
             raise
         data: dict[str, Any] = response.json()
-        media_url = data["url"]
+        media_url: str = data["url"]
         logger.info(
             "Resolved media",
             extra={"media_id": media_id, "media_url": media_url, "mime_type": data.get("mime_type")},

@@ -121,7 +121,7 @@ class WorkflowRunner:
         *,
         channel: MessagingChannel,
         storage: StorageInterface,
-        checkpointer: BaseCheckpointSaver | None = None,
+        checkpointer: BaseCheckpointSaver[Any] | None = None,
         recursion_limit: int | None = None,
     ):
         """Initialize workflow runner.
@@ -335,7 +335,7 @@ class WorkflowRunner:
         """
         logger.debug("Invoking Project Manager", extra={"thread_id": thread_id})
 
-        pm = self._create_project_manager()
+        pm: Any = self._create_project_manager()
         config = self._build_config(thread_id)
 
         # Check for pending HITL interrupts
@@ -625,8 +625,8 @@ class WorkflowRunner:
     def _build_command_from_approval(
         self,
         approval_response: BatchApprovalResponse,
-        pending_interrupts: list[dict],
-    ) -> Command:
+        pending_interrupts: list[dict[str, Any]],
+    ) -> Command[Any]:
         """Build LangGraph Command from structured approval response.
 
         Takes the Pydantic BatchApprovalResponse from approval analyzer and
@@ -742,9 +742,7 @@ class WorkflowRunner:
                         "Converted single interrupt to Product object",
                         extra={"thread_id": thread_id, "product_name": draft.name}
                     )
-                else:
-                    draft = clean_value
-                self.channel.send_approval_request(sender, draft)
+                    self.channel.send_approval_request(sender, draft)
 
             logger.info(
                 "Interrupt(s) forwarded to user - awaiting response",
@@ -792,13 +790,13 @@ class WorkflowRunner:
             self._thread_locks[sender] = Lock()
             return self._thread_locks[sender]
 
-    def _get_checkpointer(self) -> BaseCheckpointSaver:
+    def _get_checkpointer(self) -> BaseCheckpointSaver[Any]:
         """Get checkpointer instance."""
         if self._checkpointer:
             return self._checkpointer
         return get_checkpointer()
 
-    def _create_project_manager(self):
+    def _create_project_manager(self) -> Any:
         """Create PM instance with company context and channel."""
         return create_project_manager(
             company_profile=self.company_profile,
@@ -828,7 +826,7 @@ class WorkflowRunner:
             },
         }
 
-    def _extract_cataloging_result(self, messages: list) -> CatalogingResult | None:
+    def _extract_cataloging_result(self, messages: list[Any]) -> CatalogingResult | None:
         """Extract CatalogingResult from messages.
 
         Args:
@@ -860,7 +858,7 @@ class WorkflowRunner:
 
         return None
 
-    def _extract_ai_summary(self, messages: list) -> str | None:
+    def _extract_ai_summary(self, messages: list[Any]) -> str | None:
         """Extract AI summary from messages.
 
         Args:

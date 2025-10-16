@@ -17,8 +17,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
-from deepagents import create_deep_agent  # type: ignore[import-untyped]
-from deepagents.tools import write_todos  # type: ignore[import-untyped]
+from deepagents import create_deep_agent
+from deepagents.tools import write_todos
 from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -56,7 +56,7 @@ def _create_cataloging_subagent(
     storage: StorageInterface,
     checkpointer: Any,
     channel: MessagingChannel | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Create cataloging department as a CustomSubAgent.
 
     DeepAgents supports two subagent patterns:
@@ -97,7 +97,7 @@ def create_project_manager(
     checkpointer: Any,
     storage: StorageInterface,
     channel: MessagingChannel | None = None,
-    tools: Sequence | None = None,
+    tools: Sequence[Any] | None = None,
 ) -> Any:
     """Create the deepagents-powered Project Manager with proper delegation hierarchy.
 

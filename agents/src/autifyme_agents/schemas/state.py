@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Annotated, Literal
 
-from deepagents.state import DeepAgentState  # type: ignore[import-untyped]
+from deepagents.state import DeepAgentState
 from langchain.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict

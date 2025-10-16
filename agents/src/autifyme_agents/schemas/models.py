@@ -84,7 +84,7 @@ class CatalogingResult(BaseModel):
     product_id: UUID | None = Field(None, description="The UUID of the cataloged product if available.")
     product_name: str | None = Field(None, description="The name of the cataloged product.")
     message: str = Field(..., description="Human-readable summary of what happened.")
-    data: dict | None = Field(
+    data: dict[str, Any] | None = Field(
         default=None,
         description="Structured payload associated with the stage (draft details or saved record).",
     )

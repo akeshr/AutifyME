@@ -86,7 +86,7 @@ class CompanyContextMiddleware(AgentMiddleware):
         self.storage = storage
         self._profile_cache: CompanyProfile | None = None
 
-    def before_model(self, state, runtime):
+    def before_model(self, state: Any, runtime: Any) -> None:
         """Fetch and inject company profile before LLM call."""
         if self._profile_cache is None:
             self._profile_cache = self.storage.get_company_profile()

@@ -52,8 +52,8 @@ def create_cataloging_specialist(
 # Adapter for backward compatibility with tool invocation
 def cataloging_specialist_invoke(
     user_message: str,
-    image_analysis: dict | None = None,
-    config: dict | None = None,
+    image_analysis: dict[str, Any] | None = None,
+    config: dict[str, Any] | None = None,
 ) -> Product:
     """Invoke cataloging specialist with simplified interface.
 
@@ -79,4 +79,5 @@ def cataloging_specialist_invoke(
     result = agent.invoke({"messages": messages}, config=config or {})
 
     # Extract structured response (Product model)
-    return result["structured_response"]  # create_agent with response_format returns {"structured_response": Product}
+    product: Product = result["structured_response"]
+    return product

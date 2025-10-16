@@ -40,7 +40,7 @@ class WhatsAppClient:
 
         response = httpx.post(self._base_url, json=payload, headers=headers, timeout=10.0)
         response.raise_for_status()
-        data = response.json()
+        data: dict[str, Any] = response.json()
         logger.debug(
             "WhatsApp message sent",
             extra={
