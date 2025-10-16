@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from supabase import Client, create_client
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.models import CompanyProfile, Product
-
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +27,9 @@ class SupabaseStorageClient(StorageInterface):
     def __init__(
         self,
         *,
-        supabase_url: Optional[str] = None,
-        service_key: Optional[str] = None,
-        client: Optional[Client] = None,
+        supabase_url: str | None = None,
+        service_key: str | None = None,
+        client: Client | None = None,
     ) -> None:
         """Configure the adapter with explicit or settings-derived credentials."""
 
@@ -41,7 +40,7 @@ class SupabaseStorageClient(StorageInterface):
                 "SUPABASE_SERVICE_ROLE_KEY not set; falling back to anon key which has restricted write access."
             )
         self._service_key = derived_key
-        self._client: Optional[Client] = client
+        self._client: Client | None = client
 
     def _ensure_client(self) -> Client:
         """Create the Supabase client lazily to avoid side effects during import."""
@@ -91,15 +90,15 @@ class SupabaseStorageClient(StorageInterface):
         checkpoint_id: str,
         tool_call: dict,
         draft_summary: str,
-        ai_message: Optional[dict] = None,
-        image_path: Optional[str] = None,
+        ai_message: dict | None = None,
+        image_path: str | None = None,
         agent_source: str = "cataloging_department",
-        checkpoint_ns: Optional[str] = None,
+        checkpoint_ns: str | None = None,
     ) -> str:
         """Persist a pending HITL approval to the pending_approvals table."""
 
         client = self._ensure_client()
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        expires_at = datetime.now(UTC) + timedelta(hours=24)
         payload = {
             "thread_id": thread_id,
             "interrupt_id": interrupt_id,
@@ -125,17 +124,17 @@ class SupabaseStorageClient(StorageInterface):
 
         return response.data[0]["id"]
 
-    def get_pending_approval(self, thread_id: str) -> Optional[dict]:
+    def get_pending_approval(self, thread_id: str) -> dict | None:
         """Retrieve the most recent non-expired pending approval for a thread.
-        
+
         Filters out approvals past their expires_at timestamp (24h default) to prevent
         processing stale approval requests and ensure users get clear "no pending approval"
         messages instead of resuming outdated workflows.
         """
 
         client = self._ensure_client()
-        now = datetime.now(timezone.utc).isoformat()
-        
+        now = datetime.now(UTC).isoformat()
+
         response = (
             client.table("pending_approvals")
             .select("*")
@@ -260,10 +259,10 @@ class SupabaseStorageClient(StorageInterface):
     def get_workflow_outcomes(
         self,
         *,
-        time_window: Optional[timedelta] = None,
-        intent: Optional[str] = None,
-        department: Optional[str] = None,
-        success: Optional[bool] = None,
+        time_window: timedelta | None = None,
+        intent: str | None = None,
+        department: str | None = None,
+        success: bool | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """Retrieve workflow outcomes for analysis."""
@@ -273,7 +272,7 @@ class SupabaseStorageClient(StorageInterface):
 
         # Apply filters
         if time_window:
-            cutoff = (datetime.now(timezone.utc) - time_window).isoformat()
+            cutoff = (datetime.now(UTC) - time_window).isoformat()
             query = query.gte("created_at", cutoff)
 
         if intent:
@@ -299,7 +298,7 @@ class SupabaseStorageClient(StorageInterface):
         """Retrieve recent failures for regression test generation."""
         client = self._ensure_client()
 
-        cutoff = (datetime.now(timezone.utc) - time_window).isoformat()
+        cutoff = (datetime.now(UTC) - time_window).isoformat()
 
         response = (
             client.table("workflow_outcomes")
@@ -316,7 +315,7 @@ class SupabaseStorageClient(StorageInterface):
 
     def get_success_rates(
         self,
-        time_window: Optional[timedelta] = None,
+        time_window: timedelta | None = None,
     ) -> list[dict[str, Any]]:
         """Get success rate analytics by department and intent."""
         client = self._ensure_client()
@@ -335,7 +334,7 @@ class SupabaseStorageClient(StorageInterface):
 
     def get_edge_cases(
         self,
-        time_window: Optional[timedelta] = None,
+        time_window: timedelta | None = None,
         max_occurrence_count: int = 3,
         limit: int = 20,
     ) -> list[dict[str, Any]]:

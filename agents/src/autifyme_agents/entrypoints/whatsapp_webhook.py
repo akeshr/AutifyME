@@ -7,15 +7,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from autifyme_agents.core.config import settings
-from autifyme_agents.core.logging_config import setup_logging, get_logger
+from autifyme_agents.core.logging_config import get_logger, setup_logging
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.storage_factory import get_storage
-from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
+from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 
 # Initialize logging for serverless environment
 try:
@@ -131,12 +131,12 @@ async def receive(request: Request) -> Any:
         for entry in body.get("entry", []):
             for change in entry.get("changes", []):
                 value = change.get("value", {})
-                
+
                 # WhatsApp sends different event types:
                 # - "messages": incoming messages from users (PROCESS THESE)
                 # - "statuses": delivery/read receipts for outbound messages (IGNORE)
                 # - Other metadata events (IGNORE)
-                
+
                 # Only process if this is a message event (not status update)
                 messages = value.get("messages")
                 if not messages:
@@ -160,7 +160,7 @@ async def receive(request: Request) -> Any:
                     sender = message.get("from")
                     msg_type = message.get("type")
                     timestamp = message.get("timestamp")
-                    
+
                     # Skip if essential fields are missing
                     if not message_id or not sender:
                         logger.warning(

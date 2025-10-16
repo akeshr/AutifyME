@@ -17,7 +17,7 @@ from typing import Any
 class AutifyMEError(Exception):
     """
     Base exception for all AutifyME-specific errors.
-    
+
     All custom exceptions in the system inherit from this, making it easy
     to catch AutifyME errors specifically while letting system errors propagate.
     """
@@ -31,15 +31,15 @@ class AutifyMEError(Exception):
 class ToolExecutionError(AutifyMEError):
     """
     Raised when a tool fails to execute successfully.
-    
+
     This is the base class for all tool-related errors. Tools should catch
     external API errors and raise this (or a subclass) with context.
     """
-    
+
     def __init__(self, message: str, tool_name: str, original_error: Exception | None = None):
         """
         Initialize with context about the tool failure.
-        
+
         Args:
             message: Human-readable error description
             tool_name: Name of the tool that failed
@@ -52,11 +52,11 @@ class ToolExecutionError(AutifyMEError):
 
 class StorageError(ToolExecutionError):
     """Raised when database/storage operations fail."""
-    
+
     def __init__(self, message: str, operation: str, original_error: Exception | None = None):
         """
         Initialize with storage operation context.
-        
+
         Args:
             message: Error description
             operation: The storage operation that failed (e.g., "save_product", "get_company_profile")
@@ -68,11 +68,11 @@ class StorageError(ToolExecutionError):
 
 class ImageAnalysisError(ToolExecutionError):
     """Raised when image analysis (Vision API) fails."""
-    
+
     def __init__(self, message: str, image_url: str, original_error: Exception | None = None):
         """
         Initialize with image analysis context.
-        
+
         Args:
             message: Error description
             image_url: The image URL that failed to analyze
@@ -84,10 +84,10 @@ class ImageAnalysisError(ToolExecutionError):
 
 class ExternalAPIError(ToolExecutionError):
     """Raised when external API calls fail (network, timeout, rate limit, etc.)."""
-    
+
     def __init__(
-        self, 
-        message: str, 
+        self,
+        message: str,
         tool_name: str,
         api_name: str,
         status_code: int | None = None,
@@ -96,7 +96,7 @@ class ExternalAPIError(ToolExecutionError):
     ):
         """
         Initialize with external API error context.
-        
+
         Args:
             message: Error description
             tool_name: Name of the tool making the API call
@@ -108,11 +108,11 @@ class ExternalAPIError(ToolExecutionError):
         self.api_name = api_name
         self.status_code = status_code
         self.is_retryable = is_retryable
-        
+
         status_info = f" (HTTP {status_code})" if status_code else ""
         retry_info = " [RETRYABLE]" if is_retryable else " [NOT RETRYABLE]"
         full_message = f"{api_name} API error{status_info}: {message}{retry_info}"
-        
+
         super().__init__(full_message, tool_name=tool_name, original_error=original_error)
 
 
@@ -123,15 +123,15 @@ class ExternalAPIError(ToolExecutionError):
 class ValidationError(AutifyMEError):
     """
     Raised when input validation fails.
-    
+
     This indicates the input data doesn't meet requirements (schema, business rules, etc.).
     These are typically non-retryable and require user correction.
     """
-    
+
     def __init__(self, message: str, field: str | None = None, value: Any = None):
         """
         Initialize with validation error context.
-        
+
         Args:
             message: Error description
             field: The field that failed validation
@@ -139,7 +139,7 @@ class ValidationError(AutifyMEError):
         """
         self.field = field
         self.value = value
-        
+
         field_info = f" (field: {field})" if field else ""
         super().__init__(f"Validation failed{field_info}: {message}")
 
@@ -147,14 +147,14 @@ class ValidationError(AutifyMEError):
 class DataNotFoundError(AutifyMEError):
     """
     Raised when required data is not found.
-    
+
     Example: Company profile not found, product not found, etc.
     """
-    
+
     def __init__(self, resource_type: str, identifier: str):
         """
         Initialize with data not found context.
-        
+
         Args:
             resource_type: Type of resource that wasn't found (e.g., "Company", "Product")
             identifier: The identifier used in the lookup (e.g., company_id, product_id)
@@ -171,15 +171,15 @@ class DataNotFoundError(AutifyMEError):
 class ConfigurationError(AutifyMEError):
     """
     Raised when configuration is missing or invalid.
-    
+
     Example: Missing API keys, invalid database connection strings, etc.
     These typically indicate deployment/environment issues.
     """
-    
+
     def __init__(self, message: str, config_key: str | None = None):
         """
         Initialize with configuration error context.
-        
+
         Args:
             message: Error description
             config_key: The configuration key that's missing or invalid
@@ -196,14 +196,14 @@ class ConfigurationError(AutifyMEError):
 class AgentExecutionError(AutifyMEError):
     """
     Raised when an agent encounters an unrecoverable error during execution.
-    
+
     This is typically raised by agent-level logic, not individual tools.
     """
-    
+
     def __init__(self, message: str, agent_name: str, original_error: Exception | None = None):
         """
         Initialize with agent execution context.
-        
+
         Args:
             message: Error description
             agent_name: Name of the agent that failed
@@ -217,14 +217,14 @@ class AgentExecutionError(AutifyMEError):
 class WorkflowInterruptedError(AutifyMEError):
     """
     Raised when a workflow is interrupted (HITL approval denied, timeout, etc.).
-    
+
     This is not always an error condition - it can be a normal part of HITL workflows.
     """
-    
+
     def __init__(self, message: str, workflow_id: str, reason: str):
         """
         Initialize with workflow interruption context.
-        
+
         Args:
             message: Error description
             workflow_id: ID of the interrupted workflow

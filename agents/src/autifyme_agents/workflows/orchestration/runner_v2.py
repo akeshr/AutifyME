@@ -57,18 +57,18 @@ from threading import Lock
 from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.errors import GraphRecursionError, GraphInterrupt
+from langgraph.errors import GraphInterrupt, GraphRecursionError
 from langgraph.types import Command
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-from autifyme_agents.schemas.models import CompanyProfile, CatalogingResult
-from autifyme_agents.workflows.channels.protocol import MessagingChannel
-from autifyme_agents.workflows.project_manager import create_project_manager
-from autifyme_agents.workflows.outcome_tracker import OutcomeTracker, IncomingMessage
-from autifyme_agents.workflows.approval_analyzer import analyze_approval
 from autifyme_agents.schemas.approval import BatchApprovalResponse
+from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
+from autifyme_agents.workflows.approval_analyzer import analyze_approval
+from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.workflows.outcome_tracker import IncomingMessage, OutcomeTracker
+from autifyme_agents.workflows.project_manager import create_project_manager
 
 logger = logging.getLogger(__name__)
 

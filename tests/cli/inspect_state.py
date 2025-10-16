@@ -34,11 +34,12 @@ Usage:
     uv run python -m autifyme_agents.cli.inspect --list-threads
 """
 
-import sys
 import json
+import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
-from datetime import datetime
+
 from dotenv import load_dotenv
 
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer

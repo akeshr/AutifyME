@@ -7,27 +7,26 @@ Following LangChain v1 patterns:
 - Errors are caught by ToolNode's handle_tool_errors mechanism
 """
 
-from typing import List, Optional
 import logging
 
 from langchain.tools import tool
 from pydantic import BaseModel, Field
 from tenacity import (
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
 )
 
-from autifyme_agents.schemas.models import Product, CompanyProfile, CatalogingResult
-from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.exceptions import (
-    StorageError,
     ConfigurationError,
     DataNotFoundError,
     ExternalAPIError,
+    StorageError,
 )
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile, Product
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +36,9 @@ class SaveProductArgs(BaseModel):
     name: str = Field(..., description="The name of the product.")
     description: str = Field(..., description="A detailed description of the product.")
     price: float = Field(..., description="The price of the product.")
-    sizes: Optional[List[str]] = Field(None, description="A list of available sizes for the product.")
-    colors: Optional[List[str]] = Field(None, description="A list of available colors for the product.")
-    image_urls: Optional[List[str]] = Field(None, description="A list of URLs for the product images.")
+    sizes: list[str] | None = Field(None, description="A list of available sizes for the product.")
+    colors: list[str] | None = Field(None, description="A list of available colors for the product.")
+    image_urls: list[str] | None = Field(None, description="A list of URLs for the product images.")
 
 
 def _save_product(storage: StorageInterface, **kwargs) -> Product:

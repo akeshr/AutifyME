@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -42,16 +42,16 @@ class MediaReference(BaseModel):
             "'none' = already on filesystem"
         ),
     )
-    local_path: Optional[Path] = Field(
+    local_path: Path | None = Field(
         None, description="Local file path (set if already downloaded or uploaded directly)"
     )
-    platform_url: Optional[str] = Field(None, description="Platform-specific URL (may expire)")
+    platform_url: str | None = Field(None, description="Platform-specific URL (may expire)")
 
     # Metadata
-    size_bytes: Optional[int] = Field(None, description="File size in bytes")
-    caption: Optional[str] = Field(None, description="User-provided caption for media")
-    filename: Optional[str] = Field(None, description="Original filename")
-    expires_at: Optional[datetime] = Field(
+    size_bytes: int | None = Field(None, description="File size in bytes")
+    caption: str | None = Field(None, description="User-provided caption for media")
+    filename: str | None = Field(None, description="Original filename")
+    expires_at: datetime | None = Field(
         None, description="URL expiration timestamp (for eager platforms like WhatsApp)"
     )
 
@@ -67,8 +67,8 @@ class IncomingMessage(BaseModel):
     """
 
     # Core Content
-    text: Optional[str] = Field(None, description="User's text message (if any)")
-    media: List[MediaReference] = Field(
+    text: str | None = Field(None, description="User's text message (if any)")
+    media: list[MediaReference] = Field(
         default_factory=list, description="Media attachments (if any)"
     )
 
@@ -79,16 +79,16 @@ class IncomingMessage(BaseModel):
     timestamp: datetime = Field(..., description="Message timestamp")
 
     # Advanced Context (optional)
-    reply_to_message_id: Optional[str] = Field(
+    reply_to_message_id: str | None = Field(
         None, description="Message ID if replying to previous message"
     )
-    forwarded_from: Optional[str] = Field(None, description="Original sender if forwarded")
-    conversation_history: Optional[List[Dict[str, Any]]] = Field(
+    forwarded_from: str | None = Field(None, description="Original sender if forwarded")
+    conversation_history: list[dict[str, Any]] | None = Field(
         None, description="Recent messages for context (optional)"
     )
 
     # Platform-Specific Extras
-    platform_metadata: Dict[str, Any] = Field(
+    platform_metadata: dict[str, Any] = Field(
         default_factory=dict, description="Platform-specific fields (e.g., WhatsApp message type)"
     )
 
@@ -113,7 +113,7 @@ class IncomingMessage(BaseModel):
         if not self.media:
             return "No media"
 
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for m in self.media:
             counts[m.media_type] = counts.get(m.media_type, 0) + 1
 

@@ -1,7 +1,7 @@
-from .models import CatalogingResult, CompanyProfile, Product
 from .agent_outputs import CatalogingToolOutput
-from .state import ProjectManagerState
 from .messages import IncomingMessage, MediaReference
+from .models import CatalogingResult, CompanyProfile, Product
+from .state import ProjectManagerState
 
 __all__ = [
     "CatalogingResult",

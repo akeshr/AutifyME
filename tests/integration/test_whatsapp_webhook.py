@@ -10,8 +10,8 @@ from unittest.mock import Mock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from autifyme_agents.entrypoints.whatsapp_webhook import app
 from autifyme_agents.core.config import settings
+from autifyme_agents.entrypoints.whatsapp_webhook import app
 
 
 @pytest.fixture

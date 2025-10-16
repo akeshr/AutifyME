@@ -5,9 +5,9 @@ Provides structured JSON logging in production and human-readable logs in develo
 
 import logging
 import sys
-from pathlib import Path
 from datetime import datetime
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any
 
 # Configure directories for different environments
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 # Initialize variables that may be None in serverless environments
 LOGS_DIR: Path
 MEDIA_DIR: Path
-LOG_FILE: Optional[Path]
+LOG_FILE: Path | None
 
 # For serverless environments (Vercel), use /tmp for writable directories
 # For local development, use project directories

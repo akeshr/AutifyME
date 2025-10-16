@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 
 from autifyme_agents.core.config import settings
+
 # Use /tmp for media downloads on serverless platforms
 MEDIA_DIR = Path("/tmp/media_downloads")
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)

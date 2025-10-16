@@ -7,7 +7,6 @@ from langchain.tools import tool
 from autifyme_agents.core.exceptions import ExternalAPIError
 from autifyme_agents.integrations.communication.whatsapp_client import WhatsAppClient
 
-
 logger = logging.getLogger(__name__)
 
 

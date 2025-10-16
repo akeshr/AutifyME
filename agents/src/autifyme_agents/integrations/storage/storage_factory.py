@@ -3,7 +3,6 @@
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
 
-
 _storage_instance: StorageInterface | None = None
 
 

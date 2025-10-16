@@ -14,16 +14,17 @@ post-model hooks are needed—LangGraph's tool node handles all ToolMessage synt
 
 from __future__ import annotations
 
-from typing import Any, Sequence, TYPE_CHECKING
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
 from deepagents import create_deep_agent  # type: ignore[import-untyped]
 from deepagents.tools import write_todos  # type: ignore[import-untyped]
 from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
+from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.schemas.models import CompanyProfile
-from autifyme_agents.core.ports import StorageInterface
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -172,4 +173,3 @@ def create_project_manager(
             "initial_state": initial_state,
         }
     )
- 

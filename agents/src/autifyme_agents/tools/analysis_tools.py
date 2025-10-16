@@ -7,27 +7,26 @@ Following LangChain v1 patterns:
 - Errors are caught by agent for self-correction
 """
 
-from langchain.tools import BaseTool
 import logging
 
-from langchain.tools import tool
+from langchain.tools import BaseTool, tool
 from tenacity import (
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
 )
 
-from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
-from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
-from autifyme_agents.core.middleware import create_company_context_middleware
-from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.exceptions import (
-    ImageAnalysisError,
     ExternalAPIError,
+    ImageAnalysisError,
     ValidationError,
 )
+from autifyme_agents.core.middleware import create_company_context_middleware
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
+from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
 
 logger = logging.getLogger(__name__)
 

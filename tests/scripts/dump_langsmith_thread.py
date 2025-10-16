@@ -15,7 +15,7 @@ import argparse
 import sys
 from collections import deque
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from dotenv import load_dotenv
 from langsmith import Client
@@ -56,11 +56,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_run(thread_id: str, limit: int, timeout: int) -> Optional[Run]:
+def resolve_run(thread_id: str, limit: int, timeout: int) -> Run | None:
     client = Client(timeout_ms=timeout * 1000)
     runs = client.list_runs(order="desc", limit=limit)
     for run in runs:
-        config_meta: Dict[str, Any] = (run.inputs or {}).get("config", {}) if run.inputs else {}
+        config_meta: dict[str, Any] = (run.inputs or {}).get("config", {}) if run.inputs else {}
         configurable = config_meta.get("configurable", {}) if isinstance(config_meta, dict) else {}
         if configurable.get("thread_id") == thread_id:
             return run
@@ -72,8 +72,8 @@ def fetch_run_tree(client: Client, root_run: Run) -> Run:
     return client.read_run(root_run.id, load_child_runs=True)
 
 
-def format_messages(run: Run) -> List[str]:
-    messages: List[str] = []
+def format_messages(run: Run) -> list[str]:
+    messages: list[str] = []
     if run.outputs:
         outputs = run.outputs
         if "output" in outputs:

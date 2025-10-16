@@ -13,8 +13,8 @@ from typing import Any, Literal
 
 from autifyme_agents.core.logging_config import get_logger
 from autifyme_agents.integrations.communication import WhatsAppClient, WhatsAppMediaClient
+from autifyme_agents.schemas.models import CatalogingResult, Product
 from autifyme_agents.workflows.channels.protocol import ChannelError
-from autifyme_agents.schemas.models import Product, CatalogingResult
 
 logger = get_logger(__name__)
 
@@ -182,10 +182,7 @@ class WhatsAppChannel:
         Raises:
             ChannelError: If message sending fails (critical)
         """
-        if message:
-            error_message = message
-        else:
-            error_message = self._get_default_error_message(error_type)
+        error_message = message or self._get_default_error_message(error_type)
 
         logger.warning(
             "Sending WhatsApp error message",

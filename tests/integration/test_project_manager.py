@@ -12,8 +12,8 @@ import pytest
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
-from autifyme_agents.workflows.project_manager import create_project_manager
 from autifyme_agents.schemas.models import CompanyProfile
+from autifyme_agents.workflows.project_manager import create_project_manager
 
 
 @pytest.fixture

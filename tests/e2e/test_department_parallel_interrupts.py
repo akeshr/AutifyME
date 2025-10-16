@@ -9,14 +9,16 @@ This replicates the original "1 != 2" error scenario to prove it's fixed.
 
 import sys
 import uuid
+
 from dotenv import load_dotenv
 
 load_dotenv()  # noqa: E402
 
-from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.departments.cataloging_department import create_cataloging_department
 from langchain.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
+
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.departments.cataloging_department import create_cataloging_department
 
 
 def test_department_parallel_interrupts(mock_storage, memory_checkpointer):
@@ -181,6 +183,7 @@ if __name__ == "__main__":
     import uuid
     from datetime import timedelta
     from typing import Any
+
     from autifyme_agents.schemas.models import CompanyProfile, Product
 
     mock_company = CompanyProfile(

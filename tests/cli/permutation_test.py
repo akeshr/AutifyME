@@ -27,16 +27,17 @@ Usage:
     uv run python -m autifyme_agents.cli.permutation_test --all --dry-run
 """
 
-import sys
 import json
+import sys
 import time
-from pathlib import Path
 from itertools import product
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
+from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from tests.cli.simulate import ConsoleChannel, safe_print
 

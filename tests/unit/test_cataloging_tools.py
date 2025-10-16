@@ -3,12 +3,13 @@
 Tests the specialist tool wrappers, middleware injection, and error handling.
 """
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 from langchain_core.tools import ToolException
 
-from autifyme_agents.schemas.models import Product
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
+from autifyme_agents.schemas.models import Product
 from autifyme_agents.tools.cataloging_tools import (
     create_cataloging_specialist_tool,
     create_image_analysis_tool,

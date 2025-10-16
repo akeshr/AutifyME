@@ -17,18 +17,18 @@ from typing import Any
 
 from deepagents import create_deep_agent  # type: ignore[import-untyped]
 from deepagents.tools import write_todos  # type: ignore[import-untyped]
-from langgraph.checkpoint.base import BaseCheckpointSaver
 from langchain.agents.middleware.human_in_the_loop import ToolConfig
+from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from autifyme_agents.core.llm_factory import get_llm
-from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.core.middleware import CompanyContextMiddleware
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.tools import create_save_product_tool
+from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.schemas.models import Product
 from autifyme_agents.specialists.image_analysis_specialist import (
     create_image_analysis_specialist_graph,
 )
+from autifyme_agents.tools import create_save_product_tool
 
 
 def create_cataloging_department(

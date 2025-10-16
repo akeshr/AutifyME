@@ -38,19 +38,20 @@ Available Commands (during debugging):
     quit / q        - Stop debugging
 """
 
-import sys
-import json
 import cmd
+import json
+import sys
 from pathlib import Path
 from typing import Any
+
 from dotenv import load_dotenv
 
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
-from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.schemas.models import Product
+from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from tests.cli.inspect import StateInspector
 
 

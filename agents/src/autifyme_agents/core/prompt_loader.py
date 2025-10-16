@@ -1,5 +1,6 @@
 import os
 
+
 def load_prompt(file_name: str) -> str:
     """
     Loads a prompt template from the filesystem.
@@ -26,5 +27,5 @@ def load_prompt(file_name: str) -> str:
     if not os.path.exists(prompt_path):
         raise FileNotFoundError(f"Prompt file not found at: {prompt_path}")
 
-    with open(prompt_path, 'r', encoding='utf-8') as f:
+    with open(prompt_path, encoding='utf-8') as f:
         return f.read()

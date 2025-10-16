@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, Optional, Sequence, Union
-from typing_extensions import TypedDict
-
-from langchain.messages import HumanMessage, SystemMessage, AIMessage
-from langgraph.graph.message import add_messages
+from collections.abc import Sequence
+from typing import Annotated, Literal, Union
 
 from deepagents.state import DeepAgentState  # type: ignore[import-untyped]
+from langchain.messages import AIMessage, HumanMessage, SystemMessage
+from langgraph.graph.message import add_messages
+from typing_extensions import TypedDict
 
 from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
 
@@ -41,6 +41,6 @@ class ProjectManagerState(DeepAgentState):  # type: ignore[misc]
     current_step: int
     department_results: DepartmentResults
     status: Literal["idle", "planning", "awaiting_approval", "completed", "blocked"]
-    last_error: Optional[str]
+    last_error: str | None
     metadata: ProjectMetadata
     pending_interrupts: list[InterruptInfo]  # HITL interrupt context for PM

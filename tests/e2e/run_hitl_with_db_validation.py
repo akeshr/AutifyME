@@ -11,10 +11,10 @@ Tests complete workflow:
 Run: uv run python test_hitl_with_db_validation.py
 """
 
-import sys
 import os
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
 
 # Fix Windows console encoding
 if os.name == 'nt':
@@ -25,6 +25,7 @@ if os.name == 'nt':
 sys.path.insert(0, str(Path(__file__).parent / "agents" / "src"))
 
 from dotenv import load_dotenv
+
 load_dotenv()  # noqa: E402
 
 print("=" * 80)

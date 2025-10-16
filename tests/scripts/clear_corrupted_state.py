@@ -14,9 +14,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from autifyme_agents.core.logging_config import get_logger
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
-from autifyme_agents.core.logging_config import get_logger
 
 load_dotenv(Path.cwd() / ".env")
 logger = get_logger(__name__)

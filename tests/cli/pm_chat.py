@@ -20,13 +20,14 @@ Usage:
 
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
+from langchain.messages import HumanMessage
 
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
+from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.workflows.project_manager import create_project_manager
-from langchain.messages import HumanMessage
 
 
 def chat_with_pm(message: str, image_path: Path | None = None, thread_id: str = "local_test"):

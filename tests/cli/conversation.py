@@ -62,20 +62,21 @@ Available Scenarios:
     conversation_mixed - Mix of greetings, questions, and cataloging
 """
 
-import sys
 import json
+import sys
 import time
-import yaml  # type: ignore[import-untyped]
 from pathlib import Path
 from typing import Any
+
+import yaml  # type: ignore[import-untyped]
 from dotenv import load_dotenv
 
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.integrations.storage.storage_factory import get_storage
-from autifyme_agents.schemas.models import Product, CatalogingResult
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
+from autifyme_agents.integrations.storage.storage_factory import get_storage
+from autifyme_agents.schemas.models import CatalogingResult, Product
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 
 
 def safe_print(text: str) -> None:
@@ -299,7 +300,7 @@ class ConversationPlayer:
             Conversation report with turns, validations, and summary
         """
         # Load scenario
-        with open(scenario_path, 'r', encoding='utf-8') as f:
+        with open(scenario_path, encoding='utf-8') as f:
             scenario = yaml.safe_load(f)
 
         name = scenario.get('name', scenario_path.stem)
@@ -638,7 +639,7 @@ def list_scenarios() -> None:
     for scenario_id, scenario_path in sorted(scenarios.items()):
         # Load scenario to get name/description
         try:
-            with open(scenario_path, 'r', encoding='utf-8') as f:
+            with open(scenario_path, encoding='utf-8') as f:
                 scenario = yaml.safe_load(f)
                 name = scenario.get('name', scenario_id)
                 description = scenario.get('description', 'No description')

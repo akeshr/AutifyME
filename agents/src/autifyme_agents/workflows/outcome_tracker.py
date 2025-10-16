@@ -35,7 +35,6 @@ from pydantic import BaseModel, Field
 
 from autifyme_agents.core.ports import StorageInterface
 
-
 logger = logging.getLogger(__name__)
 
 

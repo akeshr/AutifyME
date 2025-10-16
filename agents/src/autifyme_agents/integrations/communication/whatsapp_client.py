@@ -9,7 +9,6 @@ import httpx
 
 from autifyme_agents.core.config import settings
 
-
 logger = logging.getLogger(__name__)
 
 

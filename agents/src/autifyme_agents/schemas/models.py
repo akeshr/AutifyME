@@ -1,7 +1,8 @@
 """Domain models for core business entities."""
 
+from typing import Any, Literal
 from uuid import UUID
-from typing import Optional, List, Literal, Any
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -14,20 +15,20 @@ class Product(BaseModel):
 
     The `id` field is None for drafts and populated by the database on INSERT.
     """
-    id: Optional[UUID] = Field(
+    id: UUID | None = Field(
         default=None,
         description="The unique identifier for the product (database-generated)."
     )
-    name: Optional[str] = Field(None, description="The name of the product.")
-    description: Optional[str] = Field(None, description="A detailed description of the product.")
-    price: Optional[float] = Field(None, description="The price of the product.")
-    sizes: Optional[List[str]] = Field(default_factory=list, description="Available sizes.")
-    colors: Optional[List[str]] = Field(default_factory=list, description="Available colors.")
-    image_urls: Optional[List[str]] = Field(default_factory=list, description="Product image URLs.")
+    name: str | None = Field(None, description="The name of the product.")
+    description: str | None = Field(None, description="A detailed description of the product.")
+    price: float | None = Field(None, description="The price of the product.")
+    sizes: list[str] | None = Field(default_factory=list, description="Available sizes.")
+    colors: list[str] | None = Field(default_factory=list, description="Available colors.")
+    image_urls: list[str] | None = Field(default_factory=list, description="Product image URLs.")
 
     @field_validator('id', mode='before')
     @classmethod
-    def validate_id(cls, v: Any) -> Optional[UUID]:
+    def validate_id(cls, v: Any) -> UUID | None:
         """
         Handle invalid UUID strings from LLM by treating them as None (draft).
 
@@ -51,7 +52,7 @@ class Product(BaseModel):
 class CompanyProfile(BaseModel):
     """
     Represents a company's profile and brand guidelines.
-    
+
     Used to provide context for product descriptions, image analysis,
     and content generation across all departments.
     """
@@ -59,8 +60,8 @@ class CompanyProfile(BaseModel):
     name: str = Field(..., description="The company's business name.")
     brand_voice: str = Field(..., description="Brand voice description.")
     target_audience: str = Field(..., description="Target customer demographic.")
-    style_preferences: Optional[List[str]] = Field(default_factory=list, description="Style keywords.")
-    industry: Optional[str] = Field(None, description="Company's industry vertical.")
+    style_preferences: list[str] | None = Field(default_factory=list, description="Style keywords.")
+    industry: str | None = Field(None, description="Company's industry vertical.")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -72,7 +73,7 @@ class CompanyProfile(BaseModel):
 class CatalogingResult(BaseModel):
     """
     Structured output from the Cataloging Department.
-    
+
     Used by the Project Manager to track cataloging progress and approvals.
     """
 
@@ -80,10 +81,10 @@ class CatalogingResult(BaseModel):
         ..., description="Current lifecycle stage for the cataloging workflow."
     )
     success: bool = Field(..., description="Whether the cataloging operation succeeded for this stage.")
-    product_id: Optional[UUID] = Field(None, description="The UUID of the cataloged product if available.")
-    product_name: Optional[str] = Field(None, description="The name of the cataloged product.")
+    product_id: UUID | None = Field(None, description="The UUID of the cataloged product if available.")
+    product_name: str | None = Field(None, description="The name of the cataloged product.")
     message: str = Field(..., description="Human-readable summary of what happened.")
-    data: Optional[dict] = Field(
+    data: dict | None = Field(
         default=None,
         description="Structured payload associated with the stage (draft details or saved record).",
     )

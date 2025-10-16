@@ -16,8 +16,8 @@ from autifyme_agents.core.exceptions import (
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
 from autifyme_agents.tools.storage_tools import (
-    create_save_product_tool,
     create_get_company_profile_tool,
+    create_save_product_tool,
 )
 
 

@@ -6,10 +6,11 @@ Usage:
     uv run python database/apply_migration.py database/migrations/001_workflow_outcomes.sql
 """
 
+import os
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
-import os
 
 # Load environment variables
 project_root = Path(__file__).parent.parent

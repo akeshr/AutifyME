@@ -9,7 +9,7 @@ Context Engineering strategy.
 
 from __future__ import annotations
 
-from langchain.tools import tool, ToolException
+from langchain.tools import ToolException, tool
 
 from autifyme_agents.core.middleware import create_company_context_middleware
 from autifyme_agents.core.ports import StorageInterface
@@ -24,7 +24,9 @@ def create_image_analysis_tool(storage: StorageInterface):
     if storage is None:
         raise ValueError("storage adapter must be provided and implement StorageInterface")
 
-    from autifyme_agents.specialists.image_analysis_specialist import image_analysis_specialist_invoke
+    from autifyme_agents.specialists.image_analysis_specialist import (
+        image_analysis_specialist_invoke,
+    )
 
     middleware = create_company_context_middleware(storage)
 

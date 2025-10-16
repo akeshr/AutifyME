@@ -47,12 +47,13 @@ Captured Scenario Format:
     }
 """
 
-import sys
 import json
 import shutil
+import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
-from datetime import datetime
+
 from dotenv import load_dotenv
 
 
@@ -255,7 +256,7 @@ class ScenarioCapture:
 
         for scenario_file in sorted(self.scenarios_dir.glob("scenario_*.json")):
             try:
-                with open(scenario_file, 'r', encoding='utf-8') as f:
+                with open(scenario_file, encoding='utf-8') as f:
                     scenario = json.load(f)
 
                     summary = {
@@ -285,7 +286,7 @@ class ScenarioCapture:
         if not scenario_path.exists():
             raise FileNotFoundError(f"Scenario not found: {scenario_id}")
 
-        with open(scenario_path, 'r', encoding='utf-8') as f:
+        with open(scenario_path, encoding='utf-8') as f:
             scenario = json.load(f)
 
         # Copy media files to output directory if specified
@@ -379,7 +380,7 @@ def main():
                 print(f"Error: File not found: {event_file}")
                 sys.exit(1)
 
-            with open(event_file, 'r', encoding='utf-8') as f:
+            with open(event_file, encoding='utf-8') as f:
                 webhook_payload = json.load(f)
 
             scenario_id = capture.capture_event(webhook_payload)

@@ -6,11 +6,12 @@ Usage:
     uv run python database/test_full_flow.py
 """
 
-import sys
-from pathlib import Path
-from dotenv import load_dotenv
 import os
+import sys
 import time
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Load environment
 project_root = Path(__file__).parent.parent
@@ -48,10 +49,9 @@ def verify_outcome_in_db(test_name: str, expected_sender: str = "local_test_user
         return None
 
     try:
-        with psycopg.connect(db_url, connect_timeout=5) as conn:
-            with conn.cursor() as cur:
-                # Get latest outcome for this sender
-                cur.execute("""
+        with psycopg.connect(db_url, connect_timeout=5) as conn, conn.cursor() as cur:
+            # Get latest outcome for this sender
+            cur.execute("""
                     SELECT
                         tracking_id,
                         message_text,
@@ -65,26 +65,26 @@ def verify_outcome_in_db(test_name: str, expected_sender: str = "local_test_user
                     LIMIT 1
                 """, (expected_sender,))
 
-                result = cur.fetchone()
-                if result:
-                    print("  [OK] Found outcome in database:")
-                    print(f"    Tracking ID: {result[0]}")
-                    print(f"    Message: {result[1][:50] if result[1] else 'None'}...")
-                    print(f"    Success: {result[2]}")
-                    print(f"    Error: {result[3] or 'None'}")
-                    print(f"    Duration: {result[4]:.2f}s" if result[4] else "    Duration: None")
-                    print(f"    Tracked At: {result[5]}")
-                    return {
-                        "tracking_id": result[0],
-                        "message": result[1],
-                        "success": result[2],
-                        "error": result[3],
-                        "duration": result[4],
-                        "created_at": result[5],
-                    }
-                else:
-                    print(f"  [FAIL] No outcome found for sender: {expected_sender}")
-                    return None
+            result = cur.fetchone()
+            if result:
+                print("  [OK] Found outcome in database:")
+                print(f"    Tracking ID: {result[0]}")
+                print(f"    Message: {result[1][:50] if result[1] else 'None'}...")
+                print(f"    Success: {result[2]}")
+                print(f"    Error: {result[3] or 'None'}")
+                print(f"    Duration: {result[4]:.2f}s" if result[4] else "    Duration: None")
+                print(f"    Tracked At: {result[5]}")
+                return {
+                    "tracking_id": result[0],
+                    "message": result[1],
+                    "success": result[2],
+                    "error": result[3],
+                    "duration": result[4],
+                    "created_at": result[5],
+                }
+            else:
+                print(f"  [FAIL] No outcome found for sender: {expected_sender}")
+                return None
 
     except Exception as e:
         print(f"  [ERROR] Database verification failed: {e}")
@@ -98,13 +98,12 @@ def get_workflow_count() -> int:
         db_url = os.getenv("DATABASE_URL")
         if not db_url:
             return -1
-        with psycopg.connect(db_url, connect_timeout=5) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT COUNT(*) FROM workflow_outcomes")
-                result = cur.fetchone()
-                if result:
-                    return result[0]
-                return -1
+        with psycopg.connect(db_url, connect_timeout=5) as conn, conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM workflow_outcomes")
+            result = cur.fetchone()
+            if result:
+                return result[0]
+            return -1
     except Exception:
         return -1
 
@@ -266,32 +265,31 @@ def main():
     try:
         import psycopg
         db_url = os.getenv("DATABASE_URL")
-        with psycopg.connect(db_url, connect_timeout=5) as conn:
-            with conn.cursor() as cur:
-                # Total count
-                cur.execute("SELECT COUNT(*) FROM workflow_outcomes")
-                total_count = cur.fetchone()[0]
-                print(f"\n  Total Workflows Tracked: {total_count}")
+        with psycopg.connect(db_url, connect_timeout=5) as conn, conn.cursor() as cur:
+            # Total count
+            cur.execute("SELECT COUNT(*) FROM workflow_outcomes")
+            total_count = cur.fetchone()[0]
+            print(f"\n  Total Workflows Tracked: {total_count}")
 
-                # Success vs failure
-                cur.execute("SELECT success, COUNT(*) FROM workflow_outcomes GROUP BY success")
-                success_breakdown = dict(cur.fetchall())
-                print(f"  Successful: {success_breakdown.get(True, 0)}")
-                print(f"  Failed: {success_breakdown.get(False, 0)}")
+            # Success vs failure
+            cur.execute("SELECT success, COUNT(*) FROM workflow_outcomes GROUP BY success")
+            success_breakdown = dict(cur.fetchall())
+            print(f"  Successful: {success_breakdown.get(True, 0)}")
+            print(f"  Failed: {success_breakdown.get(False, 0)}")
 
-                # Recent workflows
-                cur.execute("""
+            # Recent workflows
+            cur.execute("""
                     SELECT message_text, success, duration_seconds, created_at
                     FROM workflow_outcomes
                     ORDER BY created_at DESC
                     LIMIT 5
                 """)
-                print("\n  Latest 5 Workflows:")
-                for i, row in enumerate(cur.fetchall(), 1):
-                    msg = row[0][:40] if row[0] else "No message"
-                    success = "✓" if row[1] else "✗"
-                    duration = f"{row[2]:.1f}s" if row[2] else "N/A"
-                    print(f"    {i}. [{success}] {msg}... ({duration})")
+            print("\n  Latest 5 Workflows:")
+            for i, row in enumerate(cur.fetchall(), 1):
+                msg = row[0][:40] if row[0] else "No message"
+                success = "✓" if row[1] else "✗"
+                duration = f"{row[2]:.1f}s" if row[2] else "N/A"
+                print(f"    {i}. [{success}] {msg}... ({duration})")
 
     except Exception as e:
         print(f"\n  ERROR: Database verification failed: {e}")
