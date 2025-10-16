@@ -2,9 +2,8 @@
 
 from autifyme_agents.core.middleware.approval_context import ApprovalContextMiddleware
 
-# Import from the legacy middleware.py file for backwards compatibility
-# The old middleware.py is at agents/src/autifyme_agents/core/middleware.py (sibling to this package)
-from autifyme_agents.core.middleware import (
+# Import from legacy middleware file for backwards compatibility
+from autifyme_agents.core.legacy_middleware import (
     CompanyContextMiddleware,
     create_company_context_middleware,
 )
