@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from deepagents.state import DeepAgentState  # type: ignore[import-untyped]
 from langchain.messages import AIMessage, HumanMessage, SystemMessage
@@ -10,8 +10,8 @@ from typing_extensions import TypedDict
 
 from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
 
-# Use Union instead of BaseMessage to avoid langchain_core where possible
-MessageType = Union[HumanMessage, SystemMessage, AIMessage]
+# Use | instead of Union for type annotations (Python 3.10+)
+MessageType = HumanMessage | SystemMessage | AIMessage
 
 
 class DepartmentResults(TypedDict, total=False):  # type: ignore[call-arg]

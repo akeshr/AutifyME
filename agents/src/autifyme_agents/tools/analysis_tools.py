@@ -89,19 +89,19 @@ def create_analyze_product_image_tool(storage: StorageInterface) -> BaseTool:
                     status_code=getattr(e, "status_code", None),
                     is_retryable=True,
                     original_error=e,
-                )
+                ) from e
 
             if any(term in error_str for term in ["404", "not found", "access denied", "forbidden"]):
                 raise ValidationError(
                     f"Cannot access image at URL: {image_url}. Error: {str(e)}",
                     field="image_url",
                     value=image_url,
-                )
+                ) from e
 
             raise ImageAnalysisError(
                 message=f"Failed to analyze image: {str(e)}",
                 image_url=image_url,
                 original_error=e,
-            )
+            ) from e
 
     return analyze_product_image

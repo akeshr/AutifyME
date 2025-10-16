@@ -26,7 +26,7 @@ def send_whatsapp_message(recipient: str, message: str, *, client: WhatsAppClien
             tool_name="send_whatsapp_message",
             api_name="WhatsApp Business Cloud",
             original_error=exc,
-        )
+        ) from exc
 
 
 def create_send_whatsapp_message_tool():
