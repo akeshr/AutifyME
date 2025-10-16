@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
-from ..schemas.models import Product, CompanyProfile
+from ..schemas.models import CompanyProfile, Product
 
 # Note for Abhi (from our discussion):
 # This is the equivalent of a Java or TypeScript `interface`. It defines a
@@ -52,10 +52,10 @@ class StorageInterface(ABC):
         checkpoint_id: str,
         tool_call: dict[str, Any],
         draft_summary: str,
-        ai_message: Optional[dict[str, Any]] = None,
-        image_path: Optional[str] = None,
+        ai_message: dict[str, Any] | None = None,
+        image_path: str | None = None,
         agent_source: str = "cataloging_department",
-        checkpoint_ns: Optional[str] = None,
+        checkpoint_ns: str | None = None,
     ) -> str:
         """
         Persists a pending HITL approval to survive server restarts.
@@ -77,7 +77,7 @@ class StorageInterface(ABC):
         pass
 
     @abstractmethod
-    def get_pending_approval(self, thread_id: str) -> Optional[dict[str, Any]]:
+    def get_pending_approval(self, thread_id: str) -> dict[str, Any] | None:
         """
         Retrieves a pending approval by thread ID.
 
@@ -172,10 +172,10 @@ class StorageInterface(ABC):
     def get_workflow_outcomes(
         self,
         *,
-        time_window: Optional[timedelta] = None,
-        intent: Optional[str] = None,
-        department: Optional[str] = None,
-        success: Optional[bool] = None,
+        time_window: timedelta | None = None,
+        intent: str | None = None,
+        department: str | None = None,
+        success: bool | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """
@@ -214,7 +214,7 @@ class StorageInterface(ABC):
     @abstractmethod
     def get_success_rates(
         self,
-        time_window: Optional[timedelta] = None,
+        time_window: timedelta | None = None,
     ) -> list[dict[str, Any]]:
         """
         Get success rate analytics by department and intent.
@@ -234,7 +234,7 @@ class StorageInterface(ABC):
     @abstractmethod
     def get_edge_cases(
         self,
-        time_window: Optional[timedelta] = None,
+        time_window: timedelta | None = None,
         max_occurrence_count: int = 3,
         limit: int = 20,
     ) -> list[dict[str, Any]]:

@@ -7,27 +7,27 @@ Following LangChain v1 patterns:
 - Errors are caught by ToolNode's handle_tool_errors mechanism
 """
 
-from typing import List, Optional
 import logging
+from typing import Any
 
 from langchain.tools import tool
 from pydantic import BaseModel, Field
 from tenacity import (
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
 )
 
-from autifyme_agents.schemas.models import Product, CompanyProfile, CatalogingResult
-from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.exceptions import (
-    StorageError,
     ConfigurationError,
     DataNotFoundError,
     ExternalAPIError,
+    StorageError,
 )
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile, Product
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +37,12 @@ class SaveProductArgs(BaseModel):
     name: str = Field(..., description="The name of the product.")
     description: str = Field(..., description="A detailed description of the product.")
     price: float = Field(..., description="The price of the product.")
-    sizes: Optional[List[str]] = Field(None, description="A list of available sizes for the product.")
-    colors: Optional[List[str]] = Field(None, description="A list of available colors for the product.")
-    image_urls: Optional[List[str]] = Field(None, description="A list of URLs for the product images.")
+    sizes: list[str] | None = Field(None, description="A list of available sizes for the product.")
+    colors: list[str] | None = Field(None, description="A list of available colors for the product.")
+    image_urls: list[str] | None = Field(None, description="A list of URLs for the product images.")
 
 
-def _save_product(storage: StorageInterface, **kwargs) -> Product:
+def _save_product(storage: StorageInterface, **kwargs: Any) -> Product:
     if storage is None:
         raise ConfigurationError(
             "Storage client not provided via config.",
@@ -60,13 +60,13 @@ def _save_product(storage: StorageInterface, **kwargs) -> Product:
                 api_name="Supabase",
                 is_retryable=True,
                 original_error=e,
-            )
+            ) from e
 
         raise StorageError(
             message=f"Failed to save product: {str(e)}",
             operation="save_product",
             original_error=e,
-        )
+        ) from e
 
 
 def _get_company_profile(storage: StorageInterface) -> CompanyProfile:
@@ -94,16 +94,16 @@ def _get_company_profile(storage: StorageInterface) -> CompanyProfile:
                 api_name="Supabase",
                 is_retryable=True,
                 original_error=e,
-            )
+            ) from e
 
         raise StorageError(
             message=f"Failed to retrieve company profile: {str(e)}",
             operation="get_company_profile",
             original_error=e,
-        )
+        ) from e
 
 
-def create_save_product_tool(storage: StorageInterface):
+def create_save_product_tool(storage: StorageInterface) -> object:
     """Create a tool that saves products to the catalog database.
 
     Factory function that creates a LangChain tool with retry logic and proper error handling.
@@ -123,7 +123,7 @@ def create_save_product_tool(storage: StorageInterface):
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
-    def save_product(**kwargs) -> CatalogingResult:
+    def save_product(**kwargs: Any) -> CatalogingResult:
         """Persist a product to the catalog database."""
         product = _save_product(storage, **kwargs)
         return CatalogingResult(
@@ -138,7 +138,7 @@ def create_save_product_tool(storage: StorageInterface):
     return save_product
 
 
-def create_get_company_profile_tool(storage: StorageInterface):
+def create_get_company_profile_tool(storage: StorageInterface) -> object:
     """Create a tool that retrieves the company profile from storage.
 
     Factory function that creates a LangChain tool with retry logic and proper error handling.

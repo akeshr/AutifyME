@@ -4,7 +4,6 @@ from langgraph.checkpoint.postgres import PostgresSaver
 
 from autifyme_agents.core.config import settings
 
-
 _checkpointer_instance = None
 _checkpointer_cm = None
 

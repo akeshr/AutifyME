@@ -4,10 +4,11 @@ Usage:
     uv run python database/verify_phase1.py
 """
 
+import os
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
-import os
 
 # Load environment
 project_root = Path(__file__).parent.parent

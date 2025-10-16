@@ -9,14 +9,16 @@ This is NOT a unit test - it tests the entire stack.
 import sys
 import time
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()  # noqa: E402
 
-from autifyme_agents.core.ports import StorageInterface
 from langgraph.checkpoint.memory import MemorySaver
-from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
+
+from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 
 
 class TestChannel(MessagingChannel):

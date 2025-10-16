@@ -1,34 +1,34 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, Optional, Sequence, Union
-from typing_extensions import TypedDict
+from collections.abc import Sequence
+from typing import Annotated, Literal
 
-from langchain.messages import HumanMessage, SystemMessage, AIMessage
+from deepagents.state import DeepAgentState
+from langchain.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.graph.message import add_messages
-
-from deepagents.state import DeepAgentState  # type: ignore[import-untyped]
+from typing_extensions import TypedDict
 
 from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
 
-# Use Union instead of BaseMessage to avoid langchain_core where possible
-MessageType = Union[HumanMessage, SystemMessage, AIMessage]
+# Use | instead of Union for type annotations (Python 3.10+)
+MessageType = HumanMessage | SystemMessage | AIMessage
 
 
-class DepartmentResults(TypedDict, total=False):  # type: ignore[call-arg]
+class DepartmentResults(TypedDict, total=False):
     cataloging: CatalogingResult
 
 
-class ProjectMetadata(TypedDict, total=False):  # type: ignore[call-arg]
+class ProjectMetadata(TypedDict, total=False):
     workflow_id: str
     workflow_type: str
 
 
-class InterruptInfo(TypedDict, total=False):  # type: ignore[call-arg]
+class InterruptInfo(TypedDict, total=False):
     """Information about a pending HITL interrupt."""
 
     interrupt_id: str
     tool_name: str
-    tool_args: dict
+    tool_args: dict[str, object]
     description: str
 
 
@@ -37,10 +37,10 @@ class ProjectManagerState(DeepAgentState):  # type: ignore[misc]
 
     messages: Annotated[Sequence[MessageType], add_messages]
     company_profile: CompanyProfile
-    plan: list[dict]
+    plan: list[dict[str, object]]
     current_step: int
     department_results: DepartmentResults
     status: Literal["idle", "planning", "awaiting_approval", "completed", "blocked"]
-    last_error: Optional[str]
+    last_error: str | None
     metadata: ProjectMetadata
     pending_interrupts: list[InterruptInfo]  # HITL interrupt context for PM

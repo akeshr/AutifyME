@@ -7,27 +7,27 @@ Following LangChain v1 patterns:
 - Errors are caught by agent for self-correction
 """
 
-from langchain.tools import BaseTool
 import logging
+from typing import Any
 
-from langchain.tools import tool
+from langchain.tools import BaseTool, tool
 from tenacity import (
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
 )
 
-from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
-from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
-from autifyme_agents.core.middleware import create_company_context_middleware
-from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.exceptions import (
-    ImageAnalysisError,
     ExternalAPIError,
+    ImageAnalysisError,
     ValidationError,
 )
+from autifyme_agents.core.middleware import create_company_context_middleware
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
+from autifyme_agents.specialists.image_analysis_specialist import create_image_analysis_specialist
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def create_analyze_product_image_tool(storage: StorageInterface) -> BaseTool:
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
-    def analyze_product_image(image_url: str, **kwargs) -> ImageAnalysisResult:
+    def analyze_product_image(image_url: str, **kwargs: Any) -> ImageAnalysisResult:
         """Analyze a product image and return structured visual insights."""
         company_profile = kwargs.get("company_profile")
 
@@ -65,7 +65,7 @@ def create_analyze_product_image_tool(storage: StorageInterface) -> BaseTool:
             specialist = create_image_analysis_specialist()
 
             invoke_config = kwargs.get("config", {})
-            result = specialist.invoke(
+            result: ImageAnalysisResult = specialist.invoke(
                 {
                     "input": {
                         "image_url": image_url,
@@ -90,19 +90,19 @@ def create_analyze_product_image_tool(storage: StorageInterface) -> BaseTool:
                     status_code=getattr(e, "status_code", None),
                     is_retryable=True,
                     original_error=e,
-                )
+                ) from e
 
             if any(term in error_str for term in ["404", "not found", "access denied", "forbidden"]):
                 raise ValidationError(
                     f"Cannot access image at URL: {image_url}. Error: {str(e)}",
                     field="image_url",
                     value=image_url,
-                )
+                ) from e
 
             raise ImageAnalysisError(
                 message=f"Failed to analyze image: {str(e)}",
                 image_url=image_url,
                 original_error=e,
-            )
+            ) from e
 
     return analyze_product_image

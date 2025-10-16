@@ -7,7 +7,6 @@ from langchain.tools import tool
 from autifyme_agents.core.exceptions import ExternalAPIError
 from autifyme_agents.integrations.communication.whatsapp_client import WhatsAppClient
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -27,8 +26,8 @@ def send_whatsapp_message(recipient: str, message: str, *, client: WhatsAppClien
             tool_name="send_whatsapp_message",
             api_name="WhatsApp Business Cloud",
             original_error=exc,
-        )
+        ) from exc
 
 
-def create_send_whatsapp_message_tool():
+def create_send_whatsapp_message_tool() -> object:
     return send_whatsapp_message

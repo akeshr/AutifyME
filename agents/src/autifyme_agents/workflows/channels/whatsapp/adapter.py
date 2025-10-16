@@ -13,8 +13,8 @@ from typing import Any, Literal
 
 from autifyme_agents.core.logging_config import get_logger
 from autifyme_agents.integrations.communication import WhatsAppClient, WhatsAppMediaClient
+from autifyme_agents.schemas.models import CatalogingResult, Product
 from autifyme_agents.workflows.channels.protocol import ChannelError
-from autifyme_agents.schemas.models import Product, CatalogingResult
 
 logger = get_logger(__name__)
 
@@ -182,10 +182,7 @@ class WhatsAppChannel:
         Raises:
             ChannelError: If message sending fails (critical)
         """
-        if message:
-            error_message = message
-        else:
-            error_message = self._get_default_error_message(error_type)
+        error_message = message or self._get_default_error_message(error_type)
 
         logger.warning(
             "Sending WhatsApp error message",
@@ -239,15 +236,18 @@ class WhatsAppChannel:
     def format_thread_id(self, sender: str) -> str:
         """Generate WhatsApp-specific thread ID for checkpointing.
 
-        WhatsApp uses "whatsapp:" prefix to distinguish from other channels.
+        Includes phone_number_id to prevent collision between test and production environments
+        using the same user phone number.
 
         Args:
             sender: WhatsApp phone number
 
         Returns:
-            Thread ID for LangGraph checkpointer (e.g., "whatsapp:919876543210")
+            Thread ID for LangGraph checkpointer (e.g., "whatsapp:123456789:919876543210")
+            Format: "whatsapp:{phone_number_id}:{sender}"
         """
-        return f"whatsapp:{sender}"
+        phone_number_id = self.client.phone_number_id
+        return f"whatsapp:{phone_number_id}:{sender}"
 
     def _format_approval_message(self, draft: Product) -> str:
         """Format product draft as WhatsApp approval request.

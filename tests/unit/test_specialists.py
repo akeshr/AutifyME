@@ -4,11 +4,12 @@ Tests the cataloging and image analysis specialists, including their
 structured output generation and error handling.
 """
 
-import pytest
 from unittest.mock import Mock, patch
 
-from autifyme_agents.schemas.models import Product
+import pytest
+
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
+from autifyme_agents.schemas.models import Product
 from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
 from autifyme_agents.specialists.image_analysis_specialist import (
     create_image_analysis_specialist,

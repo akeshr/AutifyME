@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 from langchain.agents.middleware import AgentMiddleware
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.models import CompanyProfile
-
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def create_company_context_middleware(storage: StorageInterface) -> Callable[[Ca
     if storage is None:
         raise ValueError("storage adapter is required for company context middleware")
 
-    cached_profile: Optional[CompanyProfile] = None
+    cached_profile: CompanyProfile | None = None
 
     def _get_profile() -> CompanyProfile:
         nonlocal cached_profile
@@ -84,9 +84,9 @@ class CompanyContextMiddleware(AgentMiddleware):
         if storage is None:
             raise ValueError("storage adapter is required for company context middleware")
         self.storage = storage
-        self._profile_cache: Optional[CompanyProfile] = None
+        self._profile_cache: CompanyProfile | None = None
 
-    def before_model(self, state, runtime):
+    def before_model(self, state: Any, runtime: Any) -> None:
         """Fetch and inject company profile before LLM call."""
         if self._profile_cache is None:
             self._profile_cache = self.storage.get_company_profile()

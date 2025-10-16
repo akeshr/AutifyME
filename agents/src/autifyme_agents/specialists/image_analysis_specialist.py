@@ -108,8 +108,8 @@ def image_analysis_specialist_invoke(
     image_url: str | None = None,
     image_bytes: bytes | None = None,
     mime_type: str | None = None,
-    company_profile: "CompanyProfile | dict | None" = None,
-    config: dict | None = None,
+    company_profile: CompanyProfile | dict[str, Any] | None = None,
+    config: dict[str, Any] | None = None,
 ) -> ImageAnalysisResult:
     """Invoke image analysis specialist with serverless-safe interface.
 
@@ -175,12 +175,13 @@ Extract all visual product attributes including colors, materials, sizes, style,
     # Invoke agent
     result = agent.invoke({"messages": messages}, config=config or {})
 
-    return result["structured_response"]  # ImageAnalysisResult model
+    structured_response: ImageAnalysisResult = result["structured_response"]
+    return structured_response
 
 
 def create_image_analysis_specialist_graph(
-    company_profile: CompanyProfile | dict | None = None,
-) -> RunnableLambda:
+    company_profile: CompanyProfile | dict[str, Any] | None = None,
+) -> RunnableLambda[dict[str, Any], dict[str, Any]]:
     """Create image analysis specialist as CustomSubAgent graph.
 
     This creates a Runnable graph that bridges the gap between:
@@ -208,7 +209,7 @@ def create_image_analysis_specialist_graph(
         ... }]
     """
 
-    def analyze_image_from_state(state: dict) -> dict:
+    def analyze_image_from_state(state: dict[str, Any]) -> dict[str, Any]:
         """Process image analysis from department delegation state.
 
         Extracts file path from delegation message, reads bytes from real OS filesystem,

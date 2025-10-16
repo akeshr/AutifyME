@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 
 from autifyme_agents.core.config import settings
+
 # Use /tmp for media downloads on serverless platforms
 MEDIA_DIR = Path("/tmp/media_downloads")
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
@@ -50,7 +51,7 @@ class WhatsAppMediaClient:
             )
             raise
         data: dict[str, Any] = response.json()
-        media_url = data["url"]
+        media_url: str = data["url"]
         logger.info(
             "Resolved media",
             extra={"media_id": media_id, "media_url": media_url, "mime_type": data.get("mime_type")},

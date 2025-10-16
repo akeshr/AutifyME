@@ -12,8 +12,8 @@ Tests complete workflows with runner_v2:
 Run: uv run python test_generic_hitl_comprehensive.py
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Fix Windows console encoding
@@ -25,6 +25,7 @@ if os.name == 'nt':
 sys.path.insert(0, str(Path(__file__).parent / "agents" / "src"))
 
 from dotenv import load_dotenv
+
 load_dotenv()  # noqa: E402
 
 print("=" * 80)
@@ -32,8 +33,9 @@ print("GENERIC HITL COMPREHENSIVE END-TO-END TESTING")
 print("=" * 80)
 print()
 
-from tests.cli.simulate import run_scenario
 from pathlib import Path
+
+from tests.cli.simulate import run_scenario
 
 # Test scenarios with different HITL responses
 test_cases = [

@@ -7,15 +7,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from autifyme_agents.core.config import settings
-from autifyme_agents.core.logging_config import setup_logging, get_logger
+from autifyme_agents.core.logging_config import get_logger, setup_logging
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.storage_factory import get_storage
-from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
+from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 
 # Initialize logging for serverless environment
 try:
@@ -34,13 +34,13 @@ logger.info("AutifyME WhatsApp webhook serverless function loaded")
 
 
 @app.get("/")
-def read_root():
+def read_root() -> dict[str, str]:
     """Root endpoint to confirm the service is running."""
     return {"status": "ok", "service": "AutifyME WhatsApp Webhook"}
 
 
 @app.get("/favicon.ico", include_in_schema=False)
-async def favicon():
+async def favicon() -> RedirectResponse:
     """Redirects to the static vercel.svg in the public directory."""
     return RedirectResponse("/vercel.svg", status_code=307)
 
@@ -50,7 +50,7 @@ _runner = None
 _storage: StorageInterface | None = None
 _whatsapp_channel = None
 
-def _get_runner():
+def _get_runner() -> WorkflowRunner:
     """Lazy initialization of WorkflowRunner for serverless deployment."""
     global _runner, _storage, _whatsapp_channel
 
@@ -131,12 +131,12 @@ async def receive(request: Request) -> Any:
         for entry in body.get("entry", []):
             for change in entry.get("changes", []):
                 value = change.get("value", {})
-                
+
                 # WhatsApp sends different event types:
                 # - "messages": incoming messages from users (PROCESS THESE)
                 # - "statuses": delivery/read receipts for outbound messages (IGNORE)
                 # - Other metadata events (IGNORE)
-                
+
                 # Only process if this is a message event (not status update)
                 messages = value.get("messages")
                 if not messages:
@@ -154,13 +154,30 @@ async def receive(request: Request) -> Any:
                         )
                     continue
 
+                # Extract sender profile information for personalization
+                # WhatsApp sends contacts array with profile name
+                contacts = value.get("contacts", [])
+                sender_name = None
+                if contacts and len(contacts) > 0:
+                    profile = contacts[0].get("profile", {})
+                    sender_name = profile.get("name")
+                    logger.debug(
+                        "Extracted sender profile name",
+                        extra={"sender_name": sender_name, "event_path": str(event_path)}
+                    )
+                else:
+                    logger.warning(
+                        "No contacts array in WhatsApp payload - personalization unavailable",
+                        extra={"value_keys": list(value.keys()), "event_path": str(event_path)}
+                    )
+
                 # Process each message (usually just one, but iterate for safety)
                 for message in messages:
                     message_id = message.get("id")
                     sender = message.get("from")
                     msg_type = message.get("type")
                     timestamp = message.get("timestamp")
-                    
+
                     # Skip if essential fields are missing
                     if not message_id or not sender:
                         logger.warning(
@@ -169,11 +186,15 @@ async def receive(request: Request) -> Any:
                         )
                         continue
 
+                    # Initialize runner (and channel) before using it for thread_id
+                    # This ensures _whatsapp_channel is available for format_thread_id()
+                    runner: WorkflowRunner = _get_runner()
+
                     # Check for duplicate processing using message_id (DB-backed idempotency)
                     # WhatsApp can retry webhooks, and we need to ensure we don't
                     # process the same message multiple times. Uses database to survive restarts.
                     # Storage adapter handles atomic check-and-mark via port (no concrete adapter leakage)
-                    thread_id = _whatsapp_channel.format_thread_id(sender) if _whatsapp_channel else f"whatsapp:{sender}"
+                    thread_id = runner.channel.format_thread_id(sender)
                     if _storage and _storage.check_and_mark_message_processed(
                         message_id=message_id,
                         sender_id=sender,
@@ -220,6 +241,7 @@ async def receive(request: Request) -> Any:
                         extra={
                             "message_id": message_id,
                             "sender": sender,
+                            "sender_name": sender_name,
                             "message_type": msg_type,
                             "has_media": media_id is not None,
                             "has_text": text is not None,
@@ -233,7 +255,7 @@ async def receive(request: Request) -> Any:
                     # runner_v2 auto-detects pending interrupts via pm.get_state() and invokes approval_analyzer
                     # No special routing needed - the runner knows the context automatically
                     try:
-                        _get_runner().handle_message(sender, text, media_id)
+                        runner.handle_message(sender, text, media_id, sender_name=sender_name)
                     except GeneratorExit:
                         # GeneratorExit occurs when workflow streaming times out
                         # Message already marked as processed above for idempotency

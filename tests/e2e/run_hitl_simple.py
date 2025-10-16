@@ -4,8 +4,8 @@
 This test bypasses the message intent specialist to test HITL flow directly.
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Fix Windows console encoding
@@ -17,6 +17,7 @@ if os.name == 'nt':
 sys.path.insert(0, str(Path(__file__).parent / "agents" / "src"))
 
 from dotenv import load_dotenv
+
 load_dotenv()  # noqa: E402
 
 print("=" * 80)
@@ -25,10 +26,11 @@ print("=" * 80)
 print()
 
 # Direct cataloging department invocation
-from autifyme_agents.departments.cataloging_department import create_cataloging_department
-from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
-from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from langgraph.types import Command
+
+from autifyme_agents.departments.cataloging_department import create_cataloging_department
+from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
+from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
 
 storage = SupabaseStorageClient()
 checkpointer = get_checkpointer()
@@ -37,8 +39,9 @@ checkpointer = get_checkpointer()
 dept = create_cataloging_department(checkpointer=checkpointer, storage=storage)
 
 # Test message - simple cataloging request
-from langchain.messages import HumanMessage
 import uuid
+
+from langchain.messages import HumanMessage
 
 thread_id = f"test_{uuid.uuid4().hex[:8]}"
 config = {

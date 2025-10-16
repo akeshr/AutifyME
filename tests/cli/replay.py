@@ -30,19 +30,20 @@ Usage:
     uv run python -m autifyme_agents.cli.replay --all --validate-db --report regression_report.json
 """
 
-import sys
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Any
+
 from dotenv import load_dotenv
 
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.integrations.storage.storage_factory import get_storage
-from autifyme_agents.schemas.models import Product, CatalogingResult
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
+from autifyme_agents.integrations.storage.storage_factory import get_storage
+from autifyme_agents.schemas.models import CatalogingResult, Product
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 
 
 def safe_print(text: str) -> None:
@@ -182,7 +183,7 @@ class ScenarioReplay:
         if not scenario_path.exists():
             raise FileNotFoundError(f"Scenario not found: {scenario_id}")
 
-        with open(scenario_path, 'r', encoding='utf-8') as f:
+        with open(scenario_path, encoding='utf-8') as f:
             return json.load(f)
 
     def replay_scenario(self, scenario_id: str, hitl_mode: str = "auto_approve") -> dict[str, Any]:

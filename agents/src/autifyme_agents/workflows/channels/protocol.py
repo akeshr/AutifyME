@@ -9,9 +9,9 @@ Design Pattern: Strategy Pattern + Protocol (structural subtyping)
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol, Literal, Any
+from typing import Any, Literal, Protocol
 
-from autifyme_agents.schemas.models import Product, CatalogingResult
+from autifyme_agents.schemas.models import CatalogingResult, Product
 
 
 class MessagingChannel(Protocol):

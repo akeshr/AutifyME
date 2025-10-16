@@ -7,7 +7,7 @@ messaging platforms without hardcoding platform logic in the Runner.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from langchain.tools import tool
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def create_platform_media_tools(channel: MessagingChannel) -> list:
+def create_platform_media_tools(channel: MessagingChannel) -> list[Any]:
     """Create platform-specific media download tools.
 
     Args:

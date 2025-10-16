@@ -8,17 +8,16 @@ import base64
 from unittest.mock import Mock, patch
 
 import pytest
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
+from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
+from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.specialists.image_analysis_specialist import (
     _encode_bytes_to_data_uri,
     _encode_image_to_data_uri,
-    image_analysis_specialist_invoke,
     create_image_analysis_specialist_graph,
+    image_analysis_specialist_invoke,
 )
-from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
-from autifyme_agents.schemas.models import CompanyProfile
-
 
 # Create minimal test images (1x1 pixel)
 JPEG_1X1 = bytes.fromhex(

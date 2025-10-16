@@ -12,12 +12,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import MemorySaver
 
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.schemas.models import CompanyProfile, Product
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
+from autifyme_agents.schemas.models import CompanyProfile, Product
 
 
 @pytest.fixture

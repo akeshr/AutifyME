@@ -57,18 +57,18 @@ from threading import Lock
 from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.errors import GraphRecursionError, GraphInterrupt
+from langgraph.errors import GraphInterrupt, GraphRecursionError
 from langgraph.types import Command
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-from autifyme_agents.schemas.models import CompanyProfile, CatalogingResult
-from autifyme_agents.workflows.channels.protocol import MessagingChannel
-from autifyme_agents.workflows.project_manager import create_project_manager
-from autifyme_agents.workflows.outcome_tracker import OutcomeTracker, IncomingMessage
-from autifyme_agents.workflows.approval_analyzer import analyze_approval
 from autifyme_agents.schemas.approval import BatchApprovalResponse
+from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
+from autifyme_agents.workflows.approval_analyzer import analyze_approval
+from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.workflows.outcome_tracker import IncomingMessage, OutcomeTracker
+from autifyme_agents.workflows.project_manager import create_project_manager
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ class WorkflowRunner:
         *,
         channel: MessagingChannel,
         storage: StorageInterface,
-        checkpointer: BaseCheckpointSaver | None = None,
+        checkpointer: BaseCheckpointSaver[Any] | None = None,
         recursion_limit: int | None = None,
     ):
         """Initialize workflow runner.
@@ -176,6 +176,7 @@ class WorkflowRunner:
         sender: str,
         text: str | None,
         media_id: str | None,
+        sender_name: str | None = None,
     ) -> None:
         """Process incoming message by forwarding to PM.
 
@@ -183,11 +184,13 @@ class WorkflowRunner:
             sender: Channel-specific sender ID (e.g., phone number)
             text: Message text (optional)
             media_id: Media attachment ID (optional, channel-specific)
+            sender_name: User's display name for personalization (optional)
         """
         logger.info(
             "Handling incoming message",
             extra={
                 "sender": sender,
+                "sender_name": sender_name,
                 "has_text": text is not None,
                 "has_media": media_id is not None,
             },
@@ -198,7 +201,7 @@ class WorkflowRunner:
         lock = self._get_lock(sender)
 
         with lock:
-            self._execute_workflow(thread_id, sender, text, media_id)
+            self._execute_workflow(thread_id, sender, text, media_id, sender_name)
 
     def _execute_workflow(
         self,
@@ -206,6 +209,7 @@ class WorkflowRunner:
         sender: str,
         text: str | None,
         media_id: str | None,
+        sender_name: str | None = None,
     ) -> None:
         """Execute workflow: forward message to PM, handle any interrupts.
 
@@ -216,6 +220,7 @@ class WorkflowRunner:
             sender: Channel-specific sender ID
             text: Message text (optional)
             media_id: Media attachment ID (optional)
+            sender_name: User's display name for personalization (optional)
         """
         logger.debug(
             "Executing workflow",
@@ -226,16 +231,18 @@ class WorkflowRunner:
 
         incoming_message = IncomingMessage(
             sender_id=sender,
+            sender_name=sender_name,
             text=text,
             media_id=media_id,
             platform=self.channel.__class__.__name__.replace("Channel", "").lower(),
         )
         tracking_id = self.outcome_tracker.track_workflow_start(thread_id, incoming_message)
 
-        # Build raw payload for PM
+        # Build raw payload for PM with sender name for personalization
         raw_payload = {
             "platform": incoming_message.platform,
             "sender": sender,
+            "sender_name": sender_name,  # For personalized greetings/responses
             "text": text,
             "media_id": media_id,
             "timestamp": incoming_message.received_at.isoformat(),
@@ -328,7 +335,7 @@ class WorkflowRunner:
         """
         logger.debug("Invoking Project Manager", extra={"thread_id": thread_id})
 
-        pm = self._create_project_manager()
+        pm: Any = self._create_project_manager()
         config = self._build_config(thread_id)
 
         # Check for pending HITL interrupts
@@ -618,8 +625,8 @@ class WorkflowRunner:
     def _build_command_from_approval(
         self,
         approval_response: BatchApprovalResponse,
-        pending_interrupts: list[dict],
-    ) -> Command:
+        pending_interrupts: list[dict[str, Any]],
+    ) -> Command[Any]:
         """Build LangGraph Command from structured approval response.
 
         Takes the Pydantic BatchApprovalResponse from approval analyzer and
@@ -735,9 +742,7 @@ class WorkflowRunner:
                         "Converted single interrupt to Product object",
                         extra={"thread_id": thread_id, "product_name": draft.name}
                     )
-                else:
-                    draft = clean_value
-                self.channel.send_approval_request(sender, draft)
+                    self.channel.send_approval_request(sender, draft)
 
             logger.info(
                 "Interrupt(s) forwarded to user - awaiting response",
@@ -785,13 +790,13 @@ class WorkflowRunner:
             self._thread_locks[sender] = Lock()
             return self._thread_locks[sender]
 
-    def _get_checkpointer(self) -> BaseCheckpointSaver:
+    def _get_checkpointer(self) -> BaseCheckpointSaver[Any]:
         """Get checkpointer instance."""
         if self._checkpointer:
             return self._checkpointer
         return get_checkpointer()
 
-    def _create_project_manager(self):
+    def _create_project_manager(self) -> Any:
         """Create PM instance with company context and channel."""
         return create_project_manager(
             company_profile=self.company_profile,
@@ -821,7 +826,7 @@ class WorkflowRunner:
             },
         }
 
-    def _extract_cataloging_result(self, messages: list) -> CatalogingResult | None:
+    def _extract_cataloging_result(self, messages: list[Any]) -> CatalogingResult | None:
         """Extract CatalogingResult from messages.
 
         Args:
@@ -853,7 +858,7 @@ class WorkflowRunner:
 
         return None
 
-    def _extract_ai_summary(self, messages: list) -> str | None:
+    def _extract_ai_summary(self, messages: list[Any]) -> str | None:
         """Extract AI summary from messages.
 
         Args:

@@ -33,7 +33,6 @@ from pydantic import BaseModel, Field
 
 from autifyme_agents.core.ports import StorageInterface
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -423,7 +422,7 @@ if __name__ == "__main__":
         """
         scenarios_dict = {}
 
-        for i, pattern in enumerate(patterns):
+        for _i, pattern in enumerate(patterns):
             scenario_id = f"synthesized_{pattern.pattern_id[:8]}"
             scenarios_dict[scenario_id] = {
                 "name": (
@@ -437,11 +436,11 @@ if __name__ == "__main__":
             }
 
         # Format as Python code
-        code = '''"""Auto-generated test scenarios from production usage patterns.
+        code = f'''"""Auto-generated test scenarios from production usage patterns.
 
-Generated: {timestamp}
+Generated: {datetime.now().isoformat()}
 Source: Production logs analysis
-Pattern Count: {count}
+Pattern Count: {len(patterns)}
 
 These scenarios represent real user behavior patterns extracted from
 production logs. They are automatically synthesized to keep test coverage
@@ -452,18 +451,14 @@ from datetime import datetime
 
 
 SYNTHESIZED_SCENARIOS = {{
-{scenarios}
+{self._format_scenarios_dict(scenarios_dict)}
 }}
 
 
 def get_synthesized_scenarios():
     """Get synthesized scenarios dictionary."""
     return SYNTHESIZED_SCENARIOS
-'''.format(
-            timestamp=datetime.now().isoformat(),
-            count=len(patterns),
-            scenarios=self._format_scenarios_dict(scenarios_dict),
-        )
+'''
 
         return code
 
