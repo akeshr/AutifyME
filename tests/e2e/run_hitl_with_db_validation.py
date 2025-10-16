@@ -25,7 +25,7 @@ if os.name == 'nt':
 sys.path.insert(0, str(Path(__file__).parent / "agents" / "src"))
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv()  # noqa: E402
 
 print("=" * 80)
 print("FULL HITL FLOW WITH DATABASE VALIDATION")
@@ -77,5 +77,5 @@ print()
 print("Expected record should have:")
 print(f"  - name: {test_product['name']}")
 print(f"  - price: {test_product['price']}")
-print(f"  - id: <database-generated UUID>")
+print("  - id: <database-generated UUID>")
 print(f"  - created_at: ~{datetime.now().isoformat()}")

@@ -4,10 +4,8 @@ Tests the FastAPI webhook endpoints with various WhatsApp event payloads,
 idempotency handling, error recovery, and message processing.
 """
 
-import json
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient

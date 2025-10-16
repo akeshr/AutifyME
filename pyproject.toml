@@ -53,6 +53,11 @@ prerelease = "allow"  # Required for LangChain v1 alpha packages
 # Ruff linting configuration
 ignore = ["F821"]  # Ignore undefined name errors (false positives in some cases)
 
+[tool.ruff.lint.per-file-ignores]
+# E402: Module level import not at top of file - intentional in test scripts that use load_dotenv()
+"tests/e2e/run_*.py" = ["E402"]
+"tests/e2e/test_*.py" = ["E402"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["agents/src/autifyme_agents"]
 

@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MediaReference(BaseModel):
@@ -55,9 +55,7 @@ class MediaReference(BaseModel):
         None, description="URL expiration timestamp (for eager platforms like WhatsApp)"
     )
 
-    class Config:
-        # Allow Path objects in Pydantic models
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class IncomingMessage(BaseModel):
@@ -149,6 +147,4 @@ class IncomingMessage(BaseModel):
 
         return "\n".join(parts)
 
-    class Config:
-        # Allow datetime objects
-        json_encoders = {datetime: lambda v: v.isoformat()}
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})

@@ -4,7 +4,7 @@ Tests media URL fetching, downloading, MIME type handling, and error scenarios.
 """
 
 from pathlib import Path
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import Mock, patch
 
 import httpx
 import pytest
@@ -141,7 +141,7 @@ class TestDownloadMedia:
         )
 
         with patch('httpx.get', return_value=mock_response) as mock_get:
-            with patch('pathlib.Path.write_bytes') as mock_write:
+            with patch('pathlib.Path.write_bytes'):
                 path, content, mime_type = media_client.download_media("media_abc123")
 
         assert isinstance(path, Path)
@@ -207,7 +207,7 @@ class TestDownloadMedia:
         )
 
         with patch('httpx.get', return_value=mock_response):
-            with patch('pathlib.Path.write_bytes') as mock_write:
+            with patch('pathlib.Path.write_bytes'):
                 path, content, mime_type = media_client.download_media("large_media")
 
         assert len(content) == 12 * 1024 * 1024

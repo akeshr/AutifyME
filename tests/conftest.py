@@ -96,25 +96,32 @@ def mock_storage(mock_company_profile: CompanyProfile, mock_product: Product) ->
             thread_id: str,
             interrupt_id: str,
             checkpoint_id: str,
-            tool_call: dict,
+            tool_call: dict[str, Any],
             draft_summary: str,
-            ai_message: dict | None = None,
+            ai_message: dict[str, Any] | None = None,
             image_path: str | None = None,
-        ) -> None:
+            agent_source: str = "cataloging_department",
+            checkpoint_ns: str | None = None,
+        ) -> str:
+            approval_id = str(uuid.uuid4())
             self.pending_approvals[thread_id] = {
+                "id": approval_id,
                 "interrupt_id": interrupt_id,
                 "checkpoint_id": checkpoint_id,
                 "tool_call": tool_call,
                 "draft_summary": draft_summary,
                 "ai_message": ai_message,
                 "image_path": image_path,
+                "agent_source": agent_source,
+                "checkpoint_ns": checkpoint_ns,
             }
+            return approval_id
 
         def get_pending_approval(self, thread_id: str) -> dict[str, Any] | None:
             return self.pending_approvals.get(thread_id)
 
-        def delete_pending_approval(self, thread_id: str) -> None:
-            self.pending_approvals.pop(thread_id, None)
+        def delete_pending_approval(self, thread_id: str) -> bool:
+            return self.pending_approvals.pop(thread_id, None) is not None
 
         def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
             """Mock implementation for saving workflow outcomes."""
@@ -123,10 +130,11 @@ def mock_storage(mock_company_profile: CompanyProfile, mock_product: Product) ->
         def get_workflow_outcomes(
             self,
             *,
-            workflow_type: str | None = None,
+            time_window: timedelta | None = None,
+            intent: str | None = None,
+            department: str | None = None,
             success: bool | None = None,
             limit: int = 100,
-            offset: int = 0,
         ) -> list[dict[str, Any]]:
             """Mock implementation for getting workflow outcomes."""
             return []
@@ -134,6 +142,7 @@ def mock_storage(mock_company_profile: CompanyProfile, mock_product: Product) ->
         def get_recent_failures(
             self,
             time_window: timedelta,
+            limit: int = 10,
         ) -> list[dict[str, Any]]:
             """Mock implementation for getting recent failures."""
             return []
@@ -141,13 +150,15 @@ def mock_storage(mock_company_profile: CompanyProfile, mock_product: Product) ->
         def get_success_rates(
             self,
             time_window: timedelta | None = None,
-        ) -> dict[str, float]:
+        ) -> list[dict[str, Any]]:
             """Mock implementation for getting success rates."""
-            return {"overall": 0.95}
+            return [{"department": "overall", "success_rate_pct": 95.0}]
 
         def get_edge_cases(
             self,
             time_window: timedelta | None = None,
+            max_occurrence_count: int = 3,
+            limit: int = 20,
         ) -> list[dict[str, Any]]:
             """Mock implementation for getting edge cases."""
             return []

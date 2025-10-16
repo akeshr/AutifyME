@@ -7,7 +7,7 @@ and runner when handling batch HITL interrupts.
 from __future__ import annotations
 
 from typing import Any, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HumanInTheLoopResponse(BaseModel):
@@ -33,14 +33,15 @@ class HumanInTheLoopResponse(BaseModel):
         description="Arguments: None for accept, dict for edit, string for response",
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [
                 {"type": "accept", "args": None},
                 {"type": "edit", "args": {"price": 45.0, "name": "Updated Name"}},
                 {"type": "response", "args": "User rejected this item"},
             ]
         }
+    )
 
 
 class InterruptContext(BaseModel):
@@ -102,8 +103,8 @@ class BatchApprovalResponse(BaseModel):
                 f"exactly one response per interrupt."
             )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [
                 {
                     "responses": [
@@ -128,3 +129,4 @@ class BatchApprovalResponse(BaseModel):
                 },
             ]
         }
+    )

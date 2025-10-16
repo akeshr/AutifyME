@@ -61,9 +61,9 @@ def test_single_action_extraction():
         }
         pending_interrupts_list.append(interrupt_info)
 
-    print(f"Input: 1 interrupt (dict value)")
+    print("Input: 1 interrupt (dict value)")
     print(f"Output: {len(pending_interrupts_list)} interrupt_info objects")
-    print(f"Expected: 1")
+    print("Expected: 1")
 
     assert len(pending_interrupts_list) == 1, f"Expected 1, got {len(pending_interrupts_list)}"
     assert pending_interrupts_list[0]["interrupt_id"] == "test_interrupt_1"
@@ -140,9 +140,9 @@ def test_parallel_actions_extraction():
         }
         pending_interrupts_list.append(interrupt_info)
 
-    print(f"\nInput: 1 interrupt (list with 2 actions)")
+    print("\nInput: 1 interrupt (list with 2 actions)")
     print(f"Output: {len(pending_interrupts_list)} interrupt_info objects")
-    print(f"Expected: 2")
+    print("Expected: 2")
 
     assert len(pending_interrupts_list) == 2, f"Expected 2, got {len(pending_interrupts_list)}"
     assert pending_interrupts_list[0]["interrupt_id"] == "test_interrupt_2_0"
@@ -199,11 +199,11 @@ def test_command_building():
 
     resume_dict = dict(interrupt_responses)
 
-    print(f"Input: 2 interrupt_info with same original_interrupt_id")
+    print("Input: 2 interrupt_info with same original_interrupt_id")
     print(f"Output: Command.resume dict with {len(resume_dict)} key(s)")
-    print(f"Expected: 1 key with 2 responses")
+    print("Expected: 1 key with 2 responses")
 
-    print(f"\nResume dict:")
+    print("\nResume dict:")
     for int_id, responses in resume_dict.items():
         print(f"  {int_id}: {len(responses)} responses")
 
