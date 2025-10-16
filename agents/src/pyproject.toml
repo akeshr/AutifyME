@@ -3,7 +3,7 @@ name = "autifyme_agents"
 version = "0.1.0"
 description = "The agentic service for the AutifyME Business OS."
 authors = [{ name = "Abhi" }]
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     # Core Agentic Framework (LangChain v1 prerelease stack)
     "langchain==1.0.0a12",
