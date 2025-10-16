@@ -154,6 +154,14 @@ async def receive(request: Request) -> Any:
                         )
                     continue
 
+                # Extract sender profile information for personalization
+                # WhatsApp sends contacts array with profile name
+                contacts = value.get("contacts", [])
+                sender_name = None
+                if contacts and len(contacts) > 0:
+                    profile = contacts[0].get("profile", {})
+                    sender_name = profile.get("name")
+
                 # Process each message (usually just one, but iterate for safety)
                 for message in messages:
                     message_id = message.get("id")
@@ -220,6 +228,7 @@ async def receive(request: Request) -> Any:
                         extra={
                             "message_id": message_id,
                             "sender": sender,
+                            "sender_name": sender_name,
                             "message_type": msg_type,
                             "has_media": media_id is not None,
                             "has_text": text is not None,
@@ -233,7 +242,7 @@ async def receive(request: Request) -> Any:
                     # runner_v2 auto-detects pending interrupts via pm.get_state() and invokes approval_analyzer
                     # No special routing needed - the runner knows the context automatically
                     try:
-                        _get_runner().handle_message(sender, text, media_id)
+                        _get_runner().handle_message(sender, text, media_id, sender_name=sender_name)
                     except GeneratorExit:
                         # GeneratorExit occurs when workflow streaming times out
                         # Message already marked as processed above for idempotency

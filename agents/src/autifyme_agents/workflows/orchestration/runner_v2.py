@@ -176,6 +176,7 @@ class WorkflowRunner:
         sender: str,
         text: str | None,
         media_id: str | None,
+        sender_name: str | None = None,
     ) -> None:
         """Process incoming message by forwarding to PM.
 
@@ -183,11 +184,13 @@ class WorkflowRunner:
             sender: Channel-specific sender ID (e.g., phone number)
             text: Message text (optional)
             media_id: Media attachment ID (optional, channel-specific)
+            sender_name: User's display name for personalization (optional)
         """
         logger.info(
             "Handling incoming message",
             extra={
                 "sender": sender,
+                "sender_name": sender_name,
                 "has_text": text is not None,
                 "has_media": media_id is not None,
             },
@@ -198,7 +201,7 @@ class WorkflowRunner:
         lock = self._get_lock(sender)
 
         with lock:
-            self._execute_workflow(thread_id, sender, text, media_id)
+            self._execute_workflow(thread_id, sender, text, media_id, sender_name)
 
     def _execute_workflow(
         self,
@@ -206,6 +209,7 @@ class WorkflowRunner:
         sender: str,
         text: str | None,
         media_id: str | None,
+        sender_name: str | None = None,
     ) -> None:
         """Execute workflow: forward message to PM, handle any interrupts.
 
@@ -216,6 +220,7 @@ class WorkflowRunner:
             sender: Channel-specific sender ID
             text: Message text (optional)
             media_id: Media attachment ID (optional)
+            sender_name: User's display name for personalization (optional)
         """
         logger.debug(
             "Executing workflow",
@@ -232,10 +237,11 @@ class WorkflowRunner:
         )
         tracking_id = self.outcome_tracker.track_workflow_start(thread_id, incoming_message)
 
-        # Build raw payload for PM
+        # Build raw payload for PM with sender name for personalization
         raw_payload = {
             "platform": incoming_message.platform,
             "sender": sender,
+            "sender_name": sender_name,  # For personalized greetings/responses
             "text": text,
             "media_id": media_id,
             "timestamp": incoming_message.received_at.isoformat(),
