@@ -5,8 +5,7 @@ graph wrapper for DeepAgents, and company profile handling.
 """
 
 import base64
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 from langchain_core.messages import HumanMessage, AIMessage
@@ -396,7 +395,7 @@ class TestGraphWrapper:
             with patch('builtins.open', create=True) as mock_open_func:
                 mock_open_func.return_value.__enter__.return_value.read.return_value = JPEG_1X1
 
-                result = graph.invoke(state)
+                graph.invoke(state)
 
         # Verify company profile passed
         call_kwargs = mock_invoke_function.call_args[1]

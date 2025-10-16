@@ -9,10 +9,9 @@ This replicates the original "1 != 2" error scenario to prove it's fixed.
 
 import sys
 import uuid
-from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()  # noqa: E402
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.departments.cataloging_department import create_cataloging_department
@@ -52,14 +51,13 @@ def test_department_parallel_interrupts(mock_storage, memory_checkpointer):
 
     Make both variants with clear glass, suitable for kitchen storage."""
 
-    print(f"\n[TEST] Sending message to department:")
+    print("\n[TEST] Sending message to department:")
     print(f"  {message[:100]}...")
 
     print("\n[TEST] Invoking department (expecting 2 interrupts)...")
 
     try:
         # First invocation - should hit interrupt
-        result = None
         interrupted = False
 
         for event in department.stream(
@@ -67,7 +65,6 @@ def test_department_parallel_interrupts(mock_storage, memory_checkpointer):
             config=config,
             stream_mode="values"
         ):
-            result = event
             if "__interrupt__" in event:
                 interrupted = True
                 interrupts = event.get("__interrupt__") or []
@@ -123,7 +120,7 @@ def test_department_parallel_interrupts(mock_storage, memory_checkpointer):
             user_message="approve both",
         )
 
-        print(f"\n[TEST] Approval analyzer returned:")
+        print("\n[TEST] Approval analyzer returned:")
         print(f"  Response count: {len(approval_response.responses)}")
         print(f"  Expected count: {len(pending_interrupts)}")
         print(f"  Match: {len(approval_response.responses) == len(pending_interrupts)}")
@@ -150,16 +147,15 @@ def test_department_parallel_interrupts(mock_storage, memory_checkpointer):
         print("[TEST] Executing Command to resume workflow...")
 
         # Resume with Command
-        final_result = None
         for event in department.stream(
             command,
             config=config,
             stream_mode="values"
         ):
-            final_result = event
+            pass
 
         print("\n[TEST] Workflow resumed successfully!")
-        print(f"\n[SUCCESS] Full stack test PASSED")
+        print("\n[SUCCESS] Full stack test PASSED")
         print("  - Department made 2 parallel calls")
         print("  - Got 2 simultaneous interrupts")
         print("  - Approval analyzer handled them correctly")
@@ -217,34 +213,41 @@ if __name__ == "__main__":
             return self.saved_products[offset : offset + limit]
 
         def save_pending_approval(self, thread_id: str, interrupt_id: str, checkpoint_id: str,
-                                   tool_call: dict, draft_summary: str, ai_message: dict | None = None,
-                                   image_path: str | None = None) -> None:
+                                   tool_call: dict[str, Any], draft_summary: str, ai_message: dict[str, Any] | None = None,
+                                   image_path: str | None = None, agent_source: str = "cataloging_department",
+                                   checkpoint_ns: str | None = None) -> str:
+            approval_id = str(uuid.uuid4())
             self.pending_approvals[thread_id] = {
+                "id": approval_id,
                 "interrupt_id": interrupt_id, "checkpoint_id": checkpoint_id,
                 "tool_call": tool_call, "draft_summary": draft_summary,
                 "ai_message": ai_message, "image_path": image_path,
+                "agent_source": agent_source, "checkpoint_ns": checkpoint_ns,
             }
+            return approval_id
 
         def get_pending_approval(self, thread_id: str) -> dict[str, Any] | None:
             return self.pending_approvals.get(thread_id)
 
-        def delete_pending_approval(self, thread_id: str) -> None:
-            self.pending_approvals.pop(thread_id, None)
+        def delete_pending_approval(self, thread_id: str) -> bool:
+            return self.pending_approvals.pop(thread_id, None) is not None
 
         def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
             return str(uuid.uuid4())
 
-        def get_workflow_outcomes(self, *, workflow_type: str | None = None, success: bool | None = None,
-                                  limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+        def get_workflow_outcomes(self, *, time_window: timedelta | None = None, intent: str | None = None,
+                                  department: str | None = None, success: bool | None = None,
+                                  limit: int = 100) -> list[dict[str, Any]]:
             return []
 
-        def get_recent_failures(self, time_window: timedelta) -> list[dict[str, Any]]:
+        def get_recent_failures(self, time_window: timedelta, limit: int = 10) -> list[dict[str, Any]]:
             return []
 
-        def get_success_rates(self, time_window: timedelta | None = None) -> dict[str, float]:
-            return {"overall": 0.95}
+        def get_success_rates(self, time_window: timedelta | None = None) -> list[dict[str, Any]]:
+            return [{"department": "overall", "success_rate_pct": 95.0}]
 
-        def get_edge_cases(self, time_window: timedelta | None = None) -> list[dict[str, Any]]:
+        def get_edge_cases(self, time_window: timedelta | None = None, max_occurrence_count: int = 3,
+                           limit: int = 20) -> list[dict[str, Any]]:
             return []
 
         def check_and_mark_message_processed(self, message_id: str, sender_id: str,

@@ -2,7 +2,7 @@
 
 from uuid import UUID
 from typing import Optional, List, Literal, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Product(BaseModel):
@@ -45,8 +45,7 @@ class Product(BaseModel):
                 return None
         return None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CompanyProfile(BaseModel):
@@ -63,8 +62,7 @@ class CompanyProfile(BaseModel):
     style_preferences: Optional[List[str]] = Field(default_factory=list, description="Style keywords.")
     industry: Optional[str] = Field(None, description="Company's industry vertical.")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Department Response Models ---
@@ -90,5 +88,4 @@ class CatalogingResult(BaseModel):
         description="Structured payload associated with the stage (draft details or saved record).",
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

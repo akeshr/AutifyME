@@ -23,7 +23,7 @@ if os.name == 'nt':
 sys.path.insert(0, str(Path(__file__).parent / "agents" / "src"))
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv()  # noqa: E402
 
 print("=" * 80)
 print("HITL TESTING WITH ACTUAL IMAGE INPUTS")

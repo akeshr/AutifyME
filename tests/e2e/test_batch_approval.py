@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "agents" / "src"))
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv()  # noqa: E402
 
 from autifyme_agents.schemas.approval import BatchApprovalResponse
 from autifyme_agents.workflows.approval_analyzer import analyze_approval

@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()  # noqa: E402
 
 from autifyme_agents.core.ports import StorageInterface
 from langgraph.checkpoint.memory import MemorySaver
@@ -269,34 +269,41 @@ if __name__ == "__main__":
             return self.saved_products[offset : offset + limit]
 
         def save_pending_approval(self, thread_id: str, interrupt_id: str, checkpoint_id: str,
-                                   tool_call: dict, draft_summary: str, ai_message: dict | None = None,
-                                   image_path: str | None = None) -> None:
+                                   tool_call: dict[str, Any], draft_summary: str, ai_message: dict[str, Any] | None = None,
+                                   image_path: str | None = None, agent_source: str = "cataloging_department",
+                                   checkpoint_ns: str | None = None) -> str:
+            approval_id = str(uuid.uuid4())
             self.pending_approvals[thread_id] = {
+                "id": approval_id,
                 "interrupt_id": interrupt_id, "checkpoint_id": checkpoint_id,
                 "tool_call": tool_call, "draft_summary": draft_summary,
                 "ai_message": ai_message, "image_path": image_path,
+                "agent_source": agent_source, "checkpoint_ns": checkpoint_ns,
             }
+            return approval_id
 
         def get_pending_approval(self, thread_id: str) -> dict[str, Any] | None:
             return self.pending_approvals.get(thread_id)
 
-        def delete_pending_approval(self, thread_id: str) -> None:
-            self.pending_approvals.pop(thread_id, None)
+        def delete_pending_approval(self, thread_id: str) -> bool:
+            return self.pending_approvals.pop(thread_id, None) is not None
 
         def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
             return str(uuid.uuid4())
 
-        def get_workflow_outcomes(self, *, workflow_type: str | None = None, success: bool | None = None,
-                                  limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+        def get_workflow_outcomes(self, *, time_window: timedelta | None = None, intent: str | None = None,
+                                  department: str | None = None, success: bool | None = None,
+                                  limit: int = 100) -> list[dict[str, Any]]:
             return []
 
-        def get_recent_failures(self, time_window: timedelta) -> list[dict[str, Any]]:
+        def get_recent_failures(self, time_window: timedelta, limit: int = 10) -> list[dict[str, Any]]:
             return []
 
-        def get_success_rates(self, time_window: timedelta | None = None) -> dict[str, float]:
-            return {"overall": 0.95}
+        def get_success_rates(self, time_window: timedelta | None = None) -> list[dict[str, Any]]:
+            return [{"department": "overall", "success_rate_pct": 95.0}]
 
-        def get_edge_cases(self, time_window: timedelta | None = None) -> list[dict[str, Any]]:
+        def get_edge_cases(self, time_window: timedelta | None = None, max_occurrence_count: int = 3,
+                           limit: int = 20) -> list[dict[str, Any]]:
             return []
 
         def check_and_mark_message_processed(self, message_id: str, sender_id: str,

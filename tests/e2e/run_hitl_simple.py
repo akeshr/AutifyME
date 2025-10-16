@@ -17,7 +17,7 @@ if os.name == 'nt':
 sys.path.insert(0, str(Path(__file__).parent / "agents" / "src"))
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv()  # noqa: E402
 
 print("=" * 80)
 print("SIMPLE HITL FLOW TEST")
@@ -38,7 +38,6 @@ dept = create_cataloging_department(checkpointer=checkpointer, storage=storage)
 
 # Test message - simple cataloging request
 from langchain.messages import HumanMessage
-import json
 import uuid
 
 thread_id = f"test_{uuid.uuid4().hex[:8]}"
@@ -71,7 +70,7 @@ try:
             if interrupts:
                 interrupt_detected = True
                 interrupt_value = interrupts[0].value
-                print(f"\n⏸️  INTERRUPT DETECTED!")
+                print("\n⏸️  INTERRUPT DETECTED!")
                 print(f"Interrupt value: {interrupt_value}")
                 print()
                 break

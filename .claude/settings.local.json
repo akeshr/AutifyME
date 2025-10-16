@@ -32,7 +32,8 @@
       "Bash(timeout 30 uv run python:*)",
       "Bash(timeout:*)",
       "Bash(find:*)",
-      "Bash(uv tree:*)"
+      "Bash(uv tree:*)",
+      "Bash(mypy:*)"
     ],
     "deny": [],
     "ask": []
