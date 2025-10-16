@@ -5,11 +5,14 @@ cross-workflow orchestration logic in a single Project Manager agent. The
 implementation closely follows `docs/architecture/PROJECT_MANAGER_DESIGN.md`
 and leverages deepagents for planning, sub-agent delegation, and HITL.
 
-**HITL Strategy**: Uses LangGraph's native `interrupt_before=["tools"]` to pause
-execution after the agent emits tool calls but before the tool node executes them.
-This allows the runner to inspect tool calls (e.g., save_product) and request
-human approval, then resume the graph to execute the tool naturally. No custom
-post-model hooks are needed—LangGraph's tool node handles all ToolMessage synthesis.
+**HITL Strategy (Pattern 2 - PM-Centric)**:
+- PM-centric approval orchestration using standard LangGraph middleware
+- ApprovalContextMiddleware injects approval context before PM reasoning
+- PM makes approval decisions using approval tools
+- Runner intercepts tool output and builds Command objects
+- Workflow resumes based on PM's agentic decision
+
+This makes PM truly agentic - it sees and reasons about approvals, not just delegates.
 """
 
 from __future__ import annotations
@@ -22,9 +25,14 @@ from deepagents.tools import write_todos
 from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
+from autifyme_agents.core.middleware.approval_context import ApprovalContextMiddleware
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.schemas.models import CompanyProfile
+from autifyme_agents.tools.approval.pm_approval_tools import (
+    propose_workflow_resumption,
+    reject_workflow_approval,
+)
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -126,8 +134,12 @@ def create_project_manager(
     llm = _resolve_model(model)
     instructions = _load_prompt(company_profile)
 
-    # PM orchestration tools
-    pm_tools = [write_todos]
+    # PM orchestration tools (including HITL approval tools)
+    pm_tools = [
+        write_todos,
+        propose_workflow_resumption,  # PM-centric HITL: batch approval decisions
+        reject_workflow_approval,  # PM-centric HITL: explicit rejection
+    ]
 
     # Note: Media download tools NOT included in PM
     # PM delegates media_id to departments, departments download when needed
@@ -145,12 +157,19 @@ def create_project_manager(
     # No tool_configs needed - departments handle their own HITL via middleware
     tool_configs: dict[str, Any] = {}
 
+    # PM-centric HITL middleware (Pattern 2)
+    # Injects approval context before PM reasoning using standard LangGraph middleware
+    pm_middleware = [
+        ApprovalContextMiddleware(include_tool_details=True),
+    ]
+
     project_manager = create_deep_agent(
-        tools=pm_tools,  # PM has NO direct domain tools
+        tools=pm_tools,  # PM has orchestration + approval tools
         instructions=instructions,
         model=llm,
         subagents=subagents,
         tool_configs=tool_configs,
+        middleware=pm_middleware,  # Standard LangGraph middleware
         checkpointer=checkpointer,
     )
 

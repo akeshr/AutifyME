@@ -1,15 +1,15 @@
-"""Generic HITL Framework - Structured Output Architecture.
+"""Generic HITL Framework - PM-Centric Architecture (Pattern 2).
 
-Runner is a BLIND EXECUTOR that coordinates between PM and approval analyzer.
+Runner is a BLIND EXECUTOR - PM is the intelligent orchestrator.
 
-## STRUCTURED OUTPUT ARCHITECTURE (2025-10-14)
+## PM-CENTRIC ARCHITECTURE (2025-10-16 - Pattern 2)
 
-**Key Principle**: Use Pydantic structured outputs everywhere. No text parsing.
+**Key Principle**: PM reasons about and decides on approvals using standard LangGraph middleware.
 
 **Components**:
-- **PM**: Orchestration (delegates tasks to departments)
-- **Approval Analyzer**: HITL interpretation (structured BatchApprovalResponse)
-- **Runner**: Coordination (routes based on state, manages interrupts)
+- **PM**: Orchestration + Approval Decisions (truly agentic)
+- **ApprovalContextMiddleware**: Injects approval context before PM reasoning (standard LangGraph)
+- **Runner**: Infrastructure (forwards messages, intercepts tool output, builds Commands)
 
 ## How It Works
 
@@ -24,27 +24,29 @@ User message → Runner → PM → Departments → HITL interrupt → Channel
 5. If department needs approval → interrupt occurs
 6. Runner sends approval request to user via channel
 
-### 2. Resume Flow (Structured Batch Approval)
+### 2. Resume Flow (PM-Centric Approval)
 ```
-User approval → Runner → Approval Analyzer → BatchApprovalResponse → Command → Resume
+User approval → Runner → PM (with middleware) → Approval tools → Command → Resume
 ```
 1. User responds (e.g., "approve both", "edit price to 45")
 2. Runner detects pending interrupts in checkpoint
-3. **Runner invokes approval analyzer** (not PM!)
-4. **Approval analyzer returns BatchApprovalResponse** (Pydantic model)
-5. Runner builds Command from structured response
-6. Runner executes Command
-7. HITL middleware receives N responses for N interrupts
-8. Workflow resumes
-9. ✅ **NO TEXT PARSING - TYPE SAFE!**
+3. Runner forwards to PM with pending_interrupts in state
+4. **ApprovalContextMiddleware** injects approval context before PM reasoning
+5. **PM sees context and reasons** about approvals
+6. **PM calls approval tools** (propose_workflow_resumption)
+7. Runner intercepts tool output ("APPROVAL_DECISION: ...")
+8. Runner builds Command from tool output
+9. Runner executes Command
+10. Workflow resumes
+11. ✅ **PM IS TRULY AGENTIC - MAKES DECISIONS**
 
 **Benefits**:
-- ✅ Type safety with Pydantic throughout
-- ✅ No brittle text parsing
-- ✅ Clear separation: PM = orchestration, Analyzer = HITL interpretation
-- ✅ Batch approval works correctly (N responses for N interrupts)
-- ✅ Production-grade architecture
-- ✅ Easy to test and validate
+- ✅ PM controls workflow (not just delegates)
+- ✅ Standard LangGraph middleware (no custom patterns)
+- ✅ PM reasons about approvals (agentic behavior)
+- ✅ Runner is thin infrastructure layer
+- ✅ Scalable for future workflows
+- ✅ Type-safe tool output
 """
 
 from __future__ import annotations
@@ -65,7 +67,6 @@ from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.schemas.approval import BatchApprovalResponse
 from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
-from autifyme_agents.workflows.approval_analyzer import analyze_approval
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.outcome_tracker import IncomingMessage, OutcomeTracker
 from autifyme_agents.workflows.project_manager import create_project_manager
@@ -79,28 +80,27 @@ MAX_THREAD_LOCKS = 1000  # LRU cache size for thread locks
 class WorkflowRunner:
     """Blind executor - forwards messages to PM for intelligent orchestration.
 
-    ## CONTEXT-AWARE APPROVAL ARCHITECTURE:
+    ## PM-CENTRIC APPROVAL ARCHITECTURE (Pattern 2):
 
     Runner responsibilities:
-    - Forward messages to PM for orchestration
+    - Forward ALL messages to PM (blind infrastructure)
     - Extract interrupt context from checkpoints
-    - Extract conversation history from PM state
-    - Use approval analyzer with full conversation history for context-aware decisions
-    - Execute Command objects for approval resumption
+    - Detect PM approval tool calls
+    - Intercept tool output and build Commands
+    - Execute Commands for workflow resumption
     - Send interrupts/results to user via channel
 
-    PM handles:
+    PM handles (truly agentic):
     - Intent detection for new requests
     - Task orchestration and delegation to departments
+    - **Approval decisions** (using ApprovalContextMiddleware + approval tools)
     - Media download and processing
     - Overall workflow management
 
-    Approval Analyzer handles (with conversation history):
-    - Batch approval interpretation using full conversation context
-    - Multi-turn approval conversations (resolves "make it 25" from prior clarification)
-    - Contextual reference resolution ("the cheaper one", "use same description")
-    - Natural language approval patterns
-    - Returns structured BatchApprovalResponse
+    ApprovalContextMiddleware handles:
+    - Injects approval context before PM reasoning (standard LangGraph)
+    - Formats pending interrupts into human-readable context
+    - Runs in before_agent() hook
 
     LangGraph + DeepAgents handle:
     - Checkpoint state management
@@ -109,11 +109,12 @@ class WorkflowRunner:
     - Tool execution
 
     ## KEY BENEFITS:
-    - Approval analyzer has full conversation context (fixes context-blind issue)
-    - Minimal architectural changes (just pass conversation_history parameter)
-    - Type-safe communication via BatchApprovalResponse structured outputs
-    - Separation of concerns (PM orchestrates, analyzer interprets approvals)
-    - Works with existing DeepAgents PM architecture
+    - PM is truly agentic (reasons about approvals, not just delegates)
+    - Standard LangGraph middleware (no custom patterns)
+    - PM has full conversation context (via middleware)
+    - Runner is thin infrastructure (no business logic)
+    - Scalable for future workflows
+    - Type-safe tool-based communication
     """
 
     def __init__(
@@ -427,134 +428,96 @@ class WorkflowRunner:
 
         # Build payload based on checkpoint state
         if pending_interrupts_list:
-            # === APPROVAL ANALYZER WITH CONVERSATION HISTORY ===
-            # Extract conversation history from PM state for context-aware approval analysis
-
-            user_message = raw_payload.get("text", "")
-
-            # Extract conversation history from PM state
-            conversation_history = []
-            try:
-                state_snapshot = pm.get_state(config)
-                if state_snapshot and hasattr(state_snapshot, 'values'):
-                    conversation_history = state_snapshot.values.get("messages", [])
-                    logger.debug(
-                        "Extracted conversation history",
-                        extra={
-                            "thread_id": thread_id,
-                            "history_length": len(conversation_history)
-                        }
-                    )
-            except Exception as e:
-                logger.warning(
-                    "Could not extract conversation history",
-                    extra={"thread_id": thread_id, "error": str(e)}
-                )
+            # === PM-CENTRIC APPROVAL FLOW ===
+            # Forward to PM with pending_interrupts in state
+            # PM will use ApprovalContextMiddleware to see context
+            # PM will call approval tools
+            # We intercept tool output and build Command
 
             logger.info(
-                "Analyzing approval with conversation history",
+                "Forwarding to PM for approval decision",
                 extra={
                     "thread_id": thread_id,
                     "interrupt_count": len(pending_interrupts_list),
-                    "user_message": user_message[:50],
-                    "has_history": len(conversation_history) > 0,
-                }
+                },
             )
 
-            try:
-                # Invoke approval analyzer with conversation history
-                approval_response: BatchApprovalResponse = analyze_approval(
-                    pending_interrupts=pending_interrupts_list,
-                    user_message=user_message,
-                    conversation_history=conversation_history,  # NEW: Full context
-                )
-
-                logger.info(
-                    "Approval analysis complete",
-                    extra={
-                        "thread_id": thread_id,
-                        "response_count": len(approval_response.responses),
-                        "reasoning": approval_response.reasoning,
-                    }
-                )
-
-            except ValueError as e:
-                logger.error(
-                    "Approval analysis validation failed",
-                    extra={"thread_id": thread_id, "error": str(e)}
-                )
-                self.channel.send_text(
-                    raw_payload.get("sender", ""),
-                    "I had trouble processing your response. Please try: 'approve' or 'reject'"
-                )
-                return None, None
-
-            except Exception as e:
-                logger.exception(
-                    "Approval analysis failed",
-                    extra={"thread_id": thread_id, "error_type": type(e).__name__}
-                )
-                self.channel.send_text(
-                    raw_payload.get("sender", ""),
-                    "I encountered an error processing your response. Please try again."
-                )
-                return None, None
-
-            # Build Command from structured approval response
-            command_obj = self._build_command_from_approval(
-                approval_response, pending_interrupts_list
-            )
-
-            # Execute Command to resume workflow
-            logger.info(
-                "Executing Command to resume workflow",
-                extra={"thread_id": thread_id}
-            )
+            # Build payload with user message
+            from langchain.messages import HumanMessage
+            user_message = raw_payload.get("text", "")
+            payload = {
+                "messages": [HumanMessage(content=user_message)],
+                # Note: pending_interrupts available via __interrupt__ in state
+                # ApprovalContextMiddleware will format them
+            }
 
             last_event = None
             interrupt_value = None
+            approval_tool_output = None
 
             try:
-                for event in pm.stream(command_obj, config=config, stream_mode="values"):
+                # Stream PM execution
+                for event in pm.stream(payload, config=config, stream_mode="values"):
                     last_event = event
 
-                    # Check for new interrupts (nested workflows)
+                    # Check for approval tool calls
+                    if "messages" in event:
+                        for msg in event["messages"]:
+                            # Check for tool message with approval decision
+                            msg_type = getattr(msg, "type", None)
+                            if msg_type == "tool":
+                                content = getattr(msg, "content", "")
+                                if isinstance(content, str) and "APPROVAL_DECISION:" in content:
+                                    approval_tool_output = content
+                                    logger.info(
+                                        "Captured PM approval decision",
+                                        extra={"thread_id": thread_id, "output": content[:100]},
+                                    )
+
+                    # Check for new interrupts
                     if "__interrupt__" in event:
                         interrupts = event.get("__interrupt__") or []
                         if interrupts:
                             interrupt_value = interrupts[0].value
-                            logger.info(
-                                "Nested interrupt during resume",
-                                extra={"thread_id": thread_id}
-                            )
 
-                logger.info(
-                    "Command execution complete",
-                    extra={
-                        "thread_id": thread_id,
-                        "had_new_interrupt": interrupt_value is not None,
-                    }
-                )
+                # If PM made approval decision, build Command and resume
+                if approval_tool_output:
+                    logger.info(
+                        "Building Command from PM approval",
+                        extra={"thread_id": thread_id},
+                    )
+
+                    # Parse approval tool output and build Command
+                    command_obj = self._build_command_from_pm_approval(
+                        approval_tool_output, pending_interrupts_list
+                    )
+
+                    # Execute Command to resume workflow
+                    logger.info(
+                        "Executing Command to resume workflow",
+                        extra={"thread_id": thread_id},
+                    )
+
+                    for resume_event in pm.stream(command_obj, config=config, stream_mode="values"):
+                        last_event = resume_event
+
+                        # Check for new interrupts
+                        if "__interrupt__" in resume_event:
+                            interrupts = resume_event.get("__interrupt__") or []
+                            if interrupts:
+                                interrupt_value = interrupts[0].value
+
+                    logger.info(
+                        "PM-approved workflow resumed",
+                        extra={"thread_id": thread_id},
+                    )
 
                 return last_event, interrupt_value
 
-            except GraphInterrupt as interrupt_exc:
-                interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
-                logger.info(
-                    "Interrupt detected via exception during resume",
-                    extra={
-                        "thread_id": thread_id,
-                        "interrupt_count": len(interrupts_list),
-                    },
-                )
-                if interrupts_list:
-                    return last_event, interrupts_list[0].value
-                return last_event, None
-
-            except Exception as e:
+            except Exception:
                 logger.exception(
-                    "Command execution error",
-                    extra={"thread_id": thread_id, "error_type": type(e).__name__},
+                    "PM-centric approval flow error",
+                    extra={"thread_id": thread_id},
                 )
                 raise
 
@@ -680,6 +643,102 @@ class WorkflowRunner:
         )
 
         return Command(resume=dict(interrupt_responses))
+
+    def _build_command_from_pm_approval(
+        self,
+        approval_output: str,
+        pending_interrupts: list[dict[str, Any]],
+    ) -> Command[Any]:
+        """Build Command from PM approval tool output.
+
+        Parses tool output format: "APPROVAL_DECISION: int_1:accept | int_2:reject"
+        and builds LangGraph Command for resumption.
+
+        Args:
+            approval_output: Tool output from propose_workflow_resumption
+            pending_interrupts: List of pending interrupt contexts
+
+        Returns:
+            Command object for resuming workflow
+
+        Example:
+            Input: "APPROVAL_DECISION: int_1:accept | int_2:edit"
+            Output: Command(resume={"int_1": [{"type": "accept"}], "int_2": [{"type": "edit"}]})
+        """
+        try:
+            # Parse: "APPROVAL_DECISION: int_1:accept | int_2:reject"
+            if not approval_output.startswith("APPROVAL_DECISION:"):
+                raise ValueError(f"Invalid format: {approval_output}")
+
+            # Extract decisions part
+            decisions_str = approval_output.split("APPROVAL_DECISION:", 1)[1].strip()
+
+            # Split by | for multiple decisions
+            decision_parts = [part.strip() for part in decisions_str.split("|")]
+
+            # Build Command resume dict
+            from collections import defaultdict
+            interrupt_responses = defaultdict(list)
+
+            for decision_part in decision_parts:
+                # Parse "int_1:accept"
+                if ":" not in decision_part:
+                    logger.warning(
+                        "Skipping malformed decision part",
+                        extra={"part": decision_part}
+                    )
+                    continue
+
+                interrupt_id, decision_type = decision_part.split(":", 1)
+                interrupt_id = interrupt_id.strip()
+                decision_type = decision_type.strip()
+
+                # Find matching interrupt for metadata
+                matching_interrupt = None
+                for interrupt_info in pending_interrupts:
+                    if interrupt_id in interrupt_info.get("interrupt_id", ""):
+                        matching_interrupt = interrupt_info
+                        break
+
+                # Build response based on decision type
+                # Map PM tool decisions to HumanInTheLoopResponse types:
+                # - accept → accept
+                # - reject → response (with rejection message)
+                # - edit → edit (with modified args)
+                if decision_type == "accept":
+                    response = {"type": "accept", "args": None}
+                elif decision_type == "reject":
+                    response = {"type": "response", "args": "Rejected by PM"}
+                elif decision_type == "edit":
+                    # TODO: Extract edited args from tool call
+                    response = {"type": "edit", "args": None}  # Will be populated when edit parsing is implemented
+                else:
+                    logger.warning(
+                        "Unknown decision type",
+                        extra={"decision_type": decision_type, "interrupt_id": interrupt_id}
+                    )
+                    response = {"type": "accept", "args": None}  # Default to accept
+
+                # Group by original_interrupt_id if available
+                original_id = matching_interrupt.get("original_interrupt_id", interrupt_id) if matching_interrupt else interrupt_id
+                interrupt_responses[original_id].append(response)
+
+            logger.info(
+                "Built Command from PM approval",
+                extra={
+                    "decision_count": len(decision_parts),
+                    "interrupt_ids": list(interrupt_responses.keys()),
+                }
+            )
+
+            return Command(resume=dict(interrupt_responses))
+
+        except Exception as e:
+            logger.error(
+                "Failed to build Command from PM approval",
+                extra={"error": str(e), "output": approval_output},
+            )
+            raise
 
     def _handle_interrupt(
         self,

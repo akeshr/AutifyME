@@ -119,6 +119,23 @@ uv run python tests/cli/conversation.py --scenario greeting_to_cataloging
 
 **Complete guide**: `docs/architecture/testing/LOCAL_TESTING_STRATEGY.md`
 
+### Autonomous Testing Framework
+
+**Claude as Testing Orchestrator**: Claude can autonomously test, analyze, and improve the agentic system using a comprehensive testing framework.
+
+**Capabilities**:
+- Execute workflows with HITL simulation
+- Analyze LangSmith traces hierarchically (25x token reduction)
+- Validate database state via Supabase MCP
+- Identify issues in code, prompts, architecture
+- Generate and validate improvements iteratively
+- Run continuous improvement loops
+
+**Framework includes 23 tools across 5 categories**: Execution, Analysis (3 levels), Improvement, Helpers, Database validation
+
+**Complete framework**: `docs/architecture/testing/AUTONOMOUS_TESTING_FRAMEWORK.md`
+**Quick reference**: `docs/architecture/testing/QUICK_REFERENCE.md`
+
 ### API Verification
 
 Always verify library APIs with REPL before implementing (LangChain v1 alpha is unstable):
@@ -149,7 +166,11 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 - `tech/LANGCHAIN_V1_FEATURES.md` - LangChain v1 native patterns
 - `workflows/WHATSAPP_CATALOGING_WORKFLOW.md` - Current implementation
 
-**Complete index with 25+ docs**: See `docs/architecture/README.md`
+**Autonomous testing framework** (for Claude to test/analyze/improve system):
+- `testing/AUTONOMOUS_TESTING_FRAMEWORK.md` - **[PRIMARY]** Complete framework
+- `testing/QUICK_REFERENCE.md` - Cheat sheet for quick access
+
+**Complete index with 30+ docs**: See `docs/architecture/README.md`
 
 ### Common Gotchas
 
