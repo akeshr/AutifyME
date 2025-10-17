@@ -584,14 +584,26 @@ class WorkflowRunner:
                     if "__interrupt__" in event:
                         interrupts = event.get("__interrupt__") or []
                         if interrupts:
-                            interrupt_value = interrupts[0].value
-                            logger.info(
-                                "Interrupt detected",
-                                extra={
-                                    "thread_id": thread_id,
-                                    "interrupt_count": len(interrupts),
-                                },
-                            )
+                            # ✅ COLLECT ALL INTERRUPTS for batch approval
+                            # When PM makes parallel delegations (3 task() calls),
+                            # LangGraph creates 3 separate interrupts - we need to collect all values
+                            if len(interrupts) > 1:
+                                interrupt_value = [intr.value for intr in interrupts]
+                                logger.info(
+                                    "Multiple parallel interrupts detected",
+                                    extra={
+                                        "thread_id": thread_id,
+                                        "interrupt_count": len(interrupts),
+                                    },
+                                )
+                            else:
+                                interrupt_value = interrupts[0].value
+                                logger.info(
+                                    "Single interrupt detected",
+                                    extra={
+                                        "thread_id": thread_id,
+                                    },
+                                )
 
                 logger.debug(
                     "PM stream completed",
@@ -732,11 +744,14 @@ class WorkflowRunner:
             thread_id: Conversation thread ID
             interrupt_value: Value from interrupt (may be wrapped by DeepAgents)
         """
-        logger.debug(
-            "Handling HITL interrupt",
+        logger.info(
+            "==== INTERRUPT DEBUG ====",
             extra={
                 "thread_id": thread_id,
                 "interrupt_type": type(interrupt_value).__name__,
+                "is_list": isinstance(interrupt_value, list),
+                "is_dict": isinstance(interrupt_value, dict),
+                "length_if_list": len(interrupt_value) if isinstance(interrupt_value, list) else "N/A",
             }
         )
 
