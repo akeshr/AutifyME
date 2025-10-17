@@ -304,6 +304,23 @@ After identifying issues via trace analysis, use standard tools:
 # mcp__supabase__execute_sql(query="SELECT * FROM products WHERE ...")
 ```
 
+### Production Data Reconstruction
+**Capability**: Recreate test scenarios from real production user data.
+
+**Correlation**: LangSmith traces ↔ Supabase data via `thread_id`
+- LangSmith metadata contains `thread_id`
+- Supabase tables (workflow_outcomes, checkpoints) store same `thread_id`
+
+**Reconstruction Scenarios**:
+1. **Given trace_id**: Extract thread_id from trace → query DB → recreate scenario → compare
+2. **Given thread_id**: Query DB for user data → recreate scenario → validate fix
+3. **Regression testing**: Query recent successful workflows → re-execute → detect regressions
+4. **Multi-turn scenarios**: Extract full conversation from checkpoints → replay
+
+**Key Tables**: workflow_outcomes (384 rows), checkpoints (387 rows), products (52 rows)
+
+**Full architecture**: `tests/tools/RECONSTRUCTION_ARCHITECTURE.md`
+
 ### Use WebSearch/WebFetch for research
 ```python
 # If error message is unclear, research:

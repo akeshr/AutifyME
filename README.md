@@ -24,10 +24,12 @@
 - Error recovery and abandonment detection
 - WhatsApp webhook with idempotency
 - LangSmith observability integration
+- **Autonomous testing framework** (5-tool hierarchical trace analysis)
+- **Production data reconstruction** (test scenario replay from DB)
 
 ### 🚧 In Progress:
-- WhatsApp cataloging workflow validation
-- Unit test coverage for orchestration layer
+- Production validation with real user data
+- Expanding test coverage across all workflows
 
 ---
 
@@ -138,10 +140,10 @@ AutifyME/
 
 ## 🎯 Next Steps
 
-1. Validate refactored architecture in production (1-2 days)
-2. Complete unit test coverage for orchestration layer
+1. Test production data reconstruction with real user scenarios
+2. Expand autonomous testing across all departments
 3. Add SMS/Telegram channel adapters (~150 lines each)
-4. Remove deprecated `whatsapp_cataloging_runner.py` after validation
+4. Production deployment validation
 
 ---
 

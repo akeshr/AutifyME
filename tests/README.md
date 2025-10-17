@@ -77,6 +77,7 @@ Agent uses 5 tools autonomously, documents findings in TESTING_FINDINGS.md
 
 - `framework_validation.py` - Validates framework itself
 - `TESTING_FINDINGS.md` - Findings log from autonomous testing
+- `RECONSTRUCTION_ARCHITECTURE.md` - Production data → test scenario reconstruction
 - `.test_history.json` - Test execution history
 
 ### Documentation
