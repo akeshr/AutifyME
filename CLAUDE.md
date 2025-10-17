@@ -93,7 +93,7 @@ uv run mypy .
 
 **Production**: `agents/src/autifyme_agents/` - Core, departments, specialists, tools, workflows, entrypoints, integrations, schemas, prompts
 
-**Testing**: `tests/` - unit, integration, e2e, cli (testing tools), scripts, scenarios, fixtures
+**Testing**: `tests/` - tools/ (autonomous framework), unit, integration, cli (simulate.py, pm_chat.py), fixtures, synthesizer, archived/ (historical)
 
 **Documentation**: `docs/architecture/` organized by concern (core/, workflows/, tech/, testing/), plus `historical/`, `deployment/`, `roadmap/`
 
@@ -112,29 +112,24 @@ uv run python tests/cli/pm_chat.py --interactive
 
 # Full workflow with HITL
 uv run python tests/cli/simulate.py "Catalog these sneakers"
+```
 
-# Multi-turn scenarios
-uv run python tests/cli/conversation.py --scenario greeting_to_cataloging
+**Autonomous Framework** (primary testing method):
+```python
+from tests.tools import execute_scenario, get_trace_overview
+result = execute_scenario("Catalog Nike shoes Rs 1000", hitl_mode="auto_approve")
+overview = get_trace_overview(result.trace_id)
 ```
 
 **Complete guide**: `docs/architecture/testing/LOCAL_TESTING_STRATEGY.md`
 
 ### Autonomous Testing Framework
 
-**Claude as Testing Orchestrator**: Claude can autonomously test, analyze, and improve the agentic system using a comprehensive testing framework.
+**Claude can autonomously test, analyze, and improve the agentic system.**
 
-**Capabilities**:
-- Execute workflows with HITL simulation
-- Analyze LangSmith traces hierarchically (25x token reduction)
-- Validate database state via Supabase MCP
-- Identify issues in code, prompts, architecture
-- Generate and validate improvements iteratively
-- Run continuous improvement loops
-
-**Framework includes 23 tools across 5 categories**: Execution, Analysis (3 levels), Improvement, Helpers, Database validation
-
-**Complete framework**: `docs/architecture/testing/AUTONOMOUS_TESTING_FRAMEWORK.md`
-**Quick reference**: `docs/architecture/testing/QUICK_REFERENCE.md`
+**Methodology**: `.claude/skills/autonomous-testing.md` (complete testing workflow)
+**Agent**: `.claude/agents/workflow-tester.md` (invoke for autonomous testing)
+**Architecture**: `docs/architecture/testing/AUTONOMOUS_TESTING_FRAMEWORK.md`
 
 ### API Verification
 
@@ -166,9 +161,7 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 - `tech/LANGCHAIN_V1_FEATURES.md` - LangChain v1 native patterns
 - `workflows/WHATSAPP_CATALOGING_WORKFLOW.md` - Current implementation
 
-**Autonomous testing framework** (for Claude to test/analyze/improve system):
-- `testing/AUTONOMOUS_TESTING_FRAMEWORK.md` - **[PRIMARY]** Complete framework
-- `testing/QUICK_REFERENCE.md` - Cheat sheet for quick access
+**Autonomous testing**: Use `.claude/skills/autonomous-testing.md` skill (see Autonomous Testing Framework section above)
 
 **Complete index with 30+ docs**: See `docs/architecture/README.md`
 
