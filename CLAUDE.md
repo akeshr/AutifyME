@@ -201,3 +201,4 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 - **Architecture Docs**: `docs/architecture/README.md` (navigation hub)
 - **LangSmith Traces**: https://smith.langchain.com
 - **Roadmap**: `docs/roadmap/IMPLEMENTATION_ROADMAP.md`
+- Always use safe_print instaed of print

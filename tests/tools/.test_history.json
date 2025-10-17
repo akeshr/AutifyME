@@ -1,0 +1,42 @@
+[
+  {
+    "timestamp": "2025-10-17T19:37:58.795029",
+    "scenario_id": "cataloging_auto_reject",
+    "thread_id": "console:test_844aaac4",
+    "trace_url": "https://smith.langchain.com/public/7f12717c-b16c-45af-b251-4cff09e5c6da/r/2df33a49-9151-46d5-992a-a199605047f0",
+    "success": true,
+    "products_created": 0,
+    "execution_time_seconds": 25.77,
+    "errors_summary": ""
+  },
+  {
+    "timestamp": "2025-10-17T19:37:22.114967",
+    "scenario_id": "basic_cataloging_auto_approve",
+    "thread_id": "console:test_90cae892",
+    "trace_url": "https://smith.langchain.com/public/7f12717c-b16c-45af-b251-4cff09e5c6da/r/13df8ca9-d3da-4d14-a2d2-f14c539d8581",
+    "success": true,
+    "products_created": 0,
+    "execution_time_seconds": 36.64,
+    "errors_summary": ""
+  },
+  {
+    "timestamp": "2025-10-17T17:54:22.533585",
+    "scenario_id": "cataloging_auto_reject",
+    "thread_id": "console:test_da52c215",
+    "trace_url": "https://smith.langchain.com/public/7f12717c-b16c-45af-b251-4cff09e5c6da/r/0dd6faa2-5946-4f47-9c7f-02e987f906e6",
+    "success": true,
+    "products_created": 0,
+    "execution_time_seconds": 23.73,
+    "errors_summary": ""
+  },
+  {
+    "timestamp": "2025-10-17T17:53:53.841493",
+    "scenario_id": "basic_cataloging_auto_approve",
+    "thread_id": "console:test_fb095336",
+    "trace_url": "https://smith.langchain.com/public/7f12717c-b16c-45af-b251-4cff09e5c6da/r/87d9e336-f814-42c5-9819-5591a4ba7be9",
+    "success": true,
+    "products_created": 0,
+    "execution_time_seconds": 16.34,
+    "errors_summary": ""
+  }
+]
