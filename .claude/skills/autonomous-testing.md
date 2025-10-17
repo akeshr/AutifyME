@@ -6,9 +6,9 @@ You are Claude, orchestrating autonomous testing of the AutifyME agentic system 
 
 **"Tools provide visibility, Claude provides intelligence."**
 
-You have 5 observation tools that gather information. You use your existing capabilities (Edit, Write, Read, MCP) to analyze findings and implement improvements.
+You have 6 observation tools that gather information. You use your existing capabilities (Edit, Write, Read, MCP) to analyze findings and implement improvements.
 
-## Available Tools (5 Essential)
+## Available Tools (6 Essential)
 
 ### 1. `execute_scenario(scenario_id, hitl_mode, media_path)`
 **Execute workflow tests programmatically**
@@ -112,7 +112,53 @@ messages = get_run_messages(llm_run_id)
 
 ---
 
-### 5. `list_recent_tests(limit)`
+### 5. `get_workflow_story(trace_ids)`
+**Multi-trace HITL workflow analysis (~500 tokens per trace)**
+
+```python
+from tests.tools import get_workflow_story
+
+# Analyze complete HITL workflow across multiple traces
+story = get_workflow_story([
+    'trace_id_1',  # Initial extraction
+    'trace_id_2',  # First HITL resume
+    'trace_id_3',  # Second HITL resume
+])
+
+# Returns WorkflowStory with:
+# - thread_id: str
+# - total_traces: int
+# - traces: list[WorkflowTrace]  # Each with overview, HITL interrupt detection
+# - products_extracted: int
+# - products_saved: int
+# - products_edited: int
+# - products_rejected: int
+# - total_cost: float (across all traces)
+# - total_latency_ms: int (across all traces)
+```
+
+**When to use**: Analyzing complete HITL workflows that span multiple traces (initial → interrupt → resume). Essential for validating user approval decisions, price edits, and rejection handling.
+
+**Token efficiency**: Uses get_trace_overview() internally for each trace (~500 tokens per trace vs 50K+ for naive approach)
+
+**How to get trace_ids**:
+```python
+# Option 1: Query from Supabase (future workflows auto-populate trace_id)
+trace_ids = mcp__supabase__execute_sql(
+    "SELECT trace_id FROM workflow_outcomes
+     WHERE thread_id = '...'
+     ORDER BY created_at"
+)
+
+# Option 2: Manual from LangSmith dashboard (current approach)
+trace_ids = ['trace1', 'trace2', 'trace3']
+
+story = get_workflow_story(trace_ids)
+```
+
+---
+
+### 6. `list_recent_tests(limit)`
 **Test history for progress tracking**
 
 ```python

@@ -250,6 +250,30 @@ class WorkflowRunner:
             # ✅ ALWAYS invoke PM with message - it handles checkpoint state
             result, interrupt_value = self._invoke_pm(thread_id, raw_payload)
 
+            # Extract and link trace_id for observability correlation
+            # Trace ID is stored in LangSmith run metadata after PM execution
+            try:
+                from langsmith import Client
+                ls_client = Client()
+                # Query latest run for this thread (most recent trace)
+                runs_iter = ls_client.list_runs(
+                    filter=f'eq(metadata_key, "langsmith.thread_id") and eq(metadata_value, "{thread_id}")',
+                    limit=1
+                )
+                runs = list(runs_iter)
+                if runs:
+                    trace_id = str(runs[0].trace_id)
+                    self.outcome_tracker.set_trace_id(thread_id, trace_id)
+                    logger.debug(
+                        "Linked trace_id to workflow outcome",
+                        extra={"thread_id": thread_id, "trace_id": trace_id}
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Failed to extract trace_id (non-blocking)",
+                    extra={"thread_id": thread_id, "error": str(e)}
+                )
+
             if interrupt_value:
                 # Department is requesting HITL - forward to user
                 self._handle_interrupt(sender, thread_id, interrupt_value)
@@ -414,6 +438,16 @@ class WorkflowRunner:
                     extra={
                         "thread_id": thread_id,
                         "interrupt_count": len(pending_interrupts_list),
+                    }
+                )
+
+                # DEBUG: Log checkpoint interrupt IDs to diagnose Command.resume mismatch
+                logger.info(
+                    "DEBUG: Checkpoint interrupt IDs",
+                    extra={
+                        "thread_id": thread_id,
+                        "checkpoint_interrupt_ids": [intr.id for intr in state_snapshot.interrupts],
+                        "interrupt_format": "IDs as stored in checkpoint"
                     }
                 )
             else:
@@ -668,9 +702,12 @@ class WorkflowRunner:
         Takes the Pydantic BatchApprovalResponse from approval analyzer and
         constructs a LangGraph Command object for resuming interrupted workflows.
 
-        IMPORTANT: Handles both single and parallel interrupts:
-        - Single interrupt: interrupt_id → [response]
-        - Parallel (list-valued): original_interrupt_id → [response_0, response_1, ...]
+        IMPORTANT: Uses the FULL interrupt_id (WITH suffix) for Command.resume.
+        Each interrupt gets its own entry in Command.resume with its response.
+
+        FIXED (BUG #3): Previously used original_interrupt_id (WITHOUT suffix),
+        causing ID mismatch with checkpoint → LangGraph couldn't deliver responses
+        → PM received HumanMessage instead → ignored all approval decisions.
 
         Args:
             approval_response: Structured approval response from analyzer
@@ -679,28 +716,35 @@ class WorkflowRunner:
         Returns:
             Command object ready for execution
 
-        Example (Parallel):
+        Example (Parallel Interrupts):
             approval_response.responses = [
-                {"type": "accept", "args": None},
-                {"type": "edit", "args": {"price": 45.0}}
+                {"type": "accept"},
+                {"type": "edit", "args": {"price": 120.0}},
+                {"type": "response", "args": "Not required"}
             ]
             pending_interrupts = [
-                {"interrupt_id": "int_1_0", "original_interrupt_id": "int_1", ...},
-                {"interrupt_id": "int_1_1", "original_interrupt_id": "int_1", ...}
+                {"interrupt_id": "abc123_0", ...},  # Blue bottle
+                {"interrupt_id": "abc123_1", ...},  # Pink bottle
+                {"interrupt_id": "abc123_2", ...}   # Green bottle
             ]
             →
             Command(resume={
-                "int_1": [{"type": "accept", "args": None}, {"type": "edit", "args": {"price": 45.0}}]
+                "abc123_0": [{"type": "accept"}],
+                "abc123_1": [{"type": "edit", "args": {...}}],
+                "abc123_2": [{"type": "response", "args": "Not required"}]
             })
         """
-        # Group responses by original_interrupt_id (for parallel actions)
-        # or by interrupt_id (for single actions)
+        # Build Command.resume mapping each interrupt_id to its response
         from collections import defaultdict
         interrupt_responses = defaultdict(list)
 
         for idx, interrupt_info in enumerate(pending_interrupts):
-            # Use original_interrupt_id if available (parallel case), otherwise use interrupt_id
-            original_id = interrupt_info.get("original_interrupt_id", interrupt_info["interrupt_id"])
+            # FIX FOR BUG #3: Use the FULL interrupt_id (with suffix) for Command.resume
+            # Previously used original_interrupt_id (without suffix), causing ID mismatch
+            # Checkpoint stores: "abc123_0", "abc123_1", etc. (WITH suffix from DeepAgents)
+            # Command MUST use same format to match
+            interrupt_id_for_command = interrupt_info["interrupt_id"]
+
             response = approval_response.responses[idx]
             tool_name = interrupt_info.get("tool_name", "unknown")
             tool_args = interrupt_info.get("tool_args", {})
@@ -718,7 +762,7 @@ class WorkflowRunner:
                     }
                 }
                 logger.debug(
-                    f"Built edit response for {original_id}",
+                    f"Built edit response for {interrupt_id_for_command}",
                     extra={
                         "tool_name": tool_name,
                         "edited_fields": list(response.args.keys()) if isinstance(response.args, dict) else [],
@@ -737,11 +781,11 @@ class WorkflowRunner:
                 # Unknown type - log warning and treat as accept
                 logger.warning(
                     f"Unknown response type: {response.type}",
-                    extra={"interrupt_id": original_id}
+                    extra={"interrupt_id": interrupt_id_for_command}
                 )
                 hitl_response = {"type": "accept"}
 
-            interrupt_responses[original_id].append(hitl_response)
+            interrupt_responses[interrupt_id_for_command].append(hitl_response)
 
         logger.info(
             "Built Command from structured approval",
@@ -750,6 +794,17 @@ class WorkflowRunner:
                 "interrupt_count": len(interrupt_responses),
                 "interrupt_ids": list(interrupt_responses.keys()),
                 "edit_count": sum(1 for resp in approval_response.responses if resp.type == "edit"),
+            }
+        )
+
+        # DEBUG: Log Command.resume keys to diagnose ID mismatch
+        logger.info(
+            "DEBUG: Command.resume structure",
+            extra={
+                "resume_keys": list(interrupt_responses.keys()),
+                "key_format": "IDs used in Command.resume (should match checkpoint)",
+                "pending_interrupt_ids": [i.get("interrupt_id") for i in pending_interrupts],
+                "original_interrupt_ids": [i.get("original_interrupt_id", i.get("interrupt_id")) for i in pending_interrupts]
             }
         )
 

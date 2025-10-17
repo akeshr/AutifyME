@@ -190,6 +190,86 @@ class RunMessages(BaseModel):
 
 
 # ============================================================================
+# Multi-Trace Workflow Story Models (for HITL workflows)
+# ============================================================================
+
+class HITLDecision(BaseModel):
+    """User decision from HITL interrupt."""
+
+    product_index: int
+    """Index of product in batch."""
+
+    action: str
+    """User action: 'approved' | 'edited' | 'rejected'."""
+
+    original_data: Dict[str, Any]
+    """Original extracted product data."""
+
+    edited_data: Optional[Dict[str, Any]] = None
+    """Edited data if action was 'edited'."""
+
+
+class WorkflowTrace(BaseModel):
+    """Single trace within multi-trace HITL workflow."""
+
+    trace_id: str
+    """LangSmith trace ID."""
+
+    trace_url: str
+    """LangSmith trace URL."""
+
+    sequence: int
+    """Trace sequence (1=initial, 2=first resume, etc)."""
+
+    overview: TraceOverview
+    """Hierarchical trace overview."""
+
+    is_hitl_interrupt: bool
+    """Whether this trace ended with HITL interrupt."""
+
+    hitl_decisions: List[HITLDecision] = Field(default_factory=list)
+    """User decisions extracted from resume trace inputs."""
+
+
+class WorkflowStory(BaseModel):
+    """Complete HITL workflow narrative across multiple traces.
+
+    HITL workflows span multiple traces:
+    1. Initial trace: PM → Dept → HITL interrupt
+    2. Resume trace(s): User decisions → PM processes → Final save
+
+    This model correlates all traces to show complete story.
+    """
+
+    thread_id: str
+    """Thread ID linking all traces."""
+
+    total_traces: int
+    """Number of traces analyzed."""
+
+    traces: List[WorkflowTrace]
+    """All traces in chronological order."""
+
+    products_extracted: int
+    """Total products extracted in initial trace."""
+
+    products_saved: int
+    """Final products saved to database."""
+
+    products_rejected: int
+    """Products rejected by user."""
+
+    products_edited: int
+    """Products edited by user."""
+
+    total_cost: float
+    """Total cost across all traces."""
+
+    total_latency_ms: int
+    """Total execution time across all traces."""
+
+
+# ============================================================================
 # Test History Models
 # ============================================================================
 

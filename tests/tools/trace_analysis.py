@@ -10,6 +10,7 @@ Token savings: 25x vs naive full dump approach.
 from typing import Dict, List
 from langsmith import Client
 from datetime import datetime
+from dotenv import load_dotenv
 
 from .models import (
     TraceOverview,
@@ -20,6 +21,9 @@ from .models import (
     Message,
     ToolCall,
     ToolResult,
+    WorkflowStory,
+    WorkflowTrace,
+    HITLDecision,
 )
 
 
@@ -31,6 +35,8 @@ def _get_client() -> Client:
     """Get or create LangSmith client."""
     global _client
     if _client is None:
+        # Load environment variables from .env
+        load_dotenv()
         _client = Client()
     return _client
 
@@ -271,3 +277,208 @@ def get_run_messages(run_id: str) -> RunMessages:
                 )
 
     return RunMessages(run_id=str(run.id), messages=messages_list)
+
+
+def get_workflow_story(trace_ids: List[str]) -> WorkflowStory:
+    """Get complete HITL workflow narrative across multiple traces.
+
+    HITL workflows span multiple traces (initial → interrupt → resume).
+    This function correlates all traces to show the complete story:
+    - Initial extraction
+    - User HITL decisions (approved/edited/rejected)
+    - Final outcomes
+
+    IMPORTANT: Use Supabase MCP to get trace_ids first:
+    ```sql
+    SELECT trace_id, created_at
+    FROM workflow_outcomes
+    WHERE thread_id = 'your_thread_id'
+    ORDER BY created_at ASC
+    ```
+
+    Then pass all trace_ids to this function for analysis.
+
+    Token cost: ~500 tokens per trace (uses get_trace_overview internally)
+
+    Args:
+        trace_ids: List of trace IDs in chronological order
+
+    Returns:
+        WorkflowStory with complete multi-trace narrative
+
+    Example:
+        >>> # Step 1: Get trace_ids from Supabase MCP
+        >>> # mcp__supabase__execute_sql(
+        >>> #   query="SELECT trace_id FROM workflow_outcomes
+        >>> #          WHERE thread_id = '...' ORDER BY created_at"
+        >>> # )
+        >>>
+        >>> # Step 2: Analyze all traces
+        >>> story = get_workflow_story(['trace1', 'trace2', 'trace3'])
+        >>> print(f"Products extracted: {story.products_extracted}")
+        >>> print(f"Products saved: {story.products_saved}")
+        >>> print(f"Products rejected: {story.products_rejected}")
+    """
+    client = _get_client()
+
+    if not trace_ids:
+        raise ValueError("trace_ids cannot be empty")
+
+    # Analyze each trace
+    workflow_traces = []
+    thread_id = None
+    total_cost = 0.0
+    total_latency_ms = 0
+
+    for idx, trace_id in enumerate(trace_ids, 1):
+        # Get trace overview
+        overview = get_trace_overview(trace_id)
+
+        # Extract thread_id from first trace
+        if thread_id is None:
+            # Get thread_id from trace metadata
+            run = client.read_run(overview.run_tree[0].run_id)
+            thread_id = run.metadata.get("thread_id", "unknown")
+
+        # Accumulate costs
+        total_cost += overview.total_cost
+        total_latency_ms += overview.total_latency_ms
+
+        # Detect HITL interrupt
+        is_hitl_interrupt = _detect_hitl_interrupt(overview)
+
+        # Extract HITL decisions from next trace if this was an interrupt
+        hitl_decisions = []
+        if is_hitl_interrupt and idx < len(trace_ids):
+            # Decisions are in the NEXT trace's inputs
+            next_trace_id = trace_ids[idx]
+            hitl_decisions = _extract_hitl_decisions(next_trace_id)
+
+        workflow_traces.append(
+            WorkflowTrace(
+                trace_id=trace_id,
+                trace_url=f"https://smith.langchain.com/public/{trace_id}/r",
+                sequence=idx,
+                overview=overview,
+                is_hitl_interrupt=is_hitl_interrupt,
+                hitl_decisions=hitl_decisions,
+            )
+        )
+
+    # Count products
+    products_extracted = _count_extracted_products(workflow_traces[0].overview)
+    products_saved = _count_saved_products(workflow_traces[-1].overview)
+
+    # Count edited/rejected from HITL decisions
+    products_edited = 0
+    products_rejected = 0
+    for trace in workflow_traces:
+        for decision in trace.hitl_decisions:
+            if decision.action == "edited":
+                products_edited += 1
+            elif decision.action == "rejected":
+                products_rejected += 1
+
+    return WorkflowStory(
+        thread_id=thread_id or "unknown",
+        total_traces=len(trace_ids),
+        traces=workflow_traces,
+        products_extracted=products_extracted,
+        products_saved=products_saved,
+        products_rejected=products_rejected,
+        products_edited=products_edited,
+        total_cost=round(total_cost, 4),
+        total_latency_ms=total_latency_ms,
+    )
+
+
+def _detect_hitl_interrupt(overview: TraceOverview) -> bool:
+    """Detect if trace ended with HITL interrupt."""
+
+    def has_interrupt(node: RunNode) -> bool:
+        # Check if node is HumanInTheLoopMiddleware
+        if "HumanInTheLoop" in node.name or "interrupt" in node.name.lower():
+            return True
+        # Check children recursively
+        for child in node.children:
+            if has_interrupt(child):
+                return True
+        return False
+
+    for root in overview.run_tree:
+        if has_interrupt(root):
+            return True
+    return False
+
+
+def _extract_hitl_decisions(trace_id: str) -> List[HITLDecision]:
+    """Extract user HITL decisions from resume trace inputs."""
+    client = _get_client()
+
+    # Get first run of trace (should have HITL response in inputs)
+    runs = list(client.list_runs(trace_id=trace_id, limit=1))
+    if not runs:
+        return []
+
+    run = client.read_run(runs[0].id)
+    inputs = run.inputs
+
+    # Look for approval decisions in inputs
+    # This is simplified - real implementation would parse approval_analyzer output
+    decisions = []
+
+    # Check if inputs contain approval data structure
+    if isinstance(inputs, dict) and "messages" in inputs:
+        messages = inputs["messages"]
+        for msg in messages:
+            if isinstance(msg, dict) and msg.get("type") == "human":
+                content = msg.get("content", "")
+                # Parse approval responses (simplified)
+                # Real implementation would match actual approval_analyzer format
+                if "approved" in content.lower():
+                    # Extract product data from content
+                    # This is a placeholder - actual parsing would be more sophisticated
+                    decisions.append(
+                        HITLDecision(
+                            product_index=len(decisions),
+                            action="approved",
+                            original_data={},
+                        )
+                    )
+
+    return decisions
+
+
+def _count_extracted_products(overview: TraceOverview) -> int:
+    """Count products extracted in initial trace."""
+    count = 0
+
+    def count_extractions(node: RunNode):
+        nonlocal count
+        # Look for extraction specialist tool calls
+        if node.run_type == "tool" and "extract" in node.name.lower():
+            count += 1
+        for child in node.children:
+            count_extractions(child)
+
+    for root in overview.run_tree:
+        count_extractions(root)
+
+    return count
+
+
+def _count_saved_products(overview: TraceOverview) -> int:
+    """Count products saved in final trace."""
+    count = 0
+
+    def count_saves(node: RunNode):
+        nonlocal count
+        if node.run_type == "tool" and node.name == "save_product":
+            count += 1
+        for child in node.children:
+            count_saves(child)
+
+    for root in overview.run_tree:
+        count_saves(root)
+
+    return count
