@@ -1,1112 +1,654 @@
-# Tool Specifications - Complete API Reference
+# Testing Tool Specifications
 
-**Date**: 2025-01-16
-**Status**: 🔬 DESIGN
-**Purpose**: Complete API reference for all Autonomous Testing Framework tools
-
----
-
-## Executive Summary
-
-This document provides complete API specifications for all tools used in the Autonomous Testing Framework. Each tool includes: function signature, parameters, return types (Pydantic models), usage examples, implementation notes, and error handling patterns.
-
-**Tool Categories**:
-- **Execution Tools** (2): Run scenarios and conversations
-- **Analysis Tools - Level 0** (3): Lightweight overview
-- **Analysis Tools - Level 1** (4): Focused investigation
-- **Analysis Tools - Level 2** (3): Deep dive
-- **Improvement Tools** (4): Generate and apply fixes
-- **Helper Tools** (4): Workflow management
-- **Supabase MCP Tools** (3): Database validation
-
-**Total**: 23 tools
+**Status**: Design Complete | **Date**: 2025-10-17
+**Purpose**: Complete API reference for autonomous testing framework tools
 
 ---
 
-## Table of Contents
+## Overview
 
-1. [Execution Tools](#execution-tools)
-2. [Analysis Tools - Level 0](#analysis-tools---level-0)
-3. [Analysis Tools - Level 1](#analysis-tools---level-1)
-4. [Analysis Tools - Level 2](#analysis-tools---level-2)
-5. [Improvement Tools](#improvement-tools)
-6. [Helper Tools](#helper-tools)
-7. [Supabase MCP Tools](#supabase-mcp-tools)
-8. [Pydantic Models](#pydantic-models)
-9. [Error Handling](#error-handling)
-10. [Usage Patterns](#usage-patterns)
+This document provides detailed specifications for the 5 essential testing tools that enable Claude to observe workflow executions and trace data.
+
+**Core Principle**: These tools provide **information only**. Claude uses existing tools (Edit, Write, Read, MCP) for analysis and fixes.
 
 ---
 
-## Execution Tools
+## Tool 1: execute_scenario
 
-### `execute_scenario`
+Executes a test scenario via simulate.py and returns execution outcome.
 
-**Purpose**: Execute test scenario via simulate.py programmatically
+### Function Signature
 
-**Signature**:
 ```python
 def execute_scenario(
     scenario_id: str,
     hitl_mode: str = "auto_approve",
     media_path: Optional[str] = None
 ) -> ExecutionResult:
-    """Execute test scenario and return execution summary."""
+    """Execute test scenario programmatically.
+
+    Args:
+        scenario_id: Scenario name or custom prompt text
+        hitl_mode: HITL behavior - "auto_approve" | "auto_reject" | "auto_edit" | "manual"
+        media_path: Optional path to media file for multimodal testing
+
+    Returns:
+        ExecutionResult with success status, trace info, metrics
+    """
 ```
 
-**Parameters**:
-- `scenario_id` (str, required): Scenario identifier
-  - Examples: "cataloging_with_image", "text_clear", "greeting_to_cataloging"
-  - Must match predefined scenario in simulate.py or be custom message
-- `hitl_mode` (str, default="auto_approve"): HITL behavior
-  - Options: "auto_approve" | "auto_reject" | "auto_edit" | "interactive"
-- `media_path` (Optional[str]): Path to media file for testing
-  - Examples: "tests/fixtures/images/sneaker.jpg"
-  - Supports: images, audio, video, documents
+### Parameters
 
-**Returns**: `ExecutionResult`
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `scenario_id` | str | Yes | Scenario identifier or custom prompt |
+| `hitl_mode` | str | No | HITL behavior (default: "auto_approve") |
+| `media_path` | str | No | Path to image/video file |
+
+### Return Type: ExecutionResult
+
 ```python
 class ExecutionResult(BaseModel):
-    trace_id: str           # LangSmith root trace ID
-    run_id: str             # Top-level PM run ID
-    thread_id: str          # LangGraph thread ID (format: "console:user_abc")
-    success: bool           # Did scenario succeed?
-    duration: float         # Total execution time (seconds)
-    cost: float             # Total cost (dollars)
-    error: Optional[str]    # Error message if failed
-    messages_sent: List[dict]  # All messages sent via ConsoleChannel
-    approval_triggered: bool   # Was HITL approval triggered?
+    """Result of scenario execution."""
+
+    success: bool
+    """Whether scenario completed successfully."""
+
+    thread_id: str
+    """LangGraph thread ID (format: console:test_abc123)."""
+
+    trace_url: str
+    """LangSmith trace URL for viewing in browser."""
+
+    trace_id: str
+    """LangSmith trace ID for API queries."""
+
+    products_created: int
+    """Number of products created in database."""
+
+    execution_time_seconds: float
+    """Total execution time."""
+
+    errors: List[str]
+    """List of error messages if failed."""
 ```
 
-**Implementation**:
+### Usage Example
+
 ```python
-def execute_scenario(scenario_id, hitl_mode="auto_approve", media_path=None):
-    # Import simulate infrastructure
-    from tests.cli.simulate import run_scenario, ConsoleChannel
-    from autifyme_agents.integrations.storage.storage_factory import get_storage
-    from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-    from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
-
-    # Setup
-    storage = get_storage()
-    channel = ConsoleChannel(hitl_mode=hitl_mode)
-    checkpointer = get_checkpointer()
-    runner = WorkflowRunner(channel=channel, storage=storage, checkpointer=checkpointer)
-
-    # Generate unique sender to avoid checkpoint pollution
-    import uuid
-    sender = f"test_{uuid.uuid4().hex[:8]}"
-
-    # Capture trace_id from LangSmith context
-    from langsmith import get_current_run_tree
-
-    start_time = time.time()
-    try:
-        runner.handle_message(sender=sender, text=scenario_id, media_id=media_path)
-
-        # Get trace_id
-        run_tree = get_current_run_tree()
-        trace_id = run_tree.trace_id if run_tree else None
-        run_id = run_tree.id if run_tree else None
-
-        duration = time.time() - start_time
-
-        return ExecutionResult(
-            trace_id=trace_id,
-            run_id=run_id,
-            thread_id=channel.format_thread_id(sender),
-            success=True,
-            duration=duration,
-            cost=estimate_cost(trace_id),  # Calculate from trace
-            error=None,
-            messages_sent=channel.messages_sent,
-            approval_triggered=any(m["type"] == "approval" for m in channel.messages_sent)
-        )
-    except Exception as e:
-        duration = time.time() - start_time
-        return ExecutionResult(
-            trace_id=None,
-            run_id=None,
-            thread_id=channel.format_thread_id(sender),
-            success=False,
-            duration=duration,
-            cost=0,
-            error=str(e),
-            messages_sent=channel.messages_sent,
-            approval_triggered=False
-        )
-```
-
-**Usage Example**:
-```python
-# Execute scenario
+# Basic scenario test
 result = execute_scenario("cataloging_with_image", "auto_approve")
 
-if result.success:
-    print(f"✅ Scenario passed in {result.duration:.1f}s")
-    print(f"Trace: {result.trace_id}")
-else:
-    print(f"❌ Scenario failed: {result.error}")
-    # Analyze failure
-    structure = get_trace_structure(result.trace_id)
+if not result.success:
+    print(f"Scenario failed: {result.errors}")
+    # Analyze trace
+    trace = get_trace_overview(result.trace_id)
+
+# Multimodal test with image
+result = execute_scenario(
+    scenario_id="cataloging_with_image",
+    hitl_mode="auto_approve",
+    media_path="tests/fixtures/images/sneakers.jpg"
+)
+
+# Custom prompt test
+result = execute_scenario(
+    scenario_id="Catalog these blue jeans for $49",
+    hitl_mode="auto_approve"
+)
 ```
+
+### Implementation Notes
+
+- Wraps simulate.py functionality
+- Sets up ConsoleChannel with specified HITL mode
+- Creates WorkflowRunner with checkpointer
+- Captures trace_id from LangSmith context
+- Returns structured execution summary
 
 ---
 
-### `execute_conversation`
+## Tool 2: get_trace_overview
 
-**Purpose**: Execute multi-turn conversation scenario from YAML definition
+Fetches hierarchical structure of entire trace with metadata only (no inputs/outputs).
 
-**Signature**:
+**This is Level 0 analysis** - always start here to identify which runs failed.
+
+### Function Signature
+
 ```python
-def execute_conversation(scenario_yaml: str) -> ConversationResult:
-    """Execute multi-turn conversation and return results."""
+def get_trace_overview(trace_id: str) -> TraceOverview:
+    """Get lightweight trace structure - metadata only.
+
+    Fetches hierarchical run tree with status, timing, costs but excludes
+    inputs/outputs to minimize token usage. Use this first to identify
+    failures before drilling down with get_run_details().
+
+    Args:
+        trace_id: LangSmith trace ID from ExecutionResult
+
+    Returns:
+        TraceOverview with run hierarchy and metadata
+    """
 ```
 
-**Parameters**:
-- `scenario_yaml` (str, required): Path to YAML scenario file
-  - Examples: "tests/scenarios/greeting_to_cataloging.yaml"
-  - Must be valid conversation scenario YAML
+### Parameters
 
-**Returns**: `ConversationResult`
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `trace_id` | str | Yes | LangSmith trace ID |
+
+### Return Type: TraceOverview
+
 ```python
-class ConversationResult(BaseModel):
-    success: bool
-    turns: int               # Number of conversation turns
-    trace_ids: List[str]     # One trace_id per turn
-    thread_id: str           # Shared thread across turns
-    total_duration: float
-    total_cost: float
-    failed_turn: Optional[int]  # Which turn failed (if any)
-```
+class TraceOverview(BaseModel):
+    """Hierarchical overview of trace execution."""
 
-**Implementation**:
-```python
-def execute_conversation(scenario_yaml):
-    from tests.cli.conversation import load_scenario, execute_turns
+    trace_id: str
+    """LangSmith trace ID."""
 
-    # Load YAML scenario
-    scenario = load_scenario(scenario_yaml)
-
-    # Execute each turn
-    results = execute_turns(scenario, hitl_mode="auto_approve")
-
-    return ConversationResult(
-        success=all(r.success for r in results),
-        turns=len(results),
-        trace_ids=[r.trace_id for r in results],
-        thread_id=results[0].thread_id,
-        total_duration=sum(r.duration for r in results),
-        total_cost=sum(r.cost for r in results),
-        failed_turn=next((i for i, r in enumerate(results) if not r.success), None)
-    )
-```
-
-**Usage Example**:
-```python
-result = execute_conversation("tests/scenarios/greeting_to_cataloging.yaml")
-
-if result.success:
-    print(f"✅ All {result.turns} turns succeeded")
-else:
-    print(f"❌ Turn {result.failed_turn} failed")
-    # Analyze failed turn
-    failed_trace = result.trace_ids[result.failed_turn]
-```
-
----
-
-## Analysis Tools - Level 0
-
-### `get_trace_structure`
-
-**Purpose**: Get lightweight trace structure (metadata only)
-
-**Signature**:
-```python
-def get_trace_structure(trace_id: str) -> TraceStructure:
-    """Fetch trace structure without inputs/outputs."""
-```
-
-**Parameters**:
-- `trace_id` (str, required): LangSmith trace ID
-
-**Returns**: `TraceStructure`
-```python
-class TraceStructure(BaseModel):
-    run_hierarchy: Dict[str, List[str]]  # {parent_id: [child_ids]}
-    run_metadata: Dict[str, RunMetadata]
-    failed_runs: List[str]
-    slow_runs: List[str]
-    expensive_runs: List[str]
     total_runs: int
-    total_duration: float
+    """Total number of runs in trace."""
+
     total_cost: float
+    """Total cost in dollars."""
+
+    total_latency_ms: int
+    """Total execution time in milliseconds."""
+
+    run_tree: List[RunNode]
+    """Hierarchical tree of all runs."""
+
+class RunNode(BaseModel):
+    """Single run node in trace hierarchy."""
+
+    run_id: str
+    """Unique run ID for drilling down."""
+
+    name: str
+    """Run name: 'PM' | 'CatalogingDept' | 'ImageAnalysisSpecialist' | 'save_product'."""
+
+    run_type: str
+    """Run type: 'chain' | 'llm' | 'tool'."""
+
+    status: str
+    """Status: 'success' | 'error'."""
+
+    start_time: datetime
+    """When run started."""
+
+    end_time: datetime
+    """When run ended."""
+
+    duration_ms: int
+    """Duration in milliseconds."""
+
+    error: Optional[str]
+    """High-level error message if failed (not full traceback)."""
+
+    children: List[RunNode]
+    """Child runs (recursive tree structure)."""
+```
+
+### Usage Example
+
+```python
+# Get trace overview first
+overview = get_trace_overview(trace_id)
+
+print(f"Total runs: {overview.total_runs}")
+print(f"Total cost: ${overview.total_cost:.3f}")
+
+# Visualize hierarchy
+def print_tree(node, indent=0):
+    status_icon = "✅" if node.status == "success" else "❌"
+    print(f"{'  ' * indent}{status_icon} {node.name} ({node.duration_ms}ms)")
+    if node.error:
+        print(f"{'  ' * indent}   Error: {node.error}")
+    for child in node.children:
+        print_tree(child, indent + 1)
+
+for root in overview.run_tree:
+    print_tree(root)
+
+# Identify failures
+def find_failed_runs(node, failed=[]):
+    if node.status == "error":
+        failed.append(node.run_id)
+    for child in node.children:
+        find_failed_runs(child, failed)
+    return failed
+
+failed_run_ids = find_failed_runs(overview.run_tree[0])
+
+# Now drill into specific failures
+for run_id in failed_run_ids:
+    details = get_run_details(run_id)
+    print(f"Failed run {details.name}: {details.error}")
+```
+
+### Token Cost
+
+**~500 tokens** (vs 50K+ for full trace dump)
+
+### Implementation Notes
+
+- Uses LangSmith API: `client.list_runs(trace_id=trace_id)`
+- Fetches metadata only: `select=["id", "name", "run_type", "status", "start_time", "end_time", "error", "parent_run_id"]`
+- Excludes inputs/outputs fields (these are expensive)
+- Builds recursive tree from parent_run_id relationships
+- Returns structured hierarchy for visualization
+
+---
+
+## Tool 3: get_run_details
+
+Fetches specific run's inputs, outputs, and error details.
+
+**This is Level 1 analysis** - use after identifying failures in Level 0.
+
+### Function Signature
+
+```python
+def get_run_details(run_id: str) -> RunDetails:
+    """Get detailed information for specific run.
+
+    Fetches inputs, outputs, and error details for a single run.
+    Use this after get_trace_overview() identifies a failure to
+    investigate the specific problem.
+
+    Args:
+        run_id: Run ID from TraceOverview
+
+    Returns:
+        RunDetails with inputs, outputs, error
+    """
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `run_id` | str | Yes | Run ID from TraceOverview |
+
+### Return Type: RunDetails
+
+```python
+class RunDetails(BaseModel):
+    """Detailed information for a specific run."""
+
+    run_id: str
+    """Run ID."""
+
+    name: str
+    """Run name."""
+
+    run_type: str
+    """Run type: 'chain' | 'll m' | 'tool'."""
+
+    inputs: Dict[str, Any]
+    """Full inputs (prompts, tool arguments, etc)."""
+
+    outputs: Optional[Dict[str, Any]]
+    """Full outputs if successful (structured output, tool results)."""
+
+    error: Optional[str]
+    """Full error message and traceback if failed."""
+
+    metadata: RunMetadata
+    """Additional metadata."""
 
 class RunMetadata(BaseModel):
-    name: str
-    run_type: str
-    status: str
-    duration: float
-    cost: float
-    error_type: Optional[str]
-    token_usage: Optional[int]
+    """Metadata for a run."""
+
+    model: str
+    """Model used (e.g., 'gpt-4')."""
+
+    total_tokens: int
+    """Token usage."""
+
+    latency_ms: int
+    """Latency in milliseconds."""
+
+    parent_run_id: Optional[str]
+    """Parent run ID for context."""
 ```
 
-**Token Cost**: ~500 tokens
+### Usage Example
 
-**Usage Example**: See HIERARCHICAL_TRACE_ANALYSIS.md
+```python
+# After identifying failure in Level 0
+overview = get_trace_overview(trace_id)
+failed_runs = [node.run_id for node in overview.run_tree if node.status == "error"]
+
+# Get details for each failure
+for run_id in failed_runs:
+    details = get_run_details(run_id)
+
+    print(f"Failed Run: {details.name}")
+    print(f"Error: {details.error}")
+    print(f"Inputs: {details.inputs}")
+
+    # Analyze based on run type
+    if details.run_type == "tool":
+        # Tool failure - check tool inputs
+        print(f"Tool was called with: {details.inputs}")
+
+    elif details.run_type == "llm":
+        # LLM failure - check prompt and response
+        prompt = details.inputs.get("messages", [])
+        print(f"Prompt: {prompt}")
+
+        if details.outputs:
+            print(f"Output: {details.outputs}")
+
+    # Check if parent context needed
+    if details.metadata.parent_run_id:
+        parent = get_run_details(details.metadata.parent_run_id)
+        print(f"Parent run: {parent.name}")
+```
+
+### Token Cost
+
+**~1,500 tokens per run** (includes inputs/outputs)
+
+### Implementation Notes
+
+- Uses LangSmith API: `client.read_run(run_id)`
+- Fetches full run with inputs/outputs
+- Returns structured data for analysis
+- Use sparingly - only for identified failures
 
 ---
 
-### `get_scenario_outcome`
+## Tool 4: get_run_messages
 
-**Purpose**: Get high-level scenario result
+Fetches full conversation messages for a run (expensive, rare use).
 
-**Signature**:
+**This is Level 2 analysis** - only use when Level 1 doesn't explain the issue.
+
+### Function Signature
+
 ```python
-def get_scenario_outcome(thread_id: str) -> ScenarioOutcome:
-    """Get scenario outcome from LangGraph thread."""
+def get_run_messages(run_id: str) -> RunMessages:
+    """Get full conversation messages for a run.
+
+    Fetches complete message history for an LLM run. This is expensive
+    in tokens and should only be used when get_run_details() doesn't
+    provide enough information to understand the failure.
+
+    Args:
+        run_id: Run ID from TraceOverview (typically LLM run)
+
+    Returns:
+        RunMessages with full conversation history
+    """
 ```
 
-**Parameters**:
-- `thread_id` (str, required): LangGraph thread ID
+### Parameters
 
-**Returns**: `ScenarioOutcome`
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `run_id` | str | Yes | Run ID (should be LLM run type) |
+
+### Return Type: RunMessages
+
 ```python
-class ScenarioOutcome(BaseModel):
-    success: bool
-    duration: float
-    total_cost: float
-    message_count: int
-    approval_triggered: bool
-    final_state: str        # "completed" | "failed" | "awaiting_approval"
-    error_summary: Optional[str]
-```
+class RunMessages(BaseModel):
+    """Full conversation messages for a run."""
 
-**Implementation**:
-```python
-def get_scenario_outcome(thread_id):
-    from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-
-    checkpointer = get_checkpointer()
-    config = {"configurable": {"thread_id": thread_id}}
-
-    # Get final state
-    state_tuple = checkpointer.get_tuple(config)
-    if not state_tuple:
-        return ScenarioOutcome(success=False, error_summary="No state found")
-
-    state = state_tuple.checkpoint
-    return ScenarioOutcome(
-        success=state.get("status") == "completed",
-        duration=calculate_duration(state),
-        total_cost=state.get("total_cost", 0),
-        message_count=len(state.get("messages", [])),
-        approval_triggered=bool(state.get("pending_interrupts")),
-        final_state=state.get("status", "unknown"),
-        error_summary=state.get("last_error")
-    )
-```
-
-**Usage Example**:
-```python
-outcome = get_scenario_outcome("console:test_abc123")
-if not outcome.success:
-    print(f"Scenario failed: {outcome.error_summary}")
-```
-
----
-
-### `quick_db_check`
-
-**Purpose**: Quick DB existence check via Supabase MCP
-
-**Signature**:
-```python
-def quick_db_check(
-    scenario_id: str,
-    expected_count: int = 1
-) -> QuickCheck:
-    """Quick COUNT query to verify records exist."""
-```
-
-**Parameters**:
-- `scenario_id` (str, required): Scenario identifier (stored in product metadata)
-- `expected_count` (int, default=1): Expected number of records
-
-**Returns**: `QuickCheck`
-```python
-class QuickCheck(BaseModel):
-    exists: bool
-    count: int
-    matches_expected: bool
-    table: str
-```
-
-**Implementation**:
-```python
-def quick_db_check(scenario_id, expected_count=1):
-    result = mcp__supabase__execute_sql(
-        f"SELECT COUNT(*) as count FROM products WHERE metadata->>'scenario_id' = '{scenario_id}'"
-    )
-    count = result[0]['count']
-
-    return QuickCheck(
-        exists=count > 0,
-        count=count,
-        matches_expected=(count == expected_count),
-        table="products"
-    )
-```
-
-**Usage Example**:
-```python
-check = quick_db_check("cataloging_with_image")
-if not check.matches_expected:
-    print(f"Expected {check.expected_count}, found {check.count}")
-    # Fetch details
-    records = get_product_record(scenario_id="cataloging_with_image")
-```
-
----
-
-## Analysis Tools - Level 1
-
-### `analyze_failure_chain`
-
-**Purpose**: Analyze specific failure with context
-
-**Signature**:
-```python
-def analyze_failure_chain(failed_run_id: str) -> FailureAnalysis:
-    """Fetch failure details and trace root cause."""
-```
-
-**Parameters**:
-- `failed_run_id` (str, required): Run ID that failed
-
-**Returns**: `FailureAnalysis`
-```python
-class FailureAnalysis(BaseModel):
-    error_type: str
-    error_message: str
-    stack_trace: Optional[str]
-    root_cause_hypothesis: str
-    affected_component: str
-    component_file: Optional[str]
-    related_run_ids: List[str]
-    inputs_snapshot: dict
-    outputs_snapshot: Optional[dict]
-    parent_run_name: str
-```
-
-**Token Cost**: ~1,000 tokens
-
-**Usage Example**: See HIERARCHICAL_TRACE_ANALYSIS.md
-
----
-
-### `validate_structured_output`
-
-**Purpose**: Check if component returned correct Pydantic model
-
-**Signature**:
-```python
-def validate_structured_output(
-    run_id: str,
-    expected_schema: str
-) -> ValidationResult:
-    """Validate output against Pydantic schema."""
-```
-
-**Parameters**:
-- `run_id` (str, required): Run ID to validate
-- `expected_schema` (str, required): Schema name
-  - Options: "Product" | "ImageAnalysisResult" | "CatalogingResult"
-
-**Returns**: `ValidationResult`
-```python
-class ValidationResult(BaseModel):
-    schema_valid: bool
-    violations: List[FieldViolation]
-    type_mismatches: List[TypeMismatch]
-    missing_fields: List[str]
-    extra_fields: List[str]
-
-class FieldViolation(BaseModel):
-    field: str
-    expected: str
-    actual: Any
-    message: str
-```
-
-**Implementation**:
-```python
-def validate_structured_output(run_id, expected_schema):
-    from langsmith import Client
-    from autifyme_agents.schemas.models import Product, ImageAnalysisResult, CatalogingResult
-
-    schemas = {
-        "Product": Product,
-        "ImageAnalysisResult": ImageAnalysisResult,
-        "CatalogingResult": CatalogingResult
-    }
-
-    schema_class = schemas.get(expected_schema)
-    if not schema_class:
-        raise ValueError(f"Unknown schema: {expected_schema}")
-
-    # Fetch run output
-    client = Client()
-    run = client.read_run(run_id)
-    output = run.outputs
-
-    # Validate against schema
-    violations = []
-    type_mismatches = []
-
-    try:
-        validated = schema_class(**output)
-    except ValidationError as e:
-        for error in e.errors():
-            field = error['loc'][0] if error['loc'] else 'unknown'
-            violations.append(FieldViolation(
-                field=field,
-                expected=error['type'],
-                actual=output.get(field),
-                message=error['msg']
-            ))
-
-    return ValidationResult(
-        schema_valid=len(violations) == 0,
-        violations=violations,
-        type_mismatches=type_mismatches,
-        missing_fields=[],
-        extra_fields=[]
-    )
-```
-
-**Usage Example**:
-```python
-validation = validate_structured_output("specialist_run_id", "Product")
-if not validation.schema_valid:
-    for v in validation.violations:
-        print(f"Field '{v.field}': {v.message}")
-```
-
----
-
-### `get_product_record`
-
-**Purpose**: Get product record from Supabase via MCP
-
-**Signature**:
-```python
-def get_product_record(
-    product_id: Optional[str] = None,
-    scenario_id: Optional[str] = None,
-    filters: Optional[Dict] = None
-) -> ProductRecordResult:
-    """Query products from Supabase."""
-```
-
-**Parameters**:
-- `product_id` (Optional[str]): Specific product UUID
-- `scenario_id` (Optional[str]): Get products for scenario
-- `filters` (Optional[Dict]): Additional WHERE clauses
-
-**Returns**: `ProductRecordResult`
-```python
-class ProductRecordResult(BaseModel):
-    found: bool
-    count: int
-    records: List[ProductRecord]
-
-class ProductRecord(BaseModel):
-    id: str
-    name: Optional[str]
-    description: Optional[str]
-    price: Optional[float]
-    sizes: List[str]
-    colors: List[str]
-    image_urls: List[str]
-    created_at: str
-    metadata: dict
-```
-
-**Implementation**:
-```python
-def get_product_record(product_id=None, scenario_id=None, filters=None):
-    if product_id:
-        query = f"SELECT * FROM products WHERE id = '{product_id}'"
-    elif scenario_id:
-        query = f"SELECT * FROM products WHERE metadata->>'scenario_id' = '{scenario_id}'"
-    else:
-        query = "SELECT * FROM products LIMIT 10"
-
-    result = mcp__supabase__execute_sql(query)
-
-    return ProductRecordResult(
-        found=len(result) > 0,
-        count=len(result),
-        records=[ProductRecord(**r) for r in result]
-    )
-```
-
-**Usage Example**:
-```python
-result = get_product_record(scenario_id="cataloging_with_image")
-if result.found:
-    record = result.records[0]
-    print(f"Product: {record.name}, Price: {record.price}")
-```
-
----
-
-## Analysis Tools - Level 2
-
-### `get_full_run_details`
-
-**Purpose**: Fetch complete run details (expensive, use sparingly)
-
-**Signature**:
-```python
-def get_full_run_details(run_id: str) -> FullRunDetails:
-    """Fetch full run with inputs/outputs."""
-```
-
-**Parameters**:
-- `run_id` (str, required): Run ID to fetch
-
-**Returns**: `FullRunDetails`
-```python
-class FullRunDetails(BaseModel):
     run_id: str
+    """Run ID."""
+
+    messages: List[Message]
+    """All messages in conversation."""
+
+class Message(BaseModel):
+    """Single message in conversation."""
+
+    role: str
+    """Message role: 'system' | 'user' | 'assistant'."""
+
+    content: str
+    """Message content (text, JSON, etc)."""
+
+    tool_calls: Optional[List[ToolCall]]
+    """Tool calls made by assistant."""
+
+    tool_results: Optional[List[ToolResult]]
+    """Tool results returned."""
+
+class ToolCall(BaseModel):
+    """Tool call made by assistant."""
+
     name: str
-    run_type: str
-    status: str
-    duration: float
-    cost: float
-    inputs: dict
-    outputs: dict
-    error: Optional[dict]
-    metadata: dict
-    children: List[str]
-    parent: Optional[str]
+    """Tool name."""
+
+    arguments: Dict[str, Any]
+    """Tool arguments."""
+
+class ToolResult(BaseModel):
+    """Tool execution result."""
+
+    name: str
+    """Tool name."""
+
+    result: Any
+    """Tool return value."""
 ```
 
-**Token Cost**: 5,000-10,000 tokens
+### Usage Example
 
-**Usage Criteria**:
-- Root cause unclear from Level 0-1
-- Need exact prompt/response
-- Investigating complex reasoning
-- Context leakage suspected
+```python
+# Only use after Level 1 analysis doesn't explain issue
+details = get_run_details(specialist_run_id)
+
+# If error unclear, fetch full messages
+if "unclear reasoning" or "need to see full context":
+    messages = get_run_messages(specialist_run_id)
+
+    print("Full Conversation:")
+    for msg in messages.messages:
+        print(f"[{msg.role}]: {msg.content[:200]}...")
+
+        if msg.tool_calls:
+            for call in msg.tool_calls:
+                print(f"  Tool Call: {call.name}({call.arguments})")
+
+        if msg.tool_results:
+            for result in msg.tool_results:
+                print(f"  Tool Result: {result.name} = {result.result}")
+```
+
+### Token Cost
+
+**~5,000+ tokens** (varies with conversation length)
+
+### Usage Criteria
+
+Only use when:
+- Root cause unclear from Level 0 + Level 1
+- Need to see exact prompt/response
+- Debugging complex multi-step reasoning
+- Investigating context leakage
+
+### Implementation Notes
+
+- Uses LangSmith API: `client.read_run(run_id)`
+- Extracts full message array from inputs/outputs
+- Expensive - use rarely
+- Most issues can be diagnosed with Level 0 + Level 1
 
 ---
 
-### `trace_data_lineage`
+## Tool 5: list_recent_tests
 
-**Purpose**: Trace where data came from through execution hierarchy
+Lists recent test executions for progress tracking.
 
-**Signature**:
+### Function Signature
+
 ```python
-def trace_data_lineage(
-    field: str,
-    final_run_id: str
-) -> DataLineage:
-    """Trace field transformations."""
+def list_recent_tests(limit: int = 10) -> TestHistory:
+    """List recent test executions.
+
+    Returns history of recent test executions with outcomes.
+    Useful for tracking progress across iterations and comparing
+    metrics before/after improvements.
+
+    Args:
+        limit: Maximum number of tests to return (default: 10)
+
+    Returns:
+        TestHistory with list of recent executions
+    """
 ```
 
-**Parameters**:
-- `field` (str, required): Field name to trace (e.g., "price")
-- `final_run_id` (str, required): Run where field appears
+### Parameters
 
-**Returns**: `DataLineage`
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | int | No | Max tests to return (default: 10) |
+
+### Return Type: TestHistory
+
 ```python
-class DataLineage(BaseModel):
-    field: str
-    transformations: List[Transformation]
-    origin_run_id: str
-    origin_run_name: str
+class TestHistory(BaseModel):
+    """History of test executions."""
 
-class Transformation(BaseModel):
-    run_id: str
-    run_name: str
-    input_value: Any
-    output_value: Any
-    transformation_type: str  # "coercion" | "extraction" | "passthrough"
-```
+    tests: List[TestExecution]
+    """List of test executions, newest first."""
 
-**Usage Example**: See HIERARCHICAL_TRACE_ANALYSIS.md
+class TestExecution(BaseModel):
+    """Single test execution record."""
 
----
+    timestamp: datetime
+    """When test was executed."""
 
-## Improvement Tools
+    scenario_id: str
+    """Scenario identifier."""
 
-### `generate_prompt_improvement`
+    thread_id: str
+    """LangGraph thread ID."""
 
-**Purpose**: Generate improved prompt using LLM
+    trace_url: str
+    """LangSmith trace URL."""
 
-**Signature**:
-```python
-def generate_prompt_improvement(
-    issue_description: str,
-    current_prompt: str,
-    trace_examples: List[str]
-) -> PromptImprovement:
-    """Generate improved prompt based on issue."""
-```
-
-**Parameters**:
-- `issue_description` (str, required): Human-readable issue
-- `current_prompt` (str, required): Full current prompt text
-- `trace_examples` (List[str], required): Run IDs showing issue
-
-**Returns**: `PromptImprovement`
-```python
-class PromptImprovement(BaseModel):
-    proposed_prompt: str
-    reasoning: str
-    expected_impact: str
-    diff: str
-    confidence: float
-    affected_scenarios: List[str]
-```
-
-**Implementation**:
-```python
-def generate_prompt_improvement(issue_description, current_prompt, trace_examples):
-    from langchain_openai import ChatOpenAI
-
-    llm = ChatOpenAI(model="gpt-4", temperature=0.3)
-
-    # Fetch trace examples
-    examples_text = "\n\n".join([
-        f"Example {i+1}:\n{get_trace_example(run_id)}"
-        for i, run_id in enumerate(trace_examples)
-    ])
-
-    prompt = f"""You are an expert prompt engineer. Analyze this issue and improve the prompt.
-
-Issue: {issue_description}
-
-Current Prompt:
-{current_prompt}
-
-Trace Examples Showing Issue:
-{examples_text}
-
-Generate an improved prompt that fixes this issue. Explain your reasoning and show a diff of changes.
-
-Output JSON:
-{{
-  "proposed_prompt": "...",
-  "reasoning": "...",
-  "expected_impact": "...",
-  "confidence": 0.0-1.0
-}}
-"""
-
-    response = llm.invoke(prompt)
-    result = json.loads(response.content)
-
-    # Generate diff
-    import difflib
-    diff = "\n".join(difflib.unified_diff(
-        current_prompt.splitlines(),
-        result["proposed_prompt"].splitlines(),
-        lineterm=""
-    ))
-
-    return PromptImprovement(
-        proposed_prompt=result["proposed_prompt"],
-        reasoning=result["reasoning"],
-        expected_impact=result["expected_impact"],
-        diff=diff,
-        confidence=result["confidence"],
-        affected_scenarios=[]  # TODO: Identify affected scenarios
-    )
-```
-
-**Usage Example**:
-```python
-improvement = generate_prompt_improvement(
-    issue_description="Specialist returns price as string",
-    current_prompt=read_file("..."),
-    trace_examples=["run_abc123"]
-)
-
-print(f"Confidence: {improvement.confidence}")
-print(f"Reasoning: {improvement.reasoning}")
-print(f"\nDiff:\n{improvement.diff}")
-```
-
----
-
-### `generate_code_fix`
-
-**Purpose**: Generate code fix using LLM
-
-**Signature**:
-```python
-def generate_code_fix(
-    issue_description: str,
-    file_path: str,
-    error_context: str
-) -> CodeFix:
-    """Generate code fix for issue."""
-```
-
-**Parameters**:
-- `issue_description` (str, required): Issue description
-- `file_path` (str, required): File to fix
-- `error_context` (str, required): Error message/trace
-
-**Returns**: `CodeFix`
-```python
-class CodeFix(BaseModel):
-    proposed_changes: str
-    reasoning: str
-    files_affected: List[str]
-    risk_level: str
-    confidence: float
-    test_recommendations: List[str]
-```
-
-**Usage Example**:
-```python
-fix = generate_code_fix(
-    issue_description="save_product doesn't extract image_urls",
-    file_path="agents/src/.../cataloging_tools.py",
-    error_context=failure_analysis.error_message
-)
-
-if fix.risk_level == "low" and fix.confidence > 0.8:
-    print("Safe to apply")
-```
-
----
-
-### `apply_improvement`
-
-**Purpose**: Apply improvement with backup
-
-**Signature**:
-```python
-def apply_improvement(
-    improvement_type: str,
-    target_file: str,
-    changes: str,
-    backup: bool = True
-) -> ApplyResult:
-    """Apply improvement and create backup."""
-```
-
-**Parameters**:
-- `improvement_type` (str, required): "prompt" | "code"
-- `target_file` (str, required): File to modify
-- `changes` (str, required): New content or diff
-- `backup` (bool, default=True): Create backup?
-
-**Returns**: `ApplyResult`
-```python
-class ApplyResult(BaseModel):
     success: bool
-    backup_path: Optional[str]
-    files_modified: List[str]
-    error: Optional[str]
+    """Whether test passed."""
+
+    products_created: int
+    """Products created in database."""
+
+    execution_time_seconds: float
+    """Execution time."""
+
+    errors_summary: str
+    """Brief error summary if failed."""
 ```
 
-**Implementation**:
+### Usage Example
+
 ```python
-def apply_improvement(improvement_type, target_file, changes, backup=True):
-    from datetime import datetime
+# View recent test results
+history = list_recent_tests(limit=20)
 
-    # Create backup
-    backup_path = None
-    if backup:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = f"{target_file}.backup.{timestamp}"
-        shutil.copy(target_file, backup_path)
+print(f"Recent Tests ({len(history.tests)}):")
+for test in history.tests:
+    status = "✅" if test.success else "❌"
+    print(f"{status} {test.scenario_id} - {test.timestamp} ({test.execution_time_seconds:.1f}s)")
+    if not test.success:
+        print(f"   Error: {test.errors_summary}")
 
-    try:
-        # Apply changes using Edit tool
-        with open(target_file, 'r') as f:
-            current_content = f.read()
+# Compare before/after improvement
+history = list_recent_tests(limit=10)
+scenario = "cataloging_with_image"
 
-        with open(target_file, 'w') as f:
-            f.write(changes)
+scenario_tests = [t for t in history.tests if t.scenario_id == scenario]
+recent = scenario_tests[0]
+baseline = scenario_tests[-1]
 
-        # Log to improvement history
-        log_improvement(improvement_type, target_file, changes)
+print(f"Improvement for {scenario}:")
+print(f"  Before: {'✅' if baseline.success else '❌'} ({baseline.execution_time_seconds:.1f}s)")
+print(f"  After:  {'✅' if recent.success else '❌'} ({recent.execution_time_seconds:.1f}s)")
 
-        return ApplyResult(
-            success=True,
-            backup_path=backup_path,
-            files_modified=[target_file],
-            error=None
-        )
-    except Exception as e:
-        # Restore from backup
-        if backup and backup_path:
-            shutil.copy(backup_path, target_file)
-
-        return ApplyResult(
-            success=False,
-            backup_path=backup_path,
-            files_modified=[],
-            error=str(e)
-        )
+# Track success rate over time
+success_rate = sum(1 for t in history.tests if t.success) / len(history.tests)
+print(f"Overall success rate: {success_rate * 100:.1f}%")
 ```
 
-**Usage Example**:
-```python
-result = apply_improvement(
-    improvement_type="prompt",
-    target_file="agents/src/.../cataloging_specialist.prompt",
-    changes=improvement.proposed_prompt
-)
+### Implementation Notes
 
-if result.success:
-    print(f"✅ Applied. Backup: {result.backup_path}")
-```
+- Stores test history in local SQLite DB or JSON file
+- Captures key metrics from ExecutionResult
+- Sorted by timestamp (newest first)
+- Used for improvement validation and progress tracking
 
 ---
 
-### `compare_execution_metrics`
+## Implementation Guidance
 
-**Purpose**: Compare metrics before/after improvement
+### Phase 1 (Week 1)
 
-**Signature**:
-```python
-def compare_execution_metrics(
-    baseline_result: ExecutionResult,
-    new_result: ExecutionResult
-) -> MetricsComparison:
-    """Compare execution results."""
+Implement these 5 tools in order:
+
+1. `execute_scenario()` - Core execution capability
+2. `get_trace_overview()` - Level 0 analysis
+3. `get_run_details()` - Level 1 analysis
+4. `list_recent_tests()` - History tracking
+5. Test manually with Claude on 5-10 scenarios
+
+### File Structure
+
+```
+tests/tools/
+  ├── execution.py          # execute_scenario
+  ├── trace_analysis.py     # get_trace_overview, get_run_details, get_run_messages
+  ├── test_history.py       # list_recent_tests
+  └── models.py             # Pydantic models
 ```
 
-**Parameters**:
-- `baseline_result` (ExecutionResult, required): Before improvement
-- `new_result` (ExecutionResult, required): After improvement
+### Dependencies
 
-**Returns**: `MetricsComparison`
 ```python
-class MetricsComparison(BaseModel):
-    improved: bool
-    success_rate_delta: float
-    latency_delta: float
-    cost_delta: float
-    quality_delta: Optional[float]
-    recommendation: str  # "KEEP" | "REVERT" | "ITERATE"
+# LangSmith client
+from langsmith import Client
+
+# Supabase MCP (already available)
+# No additional dependencies needed
+
+# Existing simulate.py infrastructure
+from tests.cli.simulate import ConsoleChannel, WorkflowRunner
 ```
 
-**Implementation**:
-```python
-def compare_execution_metrics(baseline, new):
-    success_delta = int(new.success) - int(baseline.success)
-    latency_delta = new.duration - baseline.duration
-    cost_delta = new.cost - baseline.cost
+### Testing Strategy
 
-    # Decision logic
-    if success_delta > 0:
-        recommendation = "KEEP"  # Success improved
-    elif success_delta == 0 and latency_delta < 0:
-        recommendation = "KEEP"  # Latency improved
-    elif success_delta < 0:
-        recommendation = "REVERT"  # Success degraded
-    else:
-        recommendation = "ITERATE"  # No clear improvement
-
-    return MetricsComparison(
-        improved=(success_delta > 0 or latency_delta < -0.5),
-        success_rate_delta=success_delta,
-        latency_delta=latency_delta,
-        cost_delta=cost_delta,
-        quality_delta=None,
-        recommendation=recommendation
-    )
-```
-
-**Usage Example**:
-```python
-baseline = execute_scenario("test")
-# Apply improvement
-new = execute_scenario("test")
-
-comparison = compare_execution_metrics(baseline, new)
-print(f"Recommendation: {comparison.recommendation}")
-```
+Manual testing with Claude:
+1. Execute 5 scenarios with `execute_scenario()`
+2. Analyze failures with `get_trace_overview()` + `get_run_details()`
+3. Validate token costs (Level 0: ~500, Level 1: ~1,500)
+4. Test improvement cycle end-to-end
+5. Verify history tracking with `list_recent_tests()`
 
 ---
 
-## Helper Tools
+## Token Budget Summary
 
-### `load_scenario_list`
+| Tool | Token Cost | Frequency |
+|------|------------|-----------|
+| `execute_scenario()` | Minimal | Every test |
+| `get_trace_overview()` | ~500 | Every test (Level 0) |
+| `get_run_details()` | ~1,500 | Per failure (Level 1) |
+| `get_run_messages()` | ~5,000+ | Rare (Level 2) |
+| `list_recent_tests()` | Minimal | As needed |
 
-**Purpose**: Load scenarios matching pattern
+**Target**: < 3K tokens per scenario analysis (90% cases stay at Level 0 + Level 1)
 
-**Signature**:
-```python
-def load_scenario_list(pattern: str) -> List[str]:
-    """Get all scenarios matching pattern."""
-```
-
-**Parameters**:
-- `pattern` (str, required): Glob pattern
-  - Examples: "cataloging_*", "text_*", "*_with_image"
-
-**Returns**: List[str] - Scenario IDs
-
-**Implementation**:
-```python
-def load_scenario_list(pattern):
-    from tests.cli.simulate import get_predefined_scenarios
-    import fnmatch
-
-    scenarios = get_predefined_scenarios()
-    return [s for s in scenarios.keys() if fnmatch.fnmatch(s, pattern)]
-```
-
-**Usage Example**:
-```python
-scenarios = load_scenario_list("cataloging_*")
-# ["cataloging_with_image", "cataloging_text_only", ...]
-```
+**Savings**: 25x vs naive full dump approach (50K → 2K tokens)
 
 ---
 
-### `select_next_scenario`
+## Related Documentation
 
-**Purpose**: Select next scenario based on priority
-
-**Signature**:
-```python
-def select_next_scenario(
-    queue: List[str],
-    history: Dict[str, Any],
-    strategy: str = "failure_rate"
-) -> str:
-    """Select next scenario to test."""
-```
-
-**Parameters**:
-- `queue` (List[str], required): Available scenarios
-- `history` (Dict, required): Past execution history
-- `strategy` (str, default="failure_rate"): Prioritization strategy
-  - Options: "failure_rate" | "last_tested" | "impact" | "round_robin"
-
-**Returns**: str - Next scenario ID
-
-**Implementation**:
-```python
-def select_next_scenario(queue, history, strategy="failure_rate"):
-    if strategy == "failure_rate":
-        # Prioritize scenarios with highest failure rate
-        return max(queue, key=lambda s: history.get(s, {}).get("failure_rate", 0))
-    elif strategy == "last_tested":
-        # Prioritize scenarios not tested recently
-        return min(queue, key=lambda s: history.get(s, {}).get("last_tested", 0))
-    elif strategy == "round_robin":
-        return queue[0]
-```
-
-**Usage Example**:
-```python
-next_scenario = select_next_scenario(
-    queue=["cataloging_with_image", "text_clear"],
-    history=improvement_history,
-    strategy="failure_rate"
-)
-```
-
----
-
-## Supabase MCP Tools
-
-All DB operations use Supabase MCP for security and type safety.
-
-### `mcp__supabase__execute_sql`
-
-**Purpose**: Execute SQL query via MCP
-
-**Signature**: Provided by Supabase MCP
-
-**Usage Example**:
-```python
-result = mcp__supabase__execute_sql(
-    "SELECT * FROM products WHERE price > 50 LIMIT 10"
-)
-```
-
----
-
-## Pydantic Models
-
-All tool return types defined as Pydantic models for type safety:
-
-```python
-# See individual tool specifications above for complete models
-```
-
----
-
-## Error Handling
-
-All tools follow consistent error handling:
-
-```python
-class ToolError(BaseModel):
-    tool_name: str
-    error_type: str
-    error_message: str
-    context: dict
-    recoverable: bool
-    suggested_action: str
-```
-
-Tools return errors in result objects, not raise exceptions.
-
----
-
-## Usage Patterns
-
-### Pattern 1: Hierarchical Analysis
-
-```python
-# Level 0
-structure = get_trace_structure(trace_id)
-
-if structure.failed_runs:
-    # Level 1
-    for run_id in structure.failed_runs:
-        failure = analyze_failure_chain(run_id)
-
-        if not failure.root_cause_hypothesis:
-            # Level 2
-            details = get_full_run_details(run_id)
-```
-
-### Pattern 2: Improvement Cycle
-
-```python
-# Identify issue
-failure = analyze_failure_chain(run_id)
-
-# Generate fix
-improvement = generate_prompt_improvement(failure.issue, ...)
-
-# Apply
-result = apply_improvement("prompt", file, improvement.proposed_prompt)
-
-# Validate
-new_execution = execute_scenario(scenario_id)
-comparison = compare_execution_metrics(baseline, new_execution)
-```
-
----
-
-**Last Updated**: 2025-01-16
-**Next Review**: After Phase 1 implementation
+- `AUTONOMOUS_TESTING_FRAMEWORK.md` - Complete framework overview
+- `HIERARCHICAL_TRACE_ANALYSIS.md` - Token optimization strategy
+- `QUICK_REFERENCE.md` - Cheat sheet for common workflows

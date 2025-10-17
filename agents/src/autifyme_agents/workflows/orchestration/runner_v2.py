@@ -387,6 +387,7 @@ class WorkflowRunner:
                                 "description": description,
                             }
                             pending_interrupts_list.append(interrupt_info)
+                            logger.info(f"[RESUME ORDER] Interrupt {action_idx + 1}: {tool_args.get('name', 'unknown')}")
 
                     # Single dict value (single action)
                     elif isinstance(interrupt_value, dict):
@@ -818,6 +819,7 @@ class WorkflowRunner:
                         if isinstance(clean_value, dict):
                             draft = Product.model_validate(clean_value)
                             products_to_approve.append(draft)
+                            logger.info(f"[DISPLAY ORDER] Product {idx + 1}: {draft.name}")
 
                 # Send all products in batch
                 if len(products_to_approve) > 0:

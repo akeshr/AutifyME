@@ -143,7 +143,11 @@ class ConsoleChannel(MessagingChannel):
             if match:
                 product_count = int(match.group(1))
                 self.approval_count = product_count  # Set counter for mixed mode
-                print(f"\n[BATCH APPROVAL DETECTED: {product_count} products]\n")
+                print(f"\n[BATCH APPROVAL DETECTED: {product_count} products, counter set to {self.approval_count}]\n")
+            else:
+                print(f"\n[BATCH MESSAGE FOUND BUT NO MATCH: {message[:100]}]\n")
+        else:
+            print(f"\n[NOT A BATCH MESSAGE: {len(message)} chars]\n")
 
         self.messages_sent.append({"type": "text", "message": message})
         return {"status": "sent"}

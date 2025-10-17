@@ -1,105 +1,73 @@
-# Quick Reference - Autonomous Testing Framework Cheat Sheet
+# Autonomous Testing Framework - Quick Reference
 
-**Date**: 2025-01-16
-**Purpose**: Quick reference for common testing workflows and tool usage
+**Date**: 2025-10-17 | **For**: Claude (Jarvis)
 
 ---
 
-## Common Commands
+## Core Philosophy
 
-### Test Single Scenario
+**Tools provide visibility, Claude provides intelligence.**
+
+- Framework gives you information-gathering tools (5 total)
+- You use existing tools (Edit, Write, Read, MCP) for analysis and fixes
+- Focus on hierarchical observation to save 25x tokens
+
+---
+
+## 5 Essential Tools
+
 ```python
-result = execute_scenario("cataloging_with_image", "auto_approve")
-if not result.success:
-    structure = get_trace_structure(result.trace_id)
-    failure = analyze_failure_chain(structure.failed_runs[0])
-```
+# 1. Execute test
+execute_scenario("cataloging_with_image", "auto_approve", "sneakers.jpg")
+→ ExecutionResult (success, trace_id, products_created, errors)
 
-### Test Multiple Scenarios
-```python
-scenarios = load_scenario_list("cataloging_*")
-for scenario_id in scenarios:
-    result = execute_scenario(scenario_id, "auto_approve")
-    # Analyze results...
-```
+# 2. Level 0: Get trace structure (~500 tokens)
+get_trace_overview(trace_id)
+→ TraceOverview (run tree, identify failures)
 
-### Analyze Failure
-```python
-# Level 0: Overview
-structure = get_trace_structure(trace_id)
+# 3. Level 1: Get run details (~1,500 tokens)
+get_run_details(failed_run_id)
+→ RunDetails (inputs, outputs, error)
 
-# Level 1: Focused
-if structure.failed_runs:
-    failure = analyze_failure_chain(structure.failed_runs[0])
-    validation = validate_structured_output(related_run_id, "Product")
+# 4. Level 2: Get full messages (~5K+ tokens, rare)
+get_run_messages(run_id)
+→ RunMessages (full conversation)
 
-# Level 2: Deep Dive (rare)
-if not failure.root_cause_clear:
-    details = get_full_run_details(failed_run_id)
-```
-
-### Check Database
-```python
-# Quick check
-check = quick_db_check("cataloging_with_image")
-
-# Get details
-if not check.matches_expected:
-    result = get_product_record(scenario_id="cataloging_with_image")
-```
-
-### Generate & Apply Fix
-```python
-# Generate
-improvement = generate_prompt_improvement(
-    issue_description="Specialist returns price as string",
-    current_prompt=read_file("..."),
-    trace_examples=["run_id"]
-)
-
-# Apply
-result = apply_improvement("prompt", target_file, improvement.proposed_prompt)
-
-# Validate
-new_result = execute_scenario(scenario_id)
-comparison = compare_execution_metrics(baseline, new_result)
+# 5. List test history
+list_recent_tests(limit=10)
+→ TestHistory (recent executions for comparison)
 ```
 
 ---
 
-## Tool Categories
+## Standard Workflow
 
-### Execution (2 tools)
-- `execute_scenario` - Run single scenario
-- `execute_conversation` - Run multi-turn conversation
+```
+1. EXECUTE
+   result = execute_scenario("cataloging_with_image", "auto_approve")
 
-### Analysis - Level 0 (3 tools)
-- `get_trace_structure` - Lightweight overview (~500 tokens)
-- `get_scenario_outcome` - High-level result
-- `quick_db_check` - Fast DB validation
+2. OBSERVE (Level 0)
+   overview = get_trace_overview(result.trace_id)
+   # Identify which runs failed
 
-### Analysis - Level 1 (4 tools)
-- `analyze_failure_chain` - Focused failure analysis (~1,500 tokens)
-- `validate_structured_output` - Schema compliance
-- `get_product_record` - DB record details
-- `analyze_decision_point` - PM/dept routing validation
+3. INVESTIGATE (Level 1)
+   for failed_run_id in overview.failed_runs:
+       details = get_run_details(failed_run_id)
+       # Analyze error, inputs, outputs
 
-### Analysis - Level 2 (3 tools)
-- `get_full_run_details` - Complete run data (expensive)
-- `trace_data_lineage` - Track data transformations
-- `compare_traces` - Side-by-side comparison
+4. ANALYZE (Your Reasoning)
+   "save_product failed with ValidationError: price must be float.
+    Cataloging specialist returned price as string.
+    This is a prompt issue - needs type emphasis."
 
-### Improvement (4 tools)
-- `generate_prompt_improvement` - Fix prompts
-- `generate_code_fix` - Fix code
-- `apply_improvement` - Apply changes
-- `compare_execution_metrics` - Validate improvements
+5. FIX (Existing Tools)
+   Read: prompts/cataloging_specialist.prompt
+   Edit: Add type requirements section
 
-### Helpers (4 tools)
-- `load_scenario_list` - Get scenarios by pattern
-- `select_next_scenario` - Priority queue selection
-- `generate_iteration_report` - Formatted reports
-- `track_improvement_history` - Log changes
+6. VALIDATE
+   result2 = execute_scenario("cataloging_with_image", "auto_approve")
+   # Compare: Success rate 0% → 100%
+```
 
 ---
 
@@ -108,172 +76,234 @@ comparison = compare_execution_metrics(baseline, new_result)
 ```
 execute_scenario()
     ↓
+get_trace_overview() [~500 tokens]
+    ↓
 Success?
-    ├─ YES → quick_db_check() → All good? → ✅ DONE
-    │                         → Issue? → Level 1 Analysis
+    ├─ YES → Validate DB with mcp__supabase__execute_sql
+    │        All good? DONE
     │
-    └─ NO → get_trace_structure()
-              ↓
-          Identify failed_runs
-              ↓
-          For each: analyze_failure_chain()
+    └─ NO → get_run_details(failed_run_id) [~1,500 tokens]
               ↓
           Root cause clear?
-              ├─ YES → generate_improvement() → ✅ DONE
-              │
-              └─ NO → Level 2 Deep Dive
-                      ↓
-                  get_full_run_details()
-                      ↓
-                  Manual analysis → ✅ DONE
+              ├─ YES → Fix with Edit/Write → DONE
+              └─ NO → get_run_messages(run_id) [~5K tokens]
+                      Deep investigation → Fix
 ```
 
 ---
 
 ## Token Budgets
 
-| Analysis Level | Token Cost | When to Use |
-|----------------|------------|-------------|
-| Level 0 | ~500 | Always (first step) |
-| Level 1 | ~1,500 | If issues detected |
-| Level 2 | ~5,000+ | If root cause unclear |
+| Analysis Level | Tokens | When |
+|----------------|--------|------|
+| Level 0 | ~500 | Always start here |
+| Level 1 | ~1,500 | Drill into failures |
+| Level 2 | ~5,000+ | Complex reasoning bugs only |
 
-**Target**: 90% of analyses stay at Level 0-1 (< 2,000 tokens)
-
----
-
-## Common Issue Patterns
-
-### ValidationError: Type Mismatch
-**Symptom**: "price must be float, got str"
-**Cause**: Specialist returns wrong type
-**Fix**: Add type emphasis to prompt
-**Tool**: `validate_structured_output()`
-
-### Missing DB Record
-**Symptom**: Scenario passes but no DB record
-**Cause**: save_product not called or failed silently
-**Fix**: Check delegation logic
-**Tool**: `quick_db_check()` + `get_trace_structure()`
-
-### Context Leakage
-**Symptom**: Excessive token usage (10K+)
-**Cause**: Full history passed to specialist
-**Fix**: Add context engineering to prompt + code
-**Tool**: `get_full_run_details()` to inspect inputs
-
-### Multi-Turn Context Loss
-**Symptom**: Info from turn 1 lost by turn 3
-**Cause**: State not preserved across turns
-**Fix**: Update department state management
-**Tool**: `trace_data_lineage()`
+**Target**: < 3K tokens per scenario (90% stay at Level 0+1)
+**Savings**: 25x vs full dump (50K → 2K)
 
 ---
 
-## Validation Checklist
+## Common Commands
 
-After applying improvement:
-- [ ] Re-test affected scenario(s)
-- [ ] Compare metrics (success rate, latency, cost)
-- [ ] Check DB records created
-- [ ] Test passing scenarios (regression check)
-- [ ] Review comparison.recommendation
-- [ ] Keep if improved, revert if worse
+### Execute Tests
 
----
-
-## Risk Levels
-
-| Risk | Examples | Approval |
-|------|----------|----------|
-| Low | Prompt additions, error handling | Auto-apply OK |
-| Medium | Prompt removals, logic changes | Review recommended |
-| High | Multi-component, architecture | Always review |
-
----
-
-## Quick Workflows
-
-### Single Scenario Analysis (2-5 min)
-1. `execute_scenario()`
-2. `get_trace_structure()` if failed
-3. `analyze_failure_chain()` for details
-4. `validate_structured_output()` or `quick_db_check()`
-5. Report findings
-
-### Batch Testing (10-30 min)
-1. `load_scenario_list(pattern)`
-2. Loop: `execute_scenario()` for each
-3. Aggregate results
-4. Deep analysis on failures
-5. Report summary
-
-### Fix & Validate (3-10 min)
-1. `generate_prompt_improvement()` or `generate_code_fix()`
-2. Present to user
-3. `apply_improvement()`
-4. `execute_scenario()` to retest
-5. `compare_execution_metrics()`
-6. KEEP or REVERT
-
----
-
-## MCP Tools (Supabase)
-
-ALL DB operations use Supabase MCP:
 ```python
-# Execute SQL
-result = mcp__supabase__execute_sql("SELECT * FROM products ...")
+# Single test
+result = execute_scenario("cataloging_with_image", "auto_approve")
 
-# List tables
-tables = mcp__supabase__list_tables(schemas=["public"])
+# With media
+result = execute_scenario(
+    scenario_id="cataloging_with_image",
+    hitl_mode="auto_approve",
+    media_path="tests/fixtures/images/sneakers.jpg"
+)
 
-# Get advisors (security/performance)
-advisors = mcp__supabase__get_advisors(type="security")
+# Custom prompt
+result = execute_scenario("Catalog blue jeans for $49", "auto_approve")
+```
+
+### Analyze Traces
+
+```python
+# Level 0: Overview
+overview = get_trace_overview(trace_id)
+
+# Find failures
+failed_ids = []
+for node in overview.run_tree:
+    if node.status == "error":
+        failed_ids.append(node.run_id)
+
+# Level 1: Details
+for run_id in failed_ids:
+    details = get_run_details(run_id)
+    print(f"{details.name}: {details.error}")
+```
+
+### Database Validation
+
+```python
+# Check record exists
+result = mcp__supabase__execute_sql(
+    f"SELECT COUNT(*) FROM products WHERE metadata->>'scenario_id' = '{scenario_id}'"
+)
+
+# Get full record
+result = mcp__supabase__execute_sql(
+    f"SELECT * FROM products WHERE metadata->>'scenario_id' = '{scenario_id}'"
+)
+```
+
+### Fix Issues
+
+```python
+# Read current code
+current = Read("agents/src/.../cataloging_specialist.prompt")
+
+# Fix prompt
+Edit(
+    file_path="agents/src/.../cataloging_specialist.prompt",
+    old_string="<existing section>",
+    new_string="<updated section with type emphasis>"
+)
+
+# Validate fix
+result = execute_scenario("cataloging_with_image", "auto_approve")
+```
+
+### Track Progress
+
+```python
+# Recent tests
+history = list_recent_tests(limit=20)
+
+for test in history.tests:
+    status = "✅" if test.success else "❌"
+    print(f"{status} {test.scenario_id} ({test.execution_time_seconds:.1f}s)")
+
+# Compare before/after
+baseline = history.tests[-1]  # Oldest
+current = history.tests[0]    # Newest
+print(f"Improvement: {baseline.success} → {current.success}")
 ```
 
 ---
 
-## Key Files
+## Issue Patterns
 
-### Tools Implementation
-- `tests/tools/execution_tools.py`
-- `tests/tools/trace_analysis_tools.py`
-- `tests/tools/database_validation_tools.py`
-- `tests/tools/improvement_tools.py`
+| Issue Type | Detection | Fix Tool |
+|------------|-----------|----------|
+| **Prompt** (40%) | Wrong types, missing fields | Edit prompt file |
+| **Code** (30%) | Exceptions, KeyErrors | Edit Python code |
+| **Architecture** (20%) | Context loss, state bugs | Edit workflow code |
+| **Data** (10%) | Schema violations | Edit Pydantic models |
 
-### Documentation
-- `AUTONOMOUS_TESTING_FRAMEWORK.md` - Main framework
-- `HIERARCHICAL_TRACE_ANALYSIS.md` - Analysis strategy
-- `TOOL_SPECIFICATIONS.md` - API reference
-- `WORKFLOW_PATTERNS.md` - Detailed examples
-- `IMPROVEMENT_METHODOLOGY.md` - Fix strategies
+### Prompt Issues
 
----
+**Symptom**: Agent returns wrong output format
+**Detection**: get_run_details() shows type mismatches
+**Fix**: Edit prompt to add type emphasis and examples
 
-## Common Mistakes to Avoid
+### Code Issues
 
-❌ **Don't fetch full traces upfront** - Start with Level 0
-❌ **Don't analyze successful runs** - Focus on failures
-❌ **Don't write raw SQL** - Use MCP tools
-❌ **Don't skip validation** - Always retest after fix
-❌ **Don't batch improvements** - Apply one at a time
+**Symptom**: Exceptions in traceback
+**Detection**: get_run_details() shows error traceback
+**Fix**: Edit code to add error handling and validation
 
-✅ **Do use hierarchical analysis** - Save tokens
-✅ **Do explain reasoning** - Show evidence
-✅ **Do track improvements** - Log all changes
-✅ **Do check regressions** - Test passing scenarios
-✅ **Do create backups** - Always before applying
+### Architecture Issues
+
+**Symptom**: Multi-turn context loss
+**Detection**: get_trace_overview() shows context not flowing
+**Fix**: Edit workflow orchestration to fix context injection
 
 ---
 
-## Support
+## Quick Scenarios
 
-- **Full Framework**: [AUTONOMOUS_TESTING_FRAMEWORK.md](./AUTONOMOUS_TESTING_FRAMEWORK.md)
-- **Tool Reference**: [TOOL_SPECIFICATIONS.md](./TOOL_SPECIFICATIONS.md)
-- **Workflow Examples**: [WORKFLOW_PATTERNS.md](./WORKFLOW_PATTERNS.md)
-- **Fix Strategies**: [IMPROVEMENT_METHODOLOGY.md](./IMPROVEMENT_METHODOLOGY.md)
+### Single Test (2-5 min)
+
+```python
+# Execute
+result = execute_scenario("cataloging_with_image", "auto_approve")
+
+# Analyze (if failure)
+overview = get_trace_overview(result.trace_id)
+details = get_run_details(failed_run_id)
+
+# Fix
+Read + Edit prompt/code
+
+# Validate
+execute_scenario() again
+```
+
+### Batch Testing (10-20 min)
+
+```python
+scenarios = ["cataloging_basic", "cataloging_with_image", "multi_product"]
+
+for scenario in scenarios:
+    result = execute_scenario(scenario, "auto_approve")
+
+# Analyze patterns
+history = list_recent_tests(limit=len(scenarios))
+# Fix common issues once, validate all benefit
+```
+
+### Improvement Validation (3-10 min)
+
+```python
+# Before
+baseline = execute_scenario("cataloging_with_image", "auto_approve")
+
+# Fix
+Edit prompt/code
+
+# After
+current = execute_scenario("cataloging_with_image", "auto_approve")
+
+# Compare
+if current.success and not baseline.success:
+    print("✅ Improvement successful")
+else:
+    print("❌ Revert or iterate")
+```
 
 ---
 
-**Last Updated**: 2025-01-16
+## Success Metrics
+
+**Token Efficiency**:
+- Target: < 3K tokens per analysis
+- Savings: 25x vs naive approach
+
+**Improvement Velocity**:
+- Issue ID: < 5 min
+- Fix: < 10 min
+- Validation: < 5 min
+- **Full cycle**: < 20 min
+
+**System Quality**:
+- Success rate: 90%+ on core scenarios
+- Regression rate: < 5% after improvements
+
+---
+
+## Key Principles
+
+1. **Information First** - Tools provide data, you provide intelligence
+2. **Hierarchical Efficiency** - Always start with Level 0
+3. **Use Existing Tools** - Don't reinvent Edit/Write/MCP
+4. **Systematic** - Execute → Observe → Analyze → Fix → Validate
+5. **Iterate Rapidly** - Small improvements, frequent validation
+
+---
+
+## Related Docs
+
+- `AUTONOMOUS_TESTING_FRAMEWORK.md` - Complete framework
+- `TOOL_SPECIFICATIONS.md` - Detailed API reference
+- `HIERARCHICAL_TRACE_ANALYSIS.md` - Token optimization strategy
+- `LOCAL_TESTING_STRATEGY.md` - CLI tools guide
