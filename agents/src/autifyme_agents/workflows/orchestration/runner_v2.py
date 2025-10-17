@@ -428,42 +428,106 @@ class WorkflowRunner:
 
         # Build payload based on checkpoint state
         if pending_interrupts_list:
-            # === PM-CENTRIC APPROVAL FLOW ===
-            # Forward to PM with pending_interrupts in state
-            # PM will use ApprovalContextMiddleware to see context
-            # PM will call approval tools
-            # We intercept tool output and build Command
+            # === PM-CENTRIC APPROVAL FLOW WITH update_state() ===
+            # Use update_state() to inject placeholder ToolMessage, then forward to PM
 
+            user_message = raw_payload.get("text", "")
+
+            # Extract tool_call_id from state to inject placeholder ToolMessage
+            tool_call_id = None
+            try:
+                state_snapshot = pm.get_state(config)
+                if state_snapshot and hasattr(state_snapshot, 'values'):
+                    messages = state_snapshot.values.get("messages", [])
+
+                    # Find last AIMessage with tool_calls
+                    from langchain_core.messages import AIMessage
+                    for msg in reversed(messages):
+                        if isinstance(msg, AIMessage) and msg.tool_calls:
+                            tool_call_id = msg.tool_calls[0]["id"]
+                            logger.debug(
+                                "Extracted tool_call_id from interrupted AIMessage",
+                                extra={
+                                    "thread_id": thread_id,
+                                    "tool_call_id": tool_call_id,
+                                    "tool_name": msg.tool_calls[0].get("name", "unknown")
+                                }
+                            )
+                            break
+            except Exception as e:
+                logger.warning(
+                    "Could not extract tool_call_id from state",
+                    extra={"thread_id": thread_id, "error": str(e)}
+                )
+
+            if not tool_call_id:
+                logger.error(
+                    "No tool_call_id found - cannot inject placeholder ToolMessage",
+                    extra={"thread_id": thread_id}
+                )
+                self.channel.send_text(
+                    raw_payload.get("sender", ""),
+                    "I encountered an error processing your response. Please try again."
+                )
+                return None, None
+
+            # Inject placeholder ToolMessage via update_state() to satisfy OpenAI constraint
+            logger.info(
+                "Injecting placeholder ToolMessage to bypass OpenAI constraint",
+                extra={"thread_id": thread_id, "tool_call_id": tool_call_id}
+            )
+
+            try:
+                from langchain_core.messages import ToolMessage
+                placeholder = ToolMessage(
+                    content="[Waiting for approval]",
+                    tool_call_id=tool_call_id
+                )
+                pm.update_state(
+                    config=config,
+                    values={"messages": [placeholder]},
+                    as_node="hitl"
+                )
+                logger.info(
+                    "Placeholder ToolMessage injected successfully",
+                    extra={"thread_id": thread_id}
+                )
+            except Exception as e:
+                logger.exception(
+                    "Failed to inject placeholder ToolMessage",
+                    extra={"thread_id": thread_id, "error": str(e)}
+                )
+                self.channel.send_text(
+                    raw_payload.get("sender", ""),
+                    "I encountered an error processing your response. Please try again."
+                )
+                return None, None
+
+            # Now forward to PM with user message (OpenAI constraint bypassed!)
             logger.info(
                 "Forwarding to PM for approval decision",
                 extra={
                     "thread_id": thread_id,
                     "interrupt_count": len(pending_interrupts_list),
-                },
+                    "user_message": user_message[:50],
+                }
             )
 
-            # Build payload with user message
             from langchain.messages import HumanMessage
-            user_message = raw_payload.get("text", "")
-            payload = {
-                "messages": [HumanMessage(content=user_message)],
-                # Note: pending_interrupts available via __interrupt__ in state
-                # ApprovalContextMiddleware will format them
-            }
+            payload = {"messages": [HumanMessage(content=user_message)]}
 
             last_event = None
             interrupt_value = None
             approval_tool_output = None
 
             try:
-                # Stream PM execution
+                # Stream PM execution - PM will use ApprovalContextMiddleware and call approval tools
                 for event in pm.stream(payload, config=config, stream_mode="values"):
                     last_event = event
 
-                    # Check for approval tool calls
+                    # Check for approval tool calls from PM
                     if "messages" in event:
                         for msg in event["messages"]:
-                            # Check for tool message with approval decision
                             msg_type = getattr(msg, "type", None)
                             if msg_type == "tool":
                                 content = getattr(msg, "content", "")
@@ -471,7 +535,7 @@ class WorkflowRunner:
                                     approval_tool_output = content
                                     logger.info(
                                         "Captured PM approval decision",
-                                        extra={"thread_id": thread_id, "output": content[:100]},
+                                        extra={"thread_id": thread_id, "output": content[:100]}
                                     )
 
                     # Check for new interrupts
@@ -484,7 +548,7 @@ class WorkflowRunner:
                 if approval_tool_output:
                     logger.info(
                         "Building Command from PM approval",
-                        extra={"thread_id": thread_id},
+                        extra={"thread_id": thread_id}
                     )
 
                     # Parse approval tool output and build Command
@@ -495,7 +559,7 @@ class WorkflowRunner:
                     # Execute Command to resume workflow
                     logger.info(
                         "Executing Command to resume workflow",
-                        extra={"thread_id": thread_id},
+                        extra={"thread_id": thread_id}
                     )
 
                     for resume_event in pm.stream(command_obj, config=config, stream_mode="values"):
@@ -509,17 +573,26 @@ class WorkflowRunner:
 
                     logger.info(
                         "PM-approved workflow resumed",
-                        extra={"thread_id": thread_id},
+                        extra={"thread_id": thread_id}
+                    )
+                else:
+                    logger.warning(
+                        "PM did not produce approval decision",
+                        extra={"thread_id": thread_id}
                     )
 
                 return last_event, interrupt_value
 
-            except Exception:
+            except Exception as e:
                 logger.exception(
                     "PM-centric approval flow error",
-                    extra={"thread_id": thread_id},
+                    extra={"thread_id": thread_id, "error_type": type(e).__name__}
                 )
-                raise
+                self.channel.send_text(
+                    raw_payload.get("sender", ""),
+                    "I encountered an error processing your response. Please try again."
+                )
+                return None, None
 
         else:
             # No pending interrupt - normal message flow
