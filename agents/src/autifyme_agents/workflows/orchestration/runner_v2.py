@@ -485,8 +485,8 @@ class WorkflowRunner:
                 )
                 pm.update_state(
                     config=config,
-                    values={"messages": [placeholder]},
-                    as_node="hitl"
+                    values={"messages": [placeholder]}
+                    # as_node defaults to last node that updated state
                 )
                 logger.info(
                     "Placeholder ToolMessage injected successfully",
