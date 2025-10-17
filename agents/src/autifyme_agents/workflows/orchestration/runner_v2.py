@@ -442,14 +442,8 @@ class WorkflowRunner:
                 )
 
                 # DEBUG: Log checkpoint interrupt IDs to diagnose Command.resume mismatch
-                logger.info(
-                    "DEBUG: Checkpoint interrupt IDs",
-                    extra={
-                        "thread_id": thread_id,
-                        "checkpoint_interrupt_ids": [intr.id for intr in state_snapshot.interrupts],
-                        "interrupt_format": "IDs as stored in checkpoint"
-                    }
-                )
+                checkpoint_ids = [intr.id for intr in state_snapshot.interrupts]
+                logger.info(f"DEBUG: Checkpoint interrupt IDs = {checkpoint_ids}")
             else:
                 logger.debug(
                     "No pending interrupts found",
@@ -702,12 +696,8 @@ class WorkflowRunner:
         Takes the Pydantic BatchApprovalResponse from approval analyzer and
         constructs a LangGraph Command object for resuming interrupted workflows.
 
-        IMPORTANT: Uses the FULL interrupt_id (WITH suffix) for Command.resume.
+        IMPORTANT: Uses original_interrupt_id (WITHOUT suffix) to match checkpoint format.
         Each interrupt gets its own entry in Command.resume with its response.
-
-        FIXED (BUG #3): Previously used original_interrupt_id (WITHOUT suffix),
-        causing ID mismatch with checkpoint → LangGraph couldn't deliver responses
-        → PM received HumanMessage instead → ignored all approval decisions.
 
         Args:
             approval_response: Structured approval response from analyzer
@@ -739,11 +729,10 @@ class WorkflowRunner:
         interrupt_responses = defaultdict(list)
 
         for idx, interrupt_info in enumerate(pending_interrupts):
-            # FIX FOR BUG #3: Use the FULL interrupt_id (with suffix) for Command.resume
-            # Previously used original_interrupt_id (without suffix), causing ID mismatch
-            # Checkpoint stores: "abc123_0", "abc123_1", etc. (WITH suffix from DeepAgents)
-            # Command MUST use same format to match
-            interrupt_id_for_command = interrupt_info["interrupt_id"]
+            # Use original_interrupt_id (WITHOUT suffix) to match checkpoint format
+            # Checkpoint stores base IDs: "abc123", "def456", etc. (no suffix)
+            # Suffix is only used internally for unpacking list-valued interrupts
+            interrupt_id_for_command = interrupt_info.get("original_interrupt_id", interrupt_info["interrupt_id"])
 
             response = approval_response.responses[idx]
             tool_name = interrupt_info.get("tool_name", "unknown")
@@ -798,15 +787,12 @@ class WorkflowRunner:
         )
 
         # DEBUG: Log Command.resume keys to diagnose ID mismatch
-        logger.info(
-            "DEBUG: Command.resume structure",
-            extra={
-                "resume_keys": list(interrupt_responses.keys()),
-                "key_format": "IDs used in Command.resume (should match checkpoint)",
-                "pending_interrupt_ids": [i.get("interrupt_id") for i in pending_interrupts],
-                "original_interrupt_ids": [i.get("original_interrupt_id", i.get("interrupt_id")) for i in pending_interrupts]
-            }
-        )
+        resume_keys = list(interrupt_responses.keys())
+        pending_ids = [i.get("interrupt_id") for i in pending_interrupts]
+        original_ids = [i.get("original_interrupt_id", i.get("interrupt_id")) for i in pending_interrupts]
+        logger.info(f"DEBUG: Command.resume keys = {resume_keys}")
+        logger.info(f"DEBUG: Pending interrupt_ids = {pending_ids}")
+        logger.info(f"DEBUG: Original interrupt_ids = {original_ids}")
 
         return Command(resume=dict(interrupt_responses))
 
