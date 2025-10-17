@@ -667,9 +667,37 @@ class WorkflowRunner:
             # Use original_interrupt_id if available (parallel case), otherwise use interrupt_id
             original_id = interrupt_info.get("original_interrupt_id", interrupt_info["interrupt_id"])
             response = approval_response.responses[idx]
+            tool_name = interrupt_info.get("tool_name", "unknown")
+            tool_args = interrupt_info.get("tool_args", {})
 
-            # Convert Pydantic model to dict
-            interrupt_responses[original_id].append(response.model_dump())
+            # Format response based on type for HITL middleware compatibility
+            if response.type == "edit":
+                # HITL middleware expects: {"type": "edit", "action": "tool_name", "args": {...}}
+                # Merge edited args with original args
+                merged_args = {**tool_args, **response.args} if isinstance(response.args, dict) else tool_args
+                hitl_response = {"type": "edit", "action": tool_name, "args": merged_args}
+                logger.debug(
+                    f"Built edit response for {original_id}",
+                    extra={
+                        "tool_name": tool_name,
+                        "edited_fields": list(response.args.keys()) if isinstance(response.args, dict) else [],
+                    }
+                )
+            elif response.type == "accept":
+                # Accept - HITL middleware expects {"type": "accept"}
+                hitl_response = {"type": "accept"}
+            elif response.type == "response":
+                # Reject/clarification - pass through as-is
+                hitl_response = response.model_dump()
+            else:
+                # Unknown type - log warning and treat as accept
+                logger.warning(
+                    f"Unknown response type: {response.type}",
+                    extra={"interrupt_id": original_id}
+                )
+                hitl_response = {"type": "accept"}
+
+            interrupt_responses[original_id].append(hitl_response)
 
         logger.info(
             "Built Command from structured approval",
@@ -677,6 +705,7 @@ class WorkflowRunner:
                 "total_responses": len(pending_interrupts),
                 "interrupt_count": len(interrupt_responses),
                 "interrupt_ids": list(interrupt_responses.keys()),
+                "edit_count": sum(1 for resp in approval_response.responses if resp.type == "edit"),
             }
         )
 
@@ -756,10 +785,13 @@ class WorkflowRunner:
                         }
                     )
 
-                    # Send each product individually for now (channel limitation)
-                    # TODO: Update channel protocol to support true batch approvals
-                    for product in products_to_approve:
-                        self.channel.send_approval_request(sender, product)
+                    # Send batch approval - show ALL products at once
+                    if len(products_to_approve) == 1:
+                        # Single product - use standard approval request
+                        self.channel.send_approval_request(sender, products_to_approve[0])
+                    else:
+                        # Multiple products - format as batch and send all together
+                        self._send_batch_approval(sender, products_to_approve)
 
             # Handle single interrupt case
             elif isinstance(interrupt_value, dict):
@@ -787,6 +819,60 @@ class WorkflowRunner:
         except Exception as exc:
             logger.exception("Failed to send interrupt to user", exc_info=exc, extra={"thread_id": thread_id})
             self.channel.send_error(sender, "processing", "I encountered an issue requesting your input.")
+
+    def _send_batch_approval(self, sender: str, products: list[Any]) -> None:
+        """Send batch approval request with ALL products displayed together.
+
+        Args:
+            sender: Channel-specific sender ID
+            products: List of Product objects to approve
+
+        Notes:
+            This method formats multiple products into a single approval message
+            so users can see and approve all products at once for batch workflows.
+        """
+        from autifyme_agents.schemas.models import Product
+
+        # Format batch approval message
+        message_parts = [
+            f"📋 **Batch Approval Request** ({len(products)} products)",
+            "",
+            "Please review the following products:",
+            "",
+        ]
+
+        for idx, product in enumerate(products, 1):
+            # Format each product
+            product_lines = [
+                f"**Product {idx}:**",
+                f"  • Name: {product.name}",
+                f"  • Description: {product.description}",
+                f"  • Price: ₹{product.price}",
+            ]
+
+            if product.sizes:
+                product_lines.append(f"  • Sizes: {', '.join(product.sizes)}")
+            if product.colors:
+                product_lines.append(f"  • Colors: {', '.join(product.colors)}")
+            if product.image_urls:
+                product_lines.append(f"  • Images: {len(product.image_urls)} attached")
+
+            message_parts.extend(product_lines)
+            message_parts.append("")  # Blank line between products
+
+        message_parts.extend([
+            "---",
+            "",
+            "**How to respond:**",
+            "• To approve all: 'approve' or 'yes'",
+            "• To approve some: 'approve 1 and 2' or 'approve product 1'",
+            "• To edit: 'edit product 2 price to 45'",
+            "• To reject all: 'reject' or 'no'",
+        ])
+
+        # Send formatted message
+        batch_message = "\n".join(message_parts)
+        self.channel.send_text(sender, batch_message)
 
     def _get_lock(self, sender: str) -> Lock:
         """Get or create thread lock with LRU eviction.
