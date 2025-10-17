@@ -117,11 +117,13 @@ class ConsoleChannel(MessagingChannel):
                 - "auto_reject": Auto-reject all
                 - "auto_edit": Auto-approve with predefined edits
                 - "question": Simulate asking clarifying questions
+                - "mixed": Mixed approval (approve some, reject some, edit some)
         """
         self.auto_approve = auto_approve
         self.hitl_mode = "auto_approve" if auto_approve else hitl_mode
         self.messages_sent: list[dict[str, Any]] = []
         self.predefined_edits: dict[str, Any] = {}
+        self.approval_count = 0  # Track number of approval requests
 
     def format_thread_id(self, sender: str) -> str:
         return f"console:{sender}"
@@ -133,11 +135,23 @@ class ConsoleChannel(MessagingChannel):
         print(message)
         print(f"{'='*60}\n")
 
+        # Check if this is a batch approval message
+        if "**Batch Approval Request**" in message:
+            # Parse product count from message: "**Batch Approval Request** (3 products)"
+            import re
+            match = re.search(r'\((\d+) products?\)', message)
+            if match:
+                product_count = int(match.group(1))
+                self.approval_count = product_count  # Set counter for mixed mode
+                print(f"\n[BATCH APPROVAL DETECTED: {product_count} products]\n")
+
         self.messages_sent.append({"type": "text", "message": message})
         return {"status": "sent"}
 
     def send_approval_request(self, recipient: str, interrupt_value: Any) -> dict[str, Any]:
         """Generic HITL request handler - works for ANY interrupt type."""
+        self.approval_count += 1  # Increment counter
+
         print(f"\n{'='*60}")
         safe_print(f"⏸️  HITL REQUEST TO {recipient}:")
         print(f"{'='*60}")
@@ -187,6 +201,13 @@ class ConsoleChannel(MessagingChannel):
             print("User: What's the SKU for this product?")
             time.sleep(0.5)
             return {"status": "question", "question": "What's the SKU for this product?"}
+
+        elif self.hitl_mode == "mixed":
+            # Mixed mode: This doesn't send individual responses,
+            # instead returns a signal to send batch response later
+            print("\n[MIXED MODE: Will send batch response after all products]\n")
+            time.sleep(0.1)
+            return {"status": "pending_batch"}
 
         # Interactive approval (default)
         while True:
@@ -339,9 +360,9 @@ def run_scenario(
             media_id=str(image_path) if image_path else None,
         )
 
-        # If auto-approve/reject/edit mode, send follow-up approval message
+        # If auto-approve/reject/edit/mixed mode, send follow-up approval message
         # This simulates user responding to HITL interrupt
-        if hitl_mode in ["auto_approve", "auto_reject", "auto_edit"]:
+        if hitl_mode in ["auto_approve", "auto_reject", "auto_edit", "mixed"]:
             time.sleep(0.5)  # Brief pause to simulate user thinking
             print(f"\n{'='*60}")
             safe_print(f"📨 AUTO-MODE: Sending follow-up {'approval' if hitl_mode != 'auto_reject' else 'rejection'} message")
@@ -359,6 +380,20 @@ def run_scenario(
                     follow_up_text = f"approve with edits: {edits}"
                 else:
                     follow_up_text = "approve"
+            elif hitl_mode == "mixed":
+                # Mixed approval based on product count
+                product_count = channel.approval_count
+                if product_count == 1:
+                    follow_up_text = "approve"
+                elif product_count == 2:
+                    follow_up_text = "approve 1, reject 2"
+                elif product_count >= 3:
+                    # Approve 1, Reject 2, Edit 3 price to 50
+                    follow_up_text = "approve 1, reject 2, edit 3 price to 50"
+                else:
+                    follow_up_text = "approve"
+
+                safe_print(f"📝 Mixed approval for {product_count} products: {follow_up_text}")
 
             runner.handle_message(
                 sender=unique_sender,

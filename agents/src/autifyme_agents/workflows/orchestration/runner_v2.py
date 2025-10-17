@@ -574,7 +574,7 @@ class WorkflowRunner:
             )
 
             last_event = None
-            interrupt_value = None
+            accumulated_interrupts = []  # ✅ Accumulate ALL interrupts across stream events
 
             try:
                 for event in pm.stream(payload, config=config, stream_mode="values"):
@@ -584,34 +584,56 @@ class WorkflowRunner:
                     if "__interrupt__" in event:
                         interrupts = event.get("__interrupt__") or []
                         if interrupts:
-                            # ✅ COLLECT ALL INTERRUPTS for batch approval
-                            # When PM makes parallel delegations (3 task() calls),
-                            # LangGraph creates 3 separate interrupts - we need to collect all values
-                            if len(interrupts) > 1:
-                                interrupt_value = [intr.value for intr in interrupts]
-                                logger.info(
-                                    "Multiple parallel interrupts detected",
-                                    extra={
-                                        "thread_id": thread_id,
-                                        "interrupt_count": len(interrupts),
-                                    },
-                                )
-                            else:
-                                interrupt_value = interrupts[0].value
-                                logger.info(
-                                    "Single interrupt detected",
-                                    extra={
-                                        "thread_id": thread_id,
-                                    },
-                                )
+                            # ✅ ACCUMULATE interrupts from this event
+                            # When PM makes 2 parallel task() calls, we get 2 SEPARATE stream events,
+                            # each with 1 interrupt. We need to collect all of them.
+                            accumulated_interrupts.extend(interrupts)
+                            logger.info(
+                                "Interrupt event detected",
+                                extra={
+                                    "thread_id": thread_id,
+                                    "event_interrupt_count": len(interrupts),
+                                    "total_accumulated": len(accumulated_interrupts),
+                                },
+                            )
 
                 logger.debug(
                     "PM stream completed",
                     extra={
                         "thread_id": thread_id,
-                        "had_interrupt": interrupt_value is not None,
+                        "accumulated_interrupt_count": len(accumulated_interrupts),
                     },
                 )
+
+                # ✅ Process accumulated interrupts after stream completes
+                interrupt_value = None
+                if accumulated_interrupts:
+                    if len(accumulated_interrupts) > 1:
+                        # Multiple interrupts - flatten all values
+                        interrupt_value = []
+                        for intr in accumulated_interrupts:
+                            if isinstance(intr.value, list):
+                                interrupt_value.extend(intr.value)
+                            else:
+                                interrupt_value.append(intr.value)
+
+                        logger.info(
+                            "Multiple parallel interrupts collected",
+                            extra={
+                                "thread_id": thread_id,
+                                "interrupt_count": len(accumulated_interrupts),
+                                "flattened_count": len(interrupt_value),
+                            },
+                        )
+                    else:
+                        # Single interrupt - use value directly
+                        interrupt_value = accumulated_interrupts[0].value
+                        logger.info(
+                            "Single interrupt collected",
+                            extra={
+                                "thread_id": thread_id,
+                            },
+                        )
 
                 return last_event, interrupt_value
 
@@ -684,10 +706,16 @@ class WorkflowRunner:
 
             # Format response based on type for HITL middleware compatibility
             if response.type == "edit":
-                # HITL middleware expects: {"type": "edit", "action": "tool_name", "args": {...}}
-                # Merge edited args with original args
+                # HITL middleware expects: {"type": "edit", "args": {"action": "tool_name", "args": {...}}}
+                # The "args" field should be an ActionRequest with action and args
                 merged_args = {**tool_args, **response.args} if isinstance(response.args, dict) else tool_args
-                hitl_response = {"type": "edit", "action": tool_name, "args": merged_args}
+                hitl_response = {
+                    "type": "edit",
+                    "args": {
+                        "action": tool_name,
+                        "args": merged_args
+                    }
+                }
                 logger.debug(
                     f"Built edit response for {original_id}",
                     extra={
@@ -699,8 +727,11 @@ class WorkflowRunner:
                 # Accept - HITL middleware expects {"type": "accept"}
                 hitl_response = {"type": "accept"}
             elif response.type == "response":
-                # Reject/clarification - pass through as-is
-                hitl_response = response.model_dump()
+                # Reject/clarification - HITL middleware expects {"type": "response", "args": "message"}
+                hitl_response = {
+                    "type": "response",
+                    "args": response.args
+                }
             else:
                 # Unknown type - log warning and treat as accept
                 logger.warning(
@@ -744,13 +775,12 @@ class WorkflowRunner:
             thread_id: Conversation thread ID
             interrupt_value: Value from interrupt (may be wrapped by DeepAgents)
         """
-        logger.info(
-            "==== INTERRUPT DEBUG ====",
+        logger.debug(
+            "Handling HITL interrupt",
             extra={
                 "thread_id": thread_id,
                 "interrupt_type": type(interrupt_value).__name__,
                 "is_list": isinstance(interrupt_value, list),
-                "is_dict": isinstance(interrupt_value, dict),
                 "length_if_list": len(interrupt_value) if isinstance(interrupt_value, list) else "N/A",
             }
         )
@@ -850,7 +880,7 @@ class WorkflowRunner:
 
         # Format batch approval message
         message_parts = [
-            f"📋 **Batch Approval Request** ({len(products)} products)",
+            f"**Batch Approval Request** ({len(products)} products)",
             "",
             "Please review the following products:",
             "",
@@ -860,17 +890,17 @@ class WorkflowRunner:
             # Format each product
             product_lines = [
                 f"**Product {idx}:**",
-                f"  • Name: {product.name}",
-                f"  • Description: {product.description}",
-                f"  • Price: ₹{product.price}",
+                f"  - Name: {product.name}",
+                f"  - Description: {product.description}",
+                f"  - Price: Rs {product.price}",
             ]
 
             if product.sizes:
-                product_lines.append(f"  • Sizes: {', '.join(product.sizes)}")
+                product_lines.append(f"  - Sizes: {', '.join(product.sizes)}")
             if product.colors:
-                product_lines.append(f"  • Colors: {', '.join(product.colors)}")
+                product_lines.append(f"  - Colors: {', '.join(product.colors)}")
             if product.image_urls:
-                product_lines.append(f"  • Images: {len(product.image_urls)} attached")
+                product_lines.append(f"  - Images: {len(product.image_urls)} attached")
 
             message_parts.extend(product_lines)
             message_parts.append("")  # Blank line between products
@@ -879,10 +909,10 @@ class WorkflowRunner:
             "---",
             "",
             "**How to respond:**",
-            "• To approve all: 'approve' or 'yes'",
-            "• To approve some: 'approve 1 and 2' or 'approve product 1'",
-            "• To edit: 'edit product 2 price to 45'",
-            "• To reject all: 'reject' or 'no'",
+            "- To approve all: 'approve' or 'yes'",
+            "- To approve some: 'approve 1 and 2' or 'approve product 1'",
+            "- To edit: 'edit product 2 price to 45'",
+            "- To reject all: 'reject' or 'no'",
         ])
 
         # Send formatted message
