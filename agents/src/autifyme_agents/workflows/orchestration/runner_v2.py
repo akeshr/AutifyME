@@ -131,7 +131,7 @@ class WorkflowRunner:
             recursion_limit: Max PM recursion depth
         """
         logger.info("=" * 80)
-        logger.info("INITIALIZING GENERIC HITL FRAMEWORK (PM-ONLY ARCHITECTURE)")
+        logger.info("INITIALIZING GENERIC HITL FRAMEWORK (APPROVAL_ANALYZER ARCHITECTURE)")
         logger.info("=" * 80)
 
         self.channel = channel
@@ -166,7 +166,7 @@ class WorkflowRunner:
         self.outcome_tracker = OutcomeTracker(storage)
         logger.info("OutcomeTracker initialized")
 
-        logger.info("Generic HITL Framework initialized - PM-only architecture")
+        logger.info("Generic HITL Framework initialized - approval_analyzer architecture")
         logger.info("=" * 80)
 
     def handle_message(
@@ -315,14 +315,17 @@ class WorkflowRunner:
     ) -> tuple[dict[str, Any] | None, Any | None]:
         """Invoke PM with raw message payload.
 
-        ✅ PM-ONLY ARCHITECTURE: PM handles intent detection and Command construction.
+        ✅ APPROVAL_ANALYZER ARCHITECTURE:
+        - PM handles orchestration and intent detection
+        - approval_analyzer handles HITL decisions (structured BatchApprovalResponse)
+        - Runner coordinates between them
 
         When interrupts exist:
-        1. Populate state["pending_interrupts"] from checkpoint
-        2. Forward user message to PM
-        3. PM analyzes and outputs "COMMAND: {resume: [...]}"
-        4. Parse PM's COMMAND output
-        5. Build actual Command and resume
+        1. Extract interrupt context from checkpoint
+        2. Invoke approval_analyzer with user message + conversation history
+        3. Get structured BatchApprovalResponse
+        4. Build Command from structured response
+        5. Resume workflow with Command
 
         Args:
             thread_id: Conversation thread ID
@@ -687,66 +690,97 @@ class WorkflowRunner:
     ) -> None:
         """Forward interrupt to user via channel.
 
-        ✅ STANDARD APPROACH: Unwrap DeepAgents internal structure before sending to channel.
+        ✅ BATCH APPROVAL SUPPORT: Send ALL products in one batch to channel.
 
         DeepAgents wraps tool calls in action_request format:
         [{'action_request': {'action': 'tool_name', 'args': {actual_data}}}]
 
-        Channel should receive clean data (just the args), not framework internals.
+        For parallel tool calls (multiple products), we collect all Products
+        and send them together for batch approval.
 
         Args:
             sender: Channel-specific sender ID
             thread_id: Conversation thread ID
             interrupt_value: Value from interrupt (may be wrapped by DeepAgents)
         """
-        logger.debug("Handling HITL interrupt", extra={"thread_id": thread_id})
+        logger.debug(
+            "Handling HITL interrupt",
+            extra={
+                "thread_id": thread_id,
+                "interrupt_type": type(interrupt_value).__name__,
+            }
+        )
 
         try:
-            # Unwrap DeepAgents structure if present (standard pattern from lines 344-366)
-            clean_value = interrupt_value
+            from autifyme_agents.schemas.models import Product
+
+            # Collect all products (for batch approval)
+            products_to_approve: list[Product] = []
 
             if isinstance(interrupt_value, list) and len(interrupt_value) > 0:
-                # FIXED: Process ALL actions in batch, not just the first one
-                for action in interrupt_value:
+                # Parallel tool calls - collect ALL products
+                logger.info(
+                    "Processing batch interrupt",
+                    extra={"thread_id": thread_id, "action_count": len(interrupt_value)}
+                )
+
+                for idx, action in enumerate(interrupt_value):
                     if isinstance(action, dict) and "action_request" in action:
                         # DeepAgents format - extract clean args
                         action_request = action.get("action_request", {})
-                        clean_value = action_request.get("args", interrupt_value)
+                        clean_value = action_request.get("args", {})
+                        tool_name = action_request.get("action", "unknown")
+
                         logger.debug(
-                            "Unwrapped DeepAgents interrupt structure",
+                            f"Unwrapping action {idx + 1} of {len(interrupt_value)}",
                             extra={
                                 "thread_id": thread_id,
-                                "tool_name": action_request.get("action", "unknown"),
+                                "tool_name": tool_name,
+                                "product_name": clean_value.get("name", "unknown"),
                             }
                         )
-                        # Convert to Product and send for approval
+
+                        # Convert to Product and add to batch
                         if isinstance(clean_value, dict):
-                            from autifyme_agents.schemas.models import Product
                             draft = Product.model_validate(clean_value)
-                            logger.debug(
-                                "Converted interrupt args to Product object",
-                                extra={"thread_id": thread_id, "product_name": draft.name}
-                            )
-                            self.channel.send_approval_request(sender, draft)
+                            products_to_approve.append(draft)
+
+                # Send all products in batch
+                if len(products_to_approve) > 0:
+                    logger.info(
+                        "Sending batch approval request",
+                        extra={
+                            "thread_id": thread_id,
+                            "product_count": len(products_to_approve),
+                            "product_names": [p.name for p in products_to_approve],
+                        }
+                    )
+
+                    # Send each product individually for now (channel limitation)
+                    # TODO: Update channel protocol to support true batch approvals
+                    for product in products_to_approve:
+                        self.channel.send_approval_request(sender, product)
 
             # Handle single interrupt case
             elif isinstance(interrupt_value, dict):
-                clean_value = interrupt_value
+                logger.info(
+                    "Processing single interrupt",
+                    extra={"thread_id": thread_id}
+                )
+
                 # Convert dict args to Product object for channel
-                if isinstance(clean_value, dict):
-                    from autifyme_agents.schemas.models import Product
-                    draft = Product.model_validate(clean_value)
-                    logger.debug(
-                        "Converted single interrupt to Product object",
-                        extra={"thread_id": thread_id, "product_name": draft.name}
-                    )
-                    self.channel.send_approval_request(sender, draft)
+                draft = Product.model_validate(interrupt_value)
+                logger.debug(
+                    "Converted single interrupt to Product",
+                    extra={"thread_id": thread_id, "product_name": draft.name}
+                )
+                self.channel.send_approval_request(sender, draft)
 
             logger.info(
                 "Interrupt(s) forwarded to user - awaiting response",
                 extra={
                     "thread_id": thread_id,
-                    "interrupt_type": type(interrupt_value).__name__,
+                    "product_count": len(products_to_approve) if products_to_approve else 1,
                 },
             )
 
