@@ -28,20 +28,34 @@ class _SilentConsoleChannel(MessagingChannel):
     def __init__(self, hitl_mode: str = "auto_approve"):
         self.hitl_mode = hitl_mode
         self.messages_sent = []
+        self.approval_count = 0  # Track product count for mixed mode
 
     def format_thread_id(self, sender: str) -> str:
         return f"console:{sender}"
 
     def send_text(self, recipient: str, message: str, *, metadata: dict | None = None) -> dict:
         self.messages_sent.append({"type": "text", "message": message})
+
+        # Detect batch approval messages and track product count (for mixed mode)
+        if "**Batch Approval Request**" in message:
+            import re
+            match = re.search(r'\((\d+) products?\)', message)
+            if match:
+                self.approval_count = int(match.group(1))
+
         return {"status": "sent"}
 
     def send_approval_request(self, recipient: str, interrupt_value) -> dict:
         """Auto-handle HITL based on mode."""
+        self.approval_count += 1  # Increment for single approval requests
+
         if self.hitl_mode == "auto_approve":
             return {"status": "approved", "value": interrupt_value}
         elif self.hitl_mode == "auto_reject":
             return {"status": "rejected"}
+        elif self.hitl_mode == "mixed":
+            # Mixed mode signals to send batch response later
+            return {"status": "pending_batch"}
         else:
             # Default to approve for programmatic execution
             return {"status": "approved", "value": interrupt_value}
@@ -71,7 +85,8 @@ def execute_scenario(
 
     Args:
         scenario_id: Scenario identifier or custom prompt text
-        hitl_mode: HITL behavior - "auto_approve" (default) | "auto_reject"
+        hitl_mode: HITL behavior - "auto_approve" (default) | "auto_reject" | "mixed"
+                  mixed mode: For 3+ products, approves 1, rejects 2, edits 3 price to 50
         media_path: Optional path to media file (image/video/audio/document)
 
     Returns:
@@ -115,9 +130,27 @@ def execute_scenario(
         )
 
         # Auto-respond to HITL if in auto mode
-        if hitl_mode in ["auto_approve", "auto_reject"]:
+        if hitl_mode in ["auto_approve", "auto_reject", "mixed"]:
             time.sleep(0.1)  # Brief pause
-            follow_up = "approve" if hitl_mode == "auto_approve" else "reject"
+
+            # Determine follow-up text based on mode
+            if hitl_mode == "auto_approve":
+                follow_up = "approve"
+            elif hitl_mode == "auto_reject":
+                follow_up = "reject"
+            elif hitl_mode == "mixed":
+                # Mixed approval based on product count (same as simulate.py)
+                product_count = channel.approval_count
+                if product_count == 1:
+                    follow_up = "approve"
+                elif product_count == 2:
+                    follow_up = "approve 1, reject 2"
+                elif product_count >= 3:
+                    # Approve 1, Reject 2, Edit 3 price to 50
+                    follow_up = "approve 1, reject 2, edit 3 price to 50"
+                else:
+                    follow_up = "approve"
+
             runner.handle_message(
                 sender=unique_sender,
                 text=follow_up,
