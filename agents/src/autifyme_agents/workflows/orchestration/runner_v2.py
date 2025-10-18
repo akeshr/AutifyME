@@ -440,10 +440,6 @@ class WorkflowRunner:
                         "interrupt_count": len(pending_interrupts_list),
                     }
                 )
-
-                # DEBUG: Log checkpoint interrupt IDs to diagnose Command.resume mismatch
-                checkpoint_ids = [intr.id for intr in state_snapshot.interrupts]
-                logger.info(f"DEBUG: Checkpoint interrupt IDs = {checkpoint_ids}")
             else:
                 logger.debug(
                     "No pending interrupts found",
@@ -785,14 +781,6 @@ class WorkflowRunner:
                 "edit_count": sum(1 for resp in approval_response.responses if resp.type == "edit"),
             }
         )
-
-        # DEBUG: Log Command.resume keys to diagnose ID mismatch
-        resume_keys = list(interrupt_responses.keys())
-        pending_ids = [i.get("interrupt_id") for i in pending_interrupts]
-        original_ids = [i.get("original_interrupt_id", i.get("interrupt_id")) for i in pending_interrupts]
-        logger.info(f"DEBUG: Command.resume keys = {resume_keys}")
-        logger.info(f"DEBUG: Pending interrupt_ids = {pending_ids}")
-        logger.info(f"DEBUG: Original interrupt_ids = {original_ids}")
 
         return Command(resume=dict(interrupt_responses))
 
