@@ -14,8 +14,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "agents",
 from dotenv import load_dotenv
 load_dotenv('.env')
 
+import pytest
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 from autifyme_agents.integrations.storage.storage_factory import get_storage
+from autifyme_agents.core.config import settings
 
 class TestChannel:
     """Test channel that captures messages."""
@@ -53,6 +55,10 @@ class TestChannel:
         return {"status": "sent"}
 
 
+@pytest.mark.skipif(
+    "dummy" in settings.SUPABASE_URL.lower(),
+    reason="Archived test requires real Supabase instance; skipping in CI with dummy credentials"
+)
 def test_mixed_batch_approval():
     """Test mixed approval: approve 1, reject 2, edit 3."""
 
