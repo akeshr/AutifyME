@@ -599,7 +599,7 @@ class WorkflowRunner:
             )
 
             last_event = None
-            accumulated_interrupts = []  # ✅ Accumulate ALL interrupts across stream events
+            accumulated_interrupts: list[Any] = []  # ✅ Accumulate ALL interrupts across stream events
 
             try:
                 for event in pm.stream(payload, config=config, stream_mode="values"):
@@ -758,13 +758,16 @@ class WorkflowRunner:
                 hitl_response = {"type": "accept"}
             elif response.type == "response":
                 # Reject/clarification - HITL middleware expects {"type": "response", "args": "message"}
+                # For response type, args should be a string message
+                message = response.args if isinstance(response.args, str) else str(response.args or "")
                 hitl_response = {
                     "type": "response",
-                    "args": response.args
+                    "args": message
                 }
             else:
                 # Unknown type - log warning and treat as accept
-                logger.warning(
+                # Note: This branch is unreachable with current Literal types but kept for defensive programming
+                logger.warning(  # type: ignore[unreachable]
                     f"Unknown response type: {response.type}",
                     extra={"interrupt_id": interrupt_id_for_command}
                 )
@@ -907,7 +910,6 @@ class WorkflowRunner:
             This method formats multiple products into a single approval message
             so users can see and approve all products at once for batch workflows.
         """
-        from autifyme_agents.schemas.models import Product
 
         # Format batch approval message
         message_parts = [
