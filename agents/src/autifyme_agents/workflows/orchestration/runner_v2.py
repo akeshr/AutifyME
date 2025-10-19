@@ -52,7 +52,6 @@ from __future__ import annotations
 import json
 import logging
 from collections import OrderedDict
-from datetime import datetime
 from threading import Lock
 from typing import Any
 
@@ -225,8 +224,6 @@ class WorkflowRunner:
             extra={"thread_id": thread_id, "has_text": text is not None, "has_media": media_id is not None},
         )
 
-        workflow_start_time = datetime.now()
-
         incoming_message = IncomingMessage(
             sender_id=sender,
             sender_name=sender_name,
@@ -294,12 +291,22 @@ class WorkflowRunner:
                 )
                 return
 
-            # Fallback: send AI summary if available
+            # Fallback: send AI summary if available (conversational messages)
             summary = self._extract_ai_summary(result.get("messages", []))
             if summary:
                 self.channel.send_text(sender, summary)
+                self.outcome_tracker.track_workflow_end(
+                    tracking_id=tracking_id,
+                    success=True,
+                    result={"type": "conversational", "summary": summary},
+                )
             else:
                 logger.warning("No result or summary from PM", extra={"thread_id": thread_id})
+                self.outcome_tracker.track_workflow_end(
+                    tracking_id=tracking_id,
+                    success=True,
+                    result={"type": "conversational", "note": "No summary extracted"},
+                )
 
         except GraphRecursionError as exc:
             logger.exception("PM recursion limit exceeded", exc_info=exc, extra={"thread_id": thread_id, "tracking_id": tracking_id})
@@ -885,7 +892,6 @@ class WorkflowRunner:
                         if isinstance(clean_value, dict):
                             draft = Product.model_validate(clean_value)
                             products_to_approve.append(draft)
-                            logger.info(f"[DISPLAY ORDER] Product {idx + 1}: {draft.name}")
 
                 # Send all products in batch
                 if len(products_to_approve) > 0:
@@ -1077,14 +1083,11 @@ class WorkflowRunner:
         Returns:
             CatalogingResult if found, None otherwise
         """
-        print(f"[DEBUG] _extract_cataloging_result examining {len(messages)} messages")
-
         # First pass: Look for dict-format tool messages (initial workflow)
-        for idx, message in enumerate(messages):
+        for message in messages:
             message_type = getattr(message, "type", None)
             if not message_type and hasattr(message, "__class__"):
                 message_type = message.__class__.__name__.replace("Message", "").lower()
-            print(f"[DEBUG]   Message {idx}: type={message_type}")
             if message_type != "tool":
                 continue
 
@@ -1093,7 +1096,6 @@ class WorkflowRunner:
             # Format 1: Dict content with tool_name and result
             if isinstance(content, dict):
                 tool_name = content.get("tool_name")
-                print(f"[DEBUG]   Message {idx}: tool_name={tool_name}")
                 if tool_name != "save_product":
                     continue
 
@@ -1101,27 +1103,19 @@ class WorkflowRunner:
                     from autifyme_agents.schemas.agent_outputs import CatalogingToolOutput
 
                     tool_output = CatalogingToolOutput.model_validate(content)
-                    print(f"[DEBUG] FOUND cataloging_result in message {idx} (dict format)!")
                     return tool_output.result
-                except ValueError as e:
-                    print(f"[DEBUG] Message {idx}: validation failed: {e}")
+                except ValueError:
                     continue
 
             # Format 2: String content (resume workflow) - need to find the tool call
             else:
-                print(f"[DEBUG]   Message {idx}: content is string, checking for tool_call_id")
                 tool_call_id = getattr(message, "tool_call_id", None)
-                print(f"[DEBUG]   Message {idx}: tool_call_id={tool_call_id}")
                 if tool_call_id:
                     # Find the AI message with this tool call
                     result = self._find_tool_call_args(messages, tool_call_id, "save_product")
                     if result:
-                        print(f"[DEBUG] FOUND cataloging_result via tool_call_id in message {idx}!")
                         return result
-                    else:
-                        print(f"[DEBUG]   Message {idx}: tool_call_id found but couldn't extract result")
 
-        print("[DEBUG] No cataloging_result found in any message")
         return None
 
     def _find_tool_call_args(self, messages: list[Any], tool_call_id: str, tool_name: str) -> CatalogingResult | None:
@@ -1139,8 +1133,7 @@ class WorkflowRunner:
         """
         from autifyme_agents.schemas.models import CatalogingResult
 
-        print(f"[DEBUG] _find_tool_call_args: searching for tool_call_id={tool_call_id}, tool_name={tool_name}")
-        for idx, message in enumerate(messages):
+        for message in messages:
             message_type = getattr(message, "type", None)
             if not message_type and hasattr(message, "__class__"):
                 message_type = message.__class__.__name__.replace("Message", "").lower()
@@ -1149,35 +1142,24 @@ class WorkflowRunner:
 
             # Check for tool_calls
             tool_calls = getattr(message, "tool_calls", None)
-            print(f"[DEBUG]   AI message {idx}: has tool_calls={tool_calls is not None}, count={len(tool_calls) if tool_calls else 0}")
             if not tool_calls:
                 continue
 
-            for tc_idx, tc in enumerate(tool_calls):
+            for tc in tool_calls:
                 tc_id = tc.get("id")
-                tc_name = tc.get("name")
-                print(f"[DEBUG]     Tool call {tc_idx}: id={tc_id}, name={tc_name}")
 
                 # Match on ID regardless of name - resume flows use "task" instead of "save_product"
                 if tc_id == tool_call_id:
-                    print(f"[DEBUG]     ID MATCH! name={tc_name}, expected={tool_name}")
                     args = tc.get("args", {})
-                    print(f"[DEBUG]     args keys: {list(args.keys()) if isinstance(args, dict) else 'not a dict'}")
 
-                    # For task() tool, the product data might be nested in args
-                    # Try direct validation first
+                    # Try direct validation
                     try:
                         result = CatalogingResult.model_validate(args)
-                        print(f"[DEBUG]     Successfully validated CatalogingResult from args!")
                         return result
-                    except Exception as e:
-                        print(f"[DEBUG]     Direct validation failed: {e}")
+                    except Exception:
+                        # Validation failed, continue to next tool call
+                        pass
 
-                    # If task() tool, check for nested product in tool result (not args)
-                    # The actual product might be in the TOOL MESSAGE content, not the tool call args
-                    # Skip for now and fall through
-
-        print(f"[DEBUG] _find_tool_call_args: No matching tool call found")
         return None
 
     def _extract_ai_summary(self, messages: list[Any]) -> str | None:

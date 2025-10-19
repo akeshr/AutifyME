@@ -351,9 +351,8 @@ class OutcomeTracker:
         try:
             outcome_id = self.storage.save_workflow_outcome(outcome_payload)
             status = outcome_payload.get("result_data", {}).get("status") if isinstance(outcome_payload.get("result_data"), dict) else "completed"
-            print(f"[DEBUG] DB RECORD CREATED | thread={workflow.thread_id} | tracking={workflow.tracking_id} | status={status}")
             logger.info(
-                "💾 DB RECORD CREATED",
+                "Workflow outcome persisted",
                 extra={
                     "tracking_id": workflow.tracking_id,
                     "thread_id": workflow.thread_id,
