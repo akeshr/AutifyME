@@ -1,6 +1,6 @@
 """Framework validation - Test the autonomous testing framework end-to-end.
 
-This script validates the 5-tool framework by running real scenarios
+This script validates the 6-tool framework by running real scenarios
 and using hierarchical trace analysis to debug issues.
 """
 import sys
@@ -183,8 +183,8 @@ def main():
     print("=" * 80)
     print("  AUTONOMOUS TESTING FRAMEWORK VALIDATION")
     print("=" * 80)
-    print("\nThis script validates the 5-tool framework with real scenarios.")
-    print("Framework: execute -> overview -> details -> validate -> track")
+    print("\nThis script validates the 6-tool framework with real scenarios.")
+    print("Framework: execute -> overview -> details -> messages -> story -> track")
 
     # Test 1: Basic cataloging
     test1_result = test_basic_cataloging()

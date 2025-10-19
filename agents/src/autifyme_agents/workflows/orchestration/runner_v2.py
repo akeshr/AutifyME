@@ -251,22 +251,50 @@ class WorkflowRunner:
             result, interrupt_value = self._invoke_pm(thread_id, raw_payload)
 
             # Extract and link trace_id for observability correlation
-            # Trace ID is stored in LangSmith run metadata after PM execution
+            # Query LangSmith API with retry for indexing lag
             try:
+                import os
+                import time
                 from langsmith import Client
+
                 ls_client = Client()
-                # Query latest run for this thread (most recent trace)
-                runs_iter = ls_client.list_runs(
-                    filter=f'eq(metadata_key, "langsmith.thread_id") and eq(metadata_value, "{thread_id}")',
-                    limit=1
-                )
-                runs = list(runs_iter)
-                if runs:
-                    trace_id = str(runs[0].trace_id)
+                trace_id = None
+                project_name = os.getenv("LANGCHAIN_PROJECT", "autifyme-dev")
+
+                # Retry logic: LangSmith may have indexing lag after execution
+                # Note: Using client-side filtering instead of filter parameter due to escaping complexity
+                for attempt in range(3):
+                    # Query recent root runs (limit 20 to find match quickly)
+                    runs_iter = ls_client.list_runs(
+                        project_name=project_name,
+                        limit=20,
+                        is_root=True  # Only get root runs (top-level traces)
+                    )
+                    runs = list(runs_iter)
+
+                    # Filter client-side for matching thread_id
+                    matching_runs = [
+                        r for r in runs
+                        if r.metadata and r.metadata.get("langsmith.thread_id") == thread_id
+                    ]
+
+                    if matching_runs:
+                        trace_id = str(matching_runs[0].trace_id)
+                        break
+
+                    if attempt < 2:  # Don't sleep on last attempt
+                        time.sleep(0.5)  # 500ms delay for indexing
+
+                if trace_id:
                     self.outcome_tracker.set_trace_id(thread_id, trace_id)
                     logger.debug(
                         "Linked trace_id to workflow outcome",
-                        extra={"thread_id": thread_id, "trace_id": trace_id}
+                        extra={"thread_id": thread_id, "trace_id": trace_id, "attempts": attempt + 1}
+                    )
+                else:
+                    logger.warning(
+                        "Could not find trace for thread_id after 3 attempts",
+                        extra={"thread_id": thread_id}
                     )
             except Exception as e:
                 logger.warning(
