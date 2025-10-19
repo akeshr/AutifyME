@@ -52,21 +52,23 @@ from __future__ import annotations
 import json
 import logging
 from collections import OrderedDict
-from datetime import datetime
 from threading import Lock
 from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.errors import GraphInterrupt, GraphRecursionError
-from langgraph.types import Command
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
-from autifyme_agents.schemas.approval import BatchApprovalResponse
 from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
-from autifyme_agents.workflows.approval_analyzer import analyze_approval
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.workflows.handlers.approval_coordinator import ApprovalCoordinator
+from autifyme_agents.workflows.handlers.protocol import WorkflowHandler
+from autifyme_agents.workflows.interrupt_unpacker import InterruptUnpacker
+from autifyme_agents.workflows.middleware.outcome_tracking_middleware import (
+    OutcomeTrackingMiddleware,
+)
 from autifyme_agents.workflows.outcome_tracker import IncomingMessage, OutcomeTracker
 from autifyme_agents.workflows.project_manager import create_project_manager
 
@@ -119,6 +121,7 @@ class WorkflowRunner:
         *,
         channel: MessagingChannel,
         storage: StorageInterface,
+        workflow_handler: WorkflowHandler,
         checkpointer: BaseCheckpointSaver[Any] | None = None,
         recursion_limit: int | None = None,
     ):
@@ -127,6 +130,7 @@ class WorkflowRunner:
         Args:
             channel: Messaging channel adapter (WhatsApp, Telegram, etc.)
             storage: Storage adapter for company profile and products
+            workflow_handler: Workflow-specific handler for domain logic
             checkpointer: LangGraph checkpointer (creates default if None)
             recursion_limit: Max PM recursion depth
         """
@@ -136,12 +140,14 @@ class WorkflowRunner:
 
         self.channel = channel
         self.storage = storage
+        self.workflow_handler = workflow_handler
         self.recursion_limit = recursion_limit or settings.AGENT_RECURSION_LIMIT
 
         logger.debug(
             "Runner configuration",
             extra={
                 "channel": channel.__class__.__name__,
+                "workflow_handler": workflow_handler.__class__.__name__,
                 "recursion_limit": self.recursion_limit,
                 "has_custom_checkpointer": checkpointer is not None,
             },
@@ -165,6 +171,20 @@ class WorkflowRunner:
         # Phase 1: Outcome tracking for agentic learning
         self.outcome_tracker = OutcomeTracker(storage)
         logger.info("OutcomeTracker initialized")
+
+        # Outcome tracking middleware (wraps PM invocation with automatic tracking)
+        self.tracking_middleware = OutcomeTrackingMiddleware(
+            outcome_tracker=self.outcome_tracker,
+            workflow_handler=self.workflow_handler,
+        )
+        logger.info("Outcome tracking middleware initialized")
+
+        # Approval coordinator (handles approval analyzer invocation with tracking)
+        self.approval_coordinator = ApprovalCoordinator(
+            outcome_tracker=self.outcome_tracker,
+            channel=self.channel,
+        )
+        logger.info("Approval coordinator initialized")
 
         logger.info("Generic HITL Framework initialized - approval_analyzer architecture")
         logger.info("=" * 80)
@@ -211,7 +231,7 @@ class WorkflowRunner:
     ) -> None:
         """Execute workflow: forward message to PM, handle any interrupts.
 
-        ✅ SIMPLIFIED: Command resume for deepagents HITL.
+        Uses outcome tracking middleware for automatic tracking.
 
         Args:
             thread_id: Conversation thread ID
@@ -225,8 +245,7 @@ class WorkflowRunner:
             extra={"thread_id": thread_id, "has_text": text is not None, "has_media": media_id is not None},
         )
 
-        workflow_start_time = datetime.now()
-
+        # Prepare structured incoming message
         incoming_message = IncomingMessage(
             sender_id=sender,
             sender_name=sender_name,
@@ -234,108 +253,58 @@ class WorkflowRunner:
             media_id=media_id,
             platform=self.channel.__class__.__name__.replace("Channel", "").lower(),
         )
-        tracking_id = self.outcome_tracker.track_workflow_start(thread_id, incoming_message)
 
-        # Build raw payload for PM with sender name for personalization
+        # Build raw payload for PM
         raw_payload = {
             "platform": incoming_message.platform,
             "sender": sender,
-            "sender_name": sender_name,  # For personalized greetings/responses
+            "sender_name": sender_name,
             "text": text,
             "media_id": media_id,
             "timestamp": incoming_message.received_at.isoformat(),
         }
 
         try:
-            # ✅ ALWAYS invoke PM with message - it handles checkpoint state
-            result, interrupt_value = self._invoke_pm(thread_id, raw_payload)
+            # Execute with automatic outcome tracking via middleware
+            result, interrupt_value, tracking_id = self.tracking_middleware.execute_with_tracking(
+                thread_id=thread_id,
+                incoming_message=incoming_message,
+                pm_invoker=lambda tid: self._invoke_pm(thread_id, raw_payload, run_id=tid),
+            )
 
-            # Extract and link trace_id for observability correlation
-            # Trace ID is stored in LangSmith run metadata after PM execution
-            try:
-                from langsmith import Client
-                ls_client = Client()
-                # Query latest run for this thread (most recent trace)
-                runs_iter = ls_client.list_runs(
-                    filter=f'eq(metadata_key, "langsmith.thread_id") and eq(metadata_value, "{thread_id}")',
-                    limit=1
-                )
-                runs = list(runs_iter)
-                if runs:
-                    trace_id = str(runs[0].trace_id)
-                    self.outcome_tracker.set_trace_id(thread_id, trace_id)
-                    logger.debug(
-                        "Linked trace_id to workflow outcome",
-                        extra={"thread_id": thread_id, "trace_id": trace_id}
-                    )
-            except Exception as e:
-                logger.warning(
-                    "Failed to extract trace_id (non-blocking)",
-                    extra={"thread_id": thread_id, "error": str(e)}
-                )
-
+            # Handle user-facing logic (middleware handles tracking)
             if interrupt_value:
-                # Department is requesting HITL - forward to user
-                self._handle_interrupt(sender, thread_id, interrupt_value)
-                duration = (datetime.now() - workflow_start_time).total_seconds()
-                self.outcome_tracker.track_workflow_end(
-                    thread_id=thread_id,
-                    success=True,
-                    result={"status": "pending_hitl", "tracking_id": tracking_id},
-                )
+                self.workflow_handler.handle_interrupt(sender, thread_id, interrupt_value)
                 return
 
             if not result:
-                logger.warning("PM returned no result", extra={"thread_id": thread_id})
                 return
 
-            # Check for workflow completion
-            cataloging_result = self._extract_cataloging_result(result.get("messages", []))
+            # Send workflow-specific completion to user
+            cataloging_result = self.workflow_handler.extract_result(result.get("messages", []))
             if cataloging_result:
                 self.channel.send_completion(sender, cataloging_result)
-                duration = (datetime.now() - workflow_start_time).total_seconds()
-                logger.info(
-                    "Workflow completed successfully",
-                    extra={"thread_id": thread_id, "duration_seconds": duration},
-                )
-                self.outcome_tracker.track_workflow_end(
-                    thread_id=thread_id,
-                    success=True,
-                    result=cataloging_result.model_dump(),
-                )
+                logger.info("Workflow completed", extra={"thread_id": thread_id, "tracking_id": tracking_id})
                 return
 
-            # Fallback: send AI summary if available
-            summary = self._extract_ai_summary(result.get("messages", []))
+            # Send conversational response
+            summary = self.workflow_handler.extract_summary(result.get("messages", []))
             if summary:
                 self.channel.send_text(sender, summary)
-            else:
-                logger.warning("No result or summary from PM", extra={"thread_id": thread_id})
 
         except GraphRecursionError as exc:
-            logger.exception("PM recursion limit exceeded", exc_info=exc, extra={"thread_id": thread_id})
+            logger.exception("PM recursion limit exceeded", exc_info=exc)
             self.channel.send_error(sender, "recursion")
-            self.outcome_tracker.track_workflow_end(
-                thread_id=thread_id,
-                success=False,
-                error=exc,
-                resolution_strategy="user_notified",
-            )
 
         except Exception as exc:
-            logger.exception("PM invocation failed", exc_info=exc, extra={"thread_id": thread_id})
+            logger.exception("PM invocation failed", exc_info=exc)
             self.channel.send_error(sender, "processing")
-            self.outcome_tracker.track_workflow_end(
-                thread_id=thread_id,
-                success=False,
-                error=exc,
-                resolution_strategy="user_notified",
-            )
 
     def _invoke_pm(
         self,
         thread_id: str,
         raw_payload: dict[str, Any],
+        run_id: str | None = None,
     ) -> tuple[dict[str, Any] | None, Any | None]:
         """Invoke PM with raw message payload.
 
@@ -361,78 +330,18 @@ class WorkflowRunner:
         logger.debug("Invoking Project Manager", extra={"thread_id": thread_id})
 
         pm: Any = self._create_project_manager()
-        config = self._build_config(thread_id)
+        config = self._build_config(thread_id, run_id=run_id)
 
         # Check for pending HITL interrupts
-        pending_interrupts_list = []
         try:
             state_snapshot = pm.get_state(config)
 
-            if state_snapshot and state_snapshot.interrupts:
-                # Extract interrupt info for approval analyzer
-                # IMPORTANT: interrupt_obj.value can be:
-                # - A list of actions (parallel tool calls from same agent)
-                # - A single dict (single action)
-                # We need N interrupt_info objects for approval analyzer (1 response per action)
+            # Unpack interrupts into normalized format for approval processing
+            pending_interrupts_list = InterruptUnpacker.unpack_interrupts(
+                state_snapshot, thread_id=thread_id
+            )
 
-                for base_idx, interrupt_obj in enumerate(state_snapshot.interrupts):
-                    interrupt_id = interrupt_obj.id if hasattr(interrupt_obj, 'id') else f"interrupt_{base_idx}"
-                    interrupt_value = interrupt_obj.value if hasattr(interrupt_obj, 'value') else None
-
-                    # Check if value is a list of actions (parallel tool calls)
-                    if isinstance(interrupt_value, list):
-                        logger.debug(
-                            "Unpacking list-valued interrupt into individual actions",
-                            extra={
-                                "thread_id": thread_id,
-                                "interrupt_id": interrupt_id,
-                                "action_count": len(interrupt_value),
-                            }
-                        )
-
-                        # Create one interrupt_info per action
-                        for action_idx, action in enumerate(interrupt_value):
-                            # Extract metadata from action
-                            if isinstance(action, dict):
-                                action_request = action.get("action_request", {})
-                                tool_name = action_request.get("action", "unknown")
-                                tool_args = action_request.get("args", {})
-                                description = action.get("description", f"Action {action_idx + 1}")
-                            else:
-                                tool_name = "unknown"
-                                tool_args = {}
-                                description = str(action)[:100]
-
-                            interrupt_info = {
-                                "interrupt_id": f"{interrupt_id}_{action_idx}",
-                                "original_interrupt_id": interrupt_id,  # Track original for Command building
-                                "tool_name": tool_name,
-                                "tool_args": tool_args,
-                                "description": description,
-                            }
-                            pending_interrupts_list.append(interrupt_info)
-                            logger.info(f"[RESUME ORDER] Interrupt {action_idx + 1}: {tool_args.get('name', 'unknown')}")
-
-                    # Single dict value (single action)
-                    elif isinstance(interrupt_value, dict):
-                        interrupt_info = {
-                            "interrupt_id": interrupt_id,
-                            "tool_name": interrupt_value.get("tool_name", "unknown"),
-                            "tool_args": interrupt_value.get("tool_args", {}),
-                            "description": str(interrupt_value)[:100],
-                        }
-                        pending_interrupts_list.append(interrupt_info)
-
-                    # Fallback for unknown format
-                    else:
-                        interrupt_info = {
-                            "interrupt_id": interrupt_id,
-                            "tool_name": "unknown",
-                            "tool_args": {},
-                            "description": str(interrupt_value)[:100] if interrupt_value else "Pending approval",
-                        }
-                        pending_interrupts_list.append(interrupt_info)
-
+            if pending_interrupts_list:
                 logger.info(
                     "Found pending HITL interrupts",
                     extra={
@@ -477,59 +386,18 @@ class WorkflowRunner:
                     extra={"thread_id": thread_id, "error": str(e)}
                 )
 
-            logger.info(
-                "Analyzing approval with conversation history",
-                extra={
-                    "thread_id": thread_id,
-                    "interrupt_count": len(pending_interrupts_list),
-                    "user_message": user_message[:50],
-                    "has_history": len(conversation_history) > 0,
-                }
+            # Invoke approval coordinator (handles tracking, error handling, and Command building)
+            command_obj, approval_tracking_id = self.approval_coordinator.analyze_and_build_command(
+                thread_id=thread_id,
+                user_message=user_message,
+                pending_interrupts=pending_interrupts_list,
+                conversation_history=conversation_history,
+                raw_payload=raw_payload,
             )
 
-            try:
-                # Invoke approval analyzer with conversation history
-                approval_response: BatchApprovalResponse = analyze_approval(
-                    pending_interrupts=pending_interrupts_list,
-                    user_message=user_message,
-                    conversation_history=conversation_history,  # NEW: Full context
-                )
-
-                logger.info(
-                    "Approval analysis complete",
-                    extra={
-                        "thread_id": thread_id,
-                        "response_count": len(approval_response.responses),
-                        "reasoning": approval_response.reasoning,
-                    }
-                )
-
-            except ValueError as e:
-                logger.error(
-                    "Approval analysis validation failed",
-                    extra={"thread_id": thread_id, "error": str(e)}
-                )
-                self.channel.send_text(
-                    raw_payload.get("sender", ""),
-                    "I had trouble processing your response. Please try: 'approve' or 'reject'"
-                )
+            if not command_obj:
+                # Error already tracked and user notified by coordinator
                 return None, None
-
-            except Exception as e:
-                logger.exception(
-                    "Approval analysis failed",
-                    extra={"thread_id": thread_id, "error_type": type(e).__name__}
-                )
-                self.channel.send_text(
-                    raw_payload.get("sender", ""),
-                    "I encountered an error processing your response. Please try again."
-                )
-                return None, None
-
-            # Build Command from structured approval response
-            command_obj = self._build_command_from_approval(
-                approval_response, pending_interrupts_list
-            )
 
             # Execute Command to resume workflow
             logger.info(
@@ -682,223 +550,6 @@ class WorkflowRunner:
                 )
                 raise
 
-    def _build_command_from_approval(
-        self,
-        approval_response: BatchApprovalResponse,
-        pending_interrupts: list[dict[str, Any]],
-    ) -> Command[Any]:
-        """Build LangGraph Command from structured approval response.
-
-        Takes the Pydantic BatchApprovalResponse from approval analyzer and
-        constructs a LangGraph Command object for resuming interrupted workflows.
-
-        IMPORTANT: Uses original_interrupt_id (WITHOUT suffix) to match checkpoint format.
-        Each interrupt gets its own entry in Command.resume with its response.
-
-        Args:
-            approval_response: Structured approval response from analyzer
-            pending_interrupts: List of pending interrupt contexts
-
-        Returns:
-            Command object ready for execution
-
-        Example (Parallel Interrupts):
-            approval_response.responses = [
-                {"type": "accept"},
-                {"type": "edit", "args": {"price": 120.0}},
-                {"type": "response", "args": "Not required"}
-            ]
-            pending_interrupts = [
-                {"interrupt_id": "abc123_0", ...},  # Blue bottle
-                {"interrupt_id": "abc123_1", ...},  # Pink bottle
-                {"interrupt_id": "abc123_2", ...}   # Green bottle
-            ]
-            →
-            Command(resume={
-                "abc123_0": [{"type": "accept"}],
-                "abc123_1": [{"type": "edit", "args": {...}}],
-                "abc123_2": [{"type": "response", "args": "Not required"}]
-            })
-        """
-        # Build Command.resume mapping each interrupt_id to its response
-        from collections import defaultdict
-        interrupt_responses = defaultdict(list)
-
-        for idx, interrupt_info in enumerate(pending_interrupts):
-            # Use original_interrupt_id (WITHOUT suffix) to match checkpoint format
-            # Checkpoint stores base IDs: "abc123", "def456", etc. (no suffix)
-            # Suffix is only used internally for unpacking list-valued interrupts
-            interrupt_id_for_command = interrupt_info.get("original_interrupt_id", interrupt_info["interrupt_id"])
-
-            response = approval_response.responses[idx]
-            tool_name = interrupt_info.get("tool_name", "unknown")
-            tool_args = interrupt_info.get("tool_args", {})
-
-            # Format response based on type for HITL middleware compatibility
-            if response.type == "edit":
-                # HITL middleware expects: {"type": "edit", "args": {"action": "tool_name", "args": {...}}}
-                # The "args" field should be an ActionRequest with action and args
-                merged_args = {**tool_args, **response.args} if isinstance(response.args, dict) else tool_args
-                hitl_response = {
-                    "type": "edit",
-                    "args": {
-                        "action": tool_name,
-                        "args": merged_args
-                    }
-                }
-                logger.debug(
-                    f"Built edit response for {interrupt_id_for_command}",
-                    extra={
-                        "tool_name": tool_name,
-                        "edited_fields": list(response.args.keys()) if isinstance(response.args, dict) else [],
-                    }
-                )
-            elif response.type == "accept":
-                # Accept - HITL middleware expects {"type": "accept"}
-                hitl_response = {"type": "accept"}
-            elif response.type == "response":
-                # Reject/clarification - HITL middleware expects {"type": "response", "args": "message"}
-                # For response type, args should be a string message
-                message = response.args if isinstance(response.args, str) else str(response.args or "")
-                hitl_response = {
-                    "type": "response",
-                    "args": message
-                }
-            else:
-                # Unknown type - log warning and treat as accept
-                # Note: This branch is unreachable with current Literal types but kept for defensive programming
-                logger.warning(  # type: ignore[unreachable]
-                    f"Unknown response type: {response.type}",
-                    extra={"interrupt_id": interrupt_id_for_command}
-                )
-                hitl_response = {"type": "accept"}
-
-            interrupt_responses[interrupt_id_for_command].append(hitl_response)
-
-        logger.info(
-            "Built Command from structured approval",
-            extra={
-                "total_responses": len(pending_interrupts),
-                "interrupt_count": len(interrupt_responses),
-                "interrupt_ids": list(interrupt_responses.keys()),
-                "edit_count": sum(1 for resp in approval_response.responses if resp.type == "edit"),
-            }
-        )
-
-        return Command(resume=dict(interrupt_responses))
-
-    def _handle_interrupt(
-        self,
-        sender: str,
-        thread_id: str,
-        interrupt_value: Any,
-    ) -> None:
-        """Forward interrupt to user via channel.
-
-        ✅ BATCH APPROVAL SUPPORT: Send ALL products in one batch to channel.
-
-        DeepAgents wraps tool calls in action_request format:
-        [{'action_request': {'action': 'tool_name', 'args': {actual_data}}}]
-
-        For parallel tool calls (multiple products), we collect all Products
-        and send them together for batch approval.
-
-        Args:
-            sender: Channel-specific sender ID
-            thread_id: Conversation thread ID
-            interrupt_value: Value from interrupt (may be wrapped by DeepAgents)
-        """
-        logger.debug(
-            "Handling HITL interrupt",
-            extra={
-                "thread_id": thread_id,
-                "interrupt_type": type(interrupt_value).__name__,
-                "is_list": isinstance(interrupt_value, list),
-                "length_if_list": len(interrupt_value) if isinstance(interrupt_value, list) else "N/A",
-            }
-        )
-
-        try:
-            from autifyme_agents.schemas.models import Product
-
-            # Collect all products (for batch approval)
-            products_to_approve: list[Product] = []
-
-            if isinstance(interrupt_value, list) and len(interrupt_value) > 0:
-                # Parallel tool calls - collect ALL products
-                logger.info(
-                    "Processing batch interrupt",
-                    extra={"thread_id": thread_id, "action_count": len(interrupt_value)}
-                )
-
-                for idx, action in enumerate(interrupt_value):
-                    if isinstance(action, dict) and "action_request" in action:
-                        # DeepAgents format - extract clean args
-                        action_request = action.get("action_request", {})
-                        clean_value = action_request.get("args", {})
-                        tool_name = action_request.get("action", "unknown")
-
-                        logger.debug(
-                            f"Unwrapping action {idx + 1} of {len(interrupt_value)}",
-                            extra={
-                                "thread_id": thread_id,
-                                "tool_name": tool_name,
-                                "product_name": clean_value.get("name", "unknown"),
-                            }
-                        )
-
-                        # Convert to Product and add to batch
-                        if isinstance(clean_value, dict):
-                            draft = Product.model_validate(clean_value)
-                            products_to_approve.append(draft)
-                            logger.info(f"[DISPLAY ORDER] Product {idx + 1}: {draft.name}")
-
-                # Send all products in batch
-                if len(products_to_approve) > 0:
-                    logger.info(
-                        "Sending batch approval request",
-                        extra={
-                            "thread_id": thread_id,
-                            "product_count": len(products_to_approve),
-                            "product_names": [p.name for p in products_to_approve],
-                        }
-                    )
-
-                    # Send batch approval - show ALL products at once
-                    if len(products_to_approve) == 1:
-                        # Single product - use standard approval request
-                        self.channel.send_approval_request(sender, products_to_approve[0])
-                    else:
-                        # Multiple products - format as batch and send all together
-                        self._send_batch_approval(sender, products_to_approve)
-
-            # Handle single interrupt case
-            elif isinstance(interrupt_value, dict):
-                logger.info(
-                    "Processing single interrupt",
-                    extra={"thread_id": thread_id}
-                )
-
-                # Convert dict args to Product object for channel
-                draft = Product.model_validate(interrupt_value)
-                logger.debug(
-                    "Converted single interrupt to Product",
-                    extra={"thread_id": thread_id, "product_name": draft.name}
-                )
-                self.channel.send_approval_request(sender, draft)
-
-            logger.info(
-                "Interrupt(s) forwarded to user - awaiting response",
-                extra={
-                    "thread_id": thread_id,
-                    "product_count": len(products_to_approve) if products_to_approve else 1,
-                },
-            )
-
-        except Exception as exc:
-            logger.exception("Failed to send interrupt to user", exc_info=exc, extra={"thread_id": thread_id})
-            self.channel.send_error(sender, "processing", "I encountered an issue requesting your input.")
-
     def _send_batch_approval(self, sender: str, products: list[Any]) -> None:
         """Send batch approval request with ALL products displayed together.
 
@@ -1001,16 +652,17 @@ class WorkflowRunner:
             channel=self.channel,
         )
 
-    def _build_config(self, thread_id: str) -> dict[str, Any]:
+    def _build_config(self, thread_id: str, run_id: str | None = None) -> dict[str, Any]:
         """Build PM config.
 
         Args:
             thread_id: Conversation thread ID
+            run_id: Optional run_id to use as trace_id in LangSmith
 
         Returns:
             PM config dict
         """
-        return {
+        config = {
             "configurable": {
                 "thread_id": thread_id,
                 "company_id": "default",
@@ -1022,56 +674,54 @@ class WorkflowRunner:
             },
         }
 
-    def _extract_cataloging_result(self, messages: list[Any]) -> CatalogingResult | None:
-        """Extract CatalogingResult from messages.
+        # Add run_id if provided - this becomes the trace_id in LangSmith
+        if run_id:
+            from uuid import UUID
+            config["run_id"] = UUID(run_id) if isinstance(run_id, str) else run_id
+
+        return config
+
+    def _find_tool_call_args(self, messages: list[Any], tool_call_id: str, tool_name: str) -> CatalogingResult | None:
+        """Find tool call arguments in AI message by tool_call_id.
+
+        Used for resume workflows where tool message has string content.
 
         Args:
-            messages: PM output messages
+            messages: All messages
+            tool_call_id: ID to match
+            tool_name: Expected tool name
 
         Returns:
-            CatalogingResult if found, None otherwise
+            CatalogingResult if found
         """
+        from autifyme_agents.schemas.models import CatalogingResult
+
         for message in messages:
-            message_type = getattr(message, "type", None)
-            if not message_type and hasattr(message, "__class__"):
-                message_type = message.__class__.__name__.replace("Message", "").lower()
-            if message_type != "tool":
-                continue
-
-            content = getattr(message, "content", None)
-            if not isinstance(content, dict):
-                continue
-            if content.get("tool_name") != "save_product":
-                continue
-
-            try:
-                from autifyme_agents.schemas.agent_outputs import CatalogingToolOutput
-
-                tool_output = CatalogingToolOutput.model_validate(content)
-                return tool_output.result
-            except ValueError:
-                continue
-
-        return None
-
-    def _extract_ai_summary(self, messages: list[Any]) -> str | None:
-        """Extract AI summary from messages.
-
-        Args:
-            messages: PM output messages
-
-        Returns:
-            Summary string if found, None otherwise
-        """
-        for message in reversed(messages):
             message_type = getattr(message, "type", None)
             if not message_type and hasattr(message, "__class__"):
                 message_type = message.__class__.__name__.replace("Message", "").lower()
             if message_type != "ai":
                 continue
 
-            content = getattr(message, "content", None)
-            if isinstance(content, str):
-                return content
+            # Check for tool_calls
+            tool_calls = getattr(message, "tool_calls", None)
+            if not tool_calls:
+                continue
+
+            for tc in tool_calls:
+                tc_id = tc.get("id")
+
+                # Match on ID regardless of name - resume flows use "task" instead of "save_product"
+                if tc_id == tool_call_id:
+                    args = tc.get("args", {})
+
+                    # Try direct validation
+                    try:
+                        result = CatalogingResult.model_validate(args)
+                        return result
+                    except Exception:
+                        # Validation failed, continue to next tool call
+                        pass
 
         return None
+

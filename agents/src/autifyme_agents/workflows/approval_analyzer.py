@@ -152,6 +152,7 @@ def analyze_approval(
     user_message: str,
     conversation_history: list[Any] | None = None,
     llm: BaseChatModel | None = None,
+    run_id: str | None = None,
 ) -> BatchApprovalResponse:
     """Convenience function to analyze approval with validation.
 
@@ -160,6 +161,7 @@ def analyze_approval(
         user_message: User's approval/rejection message
         conversation_history: Full conversation history for context (NEW)
         llm: Optional LLM override
+        run_id: Optional run_id to use as trace_id in LangSmith
 
     Returns:
         BatchApprovalResponse with validated count
@@ -169,12 +171,21 @@ def analyze_approval(
     """
     analyzer = create_approval_analyzer(llm)
 
+    # Build config with run_id if provided
+    config = {}
+    if run_id:
+        from uuid import UUID
+        config["run_id"] = UUID(run_id) if isinstance(run_id, str) else run_id
+
     # Invoke analyzer with conversation history
-    result: BatchApprovalResponse = analyzer.invoke({
-        "pending_interrupts": pending_interrupts,
-        "user_message": user_message,
-        "conversation_history": conversation_history or [],
-    })
+    result: BatchApprovalResponse = analyzer.invoke(
+        {
+            "pending_interrupts": pending_interrupts,
+            "user_message": user_message,
+            "conversation_history": conversation_history or [],
+        },
+        config=config if config else None,
+    )
 
     # Validate count
     result.validate_count(len(pending_interrupts))

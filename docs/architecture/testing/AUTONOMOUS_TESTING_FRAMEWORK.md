@@ -13,7 +13,7 @@ This framework equips Claude with **information-gathering tools** to execute wor
 
 **Key Innovation**: Hierarchical lazy-loading trace analysis reduces token costs 25x (50K → 2K tokens) by fetching structure first, then drilling down selectively.
 
-**Tool Count**: 5 essential observation tools + existing Edit/Write/MCP tools
+**Tool Count**: 6 essential observation tools + existing Edit/Write/MCP tools
 
 ---
 
@@ -71,7 +71,7 @@ Claude already has powerful tools for code changes and DB queries. This framewor
 
 ---
 
-## III. Essential Tools (5 Total)
+## III. Essential Tools (6 Total)
 
 ### 1. execute_scenario(scenario_id, hitl_mode, media_path)
 
@@ -170,7 +170,31 @@ Fetches full conversation messages for a run (expensive, rare use).
 
 ---
 
-### 5. list_recent_tests(limit)
+### 5. get_workflow_story(trace_ids)
+
+Analyzes complete HITL workflows spanning multiple traces (initial → interrupt → resume).
+
+**Returns**: WorkflowStory
+```python
+{
+  "thread_id": str,
+  "total_traces": int,
+  "traces": List[WorkflowTrace],  # Each with overview, HITL interrupt detection
+  "products_extracted": int,
+  "products_saved": int,
+  "products_edited": int,
+  "products_rejected": int,
+  "total_cost": float,
+  "total_latency_ms": int
+}
+```
+
+**Token Cost**: ~500 tokens per trace
+**Use Case**: Validate complete HITL workflows with user approvals, edits, rejections across multiple trace resumes
+
+---
+
+### 6. list_recent_tests(limit)
 
 Lists recent test executions for progress tracking.
 
@@ -379,8 +403,9 @@ Success?
 1. Implement `execute_scenario()` - Wrapper around simulate.py
 2. Implement `get_trace_overview()` - LangSmith metadata fetch
 3. Implement `get_run_details()` - LangSmith run fetch
-4. Implement `list_recent_tests()` - Local history
-5. Manual testing by Claude on 5-10 scenarios
+4. Implement `get_workflow_story()` - Multi-trace HITL analysis
+5. Implement `list_recent_tests()` - Local history
+6. Manual testing by Claude on 5-10 scenarios
 
 **Files to Create**:
 - `tests/tools/execution.py`
@@ -398,8 +423,9 @@ Success?
 
 **Deliverables**:
 1. Implement `get_run_messages()` - Level 2 deep dive
-2. Add search/filter to test history
-3. Run 20+ scenario iterations with improvements
+2. Validate `get_workflow_story()` with multi-trace HITL scenarios
+3. Add search/filter to test history
+4. Run 20+ scenario iterations with improvements
 
 **Success Criteria**:
 - Level 2 works for complex bugs
@@ -442,9 +468,10 @@ Success?
 ## XI. Related Documentation
 
 **Framework Docs**:
-- `TOOL_SPECIFICATIONS.md` - Detailed API reference for 5 tools
+- `TOOL_SPECIFICATIONS.md` - Detailed API reference for 6 tools
 - `HIERARCHICAL_TRACE_ANALYSIS.md` - Token optimization strategy
 - `QUICK_REFERENCE.md` - Cheat sheet
+- `RECONSTRUCTION_ARCHITECTURE.md` - Production data reconstruction via thread_id/trace_id correlation
 
 **Testing Infrastructure**:
 - `LOCAL_TESTING_STRATEGY.md` - CLI tools and philosophy

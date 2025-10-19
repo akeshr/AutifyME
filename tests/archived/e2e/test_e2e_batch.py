@@ -18,6 +18,9 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.workflows.handlers.cataloging_handler import (
+    CatalogingWorkflowHandler,
+)
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 
 
@@ -92,9 +95,13 @@ def test_end_to_end_single_product(mock_storage, memory_checkpointer):
     channel = TestChannel()
     checkpointer = memory_checkpointer
 
+    # Create cataloging workflow handler
+    workflow_handler = CatalogingWorkflowHandler(channel=channel)
+
     runner = WorkflowRunner(
         channel=channel,
         storage=storage,
+        workflow_handler=workflow_handler,
         checkpointer=checkpointer,
     )
 
@@ -153,9 +160,13 @@ def test_end_to_end_multi_product_decomposed(mock_storage, memory_checkpointer):
     channel = TestChannel()
     checkpointer = memory_checkpointer
 
+    # Create cataloging workflow handler
+    workflow_handler = CatalogingWorkflowHandler(channel=channel)
+
     runner = WorkflowRunner(
         channel=channel,
         storage=storage,
+        workflow_handler=workflow_handler,
         checkpointer=checkpointer,
     )
 

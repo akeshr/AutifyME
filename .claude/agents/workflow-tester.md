@@ -1,7 +1,7 @@
 ---
 name: workflow-tester
 description: Use this agent when you need to systematically test and validate AutifyME workflows, particularly after implementing new features, fixing bugs, or making architectural changes. This agent should be used proactively after significant code changes to ensure system integrity.\n\nExamples:\n\n<example>\nContext: Developer has just implemented a new cataloging workflow feature and wants to validate it works correctly.\n\nuser: "I've just added support for multi-image cataloging. Can you verify it works?"\n\nassistant: "I'll use the workflow-tester agent to systematically validate the new multi-image cataloging feature."\n\n<uses Task tool to launch workflow-tester agent>\n\n<commentary>\nThe workflow-tester agent will execute the cataloging workflow with multi-image inputs, analyze traces hierarchically (Level 0→1→2), validate outcomes against expected behavior, and document any failures with evidence.\n</commentary>\n</example>\n\n<example>\nContext: User wants to ensure the PM → Department → Specialist hierarchy is functioning correctly after refactoring.\n\nuser: "I refactored the agent hierarchy. Need to make sure everything still works end-to-end."\n\nassistant: "I'll launch the workflow-tester agent to validate the hierarchical agent flow after your refactoring."\n\n<uses Task tool to launch workflow-tester agent>\n\n<commentary>\nThe workflow-tester will execute representative workflows, use hierarchical trace analysis to validate PM→Department→Specialist interactions, check context flow, and identify any breaks in the chain with specific evidence from traces.\n</commentary>\n</example>\n\n<example>\nContext: Proactive testing after a deployment to production.\n\nuser: "Just deployed the latest changes to staging."\n\nassistant: "Let me proactively test the deployment using the workflow-tester agent to catch any issues before they reach users."\n\n<uses Task tool to launch workflow-tester agent>\n\n<commentary>\nSince deployment just occurred, proactively use workflow-tester to validate critical workflows, analyze traces for errors or degraded performance, and ensure all integrations (WhatsApp, Supabase, LangSmith) are functioning correctly.\n</commentary>\n</example>
-model: haiku
+model: inherit
 color: yellow
 ---
 
@@ -67,42 +67,37 @@ You are an elite QA automation specialist with deep expertise in agentic systems
 - **Architectural violations**: Context leakage, improper data flow, separation of concerns breaks
 - **Integration failures**: WhatsApp, Supabase, LangSmith connectivity or format issues
 
-## Production Data Reconstruction & Multi-Trace HITL Analysis
+## Trace Correlation & HITL Workflow Analysis
 
-**Capability**: Recreate test scenarios from production user data stored in Supabase. Analyze complete HITL workflows across multiple traces.
+**Trace-to-Database Correlation**: `trace_id = tracking_id` (set via `run_id` in config)
 
-**Correlation**: LangSmith traces and Supabase data connect via `thread_id` and `trace_id`:
-- `thread_id`: Stored in trace metadata and DB tables (existing)
-- `trace_id`: Stored in `workflow_outcomes` table (new - auto-captured by runner)
+**HITL Workflow Structure** (3 records per execution):
+1. Initial PM execution → `workflow_outcomes` with `status: pending_hitl`
+2. Approval analyzer → `workflow_outcomes` with `type: approval_analysis`
+3. Resume PM execution → `workflow_outcomes` with `status: completed`
 
-**Use Cases**:
-1. **Given trace_id** → extract thread_id → query DB → recreate scenario → compare traces
-2. **Given thread_id** → query DB for all trace_ids → use get_workflow_story() → analyze complete HITL flow
-3. **Regression testing** → query recent successful workflows → re-execute → detect failures
-4. **Multi-turn scenarios** → extract from checkpoints → replay conversation
-5. **HITL validation** → query trace_ids by thread_id → analyze user decisions across resume traces
-
-**Example - Complete HITL Workflow Analysis**:
-```python
-# Query all trace_ids for a HITL workflow
-trace_ids = mcp__supabase__execute_sql(
-    "SELECT trace_id FROM workflow_outcomes
-     WHERE thread_id = 'whatsapp:...'
-     ORDER BY created_at"
-)
-
-# Analyze complete story
-from tests.tools import get_workflow_story
-story = get_workflow_story(trace_ids)
-
-# Validate outcomes
-assert story.products_saved <= story.products_extracted
-assert story.products_rejected + story.products_edited + story.products_saved == story.products_extracted
+**Query All Phases**:
+```sql
+SELECT tracking_id, trace_id, result_data->>'type' as type, result_data->>'status' as status
+FROM workflow_outcomes
+WHERE thread_id = 'console:local_test_...'
+ORDER BY created_at
 ```
 
-**Key Tables**: workflow_outcomes (with trace_id), checkpoints, products
+**Link to LangSmith**:
+```sql
+SELECT * FROM workflow_outcomes WHERE trace_id = '<trace_id_from_langsmith>'
+```
 
-**Full architecture**: `tests/tools/RECONSTRUCTION_ARCHITECTURE.md`
+**Multi-Trace Story Analysis**:
+```python
+# Get all trace_ids for a HITL workflow
+trace_ids = [row['trace_id'] for row in results]
+from tests.tools import get_workflow_story
+story = get_workflow_story(trace_ids)  # Aggregates across all 3 traces
+```
+
+**Key Tables**: workflow_outcomes (tracking_id, trace_id, thread_id), checkpoints, products
 
 ## Quality Standards
 
