@@ -15,6 +15,9 @@ from autifyme_agents.core.logging_config import get_logger, setup_logging
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
+from autifyme_agents.workflows.handlers.cataloging_handler import (
+    CatalogingWorkflowHandler,
+)
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
 
 # Initialize logging for serverless environment
@@ -66,7 +69,6 @@ def _get_runner() -> WorkflowRunner:
             logger.info("WhatsApp channel adapter created")
 
             # Create cataloging workflow handler
-            from autifyme_agents.workflows.handlers.cataloging_handler import CatalogingWorkflowHandler
             _workflow_handler = CatalogingWorkflowHandler(channel=_whatsapp_channel)
             logger.info("Cataloging workflow handler created")
 
