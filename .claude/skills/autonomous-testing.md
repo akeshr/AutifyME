@@ -350,22 +350,30 @@ After identifying issues via trace analysis, use standard tools:
 # mcp__supabase__execute_sql(query="SELECT * FROM products WHERE ...")
 ```
 
-### Production Data Reconstruction
-**Capability**: Recreate test scenarios from real production user data.
+### Production Data Reconstruction & Trace Correlation
+**Capability**: Recreate test scenarios from real production user data. Link LangSmith traces to database records.
 
-**Correlation**: LangSmith traces ↔ Supabase data via `thread_id`
-- LangSmith metadata contains `thread_id`
-- Supabase tables (workflow_outcomes, checkpoints) store same `thread_id`
+**Correlation**: `trace_id` = `tracking_id` (set via `run_id` in config)
+- Query DB by `trace_id` → get business outcome
+- Query LangSmith by `trace_id` → get technical metrics
+- Query by `thread_id` → get all phases of a conversation
 
-**Reconstruction Scenarios**:
-1. **Given trace_id**: Extract thread_id from trace → query DB → recreate scenario → compare
-2. **Given thread_id**: Query DB for user data → recreate scenario → validate fix
-3. **Regression testing**: Query recent successful workflows → re-execute → detect regressions
-4. **Multi-turn scenarios**: Extract full conversation from checkpoints → replay
+**HITL Workflow = 3 Records**:
+1. Initial PM execution (`status: pending_hitl`)
+2. Approval analyzer (`type: approval_analysis`)
+3. Resume PM execution (`status: completed`)
 
-**Key Tables**: workflow_outcomes (384 rows), checkpoints (387 rows), products (52 rows)
+**Query Examples**:
+```sql
+-- Get all phases by thread_id
+SELECT tracking_id, trace_id, result_data->>'type' as type, result_data->>'status' as status
+FROM workflow_outcomes WHERE thread_id = '...' ORDER BY created_at
 
-**Full architecture**: `tests/tools/RECONSTRUCTION_ARCHITECTURE.md`
+-- Link to LangSmith trace
+SELECT * FROM workflow_outcomes WHERE trace_id = '<from_langsmith>'
+```
+
+**Key Tables**: workflow_outcomes, checkpoints, products
 
 ### Use WebSearch/WebFetch for research
 ```python

@@ -67,42 +67,37 @@ You are an elite QA automation specialist with deep expertise in agentic systems
 - **Architectural violations**: Context leakage, improper data flow, separation of concerns breaks
 - **Integration failures**: WhatsApp, Supabase, LangSmith connectivity or format issues
 
-## Production Data Reconstruction & Multi-Trace HITL Analysis
+## Trace Correlation & HITL Workflow Analysis
 
-**Capability**: Recreate test scenarios from production user data stored in Supabase. Analyze complete HITL workflows across multiple traces.
+**Trace-to-Database Correlation**: `trace_id = tracking_id` (set via `run_id` in config)
 
-**Correlation**: LangSmith traces and Supabase data connect via `thread_id` and `trace_id`:
-- `thread_id`: Stored in trace metadata and DB tables (existing)
-- `trace_id`: Stored in `workflow_outcomes` table (new - auto-captured by runner)
+**HITL Workflow Structure** (3 records per execution):
+1. Initial PM execution → `workflow_outcomes` with `status: pending_hitl`
+2. Approval analyzer → `workflow_outcomes` with `type: approval_analysis`
+3. Resume PM execution → `workflow_outcomes` with `status: completed`
 
-**Use Cases**:
-1. **Given trace_id** → extract thread_id → query DB → recreate scenario → compare traces
-2. **Given thread_id** → query DB for all trace_ids → use get_workflow_story() → analyze complete HITL flow
-3. **Regression testing** → query recent successful workflows → re-execute → detect failures
-4. **Multi-turn scenarios** → extract from checkpoints → replay conversation
-5. **HITL validation** → query trace_ids by thread_id → analyze user decisions across resume traces
-
-**Example - Complete HITL Workflow Analysis**:
-```python
-# Query all trace_ids for a HITL workflow
-trace_ids = mcp__supabase__execute_sql(
-    "SELECT trace_id FROM workflow_outcomes
-     WHERE thread_id = 'whatsapp:...'
-     ORDER BY created_at"
-)
-
-# Analyze complete story
-from tests.tools import get_workflow_story
-story = get_workflow_story(trace_ids)
-
-# Validate outcomes
-assert story.products_saved <= story.products_extracted
-assert story.products_rejected + story.products_edited + story.products_saved == story.products_extracted
+**Query All Phases**:
+```sql
+SELECT tracking_id, trace_id, result_data->>'type' as type, result_data->>'status' as status
+FROM workflow_outcomes
+WHERE thread_id = 'console:local_test_...'
+ORDER BY created_at
 ```
 
-**Key Tables**: workflow_outcomes (with trace_id), checkpoints, products
+**Link to LangSmith**:
+```sql
+SELECT * FROM workflow_outcomes WHERE trace_id = '<trace_id_from_langsmith>'
+```
 
-**Full architecture**: `tests/tools/RECONSTRUCTION_ARCHITECTURE.md`
+**Multi-Trace Story Analysis**:
+```python
+# Get all trace_ids for a HITL workflow
+trace_ids = [row['trace_id'] for row in results]
+from tests.tools import get_workflow_story
+story = get_workflow_story(trace_ids)  # Aggregates across all 3 traces
+```
+
+**Key Tables**: workflow_outcomes (tracking_id, trace_id, thread_id), checkpoints, products
 
 ## Quality Standards
 

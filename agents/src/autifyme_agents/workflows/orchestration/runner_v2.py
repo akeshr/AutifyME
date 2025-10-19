@@ -235,6 +235,10 @@ class WorkflowRunner:
             platform=self.channel.__class__.__name__.replace("Channel", "").lower(),
         )
         tracking_id = self.outcome_tracker.track_workflow_start(thread_id, incoming_message)
+        logger.info(
+            "Workflow started",
+            extra={"thread_id": thread_id, "tracking_id": tracking_id}
+        )
 
         # Build raw payload for PM with sender name for personalization
         raw_payload = {
@@ -247,67 +251,14 @@ class WorkflowRunner:
         }
 
         try:
-            # ✅ ALWAYS invoke PM with message - it handles checkpoint state
-            result, interrupt_value = self._invoke_pm(thread_id, raw_payload)
-
-            # Extract and link trace_id for observability correlation
-            # Query LangSmith API with retry for indexing lag
-            try:
-                import os
-                import time
-                from langsmith import Client
-
-                ls_client = Client()
-                trace_id = None
-                project_name = os.getenv("LANGCHAIN_PROJECT", "autifyme-dev")
-
-                # Retry logic: LangSmith may have indexing lag after execution
-                # Note: Using client-side filtering instead of filter parameter due to escaping complexity
-                for attempt in range(3):
-                    # Query recent root runs (limit 20 to find match quickly)
-                    runs_iter = ls_client.list_runs(
-                        project_name=project_name,
-                        limit=20,
-                        is_root=True  # Only get root runs (top-level traces)
-                    )
-                    runs = list(runs_iter)
-
-                    # Filter client-side for matching thread_id
-                    matching_runs = [
-                        r for r in runs
-                        if r.metadata and r.metadata.get("langsmith.thread_id") == thread_id
-                    ]
-
-                    if matching_runs:
-                        trace_id = str(matching_runs[0].trace_id)
-                        break
-
-                    if attempt < 2:  # Don't sleep on last attempt
-                        time.sleep(0.5)  # 500ms delay for indexing
-
-                if trace_id:
-                    self.outcome_tracker.set_trace_id(thread_id, trace_id)
-                    logger.debug(
-                        "Linked trace_id to workflow outcome",
-                        extra={"thread_id": thread_id, "trace_id": trace_id, "attempts": attempt + 1}
-                    )
-                else:
-                    logger.warning(
-                        "Could not find trace for thread_id after 3 attempts",
-                        extra={"thread_id": thread_id}
-                    )
-            except Exception as e:
-                logger.warning(
-                    "Failed to extract trace_id (non-blocking)",
-                    extra={"thread_id": thread_id, "error": str(e)}
-                )
+            # Invoke PM with tracking_id as run_id (becomes trace_id in LangSmith)
+            result, interrupt_value = self._invoke_pm(thread_id, raw_payload, run_id=tracking_id)
+            self.outcome_tracker.set_trace_id(tracking_id, tracking_id)
 
             if interrupt_value:
-                # Department is requesting HITL - forward to user
                 self._handle_interrupt(sender, thread_id, interrupt_value)
-                duration = (datetime.now() - workflow_start_time).total_seconds()
                 self.outcome_tracker.track_workflow_end(
-                    thread_id=thread_id,
+                    tracking_id=tracking_id,
                     success=True,
                     result={"status": "pending_hitl", "tracking_id": tracking_id},
                 )
@@ -319,15 +270,25 @@ class WorkflowRunner:
 
             # Check for workflow completion
             cataloging_result = self._extract_cataloging_result(result.get("messages", []))
+
+            # Resume flow: tool message indicates completion without extractable result
+            if not cataloging_result and any(
+                getattr(msg, "type", None) == "tool" and
+                isinstance(getattr(msg, "content", None), str) and
+                "successfully cataloged" in getattr(msg, "content", "").lower()
+                for msg in result.get("messages", [])
+            ):
+                self.outcome_tracker.track_workflow_end(
+                    tracking_id=tracking_id,
+                    success=True,
+                    result={"status": "completed", "note": "Resume flow"},
+                )
+
             if cataloging_result:
                 self.channel.send_completion(sender, cataloging_result)
-                duration = (datetime.now() - workflow_start_time).total_seconds()
-                logger.info(
-                    "Workflow completed successfully",
-                    extra={"thread_id": thread_id, "duration_seconds": duration},
-                )
+                logger.info("Workflow completed", extra={"thread_id": thread_id, "tracking_id": tracking_id})
                 self.outcome_tracker.track_workflow_end(
-                    thread_id=thread_id,
+                    tracking_id=tracking_id,
                     success=True,
                     result=cataloging_result.model_dump(),
                 )
@@ -341,20 +302,20 @@ class WorkflowRunner:
                 logger.warning("No result or summary from PM", extra={"thread_id": thread_id})
 
         except GraphRecursionError as exc:
-            logger.exception("PM recursion limit exceeded", exc_info=exc, extra={"thread_id": thread_id})
+            logger.exception("PM recursion limit exceeded", exc_info=exc, extra={"thread_id": thread_id, "tracking_id": tracking_id})
             self.channel.send_error(sender, "recursion")
             self.outcome_tracker.track_workflow_end(
-                thread_id=thread_id,
+                tracking_id=tracking_id,
                 success=False,
                 error=exc,
                 resolution_strategy="user_notified",
             )
 
         except Exception as exc:
-            logger.exception("PM invocation failed", exc_info=exc, extra={"thread_id": thread_id})
+            logger.exception("PM invocation failed", exc_info=exc, extra={"thread_id": thread_id, "tracking_id": tracking_id})
             self.channel.send_error(sender, "processing")
             self.outcome_tracker.track_workflow_end(
-                thread_id=thread_id,
+                tracking_id=tracking_id,
                 success=False,
                 error=exc,
                 resolution_strategy="user_notified",
@@ -364,6 +325,7 @@ class WorkflowRunner:
         self,
         thread_id: str,
         raw_payload: dict[str, Any],
+        run_id: str | None = None,
     ) -> tuple[dict[str, Any] | None, Any | None]:
         """Invoke PM with raw message payload.
 
@@ -389,7 +351,7 @@ class WorkflowRunner:
         logger.debug("Invoking Project Manager", extra={"thread_id": thread_id})
 
         pm: Any = self._create_project_manager()
-        config = self._build_config(thread_id)
+        config = self._build_config(thread_id, run_id=run_id)
 
         # Check for pending HITL interrupts
         pending_interrupts_list = []
@@ -516,11 +478,41 @@ class WorkflowRunner:
             )
 
             try:
+                # Generate a unique run_id for approval analyzer trace
+                from uuid import uuid4
+                approval_run_id = str(uuid4())
+                print(f"[DEBUG] Invoking approval_analyzer with run_id={approval_run_id}")
+
+                # Track approval analyzer start
+                approval_message = IncomingMessage(
+                    sender_id=raw_payload.get("sender", ""),
+                    sender_name=raw_payload.get("sender_name"),
+                    text=f"[Approval Analysis] {user_message}",
+                    platform="internal",
+                )
+                approval_tracking_id = self.outcome_tracker.track_workflow_start(thread_id, approval_message)
+                # Use the generated run_id for trace correlation
+                self.outcome_tracker.set_trace_id(approval_tracking_id, approval_run_id)
+                print(f"[DEBUG] Approval analyzer tracking_id={approval_tracking_id}")
+
                 # Invoke approval analyzer with conversation history
                 approval_response: BatchApprovalResponse = analyze_approval(
                     pending_interrupts=pending_interrupts_list,
                     user_message=user_message,
                     conversation_history=conversation_history,  # NEW: Full context
+                    run_id=approval_run_id,  # Track approval analyzer execution
+                )
+
+                # Track approval analyzer completion
+                self.outcome_tracker.track_workflow_end(
+                    tracking_id=approval_tracking_id,
+                    success=True,
+                    result={
+                        "type": "approval_analysis",
+                        "interrupt_count": len(pending_interrupts_list),
+                        "response_count": len(approval_response.responses),
+                        "reasoning": approval_response.reasoning,
+                    }
                 )
 
                 logger.info(
@@ -537,6 +529,13 @@ class WorkflowRunner:
                     "Approval analysis validation failed",
                     extra={"thread_id": thread_id, "error": str(e)}
                 )
+                # Track approval analyzer failure
+                self.outcome_tracker.track_workflow_end(
+                    tracking_id=approval_tracking_id,
+                    success=False,
+                    error=e,
+                    resolution_strategy="user_notified"
+                )
                 self.channel.send_text(
                     raw_payload.get("sender", ""),
                     "I had trouble processing your response. Please try: 'approve' or 'reject'"
@@ -547,6 +546,13 @@ class WorkflowRunner:
                 logger.exception(
                     "Approval analysis failed",
                     extra={"thread_id": thread_id, "error_type": type(e).__name__}
+                )
+                # Track approval analyzer failure
+                self.outcome_tracker.track_workflow_end(
+                    tracking_id=approval_tracking_id,
+                    success=False,
+                    error=e,
+                    resolution_strategy="user_notified"
                 )
                 self.channel.send_text(
                     raw_payload.get("sender", ""),
@@ -1029,16 +1035,17 @@ class WorkflowRunner:
             channel=self.channel,
         )
 
-    def _build_config(self, thread_id: str) -> dict[str, Any]:
+    def _build_config(self, thread_id: str, run_id: str | None = None) -> dict[str, Any]:
         """Build PM config.
 
         Args:
             thread_id: Conversation thread ID
+            run_id: Optional run_id to use as trace_id in LangSmith
 
         Returns:
             PM config dict
         """
-        return {
+        config = {
             "configurable": {
                 "thread_id": thread_id,
                 "company_id": "default",
@@ -1050,8 +1057,19 @@ class WorkflowRunner:
             },
         }
 
+        # Add run_id if provided - this becomes the trace_id in LangSmith
+        if run_id:
+            from uuid import UUID
+            config["run_id"] = UUID(run_id) if isinstance(run_id, str) else run_id
+
+        return config
+
     def _extract_cataloging_result(self, messages: list[Any]) -> CatalogingResult | None:
         """Extract CatalogingResult from messages.
+
+        Handles two formats:
+        1. Initial workflow: Tool message with dict content {tool_name, result}
+        2. Resume workflow: Need to check tool_call_id to find matching tool call in AI message
 
         Args:
             messages: PM output messages
@@ -1059,27 +1077,107 @@ class WorkflowRunner:
         Returns:
             CatalogingResult if found, None otherwise
         """
-        for message in messages:
+        print(f"[DEBUG] _extract_cataloging_result examining {len(messages)} messages")
+
+        # First pass: Look for dict-format tool messages (initial workflow)
+        for idx, message in enumerate(messages):
             message_type = getattr(message, "type", None)
             if not message_type and hasattr(message, "__class__"):
                 message_type = message.__class__.__name__.replace("Message", "").lower()
+            print(f"[DEBUG]   Message {idx}: type={message_type}")
             if message_type != "tool":
                 continue
 
             content = getattr(message, "content", None)
-            if not isinstance(content, dict):
-                continue
-            if content.get("tool_name") != "save_product":
+
+            # Format 1: Dict content with tool_name and result
+            if isinstance(content, dict):
+                tool_name = content.get("tool_name")
+                print(f"[DEBUG]   Message {idx}: tool_name={tool_name}")
+                if tool_name != "save_product":
+                    continue
+
+                try:
+                    from autifyme_agents.schemas.agent_outputs import CatalogingToolOutput
+
+                    tool_output = CatalogingToolOutput.model_validate(content)
+                    print(f"[DEBUG] FOUND cataloging_result in message {idx} (dict format)!")
+                    return tool_output.result
+                except ValueError as e:
+                    print(f"[DEBUG] Message {idx}: validation failed: {e}")
+                    continue
+
+            # Format 2: String content (resume workflow) - need to find the tool call
+            else:
+                print(f"[DEBUG]   Message {idx}: content is string, checking for tool_call_id")
+                tool_call_id = getattr(message, "tool_call_id", None)
+                print(f"[DEBUG]   Message {idx}: tool_call_id={tool_call_id}")
+                if tool_call_id:
+                    # Find the AI message with this tool call
+                    result = self._find_tool_call_args(messages, tool_call_id, "save_product")
+                    if result:
+                        print(f"[DEBUG] FOUND cataloging_result via tool_call_id in message {idx}!")
+                        return result
+                    else:
+                        print(f"[DEBUG]   Message {idx}: tool_call_id found but couldn't extract result")
+
+        print("[DEBUG] No cataloging_result found in any message")
+        return None
+
+    def _find_tool_call_args(self, messages: list[Any], tool_call_id: str, tool_name: str) -> CatalogingResult | None:
+        """Find tool call arguments in AI message by tool_call_id.
+
+        Used for resume workflows where tool message has string content.
+
+        Args:
+            messages: All messages
+            tool_call_id: ID to match
+            tool_name: Expected tool name
+
+        Returns:
+            CatalogingResult if found
+        """
+        from autifyme_agents.schemas.models import CatalogingResult
+
+        print(f"[DEBUG] _find_tool_call_args: searching for tool_call_id={tool_call_id}, tool_name={tool_name}")
+        for idx, message in enumerate(messages):
+            message_type = getattr(message, "type", None)
+            if not message_type and hasattr(message, "__class__"):
+                message_type = message.__class__.__name__.replace("Message", "").lower()
+            if message_type != "ai":
                 continue
 
-            try:
-                from autifyme_agents.schemas.agent_outputs import CatalogingToolOutput
-
-                tool_output = CatalogingToolOutput.model_validate(content)
-                return tool_output.result
-            except ValueError:
+            # Check for tool_calls
+            tool_calls = getattr(message, "tool_calls", None)
+            print(f"[DEBUG]   AI message {idx}: has tool_calls={tool_calls is not None}, count={len(tool_calls) if tool_calls else 0}")
+            if not tool_calls:
                 continue
 
+            for tc_idx, tc in enumerate(tool_calls):
+                tc_id = tc.get("id")
+                tc_name = tc.get("name")
+                print(f"[DEBUG]     Tool call {tc_idx}: id={tc_id}, name={tc_name}")
+
+                # Match on ID regardless of name - resume flows use "task" instead of "save_product"
+                if tc_id == tool_call_id:
+                    print(f"[DEBUG]     ID MATCH! name={tc_name}, expected={tool_name}")
+                    args = tc.get("args", {})
+                    print(f"[DEBUG]     args keys: {list(args.keys()) if isinstance(args, dict) else 'not a dict'}")
+
+                    # For task() tool, the product data might be nested in args
+                    # Try direct validation first
+                    try:
+                        result = CatalogingResult.model_validate(args)
+                        print(f"[DEBUG]     Successfully validated CatalogingResult from args!")
+                        return result
+                    except Exception as e:
+                        print(f"[DEBUG]     Direct validation failed: {e}")
+
+                    # If task() tool, check for nested product in tool result (not args)
+                    # The actual product might be in the TOOL MESSAGE content, not the tool call args
+                    # Skip for now and fall through
+
+        print(f"[DEBUG] _find_tool_call_args: No matching tool call found")
         return None
 
     def _extract_ai_summary(self, messages: list[Any]) -> str | None:

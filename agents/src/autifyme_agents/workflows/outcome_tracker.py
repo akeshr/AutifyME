@@ -1,26 +1,19 @@
 """Outcome Tracking Infrastructure - Capture BUSINESS outcomes for learning.
 
-**Simplified Design** (Post-Refactor):
-- LangSmith handles ALL technical observability (traces, latency, errors, tokens)
-- OutcomeTracker focuses on BUSINESS-SPECIFIC metrics only
-- Delegates to LangSmith API for technical queries
+**Design**:
+- LangSmith: Technical observability (traces, latency, errors, tokens)
+- OutcomeTracker: Business metrics (approval rates, user patterns, product categories)
+- Correlation: `trace_id = tracking_id` (via `run_id` in config)
 
-**What This Tracker Does**:
-- Business KPIs: approval rates, user patterns, product categories
-- Custom learning signals for Phase 2 (adaptive routing)
-- Domain-specific metrics not captured by LangSmith
-
-**What LangSmith Does** (Automatic):
-- Workflow start/end timestamps
-- Duration per step
-- Errors with full stack traces
-- Token costs
-- Complete trace trees
+**Tracking Model**:
+- One `workflow_outcomes` record per workflow execution (not per thread)
+- HITL workflows create 3 records: initial (pending_hitl) + approval_analyzer + resume (completed)
+- Each record has unique `tracking_id` (UUID) used as `trace_id` in LangSmith
 
 **Integration**:
-- WorkflowRunner: Wraps execution with business metric tracking
-- LangSmith: Query for all technical observability via API
-- AdaptiveRouter (Phase 2): Learn from combined business + technical metrics
+- WorkflowRunner: Sets `run_id` in config → becomes `trace_id` in LangSmith
+- Database: Query by `thread_id` (all phases) or `trace_id` (specific execution)
+- LangSmith: Query by `trace_id` to link business + technical metrics
 """
 
 from __future__ import annotations
@@ -133,6 +126,8 @@ class OutcomeTracker:
             storage: Storage adapter for persistence
         """
         self.storage = storage
+        # Key by tracking_id (not thread_id) to support multiple workflow phases per thread
+        # This allows HITL workflows to create separate records for: initial → resume → complete
         self._active_workflows: dict[str, TrackedWorkflow] = {}
 
     def track_workflow_start(
@@ -156,7 +151,8 @@ class OutcomeTracker:
             started_at=datetime.now(),
         )
 
-        self._active_workflows[thread_id] = workflow
+        # Store by tracking_id (not thread_id) to allow multiple workflow phases
+        self._active_workflows[workflow.tracking_id] = workflow
 
         logger.info(
             "Workflow started",
@@ -172,7 +168,7 @@ class OutcomeTracker:
 
     def track_routing_decision(
         self,
-        thread_id: str,
+        tracking_id: str,
         intent: str,
         department: str,
         reasoning: str,
@@ -182,16 +178,16 @@ class OutcomeTracker:
         """Record PM routing decision.
 
         Args:
-            thread_id: LangGraph thread ID
+            tracking_id: Workflow tracking ID (returned from track_workflow_start)
             intent: Classified user intent
             department: Department selected
             reasoning: PM's reasoning
             confidence: Optional confidence score
             alternatives: Optional fallback departments
         """
-        workflow = self._active_workflows.get(thread_id)
+        workflow = self._active_workflows.get(tracking_id)
         if not workflow:
-            logger.warning(f"Routing tracked for unknown workflow: {thread_id}")
+            logger.warning(f"Routing tracked for unknown workflow: {tracking_id}")
             return
 
         workflow.routing = RoutingDecision(
@@ -206,25 +202,25 @@ class OutcomeTracker:
             "Routing decision tracked",
             extra={
                 "tracking_id": workflow.tracking_id,
-                "thread_id": thread_id,
+                "thread_id": workflow.thread_id,
                 "intent": intent,
                 "department": department,
                 "confidence": confidence,
             },
         )
 
-    def set_trace_id(self, thread_id: str, trace_id: str) -> None:
+    def set_trace_id(self, tracking_id: str, trace_id: str) -> None:
         """Set LangSmith trace ID for observability correlation.
 
         Called after PM invocation when trace_id becomes available.
 
         Args:
-            thread_id: LangGraph thread ID
+            tracking_id: Workflow tracking ID (returned from track_workflow_start)
             trace_id: LangSmith trace ID from PM execution
         """
-        workflow = self._active_workflows.get(thread_id)
+        workflow = self._active_workflows.get(tracking_id)
         if not workflow:
-            logger.warning(f"Trace ID set for unknown workflow: {thread_id}")
+            logger.warning(f"Trace ID set for unknown workflow: {tracking_id}")
             return
 
         workflow.trace_id = trace_id
@@ -233,14 +229,14 @@ class OutcomeTracker:
             "Trace ID linked to workflow",
             extra={
                 "tracking_id": workflow.tracking_id,
-                "thread_id": thread_id,
+                "thread_id": workflow.thread_id,
                 "trace_id": trace_id,
             },
         )
 
     def track_workflow_end(
         self,
-        thread_id: str,
+        tracking_id: str,
         success: bool,
         result: dict[str, Any] | None = None,
         error: Exception | None = None,
@@ -249,15 +245,15 @@ class OutcomeTracker:
         """Record workflow completion and trigger learning.
 
         Args:
-            thread_id: LangGraph thread ID
+            tracking_id: Workflow tracking ID (returned from track_workflow_start)
             success: Whether workflow succeeded
             result: Structured result data if successful
             error: Exception if failed
             resolution_strategy: How error was resolved (if applicable)
         """
-        workflow = self._active_workflows.get(thread_id)
+        workflow = self._active_workflows.get(tracking_id)
         if not workflow:
-            logger.warning(f"Workflow end tracked for unknown thread: {thread_id}")
+            logger.warning(f"Workflow end tracked for unknown tracking_id: {tracking_id}")
             return
 
         workflow.ended_at = datetime.now()
@@ -277,7 +273,7 @@ class OutcomeTracker:
             "Workflow completed",
             extra={
                 "tracking_id": workflow.tracking_id,
-                "thread_id": thread_id,
+                "thread_id": workflow.thread_id,
                 "success": success,
                 "duration_seconds": workflow.duration_seconds,
                 "error_type": workflow.result.error_type,
@@ -290,8 +286,8 @@ class OutcomeTracker:
         # Trigger learning (Phase 2 - routing optimization)
         # self._trigger_learning(workflow)
 
-        # Cleanup
-        del self._active_workflows[thread_id]
+        # Cleanup - remove from active workflows
+        del self._active_workflows[tracking_id]
 
     def get_workflow_metrics(
         self,
@@ -354,12 +350,16 @@ class OutcomeTracker:
 
         try:
             outcome_id = self.storage.save_workflow_outcome(outcome_payload)
+            status = outcome_payload.get("result_data", {}).get("status") if isinstance(outcome_payload.get("result_data"), dict) else "completed"
+            print(f"[DEBUG] DB RECORD CREATED | thread={workflow.thread_id} | tracking={workflow.tracking_id} | status={status}")
             logger.info(
-                "Business outcome persisted (technical metrics in LangSmith)",
+                "💾 DB RECORD CREATED",
                 extra={
                     "tracking_id": workflow.tracking_id,
+                    "thread_id": workflow.thread_id,
                     "outcome_id": outcome_id,
                     "success": workflow.result.success if workflow.result else None,
+                    "status": status,
                 },
             )
         except Exception as e:
