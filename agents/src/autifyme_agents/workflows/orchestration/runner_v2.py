@@ -79,14 +79,14 @@ MAX_THREAD_LOCKS = 1000  # LRU cache size for thread locks
 class WorkflowRunner:
     """Blind executor - forwards messages to PM for intelligent orchestration.
 
-    ## CONTEXT-AWARE APPROVAL ARCHITECTURE:
+    ## STRUCTURED OUTPUT ARCHITECTURE:
 
     Runner responsibilities:
-    - Forward messages to PM for orchestration
+    - Forward ALL messages to PM (blind infrastructure)
     - Extract interrupt context from checkpoints
-    - Extract conversation history from PM state
-    - Use approval analyzer with full conversation history for context-aware decisions
-    - Execute Command objects for approval resumption
+    - Invoke approval_analyzer for HITL decisions
+    - Build Commands from structured responses
+    - Execute Commands for workflow resumption
     - Send interrupts/results to user via channel
 
     PM handles:
@@ -95,12 +95,10 @@ class WorkflowRunner:
     - Media download and processing
     - Overall workflow management
 
-    Approval Analyzer handles (with conversation history):
-    - Batch approval interpretation using full conversation context
-    - Multi-turn approval conversations (resolves "make it 25" from prior clarification)
-    - Contextual reference resolution ("the cheaper one", "use same description")
-    - Natural language approval patterns
-    - Returns structured BatchApprovalResponse
+    Approval Analyzer handles:
+    - HITL interpretation (structured BatchApprovalResponse)
+    - Batch approval decisions with conversation context
+    - Type-safe approval/reject/edit responses
 
     LangGraph + DeepAgents handle:
     - Checkpoint state management
@@ -109,11 +107,11 @@ class WorkflowRunner:
     - Tool execution
 
     ## KEY BENEFITS:
-    - Approval analyzer has full conversation context (fixes context-blind issue)
-    - Minimal architectural changes (just pass conversation_history parameter)
-    - Type-safe communication via BatchApprovalResponse structured outputs
-    - Separation of concerns (PM orchestrates, analyzer interprets approvals)
-    - Works with existing DeepAgents PM architecture
+    - Type-safe with Pydantic throughout
+    - Clear separation of concerns
+    - PM = orchestration, Analyzer = HITL interpretation
+    - Batch approval works correctly
+    - Production-ready architecture
     """
 
     def __init__(
@@ -133,7 +131,7 @@ class WorkflowRunner:
             recursion_limit: Max PM recursion depth
         """
         logger.info("=" * 80)
-        logger.info("INITIALIZING GENERIC HITL FRAMEWORK (PM-ONLY ARCHITECTURE)")
+        logger.info("INITIALIZING GENERIC HITL FRAMEWORK (APPROVAL_ANALYZER ARCHITECTURE)")
         logger.info("=" * 80)
 
         self.channel = channel
@@ -168,7 +166,7 @@ class WorkflowRunner:
         self.outcome_tracker = OutcomeTracker(storage)
         logger.info("OutcomeTracker initialized")
 
-        logger.info("Generic HITL Framework initialized - PM-only architecture")
+        logger.info("Generic HITL Framework initialized - approval_analyzer architecture")
         logger.info("=" * 80)
 
     def handle_message(
@@ -252,6 +250,30 @@ class WorkflowRunner:
             # ✅ ALWAYS invoke PM with message - it handles checkpoint state
             result, interrupt_value = self._invoke_pm(thread_id, raw_payload)
 
+            # Extract and link trace_id for observability correlation
+            # Trace ID is stored in LangSmith run metadata after PM execution
+            try:
+                from langsmith import Client
+                ls_client = Client()
+                # Query latest run for this thread (most recent trace)
+                runs_iter = ls_client.list_runs(
+                    filter=f'eq(metadata_key, "langsmith.thread_id") and eq(metadata_value, "{thread_id}")',
+                    limit=1
+                )
+                runs = list(runs_iter)
+                if runs:
+                    trace_id = str(runs[0].trace_id)
+                    self.outcome_tracker.set_trace_id(thread_id, trace_id)
+                    logger.debug(
+                        "Linked trace_id to workflow outcome",
+                        extra={"thread_id": thread_id, "trace_id": trace_id}
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Failed to extract trace_id (non-blocking)",
+                    extra={"thread_id": thread_id, "error": str(e)}
+                )
+
             if interrupt_value:
                 # Department is requesting HITL - forward to user
                 self._handle_interrupt(sender, thread_id, interrupt_value)
@@ -317,14 +339,17 @@ class WorkflowRunner:
     ) -> tuple[dict[str, Any] | None, Any | None]:
         """Invoke PM with raw message payload.
 
-        ✅ PM-ONLY ARCHITECTURE: PM handles intent detection and Command construction.
+        ✅ APPROVAL_ANALYZER ARCHITECTURE:
+        - PM handles orchestration and intent detection
+        - approval_analyzer handles HITL decisions (structured BatchApprovalResponse)
+        - Runner coordinates between them
 
         When interrupts exist:
-        1. Populate state["pending_interrupts"] from checkpoint
-        2. Forward user message to PM
-        3. PM analyzes and outputs "COMMAND: {resume: [...]}"
-        4. Parse PM's COMMAND output
-        5. Build actual Command and resume
+        1. Extract interrupt context from checkpoint
+        2. Invoke approval_analyzer with user message + conversation history
+        3. Get structured BatchApprovalResponse
+        4. Build Command from structured response
+        5. Resume workflow with Command
 
         Args:
             thread_id: Conversation thread ID
@@ -386,6 +411,7 @@ class WorkflowRunner:
                                 "description": description,
                             }
                             pending_interrupts_list.append(interrupt_info)
+                            logger.info(f"[RESUME ORDER] Interrupt {action_idx + 1}: {tool_args.get('name', 'unknown')}")
 
                     # Single dict value (single action)
                     elif isinstance(interrupt_value, dict):
@@ -573,7 +599,7 @@ class WorkflowRunner:
             )
 
             last_event = None
-            interrupt_value = None
+            accumulated_interrupts = []  # ✅ Accumulate ALL interrupts across stream events
 
             try:
                 for event in pm.stream(payload, config=config, stream_mode="values"):
@@ -583,12 +609,16 @@ class WorkflowRunner:
                     if "__interrupt__" in event:
                         interrupts = event.get("__interrupt__") or []
                         if interrupts:
-                            interrupt_value = interrupts[0].value
+                            # ✅ ACCUMULATE interrupts from this event
+                            # When PM makes 2 parallel task() calls, we get 2 SEPARATE stream events,
+                            # each with 1 interrupt. We need to collect all of them.
+                            accumulated_interrupts.extend(interrupts)
                             logger.info(
-                                "Interrupt detected",
+                                "Interrupt event detected",
                                 extra={
                                     "thread_id": thread_id,
-                                    "interrupt_count": len(interrupts),
+                                    "event_interrupt_count": len(interrupts),
+                                    "total_accumulated": len(accumulated_interrupts),
                                 },
                             )
 
@@ -596,9 +626,39 @@ class WorkflowRunner:
                     "PM stream completed",
                     extra={
                         "thread_id": thread_id,
-                        "had_interrupt": interrupt_value is not None,
+                        "accumulated_interrupt_count": len(accumulated_interrupts),
                     },
                 )
+
+                # ✅ Process accumulated interrupts after stream completes
+                interrupt_value = None
+                if accumulated_interrupts:
+                    if len(accumulated_interrupts) > 1:
+                        # Multiple interrupts - flatten all values
+                        interrupt_value = []
+                        for intr in accumulated_interrupts:
+                            if isinstance(intr.value, list):
+                                interrupt_value.extend(intr.value)
+                            else:
+                                interrupt_value.append(intr.value)
+
+                        logger.info(
+                            "Multiple parallel interrupts collected",
+                            extra={
+                                "thread_id": thread_id,
+                                "interrupt_count": len(accumulated_interrupts),
+                                "flattened_count": len(interrupt_value),
+                            },
+                        )
+                    else:
+                        # Single interrupt - use value directly
+                        interrupt_value = accumulated_interrupts[0].value
+                        logger.info(
+                            "Single interrupt collected",
+                            extra={
+                                "thread_id": thread_id,
+                            },
+                        )
 
                 return last_event, interrupt_value
 
@@ -632,9 +692,8 @@ class WorkflowRunner:
         Takes the Pydantic BatchApprovalResponse from approval analyzer and
         constructs a LangGraph Command object for resuming interrupted workflows.
 
-        IMPORTANT: Handles both single and parallel interrupts:
-        - Single interrupt: interrupt_id → [response]
-        - Parallel (list-valued): original_interrupt_id → [response_0, response_1, ...]
+        IMPORTANT: Uses original_interrupt_id (WITHOUT suffix) to match checkpoint format.
+        Each interrupt gets its own entry in Command.resume with its response.
 
         Args:
             approval_response: Structured approval response from analyzer
@@ -643,32 +702,75 @@ class WorkflowRunner:
         Returns:
             Command object ready for execution
 
-        Example (Parallel):
+        Example (Parallel Interrupts):
             approval_response.responses = [
-                {"type": "accept", "args": None},
-                {"type": "edit", "args": {"price": 45.0}}
+                {"type": "accept"},
+                {"type": "edit", "args": {"price": 120.0}},
+                {"type": "response", "args": "Not required"}
             ]
             pending_interrupts = [
-                {"interrupt_id": "int_1_0", "original_interrupt_id": "int_1", ...},
-                {"interrupt_id": "int_1_1", "original_interrupt_id": "int_1", ...}
+                {"interrupt_id": "abc123_0", ...},  # Blue bottle
+                {"interrupt_id": "abc123_1", ...},  # Pink bottle
+                {"interrupt_id": "abc123_2", ...}   # Green bottle
             ]
             →
             Command(resume={
-                "int_1": [{"type": "accept", "args": None}, {"type": "edit", "args": {"price": 45.0}}]
+                "abc123_0": [{"type": "accept"}],
+                "abc123_1": [{"type": "edit", "args": {...}}],
+                "abc123_2": [{"type": "response", "args": "Not required"}]
             })
         """
-        # Group responses by original_interrupt_id (for parallel actions)
-        # or by interrupt_id (for single actions)
+        # Build Command.resume mapping each interrupt_id to its response
         from collections import defaultdict
         interrupt_responses = defaultdict(list)
 
         for idx, interrupt_info in enumerate(pending_interrupts):
-            # Use original_interrupt_id if available (parallel case), otherwise use interrupt_id
-            original_id = interrupt_info.get("original_interrupt_id", interrupt_info["interrupt_id"])
-            response = approval_response.responses[idx]
+            # Use original_interrupt_id (WITHOUT suffix) to match checkpoint format
+            # Checkpoint stores base IDs: "abc123", "def456", etc. (no suffix)
+            # Suffix is only used internally for unpacking list-valued interrupts
+            interrupt_id_for_command = interrupt_info.get("original_interrupt_id", interrupt_info["interrupt_id"])
 
-            # Convert Pydantic model to dict
-            interrupt_responses[original_id].append(response.model_dump())
+            response = approval_response.responses[idx]
+            tool_name = interrupt_info.get("tool_name", "unknown")
+            tool_args = interrupt_info.get("tool_args", {})
+
+            # Format response based on type for HITL middleware compatibility
+            if response.type == "edit":
+                # HITL middleware expects: {"type": "edit", "args": {"action": "tool_name", "args": {...}}}
+                # The "args" field should be an ActionRequest with action and args
+                merged_args = {**tool_args, **response.args} if isinstance(response.args, dict) else tool_args
+                hitl_response = {
+                    "type": "edit",
+                    "args": {
+                        "action": tool_name,
+                        "args": merged_args
+                    }
+                }
+                logger.debug(
+                    f"Built edit response for {interrupt_id_for_command}",
+                    extra={
+                        "tool_name": tool_name,
+                        "edited_fields": list(response.args.keys()) if isinstance(response.args, dict) else [],
+                    }
+                )
+            elif response.type == "accept":
+                # Accept - HITL middleware expects {"type": "accept"}
+                hitl_response = {"type": "accept"}
+            elif response.type == "response":
+                # Reject/clarification - HITL middleware expects {"type": "response", "args": "message"}
+                hitl_response = {
+                    "type": "response",
+                    "args": response.args
+                }
+            else:
+                # Unknown type - log warning and treat as accept
+                logger.warning(
+                    f"Unknown response type: {response.type}",
+                    extra={"interrupt_id": interrupt_id_for_command}
+                )
+                hitl_response = {"type": "accept"}
+
+            interrupt_responses[interrupt_id_for_command].append(hitl_response)
 
         logger.info(
             "Built Command from structured approval",
@@ -676,6 +778,7 @@ class WorkflowRunner:
                 "total_responses": len(pending_interrupts),
                 "interrupt_count": len(interrupt_responses),
                 "interrupt_ids": list(interrupt_responses.keys()),
+                "edit_count": sum(1 for resp in approval_response.responses if resp.type == "edit"),
             }
         )
 
@@ -689,72 +792,163 @@ class WorkflowRunner:
     ) -> None:
         """Forward interrupt to user via channel.
 
-        ✅ STANDARD APPROACH: Unwrap DeepAgents internal structure before sending to channel.
+        ✅ BATCH APPROVAL SUPPORT: Send ALL products in one batch to channel.
 
         DeepAgents wraps tool calls in action_request format:
         [{'action_request': {'action': 'tool_name', 'args': {actual_data}}}]
 
-        Channel should receive clean data (just the args), not framework internals.
+        For parallel tool calls (multiple products), we collect all Products
+        and send them together for batch approval.
 
         Args:
             sender: Channel-specific sender ID
             thread_id: Conversation thread ID
             interrupt_value: Value from interrupt (may be wrapped by DeepAgents)
         """
-        logger.debug("Handling HITL interrupt", extra={"thread_id": thread_id})
+        logger.debug(
+            "Handling HITL interrupt",
+            extra={
+                "thread_id": thread_id,
+                "interrupt_type": type(interrupt_value).__name__,
+                "is_list": isinstance(interrupt_value, list),
+                "length_if_list": len(interrupt_value) if isinstance(interrupt_value, list) else "N/A",
+            }
+        )
 
         try:
-            # Unwrap DeepAgents structure if present (standard pattern from lines 344-366)
-            clean_value = interrupt_value
+            from autifyme_agents.schemas.models import Product
+
+            # Collect all products (for batch approval)
+            products_to_approve: list[Product] = []
 
             if isinstance(interrupt_value, list) and len(interrupt_value) > 0:
-                # FIXED: Process ALL actions in batch, not just the first one
-                for action in interrupt_value:
+                # Parallel tool calls - collect ALL products
+                logger.info(
+                    "Processing batch interrupt",
+                    extra={"thread_id": thread_id, "action_count": len(interrupt_value)}
+                )
+
+                for idx, action in enumerate(interrupt_value):
                     if isinstance(action, dict) and "action_request" in action:
                         # DeepAgents format - extract clean args
                         action_request = action.get("action_request", {})
-                        clean_value = action_request.get("args", interrupt_value)
+                        clean_value = action_request.get("args", {})
+                        tool_name = action_request.get("action", "unknown")
+
                         logger.debug(
-                            "Unwrapped DeepAgents interrupt structure",
+                            f"Unwrapping action {idx + 1} of {len(interrupt_value)}",
                             extra={
                                 "thread_id": thread_id,
-                                "tool_name": action_request.get("action", "unknown"),
+                                "tool_name": tool_name,
+                                "product_name": clean_value.get("name", "unknown"),
                             }
                         )
-                        # Convert to Product and send for approval
+
+                        # Convert to Product and add to batch
                         if isinstance(clean_value, dict):
-                            from autifyme_agents.schemas.models import Product
                             draft = Product.model_validate(clean_value)
-                            logger.debug(
-                                "Converted interrupt args to Product object",
-                                extra={"thread_id": thread_id, "product_name": draft.name}
-                            )
-                            self.channel.send_approval_request(sender, draft)
+                            products_to_approve.append(draft)
+                            logger.info(f"[DISPLAY ORDER] Product {idx + 1}: {draft.name}")
+
+                # Send all products in batch
+                if len(products_to_approve) > 0:
+                    logger.info(
+                        "Sending batch approval request",
+                        extra={
+                            "thread_id": thread_id,
+                            "product_count": len(products_to_approve),
+                            "product_names": [p.name for p in products_to_approve],
+                        }
+                    )
+
+                    # Send batch approval - show ALL products at once
+                    if len(products_to_approve) == 1:
+                        # Single product - use standard approval request
+                        self.channel.send_approval_request(sender, products_to_approve[0])
+                    else:
+                        # Multiple products - format as batch and send all together
+                        self._send_batch_approval(sender, products_to_approve)
 
             # Handle single interrupt case
             elif isinstance(interrupt_value, dict):
-                clean_value = interrupt_value
+                logger.info(
+                    "Processing single interrupt",
+                    extra={"thread_id": thread_id}
+                )
+
                 # Convert dict args to Product object for channel
-                if isinstance(clean_value, dict):
-                    from autifyme_agents.schemas.models import Product
-                    draft = Product.model_validate(clean_value)
-                    logger.debug(
-                        "Converted single interrupt to Product object",
-                        extra={"thread_id": thread_id, "product_name": draft.name}
-                    )
-                    self.channel.send_approval_request(sender, draft)
+                draft = Product.model_validate(interrupt_value)
+                logger.debug(
+                    "Converted single interrupt to Product",
+                    extra={"thread_id": thread_id, "product_name": draft.name}
+                )
+                self.channel.send_approval_request(sender, draft)
 
             logger.info(
                 "Interrupt(s) forwarded to user - awaiting response",
                 extra={
                     "thread_id": thread_id,
-                    "interrupt_type": type(interrupt_value).__name__,
+                    "product_count": len(products_to_approve) if products_to_approve else 1,
                 },
             )
 
         except Exception as exc:
             logger.exception("Failed to send interrupt to user", exc_info=exc, extra={"thread_id": thread_id})
             self.channel.send_error(sender, "processing", "I encountered an issue requesting your input.")
+
+    def _send_batch_approval(self, sender: str, products: list[Any]) -> None:
+        """Send batch approval request with ALL products displayed together.
+
+        Args:
+            sender: Channel-specific sender ID
+            products: List of Product objects to approve
+
+        Notes:
+            This method formats multiple products into a single approval message
+            so users can see and approve all products at once for batch workflows.
+        """
+        from autifyme_agents.schemas.models import Product
+
+        # Format batch approval message
+        message_parts = [
+            f"**Batch Approval Request** ({len(products)} products)",
+            "",
+            "Please review the following products:",
+            "",
+        ]
+
+        for idx, product in enumerate(products, 1):
+            # Format each product
+            product_lines = [
+                f"**Product {idx}:**",
+                f"  - Name: {product.name}",
+                f"  - Description: {product.description}",
+                f"  - Price: Rs {product.price}",
+            ]
+
+            if product.sizes:
+                product_lines.append(f"  - Sizes: {', '.join(product.sizes)}")
+            if product.colors:
+                product_lines.append(f"  - Colors: {', '.join(product.colors)}")
+            if product.image_urls:
+                product_lines.append(f"  - Images: {len(product.image_urls)} attached")
+
+            message_parts.extend(product_lines)
+            message_parts.append("")  # Blank line between products
+
+        message_parts.extend([
+            "---",
+            "",
+            "**How to respond:**",
+            "- To approve all: 'approve' or 'yes'",
+            "- To approve some: 'approve 1 and 2' or 'approve product 1'",
+            "- To edit: 'edit product 2 price to 45'",
+            "- To reject all: 'reject' or 'no'",
+        ])
+
+        # Send formatted message
+        batch_message = "\n".join(message_parts)
+        self.channel.send_text(sender, batch_message)
 
     def _get_lock(self, sender: str) -> Lock:
         """Get or create thread lock with LRU eviction.

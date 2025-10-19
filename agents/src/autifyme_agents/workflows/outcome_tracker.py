@@ -96,6 +96,9 @@ class TrackedWorkflow(BaseModel):
         default_factory=lambda: str(uuid4()), description="Unique tracking ID"
     )
     thread_id: str = Field(description="LangGraph thread ID")
+    trace_id: str | None = Field(
+        default=None, description="LangSmith trace ID for observability correlation"
+    )
     message: IncomingMessage
     message_hash: str = Field(description="Content hash for similarity")
     routing: RoutingDecision | None = None
@@ -210,6 +213,31 @@ class OutcomeTracker:
             },
         )
 
+    def set_trace_id(self, thread_id: str, trace_id: str) -> None:
+        """Set LangSmith trace ID for observability correlation.
+
+        Called after PM invocation when trace_id becomes available.
+
+        Args:
+            thread_id: LangGraph thread ID
+            trace_id: LangSmith trace ID from PM execution
+        """
+        workflow = self._active_workflows.get(thread_id)
+        if not workflow:
+            logger.warning(f"Trace ID set for unknown workflow: {thread_id}")
+            return
+
+        workflow.trace_id = trace_id
+
+        logger.debug(
+            "Trace ID linked to workflow",
+            extra={
+                "tracking_id": workflow.tracking_id,
+                "thread_id": thread_id,
+                "trace_id": trace_id,
+            },
+        )
+
     def track_workflow_end(
         self,
         thread_id: str,
@@ -304,6 +332,7 @@ class OutcomeTracker:
         outcome_payload: dict[str, Any] = {
             "tracking_id": workflow.tracking_id,
             "thread_id": workflow.thread_id,
+            "trace_id": workflow.trace_id,  # LangSmith trace ID for observability correlation
             # Business context
             "sender_id": workflow.message.sender_id,
             "platform": workflow.message.platform,

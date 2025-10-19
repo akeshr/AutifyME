@@ -47,12 +47,26 @@ Library patterns, prompt engineering, and development practices.
 
 ## Testing & Development (`testing/`)
 
-Testing strategy, CLI tools, and development workflows.
+Testing strategy, CLI tools, and autonomous testing framework.
+
+### Manual Testing & CLI Tools
 
 | Document | Purpose |
 | --- | --- |
 | **[LOCAL_TESTING_STRATEGY.md](./testing/LOCAL_TESTING_STRATEGY.md)** | Testing philosophy and CLI tools guide (canonical) |
-| **[COMPREHENSIVE_CLI_TESTING_DESIGN.md](./testing/COMPREHENSIVE_CLI_TESTING_DESIGN.md)** | CLI testing framework design for future enhancements |
+
+### Autonomous Testing Framework (Claude-Orchestrated)
+
+Framework for Claude to test, analyze, and improve the agentic system through hierarchical trace analysis. Claude uses 5 observation tools to gather information, then applies existing tools (Edit/Write/MCP) to fix issues.
+
+**Core Philosophy**: Tools provide visibility, Claude provides intelligence.
+
+| Document | Purpose |
+| --- | --- |
+| **[AUTONOMOUS_TESTING_FRAMEWORK.md](./testing/AUTONOMOUS_TESTING_FRAMEWORK.md)** | **[PRIMARY]** Complete framework - Claude as orchestrator, 5 essential tools, workflows |
+| **[TOOL_SPECIFICATIONS.md](./testing/TOOL_SPECIFICATIONS.md)** | Complete API reference for 5 observation tools |
+| **[HIERARCHICAL_TRACE_ANALYSIS.md](./testing/HIERARCHICAL_TRACE_ANALYSIS.md)** | 3-level lazy-loading trace analysis strategy (25x token reduction) |
+| **[QUICK_REFERENCE.md](./testing/QUICK_REFERENCE.md)** | Cheat sheet - common commands, decision trees, token budgets |
 
 ---
 

@@ -5,11 +5,14 @@ cross-workflow orchestration logic in a single Project Manager agent. The
 implementation closely follows `docs/architecture/PROJECT_MANAGER_DESIGN.md`
 and leverages deepagents for planning, sub-agent delegation, and HITL.
 
-**HITL Strategy**: Uses LangGraph's native `interrupt_before=["tools"]` to pause
-execution after the agent emits tool calls but before the tool node executes them.
-This allows the runner to inspect tool calls (e.g., save_product) and request
-human approval, then resume the graph to execute the tool naturally. No custom
-post-model hooks are needed—LangGraph's tool node handles all ToolMessage synthesis.
+**HITL Strategy (Approval Analyzer)**:
+- Runner detects interrupts from department workflows
+- Runner invokes approval_analyzer (separate agent) for HITL decisions
+- approval_analyzer returns structured BatchApprovalResponse
+- Runner builds Command objects and resumes workflow
+- PM remains focused on orchestration, not approval logic
+
+This maintains clean separation: PM orchestrates, approval_analyzer decides.
 """
 
 from __future__ import annotations
@@ -127,7 +130,9 @@ def create_project_manager(
     instructions = _load_prompt(company_profile)
 
     # PM orchestration tools
-    pm_tools = [write_todos]
+    pm_tools = [
+        write_todos,
+    ]
 
     # Note: Media download tools NOT included in PM
     # PM delegates media_id to departments, departments download when needed
@@ -146,7 +151,7 @@ def create_project_manager(
     tool_configs: dict[str, Any] = {}
 
     project_manager = create_deep_agent(
-        tools=pm_tools,  # PM has NO direct domain tools
+        tools=pm_tools,  # PM has orchestration tools
         instructions=instructions,
         model=llm,
         subagents=subagents,
@@ -162,7 +167,7 @@ def create_project_manager(
         "department_results": {},
         "todos": [],
         "remaining_steps": 8,
-        "pending_interrupts": [],  # HITL interrupt context for PM
+        "pending_interrupts": [],  # Interrupt tracking (handled by runner + approval_analyzer)
     }
 
     return project_manager.with_config(

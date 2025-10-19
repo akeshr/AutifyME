@@ -93,7 +93,7 @@ uv run mypy .
 
 **Production**: `agents/src/autifyme_agents/` - Core, departments, specialists, tools, workflows, entrypoints, integrations, schemas, prompts
 
-**Testing**: `tests/` - unit, integration, e2e, cli (testing tools), scripts, scenarios, fixtures
+**Testing**: `tests/` - tools/ (autonomous framework), unit, integration, cli (simulate.py, pm_chat.py), fixtures, synthesizer, archived/ (historical)
 
 **Documentation**: `docs/architecture/` organized by concern (core/, workflows/, tech/, testing/), plus `historical/`, `deployment/`, `roadmap/`
 
@@ -112,12 +112,24 @@ uv run python tests/cli/pm_chat.py --interactive
 
 # Full workflow with HITL
 uv run python tests/cli/simulate.py "Catalog these sneakers"
+```
 
-# Multi-turn scenarios
-uv run python tests/cli/conversation.py --scenario greeting_to_cataloging
+**Autonomous Framework** (primary testing method):
+```python
+from tests.tools import execute_scenario, get_trace_overview
+result = execute_scenario("Catalog Nike shoes Rs 1000", hitl_mode="auto_approve")
+overview = get_trace_overview(result.trace_id)
 ```
 
 **Complete guide**: `docs/architecture/testing/LOCAL_TESTING_STRATEGY.md`
+
+### Autonomous Testing Framework
+
+**Claude can autonomously test, analyze, and improve the agentic system.**
+
+**Methodology**: `.claude/skills/autonomous-testing.md` (complete testing workflow)
+**Agent**: `.claude/agents/workflow-tester.md` (invoke for autonomous testing)
+**Architecture**: `docs/architecture/testing/AUTONOMOUS_TESTING_FRAMEWORK.md`
 
 ### API Verification
 
@@ -149,7 +161,9 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 - `tech/LANGCHAIN_V1_FEATURES.md` - LangChain v1 native patterns
 - `workflows/WHATSAPP_CATALOGING_WORKFLOW.md` - Current implementation
 
-**Complete index with 25+ docs**: See `docs/architecture/README.md`
+**Autonomous testing**: Use `.claude/skills/autonomous-testing.md` skill (see Autonomous Testing Framework section above)
+
+**Complete index with 30+ docs**: See `docs/architecture/README.md`
 
 ### Common Gotchas
 
@@ -180,3 +194,4 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 - **Architecture Docs**: `docs/architecture/README.md` (navigation hub)
 - **LangSmith Traces**: https://smith.langchain.com
 - **Roadmap**: `docs/roadmap/IMPLEMENTATION_ROADMAP.md`
+- Always use safe_print instaed of print

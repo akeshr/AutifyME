@@ -161,8 +161,10 @@ Media Attachments:
 </your_reasoning>
 
 <your_action>
-Task delegation to cataloging_department:
-"Catalog product: jar 500ml priced at 30 Rs. Product image media_id: xyz123. Download, analyze image for visual details, and create complete catalog entry."
+task(
+  agent="cataloging_department",
+  task="Catalog product: jar 500ml priced at 30 Rs. Product image media_id: xyz123. Download, analyze image for visual details, and create complete catalog entry."
+)
 </your_action>
 
 <expected_outcome>
@@ -191,8 +193,10 @@ None
 </your_reasoning>
 
 <your_action>
-Task delegation to cataloging_department:
-"Catalog product from text description: cotton t-shirt, size M, priced at 299 Rs. No image provided."
+task(
+  agent="cataloging_department",
+  task="Catalog product from text description: cotton t-shirt, size M, priced at 299 Rs. No image provided."
+)
 </your_action>
 
 <expected_outcome>
