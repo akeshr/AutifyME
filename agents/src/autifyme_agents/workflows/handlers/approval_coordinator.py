@@ -221,13 +221,6 @@ class ApprovalCoordinator:
                     "type": "response",
                     "args": message
                 }
-            else:
-                # Unknown type - log warning and treat as accept
-                logger.warning(
-                    f"Unknown response type: {response.type}",
-                    extra={"interrupt_id": interrupt_id_for_command}
-                )
-                hitl_response = {"type": "accept"}
 
             interrupt_responses[interrupt_id_for_command].append(hitl_response)
 

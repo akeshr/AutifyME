@@ -45,7 +45,7 @@ class InterruptUnpacker:
             - tool_args: dict
             - description: str
         """
-        pending_interrupts_list = []
+        pending_interrupts_list: list[dict[str, Any]] = []
 
         if not state_snapshot or not state_snapshot.interrupts:
             return pending_interrupts_list
