@@ -106,9 +106,14 @@ def execute_scenario(
     channel = _SilentConsoleChannel(hitl_mode=hitl_mode)
     checkpointer = get_checkpointer()
 
+    # Create cataloging workflow handler
+    from autifyme_agents.workflows.handlers.cataloging_handler import CatalogingWorkflowHandler
+    workflow_handler = CatalogingWorkflowHandler(channel=channel)
+
     runner = WorkflowRunner(
         channel=channel,
         storage=storage,
+        workflow_handler=workflow_handler,
         checkpointer=checkpointer,
     )
 

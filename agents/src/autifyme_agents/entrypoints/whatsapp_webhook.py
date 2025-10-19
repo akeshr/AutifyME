@@ -65,10 +65,16 @@ def _get_runner() -> WorkflowRunner:
             _whatsapp_channel = WhatsAppChannel()
             logger.info("WhatsApp channel adapter created")
 
-            # Create generic workflow runner with WhatsApp channel
+            # Create cataloging workflow handler
+            from autifyme_agents.workflows.handlers.cataloging_handler import CatalogingWorkflowHandler
+            _workflow_handler = CatalogingWorkflowHandler(channel=_whatsapp_channel)
+            logger.info("Cataloging workflow handler created")
+
+            # Create generic workflow runner with WhatsApp channel and cataloging handler
             _runner = WorkflowRunner(
                 channel=_whatsapp_channel,
                 storage=_storage,
+                workflow_handler=_workflow_handler,
             )
             logger.info("✅ WorkflowRunner initialized successfully")
         except Exception as e:
