@@ -660,8 +660,20 @@ class WorkflowRunner:
             run_id: Optional run_id to use as trace_id in LangSmith
 
         Returns:
-            PM config dict
+            PM config dict with context for v1.0 context_schema support
         """
+        # Build typed company context for v1.0 context_schema
+        from autifyme_agents.schemas.context import CompanyContext
+
+        company_context = CompanyContext(
+            company_id=self.company_profile.id,
+            company_name=self.company_profile.name,
+            brand_voice=self.company_profile.brand_voice,
+            target_audience=self.company_profile.target_audience,
+            style_preferences=self.company_profile.style_preferences or [],
+            industry=self.company_profile.industry,
+        )
+
         config = {
             "configurable": {
                 "thread_id": thread_id,
@@ -672,6 +684,7 @@ class WorkflowRunner:
                 "langsmith.thread_id": thread_id,
                 "workflow": "cataloging",
             },
+            "context": company_context,  # v1.0: Type-safe context injection
         }
 
         # Add run_id if provided - this becomes the trace_id in LangSmith

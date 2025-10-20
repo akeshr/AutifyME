@@ -193,14 +193,14 @@ class ApprovalCoordinator:
             tool_name = interrupt_info.get("tool_name", "unknown")
             tool_args = interrupt_info.get("tool_args", {})
 
-            # Format response based on type for HITL middleware compatibility
+            # Format response based on type for v1.0 HITL middleware compatibility
             if response.type == "edit":
-                # HITL middleware expects: {"type": "edit", "args": {"action": "tool_name", "args": {...}}}
+                # v1.0 HITL middleware expects: {"type": "edit", "edited_action": {"name": "tool_name", "args": {...}}}
                 merged_args = {**tool_args, **response.args} if isinstance(response.args, dict) else tool_args
                 hitl_response = {
                     "type": "edit",
-                    "args": {
-                        "action": tool_name,
+                    "edited_action": {
+                        "name": tool_name,
                         "args": merged_args
                     }
                 }
@@ -212,17 +212,22 @@ class ApprovalCoordinator:
                     }
                 )
             elif response.type == "accept":
-                # Accept - HITL middleware expects {"type": "accept"}
-                hitl_response = {"type": "accept"}
+                # v1.0: "accept" → "approve"
+                hitl_response = {"type": "approve"}
             elif response.type == "response":
-                # Reject/clarification - HITL middleware expects {"type": "response", "args": "message"}
+                # v1.0: "response" → "reject" with "message" field
                 message = response.args if isinstance(response.args, str) else str(response.args or "")
                 hitl_response = {
-                    "type": "response",
-                    "args": message
+                    "type": "reject",
+                    "message": message
                 }
 
             interrupt_responses[interrupt_id_for_command].append(hitl_response)
+
+        # Wrap decisions in HITLResponse format for v1.0 middleware
+        formatted_responses = {}
+        for interrupt_id, decisions in interrupt_responses.items():
+            formatted_responses[interrupt_id] = {"decisions": decisions}
 
         logger.info(
             "Built Command from structured approval",
@@ -234,4 +239,4 @@ class ApprovalCoordinator:
             }
         )
 
-        return Command(resume=dict(interrupt_responses))
+        return Command(resume=formatted_responses)

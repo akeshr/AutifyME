@@ -16,14 +16,16 @@ Architecture (Correct Hierarchy):
 from typing import Any
 
 from deepagents import create_deep_agent
-from deepagents.tools import write_todos
-from langchain.agents.middleware.human_in_the_loop import ToolConfig
+from langchain.agents.middleware.human_in_the_loop import InterruptOnConfig
+from langchain.agents.structured_output import ToolStrategy
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.middleware import CompanyContextMiddleware
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.integrations.storage import get_store
+from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import Product
 from autifyme_agents.specialists.image_analysis_specialist import (
     create_image_analysis_specialist_graph,
@@ -52,12 +54,15 @@ def create_cataloging_department(
 
     llm = get_llm()
 
+    # Get store for long-term memory
+    store = get_store()
+
     # Get company profile for brand-aware specialist configuration
     company_profile = storage.get_company_profile()
 
     # TOOLS: Only utility functions, not specialists
+    # Note: write_todos now provided by TodoListMiddleware in v1.0
     tools = [
-        write_todos,  # Planning tool for multi-step coordination
         create_save_product_tool(storage),  # Database persistence
     ]
 
@@ -68,10 +73,11 @@ def create_cataloging_department(
         tools.extend(platform_tools)
 
     # SUBAGENTS: Specialists that perform focused transformations
-    # ARCHITECTURE: Using CustomSubAgent for image specialist to bypass virtual filesystem
+    # ARCHITECTURE: Using CompiledSubAgent for image specialist to bypass virtual filesystem
     # DeepAgents SubAgent pattern injects default filesystem tools that conflict with real OS files
     subagents = [
-        # CustomSubAgent: Pre-built graph with full control (no tool injection)
+        # CompiledSubAgent: Pre-built graph with full control (no tool injection)
+        # v1.0: renamed 'graph' to 'runnable'
         {
             "name": "image_analysis_specialist",
             "description": (
@@ -80,7 +86,7 @@ def create_cataloging_department(
                 "message (e.g., 'Analyze /tmp/media_downloads/xyz.jpg'). Returns "
                 "ImageAnalysisResult with visual_description, identified_colors, and style_tags."
             ),
-            "graph": create_image_analysis_specialist_graph(company_profile),  # ✅ Custom graph
+            "runnable": create_image_analysis_specialist_graph(company_profile),  # v1.0: renamed from graph
         },
         # SubAgent: Simple spec-based (no file access needed)
         {
@@ -90,14 +96,18 @@ def create_cataloging_department(
                 "Product models. Synthesizes information, fills reasonable gaps, ensures "
                 "brand alignment. Returns Product with all catalog fields."
             ),
-            "response_format": Product,  # Structured output
-            "prompt": load_prompt("specialists/cataloging_specialist.prompt"),
+            "response_format": ToolStrategy(
+                schema=Product,
+                handle_errors=True  # v1.0: Self-healing structured outputs
+            ),
+            "system_prompt": load_prompt("specialists/cataloging_specialist.prompt"),  # v1.0: renamed from prompt
             "tools": [],  # ✅ No tools - pure synthesis
             "middleware": [],  # ✅ Disable default middleware (filesystem, write_todos)
         },
     ]
 
     # Department's middleware stack
+    # Note: TodoListMiddleware is added by default in create_deep_agent (v1.0)
     middleware: list[Any] = [
         CompanyContextMiddleware(storage),  # Inject company context
     ]
@@ -105,12 +115,10 @@ def create_cataloging_department(
     # Load department instructions
     instructions = load_prompt("departments/cataloging_department.prompt")
 
-    # Configure HITL for save_product tool
-    tool_configs = {
-        "save_product": ToolConfig(
-            allow_accept=True,
-            allow_edit=True,
-            allow_respond=True,
+    # Configure HITL for save_product tool (v1.0 uses interrupt_on parameter)
+    interrupt_config = {
+        "save_product": InterruptOnConfig(
+            allowed_decisions=["approve", "edit", "reject"],
             description="Please review this product before saving to the catalog database."
         )
     }
@@ -118,12 +126,15 @@ def create_cataloging_department(
     # Create DeepAgent department with proper hierarchy
     department = create_deep_agent(
         model=llm,
-        instructions=instructions,
+        system_prompt=instructions,  # v1.0: renamed from instructions
         tools=tools,  # ✅ Only utilities
         subagents=subagents,  # ✅ Specialists as subagents
         middleware=middleware,
         checkpointer=checkpointer,
-        tool_configs=tool_configs,
+        store=store,  # v1.0: Long-term memory store
+        use_longterm_memory=True,  # v1.0: Enable persistent cross-session memory
+        context_schema=CompanyContext,  # v1.0: Type-safe company context injection
+        interrupt_on=interrupt_config,  # v1.0: renamed from tool_configs
     )
 
     return department.with_config({

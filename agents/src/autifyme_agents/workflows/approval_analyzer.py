@@ -110,9 +110,10 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
             )
 
         # Format conversation history for context
+        # LIMIT to 3 recent messages to prevent context bleeding (applying old edits)
         history_lines = []
         if conversation_history:
-            for msg in conversation_history[-10:]:  # Last 10 messages for context
+            for msg in conversation_history[-5:]:  # Last 3 messages only (reduced from 10)
                 msg_type = getattr(msg, 'type', None)
                 if not msg_type and hasattr(msg, '__class__'):
                     msg_type = msg.__class__.__name__.replace('Message', '').lower()
@@ -178,17 +179,44 @@ def analyze_approval(
         config["run_id"] = UUID(run_id) if isinstance(run_id, str) else run_id
 
     # Invoke analyzer with conversation history
-    result: BatchApprovalResponse = analyzer.invoke(
-        {
-            "pending_interrupts": pending_interrupts,
-            "user_message": user_message,
-            "conversation_history": conversation_history or [],
-        },
-        config=config if config else None,
-    )
+    try:
+        result: BatchApprovalResponse = analyzer.invoke(
+            {
+                "pending_interrupts": pending_interrupts,
+                "user_message": user_message,
+                "conversation_history": conversation_history or [],
+            },
+            config=config if config else None,
+        )
+    except Exception as e:
+        logger.error(
+            "Approval analyzer returned malformed output",
+            extra={
+                "error": str(e),
+                "interrupt_count": len(pending_interrupts),
+                "user_message": user_message[:100],
+            }
+        )
+        raise ValueError(
+            f"Approval analyzer failed to return valid BatchApprovalResponse: {e}"
+        ) from e
 
     # Validate count
-    result.validate_count(len(pending_interrupts))
+    try:
+        result.validate_count(len(pending_interrupts))
+    except ValueError as e:
+        logger.error(
+            "Approval response count mismatch",
+            extra={
+                "expected_count": len(pending_interrupts),
+                "actual_count": len(result.responses),
+                "reasoning": result.reasoning,
+            }
+        )
+        raise ValueError(
+            f"Approval analyzer returned wrong number of responses: "
+            f"expected {len(pending_interrupts)}, got {len(result.responses)}"
+        ) from e
 
     logger.info(
         "Approval analysis complete",
