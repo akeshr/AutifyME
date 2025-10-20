@@ -25,6 +25,7 @@ from autifyme_agents.core.exceptions import (
     DataNotFoundError,
     ExternalAPIError,
     StorageError,
+    classify_api_error,
 )
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile, Product
@@ -53,20 +54,8 @@ def _save_product(storage: StorageInterface, **kwargs: Any) -> Product:
         product = Product(**kwargs)
         return storage.save_product(product)
     except Exception as e:
-        if "timeout" in str(e).lower() or "connection" in str(e).lower():
-            raise ExternalAPIError(
-                message=str(e),
-                tool_name="save_product",
-                api_name="Supabase",
-                is_retryable=True,
-                original_error=e,
-            ) from e
-
-        raise StorageError(
-            message=f"Failed to save product: {str(e)}",
-            operation="save_product",
-            original_error=e,
-        ) from e
+        # Use centralized error classifier for consistent error handling
+        raise classify_api_error(e, "save_product", "Supabase", StorageError) from e
 
 
 def _get_company_profile(storage: StorageInterface) -> CompanyProfile:
@@ -87,20 +76,8 @@ def _get_company_profile(storage: StorageInterface) -> CompanyProfile:
     except DataNotFoundError:
         raise
     except Exception as e:
-        if "timeout" in str(e).lower() or "connection" in str(e).lower():
-            raise ExternalAPIError(
-                message=str(e),
-                tool_name="get_company_profile",
-                api_name="Supabase",
-                is_retryable=True,
-                original_error=e,
-            ) from e
-
-        raise StorageError(
-            message=f"Failed to retrieve company profile: {str(e)}",
-            operation="get_company_profile",
-            original_error=e,
-        ) from e
+        # Use centralized error classifier for consistent error handling
+        raise classify_api_error(e, "get_company_profile", "Supabase", StorageError) from e
 
 
 def create_save_product_tool(storage: StorageInterface) -> object:

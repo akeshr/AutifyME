@@ -301,11 +301,12 @@ class OutcomeTracker:
         Returns:
             Metrics dictionary with success rates, avg duration, etc.
         """
-        # TODO: Implement when workflow_outcomes table exists
-        # For Phase 1.2, return placeholder
+        # Phase 2: Implement full aggregate metrics from workflow_outcomes table
+        # Current: Returns minimal runtime metrics (non-blocking placeholder)
+        # Future: Query Supabase for success rates, avg duration, category breakdown
         return {
             "active_workflows": len(self._active_workflows),
-            "note": "Full metrics available after database integration",
+            "note": "Full aggregate metrics available in Phase 2 analytics",
         }
 
     # --- Internal Methods ---

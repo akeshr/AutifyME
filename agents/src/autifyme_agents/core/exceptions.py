@@ -234,3 +234,64 @@ class WorkflowInterruptedError(AutifyMEError):
         self.reason = reason
         super().__init__(f"Workflow {workflow_id} interrupted ({reason}): {message}")
 
+
+# ============================================================================
+# Error Classification Utilities
+# ============================================================================
+
+def classify_api_error(
+    error: Exception,
+    tool_name: str,
+    api_name: str,
+    fallback_error_class: type[AutifyMEError] = ToolExecutionError,
+) -> AutifyMEError:
+    """Classify an API error and raise the appropriate AutifyME exception.
+
+    Centralizes error classification logic to avoid duplication across tools.
+    Detects transient errors (timeouts, connection issues, rate limits) and
+    raises ExternalAPIError for retry, or fallback error for permanent failures.
+
+    Args:
+        error: The caught exception from API call
+        tool_name: Name of the tool where error occurred
+        api_name: Name of the external API (e.g., "Supabase", "OpenAI")
+        fallback_error_class: Error class to use for non-retryable failures
+
+    Returns:
+        Appropriate AutifyME exception (ready to raise)
+
+    Example:
+        try:
+            result = storage.save_product(product)
+        except Exception as e:
+            raise classify_api_error(e, "save_product", "Supabase", StorageError)
+    """
+    error_str = str(error).lower()
+
+    # Detect transient/retryable errors
+    transient_indicators = [
+        "timeout",
+        "connection",
+        "rate limit",
+        "429",  # Too Many Requests
+        "503",  # Service Unavailable
+        "502",  # Bad Gateway
+        "504",  # Gateway Timeout
+    ]
+
+    if any(indicator in error_str for indicator in transient_indicators):
+        return ExternalAPIError(
+            message=str(error),
+            tool_name=tool_name,
+            api_name=api_name,
+            is_retryable=True,
+            original_error=error,
+        )
+
+    # Permanent failure - use fallback error class
+    return fallback_error_class(
+        message=f"Failed to execute {tool_name}: {str(error)}",
+        tool_name=tool_name,
+        original_error=error,
+    )
+
