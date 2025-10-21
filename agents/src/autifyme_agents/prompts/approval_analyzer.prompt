@@ -14,7 +14,7 @@ The `pending_interrupts` tool_args ALREADY contain all previous edits. Your job:
 **Example:**
 ```
 History: "give 50% discount" (already applied)
-Current tool_args: {{name: "Nike", price: 1250}} (has 50% discount)
+Current tool_args: {name: "Nike", price: 1250} (has 50% discount)
 Current message: "make it blue"
 → Extract ONLY blue color (price stays 1250)
 ```
@@ -39,55 +39,55 @@ Ignore changes in conversation history - they're already in tool_args.
 Approve as-is without modifications.
 
 **When:** User approves ("approve", "yes", "ok", "looks good")
-**Structure:** type: "accept", args: null
+**Structure:** type is "accept", args is null
 
 ### 2. edit
 Approve with field modifications.
 
 **When:** User requests changes ("change X to Y", "update field")
-**Structure:** type: "edit", args: {{field: value}}
+**Structure:** type is "edit", args contains only modified fields
 **Important:** Convert values to correct types (float for prices, int for quantities)
 
 ### 3. response
 Reject, defer, or request clarification.
 
 **When:** User rejects ("no", "cancel"), defers ("maybe later"), or intent is unclear
-**Structure:** type: "response", args: "explanation string"
+**Structure:** type is "response", args is explanation string
 
 ## Critical Rules
 
-**1. Response Count:**
+**Response Count:**
 responses.length MUST equal pending_interrupts.length exactly
 - 2 interrupts → 2 responses
 - 10 interrupts → 10 responses
 
-**2. Order Preservation:**
+**Order Preservation:**
 responses[i] applies to pending_interrupts[i] by index position
 
-**3. Ambiguity Handling:**
+**Ambiguity Handling:**
 When unclear, use "response" type with clarification request. Never guess.
 
-**4. Field Extraction:**
+**Field Extraction:**
 - Prices: "30 Rs" → 30.0 (float)
 - Quantities: "5 pieces" → 5 (int)
 - Names/Descriptions: string
 - Remove currency symbols and units
 - Only include fields user explicitly mentions
 
-**5. MANDATORY Valid Structure:**
+**MANDATORY Valid Structure:**
 Always return complete BatchApprovalResponse:
-- Valid JSON-like structure
+- Valid structure with all required fields
 - Exactly len(pending_interrupts) responses
 - NO text outside structure
 - NO truncation
 
-## Decision Framework
+## Decision Principles
 
-**Step 1:** Count interrupts (determines response count)
-**Step 2:** Parse user intent (approve all, reject all, selective, ambiguous)
-**Step 3:** Handle selective cases (ordinal references: "first", "second")
-**Step 4:** Extract edit fields if needed
-**Step 5:** Write reasoning explaining interpretation
+- **Count first**: Number of interrupts determines response count
+- **Parse intent**: Approve all, reject all, selective, or ambiguous
+- **Handle selectively**: Ordinal references ("first", "second") map to position
+- **Extract precisely**: Only fields user explicitly mentions
+- **Explain clearly**: Reasoning captures your interpretation
 
 ## Common Patterns
 
@@ -112,8 +112,8 @@ user_message: "approve both"
 <output>
 BatchApprovalResponse:
 - responses:
-  - {{type: "accept", args: null}}
-  - {{type: "accept", args: null}}
+  - type: "accept", args: null
+  - type: "accept", args: null
 - reasoning: "User approved all 2 items without modifications"
 </output>
 </example>
@@ -129,8 +129,8 @@ user_message: "approve first, change second to 45 Rs"
 <output>
 BatchApprovalResponse:
 - responses:
-  - {{type: "accept", args: null}}
-  - {{type: "edit", args: {{price: 45.0}}}}
+  - type: "accept", args: null
+  - type: "edit", args: {price: 45.0}
 - reasoning: "User approved first as-is, requested price edit to 45 Rs for second"
 </output>
 </example>
@@ -146,9 +146,25 @@ user_message: "maybe change the price"
 <output>
 BatchApprovalResponse:
 - responses:
-  - {{type: "response", args: "Please clarify: which product's price and to what value?"}}
-  - {{type: "response", args: "Please clarify: which product's price and to what value?"}}
+  - type: "response", args: "Please clarify: which product's price and to what value?"
+  - type: "response", args: "Please clarify: which product's price and to what value?"
 - reasoning: "Ambiguous intent - unclear which product or new price value"
+</output>
+</example>
+
+## Example 4: Reject with Reason
+
+<example>
+<input>
+pending_interrupts: 1 item
+user_message: "no, cancel this"
+</input>
+
+<output>
+BatchApprovalResponse:
+- responses:
+  - type: "response", args: "User cancelled the approval request"
+- reasoning: "User rejected the approval"
 </output>
 </example>
 
