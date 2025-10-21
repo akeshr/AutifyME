@@ -36,14 +36,14 @@ SSN_PATTERN = re.compile(
 )
 
 
-def sanitize_html(text: str) -> str:
+def sanitize_html(text: Any) -> Any:
     """Remove HTML tags and escape special characters to prevent XSS.
 
     Args:
-        text: Input string potentially containing HTML
+        text: Input string potentially containing HTML (or any type, returns unchanged if not str)
 
     Returns:
-        Sanitized string with HTML tags removed and entities escaped
+        Sanitized string with HTML tags removed and entities escaped, or original value if not string
 
     Examples:
         >>> sanitize_html("<script>alert('xss')</script>Hello")
@@ -55,19 +55,19 @@ def sanitize_html(text: str) -> str:
         return text
 
     # Remove HTML tags
-    text = re.sub(r'<[^>]+>', '', text)
+    sanitized = re.sub(r'<[^>]+>', '', text)
 
     # Escape remaining HTML entities for safety
-    text = html.escape(text, quote=False)
+    sanitized = html.escape(sanitized, quote=False)
 
-    return text
+    return sanitized
 
 
-def detect_pii(text: str) -> bool:
+def detect_pii(text: Any) -> bool:
     """Detect potential PII in text (phone, email, SSN, credit card).
 
     Args:
-        text: Input string to check
+        text: Input value to check (only strings are checked, others return False)
 
     Returns:
         True if PII patterns detected, False otherwise
@@ -91,15 +91,15 @@ def detect_pii(text: str) -> bool:
     )
 
 
-def redact_pii(text: str, placeholder: str = "[REDACTED]") -> str:
+def redact_pii(text: Any, placeholder: str = "[REDACTED]") -> Any:
     """Redact PII patterns from text for safe logging.
 
     Args:
-        text: Input string potentially containing PII
+        text: Input value potentially containing PII (non-strings returned unchanged)
         placeholder: Replacement text for detected PII
 
     Returns:
-        Text with PII patterns replaced
+        Text with PII patterns replaced, or original value if not string
 
     Examples:
         >>> redact_pii("Call 555-123-4567 or email test@example.com")
@@ -111,23 +111,23 @@ def redact_pii(text: str, placeholder: str = "[REDACTED]") -> str:
         return text
 
     # Redact in order of specificity (more specific first)
-    text = SSN_PATTERN.sub(placeholder, text)
-    text = CREDIT_CARD_PATTERN.sub(placeholder, text)
-    text = EMAIL_PATTERN.sub(placeholder, text)
-    text = PHONE_PATTERN.sub(placeholder, text)
+    redacted = SSN_PATTERN.sub(placeholder, text)
+    redacted = CREDIT_CARD_PATTERN.sub(placeholder, redacted)
+    redacted = EMAIL_PATTERN.sub(placeholder, redacted)
+    redacted = PHONE_PATTERN.sub(placeholder, redacted)
 
-    return text
+    return redacted
 
 
 def validate_length(
-    text: str,
+    text: Any,
     max_length: int,
     field_name: str = "field",
 ) -> None:
     """Validate text length doesn't exceed maximum.
 
     Args:
-        text: Input string to validate
+        text: Input value to validate (only strings are validated, others ignored)
         max_length: Maximum allowed length
         field_name: Field name for error message
 
