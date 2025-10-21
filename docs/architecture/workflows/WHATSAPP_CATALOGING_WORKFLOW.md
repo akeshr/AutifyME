@@ -97,6 +97,13 @@ This workflow will be managed by a generic `ProjectManagerAgent` and a new `Cata
         -   **Implementation:** LLM with structured output (Product), brand-aware via company context middleware.
         -   **Output:** `Product` with all catalog fields (name, description, price, sizes, colors, image_urls).
 
+### Error Handling & Resilience
+
+- **External API Errors:** Classified via `classify_api_error()` to detect transient vs permanent failures
+- **Retry Strategy:** Transient errors (timeout, rate limit, connection) retried up to 3 times with exponential backoff
+- **Thread Safety:** Concurrent webhook invocations safely tracked via OutcomeTracker with locks
+- **Idempotency:** Duplicate messages raise error immediately (fail-closed design) for better observability
+
 ---
 
 ## 3. Required New Components
