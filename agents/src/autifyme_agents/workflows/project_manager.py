@@ -133,17 +133,10 @@ def create_project_manager(
     # Get store for long-term memory
     store = get_store()
 
-    # PM orchestration tools - now provided by middleware in v1.0
-    # TodoListMiddleware provides write_todos tool automatically
-    pm_tools = []
-
     # Note: Media download tools NOT included in PM
     # PM delegates media_id to departments, departments download when needed
     # This keeps PM focused on orchestration, not domain operations
-
-    # Add any additional explicit tools
-    if tools is not None:
-        pm_tools.extend(tools)
+    # TodoListMiddleware provides write_todos tool automatically (v1.0)
 
     # Departments are subagents (proper delegation hierarchy)
     subagents: list[Any] = [
@@ -156,7 +149,7 @@ def create_project_manager(
 
     # No interrupt_on needed - departments handle their own HITL
     project_manager = create_deep_agent(
-        tools=pm_tools,  # PM has orchestration tools
+        tools=[],  # PM has orchestration tools (middleware provides write_todos)
         system_prompt=instructions,  # v1.0: renamed from instructions
         model=llm,
         subagents=subagents,

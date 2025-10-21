@@ -100,9 +100,7 @@ def create_cataloging_department(
                 schema=Product,
                 handle_errors=True  # v1.0: Self-healing structured outputs
             ),
-            "system_prompt": load_prompt("specialists/cataloging_specialist.prompt"),  # v1.0: renamed from prompt
-            "tools": [],  # ✅ No tools - pure synthesis
-            "middleware": [],  # ✅ Disable default middleware (filesystem, write_todos)
+            "system_prompt": load_prompt("specialists/cataloging_specialist.prompt")  # v1.0: renamed from prompt
         },
     ]
 
