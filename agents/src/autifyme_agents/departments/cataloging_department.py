@@ -81,10 +81,13 @@ def create_cataloging_department(
         {
             "name": "image_analysis_specialist",
             "description": (
-                "Analyze product images to extract visual attributes including colors, "
-                "materials, style, and features. Provide the file path in your delegation "
-                "message (e.g., 'Analyze /tmp/media_downloads/xyz.jpg'). Returns "
-                "ImageAnalysisResult with visual_description, identified_colors, and style_tags."
+                "Analyze product images to extract visual attributes (colors, materials, style, quality). "
+                "\n\nDELEGATION FORMAT (CRITICAL): "
+                "Include the COMPLETE FILE PATH literally in your message. "
+                "Example: 'Analyze /tmp/media_downloads/20251021_164516_xyz.jpg for product colors and materials.' "
+                "\n\nDO NOT say 'the downloaded file path' or 'the image from before' - use the actual path. "
+                "\n\nThe specialist extracts paths via regex pattern matching - the path MUST be present as text. "
+                "\n\nReturns ImageAnalysisResult with visual_description, identified_colors, style_tags."
             ),
             "runnable": create_image_analysis_specialist_graph(company_profile),  # v1.0: renamed from graph
         },

@@ -6,9 +6,9 @@ You are Claude, orchestrating autonomous testing of the AutifyME agentic system 
 
 **"Tools provide visibility, Claude provides intelligence."**
 
-You have 6 observation tools that gather information. You use your existing capabilities (Edit, Write, Read, MCP) to analyze findings and implement improvements.
+You have 7 observation tools that gather information. You use your existing capabilities (Edit, Write, Read, MCP) to analyze findings and implement improvements.
 
-## Available Tools (6 Essential)
+## Available Tools (7 Essential)
 
 ### 1. `execute_scenario(scenario_id, hitl_mode, media_path)`
 **Execute workflow tests programmatically**
@@ -112,7 +112,53 @@ messages = get_run_messages(llm_run_id)
 
 ---
 
-### 5. `get_workflow_story(trace_ids)`
+### 5. `get_llm_trace_tree(trace_id)`
+**LLM-only trace extraction (~2-5k tokens)**
+
+```python
+from tests.tools import get_llm_trace_tree
+
+# Extract hierarchical tree of ONLY LLM calls with full prompts
+llm_tree = get_llm_trace_tree(trace_id)
+
+# Returns LLMTraceTree with:
+# - trace_id: str
+# - trace_url: str
+# - total_llm_calls: int
+# - total_tokens: int
+# - total_cost: float
+# - llm_tree: list[LLMCallNode]  # Hierarchical tree of LLM calls
+
+# Each LLMCallNode contains:
+# - run_id: str
+# - agent_name: str  # "PM" | "CatalogingDept" | "ImageAnalysisSpecialist"
+# - hierarchy_level: str  # "orchestrator" | "department" | "specialist"
+# - system_prompt: str  # Full system prompt
+# - user_messages: list[dict]  # All user/context messages
+# - assistant_output: dict  # LLM response
+# - model: str  # "gpt-4o-mini"
+# - total_tokens: int
+# - latency_ms: int
+# - status: str
+# - error: str | None
+# - parent_agent: str | None
+# - children: list[LLMCallNode]  # Nested LLM calls
+```
+
+**When to use**:
+- Prompt analysis and optimization
+- Understanding agent decision-making and reasoning
+- Analyzing context flow between hierarchy levels (PM → Dept → Specialist)
+- Debugging LLM outputs without tool/chain noise
+- Identifying prompt engineering issues
+
+**Key benefit**: Filters out chains and tools to show ONLY LLM reasoning with full prompts and outputs. Perfect for prompt analysis, much cleaner than get_run_messages() for understanding multi-agent LLM interactions.
+
+**Token efficiency**: ~2-5k tokens per trace (includes ALL LLM prompts + outputs, but excludes chain/tool runs)
+
+---
+
+### 6. `get_workflow_story(trace_ids)`
 **Multi-trace HITL workflow analysis (~500 tokens per trace)**
 
 ```python
@@ -158,7 +204,7 @@ story = get_workflow_story(trace_ids)
 
 ---
 
-### 6. `list_recent_tests(limit)`
+### 7. `list_recent_tests(limit)`
 **Test history for progress tracking**
 
 ```python

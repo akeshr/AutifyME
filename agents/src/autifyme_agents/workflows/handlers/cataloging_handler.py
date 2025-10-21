@@ -123,16 +123,61 @@ class CatalogingWorkflowHandler:
             # Collect all products (for batch approval)
             products_to_approve: list[Product] = []
 
-            if isinstance(interrupt_value, list) and len(interrupt_value) > 0:
-                # Parallel tool calls - collect ALL products
+            # Handle DeepAgents interrupt format with action_requests
+            if isinstance(interrupt_value, dict) and "action_requests" in interrupt_value:
+                action_requests = interrupt_value.get("action_requests", [])
                 logger.info(
-                    "Processing batch interrupt",
+                    "Processing DeepAgents interrupt with action_requests",
+                    extra={"thread_id": thread_id, "action_count": len(action_requests)}
+                )
+
+                for idx, action_req in enumerate(action_requests):
+                    # DeepAgents format: {'name': 'save_product', 'args': {...}}
+                    tool_name = action_req.get("name", "unknown")
+                    clean_value = action_req.get("args", {})
+
+                    logger.debug(
+                        f"Processing action_request {idx + 1} of {len(action_requests)}",
+                        extra={
+                            "thread_id": thread_id,
+                            "tool_name": tool_name,
+                            "product_name": clean_value.get("name", "unknown"),
+                        }
+                    )
+
+                    # Convert to Product and add to batch
+                    if isinstance(clean_value, dict):
+                        draft = Product.model_validate(clean_value)
+                        products_to_approve.append(draft)
+
+                # Send all products in batch
+                if len(products_to_approve) > 0:
+                    logger.info(
+                        "Sending batch approval request",
+                        extra={
+                            "thread_id": thread_id,
+                            "product_count": len(products_to_approve),
+                            "product_names": [p.name for p in products_to_approve],
+                        }
+                    )
+
+                    if len(products_to_approve) == 1:
+                        # Single product - use standard approval request
+                        self.channel.send_approval_request(sender, products_to_approve[0])
+                    else:
+                        # Multiple products - send batch approval
+                        self._send_batch_approval(sender, products_to_approve)
+
+            # Legacy format: list of action dicts
+            elif isinstance(interrupt_value, list) and len(interrupt_value) > 0:
+                logger.info(
+                    "Processing legacy batch interrupt",
                     extra={"thread_id": thread_id, "action_count": len(interrupt_value)}
                 )
 
                 for idx, action in enumerate(interrupt_value):
                     if isinstance(action, dict) and "action_request" in action:
-                        # DeepAgents format - extract clean args
+                        # Legacy DeepAgents format - extract clean args
                         action_request = action.get("action_request", {})
                         clean_value = action_request.get("args", {})
                         tool_name = action_request.get("action", "unknown")
@@ -169,7 +214,7 @@ class CatalogingWorkflowHandler:
                         # Multiple products - send batch approval
                         self._send_batch_approval(sender, products_to_approve)
 
-            # Handle single interrupt case
+            # Handle single interrupt case (simple dict)
             elif isinstance(interrupt_value, dict):
                 logger.info(
                     "Processing single interrupt",

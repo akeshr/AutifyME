@@ -63,8 +63,8 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
         >>> assert len(result.responses) == 2
     """
     if llm is None:
-        # Use gpt-4.1-mini with low temperature for deterministic approval interpretation
-        llm = get_llm(model="gpt-4.1-mini-2025-04-14", temperature=0.2)
+        # Use gpt-4.1-mini for fast, deterministic approval interpretation with 75% caching
+        llm = get_llm(model="gpt-4.1-mini", temperature=0.2)
 
     # Configure LLM for structured output
     # Use function_calling method to avoid OpenAI schema validation issues
@@ -102,11 +102,17 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
         conversation_history = inputs.get("conversation_history", [])
 
         # Format interrupts for display
+        # CRITICAL: Use json.dumps to avoid curly brace template variable conflicts
+        # If we use str(dict), curly braces like {name} get interpreted as template vars
+        import json
         interrupt_lines = []
         for idx, interrupt in enumerate(pending_interrupts, 1):
+            tool_args = interrupt.get('tool_args', {})
+            # Use json.dumps for safe formatting (escapes braces)
+            args_str = json.dumps(tool_args, ensure_ascii=False)
             interrupt_lines.append(
                 f"{idx}. Tool: {interrupt.get('tool_name', 'unknown')}, "
-                f"Args: {interrupt.get('tool_args', {})}"
+                f"Args: {args_str}"
             )
 
         # Format conversation history for context

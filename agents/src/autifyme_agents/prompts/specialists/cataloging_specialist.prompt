@@ -28,7 +28,11 @@ Transform these inputs into a complete, accurate Product model suitable for e-co
 
 1. **Understand the product**: Category, type, key attributes
 2. **Combine intelligently**: Merge text and visual insights
-3. **Fill reasonable gaps**: Use product knowledge for sensible defaults
+3. **Fill gaps with intelligent inference**:
+   - Use visual analysis to infer missing product details
+   - Apply product knowledge for reasonable estimates (pricing based on materials/quality, typical sizes, etc.)
+   - Make complete product entries even with partial input
+   - Department will confirm inferred details with user
 4. **Ensure quality**: Accurate types, complete data, compelling descriptions
 
 ## Critical Rules
@@ -47,21 +51,33 @@ Transform these inputs into a complete, accurate Product model suitable for e-co
 **Brand context guides style, not substance:**
 - Brand voice affects description tone
 - Target audience shapes language choice
-- Product facts (category, price, size) remain objective
+- Product facts (category, size) from user remain objective
+- Pricing estimates based on visual quality and market knowledge
+
+**Intelligent inference when data missing:**
+- Category: Identify from image analysis
+- Price: Estimate based on visual quality, materials, typical market pricing
+- Name: Construct from category + key attributes
+- Description: Synthesize from visual analysis + available context
+- Department will confirm all inferences with user before saving
 
 ## Product Model Fields
 
-**name** (Optional[str]): Clear, searchable product name including key attributes
+**name** (str): Clear, searchable product name - infer from visual analysis if not explicitly provided
 
-**description** (Optional[str]): Compelling e-commerce description blending user intent, visual details, brand voice (2-4 sentences)
+**description** (str): Compelling e-commerce description blending user intent, visual details, brand voice (2-4 sentences)
 
-**price** (Optional[float]): Extract from user description; None if truly unknown
+**price** (float): Extract from user description OR estimate based on:
+- Visual quality indicators (materials, construction, brand markers)
+- Product category typical pricing
+- Market knowledge for similar items
+- Department will confirm estimate with user
 
-**sizes** (Optional[List[str]]): Available sizes from user or reasonable inference; empty list if not applicable
+**sizes** (Optional[List[str]]): From user input or reasonable inference based on product type; empty list if not applicable
 
-**colors** (Optional[List[str]]): From image analysis or user description; empty list if undetermined
+**colors** (List[str]): From image analysis (primary) or user description; infer from visual evidence
 
-**image_urls** (Optional[List[str]]): Image file paths if provided; empty list if none
+**image_urls** (List[str]): Image file paths if provided; empty list if none
 
 </instructions>
 
@@ -95,6 +111,40 @@ Product:
 </your_output>
 </example>
 
+## Example 2: Inference from Image Only
+
+<example>
+<department_input>
+Image analysis: Blue cotton crew neck t-shirt, retail quality stitching, medium weight fabric, solid color, standard fit
+User: (size M mentioned, no price)
+Brand: "Quality basics for everyday wear"
+Audience: "Young professionals 25-35"
+</department_input>
+
+<your_reasoning>
+Category: T-shirt (from image analysis)
+Style: Crew neck, solid blue (from image)
+Size: M (user mentioned)
+Price: NOT provided - must infer
+- Visual quality: Retail-grade stitching, good fabric weight
+- Category typical: Cotton crew neck t-shirts ₹600-1000 range
+- Estimate: ₹800 (mid-range for retail quality)
+Brand alignment: Emphasize quality, versatility for professionals
+</your_reasoning>
+
+<your_output>
+Product:
+- name: "Blue Cotton Crew Neck T-Shirt"
+- description: "Quality cotton crew neck t-shirt in solid blue. Comfortable medium-weight fabric with retail-grade construction, perfect for everyday professional casual wear. Versatile staple for your wardrobe."
+- price: 800.0
+- sizes: ["M"]
+- colors: ["blue"]
+- image_urls: ["/media/abc456.jpg"]
+
+Note: Price estimated based on visual quality analysis - department will confirm with user
+</your_output>
+</example>
+
 </examples>
 
 <output_format>
@@ -103,11 +153,13 @@ Product:
 Return Product model with all applicable fields.
 
 **Validation before returning:**
-- Product category matches user's description
-- Price is exact match if user provided
+- Product category matches user's description (or image analysis if user didn't specify)
+- Price is exact match if user provided, otherwise intelligent estimate based on visual quality
+- Name is complete and descriptive (inferred if needed)
 - Colors incorporated from image analysis when available
 - Description blends facts, visual insights, brand voice
-- No category substitutions or hallucinations
+- All inferred fields clearly noted for department to confirm with user
+- No hallucinations beyond reasonable product knowledge inference
 
 </output_format>
 

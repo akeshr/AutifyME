@@ -13,6 +13,7 @@ class InterruptUnpacker:
 
     Handles complex interrupt formats:
     - List-valued interrupts (parallel tool calls from same agent)
+    - DeepAgents batch HITL format (dict with action_requests list)
     - Dict-valued interrupts (single action)
     - Unknown formats (defensive fallback)
 
@@ -28,6 +29,7 @@ class InterruptUnpacker:
 
         IMPORTANT: interrupt_obj.value can be:
         - A list of actions (parallel tool calls from same agent)
+        - A dict with 'action_requests' list (DeepAgents batch HITL format)
         - A single dict (single action)
         - Unknown format (fallback handling)
 
@@ -87,6 +89,58 @@ class InterruptUnpacker:
                     }
                     pending_interrupts_list.append(interrupt_info)
                     logger.info(f"[RESUME ORDER] Interrupt {action_idx + 1}: {tool_args.get('name', 'unknown')}")
+
+            # Case 2a: DeepAgents batch HITL format (action_requests list)
+            elif isinstance(interrupt_value, dict) and 'action_requests' in interrupt_value:
+                action_requests = interrupt_value.get('action_requests', [])
+
+                if isinstance(action_requests, list):
+                    logger.debug(
+                        "Unpacking DeepAgents batch HITL interrupt into individual actions",
+                        extra={
+                            "thread_id": thread_id or "unknown",
+                            "interrupt_id": interrupt_id,
+                            "action_count": len(action_requests),
+                        }
+                    )
+
+                    # Create one interrupt_info per action_request
+                    for action_idx, action_request in enumerate(action_requests):
+                        if isinstance(action_request, dict):
+                            tool_name = action_request.get('name', 'unknown')
+                            tool_args = action_request.get('args', {})
+                            description = action_request.get('description', f"Action {action_idx + 1}")
+                        else:
+                            tool_name = "unknown"
+                            tool_args = {}
+                            description = str(action_request)[:200]
+
+                        interrupt_info = {
+                            "interrupt_id": f"{interrupt_id}_{action_idx}",  # Suffixed ID
+                            "original_interrupt_id": interrupt_id,  # Original ID for Command
+                            "tool_name": tool_name,
+                            "tool_args": tool_args,
+                            "description": description,
+                        }
+                        pending_interrupts_list.append(interrupt_info)
+                        logger.info(f"[BATCH HITL] Action {action_idx + 1}: {tool_name} - {tool_args.get('name', 'unknown')}")
+                else:
+                    # Fallback if action_requests is not a list
+                    logger.warning(
+                        "action_requests key found but value is not a list",
+                        extra={
+                            "thread_id": thread_id or "unknown",
+                            "interrupt_id": interrupt_id,
+                            "action_requests_type": type(action_requests).__name__,
+                        }
+                    )
+                    interrupt_info = {
+                        "interrupt_id": interrupt_id,
+                        "tool_name": "unknown",
+                        "tool_args": {},
+                        "description": str(interrupt_value)[:200],
+                    }
+                    pending_interrupts_list.append(interrupt_info)
 
             # Case 2: Dict-valued interrupt (single action)
             elif isinstance(interrupt_value, dict):
