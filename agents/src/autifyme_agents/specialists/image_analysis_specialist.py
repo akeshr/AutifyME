@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from langchain.agents import create_agent
+from langchain.agents.structured_output import ToolStrategy
 from langchain.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
@@ -117,7 +118,10 @@ def create_image_analysis_specialist(
         model=llm,
         tools=[],  # Pure vision extraction, no tools
         system_prompt=system_prompt,
-        response_format=ImageAnalysisResult,  # Structured output
+        response_format=ToolStrategy(
+            schema=ImageAnalysisResult,
+            handle_errors=True  # v1.0: Self-healing structured outputs
+        ),
         checkpointer=checkpointer,
         name="ImageAnalysisSpecialist",
     )

@@ -329,79 +329,138 @@ class WorkflowRunner:
         """
         logger.debug("Invoking Project Manager", extra={"thread_id": thread_id})
 
-        pm: Any = self._create_project_manager()
-        config = self._build_config(thread_id, run_id=run_id)
+        try:
+            logger.info("[PM_INVOKE] Creating PM instance", extra={"thread_id": thread_id})
+            pm: Any = self._create_project_manager()
+            logger.info(f"[PM_INVOKE] PM created successfully: {type(pm).__name__}", extra={"thread_id": thread_id})
+        except Exception as e:
+            logger.error(f"[PM_INVOKE] PM creation failed: {type(e).__name__}: {e}", exc_info=True)
+            raise
+
+        try:
+            logger.info("[PM_INVOKE] Building config", extra={"thread_id": thread_id, "run_id": run_id})
+            config = self._build_config(thread_id, run_id=run_id)
+            logger.info(f"[PM_INVOKE] Config built: {list(config.keys())}", extra={"thread_id": thread_id})
+        except Exception as e:
+            logger.error(f"[PM_INVOKE] Config building failed: {type(e).__name__}: {e}", exc_info=True)
+            raise
 
         # Check for pending HITL interrupts
+        pending_interrupts_list = []
         try:
+            logger.info("[PM_INVOKE] Getting state snapshot", extra={"thread_id": thread_id})
             state_snapshot = pm.get_state(config)
+            logger.info(
+                f"[PM_INVOKE] State snapshot retrieved: has_values={hasattr(state_snapshot, 'values')}, "
+                f"has_next={hasattr(state_snapshot, 'next')}",
+                extra={"thread_id": thread_id}
+            )
 
             # Unpack interrupts into normalized format for approval processing
+            logger.info("[PM_INVOKE] Unpacking interrupts from state", extra={"thread_id": thread_id})
             pending_interrupts_list = InterruptUnpacker.unpack_interrupts(
                 state_snapshot, thread_id=thread_id
             )
 
             if pending_interrupts_list:
                 logger.info(
-                    "Found pending HITL interrupts",
+                    "[PM_INVOKE] Found pending HITL interrupts",
                     extra={
                         "thread_id": thread_id,
                         "interrupt_count": len(pending_interrupts_list),
                     }
                 )
             else:
-                logger.debug(
-                    "No pending interrupts found",
+                logger.info(
+                    "[PM_INVOKE] No pending interrupts found - new message flow",
                     extra={"thread_id": thread_id}
                 )
         except Exception as e:
+            logger.error(
+                f"[PM_INVOKE] Failed to check for pending interrupts: {type(e).__name__}: {e}",
+                extra={"thread_id": thread_id},
+                exc_info=True
+            )
             logger.warning(
-                "Failed to check for pending interrupts - treating as new message",
-                extra={"thread_id": thread_id, "error": str(e)}
+                "[PM_INVOKE] Treating as new message",
+                extra={"thread_id": thread_id}
             )
 
         # Build payload based on checkpoint state
         if pending_interrupts_list:
             # === APPROVAL ANALYZER WITH CONVERSATION HISTORY ===
             # Extract conversation history from PM state for context-aware approval analysis
+            logger.info(
+                "[PM_INVOKE] RESUME FLOW: Processing approval response",
+                extra={
+                    "thread_id": thread_id,
+                    "interrupt_count": len(pending_interrupts_list)
+                }
+            )
 
             user_message = raw_payload.get("text", "")
+            logger.info(
+                f"[PM_INVOKE] User message: {user_message[:100] if user_message else '(empty)'}",
+                extra={"thread_id": thread_id}
+            )
 
             # Extract conversation history from PM state
             conversation_history = []
             try:
+                logger.info("[PM_INVOKE] Extracting conversation history", extra={"thread_id": thread_id})
                 state_snapshot = pm.get_state(config)
                 if state_snapshot and hasattr(state_snapshot, 'values'):
                     conversation_history = state_snapshot.values.get("messages", [])
-                    logger.debug(
-                        "Extracted conversation history",
-                        extra={
-                            "thread_id": thread_id,
-                            "history_length": len(conversation_history)
-                        }
+                    logger.info(
+                        f"[PM_INVOKE] Conversation history extracted: {len(conversation_history)} messages",
+                        extra={"thread_id": thread_id}
+                    )
+                else:
+                    logger.warning(
+                        "[PM_INVOKE] State snapshot has no values",
+                        extra={"thread_id": thread_id}
                     )
             except Exception as e:
-                logger.warning(
-                    "Could not extract conversation history",
-                    extra={"thread_id": thread_id, "error": str(e)}
+                logger.error(
+                    f"[PM_INVOKE] Could not extract conversation history: {type(e).__name__}: {e}",
+                    extra={"thread_id": thread_id},
+                    exc_info=True
                 )
 
             # Invoke approval coordinator (handles tracking, error handling, and Command building)
-            command_obj, approval_tracking_id = self.approval_coordinator.analyze_and_build_command(
-                thread_id=thread_id,
-                user_message=user_message,
-                pending_interrupts=pending_interrupts_list,
-                conversation_history=conversation_history,
-                raw_payload=raw_payload,
-            )
+            logger.info("[PM_INVOKE] Invoking approval coordinator", extra={"thread_id": thread_id})
+            try:
+                command_obj, approval_tracking_id = self.approval_coordinator.analyze_and_build_command(
+                    thread_id=thread_id,
+                    user_message=user_message,
+                    pending_interrupts=pending_interrupts_list,
+                    conversation_history=conversation_history,
+                    raw_payload=raw_payload,
+                )
+                logger.info(
+                    f"[PM_INVOKE] Approval coordinator returned: command_obj={'present' if command_obj else 'None'}, "
+                    f"tracking_id={approval_tracking_id}",
+                    extra={"thread_id": thread_id}
+                )
+            except Exception as e:
+                logger.error(
+                    f"[PM_INVOKE] Approval coordinator failed: {type(e).__name__}: {e}",
+                    extra={"thread_id": thread_id},
+                    exc_info=True
+                )
+                raise
 
             if not command_obj:
                 # Error already tracked and user notified by coordinator
+                logger.error(
+                    "[PM_INVOKE] No command object returned - approval analysis failed",
+                    extra={"thread_id": thread_id}
+                )
                 return None, None
 
             # Execute Command to resume workflow
             logger.info(
-                "Executing Command to resume workflow",
+                "[PM_INVOKE] Executing Command to resume workflow",
                 extra={"thread_id": thread_id}
             )
 
@@ -409,8 +468,18 @@ class WorkflowRunner:
             interrupt_value = None
 
             try:
+                logger.info("[PM_INVOKE] Starting Command stream execution", extra={"thread_id": thread_id})
+                event_count = 0
                 for event in pm.stream(command_obj, config=config, stream_mode="values"):
+                    event_count += 1
                     last_event = event
+                    logger.info(
+                        f"[PM_INVOKE] Command stream event #{event_count}",
+                        extra={
+                            "thread_id": thread_id,
+                            "has_interrupt": "__interrupt__" in event
+                        }
+                    )
 
                     # Check for new interrupts (nested workflows)
                     if "__interrupt__" in event:
@@ -418,12 +487,12 @@ class WorkflowRunner:
                         if interrupts:
                             interrupt_value = interrupts[0].value
                             logger.info(
-                                "Nested interrupt during resume",
-                                extra={"thread_id": thread_id}
+                                "[PM_INVOKE] Nested interrupt during resume",
+                                extra={"thread_id": thread_id, "interrupt_count": len(interrupts)}
                             )
 
                 logger.info(
-                    "Command execution complete",
+                    f"[PM_INVOKE] Command execution complete: {event_count} events",
                     extra={
                         "thread_id": thread_id,
                         "had_new_interrupt": interrupt_value is not None,
@@ -435,7 +504,7 @@ class WorkflowRunner:
             except GraphInterrupt as interrupt_exc:
                 interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
                 logger.info(
-                    "Interrupt detected via exception during resume",
+                    "[PM_INVOKE] Interrupt detected via exception during resume",
                     extra={
                         "thread_id": thread_id,
                         "interrupt_count": len(interrupts_list),
@@ -446,32 +515,54 @@ class WorkflowRunner:
                 return last_event, None
 
             except Exception as e:
-                logger.exception(
-                    "Command execution error",
-                    extra={"thread_id": thread_id, "error_type": type(e).__name__},
+                logger.error(
+                    f"[PM_INVOKE] Command execution error: {type(e).__name__}: {e}",
+                    extra={"thread_id": thread_id},
+                    exc_info=True
                 )
                 raise
 
         else:
             # No pending interrupt - normal message flow
-            from langchain.messages import HumanMessage
-            payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
-
-            logger.debug(
-                "Adding new message (no pending interrupt)",
-                extra={
-                    "thread_id": thread_id,
-                    "has_text": raw_payload.get("text") is not None,
-                    "has_media": raw_payload.get("media_id") is not None,
-                }
+            logger.info(
+                "[PM_INVOKE] NEW MESSAGE FLOW: No pending interrupts",
+                extra={"thread_id": thread_id}
             )
+
+            try:
+                from langchain.messages import HumanMessage
+                logger.info("[PM_INVOKE] Creating HumanMessage payload", extra={"thread_id": thread_id})
+                payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
+                logger.info(
+                    f"[PM_INVOKE] Payload created: has_text={raw_payload.get('text') is not None}, "
+                    f"has_media={raw_payload.get('media_id') is not None}",
+                    extra={"thread_id": thread_id}
+                )
+            except Exception as e:
+                logger.error(
+                    f"[PM_INVOKE] Failed to create payload: {type(e).__name__}: {e}",
+                    extra={"thread_id": thread_id},
+                    exc_info=True
+                )
+                raise
 
             last_event = None
             accumulated_interrupts: list[Any] = []  # ✅ Accumulate ALL interrupts across stream events
 
             try:
+                logger.info("[PM_INVOKE] Starting PM stream execution", extra={"thread_id": thread_id})
+                event_count = 0
                 for event in pm.stream(payload, config=config, stream_mode="values"):
+                    event_count += 1
                     last_event = event
+                    logger.info(
+                        f"[PM_INVOKE] PM stream event #{event_count}",
+                        extra={
+                            "thread_id": thread_id,
+                            "has_interrupt": "__interrupt__" in event,
+                            "event_keys": list(event.keys()) if isinstance(event, dict) else "not_dict"
+                        }
+                    )
 
                     # Detect interrupt in stream
                     if "__interrupt__" in event:
@@ -482,7 +573,7 @@ class WorkflowRunner:
                             # each with 1 interrupt. We need to collect all of them.
                             accumulated_interrupts.extend(interrupts)
                             logger.info(
-                                "Interrupt event detected",
+                                "[PM_INVOKE] Interrupt event detected",
                                 extra={
                                     "thread_id": thread_id,
                                     "event_interrupt_count": len(interrupts),
@@ -490,8 +581,8 @@ class WorkflowRunner:
                                 },
                             )
 
-                logger.debug(
-                    "PM stream completed",
+                logger.info(
+                    f"[PM_INVOKE] PM stream completed: {event_count} events",
                     extra={
                         "thread_id": thread_id,
                         "accumulated_interrupt_count": len(accumulated_interrupts),
@@ -501,6 +592,10 @@ class WorkflowRunner:
                 # ✅ Process accumulated interrupts after stream completes
                 interrupt_value = None
                 if accumulated_interrupts:
+                    logger.info(
+                        f"[PM_INVOKE] Processing {len(accumulated_interrupts)} accumulated interrupts",
+                        extra={"thread_id": thread_id}
+                    )
                     if len(accumulated_interrupts) > 1:
                         # Multiple interrupts - flatten all values
                         interrupt_value = []
@@ -511,7 +606,7 @@ class WorkflowRunner:
                                 interrupt_value.append(intr.value)
 
                         logger.info(
-                            "Multiple parallel interrupts collected",
+                            "[PM_INVOKE] Multiple parallel interrupts collected",
                             extra={
                                 "thread_id": thread_id,
                                 "interrupt_count": len(accumulated_interrupts),
@@ -522,18 +617,28 @@ class WorkflowRunner:
                         # Single interrupt - use value directly
                         interrupt_value = accumulated_interrupts[0].value
                         logger.info(
-                            "Single interrupt collected",
+                            "[PM_INVOKE] Single interrupt collected",
                             extra={
                                 "thread_id": thread_id,
                             },
                         )
+                else:
+                    logger.info(
+                        "[PM_INVOKE] No interrupts - workflow completed normally",
+                        extra={"thread_id": thread_id}
+                    )
 
+                logger.info(
+                    f"[PM_INVOKE] Returning: last_event={'present' if last_event else 'None'}, "
+                    f"interrupt_value={'present' if interrupt_value else 'None'}",
+                    extra={"thread_id": thread_id}
+                )
                 return last_event, interrupt_value
 
             except GraphInterrupt as interrupt_exc:
                 interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
                 logger.info(
-                    "Interrupt detected via exception",
+                    "[PM_INVOKE] Interrupt detected via exception",
                     extra={
                         "thread_id": thread_id,
                         "interrupt_count": len(interrupts_list),
@@ -544,9 +649,10 @@ class WorkflowRunner:
                 return last_event, None
 
             except Exception as e:
-                logger.exception(
-                    "PM streaming error",
-                    extra={"thread_id": thread_id, "error_type": type(e).__name__},
+                logger.error(
+                    f"[PM_INVOKE] PM streaming error: {type(e).__name__}: {e}",
+                    extra={"thread_id": thread_id},
+                    exc_info=True
                 )
                 raise
 
@@ -660,8 +766,20 @@ class WorkflowRunner:
             run_id: Optional run_id to use as trace_id in LangSmith
 
         Returns:
-            PM config dict
+            PM config dict with context for v1.0 context_schema support
         """
+        # Build typed company context for v1.0 context_schema
+        from autifyme_agents.schemas.context import CompanyContext
+
+        company_context = CompanyContext(
+            company_id=self.company_profile.id,
+            company_name=self.company_profile.name,
+            brand_voice=self.company_profile.brand_voice,
+            target_audience=self.company_profile.target_audience,
+            style_preferences=self.company_profile.style_preferences or [],
+            industry=self.company_profile.industry,
+        )
+
         config = {
             "configurable": {
                 "thread_id": thread_id,
@@ -672,6 +790,7 @@ class WorkflowRunner:
                 "langsmith.thread_id": thread_id,
                 "workflow": "cataloging",
             },
+            "context": company_context,  # v1.0: Type-safe context injection
         }
 
         # Add run_id if provided - this becomes the trace_id in LangSmith

@@ -6,6 +6,7 @@ Replaces simple chain with full agent for observability and middleware support.
 from typing import Any
 
 from langchain.agents import create_agent
+from langchain.agents.structured_output import ToolStrategy
 from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -61,7 +62,10 @@ def create_cataloging_specialist(
         model=llm,
         tools=[],  # No tools needed - pure extraction
         system_prompt=system_prompt,
-        response_format=Product,  # ✅ Structured output (replaces with_structured_output)
+        response_format=ToolStrategy(
+            schema=Product,
+            handle_errors=True  # v1.0: Self-healing structured outputs
+        ),
         checkpointer=checkpointer,  # Optional: stateful if needed
         name="CatalogingSpecialist",
     )

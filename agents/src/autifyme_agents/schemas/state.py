@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Annotated, Literal
 
-from deepagents.state import DeepAgentState
 from langchain.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
@@ -32,8 +31,12 @@ class InterruptInfo(TypedDict, total=False):
     description: str
 
 
-class ProjectManagerState(DeepAgentState):  # type: ignore[misc]
-    """Structured state carried by the Project Manager deep agent."""
+class ProjectManagerState(TypedDict):
+    """Structured state carried by the Project Manager deep agent.
+
+    Note: In LangChain v1.0 stable, DeepAgentState is no longer needed.
+    Use plain TypedDict with message annotations for LangGraph state.
+    """
 
     messages: Annotated[Sequence[MessageType], add_messages]
     company_profile: CompanyProfile
