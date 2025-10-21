@@ -9,6 +9,7 @@ from typing import Any
 from supabase import Client, create_client
 
 from autifyme_agents.core.config import settings
+from autifyme_agents.core.exceptions import ConfigurationError, StorageError
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.models import CompanyProfile, Product
 
@@ -400,3 +401,42 @@ class SupabaseStorageClient(StorageInterface):
         )
 
         return response.data if response.data else []
+
+    def cleanup(self) -> None:
+        """Close internal HTTP connections gracefully.
+
+        The Supabase Python client doesn't provide native cleanup methods,
+        but uses httpx.Client internally for all HTTP operations. This method
+        closes those internal clients to prevent connection leaks.
+
+        Call this on application shutdown or when the storage adapter is no
+        longer needed. Safe to call multiple times (idempotent).
+        """
+        if self._client is None:
+            return  # No client to cleanup
+
+        try:
+            # Close PostgREST client (database operations)
+            if hasattr(self._client.postgrest, 'session'):
+                self._client.postgrest.session.close()
+                logger.debug("Closed PostgREST HTTP client")
+        except Exception as e:
+            logger.warning(f"Failed to close PostgREST client: {e}")
+
+        try:
+            # Close Storage client (file operations)
+            if hasattr(self._client.storage, '_client'):
+                self._client.storage._client.close()
+                logger.debug("Closed Storage HTTP client")
+        except Exception as e:
+            logger.warning(f"Failed to close Storage client: {e}")
+
+        try:
+            # Close Functions client (edge function operations)
+            if hasattr(self._client.functions, '_client'):
+                self._client.functions._client.close()
+                logger.debug("Closed Functions HTTP client")
+        except Exception as e:
+            logger.warning(f"Failed to close Functions client: {e}")
+
+        logger.info("Supabase storage client cleanup completed")

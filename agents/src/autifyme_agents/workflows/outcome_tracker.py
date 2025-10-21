@@ -425,12 +425,14 @@ class OutcomeTracker:
         if isinstance(data, datetime):
             return data.isoformat()
 
-        # Fallback: convert to string representation
-        logger.warning(
-            f"Non-serializable type {type(data).__name__} converted to string",
-            extra={"type": type(data).__name__},
+        # Strict validation: raise error for non-serializable types
+        # This catches data structure issues early rather than silently losing information
+        raise TypeError(
+            f"Cannot serialize type {type(data).__name__} to JSON. "
+            f"Ensure all result_data is JSON-compatible: "
+            f"dict, list, str, int, float, bool, None, datetime, or Pydantic models. "
+            f"Got: {type(data)} with value preview: {str(data)[:100]}"
         )
-        return str(data)
 
     def _trigger_learning(self, workflow: TrackedWorkflow) -> None:
         """Trigger learning from workflow outcome.
