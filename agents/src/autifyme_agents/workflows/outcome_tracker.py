@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import datetime
+from threading import Lock
 from typing import Any
 from uuid import uuid4
 
@@ -129,6 +130,8 @@ class OutcomeTracker:
         # Key by tracking_id (not thread_id) to support multiple workflow phases per thread
         # This allows HITL workflows to create separate records for: initial → resume → complete
         self._active_workflows: dict[str, TrackedWorkflow] = {}
+        # Thread safety for concurrent workflow tracking
+        self._lock = Lock()
 
     def track_workflow_start(
         self,
@@ -152,7 +155,8 @@ class OutcomeTracker:
         )
 
         # Store by tracking_id (not thread_id) to allow multiple workflow phases
-        self._active_workflows[workflow.tracking_id] = workflow
+        with self._lock:
+            self._active_workflows[workflow.tracking_id] = workflow
 
         logger.info(
             "Workflow started",
@@ -185,18 +189,19 @@ class OutcomeTracker:
             confidence: Optional confidence score
             alternatives: Optional fallback departments
         """
-        workflow = self._active_workflows.get(tracking_id)
-        if not workflow:
-            logger.warning(f"Routing tracked for unknown workflow: {tracking_id}")
-            return
+        with self._lock:
+            workflow = self._active_workflows.get(tracking_id)
+            if not workflow:
+                logger.warning(f"Routing tracked for unknown workflow: {tracking_id}")
+                return
 
-        workflow.routing = RoutingDecision(
-            intent=intent,
-            department=department,
-            reasoning=reasoning,
-            confidence=confidence,
-            alternative_departments=alternatives or [],
-        )
+            workflow.routing = RoutingDecision(
+                intent=intent,
+                department=department,
+                reasoning=reasoning,
+                confidence=confidence,
+                alternative_departments=alternatives or [],
+            )
 
         logger.info(
             "Routing decision tracked",
@@ -218,12 +223,13 @@ class OutcomeTracker:
             tracking_id: Workflow tracking ID (returned from track_workflow_start)
             trace_id: LangSmith trace ID from PM execution
         """
-        workflow = self._active_workflows.get(tracking_id)
-        if not workflow:
-            logger.warning(f"Trace ID set for unknown workflow: {tracking_id}")
-            return
+        with self._lock:
+            workflow = self._active_workflows.get(tracking_id)
+            if not workflow:
+                logger.warning(f"Trace ID set for unknown workflow: {tracking_id}")
+                return
 
-        workflow.trace_id = trace_id
+            workflow.trace_id = trace_id
 
         logger.debug(
             "Trace ID linked to workflow",
@@ -251,23 +257,24 @@ class OutcomeTracker:
             error: Exception if failed
             resolution_strategy: How error was resolved (if applicable)
         """
-        workflow = self._active_workflows.get(tracking_id)
-        if not workflow:
-            logger.warning(f"Workflow end tracked for unknown tracking_id: {tracking_id}")
-            return
+        with self._lock:
+            workflow = self._active_workflows.get(tracking_id)
+            if not workflow:
+                logger.warning(f"Workflow end tracked for unknown tracking_id: {tracking_id}")
+                return
 
-        workflow.ended_at = datetime.now()
-        workflow.duration_seconds = (
-            workflow.ended_at - workflow.started_at
-        ).total_seconds()
+            workflow.ended_at = datetime.now()
+            workflow.duration_seconds = (
+                workflow.ended_at - workflow.started_at
+            ).total_seconds()
 
-        workflow.result = WorkflowResult(
-            success=success,
-            result_data=result,
-            error_type=type(error).__name__ if error else None,
-            error_message=str(error) if error else None,
-            resolution_strategy=resolution_strategy,
-        )
+            workflow.result = WorkflowResult(
+                success=success,
+                result_data=result,
+                error_type=type(error).__name__ if error else None,
+                error_message=str(error) if error else None,
+                resolution_strategy=resolution_strategy,
+            )
 
         logger.info(
             "Workflow completed",
@@ -287,7 +294,8 @@ class OutcomeTracker:
         # self._trigger_learning(workflow)
 
         # Cleanup - remove from active workflows
-        del self._active_workflows[tracking_id]
+        with self._lock:
+            self._active_workflows.pop(tracking_id, None)
 
     def get_workflow_metrics(
         self,
@@ -304,8 +312,11 @@ class OutcomeTracker:
         # Phase 2: Implement full aggregate metrics from workflow_outcomes table
         # Current: Returns minimal runtime metrics (non-blocking placeholder)
         # Future: Query Supabase for success rates, avg duration, category breakdown
+        with self._lock:
+            active_count = len(self._active_workflows)
+
         return {
-            "active_workflows": len(self._active_workflows),
+            "active_workflows": active_count,
             "note": "Full aggregate metrics available in Phase 2 analytics",
         }
 

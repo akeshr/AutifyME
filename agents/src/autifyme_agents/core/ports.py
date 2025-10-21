@@ -44,63 +44,10 @@ class StorageInterface(ABC):
         """
         pass
 
-    @abstractmethod
-    def save_pending_approval(
-        self,
-        thread_id: str,
-        interrupt_id: str,
-        checkpoint_id: str,
-        tool_call: dict[str, Any],
-        draft_summary: str,
-        ai_message: dict[str, Any] | None = None,
-        image_path: str | None = None,
-        agent_source: str = "cataloging_department",
-        checkpoint_ns: str | None = None,
-    ) -> str:
-        """
-        Persists a pending HITL approval to survive server restarts.
-
-        Args:
-            thread_id: LangGraph thread ID (e.g., 'whatsapp:917258067800')
-            interrupt_id: LangGraph Interrupt.id for resumption
-            checkpoint_id: Checkpoint ID where the interrupt occurred
-            tool_call: The tool call that triggered the interrupt (e.g., save_product)
-            draft_summary: Human-readable summary sent to user
-            ai_message: The AIMessage that initiated the tool call (for Command resume)
-            image_path: Optional path to temp image file for cleanup after approval/rejection
-            agent_source: Agent that triggered the interrupt (e.g., 'cataloging_department')
-            checkpoint_ns: Checkpoint namespace for resumption (e.g., 'task:cataloging_department')
-
-        Returns:
-            The approval record ID (UUID)
-        """
-        pass
-
-    @abstractmethod
-    def get_pending_approval(self, thread_id: str) -> dict[str, Any] | None:
-        """
-        Retrieves a pending approval by thread ID.
-
-        Args:
-            thread_id: LangGraph thread ID
-
-        Returns:
-            Approval record dict or None if not found
-        """
-        pass
-
-    @abstractmethod
-    def delete_pending_approval(self, thread_id: str) -> bool:
-        """
-        Removes a pending approval after it's been handled (approved/rejected).
-
-        Args:
-            thread_id: LangGraph thread ID
-
-        Returns:
-            True if deleted, False if not found
-        """
-        pass
+    # NOTE: Pending approval methods removed - architecture uses LangGraph checkpoints
+    # for HITL state persistence instead of database storage. If restart recovery
+    # is needed for approvals, use LangGraph checkpoint restoration.
+    # Removed methods: save_pending_approval(), get_pending_approval(), delete_pending_approval()
 
     # ========================================================================
     # Webhook Idempotency (Duplicate Message Detection)
