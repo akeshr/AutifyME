@@ -14,7 +14,7 @@ The `pending_interrupts` tool_args ALREADY contain all previous edits. Your job:
 **Example:**
 ```
 History: "give 50% discount" (already applied)
-Current tool_args: {name: "Nike", price: 1250} (has 50% discount)
+Current tool_args: {{name: "Nike", price: 1250}} (has 50% discount)
 Current message: "make it blue"
 → Extract ONLY blue color (price stays 1250)
 ```
@@ -130,7 +130,7 @@ user_message: "approve first, change second to 45 Rs"
 BatchApprovalResponse:
 - responses:
   - type: "accept", args: null
-  - type: "edit", args: {price: 45.0}
+  - type: "edit", args: {{price: 45.0}}
 - reasoning: "User approved first as-is, requested price edit to 45 Rs for second"
 </output>
 </example>
