@@ -329,8 +329,21 @@ class WorkflowRunner:
         """
         logger.debug("Invoking Project Manager", extra={"thread_id": thread_id})
 
-        pm: Any = self._create_project_manager()
-        config = self._build_config(thread_id, run_id=run_id)
+        try:
+            logger.info("[PM_INVOKE] Creating PM instance", extra={"thread_id": thread_id})
+            pm: Any = self._create_project_manager()
+            logger.info(f"[PM_INVOKE] PM created successfully: {type(pm).__name__}", extra={"thread_id": thread_id})
+        except Exception as e:
+            logger.error(f"[PM_INVOKE] PM creation failed: {type(e).__name__}: {e}", exc_info=True)
+            raise
+
+        try:
+            logger.info("[PM_INVOKE] Building config", extra={"thread_id": thread_id, "run_id": run_id})
+            config = self._build_config(thread_id, run_id=run_id)
+            logger.info(f"[PM_INVOKE] Config built: {list(config.keys())}", extra={"thread_id": thread_id})
+        except Exception as e:
+            logger.error(f"[PM_INVOKE] Config building failed: {type(e).__name__}: {e}", exc_info=True)
+            raise
 
         # Check for pending HITL interrupts
         try:
