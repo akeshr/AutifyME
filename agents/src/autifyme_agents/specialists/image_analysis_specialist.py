@@ -261,13 +261,20 @@ def create_image_analysis_specialist_graph(
         content = last_message.content if hasattr(last_message, "content") else str(last_message)
 
         # Extract file path from delegation text
-        # Supports both Unix (/tmp/...) and Windows (C:\tmp\...) paths
+        # Supports Unix, Windows, and test fixture paths
         patterns = [
+            # Production paths (preferred)
             r'/tmp/media_downloads/[^\s]+\.(jpg|jpeg|png|gif|webp)',  # Unix specific
             r'[A-Za-z]:[/\\]tmp[/\\]media_downloads[/\\][^\s]+\.(jpg|jpeg|png|gif|webp)',  # Windows specific
-            r'/tmp/[^\s]+\.(jpg|jpeg|png|gif|webp)',  # Unix generic
-            r'[A-Za-z]:[/\\]tmp[/\\][^\s]+\.(jpg|jpeg|png|gif|webp)',  # Windows generic
-            r'[A-Za-z]:[/\\][^\s]+\.(jpg|jpeg|png|gif|webp)',  # Windows any path
+            r'/tmp/[^\s]+\.(jpg|jpeg|png|gif|webp)',  # Unix generic /tmp
+            r'[A-Za-z]:[/\\]tmp[/\\][^\s]+\.(jpg|jpeg|png|gif|webp)',  # Windows generic C:\tmp
+            # Test/development paths
+            r'tests[/\\]fixtures[/\\][^\s]+\.(jpg|jpeg|png|gif|webp)',  # Test fixtures (relative)
+            r'[A-Za-z]:[/\\][^\s]*tests[/\\]fixtures[/\\][^\s]+\.(jpg|jpeg|png|gif|webp)',  # Test fixtures (absolute Windows)
+            r'/[^\s]*tests/fixtures/[^\s]+\.(jpg|jpeg|png|gif|webp)',  # Test fixtures (absolute Unix)
+            # Fallback: any valid file path with image extension
+            r'[A-Za-z]:[/\\][^\s]+\.(jpg|jpeg|png|gif|webp)',  # Windows any absolute path
+            r'/[^\s]+\.(jpg|jpeg|png|gif|webp)',  # Unix any absolute path
         ]
 
         match = None
@@ -277,11 +284,20 @@ def create_image_analysis_specialist_graph(
                 break
 
         if not match:
-            raise ValueError(
-                f"No image file path found in delegation message. "
-                f"Expected file path like '/tmp/media_downloads/xyz.jpg' or 'C:\\tmp\\xyz.jpg'. "
-                f"Got: {content[:200]}"
+            # Provide actionable error message for delegation protocol violation
+            error_msg = (
+                f"DELEGATION PROTOCOL ERROR: No valid file path found in your message.\n\n"
+                f"Your message: {content[:300]}\n\n"
+                f"Expected format: Include the complete file path literally.\n"
+                f"✅ CORRECT: 'Analyze /tmp/media_downloads/20251021_xyz.jpg for colors'\n"
+                f"❌ WRONG: 'Analyze the downloaded file path'\n"
+                f"❌ WRONG: 'Use the image from before'\n\n"
+                f"Supported path formats:\n"
+                f"  - Unix: /tmp/media_downloads/*.jpg\n"
+                f"  - Windows: C:\\tmp\\media_downloads\\*.jpg\n\n"
+                f"Action: Retry delegation with the complete file path from download_whatsapp_media output."
             )
+            raise ValueError(error_msg)
 
         file_path = match.group(0)
 
