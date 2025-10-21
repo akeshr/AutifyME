@@ -24,6 +24,8 @@ from .models import (
     WorkflowStory,
     WorkflowTrace,
     HITLDecision,
+    LLMCallNode,
+    LLMTraceTree,
 )
 
 
@@ -482,3 +484,289 @@ def _count_saved_products(overview: TraceOverview) -> int:
         count_saves(root)
 
     return count
+
+
+# ============================================================================
+# LLM Trace Extraction (for prompt analysis)
+# ============================================================================
+
+def _classify_hierarchy_level(agent_name: str) -> str:
+    """Classify agent hierarchy level from name.
+
+    Args:
+        agent_name: Agent/run name (e.g., "PM", "CatalogingDept", "ImageAnalysisSpecialist")
+
+    Returns:
+        Hierarchy level: "orchestrator" | "department" | "specialist" | "unknown"
+    """
+    name_lower = agent_name.lower()
+
+    # Orchestrators (PM, project manager, LangGraph root)
+    if ("pm" == name_lower or
+        "project" in name_lower and "manager" in name_lower or
+        "langgraph" in name_lower):
+        return "orchestrator"
+
+    # Departments (ends with Dept or Department)
+    if "dept" in name_lower or "department" in name_lower:
+        return "department"
+
+    # Specialists (ends with Specialist)
+    if "specialist" in name_lower:
+        return "specialist"
+
+    return "unknown"
+
+
+def _extract_system_prompt(messages: List) -> str:
+    """Extract system prompt from messages list.
+
+    Args:
+        messages: LLM input messages (can be nested list or flat list)
+
+    Returns:
+        System prompt content, or empty string if not found
+    """
+    if not messages:
+        return ""
+
+    # Flatten if nested (LangSmith sometimes wraps in extra list)
+    if messages and isinstance(messages[0], list):
+        messages = messages[0]
+
+    for msg in messages:
+        if isinstance(msg, dict):
+            # LangChain serialized format: check id or type
+            msg_id = msg.get("id", [])
+            if isinstance(msg_id, list) and "SystemMessage" in msg_id:
+                # Extract content from kwargs
+                kwargs = msg.get("kwargs", {})
+                content = kwargs.get("content", "")
+                return content if isinstance(content, str) else ""
+
+            # Standard format: check for system role
+            msg_type = msg.get("type") or msg.get("role")
+            if msg_type == "system":
+                content = msg.get("content", "")
+                if isinstance(content, str):
+                    return content
+                elif isinstance(content, list):
+                    # Handle multimodal content
+                    text_parts = [
+                        part.get("text", "") for part in content
+                        if isinstance(part, dict) and part.get("type") == "text"
+                    ]
+                    return "\n".join(text_parts)
+
+    return ""
+
+
+def get_llm_trace_tree(trace_id: str) -> LLMTraceTree:
+    """Extract hierarchical tree of LLM calls with prompts and outputs.
+
+    This function filters a trace to show ONLY LLM invocations (excludes chains
+    and tools) with full prompt content and outputs. Designed for prompt analysis
+    and optimization by the prompt-fixer agent.
+
+    Unlike get_trace_overview() which shows ALL runs with metadata only, this
+    provides FILTERED LLM-only runs with FULL prompt content.
+
+    Token cost: ~2-5k tokens per trace (vs 50k+ for full dump)
+
+    Args:
+        trace_id: LangSmith trace ID from ExecutionResult
+
+    Returns:
+        LLMTraceTree with hierarchical LLM call structure and full prompts
+
+    Example:
+        >>> tree = get_llm_trace_tree(trace_id)
+        >>> for llm_call in tree.llm_tree:
+        ...     print(f"{llm_call.agent_name} ({llm_call.hierarchy_level})")
+        ...     print(f"System: {llm_call.system_prompt[:100]}...")
+        ...     print(f"Output: {llm_call.assistant_output}")
+    """
+    client = _get_client()
+
+    # Fetch all runs with inputs/outputs (need full data for prompts)
+    runs = list(client.list_runs(trace_id=trace_id))
+
+    if not runs:
+        # Return empty tree
+        return LLMTraceTree(
+            trace_id=trace_id,
+            trace_url=f"https://smith.langchain.com/public/unknown/r/{trace_id}",
+            total_llm_calls=0,
+            total_tokens=0,
+            total_cost=0.0,
+            llm_tree=[],
+        )
+
+    # Build lookup and filter to LLM runs only
+    runs_by_id = {str(run.id): run for run in runs}
+    llm_runs = [run for run in runs if run.run_type == "llm"]
+
+    if not llm_runs:
+        # No LLM calls in trace
+        return LLMTraceTree(
+            trace_id=trace_id,
+            trace_url=f"https://smith.langchain.com/public/{runs[0].session_id if runs else 'unknown'}/r/{trace_id}",
+            total_llm_calls=0,
+            total_tokens=0,
+            total_cost=0.0,
+            llm_tree=[],
+        )
+
+    # Accumulate stats
+    total_tokens = 0
+    total_cost = 0.0
+
+    def build_llm_node(run) -> LLMCallNode:
+        """Recursively build LLMCallNode tree."""
+        nonlocal total_tokens, total_cost
+
+        # Calculate latency
+        latency_ms = None
+        if run.end_time and run.start_time:
+            latency_ms = int((run.end_time - run.start_time).total_seconds() * 1000)
+
+        # Accumulate tokens and cost
+        if run.total_tokens:
+            total_tokens += run.total_tokens
+        if run.total_cost:
+            total_cost += float(run.total_cost)
+
+        # Extract model from extra metadata
+        model = None
+        if run.extra:
+            model = run.extra.get("invocation_params", {}).get("model")
+            if not model:
+                model = run.extra.get("model")
+
+        # Extract system prompt and user messages from inputs
+        system_prompt = ""
+        user_messages = []
+
+        if run.inputs and "messages" in run.inputs:
+            raw_messages = run.inputs["messages"]
+            if isinstance(raw_messages, list):
+                # Flatten if nested
+                if raw_messages and isinstance(raw_messages[0], list):
+                    raw_messages = raw_messages[0]
+
+                system_prompt = _extract_system_prompt(raw_messages)
+
+                # Extract user/human/ai messages (exclude system)
+                for msg in raw_messages:
+                    if isinstance(msg, dict):
+                        # LangChain serialized format
+                        msg_id = msg.get("id", [])
+                        if isinstance(msg_id, list):
+                            # Check if it's NOT a SystemMessage
+                            if "SystemMessage" not in msg_id:
+                                # Extract simplified version with content
+                                kwargs = msg.get("kwargs", {})
+                                msg_type_str = msg_id[-1] if msg_id else "unknown"
+                                user_messages.append({
+                                    "type": msg_type_str,
+                                    "content": kwargs.get("content", ""),
+                                })
+                        else:
+                            # Standard format: check for non-system messages
+                            msg_type = msg.get("type") or msg.get("role")
+                            if msg_type and msg_type != "system":
+                                user_messages.append(msg)
+
+        # Extract assistant output from outputs
+        assistant_output = None
+        if run.outputs:
+            assistant_output = run.outputs
+
+        # Find meaningful agent name by traversing up parent chain
+        # Skip generic names like "model", "ChatOpenAI", "tools"
+        agent_name = run.name
+        current_run = run
+
+        # Traverse up to find meaningful agent name
+        generic_names = {"model", "ChatOpenAI", "tools", "model_to_tools"}
+        while current_run.parent_run_id and agent_name in generic_names:
+            parent_run = runs_by_id.get(str(current_run.parent_run_id))
+            if parent_run:
+                if parent_run.name not in generic_names:
+                    agent_name = parent_run.name
+                    break
+                current_run = parent_run
+            else:
+                break
+
+        # Find parent agent name (for context)
+        parent_agent = None
+        if run.parent_run_id:
+            parent_run = runs_by_id.get(str(run.parent_run_id))
+            if parent_run:
+                # Traverse up to find meaningful parent agent name
+                parent_agent = parent_run.name
+                temp_run = parent_run
+                while temp_run.parent_run_id and parent_agent in generic_names:
+                    temp_parent = runs_by_id.get(str(temp_run.parent_run_id))
+                    if temp_parent:
+                        if temp_parent.name not in generic_names:
+                            parent_agent = temp_parent.name
+                            break
+                        temp_run = temp_parent
+                    else:
+                        break
+
+        # Classify hierarchy level based on resolved agent name
+        hierarchy_level = _classify_hierarchy_level(agent_name)
+
+        # Build node
+        node = LLMCallNode(
+            run_id=str(run.id),
+            agent_name=agent_name,
+            hierarchy_level=hierarchy_level,
+            system_prompt=system_prompt,
+            user_messages=user_messages,
+            assistant_output=assistant_output,
+            model=model,
+            total_tokens=run.total_tokens,
+            latency_ms=latency_ms,
+            status=run.status,
+            error=run.error,
+            parent_agent=parent_agent,
+            children=[],
+        )
+
+        # Find and add child LLM runs (only LLM children, skip chains/tools)
+        for other_run in llm_runs:
+            if other_run.parent_run_id and str(other_run.parent_run_id) == str(run.id):
+                child_node = build_llm_node(other_run)
+                node.children.append(child_node)
+
+        return node
+
+    # Build tree from root LLM runs (those without LLM parents)
+    root_llm_nodes = []
+    for run in llm_runs:
+        # Check if parent is also an LLM run
+        is_root = True
+        if run.parent_run_id:
+            parent_run = runs_by_id.get(str(run.parent_run_id))
+            if parent_run and parent_run.run_type == "llm":
+                is_root = False
+
+        if is_root:
+            root_node = build_llm_node(run)
+            root_llm_nodes.append(root_node)
+
+    # Get trace URL from first run
+    trace_url = f"https://smith.langchain.com/public/{runs[0].session_id if runs else 'unknown'}/r/{trace_id}"
+
+    return LLMTraceTree(
+        trace_id=trace_id,
+        trace_url=trace_url,
+        total_llm_calls=len(llm_runs),
+        total_tokens=total_tokens,
+        total_cost=round(total_cost, 4),
+        llm_tree=root_llm_nodes,
+    )

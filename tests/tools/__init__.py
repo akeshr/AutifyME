@@ -5,12 +5,13 @@ testing, analysis, and improvement of the AutifyME agentic system.
 
 Core Philosophy: Tools provide visibility, Claude provides intelligence.
 
-Tool count: 6 essential observation tools
+Tool count: 7 essential observation tools
 - execute_scenario: Run workflow tests
 - get_trace_overview: Level 0 hierarchical trace analysis (~500 tokens)
 - get_run_details: Level 1 specific run analysis (~1,500 tokens)
 - get_run_messages: Level 2 full conversation (~5K+ tokens, rare)
 - get_workflow_story: Multi-trace HITL workflow analysis (~500 tokens per trace)
+- get_llm_trace_tree: LLM-only trace tree for prompt analysis (~2-5k tokens)
 - list_recent_tests: Test history for progress tracking
 """
 
@@ -23,6 +24,7 @@ from .trace_analysis import (
     get_run_details,
     get_run_messages,
     get_workflow_story,
+    get_llm_trace_tree,
 )
 
 # Test history tools
@@ -44,6 +46,8 @@ from .models import (
     WorkflowStory,
     WorkflowTrace,
     HITLDecision,
+    LLMCallNode,
+    LLMTraceTree,
 )
 
 
@@ -56,6 +60,7 @@ __all__ = [
     "get_run_details",
     "get_run_messages",
     "get_workflow_story",
+    "get_llm_trace_tree",
     "TraceOverview",
     "RunNode",
     "RunDetails",
@@ -67,6 +72,8 @@ __all__ = [
     "WorkflowStory",
     "WorkflowTrace",
     "HITLDecision",
+    "LLMCallNode",
+    "LLMTraceTree",
     # Test History
     "list_recent_tests",
     "record_test_execution",

@@ -308,5 +308,88 @@ class TestHistory(BaseModel):
     """List of test executions, newest first."""
 
 
-# Enable forward references for recursive RunNode model
+# ============================================================================
+# LLM Trace Extraction Models (for prompt analysis)
+# ============================================================================
+
+class LLMCallNode(BaseModel):
+    """Single LLM invocation with prompt and output.
+
+    Designed for prompt analysis and optimization. Extracts only LLM calls
+    from trace tree with full prompt content and outputs.
+    """
+
+    run_id: str
+    """Unique run ID for reference."""
+
+    agent_name: str
+    """Agent name: 'PM' | 'CatalogingDept' | 'ImageAnalysisSpecialist' | etc."""
+
+    hierarchy_level: str
+    """Hierarchy level: 'orchestrator' | 'department' | 'specialist'."""
+
+    # Prompt content
+    system_prompt: Optional[str] = None
+    """Full system prompt (extracted from first message if type=system)."""
+
+    user_messages: List[Dict[str, Any]] = Field(default_factory=list)
+    """All user/context messages sent to LLM (excludes system message)."""
+
+    assistant_output: Optional[Dict[str, Any]] = None
+    """Generated response from LLM (structured or text)."""
+
+    # Metadata
+    model: Optional[str] = None
+    """Model used (e.g., 'gpt-4o-mini')."""
+
+    total_tokens: Optional[int] = None
+    """Token usage for this LLM call."""
+
+    latency_ms: Optional[int] = None
+    """Latency in milliseconds."""
+
+    status: str
+    """Status: 'success' | 'error'."""
+
+    error: Optional[str] = None
+    """Error message if failed."""
+
+    # Hierarchy context
+    parent_agent: Optional[str] = None
+    """Parent agent name for context (who delegated to this agent)."""
+
+    children: List['LLMCallNode'] = Field(default_factory=list)
+    """Child LLM calls (recursive tree structure)."""
+
+
+class LLMTraceTree(BaseModel):
+    """Filtered trace showing only LLM calls with prompts and outputs.
+
+    Optimized for prompt analysis and optimization. Provides hierarchical
+    view of all LLM invocations with full prompt content.
+
+    Token cost: ~2-5k tokens per trace (vs 50k+ for full dump)
+    """
+
+    trace_id: str
+    """LangSmith trace ID."""
+
+    trace_url: str
+    """LangSmith trace URL."""
+
+    total_llm_calls: int
+    """Number of LLM calls in trace."""
+
+    total_tokens: int
+    """Total tokens across all LLM calls."""
+
+    total_cost: float
+    """Total cost in dollars."""
+
+    llm_tree: List[LLMCallNode]
+    """Hierarchical tree of LLM calls (root calls only)."""
+
+
+# Enable forward references for recursive models
 RunNode.model_rebuild()
+LLMCallNode.model_rebuild()
