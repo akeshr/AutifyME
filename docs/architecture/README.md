@@ -45,6 +45,16 @@ Library patterns, prompt engineering, and development practices.
 
 ---
 
+## Deployment & Operations (`../deployment/`)
+
+Operational guides for production runtime and maintenance.
+
+| Document | Purpose |
+| --- | --- |
+| **[DATABASE_MAINTENANCE.md](../deployment/DATABASE_MAINTENANCE.md)** | Database health monitoring, cleanup scheduling, backup strategy, index maintenance, troubleshooting |
+
+---
+
 ## Testing & Development (`testing/`)
 
 Testing strategy, CLI tools, and autonomous testing framework.

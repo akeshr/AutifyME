@@ -4,6 +4,10 @@
 **Status:** Active Roadmap
 **Based On:** Deep verification of LangChain v1, LangGraph v1, LangSmith features against current architecture
 
+> **IMPORTANT:** This document describes PROPOSED architectural enhancements for Phase 2+ deployment.
+> For the CURRENT implementation (Phase 1-4), see [ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./ACTUAL_IMPLEMENTATION_ARCHITECTURE.md).
+> References to Marketing and Operations departments in this roadmap represent future work, not current implementation.
+
 ---
 
 ## Executive Summary

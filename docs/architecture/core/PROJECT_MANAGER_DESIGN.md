@@ -2,9 +2,13 @@
 
 > **Roadmap Document** – Timeless architecture reference. Implementation status is tracked in `../roadmap/IMPLEMENTATION_ROADMAP.md`. Production integration begins once WhatsApp PM readiness checklist is satisfied (currently pending automation and stability work).
 
-**Date:** September 30, 2025  
-**Purpose:** Define how we use `deepagents` to implement our Project Manager Agent  
+**Date:** September 30, 2025
+**Purpose:** Define how we use `deepagents` to implement our Project Manager Agent
 **Status:** Roadmap Specification (pending Cataloging validation)
+
+> **Status:** Roadmap Specification - Marketing and Operations departments are future work.
+> Current implementation supports Cataloging Department only.
+> For current implementation details, see [ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./ACTUAL_IMPLEMENTATION_ARCHITECTURE.md).
 
 ---
 
@@ -23,12 +27,14 @@ The Project Manager Agent is the top-level orchestrator in our hierarchical agen
 ```
 Project Manager Agent (deepagents main agent)
     ├── Planning Tool (built-in)
-    ├── Sub-agent: Cataloging Department (custom sub-agent)
-    │   └── Tools: [image_analysis, text_analysis, save_product]
-    ├── Sub-agent: Marketing Department (custom sub-agent)
-    │   └── Tools: [copywriter, seo_analyzer, social_poster]
-    └── Sub-agent: Operations Department (custom sub-agent)
-        └── Tools: [billing, shipping, inventory]
+    └── Sub-agent: Cataloging Department (custom sub-agent) - CURRENT
+        └── Tools: [image_analysis, text_analysis, save_product]
+
+# Future Departments (not yet implemented):
+# ├── Sub-agent: Marketing Department
+# │   └── Tools: [copywriter, seo_analyzer, social_poster]
+# └── Sub-agent: Operations Department
+#     └── Tools: [billing, shipping, inventory]
 ```
 
 **Implementation:**

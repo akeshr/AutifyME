@@ -9,6 +9,7 @@ from typing import Any
 from supabase import Client, create_client
 
 from autifyme_agents.core.config import settings
+from autifyme_agents.core.exceptions import ConfigurationError, StorageError
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.models import CompanyProfile, Product
 
@@ -43,10 +44,65 @@ class SupabaseStorageClient(StorageInterface):
         self._client: Client | None = client
 
     def _ensure_client(self) -> Client:
-        """Create the Supabase client lazily to avoid side effects during import."""
+        """Create and validate the Supabase client lazily.
 
+        Validates credentials and tests connection on first initialization
+        to catch configuration issues early rather than on first query.
+
+        Returns:
+            Initialized and validated Supabase client
+
+        Raises:
+            ConfigurationError: If credentials are missing or invalid
+            ConfigurationError: If connection test fails
+        """
         if self._client is None:
-            self._client = create_client(self._supabase_url, self._service_key)
+            # Validate credentials before attempting connection
+            if not self._supabase_url:
+                raise ConfigurationError(
+                    "SUPABASE_URL not configured. Set environment variable or pass to constructor.",
+                    config_key="SUPABASE_URL"
+                )
+
+            if not self._service_key:
+                raise ConfigurationError(
+                    "Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY configured. "
+                    "Set at least one environment variable.",
+                    config_key="SUPABASE_SERVICE_ROLE_KEY"
+                )
+
+            try:
+                # Create client
+                self._client = create_client(self._supabase_url, self._service_key)
+
+                # Test connection with simple query to validate credentials
+                # Use companies table as it's fundamental to single-tenant architecture
+                _ = self._client.table("companies").select("id").limit(1).execute()
+
+                # If we get here, connection is valid (even if no data exists yet)
+                logger.info(
+                    "Supabase client initialized and connection validated",
+                    extra={
+                        "url": self._supabase_url[:30] + "...",  # Log partial URL for security
+                        "has_service_key": bool(self._service_key),
+                    }
+                )
+
+            except Exception as e:
+                logger.error(
+                    "Failed to initialize or validate Supabase client",
+                    exc_info=True,
+                    extra={
+                        "url": self._supabase_url[:30] + "..." if self._supabase_url else None,
+                        "error_type": type(e).__name__,
+                        "error_msg": str(e),
+                    }
+                )
+                raise ConfigurationError(
+                    f"Cannot connect to Supabase or validate credentials: {str(e)}",
+                    config_key="SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY"
+                ) from e
+
         return self._client
 
     def get_company_profile(self) -> CompanyProfile:
@@ -83,83 +139,10 @@ class SupabaseStorageClient(StorageInterface):
 
         return Product.model_validate(response.data[0])
 
-    def save_pending_approval(
-        self,
-        thread_id: str,
-        interrupt_id: str,
-        checkpoint_id: str,
-        tool_call: dict[str, Any],
-        draft_summary: str,
-        ai_message: dict[str, Any] | None = None,
-        image_path: str | None = None,
-        agent_source: str = "cataloging_department",
-        checkpoint_ns: str | None = None,
-    ) -> str:
-        """Persist a pending HITL approval to the pending_approvals table."""
-
-        client = self._ensure_client()
-        expires_at = datetime.now(UTC) + timedelta(hours=24)
-        payload = {
-            "thread_id": thread_id,
-            "interrupt_id": interrupt_id,
-            "checkpoint_id": checkpoint_id,
-            "tool_call": tool_call,
-            "draft_summary": draft_summary,
-            "ai_message": ai_message,
-            "image_path": image_path,
-            "agent_source": agent_source,
-            "checkpoint_ns": checkpoint_ns,
-            "expires_at": expires_at.isoformat(),
-        }
-
-        # Upsert to handle duplicate interrupts (e.g., retry scenarios)
-        response = (
-            client.table("pending_approvals")
-            .upsert(payload, on_conflict="thread_id,interrupt_id")
-            .execute()
-        )
-
-        if not response.data:
-            raise RuntimeError("Failed to persist pending approval; inspect Supabase response for details.")
-
-        approval_id: str = response.data[0]["id"]
-        return approval_id
-
-    def get_pending_approval(self, thread_id: str) -> dict[str, Any] | None:
-        """Retrieve the most recent non-expired pending approval for a thread.
-
-        Filters out approvals past their expires_at timestamp (24h default) to prevent
-        processing stale approval requests and ensure users get clear "no pending approval"
-        messages instead of resuming outdated workflows.
-        """
-
-        client = self._ensure_client()
-        now = datetime.now(UTC).isoformat()
-
-        response = (
-            client.table("pending_approvals")
-            .select("*")
-            .eq("thread_id", thread_id)
-            .gt("expires_at", now)  # Only non-expired approvals
-            .order("created_at", desc=True)
-            .limit(1)
-            .execute()
-        )
-
-        if not response.data:
-            return None
-
-        approval_data: dict[str, Any] = response.data[0]
-        return approval_data
-
-    def delete_pending_approval(self, thread_id: str) -> bool:
-        """Delete all pending approvals for a thread (handles approve/reject)."""
-
-        client = self._ensure_client()
-        response = client.table("pending_approvals").delete().eq("thread_id", thread_id).execute()
-
-        # Supabase delete returns the deleted rows; if empty, nothing was deleted
-        return bool(response.data)
+    # NOTE: Pending approval methods removed - unused in production code
+    # Architecture uses LangGraph checkpoints for HITL state persistence.
+    # Removed: save_pending_approval(), get_pending_approval(), delete_pending_approval()
+    # If restart recovery is needed, implement via checkpoint restoration.
 
     # ========================================================================
     # Webhook Idempotency (Duplicate Message Detection)
@@ -175,8 +158,8 @@ class SupabaseStorageClient(StorageInterface):
         """Atomically check if message is duplicate AND mark as processed.
 
         Uses PostgreSQL stored procedure for atomic INSERT ON CONFLICT to prevent
-        race conditions. Fail-open strategy: if DB check fails, allow processing
-        to prevent webhook blocking.
+        race conditions. Fail-closed strategy: if DB check fails, raise error to
+        prevent duplicate processing and signal system issues.
 
         Args:
             message_id: WhatsApp message ID (unique across retries)
@@ -186,6 +169,9 @@ class SupabaseStorageClient(StorageInterface):
 
         Returns:
             True if duplicate (already processed), False if new (now marked as processed)
+
+        Raises:
+            StorageError: If idempotency check fails (database unavailable, query error)
         """
         try:
             client = self._ensure_client()
@@ -217,24 +203,64 @@ class SupabaseStorageClient(StorageInterface):
             return is_duplicate
 
         except Exception as exc:
-            # Fail OPEN (allow processing) if DB check fails to prevent webhook blocking
-            logger.exception(
-                "Idempotency check failed - allowing processing (fail open)",
-                exc_info=exc,
+            # Fail CLOSED (raise error) to prevent duplicate processing
+            # This signals that the system cannot safely verify message uniqueness
+            logger.error(
+                "CRITICAL: Idempotency check failed - cannot verify message uniqueness",
+                exc_info=True,
                 extra={
                     "message_id": message_id,
+                    "sender_id": sender_id,
+                    "thread_id": thread_id,
                     "error_type": type(exc).__name__,
+                    "error_msg": str(exc),
                 },
             )
-            return False  # Process the message (risk: potential duplicate)
+            # Raise StorageError to prevent processing (fail-closed)
+            # Webhook will return error; WhatsApp will retry later when DB is healthy
+            raise StorageError(
+                message=f"Cannot verify message idempotency: {str(exc)}",
+                operation="check_and_mark_processed",
+                original_error=exc,
+            ) from exc
 
     # ========================================================================
     # Phase 1.2: Workflow Outcome Tracking (Agentic Evolution)
     # ========================================================================
 
     def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
-        """Persist workflow outcome for learning and analytics."""
+        """Persist workflow outcome for learning and analytics.
+
+        Args:
+            outcome: Workflow outcome payload with required fields:
+                - tracking_id, thread_id, sender_id (required)
+                - message_hash, success, started_at (required)
+                - trace_id, intent, department (optional)
+
+        Returns:
+            Outcome ID from database
+
+        Raises:
+            ValueError: If required fields are missing
+            RuntimeError: If database insertion fails
+        """
         client = self._ensure_client()
+
+        # Validate required fields before attempting insert
+        required_fields = ["tracking_id", "thread_id", "sender_id", "message_hash", "success", "started_at"]
+        missing_fields = [field for field in required_fields if field not in outcome or outcome[field] is None]
+
+        if missing_fields:
+            error_msg = f"Cannot persist workflow outcome - missing required fields: {missing_fields}"
+            logger.error(
+                error_msg,
+                extra={
+                    "missing_fields": missing_fields,
+                    "tracking_id": outcome.get("tracking_id"),
+                    "thread_id": outcome.get("thread_id"),
+                }
+            )
+            raise ValueError(error_msg)
 
         # Ensure timestamps are ISO strings for Supabase
         payload = outcome.copy()
@@ -242,23 +268,41 @@ class SupabaseStorageClient(StorageInterface):
             if ts_field in payload and isinstance(payload[ts_field], datetime):
                 payload[ts_field] = payload[ts_field].isoformat()
 
-        response = client.table("workflow_outcomes").insert(payload).execute()
+        try:
+            response = client.table("workflow_outcomes").insert(payload).execute()
 
-        if not response.data:
-            raise RuntimeError(
-                "Failed to persist workflow outcome; inspect Supabase response for details."
+            if not response.data or len(response.data) == 0:
+                raise RuntimeError(
+                    "Supabase returned empty response for workflow outcome insert. "
+                    "Check table schema and permissions."
+                )
+
+            logger.info(
+                "Persisted workflow outcome",
+                extra={
+                    "tracking_id": outcome.get("tracking_id"),
+                    "success": outcome.get("success"),
+                    "intent": outcome.get("intent"),
+                    "department": outcome.get("department"),
+                },
             )
 
-        logger.info(
-            "Persisted workflow outcome",
-            extra={
-                "tracking_id": outcome.get("tracking_id"),
-                "success": outcome.get("success"),
-            },
-        )
+            outcome_id: str = response.data[0]["id"]
+            return outcome_id
 
-        outcome_id: str = response.data[0]["id"]
-        return outcome_id
+        except Exception as e:
+            logger.error(
+                "Failed to persist workflow outcome to database",
+                extra={
+                    "tracking_id": outcome.get("tracking_id"),
+                    "thread_id": outcome.get("thread_id"),
+                    "error_type": type(e).__name__,
+                    "error_msg": str(e),
+                    "payload_keys": list(payload.keys()),
+                },
+                exc_info=True
+            )
+            raise
 
     def get_workflow_outcomes(
         self,
@@ -357,3 +401,42 @@ class SupabaseStorageClient(StorageInterface):
         )
 
         return response.data if response.data else []
+
+    def cleanup(self) -> None:
+        """Close internal HTTP connections gracefully.
+
+        The Supabase Python client doesn't provide native cleanup methods,
+        but uses httpx.Client internally for all HTTP operations. This method
+        closes those internal clients to prevent connection leaks.
+
+        Call this on application shutdown or when the storage adapter is no
+        longer needed. Safe to call multiple times (idempotent).
+        """
+        if self._client is None:
+            return  # No client to cleanup
+
+        try:
+            # Close PostgREST client (database operations)
+            if hasattr(self._client.postgrest, 'session'):
+                self._client.postgrest.session.close()
+                logger.debug("Closed PostgREST HTTP client")
+        except Exception as e:
+            logger.warning(f"Failed to close PostgREST client: {e}")
+
+        try:
+            # Close Storage client (file operations)
+            if hasattr(self._client.storage, '_client'):
+                self._client.storage._client.close()
+                logger.debug("Closed Storage HTTP client")
+        except Exception as e:
+            logger.warning(f"Failed to close Storage client: {e}")
+
+        try:
+            # Close Functions client (edge function operations)
+            if hasattr(self._client.functions, '_client'):
+                self._client.functions._client.close()
+                logger.debug("Closed Functions HTTP client")
+        except Exception as e:
+            logger.warning(f"Failed to close Functions client: {e}")
+
+        logger.info("Supabase storage client cleanup completed")
