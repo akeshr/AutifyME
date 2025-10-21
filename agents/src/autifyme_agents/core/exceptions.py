@@ -243,7 +243,7 @@ def classify_api_error(
     error: Exception,
     tool_name: str,
     api_name: str,
-    fallback_error_class: type[AutifyMEError] = ToolExecutionError,
+    fallback_error_class: type[ToolExecutionError] = ToolExecutionError,
 ) -> AutifyMEError:
     """Classify an API error and raise the appropriate AutifyME exception.
 
@@ -255,7 +255,8 @@ def classify_api_error(
         error: The caught exception from API call
         tool_name: Name of the tool where error occurred
         api_name: Name of the external API (e.g., "Supabase", "OpenAI")
-        fallback_error_class: Error class to use for non-retryable failures
+        fallback_error_class: Error class for non-retryable failures (must have
+            ToolExecutionError-compatible signature: message, tool_name, original_error)
 
     Returns:
         Appropriate AutifyME exception (ready to raise)
@@ -264,7 +265,8 @@ def classify_api_error(
         try:
             result = storage.save_product(product)
         except Exception as e:
-            raise classify_api_error(e, "save_product", "Supabase", StorageError)
+            # Use default ToolExecutionError for permanent failures
+            raise classify_api_error(e, "save_product", "Supabase")
     """
     error_str = str(error).lower()
 

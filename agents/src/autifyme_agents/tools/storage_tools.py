@@ -24,7 +24,6 @@ from autifyme_agents.core.exceptions import (
     ConfigurationError,
     DataNotFoundError,
     ExternalAPIError,
-    StorageError,
     classify_api_error,
 )
 from autifyme_agents.core.ports import StorageInterface
@@ -55,7 +54,7 @@ def _save_product(storage: StorageInterface, **kwargs: Any) -> Product:
         return storage.save_product(product)
     except Exception as e:
         # Use centralized error classifier for consistent error handling
-        raise classify_api_error(e, "save_product", "Supabase", StorageError) from e
+        raise classify_api_error(e, "save_product", "Supabase") from e
 
 
 def _get_company_profile(storage: StorageInterface) -> CompanyProfile:
@@ -77,7 +76,7 @@ def _get_company_profile(storage: StorageInterface) -> CompanyProfile:
         raise
     except Exception as e:
         # Use centralized error classifier for consistent error handling
-        raise classify_api_error(e, "get_company_profile", "Supabase", StorageError) from e
+        raise classify_api_error(e, "get_company_profile", "Supabase") from e
 
 
 def create_save_product_tool(storage: StorageInterface) -> object:
