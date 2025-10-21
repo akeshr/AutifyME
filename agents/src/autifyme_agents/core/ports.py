@@ -201,3 +201,24 @@ class StorageInterface(ABC):
                 - avg_duration
         """
         pass
+
+    # ========================================================================
+    # Lifecycle Management
+    # ========================================================================
+
+    @abstractmethod
+    def cleanup(self) -> None:
+        """
+        Cleanup resources on shutdown (connections, file handles, etc.).
+
+        This method is called during application shutdown via atexit handlers.
+        Implementations should:
+        - Close database connections gracefully
+        - Release file handles and network resources
+        - Be idempotent (safe to call multiple times)
+        - Not raise exceptions (log errors instead)
+
+        For in-memory adapters or adapters without persistent connections,
+        this can be a no-op.
+        """
+        pass
