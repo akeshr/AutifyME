@@ -36,7 +36,10 @@
       "Bash(uv tree:*)",
       "Bash(mypy:*)",
       "Read(//c/tmp/**)",
-      "WebFetch(domain:langsmith-sdk.readthedocs.io)"
+      "WebFetch(domain:langsmith-sdk.readthedocs.io)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:openai.com)",
+      "WebFetch(domain:cookbook.openai.com)"
     ],
     "deny": [],
     "ask": []

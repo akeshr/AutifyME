@@ -54,7 +54,7 @@ def create_cataloging_specialist(
         Agent that takes input and returns Product model
     """
 
-    llm = model or get_llm(provider="openai", model="gpt-4.1-mini-2025-04-14")
+    llm = model or get_llm(provider="openai", model="gpt-5-mini-2025-08-07")
     system_prompt = load_prompt("specialists/cataloging_specialist.prompt")
 
     # ✅ Use create_agent with response_format for structured output

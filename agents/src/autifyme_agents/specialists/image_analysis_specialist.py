@@ -110,7 +110,7 @@ def create_image_analysis_specialist(
     """
 
     # Use vision-capable model
-    llm = model or get_llm(provider="openai", model="gpt-4.1-mini-2025-04-14")
+    llm = model or get_llm(provider="openai", model="gpt-5-mini-2025-08-07")
     system_prompt = load_prompt("specialists/image_analysis_specialist.prompt")
 
     # ✅ Use create_agent with response_format

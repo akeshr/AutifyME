@@ -63,8 +63,8 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
         >>> assert len(result.responses) == 2
     """
     if llm is None:
-        # Use gpt-4.1-mini with low temperature for deterministic approval interpretation
-        llm = get_llm(model="gpt-4.1-mini-2025-04-14", temperature=0.2)
+        # Use gpt-5-mini with minimal reasoning for fast, deterministic approval interpretation
+        llm = get_llm(model="gpt-5-mini-2025-08-07", temperature=0.2)
 
     # Configure LLM for structured output
     # Use function_calling method to avoid OpenAI schema validation issues
