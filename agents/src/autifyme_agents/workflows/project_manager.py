@@ -21,12 +21,13 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from deepagents import create_deep_agent
-from deepagents.tools import write_todos
 from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.integrations.storage import get_store
+from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
 
 if TYPE_CHECKING:
@@ -81,7 +82,7 @@ def _create_cataloging_subagent(
         channel=channel,  # Pass channel for media download tools
     )
 
-    # Return CustomSubAgent spec for DeepAgents
+    # Return CompiledSubAgent spec for DeepAgents (v1.0: renamed graph to runnable)
     return {
         "name": "cataloging_department",
         "description": (
@@ -89,7 +90,7 @@ def _create_cataloging_subagent(
             "updating existing products, and batch cataloging. Supports text, images, "
             "videos, and combinations. Returns structured CatalogingResult."
         ),
-        "graph": cataloging_dept_graph,
+        "runnable": cataloging_dept_graph,  # v1.0: renamed from graph
     }
 
 
@@ -129,34 +130,33 @@ def create_project_manager(
     llm = _resolve_model(model)
     instructions = _load_prompt(company_profile)
 
-    # PM orchestration tools
-    pm_tools = [
-        write_todos,
-    ]
+    # Get store for long-term memory
+    store = get_store()
 
     # Note: Media download tools NOT included in PM
     # PM delegates media_id to departments, departments download when needed
     # This keeps PM focused on orchestration, not domain operations
-
-    # Add any additional explicit tools
-    if tools is not None:
-        pm_tools.extend(tools)
+    # TodoListMiddleware provides write_todos tool automatically (v1.0)
 
     # Departments are subagents (proper delegation hierarchy)
     subagents: list[Any] = [
         _create_cataloging_subagent(storage, checkpointer, channel),
     ]
 
-    # No tool_configs needed - departments handle their own HITL via middleware
-    tool_configs: dict[str, Any] = {}
+    # Middleware for PM
+    # Note: TodoListMiddleware is added by default in create_deep_agent (v1.0)
+    # No custom middleware needed for PM currently
 
+    # No interrupt_on needed - departments handle their own HITL
     project_manager = create_deep_agent(
-        tools=pm_tools,  # PM has orchestration tools
-        instructions=instructions,
+        tools=[],  # PM has orchestration tools (middleware provides write_todos)
+        system_prompt=instructions,  # v1.0: renamed from instructions
         model=llm,
         subagents=subagents,
-        tool_configs=tool_configs,
         checkpointer=checkpointer,
+        store=store,  # v1.0: Long-term memory store
+        use_longterm_memory=True,  # v1.0: Enable persistent cross-session memory
+        context_schema=CompanyContext,  # v1.0: Type-safe company context injection
     )
 
     initial_state = {

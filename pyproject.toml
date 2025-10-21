@@ -23,18 +23,18 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 dependencies = [
-    # Core Agentic Framework (LangChain v1 prerelease stack)
-    "langchain==1.0.0a12",
-    "langgraph==1.0.0a4",
-    "langgraph-prebuilt==0.7.0a2",
-    "langgraph-checkpoint==2.1.1",
-    "langgraph-checkpoint-postgres==2.0.24",
+    # Core Agentic Framework (LangChain v1 stable)
+    "langchain==1.0.0",
+    "langgraph==1.0.0",
+    "langgraph-prebuilt==1.0.0",
+    "langgraph-checkpoint==2.1.2",
+    "langgraph-checkpoint-postgres==2.0.25",
     "langsmith",
     # Advanced Agent Implementation
-    "deepagents==0.0.11",  # Use stable 0.0.11, not 0.0.11rc1 (has API bug)
-    # LLM Providers (v1 alpha)
-    "langchain-openai==1.0.0a3",
-    "langchain-anthropic==1.0.0a2",
+    "deepagents==0.1.1",  # Stable v1-compatible release (Oct 18, 2025)
+    # LLM Providers (v1 stable)
+    "langchain-openai==1.0.0",
+    "langchain-anthropic==1.0.0",
     "langchain-google-genai",
     # Database & Storage
     "supabase",
@@ -73,7 +73,7 @@ dev = [
 
 [tool.uv]
 # uv configuration
-prerelease = "allow"  # Required for LangChain v1 alpha packages
+# prerelease = "allow"  # No longer needed - using stable v1 releases
 
 [tool.ruff]
 line-length = 100

@@ -195,3 +195,4 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 - **LangSmith Traces**: https://smith.langchain.com
 - **Roadmap**: `docs/roadmap/IMPLEMENTATION_ROADMAP.md`
 - Always use safe_print instaed of print
+- Always use testing framework for doing any test scenarios
