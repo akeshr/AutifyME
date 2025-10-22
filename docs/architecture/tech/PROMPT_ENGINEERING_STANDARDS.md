@@ -57,10 +57,9 @@ Avoid answering "what code should it write" or "what exact steps to execute."
 | Python code snippets | Decision principles + examples | Vague instructions |
 | Step-by-step implementation | Reasoning framework | Generic platitudes |
 
-**For AutifyME:**
+**For AutifyME (2-Level Architecture):**
 - **PM:** High altitude (multi-domain orchestration principles)
-- **Departments:** Medium altitude (domain-specific workflows)
-- **Specialists:** Low-medium altitude (focused transformation logic)
+- **Specialists:** Low-medium altitude (focused domain execution with tools)
 
 ---
 
@@ -209,28 +208,28 @@ Claude is trained on XML-tagged data. Use this structure:
 
 **Focus:**
 - Intent classification across ALL domains
-- Multi-department orchestration
+- Specialist delegation (direct, no intermediate layer)
 - Workflow resumption (HITL)
 - Context synthesis for delegation
 
 **Avoid:**
 - Workflow-specific implementation details
-- Hardcoded department logic
+- Hardcoded specialist logic
 - Tool implementation instructions
 
 **Template Sections:**
 ```xml
 <background_information>
   You are the Project Manager for {company_name}, the central orchestrator
-  for all business workflows. You coordinate departments to accomplish
-  complex user goals.
+  for all business workflows. You delegate directly to domain specialists
+  to accomplish user goals.
 </background_information>
 
 <available_tools>
-  ## Department Delegation
-  - cataloging_department: Product management workflows
-  - marketing_department: Campaigns and content
-  - operations_department: Billing, shipping, inventory
+  ## Specialist Delegation (SubAgents)
+  - cataloging_specialist: Product catalog management
+  - marketing_specialist: Campaigns and content (future)
+  - operations_specialist: Billing, shipping, inventory (future)
 
   ## Coordination Tools
   - write_todos: Track multi-step workflows
@@ -241,10 +240,9 @@ Claude is trained on XML-tagged data. Use this structure:
   ## Your Core Responsibilities
 
   1. **Analyze Intent**: Understand what the user wants to accomplish
-  2. **Plan Execution**: Determine which departments and in what order
-  3. **Delegate Work**: Provide clear, complete context to departments
-  4. **Handle Interrupts**: Resume workflows when approvals return
-  5. **Synthesize Results**: Relay outcomes back to users
+  2. **Delegate Work**: Route to appropriate specialist with full context
+  3. **Handle Interrupts**: Resume workflows when approvals return
+  4. **Synthesize Results**: Relay outcomes back to users
 
   ## Decision Framework
 
@@ -252,7 +250,7 @@ Claude is trained on XML-tagged data. Use this structure:
   - Classify domain (cataloging, marketing, operations, etc.)
   - Extract relevant data from message
   - Download media if present
-  - Delegate to appropriate department with full context
+  - Delegate to appropriate specialist with complete context
 
   **For Interrupted Workflows:**
   - Identify pending approvals
@@ -261,7 +259,7 @@ Claude is trained on XML-tagged data. Use this structure:
 
   ## Quality Standards
 
-  - Provide complete context to departments (no references)
+  - Provide complete context to specialists (no references)
   - One approval point per delegation (avoid parallel interrupts)
   - Clear status updates to users
 </instructions>
@@ -273,26 +271,26 @@ Claude is trained on XML-tagged data. Use this structure:
 
 ---
 
-### 3.2 Department Heads (Domain Orchestrators)
+### 3.2 Specialists (Domain Experts with Tools)
 
-**Altitude:** Medium - Domain-specific workflow management
+**Altitude:** Low-Medium - Domain execution with tools
 
 **Focus:**
-- Workflow orchestration within domain
-- Specialist coordination
-- Domain quality standards
-- Structured outputs for PM
+- Domain-specific workflow execution
+- Tool usage (image_analysis, save_product, etc.)
+- Structured outputs (Pydantic models)
+- Quality validation before returning
 
 **Avoid:**
 - Cross-domain logic (PM's job)
-- Specialist implementation details
 - Hardcoded workflows (be adaptive)
+- Multi-specialist coordination (no other specialists exist)
 
 **Template Sections:**
 ```xml
 <background_information>
-  You are the Head of [Department Name], responsible for [domain purpose].
-  You coordinate specialists to accomplish [domain goals].
+  You are the [Domain] Specialist. You transform [input] into [output]
+  using your available tools.
 
   Context available:
   - Brand Voice: {brand_voice}
@@ -301,79 +299,28 @@ Claude is trained on XML-tagged data. Use this structure:
 </background_information>
 
 <available_tools>
-  ## Specialist Team
-  - specialist_a: [What they do]
-  - specialist_b: [What they do]
-
-  ## Persistence
-  - save_[entity]: [When to use - includes HITL]
+  - tool_a: [Purpose and when to use]
+  - tool_b: [Purpose and when to use]
+  - save_[entity]: [Persistence tool - HITL enabled]
 </available_tools>
 
 <instructions>
-  ## Your Purpose
-  [High-level domain responsibility]
-
-  ## How You Think
-  [Decision framework for workflows in this domain]
-
-  ## Workflow Principles
-  - Be adaptive (no two requests identical)
-  - Coordinate specialists sequentially when dependencies exist
-  - Ensure quality before persistence
-  - Handle HITL via middleware (transparent to you)
-</instructions>
-
-<examples>
-  [2-3 examples showing different workflow patterns in this domain]
-</examples>
-```
-
----
-
-### 3.3 Specialists (Focused Executors)
-
-**Altitude:** Low-Medium - Specific transformations
-
-**Focus:**
-- Single, well-defined task
-- Structured outputs (Pydantic models)
-- Domain expertise application
-- Quality validation before returning
-
-**Avoid:**
-- Orchestration logic (department's job)
-- Multi-step workflows
-- Cross-specialist coordination
-
-**Template Sections:**
-```xml
-<background_information>
-  You are a [specialist type] who [specific expertise].
-  You transform [input type] into [output type].
-</background_information>
-
-<instructions>
-  ## Your Task
-  [Clear, focused responsibility]
-
-  ## What You Consider
-  - [Factor 1]
-  - [Factor 2]
-  - [Factor 3]
+  ## Your Workflow
+  [Decision framework for using tools adaptively]
 
   ## Quality Standards
-  [What "good" looks like]
+  [What "good" output looks like]
 
   ## Critical Rules
-  [Anti-hallucination, fidelity to input, etc.]
+  [Anti-hallucination, fidelity to input, validation before persistence]
 </instructions>
 
 <examples>
-  [1-2 examples showing reasoning process]
+  [2-3 examples showing tool usage and reasoning]
 </examples>
 
 <output_format>
-  Return: [PydanticModelName]
+  Return: [ResultModelName] with success status, message, and data
 
   Validation checklist:
   - [ ] [Check 1]
@@ -439,18 +386,15 @@ Claude is trained on XML-tagged data. Use this structure:
 ### 4.3 Coverage Matrix
 
 For PM prompts, ensure examples cover:
-- ✅ Single-department workflows
-- ✅ Multi-step within same department
+- ✅ Single-domain workflows (delegate to one specialist)
 - ✅ Interrupted workflow resumption
 - ✅ Different input modalities (text, image, voice)
 - ✅ Multiple domains (not just cataloging)
 
-For Department prompts:
-- ✅ Simple workflow (text only)
-- ✅ Complex workflow (multiple specialists)
+For Specialist prompts:
+- ✅ Simple workflow (single tool usage)
+- ✅ Complex workflow (multiple tool calls with dependencies)
 - ✅ Missing data (clarification needed)
-
-For Specialists:
 - ✅ Standard input
 - ✅ Ambiguous input (reasoning through uncertainty)
 
@@ -517,16 +461,15 @@ You handle product cataloging. When users send product images:
 
 ✅ **Good:**
 ```
-You orchestrate all business workflows by delegating to specialized departments:
-- Cataloging: Product management
-- Marketing: Campaigns and content
-- Operations: Billing, shipping, inventory
-- Website: Content updates and design
+You orchestrate all business workflows by delegating to domain specialists:
+- Cataloging Specialist: Product catalog management
+- Marketing Specialist: Campaigns and content (future)
+- Operations Specialist: Billing, shipping, inventory (future)
 
 For each request:
 1. Classify domain and intent
 2. Extract relevant data
-3. Delegate to appropriate department with complete context
+3. Delegate to appropriate specialist with complete context
 4. Handle any approval workflows
 5. Synthesize and relay results
 ```
