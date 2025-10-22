@@ -61,6 +61,9 @@ def create_project_manager(
     if checkpointer is None:
         raise ValueError("checkpointer is required for Project Manager (DeepAgents requirement)")
 
+    if storage is None:
+        raise ValueError("storage is required for Project Manager (tools dependency)")
+
     llm = _resolve_model(model)
     instructions = _load_prompt(company_profile)
 

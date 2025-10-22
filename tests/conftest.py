@@ -176,6 +176,13 @@ def mock_storage(mock_company_profile: CompanyProfile, mock_product: Product) ->
             """
             return False
 
+        def cleanup(self) -> None:
+            """Mock implementation for cleanup.
+
+            No resources to clean up in test mock.
+            """
+            pass
+
     return MockStorageClient()
 
 

@@ -184,6 +184,10 @@ class TestGetCompanyProfileTool:
             def check_and_mark_message_processed(self, message_id, sender_id, thread_id, received_at):
                 return False
 
+            def cleanup(self) -> None:
+                """No cleanup needed for test mock."""
+                pass
+
         tool = create_get_company_profile_tool(EmptyStorage())
 
         with pytest.raises(DataNotFoundError) as exc_info:
