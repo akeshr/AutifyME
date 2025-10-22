@@ -13,7 +13,7 @@ from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 from autifyme_agents.tools.storage_tools import create_save_product_tool
 
 
-@before_agent
+@before_agent  # type: ignore[arg-type]  # LangChain v1 alpha type signature variance
 def _limit_message_history(state: dict[str, Any]) -> dict[str, Any]:
     """Limit message history to prevent token bloat from PM conversation.
 

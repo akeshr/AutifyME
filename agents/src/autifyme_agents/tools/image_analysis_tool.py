@@ -134,7 +134,7 @@ def image_analysis_tool(
     # which would inherit LangGraph's full message history (~200K tokens)
     llm = ChatOpenAI(
         model="gpt-4.1-mini",
-        request_timeout=API_TIMEOUT,
+        timeout=API_TIMEOUT,  # Sets request_timeout internally
         model_kwargs={
             "response_format": {
                 "type": "json_schema",
