@@ -7,18 +7,70 @@ from product images. Returns structured ImageAnalysisResult.
 """
 
 import base64
+import io
 from pathlib import Path
 from typing import Annotated
 
 from langchain_core.tools import tool
+from PIL import Image
 from pydantic import Field
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 
+# Vision model optimal dimensions (OpenAI recommends max 2048px)
+MAX_DIMENSION = 2048
+JPEG_QUALITY = 85
+
+
+def _resize_image_for_vision_api(image_path: str) -> bytes:
+    """Resize and compress image for efficient Vision API processing.
+
+    Large images (e.g., 5MB phone photos) cause massive token usage when base64-encoded.
+    This resizes to max 2048px (OpenAI's high-detail threshold) while preserving aspect ratio.
+
+    Args:
+        image_path: Path to source image file
+
+    Returns:
+        Optimized image as JPEG bytes
+
+    Raises:
+        FileNotFoundError: If image file doesn't exist
+    """
+    path = Path(image_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Image file not found: {image_path}")
+
+    # Load image
+    with Image.open(path) as img:
+        # Convert RGBA to RGB (Vision API expects RGB)
+        if img.mode in ('RGBA', 'LA', 'P'):
+            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+            rgb_img.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = rgb_img
+
+        # Resize if exceeds max dimension (preserve aspect ratio)
+        width, height = img.size
+        if max(width, height) > MAX_DIMENSION:
+            if width > height:
+                new_width = MAX_DIMENSION
+                new_height = int(height * (MAX_DIMENSION / width))
+            else:
+                new_height = MAX_DIMENSION
+                new_width = int(width * (MAX_DIMENSION / height))
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        # Save to bytes buffer as optimized JPEG
+        buffer = io.BytesIO()
+        img.save(buffer, format='JPEG', quality=JPEG_QUALITY, optimize=True)
+        return buffer.getvalue()
+
 
 def _encode_image_to_base64_uri(image_path: str) -> str:
     """Convert local image file to base64 data URI for vision models.
+
+    Automatically resizes large images to prevent token overflow.
 
     Args:
         image_path: Path to local image file
@@ -29,26 +81,12 @@ def _encode_image_to_base64_uri(image_path: str) -> str:
     Raises:
         FileNotFoundError: If image file doesn't exist
     """
-    path = Path(image_path)
+    # Resize and compress image
+    image_bytes = _resize_image_for_vision_api(image_path)
 
-    if not path.exists():
-        raise FileNotFoundError(f"Image file not found: {image_path}")
-
-    # Determine MIME type from extension
-    ext = path.suffix.lower()
-    mime_type = {
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.png': 'image/png',
-        '.gif': 'image/gif',
-        '.webp': 'image/webp',
-    }.get(ext, 'image/jpeg')
-
-    with open(path, 'rb') as f:
-        image_bytes = f.read()
-
+    # Encode to base64
     encoded = base64.b64encode(image_bytes).decode('utf-8')
-    return f"data:{mime_type};base64,{encoded}"
+    return f"data:image/jpeg;base64,{encoded}"
 
 
 @tool
