@@ -66,8 +66,8 @@ def get_llm(
             llm = ChatOpenAI(
                 model=model,
                 temperature=temperature,
-                reasoning_effort=reasoning_effort,  # type: ignore[call-arg]
-                verbosity=verbosity,  # type: ignore[call-arg]
+                reasoning_effort=reasoning_effort,
+                verbosity=verbosity,
             )
         else:
             # GPT-4.1 and other models (standard configuration)

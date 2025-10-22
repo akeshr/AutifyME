@@ -110,4 +110,7 @@ Be specific and objective. Describe what you actually see."""
     # Call Vision API with structured output
     result = llm.with_structured_output(ImageAnalysisResult).invoke(messages)
 
-    return result
+    # Ensure return type matches (structured_output returns BaseModel or dict)
+    if isinstance(result, ImageAnalysisResult):
+        return result
+    raise ValueError(f"Unexpected result type from Vision API: {type(result)}")
