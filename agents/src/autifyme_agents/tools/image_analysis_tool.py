@@ -8,32 +8,47 @@ from product images. Returns structured ImageAnalysisResult.
 
 import base64
 import io
+import json
 from pathlib import Path
 from typing import Annotated
 
 from langchain.tools import tool
+from langchain_openai import ChatOpenAI
 from PIL import Image
 from pydantic import Field
 
-from autifyme_agents.core.llm_factory import get_llm
+from autifyme_agents.core.exceptions import ToolExecutionError
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 
-# Vision model optimal dimensions (OpenAI recommends max 2048px)
-MAX_DIMENSION = 2048
+# Vision model optimal dimensions
+# Reduced from 2048 to 1024 to minimize token usage (gpt-4.1 uses 32px patches)
+# 1024px provides sufficient detail for product cataloging while reducing tokens by ~75%
+MAX_DIMENSION = 1024
 JPEG_QUALITY = 85
+
+# Vision API detail mode: "low" (512px, 85 tokens) vs "high" (tiled, ~170 tokens/tile)
+# For product images, "high" detail is necessary to read text, logos, materials
+VISION_DETAIL = "high"
+
+# API timeout (seconds) - vision processing can be slow
+API_TIMEOUT = 60
 
 
 def _resize_image_for_vision_api(image_path: str) -> bytes:
     """Resize and compress image for efficient Vision API processing.
 
-    Large images (e.g., 5MB phone photos) cause massive token usage when base64-encoded.
-    This resizes to max 2048px (OpenAI's high-detail threshold) while preserving aspect ratio.
+    Large images cause massive token usage. This resizes to max 1024px to reduce tokens
+    by ~75% while preserving sufficient detail for product cataloging.
+
+    Token calculation (gpt-4.1): ceil(width/32) * ceil(height/32) patches
+    - 1024x1024: 32*32 = 1,024 tokens
+    - 2048x2048: 64*64 = 4,096 tokens (4x more expensive!)
 
     Args:
         image_path: Path to source image file
 
     Returns:
-        Optimized image as JPEG bytes
+        Optimized image as JPEG bytes (max 1024px, 85% quality)
 
     Raises:
         FileNotFoundError: If image file doesn't exist
@@ -114,8 +129,23 @@ def image_analysis_tool(
         >>> print(result.identified_colors)
         ["blue", "white"]
     """
-    # Get vision-capable LLM
-    llm = get_llm(provider="openai", model="gpt-4.1-mini")
+    # Get vision-capable LLM with structured output via model_kwargs
+    # Using model_kwargs instead of with_structured_output() to avoid RunnableSequence
+    # which would inherit LangGraph's full message history (~200K tokens)
+    llm = ChatOpenAI(
+        model="gpt-4.1-mini",
+        request_timeout=API_TIMEOUT,
+        model_kwargs={
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "ImageAnalysisResult",
+                    "strict": True,
+                    "schema": ImageAnalysisResult.model_json_schema(),
+                },
+            }
+        },
+    )
 
     # Convert image to base64 data URI
     image_uri = _encode_image_to_base64_uri(image_path)
@@ -134,28 +164,38 @@ Focus on:
 
 Be specific and objective. Describe what you actually see."""
 
-    # Build vision message
+    # Build vision message with explicit detail parameter
     messages = [
         {
             "role": "user",
             "content": [
                 {"type": "text", "text": content},
-                {"type": "image_url", "image_url": {"url": image_uri}},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": image_uri,
+                        "detail": VISION_DETAIL,  # Explicit detail mode
+                    },
+                },
             ],
         }
     ]
 
-    # Call Vision API with structured output (direct invoke, no RunnableSequence)
-    # Use json_schema method which is more reliable for large payloads
-    structured_llm = llm.with_structured_output(
-        ImageAnalysisResult,
-        method="json_schema",  # More robust than function_calling
-        include_raw=False,
-    )
+    # Call Vision API directly with ChatOpenAI (not RunnableSequence)
+    response = llm.invoke(messages)
 
-    result = structured_llm.invoke(messages)
-
-    # Ensure return type matches (structured_output returns BaseModel or dict)
-    if isinstance(result, ImageAnalysisResult):
+    # Parse response content as ImageAnalysisResult
+    try:
+        # Ensure content is string (handle both str and list types)
+        content_str = response.content if isinstance(response.content, str) else str(response.content)
+        result_dict = json.loads(content_str)
+        result = ImageAnalysisResult(**result_dict)
         return result
-    raise ValueError(f"Unexpected result type from Vision API: {type(result)}")
+    except (json.JSONDecodeError, ValueError) as e:
+        # ToolExecutionError doesn't have details param - include in message
+        content_preview = (response.content if isinstance(response.content, str) else str(response.content))[:500]
+        raise ToolExecutionError(
+            tool_name="image_analysis_tool",
+            message=f"Failed to parse Vision API response: {str(e)}. Response: {content_preview}",
+            original_error=e,
+        ) from e
