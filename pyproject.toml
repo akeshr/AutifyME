@@ -45,6 +45,7 @@ dependencies = [
     # Utilities
     "python-dotenv>=1.0.0",
     "tenacity>=8.0.0",
+    "pillow>=10.0.0",  # Image processing for Vision API optimization
     # Webhook stack
     "fastapi>=0.118.0",
     "uvicorn>=0.37.0",
