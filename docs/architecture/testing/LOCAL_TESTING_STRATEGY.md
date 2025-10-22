@@ -85,8 +85,8 @@ uv run python -m tests.cli.pm_chat --interactive
 
 **What it tests**:
 - PM intent classification
-- PM delegation to departments
-- Department execution
+- PM delegation to specialists
+- Specialist execution
 - Response formatting
 
 **What it skips**:
@@ -97,7 +97,7 @@ uv run python -m tests.cli.pm_chat --interactive
 **Use when**:
 - Testing PM prompt changes
 - Testing new intents
-- Debugging department delegation
+- Debugging specialist delegation
 - Quick sanity checks
 
 ---
@@ -530,7 +530,7 @@ def test_catalog_with_text_and_image(pm_agent):
     last_message = messages[-1]
     response = getattr(last_message, "content", "")
 
-    # PM should delegate to cataloging_department
+    # PM should delegate to cataloging_specialist
     assert "cataloging" in response.lower() or "product" in response.lower()
 
 
@@ -587,7 +587,7 @@ def test_text_only_cataloging(pm_agent):
     last_message = messages[-1]
     response = getattr(last_message, "content", "")
 
-    # PM should delegate to cataloging_department
+    # PM should delegate to cataloging_specialist
     assert "cataloging" in response.lower() or "product" in response.lower() or "added" in response.lower()
 
 
@@ -603,7 +603,7 @@ def test_product_inquiry(pm_agent):
     messages = result.get("messages", [])
     assert len(messages) > 0
 
-    # PM should delegate to cataloging_department for product inquiry
+    # PM should delegate to cataloging_specialist for product inquiry
     # Response will vary based on implementation
 ```
 

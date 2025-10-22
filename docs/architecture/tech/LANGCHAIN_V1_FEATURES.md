@@ -80,7 +80,7 @@ for block in response.content_blocks:
 **Why This Matters for AutifyME:**
 - **Product Cataloging** - Extract image analysis results with confidence scores
 - **Brand Voice** - Access reasoning traces to validate tone/style decisions
-- **Multi-Department Context** - Pass structured citations between specialists
+- **Multi-Specialist Context** - Pass structured citations between specialists
 - **Transparency** - Show customers why a product was categorized a certain way
 
 ---
@@ -113,7 +113,7 @@ langchain/
 - AI responses can emit `Command(update=..., goto=...)` to adjust state/flow without leaving the agent graph.
 
 **Why This Matters for AutifyME:**
-- Provides a production-ready scaffold for Department/PM agents with composable middleware (HITL, summarization, prompt caching).
+- Provides a production-ready scaffold for Specialist/PM agents with composable middleware (HITL, summarization, prompt caching).
 - ToolNode semantics align with ports/adapters: deterministic tools, clear error semantics, structured outputs.
 - Supports typed contracts between agents, matching our architecture requirements.
 
@@ -310,19 +310,16 @@ The `deepagents` library extends LangChain's base agents with **advanced plannin
 from deepagents import create_deep_agent
 from langchain_openai import ChatOpenAI
 
-def create_project_manager(company_profile: dict):
+def create_project_manager(company_profile: dict, specialists: list):
+    """Create PM with specialist subagents (2-level architecture)."""
     agent = create_deep_agent(
-        tools=get_all_tools(),  # Registry of all department tools
-        instructions=PROJECT_MANAGER_PROMPT.format(
+        tools=[],  # PM has no direct tools (specialists have tools)
+        subagents=specialists,  # Specialists attached as SubAgents
+        system_prompt=PROJECT_MANAGER_PROMPT.format(
             company_name=company_profile["name"],
             brand_voice=company_profile["brand_voice"],
         ),
         model=ChatOpenAI(model="gpt-4.1-mini-2025-04-14", temperature=0.2),
-        tool_configs={
-            "save_product": True,      # Require approval
-            "publish_website": True,    # Require approval
-            "post_to_social": False,    # No approval needed
-        }
     )
     return agent
 ```
@@ -337,31 +334,39 @@ Unlike basic ReAct agents, `deepagents` agents:
 **Why This Matters:**
 - **Complex Workflows:** WhatsApp cataloging requires 5+ steps (receive → analyze → extract → save → confirm)
 - **Error Recovery:** If image analysis fails, PM replans to request clearer photo
-- **Multi-Department:** PM plans which departments to invoke in parallel vs. sequential
+- **Multi-Specialist:** PM plans which specialists to invoke in parallel vs. sequential
 
 #### **3. Sub-Agent Architecture**
 
-`deepagents` natively supports **hierarchical agent structures** (perfect for our PM → Dept → Specialist pattern).
+`deepagents` natively supports **hierarchical agent structures** (perfect for our PM → Specialist pattern).
 
-**How It Works:**
+**How It Works (2-Level Architecture):**
 ```python
-# Project Manager spawns Department sub-agents
-pm_agent = create_deep_agent(
-    tools=[cataloging_dept, marketing_dept, operations_dept],
-    ...
+from deepagents import create_deep_agent, create_agent
+
+# Create specialist with tools
+cataloging_specialist = create_agent(
+    model=llm,
+    tools=[image_analysis_tool, save_product_tool],
+    system_prompt=load_prompt("specialists/cataloging_specialist.prompt"),
+    tool_configs={
+        "save_product": ToolConfig(allow_accept=True, allow_edit=True),
+    },
 )
 
-# Each Department is itself a deep_agent
-cataloging_dept = create_deep_agent(
-    tools=[image_analysis_tool, text_analysis_tool],
-    ...
+# PM delegates directly to specialists (no department layer)
+pm_agent = create_deep_agent(
+    tools=[],  # PM has no tools
+    subagents=[cataloging_specialist],  # Specialists as SubAgents
+    system_prompt=load_prompt("project_manager.prompt"),
+    model=llm,
 )
 ```
 
 **Benefits:**
 - **Separation of Concerns:** Each agent has clear scope
-- **Parallel Execution:** PM can invoke multiple departments simultaneously
-- **Error Isolation:** Department failure doesn't crash entire workflow
+- **Direct Delegation:** PM routes to specialist without intermediate layer
+- **Error Isolation:** Specialist failure doesn't crash entire workflow
 
 #### **4. Human-in-the-Loop (HITL)**
 
@@ -395,10 +400,10 @@ tool_configs={
 - LangGraph checkpointing for state management
 - LangSmith tracing for observability
 
-**Our Strategy:**
-1. Use `deepagents` for **Project Manager** (complex orchestration)
-2. Use `create_agent` for **Departments** (simpler delegation)
-3. Use `@tool` functions for **Specialists** (focused tasks)
+**Our Strategy (2-Level Architecture):**
+1. Use `create_deep_agent` for **Project Manager** (orchestration with specialist subagents)
+2. Use `create_agent` for **Specialists** (domain experts with tools)
+3. Use `@tool` functions for **Utility Tools** (image analysis, storage, etc.)
 
 ---
 
