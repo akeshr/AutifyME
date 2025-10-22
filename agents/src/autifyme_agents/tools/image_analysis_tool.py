@@ -8,16 +8,15 @@ from product images. Returns structured ImageAnalysisResult.
 
 import base64
 import io
-import json
 from pathlib import Path
 from typing import Annotated
 
 from langchain.tools import tool
-from langchain_openai import ChatOpenAI
 from PIL import Image
 from pydantic import Field
 
 from autifyme_agents.core.exceptions import ToolExecutionError
+from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 
 # Vision model optimal dimensions
@@ -30,8 +29,8 @@ JPEG_QUALITY = 85
 # For product images, "high" detail is necessary to read text, logos, materials
 VISION_DETAIL = "high"
 
-# API timeout (seconds) - vision processing can be slow
-API_TIMEOUT = 60
+# API timeout (seconds) - vision processing can be slow, especially with high detail mode
+API_TIMEOUT = 60.0
 
 
 def _resize_image_for_vision_api(image_path: str) -> bytes:
@@ -129,23 +128,8 @@ def image_analysis_tool(
         >>> print(result.identified_colors)
         ["blue", "white"]
     """
-    # Get vision-capable LLM with structured output via model_kwargs
-    # Using model_kwargs instead of with_structured_output() to avoid RunnableSequence
-    # which would inherit LangGraph's full message history (~200K tokens)
-    llm = ChatOpenAI(
-        model="gpt-4.1-mini",
-        timeout=API_TIMEOUT,  # Sets request_timeout internally
-        model_kwargs={
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "ImageAnalysisResult",
-                    "strict": True,
-                    "schema": ImageAnalysisResult.model_json_schema(),
-                },
-            }
-        },
-    )
+    # Get vision-capable LLM with timeout
+    llm = get_llm(provider="openai", model="gpt-4.1-mini", timeout=API_TIMEOUT)
 
     # Convert image to base64 data URI
     image_uri = _encode_image_to_base64_uri(image_path)
@@ -174,28 +158,31 @@ Be specific and objective. Describe what you actually see."""
                     "type": "image_url",
                     "image_url": {
                         "url": image_uri,
-                        "detail": VISION_DETAIL,  # Explicit detail mode
+                        "detail": VISION_DETAIL,  # Explicit high-detail mode
                     },
                 },
             ],
         }
     ]
 
-    # Call Vision API directly with ChatOpenAI (not RunnableSequence)
-    response = llm.invoke(messages)
+    # Use standard LangChain with_structured_output (handles schema automatically)
+    structured_llm = llm.with_structured_output(
+        ImageAnalysisResult,  # Pass Pydantic model directly
+        method="json_schema",
+        include_raw=False,
+    )
 
-    # Parse response content as ImageAnalysisResult
-    try:
-        # Ensure content is string (handle both str and list types)
-        content_str = response.content if isinstance(response.content, str) else str(response.content)
-        result_dict = json.loads(content_str)
-        result = ImageAnalysisResult(**result_dict)
+    result = structured_llm.invoke(messages)
+
+    # Ensure return type matches
+    if isinstance(result, ImageAnalysisResult):
         return result
-    except (json.JSONDecodeError, ValueError) as e:
-        # ToolExecutionError doesn't have details param - include in message
-        content_preview = (response.content if isinstance(response.content, str) else str(response.content))[:500]
-        raise ToolExecutionError(
-            tool_name="image_analysis_tool",
-            message=f"Failed to parse Vision API response: {str(e)}. Response: {content_preview}",
-            original_error=e,
-        ) from e
+    # If dict, convert to ImageAnalysisResult
+    if isinstance(result, dict):
+        return ImageAnalysisResult(**result)
+
+    raise ToolExecutionError(
+        tool_name="image_analysis_tool",
+        message=f"Unexpected result type from Vision API: {type(result)}",
+        original_error=None,
+    )
