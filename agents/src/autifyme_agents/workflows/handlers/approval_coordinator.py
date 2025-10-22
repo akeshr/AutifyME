@@ -9,6 +9,7 @@ from uuid import uuid4
 from langgraph.types import Command
 
 from autifyme_agents.schemas.approval import BatchApprovalResponse
+from autifyme_agents.schemas.interrupt import InterruptInfo
 from autifyme_agents.workflows.approval_analyzer import analyze_approval
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.outcome_tracker import IncomingMessage, OutcomeTracker
@@ -41,7 +42,7 @@ class ApprovalCoordinator:
         self,
         thread_id: str,
         user_message: str,
-        pending_interrupts: list[dict[str, Any]],
+        pending_interrupts: list[InterruptInfo],
         conversation_history: list[Any],
         raw_payload: dict[str, Any],
     ) -> tuple[Command[Any] | None, str | None]:
@@ -165,7 +166,7 @@ class ApprovalCoordinator:
     def _build_command_from_approval(
         self,
         approval_response: BatchApprovalResponse,
-        pending_interrupts: list[dict[str, Any]],
+        pending_interrupts: list[InterruptInfo],
     ) -> Command[Any]:
         """Build LangGraph Command from structured approval response.
 
@@ -187,11 +188,11 @@ class ApprovalCoordinator:
 
         for idx, interrupt_info in enumerate(pending_interrupts):
             # Use original_interrupt_id (WITHOUT suffix) to match checkpoint format
-            interrupt_id_for_command = interrupt_info.get("original_interrupt_id", interrupt_info["interrupt_id"])
+            interrupt_id_for_command = interrupt_info.original_interrupt_id or interrupt_info.interrupt_id
 
             response = approval_response.responses[idx]
-            tool_name = interrupt_info.get("tool_name", "unknown")
-            tool_args = interrupt_info.get("tool_args", {})
+            tool_name = interrupt_info.tool_name
+            tool_args = interrupt_info.tool_args
 
             # Format response based on type for v1.0 HITL middleware compatibility
             if response.type == "edit":

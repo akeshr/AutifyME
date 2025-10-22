@@ -1,9 +1,14 @@
-import os
+from functools import lru_cache
+from pathlib import Path
 
 
+@lru_cache(maxsize=32)
 def load_prompt(file_name: str) -> str:
     """
-    Loads a prompt template from the filesystem.
+    Loads a prompt template from the filesystem with caching.
+
+    Uses functools.lru_cache to avoid repeated disk I/O for the same prompts.
+    Cache size of 32 is sufficient for all current prompts (PM + specialists).
 
     This function is the designated way to access version-controlled
     prompts, ensuring that prompt content is decoupled from the agent logic.
@@ -18,14 +23,13 @@ def load_prompt(file_name: str) -> str:
     Raises:
         FileNotFoundError: If the prompt file does not exist.
     """
-    # Construct the full path to the prompt file.
-    # __file__ gives the path of the current script (prompt_loader.py).
-    # We navigate up one level to `core` and then down to `prompts`.
-    base_path = os.path.dirname(__file__)
-    prompt_path = os.path.join(base_path, '..', 'prompts', file_name)
+    # Construct the full path to the prompt file using pathlib.
+    # Path(__file__).parent gives the directory of the current script (core/).
+    # We navigate up to parent and then down to prompts/.
+    base_path = Path(__file__).parent
+    prompt_path = base_path / '..' / 'prompts' / file_name
 
-    if not os.path.exists(prompt_path):
+    if not prompt_path.exists():
         raise FileNotFoundError(f"Prompt file not found at: {prompt_path}")
 
-    with open(prompt_path, encoding='utf-8') as f:
-        return f.read()
+    return prompt_path.read_text(encoding='utf-8')

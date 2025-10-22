@@ -23,6 +23,11 @@ class SupabaseStorageClient(StorageInterface):
     application depends on a stable port rather than Supabase specifics. A
     single instance should be reused within a workflow run to avoid creating
     redundant network clients.
+
+    Supports context manager protocol for automatic resource cleanup:
+        with SupabaseStorageClient() as storage:
+            storage.save_product(product)
+        # HTTP connections automatically closed
     """
 
     def __init__(
@@ -42,6 +47,25 @@ class SupabaseStorageClient(StorageInterface):
             )
         self._service_key = derived_key
         self._client: Client | None = client
+
+    def __enter__(self) -> SupabaseStorageClient:
+        """Enter context manager - ensures client is initialized.
+
+        Returns:
+            Self for context manager protocol
+        """
+        self._ensure_client()
+        return self
+
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any) -> None:
+        """Exit context manager - performs automatic cleanup.
+
+        Args:
+            exc_type: Exception type if an error occurred
+            exc_val: Exception value if an error occurred
+            exc_tb: Exception traceback if an error occurred
+        """
+        self.cleanup()
 
     def _ensure_client(self) -> Client:
         """Create and validate the Supabase client lazily.

@@ -27,6 +27,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.schemas.approval import BatchApprovalResponse
+from autifyme_agents.schemas.interrupt import InterruptInfo
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +156,7 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
 
 
 def analyze_approval(
-    pending_interrupts: list[dict[str, Any]],
+    pending_interrupts: list[InterruptInfo],
     user_message: str,
     conversation_history: list[Any] | None = None,
     llm: BaseChatModel | None = None,
@@ -164,9 +165,9 @@ def analyze_approval(
     """Convenience function to analyze approval with validation.
 
     Args:
-        pending_interrupts: List of interrupt context dicts
+        pending_interrupts: List of InterruptInfo objects
         user_message: User's approval/rejection message
-        conversation_history: Full conversation history for context (NEW)
+        conversation_history: Full conversation history for context
         llm: Optional LLM override
         run_id: Optional run_id to use as trace_id in LangSmith
 
@@ -176,6 +177,9 @@ def analyze_approval(
     Raises:
         ValueError: If response count doesn't match interrupt count
     """
+    # Convert InterruptInfo objects to dicts for LLM prompt
+    interrupts_as_dicts = [interrupt.to_dict() for interrupt in pending_interrupts]
+
     analyzer = create_approval_analyzer(llm)
 
     # Build config with run_id if provided
@@ -188,7 +192,7 @@ def analyze_approval(
     try:
         result: BatchApprovalResponse = analyzer.invoke(
             {
-                "pending_interrupts": pending_interrupts,
+                "pending_interrupts": interrupts_as_dicts,
                 "user_message": user_message,
                 "conversation_history": conversation_history or [],
             },

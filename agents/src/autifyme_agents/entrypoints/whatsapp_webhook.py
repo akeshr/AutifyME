@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from autifyme_agents.core.config import settings
@@ -36,6 +37,76 @@ app = FastAPI()
 logger.info("AutifyME WhatsApp webhook serverless function loaded")
 
 
+# ============================================================================
+# FastAPI Dependencies (Dependency Injection)
+# ============================================================================
+# These functions provide singleton instances for serverless deployment.
+# FastAPI automatically manages dependency lifecycle and injection.
+
+
+@lru_cache(maxsize=1)
+def get_storage_dependency() -> StorageInterface:
+    """Get singleton storage adapter for dependency injection.
+
+    Returns:
+        StorageInterface implementation (singleton via lru_cache)
+    """
+    logger.info("Initializing storage adapter")
+    storage = get_storage()
+    logger.info("Storage adapter initialized successfully")
+    return storage
+
+
+@lru_cache(maxsize=1)
+def get_channel_dependency() -> WhatsAppChannel:
+    """Get singleton WhatsApp channel for dependency injection.
+
+    Returns:
+        WhatsAppChannel instance (singleton via lru_cache)
+    """
+    logger.info("Creating WhatsApp channel adapter")
+    channel = WhatsAppChannel()
+    logger.info("WhatsApp channel adapter created")
+    return channel
+
+
+def get_workflow_handler(
+    channel: WhatsAppChannel = Depends(get_channel_dependency),  # noqa: B008
+) -> CatalogingWorkflowHandler:
+    """Get cataloging workflow handler with injected channel.
+
+    Args:
+        channel: WhatsApp channel (injected by FastAPI)
+
+    Returns:
+        CatalogingWorkflowHandler instance
+    """
+    return CatalogingWorkflowHandler(channel=channel)
+
+
+def get_runner(
+    storage: StorageInterface = Depends(get_storage_dependency),  # noqa: B008
+    channel: WhatsAppChannel = Depends(get_channel_dependency),  # noqa: B008
+    workflow_handler: CatalogingWorkflowHandler = Depends(get_workflow_handler),  # noqa: B008
+) -> WorkflowRunner:
+    """Get workflow runner with all dependencies injected.
+
+    Args:
+        storage: Storage adapter (injected by FastAPI)
+        channel: WhatsApp channel (injected by FastAPI)
+        workflow_handler: Cataloging workflow handler (injected by FastAPI)
+
+    Returns:
+        WorkflowRunner instance with all dependencies
+    """
+    logger.debug("Creating WorkflowRunner with injected dependencies")
+    return WorkflowRunner(
+        channel=channel,
+        storage=storage,
+        workflow_handler=workflow_handler,
+    )
+
+
 @app.get("/")
 def read_root() -> dict[str, str]:
     """Root endpoint to confirm the service is running."""
@@ -46,44 +117,6 @@ def read_root() -> dict[str, str]:
 async def favicon() -> RedirectResponse:
     """Redirects to the static vercel.svg in the public directory."""
     return RedirectResponse("/vercel.svg", status_code=307)
-
-
-# Lazy initialization for serverless deployment
-_runner = None
-_storage: StorageInterface | None = None
-_whatsapp_channel = None
-
-def _get_runner() -> WorkflowRunner:
-    """Lazy initialization of WorkflowRunner for serverless deployment."""
-    global _runner, _storage, _whatsapp_channel
-
-    if _runner is None:
-        logger.info("Initializing WorkflowRunner with WhatsApp channel...")
-        try:
-            # Get storage adapter via factory (hexagonal architecture - depend on port)
-            _storage = get_storage()
-            logger.info("Storage adapter initialized successfully")
-
-            # Create channel adapter
-            _whatsapp_channel = WhatsAppChannel()
-            logger.info("WhatsApp channel adapter created")
-
-            # Create cataloging workflow handler
-            _workflow_handler = CatalogingWorkflowHandler(channel=_whatsapp_channel)
-            logger.info("Cataloging workflow handler created")
-
-            # Create generic workflow runner with WhatsApp channel and cataloging handler
-            _runner = WorkflowRunner(
-                channel=_whatsapp_channel,
-                storage=_storage,
-                workflow_handler=_workflow_handler,
-            )
-            logger.info("✅ WorkflowRunner initialized successfully")
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize WorkflowRunner: {e}", exc_info=True)
-            raise
-
-    return _runner
 
 _EVENT_DUMP_DIR = Path("/tmp/whatsapp_events")
 
@@ -187,7 +220,12 @@ async def verify(request: Request) -> Any:
 
 
 @app.post("/webhook")
-async def receive(request: Request, background_tasks: BackgroundTasks) -> Any:
+async def receive(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    runner: WorkflowRunner = Depends(get_runner),  # noqa: B008
+    storage: StorageInterface = Depends(get_storage_dependency),  # noqa: B008
+) -> Any:
     body = await request.json()
     event_path = _persist_event(body)
     logger.info("Incoming WhatsApp payload saved", extra={"event_path": str(event_path)})
@@ -259,16 +297,12 @@ async def receive(request: Request, background_tasks: BackgroundTasks) -> Any:
                         )
                         continue
 
-                    # Initialize runner (and channel) before using it for thread_id
-                    # This ensures _whatsapp_channel is available for format_thread_id()
-                    runner: WorkflowRunner = _get_runner()
-
                     # Check for duplicate processing using message_id (DB-backed idempotency)
                     # WhatsApp can retry webhooks, and we need to ensure we don't
                     # process the same message multiple times. Uses database to survive restarts.
                     # Storage adapter handles atomic check-and-mark via port (no concrete adapter leakage)
                     thread_id = runner.channel.format_thread_id(sender)
-                    if _storage and _storage.check_and_mark_message_processed(
+                    if storage.check_and_mark_message_processed(
                         message_id=message_id,
                         sender_id=sender,
                         thread_id=thread_id,

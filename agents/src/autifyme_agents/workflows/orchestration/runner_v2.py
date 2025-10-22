@@ -51,8 +51,9 @@ from __future__ import annotations
 
 import json
 import logging
-from collections import OrderedDict
-from threading import Lock
+
+# Threading removed - not needed for single-tenant architecture
+# FastAPI background tasks + database checkpointing provide sufficient concurrency control
 from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -74,8 +75,7 @@ from autifyme_agents.workflows.project_manager import create_project_manager
 
 logger = logging.getLogger(__name__)
 
-# Constants
-MAX_THREAD_LOCKS = 1000  # LRU cache size for thread locks
+# Constants removed - threading complexity eliminated
 
 
 class WorkflowRunner:
@@ -164,10 +164,6 @@ class WorkflowRunner:
         # Checkpointer management
         self._checkpointer = checkpointer
 
-        # Thread safety: LRU lock manager per sender
-        self._thread_locks: OrderedDict[str, Lock] = OrderedDict()
-        self._locks_mutex = Lock()
-
         # Phase 1: Outcome tracking for agentic learning
         self.outcome_tracker = OutcomeTracker(storage)
         logger.info("OutcomeTracker initialized")
@@ -214,12 +210,10 @@ class WorkflowRunner:
             },
         )
 
-        # Thread safety - serialize per sender
+        # Single-tenant architecture - no locking needed
+        # FastAPI background tasks + database checkpointing provide sufficient concurrency control
         thread_id = self.channel.format_thread_id(sender)
-        lock = self._get_lock(sender)
-
-        with lock:
-            self._execute_workflow(thread_id, sender, text, media_id, sender_name)
+        self._execute_workflow(thread_id, sender, text, media_id, sender_name)
 
     def _execute_workflow(
         self,
@@ -300,6 +294,179 @@ class WorkflowRunner:
             logger.exception("PM invocation failed", exc_info=exc)
             self.channel.send_error(sender, "processing")
 
+    def _handle_resume_flow(
+        self,
+        pm: Any,
+        config: dict[str, Any],
+        thread_id: str,
+        raw_payload: dict[str, Any],
+        pending_interrupts_list: list[dict[str, Any]],
+    ) -> tuple[dict[str, Any] | None, Any | None]:
+        """Handle resume flow when interrupts exist.
+
+        Args:
+            pm: Project Manager instance
+            config: LangGraph config
+            thread_id: Conversation thread ID
+            raw_payload: Raw platform message dict
+            pending_interrupts_list: List of normalized interrupt dicts
+
+        Returns:
+            Tuple of (final_result, interrupt_value)
+        """
+        user_message = raw_payload.get("text", "")
+
+        # Extract conversation history
+        conversation_history = []
+        try:
+            state_snapshot = pm.get_state(config)
+            if state_snapshot and hasattr(state_snapshot, 'values'):
+                conversation_history = state_snapshot.values.get("messages", [])
+        except Exception as e:
+            logger.debug("Could not extract conversation history", extra={"thread_id": thread_id, "error": str(e)})
+
+        # Analyze approval and build command
+        try:
+            command_obj, approval_tracking_id = self.approval_coordinator.analyze_and_build_command(
+                thread_id=thread_id,
+                user_message=user_message,
+                pending_interrupts=pending_interrupts_list,
+                conversation_history=conversation_history,
+                raw_payload=raw_payload,
+            )
+        except Exception as e:
+            logger.error(
+                "Approval analysis failed",
+                extra={"thread_id": thread_id, "error": str(e)},
+                exc_info=True
+            )
+            raise
+
+        if not command_obj:
+            logger.error("Approval analysis returned no command", extra={"thread_id": thread_id})
+            return None, None
+
+        logger.info(
+            "Resume flow: executing command",
+            extra={
+                "thread_id": thread_id,
+                "interrupt_count": len(pending_interrupts_list),
+                "message_preview": user_message[:50],
+                "history_length": len(conversation_history),
+            }
+        )
+
+        # Execute command and collect results
+        last_event = None
+        interrupt_value = None
+
+        try:
+            for event in pm.stream(command_obj, config=config, stream_mode="values"):
+                last_event = event
+                if "__interrupt__" in event:
+                    interrupts = event.get("__interrupt__") or []
+                    if interrupts:
+                        interrupt_value = interrupts[0].value
+
+            logger.debug(
+                "Command execution complete",
+                extra={"thread_id": thread_id, "had_new_interrupt": interrupt_value is not None}
+            )
+            return last_event, interrupt_value
+
+        except GraphInterrupt as interrupt_exc:
+            interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
+            logger.debug("Interrupt via exception", extra={"thread_id": thread_id, "count": len(interrupts_list)})
+            if interrupts_list:
+                return last_event, interrupts_list[0].value
+            return last_event, None
+
+        except Exception as e:
+            logger.error("Command execution failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
+            raise
+
+    def _handle_new_message_flow(
+        self,
+        pm: Any,
+        config: dict[str, Any],
+        thread_id: str,
+        raw_payload: dict[str, Any],
+    ) -> tuple[dict[str, Any] | None, Any | None]:
+        """Handle new message flow when no interrupts exist.
+
+        Args:
+            pm: Project Manager instance
+            config: LangGraph config
+            thread_id: Conversation thread ID
+            raw_payload: Raw platform message dict
+
+        Returns:
+            Tuple of (final_result, interrupt_value)
+        """
+        # Create payload
+        try:
+            from langchain.messages import HumanMessage
+            payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
+        except Exception as e:
+            logger.error("Payload creation failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
+            raise
+
+        logger.info(
+            "New message flow: starting PM stream",
+            extra={
+                "thread_id": thread_id,
+                "has_text": raw_payload.get('text') is not None,
+                "has_media": raw_payload.get('media_id') is not None,
+            }
+        )
+
+        # Stream PM and accumulate interrupts
+        last_event = None
+        accumulated_interrupts: list[Any] = []
+
+        try:
+            for event in pm.stream(payload, config=config, stream_mode="values"):
+                last_event = event
+                if "__interrupt__" in event:
+                    interrupts = event.get("__interrupt__") or []
+                    if interrupts:
+                        accumulated_interrupts.extend(interrupts)
+
+            # Process accumulated interrupts
+            interrupt_value = None
+            if accumulated_interrupts:
+                if len(accumulated_interrupts) > 1:
+                    # Flatten multiple interrupts
+                    interrupt_value = []
+                    for intr in accumulated_interrupts:
+                        if isinstance(intr.value, list):
+                            interrupt_value.extend(intr.value)
+                        else:
+                            interrupt_value.append(intr.value)
+                else:
+                    interrupt_value = accumulated_interrupts[0].value
+
+            logger.debug(
+                "PM stream complete",
+                extra={
+                    "thread_id": thread_id,
+                    "interrupt_count": len(accumulated_interrupts),
+                    "has_result": last_event is not None,
+                }
+            )
+            return last_event, interrupt_value
+
+        except GraphInterrupt as interrupt_exc:
+            interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
+            logger.debug("Interrupt via exception", extra={"thread_id": thread_id, "count": len(interrupts_list)})
+            if interrupts_list:
+                return last_event, interrupts_list[0].value
+            return last_event, None
+
+        except Exception as e:
+            logger.error("PM streaming failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
+            raise
+
     def _invoke_pm(
         self,
         thread_id: str,
@@ -327,421 +494,40 @@ class WorkflowRunner:
         Returns:
             Tuple of (final_result, interrupt_value) - at most one will be non-None
         """
-        logger.debug("Invoking Project Manager", extra={"thread_id": thread_id})
-
+        # Create PM and config
         try:
-            logger.info("[PM_INVOKE] Creating PM instance", extra={"thread_id": thread_id})
-            pm: Any = self._create_project_manager()
-            logger.info(f"[PM_INVOKE] PM created successfully: {type(pm).__name__}", extra={"thread_id": thread_id})
-        except Exception as e:
-            logger.error(f"[PM_INVOKE] PM creation failed: {type(e).__name__}: {e}", exc_info=True)
-            raise
-
-        try:
-            logger.info("[PM_INVOKE] Building config", extra={"thread_id": thread_id, "run_id": run_id})
+            pm = self._create_project_manager()
             config = self._build_config(thread_id, run_id=run_id)
-            logger.info(f"[PM_INVOKE] Config built: {list(config.keys())}", extra={"thread_id": thread_id})
         except Exception as e:
-            logger.error(f"[PM_INVOKE] Config building failed: {type(e).__name__}: {e}", exc_info=True)
+            logger.error("PM initialization failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
             raise
 
-        # Check for pending HITL interrupts
-        pending_interrupts_list = []
+        # Check for pending interrupts
         try:
-            logger.info("[PM_INVOKE] Getting state snapshot", extra={"thread_id": thread_id})
             state_snapshot = pm.get_state(config)
+            pending_interrupts_list = InterruptUnpacker.unpack_interrupts(state_snapshot, thread_id=thread_id)
+
+            flow_type = "resume" if pending_interrupts_list else "new_message"
             logger.info(
-                f"[PM_INVOKE] State snapshot retrieved: has_values={hasattr(state_snapshot, 'values')}, "
-                f"has_next={hasattr(state_snapshot, 'next')}",
-                extra={"thread_id": thread_id}
-            )
-
-            # Unpack interrupts into normalized format for approval processing
-            logger.info("[PM_INVOKE] Unpacking interrupts from state", extra={"thread_id": thread_id})
-            pending_interrupts_list = InterruptUnpacker.unpack_interrupts(
-                state_snapshot, thread_id=thread_id
-            )
-
-            if pending_interrupts_list:
-                logger.info(
-                    "[PM_INVOKE] Found pending HITL interrupts",
-                    extra={
-                        "thread_id": thread_id,
-                        "interrupt_count": len(pending_interrupts_list),
-                    }
-                )
-            else:
-                logger.info(
-                    "[PM_INVOKE] No pending interrupts found - new message flow",
-                    extra={"thread_id": thread_id}
-                )
-        except Exception as e:
-            logger.error(
-                f"[PM_INVOKE] Failed to check for pending interrupts: {type(e).__name__}: {e}",
-                extra={"thread_id": thread_id},
-                exc_info=True
-            )
-            logger.warning(
-                "[PM_INVOKE] Treating as new message",
-                extra={"thread_id": thread_id}
-            )
-
-        # Build payload based on checkpoint state
-        if pending_interrupts_list:
-            # === APPROVAL ANALYZER WITH CONVERSATION HISTORY ===
-            # Extract conversation history from PM state for context-aware approval analysis
-            logger.info(
-                "[PM_INVOKE] RESUME FLOW: Processing approval response",
+                "PM invocation starting",
                 extra={
                     "thread_id": thread_id,
-                    "interrupt_count": len(pending_interrupts_list)
+                    "flow_type": flow_type,
+                    "interrupt_count": len(pending_interrupts_list),
                 }
             )
-
-            user_message = raw_payload.get("text", "")
-            logger.info(
-                f"[PM_INVOKE] User message: {user_message[:100] if user_message else '(empty)'}",
-                extra={"thread_id": thread_id}
+        except Exception as e:
+            logger.warning(
+                "Interrupt check failed, treating as new message",
+                extra={"thread_id": thread_id, "error": str(e)}
             )
+            pending_interrupts_list = []
 
-            # Extract conversation history from PM state
-            conversation_history = []
-            try:
-                logger.info("[PM_INVOKE] Extracting conversation history", extra={"thread_id": thread_id})
-                state_snapshot = pm.get_state(config)
-                if state_snapshot and hasattr(state_snapshot, 'values'):
-                    conversation_history = state_snapshot.values.get("messages", [])
-                    logger.info(
-                        f"[PM_INVOKE] Conversation history extracted: {len(conversation_history)} messages",
-                        extra={"thread_id": thread_id}
-                    )
-                else:
-                    logger.warning(
-                        "[PM_INVOKE] State snapshot has no values",
-                        extra={"thread_id": thread_id}
-                    )
-            except Exception as e:
-                logger.error(
-                    f"[PM_INVOKE] Could not extract conversation history: {type(e).__name__}: {e}",
-                    extra={"thread_id": thread_id},
-                    exc_info=True
-                )
-
-            # Invoke approval coordinator (handles tracking, error handling, and Command building)
-            logger.info("[PM_INVOKE] Invoking approval coordinator", extra={"thread_id": thread_id})
-            try:
-                command_obj, approval_tracking_id = self.approval_coordinator.analyze_and_build_command(
-                    thread_id=thread_id,
-                    user_message=user_message,
-                    pending_interrupts=pending_interrupts_list,
-                    conversation_history=conversation_history,
-                    raw_payload=raw_payload,
-                )
-                logger.info(
-                    f"[PM_INVOKE] Approval coordinator returned: command_obj={'present' if command_obj else 'None'}, "
-                    f"tracking_id={approval_tracking_id}",
-                    extra={"thread_id": thread_id}
-                )
-            except Exception as e:
-                logger.error(
-                    f"[PM_INVOKE] Approval coordinator failed: {type(e).__name__}: {e}",
-                    extra={"thread_id": thread_id},
-                    exc_info=True
-                )
-                raise
-
-            if not command_obj:
-                # Error already tracked and user notified by coordinator
-                logger.error(
-                    "[PM_INVOKE] No command object returned - approval analysis failed",
-                    extra={"thread_id": thread_id}
-                )
-                return None, None
-
-            # Execute Command to resume workflow
-            logger.info(
-                "[PM_INVOKE] Executing Command to resume workflow",
-                extra={"thread_id": thread_id}
-            )
-
-            last_event = None
-            interrupt_value = None
-
-            try:
-                logger.info("[PM_INVOKE] Starting Command stream execution", extra={"thread_id": thread_id})
-                event_count = 0
-                for event in pm.stream(command_obj, config=config, stream_mode="values"):
-                    event_count += 1
-                    last_event = event
-                    logger.info(
-                        f"[PM_INVOKE] Command stream event #{event_count}",
-                        extra={
-                            "thread_id": thread_id,
-                            "has_interrupt": "__interrupt__" in event
-                        }
-                    )
-
-                    # Check for new interrupts (nested workflows)
-                    if "__interrupt__" in event:
-                        interrupts = event.get("__interrupt__") or []
-                        if interrupts:
-                            interrupt_value = interrupts[0].value
-                            logger.info(
-                                "[PM_INVOKE] Nested interrupt during resume",
-                                extra={"thread_id": thread_id, "interrupt_count": len(interrupts)}
-                            )
-
-                logger.info(
-                    f"[PM_INVOKE] Command execution complete: {event_count} events",
-                    extra={
-                        "thread_id": thread_id,
-                        "had_new_interrupt": interrupt_value is not None,
-                    }
-                )
-
-                return last_event, interrupt_value
-
-            except GraphInterrupt as interrupt_exc:
-                interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
-                logger.info(
-                    "[PM_INVOKE] Interrupt detected via exception during resume",
-                    extra={
-                        "thread_id": thread_id,
-                        "interrupt_count": len(interrupts_list),
-                    },
-                )
-                if interrupts_list:
-                    return last_event, interrupts_list[0].value
-                return last_event, None
-
-            except Exception as e:
-                logger.error(
-                    f"[PM_INVOKE] Command execution error: {type(e).__name__}: {e}",
-                    extra={"thread_id": thread_id},
-                    exc_info=True
-                )
-                raise
-
+        # Route to appropriate flow
+        if pending_interrupts_list:
+            return self._handle_resume_flow(pm, config, thread_id, raw_payload, pending_interrupts_list)
         else:
-            # No pending interrupt - normal message flow
-            logger.info(
-                "[PM_INVOKE] NEW MESSAGE FLOW: No pending interrupts",
-                extra={"thread_id": thread_id}
-            )
-
-            try:
-                from langchain.messages import HumanMessage
-                logger.info("[PM_INVOKE] Creating HumanMessage payload", extra={"thread_id": thread_id})
-                payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
-                logger.info(
-                    f"[PM_INVOKE] Payload created: has_text={raw_payload.get('text') is not None}, "
-                    f"has_media={raw_payload.get('media_id') is not None}",
-                    extra={"thread_id": thread_id}
-                )
-            except Exception as e:
-                logger.error(
-                    f"[PM_INVOKE] Failed to create payload: {type(e).__name__}: {e}",
-                    extra={"thread_id": thread_id},
-                    exc_info=True
-                )
-                raise
-
-            last_event = None
-            accumulated_interrupts: list[Any] = []  # ✅ Accumulate ALL interrupts across stream events
-
-            try:
-                logger.info("[PM_INVOKE] Starting PM stream execution", extra={"thread_id": thread_id})
-                event_count = 0
-                for event in pm.stream(payload, config=config, stream_mode="values"):
-                    event_count += 1
-                    last_event = event
-                    logger.info(
-                        f"[PM_INVOKE] PM stream event #{event_count}",
-                        extra={
-                            "thread_id": thread_id,
-                            "has_interrupt": "__interrupt__" in event,
-                            "event_keys": list(event.keys()) if isinstance(event, dict) else "not_dict"
-                        }
-                    )
-
-                    # Detect interrupt in stream
-                    if "__interrupt__" in event:
-                        interrupts = event.get("__interrupt__") or []
-                        if interrupts:
-                            # ✅ ACCUMULATE interrupts from this event
-                            # When PM makes 2 parallel task() calls, we get 2 SEPARATE stream events,
-                            # each with 1 interrupt. We need to collect all of them.
-                            accumulated_interrupts.extend(interrupts)
-                            logger.info(
-                                "[PM_INVOKE] Interrupt event detected",
-                                extra={
-                                    "thread_id": thread_id,
-                                    "event_interrupt_count": len(interrupts),
-                                    "total_accumulated": len(accumulated_interrupts),
-                                },
-                            )
-
-                logger.info(
-                    f"[PM_INVOKE] PM stream completed: {event_count} events",
-                    extra={
-                        "thread_id": thread_id,
-                        "accumulated_interrupt_count": len(accumulated_interrupts),
-                    },
-                )
-
-                # ✅ Process accumulated interrupts after stream completes
-                interrupt_value = None
-                if accumulated_interrupts:
-                    logger.info(
-                        f"[PM_INVOKE] Processing {len(accumulated_interrupts)} accumulated interrupts",
-                        extra={"thread_id": thread_id}
-                    )
-                    if len(accumulated_interrupts) > 1:
-                        # Multiple interrupts - flatten all values
-                        interrupt_value = []
-                        for intr in accumulated_interrupts:
-                            if isinstance(intr.value, list):
-                                interrupt_value.extend(intr.value)
-                            else:
-                                interrupt_value.append(intr.value)
-
-                        logger.info(
-                            "[PM_INVOKE] Multiple parallel interrupts collected",
-                            extra={
-                                "thread_id": thread_id,
-                                "interrupt_count": len(accumulated_interrupts),
-                                "flattened_count": len(interrupt_value),
-                            },
-                        )
-                    else:
-                        # Single interrupt - use value directly
-                        interrupt_value = accumulated_interrupts[0].value
-                        logger.info(
-                            "[PM_INVOKE] Single interrupt collected",
-                            extra={
-                                "thread_id": thread_id,
-                            },
-                        )
-                else:
-                    logger.info(
-                        "[PM_INVOKE] No interrupts - workflow completed normally",
-                        extra={"thread_id": thread_id}
-                    )
-
-                logger.info(
-                    f"[PM_INVOKE] Returning: last_event={'present' if last_event else 'None'}, "
-                    f"interrupt_value={'present' if interrupt_value else 'None'}",
-                    extra={"thread_id": thread_id}
-                )
-                return last_event, interrupt_value
-
-            except GraphInterrupt as interrupt_exc:
-                interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
-                logger.info(
-                    "[PM_INVOKE] Interrupt detected via exception",
-                    extra={
-                        "thread_id": thread_id,
-                        "interrupt_count": len(interrupts_list),
-                    },
-                )
-                if interrupts_list:
-                    return last_event, interrupts_list[0].value
-                return last_event, None
-
-            except Exception as e:
-                logger.error(
-                    f"[PM_INVOKE] PM streaming error: {type(e).__name__}: {e}",
-                    extra={"thread_id": thread_id},
-                    exc_info=True
-                )
-                raise
-
-    def _send_batch_approval(self, sender: str, products: list[Any]) -> None:
-        """Send batch approval request with ALL products displayed together.
-
-        Args:
-            sender: Channel-specific sender ID
-            products: List of Product objects to approve
-
-        Notes:
-            This method formats multiple products into a single approval message
-            so users can see and approve all products at once for batch workflows.
-        """
-
-        # Format batch approval message
-        message_parts = [
-            f"**Batch Approval Request** ({len(products)} products)",
-            "",
-            "Please review the following products:",
-            "",
-        ]
-
-        for idx, product in enumerate(products, 1):
-            # Format each product
-            product_lines = [
-                f"**Product {idx}:**",
-                f"  - Name: {product.name}",
-                f"  - Description: {product.description}",
-                f"  - Price: Rs {product.price}",
-            ]
-
-            if product.sizes:
-                product_lines.append(f"  - Sizes: {', '.join(product.sizes)}")
-            if product.colors:
-                product_lines.append(f"  - Colors: {', '.join(product.colors)}")
-            if product.image_urls:
-                product_lines.append(f"  - Images: {len(product.image_urls)} attached")
-
-            message_parts.extend(product_lines)
-            message_parts.append("")  # Blank line between products
-
-        message_parts.extend([
-            "---",
-            "",
-            "**How to respond:**",
-            "- To approve all: 'approve' or 'yes'",
-            "- To approve some: 'approve 1 and 2' or 'approve product 1'",
-            "- To edit: 'edit product 2 price to 45'",
-            "- To reject all: 'reject' or 'no'",
-        ])
-
-        # Send formatted message
-        batch_message = "\n".join(message_parts)
-        self.channel.send_text(sender, batch_message)
-
-    def _get_lock(self, sender: str) -> Lock:
-        """Get or create thread lock with LRU eviction.
-
-        Args:
-            sender: Channel-specific sender ID
-
-        Returns:
-            Thread lock for this sender
-        """
-        # Fast path: lock already exists
-        if sender in self._thread_locks:
-            with self._locks_mutex:
-                self._thread_locks.move_to_end(sender)
-            return self._thread_locks[sender]
-
-        # Slow path: create lock with LRU eviction
-        with self._locks_mutex:
-            # Double-check
-            if sender in self._thread_locks:
-                self._thread_locks.move_to_end(sender)
-                return self._thread_locks[sender]
-
-            # Evict oldest if at capacity
-            if len(self._thread_locks) >= MAX_THREAD_LOCKS:
-                oldest_sender, _ = self._thread_locks.popitem(last=False)
-                logger.debug(
-                    "Evicted LRU thread lock",
-                    extra={"evicted_sender": oldest_sender, "cache_size": len(self._thread_locks)},
-                )
-
-            # Create new lock
-            self._thread_locks[sender] = Lock()
-            return self._thread_locks[sender]
+            return self._handle_new_message_flow(pm, config, thread_id, raw_payload)
 
     def _get_checkpointer(self) -> BaseCheckpointSaver[Any]:
         """Get checkpointer instance."""

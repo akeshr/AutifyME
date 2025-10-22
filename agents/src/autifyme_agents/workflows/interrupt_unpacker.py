@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from autifyme_agents.schemas.interrupt import InterruptInfo
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,7 +26,7 @@ class InterruptUnpacker:
     def unpack_interrupts(
         state_snapshot: Any,
         thread_id: str | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[InterruptInfo]:
         """Unpack LangGraph interrupts into normalized flat list.
 
         IMPORTANT: interrupt_obj.value can be:
@@ -33,21 +35,16 @@ class InterruptUnpacker:
         - A single dict (single action)
         - Unknown format (fallback handling)
 
-        We create N interrupt_info objects for approval analyzer (1 response per action).
+        We create N InterruptInfo objects for approval analyzer (1 response per action).
 
         Args:
             state_snapshot: LangGraph StateSnapshot with interrupts
             thread_id: Optional thread ID for logging
 
         Returns:
-            List of normalized interrupt_info dicts with:
-            - interrupt_id: str (with suffix for list items: "id_0", "id_1", ...)
-            - original_interrupt_id: str (without suffix, for Command building)
-            - tool_name: str
-            - tool_args: dict
-            - description: str
+            List of normalized InterruptInfo objects with type-safe fields
         """
-        pending_interrupts_list: list[dict[str, Any]] = []
+        pending_interrupts_list: list[InterruptInfo] = []
 
         if not state_snapshot or not state_snapshot.interrupts:
             return pending_interrupts_list
@@ -80,13 +77,13 @@ class InterruptUnpacker:
                         tool_args = {}
                         description = str(action)[:100]
 
-                    interrupt_info = {
-                        "interrupt_id": f"{interrupt_id}_{action_idx}",  # Suffixed ID
-                        "original_interrupt_id": interrupt_id,  # Original ID for Command
-                        "tool_name": tool_name,
-                        "tool_args": tool_args,
-                        "description": description,
-                    }
+                    interrupt_info = InterruptInfo(
+                        interrupt_id=f"{interrupt_id}_{action_idx}",
+                        original_interrupt_id=interrupt_id,
+                        tool_name=tool_name,
+                        tool_args=tool_args,
+                        description=description,
+                    )
                     pending_interrupts_list.append(interrupt_info)
                     logger.info(f"[RESUME ORDER] Interrupt {action_idx + 1}: {tool_args.get('name', 'unknown')}")
 
@@ -115,13 +112,13 @@ class InterruptUnpacker:
                             tool_args = {}
                             description = str(action_request)[:200]
 
-                        interrupt_info = {
-                            "interrupt_id": f"{interrupt_id}_{action_idx}",  # Suffixed ID
-                            "original_interrupt_id": interrupt_id,  # Original ID for Command
-                            "tool_name": tool_name,
-                            "tool_args": tool_args,
-                            "description": description,
-                        }
+                        interrupt_info = InterruptInfo(
+                            interrupt_id=f"{interrupt_id}_{action_idx}",
+                            original_interrupt_id=interrupt_id,
+                            tool_name=tool_name,
+                            tool_args=tool_args,
+                            description=description,
+                        )
                         pending_interrupts_list.append(interrupt_info)
                         logger.info(f"[BATCH HITL] Action {action_idx + 1}: {tool_name} - {tool_args.get('name', 'unknown')}")
                 else:
@@ -134,22 +131,24 @@ class InterruptUnpacker:
                             "action_requests_type": type(action_requests).__name__,
                         }
                     )
-                    interrupt_info = {
-                        "interrupt_id": interrupt_id,
-                        "tool_name": "unknown",
-                        "tool_args": {},
-                        "description": str(interrupt_value)[:200],
-                    }
+                    interrupt_info = InterruptInfo(
+                        interrupt_id=interrupt_id,
+                        original_interrupt_id=interrupt_id,
+                        tool_name="unknown",
+                        tool_args={},
+                        description=str(interrupt_value)[:200],
+                    )
                     pending_interrupts_list.append(interrupt_info)
 
             # Case 2: Dict-valued interrupt (single action)
             elif isinstance(interrupt_value, dict):
-                interrupt_info = {
-                    "interrupt_id": interrupt_id,
-                    "tool_name": interrupt_value.get("tool_name", "unknown"),
-                    "tool_args": interrupt_value.get("tool_args", {}),
-                    "description": str(interrupt_value)[:100],
-                }
+                interrupt_info = InterruptInfo(
+                    interrupt_id=interrupt_id,
+                    original_interrupt_id=interrupt_id,
+                    tool_name=interrupt_value.get("tool_name", "unknown"),
+                    tool_args=interrupt_value.get("tool_args", {}),
+                    description=str(interrupt_value)[:100],
+                )
                 pending_interrupts_list.append(interrupt_info)
 
             # Case 3: Unknown format (defensive fallback)
@@ -162,12 +161,13 @@ class InterruptUnpacker:
                         "value_type": type(interrupt_value).__name__,
                     }
                 )
-                interrupt_info = {
-                    "interrupt_id": interrupt_id,
-                    "tool_name": "unknown",
-                    "tool_args": {},
-                    "description": str(interrupt_value)[:100] if interrupt_value else "Pending approval",
-                }
+                interrupt_info = InterruptInfo(
+                    interrupt_id=interrupt_id,
+                    original_interrupt_id=interrupt_id,
+                    tool_name="unknown",
+                    tool_args={},
+                    description=str(interrupt_value)[:100] if interrupt_value else "Pending approval",
+                )
                 pending_interrupts_list.append(interrupt_info)
 
         logger.debug(
