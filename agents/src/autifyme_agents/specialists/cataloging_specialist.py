@@ -50,6 +50,5 @@ def create_cataloging_specialist(storage: StorageInterface) -> dict[str, Any]:
         "description": description,
         "tools": [image_analysis_tool, save_product],
         "system_prompt": system_prompt,
-        "middleware": [_limit_message_history],  # Ultra-thin context
         "interrupt_on": {"save_product": True},
     }

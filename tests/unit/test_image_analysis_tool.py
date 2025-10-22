@@ -204,8 +204,12 @@ class TestImageAnalysisTool:
             # Verify LLM was called with correct model
             mock_get_llm.assert_called_once_with(provider="openai", model="gpt-4.1-mini")
 
-            # Verify with_structured_output was called with correct schema
-            mock_llm.with_structured_output.assert_called_once_with(ImageAnalysisResult)
+            # Verify with_structured_output was called with correct schema and parameters
+            mock_llm.with_structured_output.assert_called_once_with(
+                ImageAnalysisResult,
+                method="json_schema",
+                include_raw=False,
+            )
 
             # Verify invoke was called with messages containing image
             call_args = mock_structured.invoke.call_args[0][0]

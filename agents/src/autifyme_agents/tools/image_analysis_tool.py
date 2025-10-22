@@ -11,7 +11,7 @@ import io
 from pathlib import Path
 from typing import Annotated
 
-from langchain_core.tools import tool
+from langchain.tools import tool
 from PIL import Image
 from pydantic import Field
 
@@ -145,8 +145,15 @@ Be specific and objective. Describe what you actually see."""
         }
     ]
 
-    # Call Vision API with structured output
-    result = llm.with_structured_output(ImageAnalysisResult).invoke(messages)
+    # Call Vision API with structured output (direct invoke, no RunnableSequence)
+    # Use json_schema method which is more reliable for large payloads
+    structured_llm = llm.with_structured_output(
+        ImageAnalysisResult,
+        method="json_schema",  # More robust than function_calling
+        include_raw=False,
+    )
+
+    result = structured_llm.invoke(messages)
 
     # Ensure return type matches (structured_output returns BaseModel or dict)
     if isinstance(result, ImageAnalysisResult):
