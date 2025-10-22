@@ -1,108 +1,38 @@
-"""Cataloging specialist using create_agent for consistency.
+"""Cataloging specialist - synthesizes product information into catalog entries.
 
-Replaces simple chain with full agent for observability and middleware support.
+Factory function returns SubAgent spec for PM's subagents list.
 """
 
 from typing import Any
 
-from langchain.agents import create_agent
-from langchain.agents.structured_output import ToolStrategy
-from langchain.chat_models import BaseChatModel
-
-from autifyme_agents.core.llm_factory import get_llm
+from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.schemas.models import Product
-
-# Module-level cache for specialist agent (thread-safe, reusable)
-_cached_cataloging_specialist: Any | None = None
+from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
+from autifyme_agents.tools.storage_tools import create_save_product_tool
 
 
-def _get_cataloging_specialist() -> Any:
-    """Get or create the cached cataloging specialist agent.
-
-    Uses module-level singleton pattern for performance:
-    - Agent compilation is non-trivial (graph building, tool binding)
-    - LangChain agents are thread-safe and stateless (verified via REPL)
-    - Each invoke() is independent with no state leakage
-
-    Returns:
-        Cached agent instance, safe to reuse across invocations
-    """
-    global _cached_cataloging_specialist
-    if _cached_cataloging_specialist is None:
-        _cached_cataloging_specialist = create_cataloging_specialist()
-    return _cached_cataloging_specialist
-
-
-def create_cataloging_specialist(
-    model: BaseChatModel | None = None,
-    checkpointer: Any | None = None,
-) -> Any:
-    """Create cataloging specialist as full agent with structured output.
-
-    Uses create_agent instead of simple chain for:
-    - LangSmith observability (traced as agent)
-    - Middleware support (caching, summarization)
-    - Future extensibility (can add tools)
-    - Architectural consistency (agents all the way down)
+def create_cataloging_specialist(storage: StorageInterface) -> dict[str, Any]:
+    """Create cataloging specialist SubAgent spec.
 
     Args:
-        model: Optional LLM override
-        checkpointer: Optional checkpointer for stateful specialist
+        storage: Storage adapter for database operations
 
     Returns:
-        Agent that takes input and returns Product model
+        SubAgent spec with tools and HITL configuration
     """
-
-    llm = model or get_llm(provider="openai", model="gpt-4.1-mini")
+    save_product = create_save_product_tool(storage)
     system_prompt = load_prompt("specialists/cataloging_specialist.prompt")
 
-    # ✅ Use create_agent with response_format for structured output
-    agent = create_agent(
-        model=llm,
-        tools=[],  # No tools needed - pure extraction
-        system_prompt=system_prompt,
-        response_format=ToolStrategy(
-            schema=Product,
-            handle_errors=True  # v1.0: Self-healing structured outputs
-        ),
-        checkpointer=checkpointer,  # Optional: stateful if needed
-        name="CatalogingSpecialist",
+    description = (
+        "Synthesizes product information from user descriptions and image analysis. "
+        "Analyzes product images, infers missing details, creates complete catalog entries "
+        "with human approval before saving to database."
     )
 
-    return agent
-
-
-# Adapter for backward compatibility with tool invocation
-def cataloging_specialist_invoke(
-    user_message: str,
-    image_analysis: dict[str, Any] | None = None,
-    config: dict[str, Any] | None = None,
-) -> Product:
-    """Invoke cataloging specialist with simplified interface.
-
-    This maintains compatibility with existing tool wrappers while
-    using the new agent-based implementation underneath.
-    """
-
-    # Use cached agent for performance (10-50ms savings per invocation)
-    agent = _get_cataloging_specialist()
-
-    # Build input message
-    content_parts = [f"User request:\n{user_message}"]
-
-    if image_analysis:
-        content_parts.append(f"\nImage insights:\n{image_analysis}")
-    else:
-        content_parts.append("\nNo image insights provided.")
-
-    content_parts.append("\nProduce a complete product record with all available fields populated.")
-
-    messages = [{"role": "human", "content": "\n".join(content_parts)}]
-
-    # Invoke agent
-    result = agent.invoke({"messages": messages}, config=config or {})
-
-    # Extract structured response (Product model)
-    product: Product = result["structured_response"]
-    return product
+    return {
+        "name": "cataloging_specialist",
+        "description": description,
+        "tools": [image_analysis_tool, save_product],
+        "system_prompt": system_prompt,
+        "interrupt_on": {"save_product": True},
+    }
