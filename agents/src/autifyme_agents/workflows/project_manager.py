@@ -1,19 +1,4 @@
-"""Project Manager agent built on deepagents.
-
-This module adheres to our Architecture-First mandate by centralizing all
-cross-workflow orchestration logic in a single Project Manager agent. The
-implementation closely follows `docs/architecture/PROJECT_MANAGER_DESIGN.md`
-and leverages deepagents for planning, sub-agent delegation, and HITL.
-
-**HITL Strategy (Approval Analyzer)**:
-- Runner detects interrupts from department workflows
-- Runner invokes approval_analyzer (separate agent) for HITL decisions
-- approval_analyzer returns structured BatchApprovalResponse
-- Runner builds Command objects and resumes workflow
-- PM remains focused on orchestration, not approval logic
-
-This maintains clean separation: PM orchestrates, approval_analyzer decides.
-"""
+"""Project Manager - orchestrates specialists to handle business workflows."""
 
 from __future__ import annotations
 
@@ -35,13 +20,7 @@ if TYPE_CHECKING:
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
-    """Return the configured chat model for the Project Manager.
-
-    Follows the Architecture-First rule by centralizing model selection through
-    our LLM factory. Default configuration uses gpt-4.1-mini for fast, deterministic
-    planning with 75% cache discount (best caching).
-    """
-
+    """Return configured LLM for PM. Defaults to gpt-4.1-mini."""
     if model is not None:
         return model
     return get_llm(model="gpt-4.1-mini", temperature=0.2)
@@ -56,44 +35,6 @@ def _load_prompt(company_profile: CompanyProfile) -> str:
     )
 
 
-def _create_cataloging_subagent(
-    storage: StorageInterface,
-    checkpointer: Any,
-    channel: MessagingChannel | None = None,
-) -> dict[str, Any]:
-    """Create cataloging department as a CustomSubAgent.
-
-    DeepAgents supports two subagent patterns:
-    1. SubAgent: Declare specs, DeepAgents builds agent
-    2. CustomSubAgent: Pass pre-built agent graph
-
-    Our department has complex middleware (HITL, caching, summarization) and
-    response_format, so we use CustomSubAgent to preserve all that logic.
-
-    This is the correct architecture: PM delegates to department subagent,
-    department executes workflow with full middleware stack.
-    """
-    from autifyme_agents.departments.cataloging_department import create_cataloging_department
-
-    # Create FULL department agent with middleware, HITL, checkpointing
-    cataloging_dept_graph = create_cataloging_department(
-        checkpointer=checkpointer,
-        storage=storage,
-        channel=channel,  # Pass channel for media download tools
-    )
-
-    # Return CompiledSubAgent spec for DeepAgents (v1.0: renamed graph to runnable)
-    return {
-        "name": "cataloging_department",
-        "description": (
-            "Handles product cataloging workflows including adding new products, "
-            "updating existing products, and batch cataloging. Supports text, images, "
-            "videos, and combinations. Returns structured CatalogingResult."
-        ),
-        "runnable": cataloging_dept_graph,  # v1.0: renamed from graph
-    }
-
-
 def create_project_manager(
     company_profile: CompanyProfile,
     *,
@@ -103,60 +44,66 @@ def create_project_manager(
     channel: MessagingChannel | None = None,
     tools: Sequence[Any] | None = None,
 ) -> Any:
-    """Create the deepagents-powered Project Manager with proper delegation hierarchy.
+    """Create Project Manager that orchestrates specialists.
 
     Args:
-        company_profile: Single-tenant company context required for all workflows.
-        model: Optional override for the LLM powering the manager.
-        checkpointer: LangGraph checkpointer for durable state (required - provided by runner).
-        storage: Storage adapter implementing StorageInterface (required).
-        channel: Optional messaging channel for MessageIntentTool (enables agentic message interpretation).
-        tools: Optional explicit tool list for PM orchestration only (NOT domain tools).
+        company_profile: Company context for brand voice and target audience
+        model: Optional LLM override
+        checkpointer: LangGraph checkpointer for state persistence (required)
+        storage: Storage adapter for database operations (required)
+        channel: Messaging channel for platform-specific media download tools
+        tools: Ignored - tools auto-configured from channel
 
     Returns:
-        Compiled deepagents agent with proper delegation to departments.
-
-    **Architecture**:
-    - PM handles intent detection directly (no specialist)
-    - PM delegates with media_id (no download tools - keeps PM simple)
-    - Departments download media when needed (lazy loading)
-    - Departments have domain tools (analyze_image, save_product, download_media)
-    - Enforces PM → Department → Specialist → Tools hierarchy
+        Compiled DeepAgent with specialist delegation
     """
 
     if checkpointer is None:
         raise ValueError("checkpointer is required for Project Manager (DeepAgents requirement)")
 
+    if storage is None:
+        raise ValueError("storage is required for Project Manager (tools dependency)")
+
     llm = _resolve_model(model)
     instructions = _load_prompt(company_profile)
 
-    # Get store for long-term memory
     store = get_store()
 
-    # Note: Media download tools NOT included in PM
-    # PM delegates media_id to departments, departments download when needed
-    # This keeps PM focused on orchestration, not domain operations
-    # TodoListMiddleware provides write_todos tool automatically (v1.0)
+    # Platform tools (media download based on channel)
+    pm_tools: list[Any] = []
+    if channel is not None:
+        from autifyme_agents.tools.platform_tools import create_platform_media_tools
+        pm_tools.extend(create_platform_media_tools(channel))
 
-    # Departments are subagents (proper delegation hierarchy)
+    # Specialists as subagents
+    from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
+
     subagents: list[Any] = [
-        _create_cataloging_subagent(storage, checkpointer, channel),
+        create_cataloging_specialist(storage),
     ]
 
-    # Middleware for PM
-    # Note: TodoListMiddleware is added by default in create_deep_agent (v1.0)
-    # No custom middleware needed for PM currently
+    # HITL Configuration: Aggregate interrupt_on from all subagents
+    # Each specialist can declare which tools require approval via interrupt_on dict
+    # PM aggregates these and passes to DeepAgents to enable HITL middleware
+    # Example: cataloging_specialist has interrupt_on={'save_product': True}
+    interrupt_configs: dict[str, bool] = {}
+    for subagent in subagents:
+        if isinstance(subagent, dict) and "interrupt_on" in subagent:
+            interrupt_configs.update(subagent["interrupt_on"])
 
-    # No interrupt_on needed - departments handle their own HITL
+    # DeepAgents automatically adds HumanInTheLoopMiddleware when interrupt_on is provided
+    # This middleware intercepts tool calls matching interrupt_on config and raises interrupts
+    # Runner detects these interrupts and handles the approval workflow
     project_manager = create_deep_agent(
-        tools=[],  # PM has orchestration tools (middleware provides write_todos)
-        system_prompt=instructions,  # v1.0: renamed from instructions
+        tools=pm_tools,
+        system_prompt=instructions,
         model=llm,
         subagents=subagents,
+        interrupt_on=interrupt_configs,  # DeepAgents auto-creates HITL middleware from this
         checkpointer=checkpointer,
-        store=store,  # v1.0: Long-term memory store
-        use_longterm_memory=True,  # v1.0: Enable persistent cross-session memory
-        context_schema=CompanyContext,  # v1.0: Type-safe company context injection
+        store=store,
+        use_longterm_memory=True,
+        context_schema=CompanyContext,
     )
 
     initial_state = {

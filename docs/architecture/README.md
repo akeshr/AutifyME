@@ -93,7 +93,7 @@ Framework for Claude to test, analyze, and improve the agentic system through hi
 
 ### LangGraph Interrupt Detection in Subgraphs
 
-**If you're working with HITL/interrupts in subgraphs (DeepAgents, departments):**
+**If you're working with HITL/interrupts in subgraphs (DeepAgents, specialists):**
 
 ❌ **DO NOT** use `checkpointer.get_tuple(config).checkpoint.get("__interrupt__")` - it doesn't work!
 
@@ -115,7 +115,7 @@ Before implementing any feature:
 2. Review **[AGENTS_DESIGN.md](./core/AGENTS_DESIGN.md)** for hierarchy and context engineering
 3. **Writing prompts?** Follow **[PROMPT_ENGINEERING_STANDARDS.md](./tech/PROMPT_ENGINEERING_STANDARDS.md)**
 4. For implementation sequencing, read `../roadmap/IMPLEMENTATION_ROADMAP.md`
-5. For pending departments or PM details, consult **[PROJECT_MANAGER_DESIGN.md](./core/PROJECT_MANAGER_DESIGN.md)**
+5. For specialist or PM details, consult **[PROJECT_MANAGER_DESIGN.md](./core/PROJECT_MANAGER_DESIGN.md)**
 6. Follow Cursor rules in `../../.cursor/rules/`
 
 ---

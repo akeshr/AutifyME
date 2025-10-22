@@ -4,9 +4,9 @@ This document outlines the design for the Cataloging MVP feature: enabling India
 
 ---
 
-## Architecture (2025-10-15)
+## Architecture (2025-01-22)
 
-**Native LangGraph HITL with DeepAgents hierarchy.**
+**Native LangGraph HITL with 2-level DeepAgents hierarchy.**
 
 ### Components
 
@@ -14,14 +14,14 @@ This document outlines the design for the Cataloging MVP feature: enabling India
 - **Channel Adapter**: `integrations/communication/whatsapp_client.py` - WhatsApp Graph API client
 - **Workflow Runner**: `workflows/orchestration/runner_v2.py` - Generic orchestrator (PM invocation, HITL detection)
 - **Approval Analyzer**: `workflows/approval_analyzer.py` - HITL interpretation with structured output
-- **Project Manager**: `workflows/project_manager.py` - DeepAgent (delegates to departments via CustomSubAgents)
-- **Cataloging Department**: `departments/cataloging_department.py` - DeepAgent (coordinates specialists via SubAgents)
-- **Specialists**: `specialists/` - SubAgent specs or CustomSubAgent graphs
+- **Project Manager**: `workflows/project_manager.py` - DeepAgent (delegates to specialists via SubAgents)
+- **Cataloging Specialist**: `specialists/cataloging_specialist.py` - SubAgent (uses tools directly: image_analysis, save_product)
+- **Tools**: `tools/` - Utility functions (image_analysis_tool, storage_tools)
 
 ### Key Features
 
 - ✅ Native LangGraph interrupt handling (no custom coordinators)
-- ✅ Full DeepAgents hierarchy (PM → Dept → Specialist)
+- ✅ 2-Level DeepAgents hierarchy (**PM → Specialist → Tools**)
 - ✅ Structured approval interpretation (BatchApprovalResponse)
 - ✅ Type-safe via Pydantic throughout
 
@@ -49,8 +49,8 @@ The entire user experience is conversational and happens within WhatsApp.
 
 ### HITL Interaction
 
-1. Department attempts `save_product` after specialists complete draft
-2. `tool_configs` triggers native LangGraph interrupt (HumanInTheLoopMiddleware)
+1. Specialist attempts `save_product` after synthesizing product draft
+2. `tool_configs` (configured on specialist) triggers native LangGraph interrupt (HumanInTheLoopMiddleware)
 3. Runner detects `__interrupt__` in event stream, extracts draft from interrupt value
 4. Runner sends approval request to user via channel
 5. User responds (approve/reject/edits)
@@ -66,36 +66,31 @@ The entire user experience is conversational and happens within WhatsApp.
 
 ## 2. Agentic Architecture & Workflow
 
-This workflow will be managed by a generic `ProjectManagerAgent` and a new `Cataloging` department. The system is designed to be context-aware, loading company-specific information at the start of each workflow.
+This workflow is managed by a generic `ProjectManagerAgent` that delegates directly to specialists. The system is context-aware, loading company-specific information at the start of each workflow.
 
 1.  **Entrypoint & Context Injection:**
-    -   An `api.py` entrypoint will expose a webhook to receive incoming messages from the WhatsApp Cloud API.
-    -   Upon receiving a message, the system will use the user's phone number to look up their associated `company_id`.
-    -   It will then fetch the corresponding `company_profile` from the Supabase database.
-    -   This `company_profile` object will be passed as initial input to the `ProjectManagerAgent`, making all subsequent actions context-aware.
+    -   An `api.py` entrypoint exposes a webhook to receive incoming messages from the WhatsApp Cloud API.
+    -   Upon receiving a message, the system uses the user's phone number to look up their associated `company_id`.
+    -   It fetches the corresponding `company_profile` from the Supabase database.
+    -   This `company_profile` object is passed as initial input to the `ProjectManagerAgent`, making all subsequent actions context-aware.
 
-2.  **`ProjectManagerAgent` (DeepAgent Orchestrator):**
-    -   Implemented via `deepagents.create_deep_agent` with the cataloging department registered as a CustomSubAgent (pre-built graph).
+2.  **`ProjectManagerAgent` (Top-Level Orchestrator):**
+    -   Implemented via `deepagents.create_deep_agent` with specialists registered as SubAgents.
     -   **Intent Analysis:** Filters greetings/noise, recognizes cataloging requests, and detects pending interrupts for workflow resumption.
-    -   **Structured Delegation:** Passes raw platform messages (JSON payload) to departments with complete context.
+    -   **Direct Delegation:** Passes raw platform messages to cataloging specialist with complete context.
     -   **Self-Correction:** Applies recursion-limit guards and surfaces failures to human support rather than looping.
 
-3.  **`CatalogingDept` Agent (Department Head):**
-    -   **Purpose:** Orchestrate product cataloging workflow by coordinating specialist subagents.
-    -   **Workflow:** Adaptive delegation based on available data:
-        -   If images present → delegate to `ImageAnalysisSpecialist` for visual extraction
-        -   Delegate to `CatalogingSpecialist` to synthesize data into Product model
-        -   Call `save_product` tool (triggers HITL approval via tool_configs)
-
-4.  **Specialist Agents:**
-    -   **`ImageAnalysisSpecialist`:**
-        -   **Purpose:** Extract visual product attributes from images.
-        -   **Implementation:** Vision-capable LLM (gpt-4.1-mini-2025-04-14) with structured output (ImageAnalysisResult).
-        -   **Output:** `ImageAnalysisResult` with visual_description, identified_colors, style_tags.
-    -   **`CatalogingSpecialist`:**
-        -   **Purpose:** Transform user descriptions and image insights into complete Product models.
-        -   **Implementation:** LLM with structured output (Product), brand-aware via company context middleware.
-        -   **Output:** `Product` with all catalog fields (name, description, price, sizes, colors, image_urls).
+3.  **`CatalogingSpecialist` (Domain Expert):**
+    -   **Purpose:** Transform user descriptions and images into complete Product models.
+    -   **Implementation:** Created via `create_agent()` with tools attached.
+    -   **Tools:**
+        -   `image_analysis_tool`: Analyzes product images using Vision API → returns `ImageAnalysisResult`
+        -   `save_product`: Persists product to database (HITL-enabled via `tool_configs`)
+    -   **Workflow:** Adaptive execution based on available data:
+        -   If images present → call `image_analysis_tool(image_path)` for visual extraction
+        -   Synthesize data from user text + image insights into Product model
+        -   Call `save_product(name, price, ...)` → triggers HITL approval
+    -   **Output:** `CatalogingResult` with success status, product_id, and message
 
 ### Error Handling & Resilience
 
@@ -106,16 +101,16 @@ This workflow will be managed by a generic `ProjectManagerAgent` and a new `Cata
 
 ---
 
-## 3. Required New Components
+## 3. Required Components
 
-This feature requires the creation of several new components in our project structure.
+This feature uses the following components:
 
-1.  **`integrations/communication/whatsapp_client.py`:** A new adapter to handle the specifics of sending and receiving messages via the WhatsApp Business Cloud API.
-2.  **`tools/communication_tools.py`:** Provides `send_whatsapp_message` (factory helper will be added alongside the Project Manager rollout).
-3.  **`schemas/models.py`:** Will need a new Pydantic model for a `Product` (e.g., with fields `id`, `name`, `description`, `price`, `sizes`, `colors`, `image_urls`).
-4.  **Supabase Schema:** A new `products` table in our database to store the catalog information.
-5.  **`workflows/product_ingestion.py`:** Planned home for the `Project Manager` agent (post-MVP).
-6.  **`departments/cataloging/`:** Future directory for the full 3-layer structure. For now, `cataloging_department.py` implements the department with direct tool orchestration as an interim step.
+1.  **`integrations/communication/whatsapp_client.py`:** Adapter to handle sending and receiving messages via the WhatsApp Business Cloud API.
+2.  **`tools/communication_tools.py`:** Provides `send_whatsapp_message`.
+3.  **`schemas/models.py`:** Pydantic model for `Product` (fields: `id`, `name`, `description`, `price`, `sizes`, `colors`, `image_urls`).
+4.  **Supabase Schema:** `products` table in database to store catalog information.
+5.  **`workflows/project_manager.py`:** Project Manager agent with specialist delegation.
+6.  **`specialists/cataloging_specialist.py`:** Cataloging specialist with image_analysis_tool and save_product tools.
 
 ## Implementation Notes
 

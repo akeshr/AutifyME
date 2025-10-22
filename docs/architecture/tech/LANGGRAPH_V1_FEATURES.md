@@ -44,10 +44,10 @@ LangGraph v1 is a **low-level agent orchestration framework** for building state
 - Enables distributed execution patterns (fan-out, fan-in, map-reduce)
 
 **Benefits for AutifyME:**
-- Department agents can execute in parallel when independent
+- Specialist agents can execute in parallel when independent
 - PM can orchestrate multi-step workflows with dependency management
 - Checkpoints captured after each super-step for crash recovery
-- Multiple departments can update shared state safely via reducers
+- Multiple specialists can update shared state safely via reducers
 
 ---
 
@@ -301,7 +301,7 @@ Node returns `[Send("processor", state1), Send("processor", state2), ...]` to sp
 **Why This Matters:**
 - Future: Analyze multiple product images in parallel
 - Process batch cataloging requests concurrently
-- Marketing department generates content for multiple platforms simultaneously
+- Future: Marketing specialist generates content for multiple platforms simultaneously
 - Results automatically merged via state reducers without custom aggregation code
 
 ---
@@ -333,11 +333,11 @@ Define a routing function that examines state and returns the next node name. En
 
 **Benefits:**
 - Modular workflow composition
-- Department agents as subgraphs of PM
+- Specialist agents as subgraphs of PM
 - Checkpointer propagates automatically to subgraphs
 
 **Why This Matters:**
-- Each department is a subgraph with its own state schema
+- Each specialist is a subgraph with its own state schema
 - PM orchestrates subgraphs without managing their internal state
 - Catalog workflow can be reused in batch processing subgraph
 
@@ -355,7 +355,7 @@ Define a routing function that examines state and returns the next node name. En
 - Track `remaining_steps` in state and decrement per iteration
 
 **Why This Matters:**
-- ReAct agent loops (think → act → observe) until task complete
+- Specialist agent loops (think → act → observe) until task complete
 - Retry logic with bounded attempts
 - Multi-round approval workflows (reject → revise → re-approve)
 
@@ -411,13 +411,13 @@ Pass list as `stream_mode` parameter: `stream_mode=["values", "messages"]`
 
 ### tools_condition
 
-**Standard conditional logic for ReAct agents.**
+**Standard conditional logic for tool-calling agents.**
 
 Routes to `ToolNode` if last AI message contains tool calls, else to `END`.
 
 **Why This Matters:**
 - Eliminates boilerplate routing logic in every agent
-- Standard pattern across all department agents
+- Standard pattern across all specialist agents
 - Compatible with LangChain v1 `create_agent`
 
 ### InjectedState & InjectedStore
@@ -460,7 +460,7 @@ Mark tool parameters with `InjectedState` or `InjectedStore` to receive runtime 
 - Collaborative agents (wait for all specialists before synthesis)
 
 **Why This Matters:**
-- PM waits for all departments before final decision
+- PM waits for all specialists before final decision (if multiple specialists invoked in parallel)
 - Aggregate results from parallel specialist invocations
 - Synchronization point in complex workflows
 
@@ -490,7 +490,7 @@ LangGraph powers LangChain v1 agents under the hood:
 - Checkpointing enables HITL and recovery in agents
 
 **Why This Matters:**
-- Our department agents benefit from LangGraph features without direct usage
+- Our specialist agents benefit from LangGraph features without direct usage
 - Upgrading to explicit LangGraph gives more control when needed
 - PM can use DeepAgents (which wraps LangGraph) for advanced orchestration
 
@@ -498,27 +498,28 @@ LangGraph powers LangChain v1 agents under the hood:
 
 ## 🎯 AutifyME Usage Strategy
 
-### Current Implementation (Cataloging Workflow)
-- **Departments:** Use `create_agent` (LangGraph under hood)
+### Current Implementation (2-Level Architecture)
+- **Specialists:** Use `create_agent` with tools (LangGraph under hood)
+- **PM:** Use `create_deep_agent` with specialist subagents
 - **Checkpointing:** `PostgresSaver` for HITL approval persistence
-- **HITL:** `interrupt_before` for `save_product` approval
+- **HITL:** Configured via `tool_configs` on specialist tools
 - **Streaming:** `messages` mode for WhatsApp token-by-token responses
 
-### Future Expansion (Project Manager)
-- **PM Graph:** Explicit `StateGraph` with department subgraphs
-- **Parallel Execution:** Multiple departments in same super-step
+### Future Expansion
+- **Parallel Specialists:** Multiple specialists executing in same super-step
 - **Store:** Company profile and user preferences across threads
 - **Map-Reduce:** Batch cataloging via `Send` API
+- **Additional Specialists:** Marketing, Operations, Inventory specialists as subagents
 
 ### When to Use Direct LangGraph
-- **Complex orchestration:** PM coordinating multiple departments
-- **Custom state schemas:** Department-specific state beyond messages
+- **Complex orchestration:** PM coordinating multiple specialists with custom flow
+- **Custom state schemas:** Specialist-specific state beyond messages
 - **Advanced patterns:** Map-reduce, consensus, multi-stage approvals
 - **Fine-grained control:** Need explicit control over execution flow
 
 ### When LangChain Agents Suffice
-- **Simple delegation:** Department with tools and specialists
-- **Standard ReAct:** Tool-calling loop with structured output
+- **Simple delegation:** Specialist with tools executing workflows
+- **Standard tool-calling:** Tool-calling loop with structured output
 - **Middleware-driven:** Cross-cutting concerns handled by middleware
 
 ---
@@ -529,27 +530,28 @@ LangGraph powers LangChain v1 agents under the hood:
 |---------|-----------------|-----------|
 | **Abstraction Level** | High (opinionated patterns) | Low (full control) |
 | **State Management** | Messages-only | Custom state schemas |
-| **Cycles** | Fixed ReAct loop | Arbitrary cycles |
+| **Cycles** | Fixed tool-calling loop | Arbitrary cycles |
 | **Parallel Execution** | Limited | Native (super-steps) |
 | **Subgraphs** | Not supported | First-class |
 | **Custom Routing** | Middleware-based | Conditional edges + Command |
-| **Use Case** | Departments, Specialists | Project Manager, complex workflows |
+| **Use Case** | Specialists (domain experts) | Project Manager, complex workflows |
 
 ---
 
 ## 🚀 Key Takeaways
 
-**For AutifyME Architecture:**
+**For AutifyME Architecture (2-Level):**
 
-1. **Departments = LangChain Agents (LangGraph under hood)**
+1. **Specialists = LangChain Agents (LangGraph under hood)**
    - Benefit from LangGraph features without complexity
    - Middleware, HITL, checkpointing all available
-   - Easy to upgrade to explicit LangGraph when needed
+   - Created via `create_agent` with tools parameter
+   - Attached to PM as SubAgents
 
-2. **Project Manager = Explicit LangGraph StateGraph**
-   - Needs custom orchestration logic
-   - Coordinates subgraphs (departments)
-   - Benefits from conditional routing and parallel execution
+2. **Project Manager = DeepAgents (wraps LangGraph)**
+   - Created via `create_deep_agent` with specialist subagents
+   - Direct delegation without intermediate layer
+   - Benefits from planning middleware and orchestration
 
 3. **Persistence Strategy:**
    - Checkpointing (PostgresSaver) for workflow state
@@ -557,14 +559,15 @@ LangGraph powers LangChain v1 agents under the hood:
    - Both Supabase-compatible
 
 4. **HITL Implementation:**
-   - `interrupt_before` for approval gates (already used)
+   - Configured via `tool_configs` on specialist tools
    - `Command(resume=...)` for user input injection
    - Checkpoints preserve state during interrupts
 
 5. **Scalability Path:**
-   - Start with simple agents (cataloging department)
-   - Add explicit LangGraph when complexity grows (PM orchestration)
-   - Use subgraphs for modularity (marketing, operations departments)
+   - Start with single specialist (cataloging)
+   - Add more specialists as SubAgents (marketing, inventory, operations)
+   - Use parallel specialist invocation for efficiency
+   - Keep 2-level architecture for simplicity
 
 ---
 

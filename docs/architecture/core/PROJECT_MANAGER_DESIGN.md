@@ -2,196 +2,205 @@
 
 > **Roadmap Document** – Timeless architecture reference. Implementation status is tracked in `../roadmap/IMPLEMENTATION_ROADMAP.md`. Production integration begins once WhatsApp PM readiness checklist is satisfied (currently pending automation and stability work).
 
-**Date:** September 30, 2025
+**Date:** January 22, 2025
 **Purpose:** Define how we use `deepagents` to implement our Project Manager Agent
-**Status:** Roadmap Specification (pending Cataloging validation)
+**Status:** ✅ Implemented - 2-Level Architecture (PM → Specialist → Tools)
 
-> **Status:** Roadmap Specification - Marketing and Operations departments are future work.
-> Current implementation supports Cataloging Department only.
-> For current implementation details, see [ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./ACTUAL_IMPLEMENTATION_ARCHITECTURE.md).
+> **Status:** Current implementation uses 2-level hierarchy.
+> PM delegates directly to specialists (no department layer).
+> Cataloging specialist is production-ready.
+> For implementation details, see [ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./ACTUAL_IMPLEMENTATION_ARCHITECTURE.md).
 
 ---
 
 ## Overview
 
-The Project Manager Agent is the top-level orchestrator in our hierarchical agentic system. We use the `deepagents` library to implement it, leveraging its built-in planning, sub-agent delegation, and HITL capabilities.
+The Project Manager Agent is the top-level orchestrator in our 2-level agentic system. We use the `deepagents` library to implement it, leveraging sub-agent delegation and HITL capabilities.
 
-**Key Insight:** `deepagents` sub-agents = Our Department Heads
+**Key Insight:** `deepagents` sub-agents = Our Specialists (with tools attached)
 
 ---
 
 ## Architecture Mapping
 
-### Our Hierarchy → `deepagents` Components
+### 2-Level Hierarchy → `deepagents` Components
 
 ```
-Project Manager Agent (deepagents main agent)
-    ├── Planning Tool (built-in)
-    └── Sub-agent: Cataloging Department (custom sub-agent) - CURRENT
-        └── Tools: [image_analysis, text_analysis, save_product]
-
-# Future Departments (not yet implemented):
-# ├── Sub-agent: Marketing Department
-# │   └── Tools: [copywriter, seo_analyzer, social_poster]
-# └── Sub-agent: Operations Department
-#     └── Tools: [billing, shipping, inventory]
+Project Manager Agent (create_deep_agent)
+    └── Sub-agents: Specialists (create_agent with tools)
+        ├── Cataloging Specialist - ✅ PRODUCTION
+        │   └── Tools: [image_analysis_tool, save_product]
+        ├── Marketing Specialist - 🔮 FUTURE
+        │   └── Tools: [copywriter, seo_analyzer, social_poster]
+        └── Operations Specialist - 🔮 FUTURE
+            └── Tools: [billing, shipping, inventory]
 ```
 
 **Implementation:**
-- **Project Manager** = `deepagents` main agent with generic instructions
-- **Department Heads** = Custom sub-agents with domain-specific instructions and tools
-- **Specialists** = Tools within each department's toolset
-- **HITL** = Built-in approval for critical operations
+- **Project Manager** = `create_deep_agent()` with minimal tools, delegates to specialists
+- **Specialists** = `create_agent()` with domain-specific instructions and tools
+- **Tools** = Utility functions attached to specialists (via tools parameter)
+- **HITL** = Configured via `tool_configs` on specialist tools
 
 ---
 
-## Implementation Strategy
+## Implementation Status
 
-# Implementation Readiness Checklist
+**Current State:** ✅ 2-Level architecture implemented and production-ready
 
-Before starting implementation, ensure the following prerequisites are met:
-
-1. ✅ Cataloging Department MVP validated with real customer (performance + satisfaction).  
-2. ✅ HITL approval loop implemented and battle-tested.  
-3. ✅ Structured department outputs (`CatalogingResult` → PM) finalized.  
-4. ✅ Dependency injection for storage/middleware refactored away from globals.  
-5. ✅ Testing strategy upgraded from scripts to automated assertions (or minimal test harness).  
-6. 🔄 Decide whether to keep `deepagents` or use native LangChain planning once v1 stabilizes.
-
-Only after this checklist is complete should we begin Phase 1.
+1. ✅ Cataloging specialist validated with real workflows (performance + usability confirmed)
+2. ✅ HITL approval loop implemented and battle-tested via tool_configs
+3. ✅ Structured outputs (`CatalogingResult` → PM) finalized via Pydantic models
+4. ✅ Dependency injection for storage implemented via constructor parameters
+5. ✅ Testing framework upgraded to autonomous testing with assertions
+6. ✅ Using `deepagents` for 2-level hierarchy (PM → Specialist → Tools)
 
 ---
 
 ## Implementation Strategy (Post-MVP)
 
-### Phase 1: Generic Project Manager
+### Current Implementation: 2-Level Project Manager
 
-Build the Project Manager that can orchestrate ANY workflow.
+PM delegates directly to specialists (no department layer).
 
 ```python
 # agents/src/autifyme_agents/workflows/project_manager.py
 
 from deepagents import create_deep_agent
-from langchain_openai import ChatOpenAI
-from langgraph.checkpoint.postgres import PostgresSaver
+from langchain.chat_models import BaseChatModel
 
-from ..core.config import settings
-from ..prompts.templates import PROJECT_MANAGER_PROMPT
-from ..tools.registry import get_all_tools
+from autifyme_agents.core.llm_factory import get_llm
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.schemas.models import CompanyProfile
 
-def create_project_manager(company_profile: dict):
-    """
-    Creates the generic Project Manager agent.
-    
+def create_project_manager(
+    company_profile: CompanyProfile,
+    *,
+    model: BaseChatModel | None = None,
+    checkpointer: Any,
+    storage: StorageInterface,
+    channel: MessagingChannel | None = None,
+) -> Any:
+    """Create Project Manager that delegates to specialists.
+
     Args:
-        company_profile: Company context (brand voice, target audience, etc.)
-    
+        company_profile: Company context for brand voice and target audience
+        model: Optional LLM override
+        checkpointer: LangGraph checkpointer for state persistence (required)
+        storage: Storage adapter for database operations (required)
+        channel: Messaging channel for platform-specific media download tools
+
     Returns:
-        Compiled LangGraph workflow
+        Compiled DeepAgent with specialist delegation
     """
-    
-    # Get all available tools (from all departments)
-    tools = get_all_tools()
-    
-    # Create agent with company-specific context
-    agent = create_deep_agent(
-        tools=tools,
-        instructions=PROJECT_MANAGER_PROMPT.format(
-            company_name=company_profile["name"],
-            brand_voice=company_profile["brand_voice"],
-            target_audience=company_profile["target_audience"],
-        ),
-        model=ChatOpenAI(model="gpt-4.1-mini-2025-04-14", temperature=0.2),
-        tool_configs={
-            # HITL for critical operations
-            "save_product": True,
-            "publish_website": True,
-            "post_to_social": True,
-            "send_invoice": True,
-        }
+
+    llm = get_llm(model="gpt-4.1-mini", temperature=0.2)
+    instructions = load_prompt("project_manager.prompt").format(
+        company_name=company_profile.name,
+        brand_voice=company_profile.brand_voice,
+        target_audience=company_profile.target_audience,
     )
-    
-    # Add persistent checkpointing
-    checkpointer = PostgresSaver.from_conn_string(settings.DATABASE_URL)
-    agent.checkpointer = checkpointer
-    
-    return agent
+
+    # Platform tools (media download based on channel)
+    pm_tools: list[Any] = []
+    if channel is not None:
+        from autifyme_agents.tools.platform_tools import create_platform_media_tools
+        pm_tools.extend(create_platform_media_tools(channel))
+
+    # Specialists as subagents
+    from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
+
+    subagents: list[Any] = [
+        create_cataloging_specialist(storage),
+        # Future specialists...
+    ]
+
+    project_manager = create_deep_agent(
+        tools=pm_tools,  # PM has minimal tools (media download)
+        system_prompt=instructions,
+        model=llm,
+        subagents=subagents,  # Specialists with their own tools
+        checkpointer=checkpointer,
+        store=get_store(),
+        use_longterm_memory=True,
+        context_schema=CompanyContext,
+    )
+
+    return project_manager.with_config({
+        "metadata": {"workflow": "cataloging"},
+        "initial_state": initial_state,
+    })
 ```
 
 **Key Features:**
-- Generic instructions (handles any workflow type)
-- All tools available (delegates to appropriate department via sub-agents)
-- HITL for critical operations
-- State persistence with PostgreSQL
+- Generic orchestrator (not hardcoded to workflows)
+- Specialists as SubAgents (tools attached at specialist level)
+- HITL configured via tool_configs on specialist tools
+- State persistence with PostgreSQL checkpointer
 
 ---
 
-### Phase 2: Department Sub-agents
+### Specialist Implementation Pattern
 
-Each department is a custom sub-agent with specific instructions and tools.
-
-```python
-# agents/src/autifyme_agents/departments/cataloging/instructions.py
-
-CATALOGING_DEPT_INSTRUCTIONS = """
-You are the Cataloging Department Head.
-
-Your role is to transform raw product information (images, text from WhatsApp) 
-into structured, high-quality product listings for the catalog.
-
-Available specialists:
-- image_analysis: Extract product info from images
-- text_analysis: Extract product info from text messages
-- save_product: Save product to database (requires approval)
-
-Workflow:
-1. Analyze input type (image, text, or both)
-2. Delegate to appropriate specialist(s)
-3. Combine results into complete product draft
-4. Request approval for save_product
-5. Save approved product
-
-Brand Voice: {brand_voice}
-Target Audience: {target_audience}
-"""
-```
+Specialists are created with `create_agent()` and attached to PM as SubAgents.
 
 ```python
-# The Project Manager will automatically create sub-agents
-# when it needs to delegate to a specific department.
-# We just need to provide department-specific tools.
+# agents/src/autifyme_agents/specialists/cataloging_specialist.py
 
-# agents/src/autifyme_agents/tools/registry.py
+from deepagents import create_agent
+from autifyme_agents.core.llm_factory import get_llm
+from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
+from autifyme_agents.tools.storage_tools import create_save_product_tool
+from autifyme_agents.schemas.models import Product
 
-def get_cataloging_tools():
-    """Returns tools for Cataloging Department"""
-    return [
-        image_analysis_specialist,
-        text_analysis_specialist,
-        save_product,
-        get_company_profile,
-    ]
+def create_cataloging_specialist(storage: StorageInterface) -> Any:
+    """Create cataloging specialist with tools.
 
-def get_all_tools():
-    """Returns all tools for Project Manager"""
-    return [
-        *get_cataloging_tools(),
-        *get_marketing_tools(),
-        *get_operations_tools(),
-    ]
+    Args:
+        storage: Storage adapter for database operations
+
+    Returns:
+        Specialist agent with image_analysis_tool and save_product tool
+    """
+
+    specialist = create_agent(
+        model=get_llm(model="gpt-4.1-mini", temperature=0),
+        system_prompt=load_prompt("specialists/cataloging_specialist.prompt"),
+        tools=[
+            image_analysis_tool,  # Vision API wrapper
+            create_save_product_tool(storage),  # Database persistence
+        ],
+        tool_configs={
+            "save_product": ToolConfig(
+                allow_accept=True,
+                allow_edit=True,
+                allow_respond=True,
+                description="Review product before saving"
+            )
+        },
+        response_format=Product,  # Structured output
+    )
+
+    return specialist
 ```
 
-**How Sub-agent Delegation Works:**
+**How Specialist Delegation Works:**
 
 1. **User:** "Catalog this product from images"
-2. **Project Manager:** Uses planning tool → "This is a cataloging task"
-3. **Project Manager:** Creates custom sub-agent for Cataloging Department
-4. **Sub-agent:** Gets only cataloging tools + department instructions
-5. **Sub-agent:** Delegates to specialists (tools), assembles result
-6. **Sub-agent:** Returns to Project Manager
-7. **Project Manager:** Returns to user
+2. **Project Manager:** Classifies as cataloging task
+3. **Project Manager:** Delegates to `cataloging_specialist` subagent with complete context
+4. **Specialist:** Calls `image_analysis_tool(image_path)` → gets ImageAnalysisResult
+5. **Specialist:** Synthesizes Product model from user text + image insights
+6. **Specialist:** Calls `save_product(...)` → triggers HITL interrupt
+7. **Runner:** Handles approval workflow
+8. **Tool:** Executes after approval → returns CatalogingResult
+9. **Specialist:** Returns result to PM
+10. **Project Manager:** Relays success to user
 
-**Benefit:** Context isolation - each department only sees relevant tools and context.
+**Benefit:** Direct delegation, tools scoped to specialist, no unnecessary layers.
 
 ---
 

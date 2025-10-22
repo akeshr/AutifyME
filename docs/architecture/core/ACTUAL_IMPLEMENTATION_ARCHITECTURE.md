@@ -1,8 +1,8 @@
 # Actual Implementation Architecture (As-Built Reference)
 
-**Date:** January 21, 2025
-**Status:** ✅ Verified (Phase 1-4 Complete)
-**Last Updated:** Phase 4 - Database polish, cleanup handlers, JSON validation
+**Date:** January 22, 2025
+**Status:** ✅ Verified (2-Level Architecture v1.0.0)
+**Last Updated:** 2-Level refactoring complete - PM → Specialist → Tools
 **Purpose:** Ground truth - actual implementation as coded
 
 ---
@@ -11,7 +11,14 @@
 
 This document captures the **actual implemented architecture** verified from production code.
 
-**Architecture:** Full DeepAgents hierarchy using CustomSubAgents for PM → Department delegation and SubAgents/CustomSubAgents for Department → Specialist delegation.
+**Architecture:** 2-Level hierarchy using DeepAgents - **PM → Specialist → Tools** pattern. Departments removed for simplicity and direct specialist delegation.
+
+**Key Changes from Previous 3-Level:**
+- ❌ Removed Layer 2 (Departments)
+- ✅ PM delegates directly to specialists via SubAgents
+- ✅ Specialists configured at PM level
+- ✅ Tools attached to specialists based on their needs
+- ✅ HITL configured via `tool_configs` on specialist tools
 
 ---
 
@@ -24,364 +31,120 @@ This document captures the **actual implemented architecture** verified from pro
 ```python
 # Actual code pattern:
 project_manager = create_deep_agent(
-    tools=[write_todos, download_{platform}_media],  # Coordination tools only
-    instructions=load_prompt("project_manager.prompt"),
-    subagents=[cataloging_department_spec],  # CustomSubAgent with pre-built graph
-    tool_configs={},  # Empty - HITL handled by departments
+    tools=[],  # PM has NO tools (specialists have the tools)
+    system_prompt=load_prompt("project_manager.prompt"),
+    subagents=[
+        # Specialists as SubAgents
+        cataloging_specialist_subagent,
+    ],
+    model=llm,
     checkpointer=checkpointer,
+    store=store,
+    use_longterm_memory=True,
+    context_schema=CompanyContext,
 )
 ```
 
-**Tools Available:**
-- `write_todos` - DeepAgents planning tool
-- `download_{platform}_media` - Platform-specific media download (WhatsApp, Telegram, etc.)
-  - **Dynamic naming**: `download_whatsapp_media`, `download_telegram_media`
-  - Created via `create_platform_media_tools(channel)`
-  - Takes `media_id`, returns local file path
-
 **Subagents:**
-- Departments exposed as **CustomSubAgents** (pre-built graphs)
-- PM delegates via automatic "task" tool (DeepAgents built-in)
-- Each subagent has: `name`, `description`, `graph` (compiled agent)
+- Specialists exposed as **SubAgents** (DeepAgents native pattern)
+- PM delegates via automatic subagent invocation
+- Each subagent: `name`, `description`, `system_prompt`, `tools`, `tool_configs`
 
 **What PM Does NOT Have:**
-- ❌ Domain tools (image_analysis_specialist, save_product, etc.)
-- ❌ tool_configs for HITL (departments handle this)
-- ❌ Direct access to specialists
-- ❌ Command construction logic (runner handles HITL)
+- ❌ Direct tool access (specialists have the tools)
+- ❌ Domain logic (specialists handle this)
+- ❌ Tool configuration (configured on specialists)
 
 **Data Flow:**
-- Input: `{"messages": [HumanMessage(semantic_description)]}`
-- Uses `IncomingMessage.to_semantic_description()` for structured message format
-- Delegates to departments via `task` tool
+- Input: `{"messages": [HumanMessage(content)]}`
+- Semantic message format from runner
+- Delegates to specialists via subagent calls
 - Output: Via messages in state
 
 ---
 
-### Layer 2: Departments (Domain Orchestrators)
+### Layer 2: Specialists (Domain Experts)
 
-**Implementation:** `departments/cataloging_department.py`
+**Implementation:** `specialists/cataloging_specialist.py`
+
+Specialists are **SubAgents** created via `create_agent()` and attached to PM:
 
 ```python
 # Actual code pattern:
-department = create_deep_agent(
-    model=llm,
-    instructions=load_prompt("departments/cataloging_department.prompt"),
-    tools=[
-        write_todos,  # Planning tool
-        create_save_product_tool(storage),  # Database persistence
-        *platform_media_tools,  # Optional media download
-    ],
-    subagents=[  # ✅ Specialists as SubAgents (proper hierarchy)
-        # CustomSubAgent: Pre-built graph (bypasses virtual filesystem)
-        {
-            "name": "image_analysis_specialist",
-            "description": "Analyze product images...",
-            "graph": create_image_analysis_specialist_graph(company_profile),
+def create_cataloging_specialist(storage: StorageInterface) -> Any:
+    """Create cataloging specialist with tools."""
+
+    specialist = create_agent(
+        model=get_llm(model="gpt-4.1-mini", temperature=0),
+        system_prompt=load_prompt("specialists/cataloging_specialist.prompt"),
+        tools=[
+            image_analysis_tool,  # Vision API wrapper
+            create_save_product_tool(storage),  # Database persistence
+        ],
+        tool_configs={
+            "save_product": ToolConfig(
+                allow_accept=True,
+                allow_edit=True,
+                allow_respond=True,
+                description="Review product before saving"
+            )
         },
-        # Standard SubAgent: Spec-based (pure synthesis)
-        {
-            "name": "cataloging_specialist",
-            "description": "Transform descriptions into Product models...",
-            "response_format": Product,
-            "prompt": load_prompt("specialists/cataloging_specialist.prompt"),
-            "tools": [],
-            "middleware": [],
-        },
-    ],
-    middleware=[CompanyContextMiddleware(storage)],
-    checkpointer=checkpointer,
-    tool_configs={
-        "save_product": ToolConfig(
-            allow_accept=True,
-            allow_edit=True,
-            allow_respond=True,
-            description="Review product before saving"
-        )
-    },
-)
+        response_format=Product,  # Structured output
+    )
+
+    return specialist
 ```
 
-**Tools Available:**
-- `write_todos` - Planning tool
-- `save_product` - Persists product (HITL enabled)
-- `download_{platform}_media` - If channel provided
+**Current Specialists:**
+- `cataloging_specialist` - Synthesizes Product models from user descriptions + image analysis
 
-**Subagents Available:**
-- `image_analysis_specialist` - SubAgent that returns `ImageAnalysisResult`
-- `cataloging_specialist` - SubAgent that returns `Product`
+**Tools Available to Specialists:**
+- `image_analysis_tool` - Analyzes product images via Vision API
+- `save_product` - Persists products to database (HITL enabled)
 
 **HITL Configuration:**
-- Configured via `tool_configs` on `save_product`
-- Triggers LangGraph native interrupt: `__interrupt__` in event stream
+- Configured via `tool_configs` on specialist
+- Triggers DeepAgents native interrupt
 - Runner detects interrupt, sends approval request
-- Resumes with `Command(resume={interrupt_id: {"type": "accept"}})`
-
-**Middleware:**
-- `CompanyContextMiddleware` - Injects company_profile into tool calls
-- DeepAgents auto-adds: caching, summarization
-
-**What Departments Do NOT Have:**
-- ❌ Specialists as subagents (they're tools!)
-- ❌ Direct database access (goes through tools)
-- ❌ HITL logic (framework handles via tool_configs)
-
----
-
-### Layer 3: Specialists (Transformation SubAgents)
-
-**Implementation:** Defined as SubAgent specs in department configuration
-
-**Pattern:** Specialists are **SubAgents** (not tools, not custom agents)
-
-```python
-# SubAgent specification in department:
-{
-    "name": "cataloging_specialist",
-    "description": "Transform user descriptions into Product models...",
-    "response_format": Product,  # Structured output
-    "system_prompt": load_prompt("specialists/cataloging_specialist.prompt"),
-}
-```
-
-**Key Pattern:** DeepAgents builds specialist agents automatically from SubAgent specs!
+- Resumes with Command
 
 **Structured Outputs:**
-- `ImageAnalysisResult` - Vision model output
 - `Product` - Cataloging specialist output
+- `ImageAnalysisResult` - Image analysis tool output
 
-**How Departments Invoke:**
-- Department delegates to specialist by name (automatic via DeepAgents)
-- Specialist receives focused input from department
-- Specialist returns structured Pydantic model
-- Department uses output for next step
-
-**Why SubAgents, Not Tools:**
-- Proper hierarchical delegation (PM → Dept → Specialist)
-- Consistent with architectural design
-- Clear separation of concerns
-- Observability at each layer
+**How PM Invokes:**
+- PM delegates to specialist by name (automatic via DeepAgents)
+- Specialist receives focused input from PM
+- Specialist uses tools to complete task
+- Specialist returns structured Pydantic model or final response
 
 ---
 
-### Performance & Resilience Optimizations (Phase 2-4)
+### Layer 3: Tools (Utility Functions)
 
-#### Specialist Caching Pattern (Phase 2)
-
-Each specialist module maintains a module-level singleton cache for performance:
-
-```python
-# agents/src/autifyme_agents/specialists/image_analysis_specialist.py
-_cached_image_analysis_specialist: Any | None = None
-
-def _get_image_analysis_specialist() -> Any:
-    """Get or create cached specialist agent.
-
-    Uses module-level singleton for performance:
-    - Agent compilation is non-trivial (graph building, tool binding)
-    - LangChain agents are thread-safe and stateless (verified via REPL)
-    - Each invoke() is independent with no state leakage
-
-    Returns:
-        Cached agent instance, safe to reuse across invocations
-    """
-    global _cached_image_analysis_specialist
-    if _cached_image_analysis_specialist is None:
-        _cached_image_analysis_specialist = create_image_analysis_specialist()
-    return _cached_image_analysis_specialist
-```
-
-Same pattern applied to `cataloging_specialist.py`.
-
-**Benefit:** Saves 10-50ms per specialist invocation by avoiding redundant graph compilation.
-
----
-
-#### Centralized Error Classification (Phase 2)
-
-All external API errors flow through centralized classifier:
-
-```python
-# agents/src/autifyme_agents/core/exceptions.py
-def classify_api_error(
-    error: Exception,
-    tool_name: str,
-    api_name: str,
-    fallback_error_class: type[AutifyMEError] = ToolExecutionError,
-) -> AutifyMEError:
-    """Classify API error and raise appropriate AutifyME exception.
-
-    Detects transient errors (timeouts, connection issues, rate limits)
-    and raises ExternalAPIError for retry, or fallback error for permanent failures.
-
-    Implementation:
-    - Transient indicators: timeout, connection, rate limit, 429, 503, 502, 504
-    - Transient → ExternalAPIError(is_retryable=True)
-    - Permanent → fallback_error_class (e.g., StorageError)
-    """
-```
-
-**Usage in Tools:**
-
-```python
-# agents/src/autifyme_agents/tools/storage_tools.py
-@tool(args_schema=SaveProductArgs)
-@retry(stop=stop_after_attempt(3), ...)
-def save_product(**kwargs) -> CatalogingResult:
-    try:
-        product = Product(**kwargs)
-        return storage.save_product(product)
-    except Exception as e:
-        # Use centralized error classifier
-        raise classify_api_error(e, "save_product", "Supabase", StorageError)
-```
-
-**Benefits:**
-- Retry logic applied consistently across all tools
-- Tenacity respects `ExternalAPIError.is_retryable` flag
-- Centralized maintenance point
-- Clear observability in traces
-
----
-
-#### Thread-Safe Outcome Tracking (Phase 3)
-
-OutcomeTracker protects concurrent workflow access with locks:
-
-```python
-# agents/src/autifyme_agents/workflows/outcome_tracker.py
-from threading import Lock
-
-class OutcomeTracker:
-    """Tracks business-specific workflow outcomes for learning.
-
-    Thread-safe for concurrent webhook invocations.
-    """
-
-    def __init__(self, storage: StorageInterface):
-        self.storage = storage
-        self._active_workflows: dict[str, TrackedWorkflow] = {}
-        self._lock = Lock()  # Thread safety for concurrent workflows
-```
-
-**Why Important:** Multiple WhatsApp messages may trigger concurrent invocations. Lock ensures atomic tracking_id assignment and workflow state updates.
-
----
-
-#### Idempotency & Fail-Closed Design (Phase 3)
-
-Database layer enforces fail-closed idempotency:
-
-```python
-# agents/src/autifyme_agents/integrations/storage/supabase_client.py (lines 150-189)
-
-def process_webhook(self, message_id: str) -> bool:
-    """Mark message as processed for idempotency.
-
-    Raises error if message_id already processed (fail-closed).
-
-    Returns:
-        True if new message
-
-    Raises:
-        DuplicateMessageError if already processed
-    """
-    # Check if already processed
-    if self._is_message_processed(message_id):
-        raise DuplicateMessageError(f"Message {message_id} already processed")
-
-    # Mark as processed
-    self._mark_processed(message_id)
-    return True
-```
-
-**Design Change:** Before Phase 3, duplicates silently proceeded. After Phase 3, they raise errors immediately. Enables better observability and prevents subtle bugs.
-
----
-
-#### Storage Cleanup & Graceful Shutdown (Phase 4)
-
-Storage singleton registers atexit handler for clean shutdown:
-
-```python
-# agents/src/autifyme_agents/integrations/storage/storage_factory.py
-import atexit
-
-_storage_instance: StorageInterface | None = None
-_cleanup_registered = False
-
-def get_storage() -> StorageInterface:
-    """Return singleton storage adapter.
-
-    Creates instance on first call and registers cleanup handler.
-    """
-    global _storage_instance, _cleanup_registered
-
-    if _storage_instance is None:
-        # Instantiate concrete adapter
-        _storage_instance = SupabaseStorageClient()
-
-        # Register cleanup on first instantiation
-        if not _cleanup_registered:
-            atexit.register(_cleanup_storage)
-            _cleanup_registered = True
-            logger.debug("Registered storage cleanup handler for application shutdown")
-
-    return _storage_instance
-
-def _cleanup_storage() -> None:
-    """Cleanup storage connections on application shutdown.
-
-    Called automatically via atexit when Python interpreter terminates.
-    Closes internal HTTP connections to prevent resource leaks.
-    """
-    global _storage_instance
-
-    if _storage_instance is not None:
-        try:
-            if hasattr(_storage_instance, 'cleanup'):
-                _storage_instance.cleanup()
-                logger.info("Storage singleton cleanup completed")
-        except Exception as e:
-            # Non-blocking: Log but don't crash shutdown
-            logger.error(f"Error during storage cleanup: {e}", exc_info=True)
-```
-
-**Why Important:** Production deployments need graceful shutdowns (serverless cold starts, container restarts). HTTP connections must be explicitly closed to avoid cascading failures.
-
----
-
-#### Removed: Pending Approval Database Methods (Phase 3)
-
-The following methods were removed from SupabaseStorageClient in Phase 3:
-- `save_pending_approval()`
-- `get_pending_approval()`
-- `delete_pending_approval()`
-
-**Rationale:** HITL state is managed entirely by LangGraph checkpoints via native interrupt handling. Database methods were redundant and unused.
-
-**Current HITL Flow:**
-1. Department calls save_product tool
-2. tool_configs triggers native LangGraph interrupt
-3. Runner detects interrupt, extracts draft
-4. LangGraph checkpoint stores interrupt state
-5. Runner sends approval request to user
-6. User responds
-7. Runner resumes with Command
-8. Tool executes
-
-See [WHATSAPP_CATALOGING_WORKFLOW.md § HITL Interaction](../workflows/WHATSAPP_CATALOGING_WORKFLOW.md#hitl-interaction) for complete flow.
-
----
-
-### Layer 4: Tools (Utility Functions)
-
-**Implementation:** `tools/storage_tools.py`, `tools/platform_tools.py`
+**Implementation:** `tools/image_analysis_tool.py`, `tools/storage_tools.py`
 
 ```python
 # Actual code patterns:
 
-# 1. Storage Tool with retry logic
+# 1. Image Analysis Tool (Vision API)
+@tool
+def image_analysis_tool(image_path: str) -> ImageAnalysisResult:
+    """Analyze product image using Vision API."""
+    llm = get_llm(provider="openai", model="gpt-4.1-mini")
+    image_uri = _encode_image_to_base64_uri(image_path)  # Resizes to 2048px max
+
+    # Direct invoke with json_schema method for reliability
+    structured_llm = llm.with_structured_output(
+        ImageAnalysisResult,
+        method="json_schema",  # More robust than function_calling
+        include_raw=False,
+    )
+
+    result = structured_llm.invoke(messages)
+    return result
+
+# 2. Storage Tool with retry logic
 @tool(args_schema=SaveProductArgs)
 @retry(stop=stop_after_attempt(3), ...)
 def save_product(**kwargs) -> CatalogingResult:
@@ -393,31 +156,27 @@ def save_product(**kwargs) -> CatalogingResult:
         product_id=saved.id,
         ...
     )
-
-# 2. Platform Tool with dynamic naming
-def create_platform_media_tools(channel: MessagingChannel) -> list:
-    @tool
-    def download_media(media_id: str) -> str:
-        return str(channel.download_media(media_id))
-
-    # Dynamic naming based on platform
-    download_media.name = f"download_{platform}_media"
-    download_media.description = f"Download media from {platform}..."
-
-    return [download_media]
 ```
 
-**save_product Signature:**
-- Args: `name`, `description`, `price`, `sizes`, `colors`, `image_urls` (individual fields)
-- Returns: `CatalogingResult` (not Product!)
-- Retry logic: 3 attempts for transient failures
-- HITL: Configured at department level via tool_configs
+**Key Patterns:**
 
-**Platform Tools:**
-- Dynamically named: `download_whatsapp_media`, `download_telegram_media`
-- Takes: `media_id` (platform-specific identifier)
-- Returns: Local file path as string
-- Used by: PM and departments
+**Image Analysis Tool:**
+- Resizes images to 2048px max before Vision API call
+- Uses `json_schema` method for structured output (more reliable than `function_calling`)
+- Returns `ImageAnalysisResult` Pydantic model
+- Token-optimized (target <50k tokens per image)
+
+**save_product Tool:**
+- Takes individual Product fields (not full Product object)
+- Returns `CatalogingResult` (not Product!)
+- Retry logic: 3 attempts for transient failures
+- HITL: Configured at specialist level via tool_configs
+
+**Image Optimization (Critical Fix):**
+- `_resize_image_for_vision_api()` - Resizes to MAX_DIMENSION = 2048px
+- `_encode_image_to_base64_uri()` - Converts to data URI
+- JPEG quality 85, optimized compression
+- Prevents Vision API timeout with large images
 
 ---
 
@@ -425,7 +184,7 @@ def create_platform_media_tools(channel: MessagingChannel) -> list:
 
 ### Actual Implementation Pattern
 
-**1. Configuration (Department Level):**
+**1. Configuration (Specialist Level):**
 ```python
 tool_configs = {
     "save_product": ToolConfig(
@@ -442,28 +201,26 @@ tool_configs = {
 for event in pm.stream(payload, config=config, stream_mode="values"):
     if "__interrupt__" in event:
         interrupts = event.get("__interrupt__", [])
-        interrupt_value = interrupts[0].value  # Native LangGraph interrupt
+        interrupt_value = interrupts[0].value  # DeepAgents interrupt format
         # Extract draft, send approval request
 ```
 
-**3. Interrupt Value Format:**
+**3. Interrupt Value Format (DeepAgents):**
 ```python
 # HumanInTheLoopMiddleware format:
-interrupt_value = [
-    {
-        "action_request": {
-            "action": "save_product",
-            "args": {
-                "name": "Jar 500ml",
-                "description": "...",
-                "price": 30.0,
-                "sizes": [],
-                "colors": ["clear"],
-                "image_urls": ["/path/to/image.jpg"]
-            }
+interrupt_value = {
+    "action_request": {
+        "action": "save_product",
+        "args": {
+            "name": "Product Name",
+            "description": "...",
+            "price": 29.99,
+            "sizes": ["M", "L"],
+            "colors": ["blue"],
+            "image_urls": ["/path/to/image.jpg"]
         }
     }
-]
+}
 ```
 
 **4. Resumption (Runner):**
@@ -478,7 +235,7 @@ for event in pm.stream(command, config=config, stream_mode="values"):
     # Tool executes, returns CatalogingResult
 ```
 
-**Critical:** PM does NOT handle HITL - runner does. PM is unaware of interrupts.
+**Critical:** PM does NOT handle HITL - runner orchestrates the flow.
 
 ---
 
@@ -527,29 +284,10 @@ class CompanyProfile(BaseModel):
 class ImageAnalysisResult(BaseModel):
     visual_description: str  # min_length=20
     identified_colors: List[str] = []
+    materials: List[str] = []
     style_tags: List[str] = []  # e.g., ['vintage', 'modern']
+    estimated_dimensions: Optional[str] = None
 ```
-
----
-
-## State Management
-
-### ProjectManagerState (`schemas/state.py`)
-
-```python
-class ProjectManagerState(DeepAgentState):
-    messages: Annotated[Sequence[MessageType], add_messages]
-    company_profile: CompanyProfile
-    plan: list[dict]
-    current_step: int
-    department_results: DepartmentResults
-    status: Literal["idle", "planning", "awaiting_approval", "completed", "blocked"]
-    last_error: Optional[str]
-    metadata: ProjectMetadata
-    pending_interrupts: list[InterruptInfo]  # HITL context (not used by PM directly)
-```
-
-**Note:** `pending_interrupts` exists in state but **PM does NOT use it** - runner extracts from checkpoint.
 
 ---
 
@@ -579,7 +317,7 @@ messages = [HumanMessage(content=content)]
 User sent a message via WhatsApp.
 
 Text Content:
-"catalog this jar 500ml 30rs"
+"catalog this product for Rs 500"
 
 Media Attachments:
 1. [IMAGE] image/jpeg
@@ -589,13 +327,13 @@ Media Attachments:
 
 **4. PM processes:**
 - Analyzes intent (cataloging request)
-- Downloads media if needed (via download_whatsapp_media tool)
-- Delegates to cataloging_department (via task tool / subagent)
+- Delegates to `cataloging_specialist` subagent
+- Passes user message and context
 
-**5. Department processes:**
-- Calls image_analysis_specialist(image_url="/path/to/xyz123.jpg")
-- Calls cataloging_specialist(user_message="...", image_analysis={...})
-- Calls save_product(name="...", price=30.0, ...) → HITL interrupt
+**5. Specialist processes:**
+- Calls `image_analysis_tool(image_path="/path/to/xyz123.jpg")`
+- Synthesizes Product from user message + image insights
+- Calls `save_product(name="...", price=500.0, ...)` → HITL interrupt
 
 **6. Runner handles HITL:**
 - Detects `__interrupt__` in stream
@@ -607,22 +345,21 @@ Media Attachments:
 **7. save_product executes:**
 - Persists to database
 - Returns CatalogingResult
-- Department completes
+- Specialist completes
 - PM relays result
 
 ---
 
 ## Architectural Alignment Status
 
-✅ **CORRECTED**: Implementation now matches design intent!
+✅ **2-LEVEL ARCHITECTURE**: Implementation complete!
 
 | Layer | Pattern | Status |
 |-------|---------|--------|
-| **PM → Departments** | CustomSubAgents | ✅ Correct |
-| **Departments → Specialists** | SubAgents (not tools) | ✅ **FIXED** |
-| **Specialists** | SubAgent specs with response_format | ✅ Correct |
-| **Tools** | Utility functions only | ✅ Correct |
-| **HITL** | Department tool_config | ✅ Correct |
+| **PM → Specialists** | SubAgents | ✅ Correct |
+| **Specialists** | create_agent with tools | ✅ Correct |
+| **Tools** | Utility functions | ✅ Correct |
+| **HITL** | Specialist tool_configs | ✅ Correct |
 | **Command Construction** | Runner handles | ✅ Correct |
 
 ---
@@ -633,57 +370,36 @@ Media Attachments:
 
 **What PM Knows:**
 - ✅ User sends structured messages (semantic descriptions)
-- ✅ Has write_todos for planning
-- ✅ Has download_{platform}_media for fetching attachments
-- ✅ Can delegate to departments via "task" (mention as available departments, not tools)
-- ✅ Departments return results via state/messages
+- ✅ Can delegate to specialist subagents (mention available specialists)
+- ✅ Specialists return results via messages
+- ✅ Company context available via DeepAgents store
 
 **What PM Does NOT Know:**
 - ❌ HITL mechanics (runner handles this)
 - ❌ How to build Commands (not PM's job)
-- ❌ pending_interrupts interpretation (runner's job)
-- ❌ Individual specialist tools (departments coordinate those)
-- ❌ save_product tool (department's tool)
+- ❌ Individual specialist tools (specialists coordinate those)
+- ❌ Tool implementation details (abstracted away)
 
-**PM's Altitude:** High-level orchestration, intent classification, delegation strategy
-
----
-
-### For Department Prompt:
-
-**What Department Knows:**
-- ✅ Has specialist **subagents** that return structured data
-- ✅ Delegates to `image_analysis_specialist` subagent → returns ImageAnalysisResult
-- ✅ Delegates to `cataloging_specialist` subagent → returns Product
-- ✅ Calls `save_product` tool (takes Product fields, returns CatalogingResult)
-- ✅ save_product triggers HITL (framework handles automatically)
-- ✅ Has write_todos for multi-step coordination
-- ✅ Can download media if needed
-
-**What Department Does NOT Know:**
-- ❌ How HITL approval UI works (channel's job)
-- ❌ Command construction (framework's job)
-- ❌ PM's orchestration logic (separation of concerns)
-- ❌ Specialist implementation details (delegates via subagent name)
-
-**Department's Altitude:** Domain workflow orchestration, subagent delegation, quality assurance
+**PM's Altitude:** High-level orchestration, intent classification, specialist delegation
 
 ---
 
 ### For Specialist Prompts:
 
 **What Specialist Knows:**
-- ✅ Receives focused input (user_message + optional image_analysis)
-- ✅ Company context injected via middleware
-- ✅ Returns structured Pydantic model
-- ✅ No tools available (pure transformation)
+- ✅ Has specific **tools** to accomplish tasks
+- ✅ Calls `image_analysis_tool(image_path)` → returns ImageAnalysisResult
+- ✅ Calls `save_product(name, price, ...)` → returns CatalogingResult
+- ✅ save_product triggers HITL (framework handles automatically)
+- ✅ Returns structured output or final response
 
 **What Specialist Does NOT Know:**
-- ❌ Orchestration logic (department's job)
-- ❌ Approval workflows (department + framework)
+- ❌ How HITL approval UI works (channel's job)
+- ❌ Command construction (framework's job)
+- ❌ PM's orchestration logic (separation of concerns)
 - ❌ Other specialists (decoupled)
 
-**Specialist's Altitude:** Focused transformation, domain expertise, structured output generation
+**Specialist's Altitude:** Domain workflow execution, tool usage, structured output generation
 
 ---
 
@@ -692,43 +408,154 @@ Media Attachments:
 **Local Testing Commands:**
 ```bash
 # Direct PM invocation (interactive)
-uv run python -m autifyme_agents.cli.pm_chat
+uv run python tests/cli/pm_chat.py --interactive
 
 # Full workflow simulation with HITL
-uv run python -m autifyme_agents.cli.simulate
+uv run python tests/cli/simulate.py "Catalog these sneakers"
 
-# Inspect traces
-uv run python -m autifyme_agents.cli.inspect --thread-id <id>
+# Autonomous testing framework
+from tests.tools import execute_scenario, get_trace_overview
+result = execute_scenario("Catalog Nike shoes Rs 1000", hitl_mode="auto_approve")
+overview = get_trace_overview(result.trace_id)
 ```
 
 **Key Files to Verify:**
 - `workflows/project_manager.py` - PM construction
-- `departments/cataloging_department.py` - Department construction
 - `specialists/cataloging_specialist.py` - Specialist implementation
-- `tools/cataloging_tools.py` - Tool wrappers
+- `tools/image_analysis_tool.py` - Vision API wrapper
+- `tools/storage_tools.py` - Database persistence
 - `workflows/orchestration/runner.py` - HITL handling
 
 ---
 
-## Summary: Prompt Refactoring Checklist
+## Performance & Resilience Optimizations
 
-When refactoring prompts, ensure alignment with:
+### Image Optimization (Critical Fix)
 
-- [ ] PM only has coordination tools (write_todos, download_media)
-- [ ] PM delegates to departments via CustomSubAgents
-- [ ] PM does NOT handle HITL or Commands
-- [ ] **Departments delegate to specialists AS SUBAGENTS** (not tools!)
-- [ ] Departments call save_product tool with individual Product fields
-- [ ] Specialists defined as SubAgent specs with response_format
-- [ ] Specialists return Pydantic models (Product, ImageAnalysisResult)
-- [ ] Specialists are context-light (company_profile from parent context)
-- [ ] Platform tools have dynamic names (download_{platform}_media)
-- [ ] HITL is transparent to PM and departments (framework handles)
+**Problem:** Large images (5MB phone photos) caused Vision API timeouts and excessive token usage (~300k tokens).
+
+**Solution:** Resize and compress before Vision API call:
+
+```python
+# agents/src/autifyme_agents/tools/image_analysis_tool.py
+MAX_DIMENSION = 2048  # OpenAI's high-detail threshold
+JPEG_QUALITY = 85
+
+def _resize_image_for_vision_api(image_path: str) -> bytes:
+    """Resize to max 2048px, convert to optimized JPEG."""
+    with Image.open(path) as img:
+        # Convert RGBA to RGB
+        if img.mode in ('RGBA', 'LA', 'P'):
+            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+            rgb_img.paste(img, mask=img.split()[-1])
+            img = rgb_img
+
+        # Resize if needed (preserve aspect ratio)
+        if max(img.size) > MAX_DIMENSION:
+            img.thumbnail((MAX_DIMENSION, MAX_DIMENSION), Image.Resampling.LANCZOS)
+
+        # Save as optimized JPEG
+        buffer = io.BytesIO()
+        img.save(buffer, format='JPEG', quality=JPEG_QUALITY, optimize=True)
+        return buffer.getvalue()
+```
+
+**Result:** Token usage reduced to ~50k tokens per image, Vision API reliability improved.
+
+---
+
+### Vision API Structured Output (Critical Fix)
+
+**Problem:** Default `with_structured_output()` created unreliable RunnableSequence that hung with large images.
+
+**Solution:** Use explicit `json_schema` method:
+
+```python
+# Before (unreliable):
+structured_llm = llm.with_structured_output(ImageAnalysisResult)
+
+# After (reliable):
+structured_llm = llm.with_structured_output(
+    ImageAnalysisResult,
+    method="json_schema",  # More robust than function_calling
+    include_raw=False,
+)
+```
+
+**Why:** `json_schema` method provides better handling of large multimodal payloads than default `function_calling`.
+
+---
+
+### Centralized Error Classification
+
+All external API errors flow through centralized classifier:
+
+```python
+# agents/src/autifyme_agents/core/exceptions.py
+def classify_api_error(
+    error: Exception,
+    tool_name: str,
+    api_name: str,
+    fallback_error_class: type[AutifyMEError] = ToolExecutionError,
+) -> AutifyMEError:
+    """Classify API error and raise appropriate AutifyME exception.
+
+    Transient indicators: timeout, connection, rate limit, 429, 503, 502, 504
+    - Transient → ExternalAPIError(is_retryable=True)
+    - Permanent → fallback_error_class
+    """
+```
+
+**Benefits:**
+- Retry logic applied consistently across all tools
+- Tenacity respects `ExternalAPIError.is_retryable` flag
+- Centralized maintenance point
+
+---
+
+### Storage Cleanup & Graceful Shutdown
+
+Storage singleton registers atexit handler:
+
+```python
+# agents/src/autifyme_agents/integrations/storage/storage_factory.py
+import atexit
+
+def get_storage() -> StorageInterface:
+    """Return singleton with cleanup handler."""
+    global _storage_instance, _cleanup_registered
+
+    if _storage_instance is None:
+        _storage_instance = SupabaseStorageClient()
+
+        if not _cleanup_registered:
+            atexit.register(_cleanup_storage)
+            _cleanup_registered = True
+
+    return _storage_instance
+```
+
+**Why Important:** Graceful shutdowns prevent HTTP connection leaks in serverless/container environments.
+
+---
+
+## Summary: 2-Level Architecture Checklist
+
+When refactoring or extending:
+
+- [ ] PM delegates directly to specialists (no department layer)
+- [ ] Specialists are SubAgents under PM
+- [ ] Tools attached to specialists based on needs
+- [ ] HITL configured via tool_configs on specialist tools
+- [ ] PM does NOT handle HITL or Commands (runner does)
+- [ ] Specialists return structured Pydantic models when appropriate
+- [ ] Image analysis tool uses `json_schema` method
+- [ ] Images resized to 2048px max before Vision API
+- [ ] Platform tools omitted from PM (specialists don't need media download)
 - [ ] No Python code in prompts (show patterns via examples)
 
 ---
 
-**Last Updated:** January 2025
-**Verified Against:** Main branch (InitialDesign)
-**Next Review:** When adding new departments or workflows
-
+**Last Updated:** January 22, 2025
+**Verified Against:** Main branch (InitialDesign-2-level_v1.0.0)
+**Next Review:** When adding new specialists or workflows

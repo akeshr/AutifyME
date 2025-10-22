@@ -40,6 +40,10 @@ class SaveProductArgs(BaseModel):
     sizes: list[str] | None = Field(None, description="A list of available sizes for the product.")
     colors: list[str] | None = Field(None, description="A list of available colors for the product.")
     image_urls: list[str] | None = Field(None, description="A list of URLs for the product images.")
+    id: str | None = Field(
+        None,
+        description="Product ID for updates. If provided, updates existing product (upsert). If None, creates new product.",
+    )
 
 
 def _save_product(storage: StorageInterface, **kwargs: Any) -> Product:
@@ -91,7 +95,11 @@ def create_save_product_tool(storage: StorageInterface) -> object:
     Returns:
         LangChain tool function that accepts product fields and returns CatalogingResult
     """
-    @tool(args_schema=SaveProductArgs)
+    @tool(
+        "save_product",
+        args_schema=SaveProductArgs,
+        return_direct=False,
+    )
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
@@ -100,7 +108,13 @@ def create_save_product_tool(storage: StorageInterface) -> object:
         reraise=True,
     )
     def save_product(**kwargs: Any) -> CatalogingResult:
-        """Persist a product to the catalog database."""
+        """Save or update a product in the catalog database (CREATE or UPDATE via upsert).
+
+        CREATE: Omit 'id' to create new product. Returns product_id - store this for updates.
+        UPDATE: Include 'id' from previous save to update existing product (no duplicate created).
+
+        Always returns full product with id in the response for future updates.
+        """
         product = _save_product(storage, **kwargs)
         return CatalogingResult(
             stage="saved",

@@ -7,6 +7,9 @@ from typing import Any
 
 from autifyme_agents.schemas.models import CatalogingResult, Product
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.workflows.orchestration.message_formatter import (
+    format_batch_approval_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -297,43 +300,5 @@ class CatalogingWorkflowHandler:
             sender: Channel-specific sender ID
             products: List of Product objects to approve
         """
-        # Format batch approval message
-        message_parts = [
-            f"**Batch Approval Request** ({len(products)} products)",
-            "",
-            "Please review the following products:",
-            "",
-        ]
-
-        for idx, product in enumerate(products, 1):
-            # Format each product
-            product_lines = [
-                f"**Product {idx}:**",
-                f"  - Name: {product.name}",
-                f"  - Description: {product.description}",
-                f"  - Price: Rs {product.price}",
-            ]
-
-            if product.sizes:
-                product_lines.append(f"  - Sizes: {', '.join(product.sizes)}")
-            if product.colors:
-                product_lines.append(f"  - Colors: {', '.join(product.colors)}")
-            if product.image_urls:
-                product_lines.append(f"  - Images: {len(product.image_urls)} attached")
-
-            message_parts.extend(product_lines)
-            message_parts.append("")  # Blank line between products
-
-        message_parts.extend([
-            "---",
-            "",
-            "**How to respond:**",
-            "- To approve all: 'approve' or 'yes'",
-            "- To approve some: 'approve 1 and 2' or 'approve product 1'",
-            "- To edit: 'edit product 2 price to 45'",
-            "- To reject all: 'reject' or 'no'",
-        ])
-
-        # Send formatted message
-        batch_message = "\n".join(message_parts)
+        batch_message = format_batch_approval_message(products)
         self.channel.send_text(sender, batch_message)
