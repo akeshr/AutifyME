@@ -224,19 +224,34 @@ class ApprovalCoordinator:
 
             interrupt_responses[interrupt_id_for_command].append(hitl_response)
 
-        # Wrap decisions in HITLResponse format for v1.0 middleware
-        formatted_responses = {}
-        for interrupt_id, decisions in interrupt_responses.items():
-            formatted_responses[interrupt_id] = {"decisions": decisions}
+        # Build HITLResponse for LangGraph Command
+        # IMPORTANT: Command.resume should contain the value that interrupt() returns, NOT a dict keyed by interrupt_id
+        # HumanInTheLoopMiddleware calls: hitl_response = interrupt(hitl_request)
+        # So we pass {"decisions": [...]} directly, not {interrupt_id: {"decisions": [...]}}
+
+        # Verify we have exactly ONE interrupt (batch HITL = multiple action_requests under ONE interrupt)
+        if len(interrupt_responses) != 1:
+            raise ValueError(
+                f"Expected single interrupt for batch HITL, got {len(interrupt_responses)}. "
+                f"Multiple separate interrupts not yet supported."
+            )
+
+        # Extract the HITLResponse value (decisions list)
+        interrupt_id = list(interrupt_responses.keys())[0]
+        decisions = interrupt_responses[interrupt_id]
+
+        # Build HITLResponse format: {"decisions": [...]}
+        hitl_response_value = {"decisions": decisions}
 
         logger.info(
             "Built Command from structured approval",
             extra={
                 "total_responses": len(pending_interrupts),
-                "interrupt_count": len(interrupt_responses),
-                "interrupt_ids": list(interrupt_responses.keys()),
+                "interrupt_id": interrupt_id,
+                "decision_count": len(decisions),
                 "edit_count": sum(1 for resp in approval_response.responses if resp.type == "edit"),
             }
         )
 
-        return Command(resume=formatted_responses)
+        # Pass HITLResponse directly to Command.resume (NOT wrapped in dict with interrupt_id)
+        return Command(resume=hitl_response_value)

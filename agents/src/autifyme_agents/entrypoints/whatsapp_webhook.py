@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from autifyme_agents.core.config import settings
@@ -97,6 +97,71 @@ def _persist_event(payload: dict[str, Any]) -> Path:
     return path
 
 
+def _process_message_async(
+    runner: WorkflowRunner,
+    sender: str,
+    text: str | None,
+    media_id: str | None,
+    sender_name: str | None,
+    message_id: str,
+    event_path: Path,
+) -> None:
+    """Process workflow message asynchronously in background.
+
+    This function runs in a FastAPI background task to decouple webhook
+    acknowledgment (200 OK) from workflow processing. This ensures WhatsApp
+    receives a response within their timeout window (~5 seconds) even when
+    workflows take longer (e.g., image analysis, 8+ products).
+
+    Args:
+        runner: Workflow runner instance
+        sender: WhatsApp sender phone number
+        text: Message text (optional)
+        media_id: Media attachment ID (optional)
+        sender_name: User's display name (optional)
+        message_id: WhatsApp message ID (for logging)
+        event_path: Path to persisted event JSON (for logging)
+    """
+    try:
+        logger.info(
+            "Background workflow processing started",
+            extra={
+                "message_id": message_id,
+                "sender": sender,
+                "has_media": media_id is not None,
+                "has_text": text is not None,
+            }
+        )
+
+        # Process workflow (may take >5 seconds for complex catalogs)
+        runner.handle_message(sender, text, media_id, sender_name=sender_name)
+
+        logger.info(
+            "Background workflow processing completed",
+            extra={"message_id": message_id, "sender": sender}
+        )
+
+    except GeneratorExit:
+        # GeneratorExit occurs when workflow streaming times out
+        logger.warning(
+            "Workflow streaming timed out (GeneratorExit) in background task",
+            extra={"message_id": message_id, "sender": sender, "event_path": str(event_path)}
+        )
+
+    except Exception as workflow_exc:
+        logger.exception(
+            "Background workflow execution failed",
+            exc_info=workflow_exc,
+            extra={
+                "message_id": message_id,
+                "sender": sender,
+                "error_type": type(workflow_exc).__name__,
+                "event_path": str(event_path),
+            }
+        )
+        # Don't raise - background task failures are logged but don't affect webhook response
+
+
 # REMOVED: _is_approval_message() helper
 # runner_v2 uses native LangGraph patterns - ALL messages go through handle_message()
 # Runner automatically detects pending interrupts via pm.get_state() and invokes approval_analyzer
@@ -122,7 +187,7 @@ async def verify(request: Request) -> Any:
 
 
 @app.post("/webhook")
-async def receive(request: Request) -> Any:
+async def receive(request: Request, background_tasks: BackgroundTasks) -> Any:
     body = await request.json()
     event_path = _persist_event(body)
     logger.info("Incoming WhatsApp payload saved", extra={"event_path": str(event_path)})
@@ -259,37 +324,36 @@ async def receive(request: Request) -> Any:
                         },
                     )
 
-                    # ✅ NATIVE LANGGRAPH PATTERN: ALL messages go through handle_message()
-                    # runner_v2 auto-detects pending interrupts via pm.get_state() and invokes approval_analyzer
-                    # No special routing needed - the runner knows the context automatically
-                    try:
-                        runner.handle_message(sender, text, media_id, sender_name=sender_name)
-                    except GeneratorExit:
-                        # GeneratorExit occurs when workflow streaming times out
-                        # Message already marked as processed above for idempotency
-                        # This prevents WhatsApp retries from creating duplicate threads
-                        logger.warning(
-                            "Workflow streaming timed out (GeneratorExit)",
-                            extra={
-                                "message_id": message_id,
-                                "sender": sender,
-                                "event_path": str(event_path)
-                            },
-                        )
-                        continue
-                    except Exception as workflow_exc:
-                        # Message already marked as processed above for idempotency
-                        logger.exception(
-                            "Workflow execution failed",
-                            extra={
-                                "message_id": message_id,
-                                "sender": sender,
-                                "event_path": str(event_path),
-                                "error_type": type(workflow_exc).__name__
-                            },
-                        )
-                        # Continue processing other messages in the payload
-                        continue
+                    # ✅ BACKGROUND PROCESSING: Schedule workflow asynchronously
+                    # FastAPI background tasks decouple webhook acknowledgment from workflow processing
+                    # This ensures WhatsApp receives 200 OK within timeout (~5 seconds) even when
+                    # workflows take longer (e.g., image analysis, 8+ products cataloging)
+                    #
+                    # Flow:
+                    # 1. Duplicate check (above) prevents multiple tasks for same message
+                    # 2. Add task to background queue
+                    # 3. Return 200 OK immediately (within milliseconds)
+                    # 4. Background task runs workflow (may take 10+ seconds)
+                    # 5. If WhatsApp retries, duplicate check blocks it (safety net)
+                    background_tasks.add_task(
+                        _process_message_async,
+                        runner=runner,
+                        sender=sender,
+                        text=text,
+                        media_id=media_id,
+                        sender_name=sender_name,
+                        message_id=message_id,
+                        event_path=event_path,
+                    )
+
+                    logger.info(
+                        "Message scheduled for background processing",
+                        extra={
+                            "message_id": message_id,
+                            "sender": sender,
+                            "message_type": msg_type,
+                        }
+                    )
 
         return {"status": "processed"}
     except Exception as exc:  # noqa: BLE001
