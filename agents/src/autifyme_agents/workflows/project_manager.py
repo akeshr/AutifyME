@@ -82,11 +82,20 @@ def create_project_manager(
         create_cataloging_specialist(storage),
     ]
 
+    # Aggregate interrupt_on configs from all subagents for HITL
+    interrupt_configs: dict[str, bool] = {}
+    for subagent in subagents:
+        if isinstance(subagent, dict) and "interrupt_on" in subagent:
+            interrupt_configs.update(subagent["interrupt_on"])
+
+    # NOTE: DeepAgents automatically adds HumanInTheLoopMiddleware when interrupt_on is provided
+    # We don't need to manually add it to middleware list (would cause duplicate error)
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
         subagents=subagents,
+        interrupt_on=interrupt_configs,  # DeepAgents auto-creates HITL middleware from this
         checkpointer=checkpointer,
         store=store,
         use_longterm_memory=True,
