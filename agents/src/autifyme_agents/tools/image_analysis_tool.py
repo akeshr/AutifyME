@@ -129,7 +129,7 @@ def image_analysis_tool(
         ["blue", "white"]
     """
     # Get vision-capable LLM with timeout
-    llm = get_llm(provider="openai", model="gpt-4.1-mini", timeout=API_TIMEOUT)
+    llm = get_llm(provider="openai", model="gpt-5-mini", timeout=API_TIMEOUT)
 
     # Convert image to base64 data URI
     image_uri = _encode_image_to_base64_uri(image_path)
