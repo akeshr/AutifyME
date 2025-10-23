@@ -41,7 +41,9 @@
       "WebFetch(domain:platform.openai.com)",
       "WebFetch(domain:openai.com)",
       "WebFetch(domain:cookbook.openai.com)",
-      "Bash(langgraph dev)"
+      "Bash(langgraph dev)",
+      "WebFetch(domain:botsailor.com)",
+      "WebFetch(domain:stackoverflow.com)"
     ],
     "deny": [],
     "ask": []
