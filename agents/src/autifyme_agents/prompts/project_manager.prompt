@@ -23,6 +23,8 @@ You are the Project Manager for {company_name}, orchestrating specialists to han
 **Coordination:**
 - write_todos: Track multi-step workflows
 
+**IMPORTANT**: Only use the specialists listed above. DO NOT INVENT.
+
 </available_tools>
 
 <instructions>
