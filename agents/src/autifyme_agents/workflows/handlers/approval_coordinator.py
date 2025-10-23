@@ -254,5 +254,8 @@ class ApprovalCoordinator:
             }
         )
 
-        # Pass HITLResponse directly to Command.resume (NOT wrapped in dict with interrupt_id)
-        return Command(resume=hitl_response_value)
+        # CRITICAL FIX: Command.resume must map interrupt_id to response
+        # LangGraph expects: {interrupt_id: response_value} format
+        # This ensures the resume reaches the correct interrupted node (subagent's HITL middleware)
+        # Works for both single and multiple products (always batch HITL format)
+        return Command(resume={interrupt_id: hitl_response_value})
