@@ -255,52 +255,24 @@ class ApprovalCoordinator:
         )
 
         # Build HITLResponse for LangGraph Command
-        # IMPORTANT: Command.resume should contain the value that interrupt() returns, NOT a dict keyed by interrupt_id
-        # HumanInTheLoopMiddleware calls: hitl_response = interrupt(hitl_request)
-        # So we pass {"decisions": [...]} directly, not {interrupt_id: {"decisions": [...]}}
 
-        # Verify we have exactly ONE interrupt (batch HITL = multiple action_requests under ONE interrupt)
-        logger.debug(
-            "Validating interrupt count for batch HITL",
-            extra={"expected": 1, "actual": len(interrupt_responses)}
-        )
-
-        if len(interrupt_responses) != 1:
-            raise ValueError(
-                f"Expected single interrupt for batch HITL, got {len(interrupt_responses)}. "
-                f"Multiple separate interrupts not yet supported."
-            )
-
-        # Extract the HITLResponse value (decisions list)
-        interrupt_id = list(interrupt_responses.keys())[0]
-        decisions = interrupt_responses[interrupt_id]
-
-        # Build HITLResponse format: {"decisions": [...]}
-        hitl_response_value = {"decisions": decisions}
+        # Wrap decisions in HITLResponse format for v1.0 middleware
+        # Format: {interrupt_id: {"decisions": [...]}}
+        formatted_responses = {}
+        for interrupt_id, decisions in interrupt_responses.items():
+            formatted_responses[interrupt_id] = {"decisions": decisions}
 
         logger.info(
             "Built Command from structured approval",
             extra={
                 "total_responses": len(pending_interrupts),
-                "interrupt_id": interrupt_id,
-                "decision_count": len(decisions),
+                "interrupt_count": len(interrupt_responses),
+                "interrupt_ids": list(interrupt_responses.keys()),
                 "edit_count": sum(1 for resp in approval_response.responses if resp.type == "edit"),
             }
         )
 
-        # CRITICAL FIX: Command.resume must map interrupt_id to response
-        # LangGraph expects: {interrupt_id: response_value} format
-        # This ensures the resume reaches the correct interrupted node (subagent's HITL middleware)
-        # Works for both single and multiple products (always batch HITL format)
-        command_to_return = Command(resume={interrupt_id: hitl_response_value})
-
-        logger.info(
-            "Built Command object for resumption",
-            extra={
-                "interrupt_id": interrupt_id,
-                "decision_count": len(decisions),
-                "command_resume_keys": list(command_to_return.resume.keys()) if command_to_return.resume else [],
-            }
-        )
+        # Return Command with formatted responses mapping interrupt_id to decisions
+        command_to_return = Command(resume=formatted_responses)
 
         return command_to_return

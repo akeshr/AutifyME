@@ -29,11 +29,13 @@ def create_cataloging_specialist(storage: StorageInterface) -> dict[str, Any]:
         "with human approval before saving to database."
     )
 
-    # HITL is configured at PM level, not specialist level
-    # PM's HITL middleware will intercept save_product calls from this specialist
+    # HITL configuration at specialist level (correct for 2-level DeepAgents architecture)
+    # Each specialist configures its own HITL for its tools
+    # This prevents interrupt loops that occur when HITL is at PM level
     return {
         "name": "cataloging_specialist",
         "description": description,
         "tools": [image_analysis_tool, save_product],
         "system_prompt": system_prompt,
+        "interrupt_on": {"save_product": True},  # HITL at specialist level
     }
