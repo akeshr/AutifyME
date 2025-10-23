@@ -53,6 +53,8 @@ class InterruptUnpacker:
             interrupt_id = interrupt_obj.id if hasattr(interrupt_obj, 'id') else f"interrupt_{base_idx}"
             interrupt_value = interrupt_obj.value if hasattr(interrupt_obj, 'value') else None
 
+            logger.info(f"[UNPACK] Found interrupt with ID={interrupt_id}, value_type={type(interrupt_value).__name__}")
+
             # Case 1: List-valued interrupt (parallel tool calls)
             if isinstance(interrupt_value, list):
                 logger.debug(

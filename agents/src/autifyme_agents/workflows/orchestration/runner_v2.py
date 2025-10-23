@@ -353,6 +353,7 @@ class WorkflowRunner:
                 "interrupt_count": len(pending_interrupts_list),
                 "message_preview": user_message[:50],
                 "history_length": len(conversation_history),
+                "command_resume_keys": list(command_obj.resume.keys()) if command_obj and command_obj.resume else [],
             }
         )
 
@@ -361,12 +362,28 @@ class WorkflowRunner:
         interrupt_value = None
 
         try:
+            logger.info(
+                "Starting PM stream with Command",
+                extra={"thread_id": thread_id, "stream_mode": "values"}
+            )
+
+            event_count = 0
             for event in pm.stream(command_obj, config=config, stream_mode="values"):
+                event_count += 1
                 last_event = event
                 if "__interrupt__" in event:
                     interrupts = event.get("__interrupt__") or []
                     if interrupts:
                         interrupt_value = interrupts[0].value
+
+            logger.info(
+                "PM stream completed",
+                extra={
+                    "thread_id": thread_id,
+                    "event_count": event_count,
+                    "had_new_interrupt": interrupt_value is not None,
+                }
+            )
 
             logger.debug(
                 "Command execution complete",
@@ -403,10 +420,38 @@ class WorkflowRunner:
         Returns:
             Tuple of (final_result, interrupt_value)
         """
-        # Create payload
+        # Create payload with actual user text as content, metadata in additional_kwargs
         try:
             from langchain.messages import HumanMessage
-            payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
+
+            # Extract user text - this is what PM should see directly
+            user_text = raw_payload.get("text", "")
+            media_id = raw_payload.get("media_id")
+
+            # Build natural language message that includes media_id when present
+            # PM needs media_id explicitly to call download_media tool
+            if media_id:
+                if user_text:
+                    # Text + media: append media_id to user message
+                    user_text = f"{user_text} [media_id: {media_id}]"
+                else:
+                    # Media only: create descriptive message with media_id
+                    user_text = f"[Media attachment: {media_id}]"
+
+            # Put platform metadata in additional_kwargs (standard LangChain pattern)
+            # PM receives clean user text with embedded media_id, metadata available if needed
+            payload = {
+                "messages": [HumanMessage(
+                    content=user_text,
+                    additional_kwargs={
+                        "platform": raw_payload.get("platform"),
+                        "sender": raw_payload.get("sender"),
+                        "sender_name": raw_payload.get("sender_name"),
+                        "media_id": media_id,
+                        "timestamp": raw_payload.get("timestamp"),
+                    }
+                )]
+            }
         except Exception as e:
             logger.error("Payload creation failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
             raise

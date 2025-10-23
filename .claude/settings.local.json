@@ -40,7 +40,13 @@
       "WebFetch(domain:langsmith-sdk.readthedocs.io)",
       "WebFetch(domain:platform.openai.com)",
       "WebFetch(domain:openai.com)",
-      "WebFetch(domain:cookbook.openai.com)"
+      "WebFetch(domain:cookbook.openai.com)",
+      "Bash(langgraph dev)",
+      "WebFetch(domain:botsailor.com)",
+      "WebFetch(domain:stackoverflow.com)",
+      "WebFetch(domain:www.pavisha.com)",
+      "WebFetch(domain:share.google)",
+      "WebFetch(domain:www.google.com)"
     ],
     "deny": [],
     "ask": []

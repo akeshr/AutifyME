@@ -12,10 +12,10 @@ from pathlib import Path
 from typing import Annotated
 
 from langchain.tools import tool
+from langchain_core.tools import ToolException
 from PIL import Image
 from pydantic import Field
 
-from autifyme_agents.core.exceptions import ToolExecutionError
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 
@@ -108,6 +108,9 @@ def image_analysis_tool(
     Returns:
         ImageAnalysisResult with visual description, colors, materials, style, etc.
 
+    Raises:
+        ToolException: When image analysis fails, enabling LLM self-healing
+
     Example:
         >>> result = image_analysis_tool("/tmp/product.jpg")
         >>> print(result.visual_description)
@@ -115,14 +118,15 @@ def image_analysis_tool(
         >>> print(result.identified_colors)
         ["blue", "white"]
     """
-    # Get vision-capable LLM
-    llm = get_llm(provider="openai", model="gpt-5-mini")
+    try:
+        # Get vision-capable LLM
+        llm = get_llm(provider="openai", model="gpt-5-mini")
 
-    # Convert image to base64 data URI
-    image_uri = _encode_image_to_base64_uri(image_path)
+        # Convert image to base64 data URI
+        image_uri = _encode_image_to_base64_uri(image_path)
 
-    # Vision API prompt
-    content = """Analyze this product image and extract all visual attributes.
+        # Vision API prompt
+        content = """Analyze this product image and extract all visual attributes.
 
 Focus on:
 - Visual description (detailed, specific)
@@ -135,35 +139,48 @@ Focus on:
 
 Be specific and objective. Describe what you actually see."""
 
-    # Build vision message
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": content},
-                {"type": "image_url", "image_url": {"url": image_uri}},
-            ],
-        }
-    ]
+        # Build vision message
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": content},
+                    {"type": "image_url", "image_url": {"url": image_uri}},
+                ],
+            }
+        ]
 
-    # Use standard LangChain with_structured_output (handles schema automatically)
-    structured_llm = llm.with_structured_output(
-        ImageAnalysisResult,  # Pass Pydantic model directly
-        method="json_schema",
-        include_raw=False,
-    )
+        # Use standard LangChain with_structured_output (handles schema automatically)
+        structured_llm = llm.with_structured_output(
+            ImageAnalysisResult,  # Pass Pydantic model directly
+            method="json_schema",
+            include_raw=False,
+        )
 
-    result = structured_llm.invoke(messages)
+        result = structured_llm.invoke(messages)
 
-    # Ensure return type matches
-    if isinstance(result, ImageAnalysisResult):
-        return result
-    # If dict, convert to ImageAnalysisResult
-    if isinstance(result, dict):
-        return ImageAnalysisResult(**result)
+        # Ensure return type matches
+        if isinstance(result, ImageAnalysisResult):
+            return result
+        # If dict, convert to ImageAnalysisResult
+        if isinstance(result, dict):
+            return ImageAnalysisResult(**result)
 
-    raise ToolExecutionError(
-        tool_name="image_analysis_tool",
-        message=f"Unexpected result type from Vision API: {type(result)}",
-        original_error=None,
-    )
+        # Unexpected result type
+        raise ToolException(
+            f"Unexpected result type from Vision API: {type(result)}"
+        )
+
+    except ToolException:
+        # Re-raise ToolException as-is
+        raise
+    except FileNotFoundError as exc:
+        # Image file not found
+        raise ToolException(
+            f"Image file not found: {image_path}"
+        ) from exc
+    except Exception as exc:
+        # All other failures (PIL errors, API errors, etc.)
+        raise ToolException(
+            f"Failed to analyze image at '{image_path}': {str(exc)}"
+        ) from exc
