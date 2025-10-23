@@ -6,7 +6,9 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
 from supabase import Client, create_client
+from supabase.lib.client_options import SyncClientOptions
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.exceptions import ConfigurationError, StorageError
@@ -96,8 +98,23 @@ class SupabaseStorageClient(StorageInterface):
                 )
 
             try:
-                # Create client
-                self._client = create_client(self._supabase_url, self._service_key)
+                # Configure HTTP client to use HTTP/1.1 instead of HTTP/2
+                # This prevents "ConnectionTerminated" errors from stale HTTP/2 connections
+                http_client = httpx.Client(
+                    http2=False,  # Disable HTTP/2 to avoid connection multiplexing issues
+                    limits=httpx.Limits(
+                        max_keepalive_connections=5,  # Limit keep-alive connections
+                        max_connections=10,
+                    ),
+                    timeout=httpx.Timeout(120.0, connect=10.0),  # Explicit timeouts
+                )
+
+                # Create client with custom HTTP configuration
+                options = SyncClientOptions(
+                    httpx_client=http_client,
+                    postgrest_client_timeout=120,
+                )
+                self._client = create_client(self._supabase_url, self._service_key, options=options)
 
                 # Test connection with simple query to validate credentials
                 # Use companies table as it's fundamental to single-tenant architecture
@@ -109,6 +126,7 @@ class SupabaseStorageClient(StorageInterface):
                     extra={
                         "url": self._supabase_url[:30] + "...",  # Log partial URL for security
                         "has_service_key": bool(self._service_key),
+                        "http_version": "HTTP/1.1",  # Log protocol version
                     }
                 )
 
