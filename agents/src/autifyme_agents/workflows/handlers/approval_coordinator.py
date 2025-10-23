@@ -183,12 +183,31 @@ class ApprovalCoordinator:
         Returns:
             Command object ready for execution
         """
+        logger.info(
+            "Starting Command construction from approval",
+            extra={
+                "interrupt_count": len(pending_interrupts),
+                "response_count": len(approval_response.responses),
+            }
+        )
+
         from collections import defaultdict
         interrupt_responses = defaultdict(list)
 
         for idx, interrupt_info in enumerate(pending_interrupts):
             # Use original_interrupt_id (WITHOUT suffix) to match checkpoint format
             interrupt_id_for_command = interrupt_info.original_interrupt_id or interrupt_info.interrupt_id
+
+            logger.debug(
+                f"Processing interrupt {idx}",
+                extra={
+                    "idx": idx,
+                    "interrupt_id": interrupt_info.interrupt_id,
+                    "original_interrupt_id": interrupt_info.original_interrupt_id,
+                    "interrupt_id_for_command": interrupt_id_for_command,
+                    "tool_name": interrupt_info.tool_name,
+                }
+            )
 
             response = approval_response.responses[idx]
             tool_name = interrupt_info.tool_name
@@ -225,12 +244,27 @@ class ApprovalCoordinator:
 
             interrupt_responses[interrupt_id_for_command].append(hitl_response)
 
+        # Log what we collected after processing all interrupts
+        logger.info(
+            "Processed all interrupts into grouped responses",
+            extra={
+                "unique_interrupt_ids": list(interrupt_responses.keys()),
+                "interrupt_id_count": len(interrupt_responses),
+                "total_decisions": sum(len(v) for v in interrupt_responses.values()),
+            }
+        )
+
         # Build HITLResponse for LangGraph Command
         # IMPORTANT: Command.resume should contain the value that interrupt() returns, NOT a dict keyed by interrupt_id
         # HumanInTheLoopMiddleware calls: hitl_response = interrupt(hitl_request)
         # So we pass {"decisions": [...]} directly, not {interrupt_id: {"decisions": [...]}}
 
         # Verify we have exactly ONE interrupt (batch HITL = multiple action_requests under ONE interrupt)
+        logger.debug(
+            "Validating interrupt count for batch HITL",
+            extra={"expected": 1, "actual": len(interrupt_responses)}
+        )
+
         if len(interrupt_responses) != 1:
             raise ValueError(
                 f"Expected single interrupt for batch HITL, got {len(interrupt_responses)}. "
