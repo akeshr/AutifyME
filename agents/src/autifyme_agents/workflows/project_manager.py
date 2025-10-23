@@ -75,29 +75,29 @@ def create_project_manager(
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
         pm_tools.extend(create_platform_media_tools(channel))
 
-    # Specialists as subagents
+    # Cataloging tools - save_product on PM for HITL (avoids subagent re-invocation issue)
+    from autifyme_agents.tools.storage_tools import create_save_product_tool
+    pm_tools.append(create_save_product_tool(storage))
+
+    # Specialist for image analysis (no HITL, returns data to PM)
     from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
 
     subagents: list[Any] = [
-        create_cataloging_specialist(storage),
+        create_cataloging_specialist(storage),  # Has image_analysis_tool only
     ]
 
-    # Aggregate interrupt_on configs from all subagents for HITL
-    # This ensures PM-level HITL middleware intercepts save_product from subagents
-    interrupt_configs: dict[str, bool] = {}
-    for subagent in subagents:
-        if isinstance(subagent, dict) and "interrupt_on" in subagent:
-            interrupt_configs.update(subagent["interrupt_on"])
+    # HITL only at PM level for save_product
+    # Specialist analyzes images and returns data; PM saves with approval
+    interrupt_configs: dict[str, bool] = {"save_product": True}
 
     # NOTE: DeepAgents automatically adds HumanInTheLoopMiddleware when interrupt_on is provided
-    # Subagents also get HITL via their own interrupt_on declaration
-    # This dual-level HITL ensures interrupts are properly caught and resumed
+    # Hybrid architecture: specialist for analysis, PM for HITL-required saves
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
         subagents=subagents,
-        interrupt_on=interrupt_configs,  # Aggregated from subagents
+        interrupt_on=interrupt_configs,
         checkpointer=checkpointer,
         store=store,
         use_longterm_memory=True,

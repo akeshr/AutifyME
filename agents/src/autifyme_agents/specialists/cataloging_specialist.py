@@ -8,31 +8,30 @@ from typing import Any
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
-from autifyme_agents.tools.storage_tools import create_save_product_tool
 
 
 def create_cataloging_specialist(storage: StorageInterface) -> dict[str, Any]:
     """Create cataloging specialist SubAgent spec.
 
     Args:
-        storage: Storage adapter for database operations
+        storage: Storage adapter for database operations (not used - kept for interface compatibility)
 
     Returns:
-        SubAgent spec with tools, HITL configuration, and message limiting middleware
+        SubAgent spec with image analysis tool only.
+        save_product moved to PM level to avoid HITL re-invocation issues.
     """
-    save_product = create_save_product_tool(storage)
     system_prompt = load_prompt("specialists/cataloging_specialist.prompt")
 
     description = (
-        "Synthesizes product information from user descriptions and image analysis. "
-        "Analyzes product images, infers missing details, creates complete catalog entries "
-        "with human approval before saving to database."
+        "Analyzes product images and synthesizes product information. "
+        "Extracts visual details (colors, materials, style, quality) and returns "
+        "structured product data. PM handles saving to database with approval."
     )
 
     return {
         "name": "cataloging_specialist",
         "description": description,
-        "tools": [image_analysis_tool, save_product],
+        "tools": [image_analysis_tool],  # Only analysis tool, no save_product
         "system_prompt": system_prompt,
-        "interrupt_on": {"save_product": True},  # Subagent declares HITL for its tools
+        # No interrupt_on - specialist has no HITL tools
     }
