@@ -82,16 +82,22 @@ def create_project_manager(
         create_cataloging_specialist(storage),
     ]
 
-    # HITL Configuration: PM level (CRITICAL for proper Command.resume routing)
-    # interrupt_on MUST be at PM level for subagent tools requiring approval
-    # When interrupt_on is at specialist level, PM cannot route Command.resume correctly
-    # Pattern: Specialist declares tools, PM declares which tools need HITL
+    # Aggregate interrupt_on configs from all subagents for HITL
+    # This ensures PM-level HITL middleware intercepts save_product from subagents
+    interrupt_configs: dict[str, bool] = {}
+    for subagent in subagents:
+        if isinstance(subagent, dict) and "interrupt_on" in subagent:
+            interrupt_configs.update(subagent["interrupt_on"])
+
+    # NOTE: DeepAgents automatically adds HumanInTheLoopMiddleware when interrupt_on is provided
+    # Subagents also get HITL via their own interrupt_on declaration
+    # This dual-level HITL ensures interrupts are properly caught and resumed
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
         subagents=subagents,
-        interrupt_on={"save_product": True},  # HITL for specialist tools at PM level
+        interrupt_on=interrupt_configs,  # Aggregated from subagents
         checkpointer=checkpointer,
         store=store,
         use_longterm_memory=True,
