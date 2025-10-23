@@ -146,6 +146,11 @@ def _process_message_async(
     receives a response within their timeout window (~5 seconds) even when
     workflows take longer (e.g., image analysis, 8+ products).
 
+    Phase 1 Typing Indicator:
+    - Sends typing indicator once at start (25s duration or until message sent)
+    - Provides immediate feedback that bot is processing
+    - No auto-refresh in Phase 1 (future: Phase 2 for workflows >25s)
+
     Args:
         runner: Workflow runner instance
         sender: WhatsApp sender phone number
@@ -166,7 +171,24 @@ def _process_message_async(
             }
         )
 
+        # Send typing indicator (Phase 1: single call, lasts 25s or until message sent)
+        # WhatsApp API: marks message as read + shows "typing..." for 25s
+        try:
+            runner.channel.client.send_typing_indicator(message_id)
+            logger.debug(
+                "Typing indicator sent (message marked as read)",
+                extra={"message_id": message_id, "sender": sender}
+            )
+        except Exception as typing_exc:
+            # Non-critical: continue processing even if typing indicator fails
+            logger.warning(
+                "Failed to send typing indicator (continuing with workflow)",
+                exc_info=typing_exc,
+                extra={"message_id": message_id, "sender": sender}
+            )
+
         # Process workflow (may take >5 seconds for complex catalogs)
+        # Typing indicator automatically stops when workflow sends response message
         runner.handle_message(sender, text, media_id, sender_name=sender_name)
 
         logger.info(

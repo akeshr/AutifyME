@@ -25,6 +25,57 @@ class WhatsAppClient:
 
         self._base_url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/messages"
 
+    def send_typing_indicator(self, message_id: str) -> dict[str, Any]:
+        """Mark message as read and show typing indicator.
+
+        WhatsApp typing indicator behavior (per official Cloud API docs):
+        - Marks the incoming message as read
+        - Shows "typing..." animation to sender
+        - Lasts 25 seconds or until next message sent
+        - Should only be used when bot will respond (prevents poor UX)
+
+        Official format:
+        {
+          "messaging_product": "whatsapp",
+          "status": "read",
+          "message_id": "<WHATSAPP_MESSAGE_ID>",
+          "typing_indicator": {
+            "type": "text"
+          }
+        }
+
+        Args:
+            message_id: WhatsApp message ID from incoming webhook
+
+        Returns:
+            WhatsApp API response dict
+
+        Raises:
+            httpx.HTTPStatusError: If API call fails
+        """
+        payload = {
+            "messaging_product": "whatsapp",
+            "status": "read",
+            "message_id": message_id,
+            "typing_indicator": {
+                "type": "text"
+            }
+        }
+
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+        }
+
+        response = httpx.post(self._base_url, json=payload, headers=headers, timeout=10.0)
+        response.raise_for_status()
+        data: dict[str, Any] = response.json()
+        logger.debug(
+            "WhatsApp typing indicator sent (message marked as read)",
+            extra={"message_id": message_id},
+        )
+        return data
+
     def send_text(self, recipient: str, message: str, *, preview_url: bool = False) -> dict[str, Any]:
         payload = {
             "messaging_product": "whatsapp",
