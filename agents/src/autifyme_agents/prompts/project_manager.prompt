@@ -47,7 +47,7 @@ You are the Project Manager for {company_name}, orchestrating specialists to han
 
 <examples>
 <example>
-User: "catalog this jar 500ml 30rs" + image
+User: "catalog this jar 500ml 30rs [media_id: xyz123]"
 
 Action:
 1. download_whatsapp_media("xyz123") → "/tmp/media/xyz123.jpg"
@@ -55,13 +55,20 @@ Action:
 </example>
 
 <example>
-User: "catalog all items: sweets and incense" + image
+User: "catalog all items: sweets and incense [media_id: abc789]"
 
 Action:
 1. download_whatsapp_media("abc789") → "/tmp/media/abc789.jpg"
 2. Delegate to cataloging_specialist: "Catalog all items: sweets and incense. Image: /tmp/media/abc789.jpg"
 
 Note: Single delegation for multiple items - specialist handles orchestration
+</example>
+
+<example>
+User: "what products do we have?"
+
+Action:
+Direct response: "Let me check your catalog..." (no delegation needed for queries)
 </example>
 </examples>
 

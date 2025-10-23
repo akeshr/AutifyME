@@ -403,10 +403,38 @@ class WorkflowRunner:
         Returns:
             Tuple of (final_result, interrupt_value)
         """
-        # Create payload
+        # Create payload with actual user text as content, metadata in additional_kwargs
         try:
             from langchain.messages import HumanMessage
-            payload = {"messages": [HumanMessage(content=json.dumps(raw_payload))]}
+
+            # Extract user text - this is what PM should see directly
+            user_text = raw_payload.get("text", "")
+            media_id = raw_payload.get("media_id")
+
+            # Build natural language message that includes media_id when present
+            # PM needs media_id explicitly to call download_media tool
+            if media_id:
+                if user_text:
+                    # Text + media: append media_id to user message
+                    user_text = f"{user_text} [media_id: {media_id}]"
+                else:
+                    # Media only: create descriptive message with media_id
+                    user_text = f"[Media attachment: {media_id}]"
+
+            # Put platform metadata in additional_kwargs (standard LangChain pattern)
+            # PM receives clean user text with embedded media_id, metadata available if needed
+            payload = {
+                "messages": [HumanMessage(
+                    content=user_text,
+                    additional_kwargs={
+                        "platform": raw_payload.get("platform"),
+                        "sender": raw_payload.get("sender"),
+                        "sender_name": raw_payload.get("sender_name"),
+                        "media_id": media_id,
+                        "timestamp": raw_payload.get("timestamp"),
+                    }
+                )]
+            }
         except Exception as e:
             logger.error("Payload creation failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
             raise
