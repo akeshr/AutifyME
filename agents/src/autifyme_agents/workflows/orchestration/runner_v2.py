@@ -353,6 +353,7 @@ class WorkflowRunner:
                 "interrupt_count": len(pending_interrupts_list),
                 "message_preview": user_message[:50],
                 "history_length": len(conversation_history),
+                "command_resume_keys": list(command_obj.resume.keys()) if command_obj and command_obj.resume else [],
             }
         )
 
@@ -361,12 +362,28 @@ class WorkflowRunner:
         interrupt_value = None
 
         try:
+            logger.info(
+                "Starting PM stream with Command",
+                extra={"thread_id": thread_id, "stream_mode": "values"}
+            )
+
+            event_count = 0
             for event in pm.stream(command_obj, config=config, stream_mode="values"):
+                event_count += 1
                 last_event = event
                 if "__interrupt__" in event:
                     interrupts = event.get("__interrupt__") or []
                     if interrupts:
                         interrupt_value = interrupts[0].value
+
+            logger.info(
+                "PM stream completed",
+                extra={
+                    "thread_id": thread_id,
+                    "event_count": event_count,
+                    "had_new_interrupt": interrupt_value is not None,
+                }
+            )
 
             logger.debug(
                 "Command execution complete",

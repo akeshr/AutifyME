@@ -258,4 +258,15 @@ class ApprovalCoordinator:
         # LangGraph expects: {interrupt_id: response_value} format
         # This ensures the resume reaches the correct interrupted node (subagent's HITL middleware)
         # Works for both single and multiple products (always batch HITL format)
-        return Command(resume={interrupt_id: hitl_response_value})
+        command_to_return = Command(resume={interrupt_id: hitl_response_value})
+
+        logger.info(
+            "Built Command object for resumption",
+            extra={
+                "interrupt_id": interrupt_id,
+                "decision_count": len(decisions),
+                "command_resume_keys": list(command_to_return.resume.keys()) if command_to_return.resume else [],
+            }
+        )
+
+        return command_to_return
