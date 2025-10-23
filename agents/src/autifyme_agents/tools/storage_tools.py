@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from langchain.tools import tool
+from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field
 from tenacity import (
     before_sleep_log,
@@ -114,16 +115,34 @@ def create_save_product_tool(storage: StorageInterface) -> object:
         UPDATE: Include 'id' from previous save to update existing product (no duplicate created).
 
         Always returns full product with id in the response for future updates.
+
+        Raises:
+            ToolException: When save fails after retries, enabling LLM self-healing
         """
-        product = _save_product(storage, **kwargs)
-        return CatalogingResult(
-            stage="saved",
-            success=True,
-            product_id=product.id,
-            product_name=product.name,
-            message="Product persisted to catalog",
-            data={"product": product.model_dump()},
-        )
+        try:
+            product = _save_product(storage, **kwargs)
+            return CatalogingResult(
+                stage="saved",
+                success=True,
+                product_id=product.id,
+                product_name=product.name,
+                message="Product persisted to catalog",
+                data={"product": product.model_dump()},
+            )
+        except Exception as exc:
+            # Wrap all failures in ToolException for LangChain error handling
+            # This enables LLM self-healing via handle_tool_errors mechanism
+            logger.error(
+                "Failed to save product after retries",
+                exc_info=True,
+                extra={
+                    "product_name": kwargs.get("name"),
+                    "error_type": type(exc).__name__,
+                },
+            )
+            raise ToolException(
+                f"Cannot save product '{kwargs.get('name', 'unknown')}': {str(exc)}"
+            ) from exc
 
     return save_product
 
@@ -149,7 +168,21 @@ def create_get_company_profile_tool(storage: StorageInterface) -> object:
         reraise=True,
     )
     def get_company_profile() -> CompanyProfile:
-        """Retrieve the company's profile, including brand voice and target audience."""
-        return _get_company_profile(storage)
+        """Retrieve the company's profile, including brand voice and target audience.
+
+        Raises:
+            ToolException: When profile retrieval fails after retries
+        """
+        try:
+            return _get_company_profile(storage)
+        except Exception as exc:
+            logger.error(
+                "Failed to retrieve company profile after retries",
+                exc_info=True,
+                extra={"error_type": type(exc).__name__},
+            )
+            raise ToolException(
+                f"Cannot retrieve company profile: {str(exc)}"
+            ) from exc
 
     return get_company_profile

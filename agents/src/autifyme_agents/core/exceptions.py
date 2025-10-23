@@ -30,10 +30,28 @@ class AutifyMEError(Exception):
 
 class ToolExecutionError(AutifyMEError):
     """
-    Raised when a tool fails to execute successfully.
+    Base class for internal tool errors (integration layer).
 
-    This is the base class for all tool-related errors. Tools should catch
-    external API errors and raise this (or a subclass) with context.
+    IMPORTANT: DO NOT raise this directly from LangChain @tool decorated functions.
+    Use langchain_core.tools.ToolException instead for LLM error handling.
+
+    This exception hierarchy is for error classification within integrations:
+    - Storage adapters (SupabaseStorageClient)
+    - External API clients (WhatsAppClient, Vision API wrappers)
+    - Internal error routing and logging
+
+    LangChain tools should:
+    1. Call internal functions that may raise ToolExecutionError subclasses
+    2. Catch all exceptions at tool boundary
+    3. Re-raise as ToolException for LLM self-healing
+
+    Example:
+        # In storage_tools.py
+        try:
+            product = _save_product(storage, **kwargs)  # May raise ConfigurationError
+            return CatalogingResult(...)
+        except Exception as exc:
+            raise ToolException(f"Cannot save product: {exc}") from exc
     """
 
     def __init__(self, message: str, tool_name: str, original_error: Exception | None = None):
