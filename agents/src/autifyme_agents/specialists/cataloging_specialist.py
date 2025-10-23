@@ -29,13 +29,13 @@ def create_cataloging_specialist(storage: StorageInterface) -> dict[str, Any]:
         "with human approval before saving to database."
     )
 
-    # HITL configuration at specialist level (correct for 2-level DeepAgents architecture)
-    # Each specialist configures its own HITL for its tools
-    # This prevents interrupt loops that occur when HITL is at PM level
+    # CRITICAL: NO interrupt_on at specialist level
+    # HITL must be configured at PM level for proper Command.resume routing
+    # When interrupt_on is at specialist level, PM can't route resume correctly
     return {
         "name": "cataloging_specialist",
         "description": description,
         "tools": [image_analysis_tool, save_product],
         "system_prompt": system_prompt,
-        "interrupt_on": {"save_product": True},  # HITL at specialist level
+        # NO interrupt_on here - PM handles HITL for all subagent tools
     }

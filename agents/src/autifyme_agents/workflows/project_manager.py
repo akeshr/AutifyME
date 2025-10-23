@@ -82,16 +82,16 @@ def create_project_manager(
         create_cataloging_specialist(storage),
     ]
 
-    # HITL Configuration: Handled by specialists
-    # Each specialist declares which tools require approval via interrupt_on in their SubAgent spec
-    # DeepAgents SubAgents create their own HITL middleware - PM doesn't need interrupt_on
-    # Example: cataloging_specialist has interrupt_on={'save_product': True}
+    # HITL Configuration: PM level (CRITICAL for proper Command.resume routing)
+    # interrupt_on MUST be at PM level for subagent tools requiring approval
+    # When interrupt_on is at specialist level, PM cannot route Command.resume correctly
+    # Pattern: Specialist declares tools, PM declares which tools need HITL
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
         subagents=subagents,
-        # NO interrupt_on at PM level - specialists handle their own HITL
+        interrupt_on={"save_product": True},  # HITL for specialist tools at PM level
         checkpointer=checkpointer,
         store=store,
         use_longterm_memory=True,
