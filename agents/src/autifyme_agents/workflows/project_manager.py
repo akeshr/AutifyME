@@ -75,33 +75,29 @@ def create_project_manager(
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
         pm_tools.extend(create_platform_media_tools(channel))
 
-    # Specialists as subagents
-    from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
+    # Cataloging tools - save_product on PM for HITL (avoids subagent re-invocation issue)
     from autifyme_agents.tools.storage_tools import create_save_product_tool
-
-    # CRITICAL FIX for config propagation:
-    # Add specialist tools to PM so HITL middleware can intercept them
-    # This matches the 3-level architecture pattern where PM had tools directly
     pm_tools.append(create_save_product_tool(storage))
 
+    # Specialist for image analysis (no HITL, returns data to PM)
+    from autifyme_agents.specialists.cataloging_specialist import create_cataloging_specialist
+
     subagents: list[Any] = [
-        create_cataloging_specialist(storage),
+        create_cataloging_specialist(storage),  # Has image_analysis_tool only
     ]
 
-    # HITL Configuration: Configure at PM level (not subagent level)
-    # This ensures PM's HITL middleware intercepts tool calls from subagents
-    # Matches 3-level architecture where tool_configs was at top level
+    # HITL only at PM level for save_product
+    # Specialist analyzes images and returns data; PM saves with approval
     interrupt_configs: dict[str, bool] = {"save_product": True}
 
-    # DeepAgents automatically adds HumanInTheLoopMiddleware when interrupt_on is provided
-    # This middleware intercepts tool calls matching interrupt_on config and raises interrupts
-    # Runner detects these interrupts and handles the approval workflow
+    # NOTE: DeepAgents automatically adds HumanInTheLoopMiddleware when interrupt_on is provided
+    # Hybrid architecture: specialist for analysis, PM for HITL-required saves
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
         subagents=subagents,
-        interrupt_on=interrupt_configs,  # DeepAgents auto-creates HITL middleware from this
+        interrupt_on=interrupt_configs,
         checkpointer=checkpointer,
         store=store,
         use_longterm_memory=True,
