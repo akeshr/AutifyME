@@ -1,870 +1,875 @@
-# Product Onboarding - Implementation Plan
+# Product Onboarding: Implementation Plan
 
-**Date:** 2025-10-23
-**Status:** Ready for Implementation
-**Based On:** WORKFLOW_DESIGN_STRATEGY.md principles
-**Priority:** Product Intelligence + Visual Content specialists
-
----
-
-## Executive Summary
-
-**Goal:** Enable PAVISHA to onboard products via WhatsApp (text + images) → Complete product in database with professional images
-
-**Approach:** 2 domain specialists + 1 HITL point
-
-**Design Validation (per WORKFLOW_DESIGN_STRATEGY.md):**
-- ✅ Domain-based (not workflow-specific)
-- ✅ Reusable across multiple workflows
-- ✅ LLM factory pattern
-- ✅ Minimal HITL (1 point)
-- ✅ Latest AI models (Nano Banana FREE, Veo 3.1, Imagen 3)
+**Date:** 2025-10-24
+**Status:** Ready for Execution
+**Timeline:** 4 weeks to production
+**Reference:** PRODUCT_ONBOARDING_COMPLETE_DESIGN.md
 
 ---
 
-## Part I: Architecture
+## Implementation Philosophy
 
-### Specialists
+**Production-Grade from Day One:**
+- All 5 specialists built to completion (no scope reduction)
+- All 4 HITL points implemented
+- Complete database integration (9 tables)
+- Full error handling and resilience
+- Comprehensive testing before production
 
+**Optimization Strategy:**
+- Build in optimal order based on dependencies
+- Maximize parallel development where possible
+- Foundation first, then parallel workstreams
+- Integration last, after specialists complete
+
+---
+
+## Dependency Analysis
+
+### **Critical Path (Sequential):**
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                  PROJECT MANAGER AGENT                       │
-│  Orchestrates: Product Intelligence → Visual Content        │
-└─────────────────────────────────────────────────────────────┘
-                            │
-        ┌───────────────────┴───────────────────┐
-        ▼                                       ▼
-┌───────────────────────────────┐   ┌───────────────────────────────┐
-│ Product Intelligence          │   │ Visual Content                │
-│ Specialist                    │   │ Specialist                    │
-│                               │   │                               │
-│ Domain: Product Understanding │   │ Domain: Visual Assets         │
-│                               │   │                               │
-│ Does:                         │   │ Does:                         │
-│ • Vision analysis (multimodal)│   │ • Enhance (Nano Banana FREE)  │
-│ • Spec extraction             │   │ • Generate (Imagen 3 $0.03)   │
-│ • Category mapping            │   │ • Video (Veo 3.1 $0.15/sec)   │
-│ • Variant detection (inline)  │   │ • Consistency management      │
-│ • SEO generation (inline)     │   │ • Quality decisions           │
-│ • Image classification        │   │                               │
-│                               │   │ Tools:                        │
-│ Tools:                        │   │ • enhance_nano_banana         │
-│ • multimodal_analysis         │   │ • generate_imagen3            │
-│ • category_mapper             │   │ • generate_veo31              │
-│                               │   │ • create_graphic              │
-│ Output:                       │   │                               │
-│ ProductDraft (structured)     │   │ Output:                       │
-│                               │   │ VisualAssets (CDN URLs)       │
-└───────────────────────────────┘   └───────────────────────────────┘
+Database Persistence Tools
+    ↓
+Product Architecture Specialist
+    ↓
+PM Orchestration
+    ↓
+WhatsApp Integration
+    ↓
+Production Testing
 ```
 
-### Workflow Flow
-
+### **Parallel Workstreams (After Product Architecture):**
 ```
-User (WhatsApp): "Add 500ml bottle, clear/amber, ₹12" + 2 images
-   ↓
-PM classifies intent: Product onboarding
-   ↓
-PM → Product Intelligence Specialist
-   Input: {text, images, company_context}
-   ↓
-   Product Intelligence calls multimodal_analysis tool
-   → Vision API analyzes 2 images + text in ONE call
-   → Extracts: specs, suggests categories, detects variants
-   ↓
-   Product Intelligence inline logic:
-   → Variant detection: "clear/amber" → color axis → 2 SKUs
-   → Category mapping: Calls category_mapper tool
-   → SEO generation: URL slug, meta tags (inline)
-   → Image classification: type, angle (from Vision API)
-   ↓
-   Returns: ProductDraft {
-     product_family: {...},
-     variant_axes: [{name: "color", ...}],
-     variant_values: [{value: "Clear"}, {value: "Amber"}],
-     sku_preview: ["PAV-BTL-500-CLR", "PAV-BTL-500-AMB"],
-     images_metadata: [{type: "product_shot", angle: "front", ...}],
-     category_id: UUID,
-     url_slug: "500ml-pet-bottle-food-grade",
-     confidence_score: 0.92,
-   }
-   ↓
-PM → Visual Content Specialist
-   Input: {product_draft, raw_images}
-   ↓
-   Visual Content analyzes quality:
-   → Image 1: Quality 6/10 → Decision: Enhance with Nano Banana
-   → Image 2: Quality 4/10 → Decision: Regenerate with Imagen 3
-   ↓
-   Visual Content calls tools:
-   → enhance_nano_banana(image1) → CDN URL (FREE!)
-   → generate_imagen3({
-       reference: image2,
-       prompt: "500ml PET bottle, white background, professional",
-       angles: ["front", "side", "top"],
-     }) → 3 CDN URLs ($0.09)
-   ↓
-   Visual Content ensures consistency:
-   → Check existing PAVISHA products
-   → Match style (white background, centered, soft shadows)
-   ↓
-   Returns: VisualAssets {
-     enhanced_images: [CDN_URL_1],
-     generated_images: [CDN_URL_2, CDN_URL_3, CDN_URL_4],
-     primary_image_url: CDN_URL_2,
-     total_cost: $0.09,
-   }
-   ↓
-PM combines outputs
-   ↓
-───────────────────────────────────────────────────────
-HITL: User reviews ONE screen
-───────────────────────────────────────────────────────
-
-📦 Product: 500ml PET Bottle - Food Grade
-💰 Price: ₹12.00 (base price)
-📂 Category: Packaging > PET Products > Bottles
-🔗 URL: /products/500ml-pet-bottle-food-grade
-
-🏷️ Variants (2 SKUs):
-  ✓ Clear (PAV-BTL-500-CLR) - ₹12.00
-  ✓ Amber (PAV-BTL-500-AMB) - ₹12.00
-
-🖼️ Images (4 professional images):
-  [CDN_URL_2] ⭐ Primary - Front view (white bg)
-  [CDN_URL_1] Enhanced original - Side view
-  [CDN_URL_3] Generated - Top view
-  [CDN_URL_4] Generated - 45° angle
-
-💵 Image generation cost: ₹7.50 ($0.09)
-
-───────────────────────────────────────────────────────
-✅ Approve & Save  ✏️ Edit Details  ❌ Cancel
-───────────────────────────────────────────────────────
-   ↓
-User: ✅ Approve
-   ↓
-PM → Persistence Tool
-   Atomic transaction:
-   1. product_families
-   2. variant_axes, variant_values
-   3. products (2 SKUs)
-   4. product_variant_values
-   5. customer_segments (B2B inferred)
-   6. product_family_industries (Food=311, Beverage=312)
-   7. product_images (4 images with metadata)
-   8. Initial history records
-   ↓
-Success: Product saved with 2 SKUs and 4 professional images
+Product Architecture Complete
+         ↓
+    ┌────┴────┬────┴────┬────┴────┐
+    ↓         ↓         ↓         ↓
+Taxonomy  Market    Visual   Content/SEO
+         Intel     Assets
 ```
 
 ---
 
-## Part II: Implementation Phases
+## Week 1: Foundation Layer
 
-### Phase 1: Foundation (Week 1)
+### **Goal:** Build foundation that everything depends on
 
-**Goal:** LLM factory + Core tools
+**Priority:** CRITICAL PATH - Blocks all other work
 
-#### Day 1-2: LLM Factory
+---
 
-**File:** `agents/src/autifyme_agents/core/llm_factory.py`
+### **Days 1-3: Database Persistence Tools**
 
-```python
-from langchain_anthropic import ChatAnthropic
-from langchain_openai import ChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
+**Why First:** All specialists write to database. Build complete transaction system.
 
-class LLMFactory:
-    """Centralized LLM instantiation - no hardcoded models."""
+**Deliverables:**
 
-    @staticmethod
-    def get_llm(
-        provider: Literal["openai", "anthropic", "google"],
-        model: str,
-        temperature: float = 0,
-        **kwargs
-    ) -> BaseChatModel:
-        """Get LLM instance from configuration.
+**1. Tool: `save_product_family_atomic`**
+- Atomic transaction across 9 tables:
+  1. product_families
+  2. variant_axes
+  3. variant_values
+  4. products (N SKUs)
+  5. product_variant_values (M:N junctions)
+  6. product_family_industries
+  7. customer_segments
+  8. product_images
+  9. marketing_content
+- Automatic history records (price, inventory via triggers)
+- Audit log entries (via triggers)
+- Complete rollback on any failure
+- Return PersistenceResult with all created IDs
 
-        Examples:
-        - get_llm("openai", "gpt-4o", temperature=0)
-        - get_llm("anthropic", "claude-3-5-sonnet-20241022", temperature=0.7)
-        - get_llm("google", "gemini-2.0-flash-exp", temperature=0)
-        """
+**2. Database Query Tools:**
+- `get_existing_categories()` → List[Category]
+- `get_existing_products()` → List[Product]
+- `get_company_profile()` → CompanyProfile
+- `get_company_intelligence()` → CompanyIntelligence
+- `get_catalog_style()` → CatalogStyle
 
-        if provider == "openai":
-            return ChatOpenAI(model=model, temperature=temperature, **kwargs)
-        elif provider == "anthropic":
-            return ChatAnthropic(model=model, temperature=temperature, **kwargs)
-        elif provider == "google":
-            return ChatGoogleGenerativeAI(model=model, temperature=temperature, **kwargs)
-        else:
-            raise ValueError(f"Unknown provider: {provider}")
-
-# Usage in specialists
-llm = LLMFactory.get_llm("openai", "gpt-4o", temperature=0)
-specialist = ProductIntelligenceSpecialist(llm=llm)
-```
+**3. Error Handling:**
+- Duplicate SKU detection → regenerate with suffix
+- Duplicate URL slug → append variant identifier
+- Foreign key violation → log, rollback, retry
+- Transaction conflict → exponential backoff retry (3 attempts)
 
 **Testing:**
-- Verify all 3 providers work
-- Test model switching
-- Validate temperature control
+- Insert simple product (no variants) → verify 7 tables populated
+- Insert product family with 2 variants → verify 9 tables, 2 SKUs created
+- Insert complex family with 6 variants (3 axes) → verify junction table correctness
+- Test rollback: Force failure at table 5 → verify tables 1-4 rolled back
+- Test duplicate SKU → verify suffix appended
+- Performance: Insert 10 families in parallel → verify no conflicts
+
+**Success Criteria:**
+- ✅ Complete product family insertion in single transaction
+- ✅ Rollback works correctly on any table failure
+- ✅ All relationships maintained (foreign keys, junctions)
+- ✅ Audit trail captured
+- ✅ Performance <2 seconds per family
 
 ---
 
-#### Day 3-4: Core Tools
+### **Days 4-7: Product Architecture Specialist**
 
-**File:** `agents/src/autifyme_agents/tools/vision_tools.py`
+**Why Second:** All other specialists depend on product structure definition.
 
-```python
-@tool
-def multimodal_analysis(
-    image_paths: list[str],
-    user_text: str,
-    company_context: dict,
-) -> MultimodalAnalysisResult:
-    """Analyze images and text together using Vision API.
+**Deliverables:**
 
-    ONE API CALL returns:
-    - Product specifications (name, price, dimensions, materials, etc.)
-    - Image classifications (type: product_shot/lifestyle, angle: front/side/top)
-    - Alt text for each image (SEO-optimized, <125 chars)
-    - Suggested category
-    - Variant hints ("clear and amber" detected)
+**1. Specialist Implementation (create_agent)**
+- Agent configuration with DeepAgents
+- Structured output: ProductArchitectureDraft
+- Temperature: 0 (deterministic)
+- Model: gpt-4o or claude-3-5-sonnet-20241022
 
-    Uses: GPT-4V or Claude 3.5 Sonnet (configured via LLM factory)
-    """
+**2. Tool: `analyze_product_multimodal`**
+- Input: image_paths, user_text, company_context
+- ONE vision API call analyzing all images + text
+- Extract: specs (dimensions, material, weight, features, certifications)
+- Classify: image types (product_shot, lifestyle, detail)
+- Classify: image angles (front, side, top, 45_degree)
+- Generate: basic alt text per image (descriptive, factual)
+- Suggest: product name, category
+- Detect: variant hints (visual differences, text mentions)
+- Confidence: score per extracted field (0-1)
+- Output: MultimodalAnalysisResult
+- Image optimization: resize to 2048px max before API call
+- Method: `json_schema` for structured output (more reliable than function_calling)
 
-    llm = LLMFactory.get_llm("openai", "gpt-4o", temperature=0)
-    structured_llm = llm.with_structured_output(MultimodalAnalysisResult)
+**3. Tool: `calculate_sku_combinations`**
+- Input: variant_axes, compatibility_rules
+- Calculate: all valid combinations
+- Warn: if >20 SKUs (flag for user confirmation)
+- Identify: invalid combinations with reasons
+- Output: SKUCombinationResult
 
-    # Build multimodal messages
-    messages = [
-        ("system", MULTIMODAL_ANALYSIS_PROMPT),
-        ("human", [
-            {"type": "text", "text": f"User input: {user_text}\n\nCompany: {company_context}"},
-            *[{"type": "image_url", "image_url": encode_image(path)} for path in image_paths],
-        ]),
-    ]
+**4. Tool: `generate_sku_pattern`**
+- Input: product_family_draft, existing_catalog
+- Generate: SKU strings following catalog conventions
+- Format: {COMPANY_PREFIX}-{PRODUCT_TYPE}-{SPEC1}-{VARIANT_CODES}
+- Ensure: uniqueness across catalog
+- Output: List[str] (SKU codes)
 
-    result = structured_llm.invoke(messages)
-    return result
-```
+**5. Inline Logic (LLM Reasoning):**
+- Variant detection: Parse user text for variant mentions
+  - "clear and amber" → color axis with 2 values
+  - "500ml, 1L, 2L" → capacity axis with 3 values
+- Compatibility rules: "28mm neck only with 500ml-1L capacity"
+- Industry-specific rules: "pharma requires amber bottles"
+- Pricing strategy: base price + variant adjustments + bulk tiers
 
-**File:** `agents/src/autifyme_agents/tools/category_tools.py`
-
-```python
-@tool
-def category_mapper(
-    product_name: str,
-    product_type: str,
-    material: str,
-    existing_categories: list[Category],
-) -> CategoryMapping:
-    """Map product to category tree and generate SEO fields.
-
-    Returns:
-    - category_id (if match found in existing categories)
-    - category_path (hierarchical breadcrumb)
-    - google_product_category (Google taxonomy code)
-    - url_slug (SEO-friendly slug)
-    """
-```
+**6. Prompt Engineering:**
+- Product Architecture specialist prompt
+- Context: PAVISHA (B2B manufacturer, PET bottles, food-grade focus)
+- Examples: Complex variants, compatibility rules, industry constraints
+- Brand voice: Professional, technical, quality-focused
+- Output format: Structured ProductArchitectureDraft
 
 **Testing:**
-- Test with PAVISHA bottle images
-- Validate structured output
-- Verify confidence scoring
+- Simple product (no variants): T-shirt, single color, single size
+- 2-dimension variants: Bottle with 2 colors × 2 neck finishes = 4 SKUs
+- 3-dimension variants: Bottle with 3 capacities × 2 colors × 2 necks = 12 SKUs
+- Complex compatibility: 28mm neck invalid with 2L capacity → only 10 valid SKUs
+- Industry constraints: Pharma product → amber only → reduces to 6 SKUs
+- Low confidence: Blurry images → detect missing specs, flag for clarification
+- Image analysis: Multi-angle shots → classify correctly (front, side, top)
+
+**Success Criteria:**
+- ✅ Variant detection accuracy >90% (test with 20 products)
+- ✅ SKU generation follows catalog pattern 100%
+- ✅ Confidence scoring accurate (manual validation)
+- ✅ Compatibility rules enforced correctly
+- ✅ Image classification accuracy >85%
+- ✅ Processing time <30 seconds (including vision API)
 
 ---
 
-### Phase 2: Product Intelligence Specialist (Week 1-2)
+## Week 2: Parallel Specialist Development
 
-**Goal:** Complete product understanding domain
+### **Goal:** Build all remaining specialists simultaneously
 
-#### Day 5-7: Specialist Implementation
+**Priority:** HIGH - Can run in parallel workstreams
 
-**File:** `agents/src/autifyme_agents/specialists/product_intelligence_specialist.py`
+**Strategy:** Different developers/workstreams can build simultaneously once Product Architecture is complete
 
-```python
-class ProductIntelligenceSpecialist:
-    """Domain: Product Understanding
+---
 
-    Reusable across:
-    - Product onboarding
-    - Product updates
-    - Competitive analysis
-    - Inventory audits
-    """
+### **Workstream A: Taxonomy Specialist (Days 8-11)**
 
-    def __init__(self, llm: BaseChatModel, storage: StorageInterface):
-        self.llm = llm
-        self.storage = storage
-        self.tools = [
-            multimodal_analysis,
-            category_mapper,
-        ]
+**Deliverables:**
 
-    async def process(
-        self,
-        user_text: str,
-        image_paths: list[str],
-        company_context: dict,
-    ) -> ProductDraft:
-        """Transform user input into database-ready product structure."""
+**1. Specialist Implementation**
+- Agent configuration
+- Output: TaxonomyMapping
 
-        # Step 1: Multimodal analysis
-        analysis = await self._call_tool(
-            "multimodal_analysis",
-            image_paths=image_paths,
-            user_text=user_text,
-            company_context=company_context,
-        )
+**2. Tool: `map_to_internal_category`**
+- Input: product_name, product_type, material, existing_categories
+- Similarity search + LLM reasoning against category tree
+- Output: InternalCategoryMatch (category_id, path, confidence)
 
-        # Step 2: Inline variant detection
-        variant_structure = self._detect_variants(analysis, user_text)
+**3. Tool: `find_google_product_category`**
+- Input: product_name, product_type, material, use_case
+- Search 6000+ Google Product Category taxonomy
+- Output: GoogleCategoryMatch (code, path, alternatives)
 
-        # Step 3: Category mapping
-        category_info = await self._call_tool(
-            "category_mapper",
-            product_name=analysis.product_name,
-            product_type=analysis.product_type,
-            material=analysis.material,
-            existing_categories=self.storage.get_categories(),
-        )
+**4. Tool: `standardize_attributes`**
+- Input: raw_attributes, product_type, existing_catalog
+- Normalize: "capacity" vs "volume" vs "size" → standardize to "capacity"
+- Normalize: units (500ml vs 0.5L → 500ml)
+- Output: StandardizedAttributes
 
-        # Step 4: Inline SEO generation
-        seo_fields = self._generate_seo_fields(
-            analysis.product_name,
-            analysis.product_description,
-            category_info.category_path,
-        )
+**5. Inline Logic:**
+- Tag generation: Industry + material + compliance → relevant tags
+- Facet design: Identify filterable attributes, set types (discrete vs range)
+- Amazon category mapping (if applicable)
 
-        # Step 5: Assemble ProductDraft
-        return ProductDraft(
-            product_family=self._build_product_family(analysis, category_info, seo_fields),
-            variant_axes=variant_structure.axes,
-            variant_values=variant_structure.values,
-            sku_preview=variant_structure.sku_preview,
-            images_metadata=analysis.images_metadata,
-            category_id=category_info.category_id,
-            url_slug=seo_fields.url_slug,
-            confidence_score=analysis.confidence_score,
-            missing_fields=analysis.missing_fields,
-        )
-
-    def _detect_variants(self, analysis, user_text) -> VariantStructure:
-        """Inline variant detection logic (not a separate specialist)."""
-        # Parse user text for variant mentions
-        # "clear and amber" → color axis with 2 values
-        # Calculate combinations
-        # Generate SKU preview
-        pass
-
-    def _generate_seo_fields(self, name, description, category_path) -> SEOFields:
-        """Inline SEO generation (not a separate specialist)."""
-        # URL slug: lowercase, hyphens, unique
-        # Meta title: <60 chars
-        # Meta description: <155 chars
-        pass
-```
-
-**Prompt:** `agents/src/autifyme_agents/prompts/product_intelligence_specialist.md`
-
-```xml
-<role>
-You are the Product Intelligence Specialist for PAVISHA PET INDUSTRIES.
-
-Domain: Understanding products (specifications, categories, attributes).
-</role>
-
-<capabilities>
-Tools available:
-- multimodal_analysis: Analyze images and text together (Vision API)
-- category_mapper: Map products to taxonomy
-
-Inline logic:
-- Variant detection from user input
-- SEO field generation
-- SKU calculations
-</capabilities>
-
-<workflow>
-1. Call multimodal_analysis with all images + user text
-2. Detect variants inline (parse user mentions)
-3. Call category_mapper for taxonomy
-4. Generate SEO fields inline
-5. Return ProductDraft (complete, structured)
-</workflow>
-
-<output>
-ProductDraft with:
-- product_family (all fields including category, pricing, tags)
-- variant_axes, variant_values (if detected)
-- sku_preview (list of SKU strings)
-- images_metadata (classifications from Vision API)
-- seo_fields (url_slug, meta_title, meta_description)
-- confidence_score, missing_fields
-</output>
-```
+**6. Prompt:**
+- Taxonomy specialist prompt
+- Multi-system expert (Google, Amazon, Schema.org)
+- NAICS-aware
+- Google Shopping requirements knowledge
 
 **Testing:**
-- Test with 5 PAVISHA products
-- Validate variant detection accuracy
-- Verify SEO field quality
-- Test confidence scoring
+- Map bottle to all taxonomies (internal, Google, Amazon, Schema.org)
+- Test attribute standardization (various input formats → consistent output)
+- Test tag generation (food-grade product → correct tags)
+- Test facet design (capacity should be range, color should be discrete)
+
+**Success Criteria:**
+- ✅ Category mapping accuracy >90%
+- ✅ Google Product Category correct 100% (validation required)
+- ✅ Attribute standardization consistent
+- ✅ Tag relevance >85% (manual review)
 
 ---
 
-### Phase 3: Visual Content Specialist (Week 2)
+### **Workstream B: Market Intelligence Specialist (Days 8-11)**
 
-**Goal:** Professional visual assets generation
+**Deliverables:**
 
-#### Day 8-10: Visual Tools
+**1. Specialist Implementation**
+- Agent configuration
+- Output: MarketPositioning
 
-**File:** `agents/src/autifyme_agents/tools/visual_tools.py`
+**2. Tool: `find_relevant_industries`**
+- Input: product_type, material, certifications, capacity_range
+- Query NAICS taxonomy (74 records in database)
+- LLM reasoning about industry fit
+- Output: IndustryMatchResult (industries, relevance scores, use_cases)
 
-```python
-@tool
-def enhance_nano_banana(
-    image_path: str,
-    enhancement_instructions: str,
-) -> str:
-    """Enhance image using Nano Banana (Gemini 2.5 Flash Image).
+**3. Tool: `analyze_customer_segments`**
+- Input: product_specs, company_business_models, industry_matches
+- Match product attributes to buyer personas
+- Output: SegmentAnalysisResult (segments, fit scores, value_props, pain_points)
 
-    Examples:
-    - "Remove background, make white studio background"
-    - "Improve lighting, enhance colors, make professional"
-    - "Fix color balance and increase sharpness"
+**4. Tool: `analyze_competitive_positioning`**
+- Input: product_specs, industry, company_intelligence
+- Identify competitors from company_intelligence table
+- Output: CompetitivePositioningResult (competitors, positioning_matrix, opportunities)
 
-    Cost: FREE (Gemini free tier)
-    Quality: #1 ranked image editing model
+**5. Inline Logic:**
+- Use case generation: Product + industry → specific uses
+- Value prop mapping: Segment-aware benefits (B2B = cost, D2C = quality)
+- Tone selection: professional (B2B), aspirational (D2C)
+- Channel strategy: LinkedIn (B2B), Instagram (D2C)
 
-    Returns: CDN URL to enhanced image
-    """
-
-    # Use Google Gemini API (Nano Banana)
-    # Upload image, apply enhancements
-    # Download result, upload to Supabase Storage
-    # Return CDN URL
-
-@tool
-def generate_imagen3_product_shot(
-    reference_image_url: str,
-    product_name: str,
-    material: str,
-    style: Literal["white_background", "studio", "floating"] = "white_background",
-    angle: Literal["front", "side", "top", "45_degree"] = "front",
-) -> str:
-    """Generate professional product photo using Google Imagen 3.
-
-    Prompt template:
-    "Professional product photography of a {product_name}, made of {material},
-     {angle} view, on a {style} background, studio lighting, high resolution,
-     commercial quality, sharp focus, 8K"
-
-    Cost: $0.03 per image
-    Returns: CDN URL
-    """
-
-    # Call Google Imagen 3 API
-    # Download generated image
-    # Upload to Supabase Storage
-    # Return CDN URL
-
-@tool
-def generate_veo31_video(
-    product_image_url: str,
-    scene_description: str,
-    duration_seconds: int = 30,
-    include_audio: bool = True,
-) -> str:
-    """Generate product video using Google Veo 3.1.
-
-    Features:
-    - Up to 60 seconds @ 1080p
-    - Native audio (ambient sounds, narration)
-    - Image-to-video animation
-
-    Cost: $4.50 (Fast, 30s) or $12 (Standard, 30s)
-    Returns: CDN URL to video
-    """
-```
+**6. Prompt:**
+- Market Intelligence specialist prompt
+- Strategic analyst persona
+- B2B manufacturing context
+- NAICS taxonomy expert
 
 **Testing:**
-- Test Nano Banana enhancement (FREE!)
-- Test Imagen 3 generation ($0.03)
-- Test Veo 3.1 video ($4.50)
-- Validate CDN uploads
+- Map bottle to industries (Food 311, Beverage 312, Pharma 325)
+- Generate use cases per industry (juice bottles vs medicine bottles)
+- Identify segments (B2B Enterprise vs D2C Brands)
+- Map value props per segment (cost savings vs premium quality)
+- Competitive analysis (identify relevant competitors)
+
+**Success Criteria:**
+- ✅ Industry relevance scoring accurate >85%
+- ✅ Use case generation relevant >90%
+- ✅ Segment matching appropriate 100%
+- ✅ Value props aligned with segment needs
 
 ---
 
-#### Day 11-13: Visual Content Specialist
+### **Workstream C: Visual Assets Specialist (Days 8-11)**
 
-**File:** `agents/src/autifyme_agents/specialists/visual_content_specialist.py`
+**Deliverables:**
 
-```python
-class VisualContentSpecialist:
-    """Domain: Visual Assets (images, videos, graphics)
+**1. Specialist Implementation**
+- Agent configuration
+- Output: VisualAssets
 
-    Reusable across:
-    - Product onboarding
-    - Marketing campaigns
-    - Catalog generation
-    - Social media posts
-    - Ad creatives
-    """
+**2. Tool: `analyze_image_quality`**
+- Input: image_path
+- Vision API quality assessment
+- Output: ImageQualityResult (score 1-10, issues, recommendation)
 
-    def __init__(self, llm: BaseChatModel, storage: StorageInterface):
-        self.llm = llm
-        self.storage = storage
-        self.tools = [
-            enhance_nano_banana,
-            generate_imagen3_product_shot,
-            generate_veo31_video,
-        ]
+**3. Tool: `enhance_image`**
+- Input: image_path, enhancements, style_guide
+- AI enhancement (Imagen 3 or similar)
+- Background removal, lighting improvement, sharpening
+- Output: EnhancedImageResult (cdn_url, cost)
 
-    async def generate(
-        self,
-        product_draft: ProductDraft,
-        raw_images: list[str],
-        options: dict,
-    ) -> VisualAssets:
-        """Generate professional visual assets."""
+**4. Tool: `generate_professional_shot`**
+- Input: reference_image_url, product_specs, angle, style
+- AI generation (Imagen 3) - multi-angle shots
+- Studio lighting, white background
+- Output: GeneratedImageResult (cdn_url, cost)
 
-        # Step 1: Analyze quality of raw images
-        quality_scores = await self._analyze_quality(raw_images)
+**5. Tool: `format_for_channel`**
+- Input: image_url, channel, requirements
+- Resize, crop, format conversion
+- Web (1200px), Print (300dpi), Social (1080x1080)
+- Output: FormattedImageResult (cdn_url, dimensions)
 
-        # Step 2: Decision making
-        decisions = []
-        for img, score in zip(raw_images, quality_scores):
-            if score > 7:
-                decision = "use_as_is"
-            elif score > 4:
-                decision = "enhance_nano_banana"  # FREE!
-            else:
-                decision = "regenerate_imagen3"  # $0.03
+**6. Inline Logic:**
+- Decision tree: 8-10 score = use as-is, 5-7 = enhance, 1-4 = regenerate
+- Style consistency check: Compare with existing catalog (background, lighting)
+- Primary selection: Front view > side view, product_shot > lifestyle
+- Cost tracking: Sum all operations, report transparently
 
-            decisions.append({"image": img, "score": score, "action": decision})
-
-        # Step 3: Execute enhancements/generation
-        enhanced_images = []
-        generated_images = []
-        total_cost = Decimal("0.00")
-
-        for decision in decisions:
-            if decision["action"] == "use_as_is":
-                cdn_url = await self._upload_to_cdn(decision["image"])
-                enhanced_images.append(cdn_url)
-
-            elif decision["action"] == "enhance_nano_banana":
-                cdn_url = await self._call_tool(
-                    "enhance_nano_banana",
-                    image_path=decision["image"],
-                    enhancement_instructions="Professional product photo quality",
-                )
-                enhanced_images.append(cdn_url)
-                # Cost: FREE!
-
-            elif decision["action"] == "regenerate_imagen3":
-                # Generate multiple angles
-                for angle in ["front", "side", "top"]:
-                    cdn_url = await self._call_tool(
-                        "generate_imagen3_product_shot",
-                        reference_image_url=decision["image"],
-                        product_name=product_draft.product_family.name,
-                        material=product_draft.product_family.material,
-                        angle=angle,
-                    )
-                    generated_images.append(cdn_url)
-                    total_cost += Decimal("0.03")
-
-        # Step 4: Consistency check
-        if len(self.storage.get_products()) > 0:
-            # Match style of existing products
-            await self._ensure_consistency(enhanced_images + generated_images)
-
-        # Step 5: Select primary image
-        primary_image = self._select_primary(enhanced_images + generated_images)
-
-        return VisualAssets(
-            enhanced_images=enhanced_images,
-            generated_images=generated_images,
-            primary_image_url=primary_image,
-            total_cost=total_cost,
-        )
-```
-
-**Prompt:** `agents/src/autifyme_agents/prompts/visual_content_specialist.md`
-
-```xml
-<role>
-You are the Visual Content Specialist for PAVISHA PET INDUSTRIES.
-
-Domain: Professional visual assets (images, videos, graphics).
-</role>
-
-<capabilities>
-Tools available:
-- enhance_nano_banana: FREE image enhancement (Google Gemini)
-- generate_imagen3_product_shot: Generate professional photos ($0.03/image)
-- generate_veo31_video: Generate product videos ($4.50-24/video)
-
-Decision making:
-- Analyze image quality (1-10 score)
-- Choose enhancement vs regeneration strategy
-- Ensure consistency across product family
-- Select primary image
-</capabilities>
-
-<decision_framework>
-Image quality score:
-- 8-10: Use as-is (upload to CDN)
-- 5-7: Enhance with Nano Banana (FREE!)
-- 1-4: Regenerate with Imagen 3 ($0.03)
-
-Style consistency:
-- If >10 products exist, match existing style
-- If first product, establish style baseline
-</decision_framework>
-
-<output>
-VisualAssets with:
-- enhanced_images (CDN URLs)
-- generated_images (CDN URLs)
-- primary_image_url (hero image)
-- total_cost (transparency for user)
-</output>
-```
+**7. Prompt:**
+- Visual Assets specialist prompt
+- Visual design expert
+- B2B product photography standards
+- Brand consistency focus
 
 **Testing:**
-- Test quality scoring logic
-- Test decision tree (enhance vs regenerate)
-- Test consistency matching
-- Validate cost calculations
+- High quality image (9/10) → use as-is
+- Medium quality (6/10) → enhance successfully
+- Low quality (3/10) → regenerate multi-angle
+- Style consistency: Match existing PAVISHA catalog
+- Channel formatting: Generate web, print, social versions
+- Cost tracking: Accurate cost per operation
+
+**Success Criteria:**
+- ✅ Quality scoring accurate (±1 point manual validation)
+- ✅ Enhancement improves quality by 2+ points
+- ✅ Generated images professional quality (manual review >8/10)
+- ✅ Style consistency maintained >90%
+- ✅ Cost tracking 100% accurate
 
 ---
 
-### Phase 4: PM Orchestration (Week 3)
+### **Workstream D: Content & SEO Specialist (Days 8-11)**
 
-**Goal:** Wire specialists together
+**Deliverables:**
 
-#### Day 14-16: Workflow Orchestrator
+**1. Specialist Implementation**
+- Agent configuration
+- Output: ContentPackage
 
-**File:** `agents/src/autifyme_agents/workflows/product_onboarding_workflow.py`
+**2. Tool: `generate_product_content`**
+- Input: product_specs, market_positioning, company_context
+- LLM generation with brand voice + segment tone
+- Output: ProductContentResult (description, bullets, benefits, keywords_used)
 
-```python
-async def product_onboarding_workflow(
-    user_text: str,
-    image_paths: list[str],
-    company_profile: CompanyProfile,
-    company_intelligence: CompanyIntelligence,
-) -> ProductOnboardingResult:
-    """Complete product onboarding workflow.
+**3. Tool: `research_keywords`**
+- Input: product_type, industry, competitors
+- Competitive keyword analysis
+- Output: KeywordResearchResult (primary, secondary, long-tail keywords)
 
-    Orchestrates: Product Intelligence → Visual Content → Persistence
-    """
+**4. Tool: `generate_schema_markup`**
+- Input: product, taxonomy, market, content
+- Build JSON-LD structured data
+- Output: SchemaMarkupResult (Product, Offer, Brand, Organization schemas)
 
-    # Phase 1: Product Intelligence
-    product_draft = await pm.delegate_to(
-        specialist="product_intelligence",
-        input={
-            "user_text": user_text,
-            "image_paths": image_paths,
-            "company_context": {
-                "profile": company_profile.model_dump(),
-                "intelligence": company_intelligence.model_dump(),
-            },
-        },
-    )
+**5. Tool: `optimize_meta_tags`**
+- Input: product_name, description, keywords, brand
+- SEO-optimized meta tags with CTR best practices
+- Output: MetaTagsResult (meta_title, meta_description, OG tags, canonical)
 
-    # Phase 2: Visual Content
-    visual_assets = await pm.delegate_to(
-        specialist="visual_content",
-        input={
-            "product_draft": product_draft,
-            "raw_images": image_paths,
-            "options": {"generate_videos": False},  # Optional
-        },
-    )
+**6. Inline Logic:**
+- URL slug generation: lowercase + hyphens + unique
+- Keyword integration: Natural, not stuffing
+- Brand voice application: From company_intelligence
+- Tone selection: Per target segment
 
-    # Phase 3: HITL (1 approval point)
-    approval = await pm.hitl_approve(
-        screen="product_review",
-        data={
-            "product_draft": product_draft,
-            "visual_assets": visual_assets,
-        },
-    )
-
-    if not approval.approved:
-        if approval.action == "edit":
-            # Apply user edits
-            product_draft = apply_edits(product_draft, approval.edits)
-        elif approval.action == "cancel":
-            return ProductOnboardingResult(success=False, message="Cancelled by user")
-
-    # Phase 4: Atomic Persistence
-    result = await pm.call_tool(
-        tool="save_complete_product",
-        args={
-            "product_draft": product_draft,
-            "visual_assets": visual_assets,
-        },
-    )
-
-    return ProductOnboardingResult(
-        success=True,
-        product_family_id=result.product_family_id,
-        sku_count=len(result.product_ids),
-        image_count=len(visual_assets.enhanced_images + visual_assets.generated_images),
-        total_cost=visual_assets.total_cost,
-        message=f"Product onboarded: {product_draft.product_family.name}",
-    )
-```
+**7. Prompt:**
+- Content & SEO specialist prompt
+- SEO copywriter expert
+- B2B tone knowledge
+- Schema.org expertise
+- PAVISHA brand voice integration
 
 **Testing:**
-- End-to-end test with PAVISHA bottle
-- Test HITL approval flow
-- Test edit/cancel paths
-- Validate atomic persistence
+- Generate description (200-300 words, brand voice, keyword-aware)
+- Generate bullets (5-8 features, differentiators)
+- Generate benefits (feature → benefit transformation)
+- Keyword research (find relevant keywords for "food grade PET bottles")
+- Schema.org markup (validate JSON-LD)
+- Meta optimization (<60 chars title, <155 chars description)
+
+**Success Criteria:**
+- ✅ Content quality: Readability score >60 (Flesch)
+- ✅ Brand voice alignment: Manual review >90% match
+- ✅ Keyword integration: Natural, density 1-2%
+- ✅ Schema.org: Valid JSON-LD 100%
+- ✅ Meta tags: Within character limits 100%
+- ✅ SEO best practices: Manual audit passes
 
 ---
 
-#### Day 17-21: Integration & Testing
+## Week 3: Integration & PM Orchestration
 
-**WhatsApp Integration:**
-- Update webhook to route to product_onboarding_workflow
-- Test HITL via WhatsApp messages
-- Validate media handling
+### **Goal:** Wire all specialists together via PM
 
-**Autonomous Testing:**
-```python
-from tests.tools import execute_scenario
-
-result = execute_scenario(
-    "Catalog 500ml bottle, clear and amber colors, Rs 12",
-    images=["bottle_front.jpg", "bottle_side.jpg"],
-    hitl_mode="auto_approve",
-)
-
-assert result.success
-assert result.sku_count == 2
-assert result.image_count >= 2
-```
+**Priority:** CRITICAL PATH - Blocks production deployment
 
 ---
 
-## Part III: Success Metrics
+### **Days 12-14: PM Orchestration**
 
-### Product Intelligence Quality
+**Deliverables:**
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Confidence Score | > 0.8 | Average across products |
-| Variant Detection Accuracy | > 90% | Manual validation |
-| Category Mapping Accuracy | > 90% | Manual validation |
-| SEO Slug Quality | 100% | Uniqueness + format validation |
+**1. PM Agent (create_deep_agent)**
+- All 5 specialists as SubAgents
+- Context management (DeepAgents store integration)
+- State management across HITL interrupts
 
-### Visual Content Quality
+**2. Phase 1 Orchestration:**
+- Delegate to Product Architecture
+- Handle low confidence (ask clarifications)
+- Multi-turn conversation support
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Image Quality Score | > 7/10 | Average after processing |
-| Cost per Product | < $0.20 | Average (mostly Nano Banana FREE) |
-| User Approval Rate | > 85% | % approved without edits |
-| Consistency Score | > 90% | Style matching across products |
+**3. HITL 1: Variant Structure Validation**
+- Present ProductArchitectureDraft in WhatsApp format
+- Handle actions: Approve, Edit, Reject
+- Re-delegate to Product Architecture if edited
 
-### Workflow Performance
+**4. Phase 2 Orchestration (Parallel):**
+- Delegate to Taxonomy + Market Intelligence + Visual Assets simultaneously
+- Wait for all 3 to complete
+- Handle partial failures (retry or skip non-critical)
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Total Time (excluding HITL) | < 60 seconds | Product Intelligence + Visual Content |
-| HITL Edit Rate | < 20% | % of products user edits before approval |
-| Persistence Success Rate | > 99% | Atomic transaction success |
-| User Satisfaction | > 4.5/5 | Post-workflow survey |
+**5. HITL 2: Visual Assets Approval**
+- Present VisualAssets in image gallery format
+- Handle actions: Approve, Regenerate, Use Original
+- Re-delegate to Visual Assets if regenerate requested
 
----
+**6. Phase 3 Orchestration (Sequential):**
+- Delegate to Content & SEO (needs Phase 2 outputs)
+- Pass all context from previous phases
 
-## Part IV: Cost Analysis
+**7. HITL 3: Content & SEO Review**
+- Present ContentPackage with preview
+- Handle actions: Approve, Edit, Regenerate
+- Re-delegate or apply inline edits
 
-### Per Product (100 products)
+**8. PM Synthesis:**
+- Combine all 5 specialist outputs
+- Build UnifiedProductFoundation
+- Resolve conflicts (e.g., Taxonomy vs Market Intelligence mismatches)
+- Fill gaps
 
-**Minimal Path (Enhance only):**
-- Vision analysis (GPT-4V): $0.02
-- Nano Banana enhancement: $0.00 (FREE!)
-- **Total: $2 for 100 products**
+**9. HITL 4: Final Unified Approval**
+- Present complete product summary
+- Handle actions: Save, Edit Any Section, Cancel
+- Determine which specialist to re-engage if edited
 
-**Standard Path (Enhance + Generate):**
-- Vision analysis: $0.02
-- Nano Banana enhancement: $0.00 (FREE!)
-- Imagen 3 (3 new angles): $0.09
-- **Total: $11 for 100 products**
+**10. Persistence:**
+- Call `save_product_family_atomic` tool
+- Handle success/failure
+- Return PersistenceResult
 
-**Premium Path (with Video):**
-- Vision analysis: $0.02
-- Nano Banana enhancement: $0.00
-- Imagen 3 (3 angles): $0.09
-- Veo 3.1 video (30s): $4.50
-- **Total: $461 for 100 products**
+**11. Error Recovery:**
+- Specialist failure → retry with adjusted input (3 attempts)
+- Low confidence → user clarification
+- Vision API timeout → compress image, retry
+- Database conflict → rollback, log, retry
 
-**vs Professional Photography:**
-- ₹5L-20L ($6,000-$24,000) for 100 products
-- **Savings: 99.8% (minimal) to 98% (with video)**
+**12. Cost Tracking:**
+- Accumulate costs per specialist
+- Report total at HITL 4
+- Breakdown by component (vision, enhancement, generation)
 
----
+**13. PM Prompt:**
+- Workflow orchestrator persona
+- Context manager
+- HITL coordinator
+- Error handler
 
-## Part V: Future Enhancements (Post-MVP)
+**Testing:**
+- Simple product (no variants, skip some specialists)
+- Standard product (2 variants, all specialists)
+- Complex product (6 variants, all specialists)
+- Low confidence path (Product Architecture asks for clarification)
+- User edit path (HITL 1 edit → re-delegate)
+- User reject path (HITL 1 reject → cancel workflow)
+- Error path (Vision API timeout → retry with compressed image)
+- Multi-turn path (missing info → ask user → resume)
 
-### Marketing Content Specialist (Separate Workflow)
-- Not part of onboarding
-- Separate trigger: "Generate marketing for product X"
-- Reuses Visual Content Specialist outputs
-
-### Bulk Operations
-- CSV import
-- Batch processing
-- Progress tracking
-
-### Advanced Video
-- 60-second product showcases
-- Multiple scenes
-- Custom audio/narration
-
----
-
-## Summary: Implementation Checklist
-
-### Week 1: Foundation
-- [ ] LLM factory implementation
-- [ ] multimodal_analysis tool
-- [ ] category_mapper tool
-- [ ] Testing with real PAVISHA data
-
-### Week 2: Specialists
-- [ ] Product Intelligence Specialist
-- [ ] Visual Content Specialist
-- [ ] Tool integrations (Nano Banana, Imagen 3, Veo 3.1)
-- [ ] Individual specialist testing
-
-### Week 3: Integration
-- [ ] PM orchestration
-- [ ] HITL implementation
-- [ ] Atomic persistence
-- [ ] WhatsApp integration
-- [ ] End-to-end testing
-
-### Success Criteria
-- [ ] 2 specialists working
-- [ ] 1 HITL approval point
-- [ ] < 60 seconds processing
-- [ ] < $0.20 per product average cost
-- [ ] > 85% user approval rate
+**Success Criteria:**
+- ✅ All phases execute in correct order
+- ✅ All 4 HITL points functional
+- ✅ Error recovery works (no crashes)
+- ✅ Multi-turn conversation preserves state
+- ✅ Cost tracking accurate
+- ✅ Synthesis resolves conflicts correctly
+- ✅ Database persistence atomic (all or nothing)
 
 ---
 
-**Last Updated:** 2025-10-23
-**Status:** Ready for Week 1 Implementation
-**Next Step:** Begin LLM Factory + Core Tools (Day 1-4)
+### **Days 15-17: WhatsApp Integration**
+
+**Deliverables:**
+
+**1. Webhook Routing:**
+- Detect "product onboarding" intent from user message
+- Route to product_onboarding_workflow
+- Handle media download (WhatsApp images)
+
+**2. HITL Message Formatting:**
+- Format HITL 1 (Variant Structure) for WhatsApp rich message
+- Format HITL 2 (Visual Assets) with image gallery
+- Format HITL 3 (Content & SEO) with preview
+- Format HITL 4 (Final Unified) with complete summary
+
+**3. HITL Response Parsing:**
+- Parse user responses (button clicks, text replies)
+- Map to actions (Approve, Edit, Reject, Clarification)
+- Extract edit data if user provides modifications
+
+**4. Multi-Turn Conversation:**
+- Maintain thread state across messages
+- Resume workflow from saved phase
+- Handle clarification questions and responses
+
+**5. Error Messages:**
+- User-friendly error messages
+- Retry prompts
+- Help messages
+
+**Testing:**
+- Complete WhatsApp flow with real images
+- Test all HITL paths (approve, edit, reject)
+- Test multi-turn (clarification questions)
+- Test error scenarios (image download fails, database timeout)
+- Test concurrent users (2 users onboarding simultaneously)
+
+**Success Criteria:**
+- ✅ WhatsApp messages formatted correctly
+- ✅ All HITL actions work via WhatsApp
+- ✅ Image gallery displays correctly
+- ✅ Multi-turn conversation maintains state
+- ✅ Errors display user-friendly messages
+
+---
+
+## Week 4: Production Hardening
+
+### **Goal:** Comprehensive testing and production deployment
+
+**Priority:** CRITICAL - Must pass before production
+
+---
+
+### **Days 18-20: Autonomous Testing**
+
+**Deliverables:**
+
+**1. Test Suite (Autonomous Testing Framework):**
+- Simple product (no variants)
+- 2-variant product (color only)
+- 6-variant product (capacity × color × neck)
+- Complex compatibility (invalid combinations)
+- Incomplete input (missing price, missing specs)
+- Poor quality images (test enhancement)
+- Unusable images (test regeneration)
+- Low confidence (test clarification flow)
+- Multi-turn conversation (partial info, then complete)
+- Error scenarios (API timeout, database conflict)
+- HITL rejection (user rejects at various points)
+- Cost tracking validation
+
+**2. Performance Testing:**
+- Processing time <90 seconds (excluding HITL)
+- Concurrent workflows (5 simultaneous onboardings)
+- Database transaction performance (<2 seconds)
+- Vision API latency (measure and optimize)
+
+**3. Quality Metrics:**
+- Success rate >95% (autonomous tests)
+- Specialist confidence >0.85 average
+- Database persistence success >99.9%
+- Cost tracking accuracy 100%
+- HITL edit rate <20% (user edits at HITL points)
+
+**4. Edge Cases:**
+- 20+ SKU warning triggered correctly
+- Duplicate SKU handling (suffix appended)
+- Duplicate URL slug handling (variant identifier appended)
+- Image >5MB (compression triggered)
+- Vision API timeout (retry with smaller image)
+- Database conflict (rollback and retry)
+
+**Success Criteria:**
+- ✅ All test scenarios pass
+- ✅ Performance benchmarks met
+- ✅ Quality metrics achieved
+- ✅ Edge cases handled gracefully
+- ✅ No crashes or unhandled exceptions
+
+---
+
+### **Days 21-23: Staging Deployment & Validation**
+
+**Deliverables:**
+
+**1. Staging Deployment:**
+- Deploy complete system to staging environment
+- Configure environment variables
+- Verify database connections
+- Verify WhatsApp webhook connection
+
+**2. Staging Tests:**
+- Run autonomous test suite in staging
+- Test with real PAVISHA user (staging account)
+- Onboard 5-10 real products
+- Validate database records (verify all 9 tables populated)
+- Validate multi-channel readiness (can export to Google Shopping format)
+
+**3. User Acceptance Testing (PAVISHA Team):**
+- Onboard 20-30 real products via WhatsApp
+- Collect feedback on HITL UX (is it clear? too many approvals?)
+- Validate product records (descriptions accurate? SEO good?)
+- Validate images (quality acceptable? style consistent?)
+- Measure: processing time, cost per product, user satisfaction
+
+**4. Prompt Iteration:**
+- Refine specialist prompts based on real usage
+- Adjust HITL message formatting based on feedback
+- Tune confidence thresholds (too many clarifications? too few?)
+- Optimize meta tag generation (titles too long? descriptions not compelling?)
+
+**Success Criteria:**
+- ✅ Staging tests pass 100%
+- ✅ PAVISHA team satisfied with UX (>4.5/5 rating)
+- ✅ Product records complete and accurate
+- ✅ Images professional quality (manual review >8/10)
+- ✅ SEO metadata passes manual audit
+
+---
+
+### **Days 24-28: Production Deployment & Monitoring**
+
+**Deliverables:**
+
+**1. Production Deployment:**
+- Deploy to production environment
+- Smoke tests (basic workflow completion)
+- Rollback plan prepared
+
+**2. Monitoring Setup:**
+- LangSmith tracing enabled (all specialist calls tracked)
+- Cost tracking per workflow
+- Error rate monitoring (alert if >5%)
+- Performance monitoring (alert if processing time >120 seconds)
+- HITL analytics (edit rates, rejection reasons)
+
+**3. Production Validation (First 50 Products):**
+- Monitor closely (on-call support)
+- Collect metrics: success rate, processing time, cost per product
+- Validate database integrity (spot-check 10 products)
+- User feedback (PAVISHA team satisfaction)
+
+**4. Incident Response:**
+- Document any production issues
+- Root cause analysis
+- Hotfixes if critical
+- Prompt iteration if quality issues
+
+**5. Documentation:**
+- Update README with production status
+- Document known issues/limitations
+- Create runbook for common errors
+- User guide for PAVISHA team
+
+**Success Criteria:**
+- ✅ Production deployment successful (no rollback)
+- ✅ First 50 products onboarded successfully (>95% success rate)
+- ✅ No critical incidents
+- ✅ Performance metrics met (processing time, cost)
+- ✅ User satisfaction high (PAVISHA team happy)
+
+---
+
+## Production Readiness Checklist
+
+### **Before Production Launch**
+
+**Specialists (All Complete):**
+- [ ] Product Architecture Specialist (tools, prompt, tests)
+- [ ] Taxonomy Specialist (tools, prompt, tests)
+- [ ] Market Intelligence Specialist (tools, prompt, tests)
+- [ ] Visual Assets Specialist (tools, prompt, tests)
+- [ ] Content & SEO Specialist (tools, prompt, tests)
+
+**PM Orchestration:**
+- [ ] Context loading from store working
+- [ ] All 4 HITL points functional
+- [ ] Multi-turn conversation tested
+- [ ] Error recovery validated
+- [ ] Cost tracking accurate
+- [ ] Synthesis logic correct
+
+**Database:**
+- [ ] Atomic transactions verified (9 tables)
+- [ ] Rollback tested
+- [ ] Audit log working
+- [ ] Temporal history working (price, inventory)
+- [ ] Performance acceptable (<2 seconds per family)
+
+**Integration:**
+- [ ] WhatsApp webhook reliable
+- [ ] Media download working
+- [ ] HITL messages formatted correctly
+- [ ] Response parsing robust
+
+**Testing:**
+- [ ] Autonomous test suite passing >95%
+- [ ] Edge cases covered
+- [ ] Performance benchmarks met
+- [ ] UAT with PAVISHA complete
+
+**Observability:**
+- [ ] LangSmith tracing enabled
+- [ ] Cost tracking per product
+- [ ] Error rate monitoring
+- [ ] Performance alerts configured
+- [ ] HITL analytics dashboard
+
+**Documentation:**
+- [ ] Design doc complete
+- [ ] Implementation plan complete
+- [ ] Runbook for common errors
+- [ ] User guide for PAVISHA team
+
+---
+
+## Risk Mitigation
+
+### **Risk 1: Vision API Reliability**
+**Mitigation:**
+- Image optimization (resize to 2048px before API call)
+- Retry logic (3 attempts with exponential backoff)
+- Fallback to text-only analysis if vision fails
+- Monitoring and alerting
+
+### **Risk 2: Complex Variant Logic Edge Cases**
+**Mitigation:**
+- Start simple (Phase 1 validates structure)
+- HITL 1 catches issues early (before wasted compute)
+- User validation on complex structures
+- Autonomous testing covers edge cases
+
+### **Risk 3: Database Schema Changes**
+**Mitigation:**
+- Schema already implemented and validated
+- Test transactions in staging first
+- Rollback plan ready
+
+### **Risk 4: HITL UX Needs Iteration**
+**Mitigation:**
+- Start with 4 HITL points (Phase 1)
+- Collect feedback in UAT
+- Iterate message formatting based on real usage
+- Can adjust HITL frequency post-launch if needed
+
+### **Risk 5: Prompt Engineering Takes Longer**
+**Mitigation:**
+- Use existing patterns from cataloging specialist
+- Test-driven development (write tests first)
+- Autonomous testing validates quality
+- Iterate in staging with real products
+
+### **Risk 6: Cost Overruns**
+**Mitigation:**
+- Cost tracking transparent at every step
+- User sees cost before final approval (HITL 4)
+- Free tier for enhancement (Gemini) where possible
+- Monitoring and alerts for cost anomalies
+
+---
+
+## Success Metrics
+
+### **Technical Metrics (Week 4)**
+- **Success Rate:** >95% (product onboardings complete without errors)
+- **Processing Time:** <90 seconds (excluding HITL wait time)
+- **Database Persistence:** >99.9% (atomic transactions succeed)
+- **Specialist Confidence:** >0.85 average across all specialists
+- **Cost Per Product:** <$0.20 average (mostly enhancement, selective generation)
+
+### **Quality Metrics (Week 4+)**
+- **HITL Edit Rate:** <20% (user approves first time without edits)
+- **HITL Rejection Rate:** <5% (user cancels workflow)
+- **Image Quality:** >8/10 manual review (professional quality)
+- **Content Quality:** >90% brand voice alignment (manual review)
+- **SEO Quality:** 100% meta tags within limits, valid schema.org
+
+### **User Experience Metrics (Week 4+)**
+- **User Satisfaction:** >4.5/5 (PAVISHA team rating)
+- **Time to Onboard:** <5 minutes user active time (rest is system processing)
+- **Multi-Turn Rate:** <30% (most products complete in single conversation)
+- **Error Rate:** <5% (system errors requiring support)
+
+---
+
+## Timeline Summary
+
+**Week 1: Foundation**
+- Days 1-3: Database persistence tools
+- Days 4-7: Product Architecture Specialist
+- Milestone: Can extract product specs and save to database
+
+**Week 2: Specialists (Parallel)**
+- Days 8-11: Taxonomy, Market Intel, Visual Assets, Content/SEO (all 4 in parallel)
+- Milestone: All 5 specialists complete and tested individually
+
+**Week 3: Integration**
+- Days 12-14: PM orchestration + 4 HITL points
+- Days 15-17: WhatsApp integration
+- Milestone: Complete end-to-end workflow via WhatsApp
+
+**Week 4: Production**
+- Days 18-20: Autonomous testing + performance tuning
+- Days 21-23: Staging deployment + UAT with PAVISHA
+- Days 24-28: Production deployment + monitoring
+- Milestone: Live in production with 50+ products onboarded
+
+**Total: 4 weeks from start to production**
+
+---
+
+## Post-Launch Iteration Plan
+
+### **Week 5-6: Optimization**
+Based on real usage data:
+- Prompt refinement (improve specialist output quality)
+- HITL UX iteration (simplify if too many approvals)
+- Performance optimization (reduce processing time)
+- Cost optimization (use free tiers where possible)
+
+### **Week 7-8: Scale Testing**
+- Onboard 100+ products
+- Concurrent user testing (10+ simultaneous workflows)
+- Database performance at scale
+- Monitor and optimize bottlenecks
+
+### **Week 9+: Feature Enhancements**
+- Add missing features based on feedback
+- Integrate with Google Shopping, Amazon
+- Add video generation (if requested)
+- Add bulk import from CSV
+
+---
+
+**Last Updated:** 2025-10-24
+**Next Action:** Begin Week 1, Day 1 - Database Persistence Tools
+**Implementation Owner:** Engineering Team
+**Design Reference:** PRODUCT_ONBOARDING_COMPLETE_DESIGN.md
