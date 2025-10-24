@@ -64,10 +64,10 @@ if TYPE_CHECKING:
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
-    """Return configured LLM for PM. Defaults to gpt-4o for complex orchestration."""
+    """Return configured LLM for PM. Defaults to gpt-4.1-mini for orchestration."""
     if model is not None:
         return model
-    return get_llm(model="gpt-4o", temperature=0.2)
+    return get_llm(model="gpt-4.1-mini", temperature=0.2)
 
 
 def _load_prompt(company_profile: CompanyProfile) -> str:
@@ -111,7 +111,7 @@ def create_project_manager(
 
     Args:
         company_profile: Company context for brand voice and positioning
-        model: Optional LLM override (defaults to gpt-4o)
+        model: Optional LLM override (defaults to gpt-4.1-mini)
         checkpointer: LangGraph checkpointer for state persistence (required)
         storage: Storage adapter for database operations (required)
         channel: Messaging channel for platform-specific operations (optional)

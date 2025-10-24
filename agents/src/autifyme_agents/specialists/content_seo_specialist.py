@@ -141,7 +141,7 @@ def generate_product_description(
         Product description with short and long variants
     """
     # Use LLM to generate brand-aligned description
-    llm = get_llm(model="gpt-4o-mini", temperature=0.7)
+    llm = get_llm(model="gpt-4.1-mini", temperature=0.7)
 
     prompt = f"""Generate compelling product description for ecommerce.
 
