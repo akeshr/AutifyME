@@ -1,8 +1,8 @@
 # AutifyME Enterprise Database Schema Design
 
-**Version:** 2.0.0
-**Date:** 2025-10-25
-**Status:** ✅ Master Reference - Production + Marketing Domains
+**Version:** 3.0.0
+**Date:** 2025-01-25
+**Status:** ✅ Master Reference - LangSmith-First Architecture
 **Purpose:** Comprehensive enterprise-grade database architecture for all AutifyME workflows
 
 ---
@@ -14,11 +14,11 @@ This document defines the **complete enterprise database architecture** for Auti
 - ✅ **Product Onboarding** - Variant families, SKU architecture, multi-system taxonomy (9 tables)
 - ✅ **Marketing Campaigns** - Multi-platform orchestration, creative management, performance tracking (4 new + 1 extended)
 - 🚀 **Platform Integration (Phase 2)** - 8 advertising platforms prioritized: Meta, Google Ads, Amazon, YouTube (Phase 1) → X, LinkedIn, TikTok (Phase 2+). Includes credentials, rate limiting, metrics, webhooks (7 new + 4 extended)
-- ✅ **Cataloging** - Simple product entry (legacy workflow)
-- ✅ **Infrastructure** - Workflow orchestration, idempotency, audit trails (9 tables)
+- ✅ **Infrastructure** - Operational foundation, media management, thread tracking (11 tables)
 - 🔮 **Future Workflows** - Inventory, CRM, Analytics (extensible foundation)
 
 **Design Principles:**
+- **LangSmith-First Architecture** - LangSmith is source of truth for workflow tracing, learning, and observability
 - **Normalized to 3NF** - No redundancy, referential integrity via foreign keys
 - **Single-Tenant** - One company per database (simplified architecture)
 - **Reusable Components** - Shared entities across workflows (customer_segments, industries, marketing_content)
@@ -28,29 +28,50 @@ This document defines the **complete enterprise database architecture** for Auti
 - **Hybrid Abstraction** - Generic models + JSONB extensions for platform-specific features
 
 **Total Schema:**
-- **41 Tables** across 5 categories (34 current + 7 Phase 2)
+- **39 Tables** across 5 categories (32 current + 7 Phase 2)
 - **9 Automatic Triggers** for history and audit trails
-- **Multiple Views** for analytics and monitoring
+- **LangSmith Integration** for workflow tracing and learning (no duplicate tracking tables)
 
 ---
 
 ## Table Categories Overview
 
-### Category 1: Infrastructure & System Tables (9 Tables)
+### Category 1: Infrastructure & System Tables (11 Tables)
 
-Core platform functionality for workflow orchestration, message processing, and system operations.
+Core platform functionality for operational requirements, framework support, and system operations.
 
-| Table | Purpose | Current Rows |
-|-------|---------|--------------|
-| `companies` | Single-tenant company profile | 1 (exactly one) |
-| `company_intelligence` | Auto-discovered brand intelligence | 1 (exactly one) |
-| `workflow_outcomes` | Workflow execution tracking for learning | 1,111 |
-| `routing_history` | Lightweight routing analytics | 0 |
-| `processed_messages` | Webhook idempotency (24h TTL) | 86 |
-| `pending_approvals` | HITL state persistence | 0 |
-| `checkpoints` | LangGraph workflow state | 87 |
-| `checkpoint_blobs` | LangGraph binary state | 73 |
-| `checkpoint_writes` | LangGraph incremental writes | 153 |
+**Architecture Note:** LangSmith is the source of truth for workflow tracing, learning, and observability. Infrastructure tables focus on operational needs that LangSmith cannot serve (real-time deduplication, HITL state, media lifecycle, thread metadata).
+
+| Table | Purpose | Type |
+|-------|---------|------|
+| `companies` | Single-tenant company profile & system settings | Operational Config |
+| `processed_messages` | Webhook deduplication (24h TTL) | Real-Time Dedup |
+| `media_files` | Media lifecycle, cleanup, entity correlation | Media Management |
+| `conversation_threads` | Thread metadata, archival, context summary | Thread Management |
+| `checkpoints` | LangGraph workflow state snapshots | Framework (LangGraph) |
+| `checkpoint_blobs` | LangGraph binary state objects | Framework (LangGraph) |
+| `checkpoint_writes` | LangGraph incremental state writes | Framework (LangGraph) |
+| `checkpoint_migrations` | LangGraph schema versioning | Framework (LangGraph) |
+| `store` | DeepAgents long-term memory (company context) | Framework (DeepAgents) |
+| `store_migrations` | DeepAgents schema versioning | Framework (DeepAgents) |
+| `audit_log` | Automatic audit trail (database triggers) | Compliance |
+
+**Recommendation - Delete Obsolete Tables:**
+
+LangSmith provides superior workflow tracing and learning capabilities. The following tables duplicate LangSmith functionality and should be removed:
+
+```sql
+DROP TABLE IF EXISTS routing_history CASCADE;
+DROP TABLE IF EXISTS workflow_outcomes CASCADE;
+DROP TABLE IF EXISTS company_intelligence CASCADE;
+DROP TABLE IF EXISTS pending_approvals CASCADE;
+```
+
+**Rationale:**
+- `workflow_outcomes` - LangSmith traces provide complete execution tracking with better query capabilities
+- `company_intelligence` - Learning patterns should be queried from LangSmith and cached as needed
+- `routing_history` - LangSmith traces show routing decisions with full context
+- `pending_approvals` - LangGraph checkpoints handle HITL state persistence
 
 ---
 
@@ -190,111 +211,289 @@ Cross-workflow entities reused across multiple domains.
 
 ## Infrastructure & System Tables
 
-### 1. Companies (Single-Tenant Core)
+---
 
-**Purpose:** Single-tenant company profile - exactly ONE row in production.
+### 1. Companies (Single-Tenant Configuration)
+
+**Purpose:** Single-tenant company profile with operational system settings - exactly ONE row in production.
 
 **Key Attributes:**
-- Identity: id (UUID), name, legal_name, domain
-- Branding: brand_voice, brand_attributes (JSONB), target_markets (array)
-- Contact: website, email, phone, full address
-- Defaults: default_currency (INR), default_timezone (Asia/Kolkata)
+- **Identity:** id (UUID), name, legal_name, domain
+- **Branding:** brand_voice, brand_attributes (JSONB - certifications, competitive advantages, social handles), target_markets (array)
+- **Contact:** website, email, phone, full address fields (address_line1, address_line2, city, state, postal_code, country)
+- **Defaults:** default_currency (INR), default_timezone (Asia/Kolkata), default_language (en)
+- **System Settings:** system_settings (JSONB - HITL timeouts, archival policies, media limits)
+- **Timestamps:** created_at, updated_at
 
-**Usage:** All workflows implicitly belong to this company. Loaded once at startup, injected via middleware.
+**Schema:**
+```sql
+CREATE TABLE companies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  legal_name TEXT,
+  domain TEXT,
+  brand_voice TEXT,
+  brand_attributes JSONB DEFAULT '{}'::jsonb,
+  target_markets TEXT[],
+  website TEXT,
+  email TEXT,
+  phone TEXT,
+  address_line1 TEXT,
+  address_line2 TEXT,
+  city TEXT,
+  state TEXT,
+  postal_code TEXT,
+  country TEXT DEFAULT 'India',
+  default_currency TEXT DEFAULT 'INR',
+  default_timezone TEXT DEFAULT 'Asia/Kolkata',
+  default_language TEXT DEFAULT 'en',
+  system_settings JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-**Single-Tenant Enforcement:** Unique index on (true) ensures exactly one row.
+CREATE UNIQUE INDEX idx_companies_single_tenant ON companies ((true));
+```
+
+**Usage:**
+- Loaded once at PM startup, injected into all specialists via middleware
+- All workflows implicitly belong to this single company
+- system_settings controls operational behavior (HITL timeouts, cleanup policies)
+
+**Single-Tenant Enforcement:** Unique index on `(true)` ensures exactly one row.
 
 ---
 
-### 2. Company Intelligence (Auto-Discovered)
-
-**Purpose:** Auto-discovered company intelligence from product analysis and market research.
-
-**Key Attributes:**
-- Business: business_models (B2B/B2C/D2C array), price_positioning (budget/mid-range/premium/luxury)
-- Brand: brand_voice, brand_values (array), visual_identity (JSONB)
-- Market: target_audiences (JSONB personas), competitors (JSONB)
-- Metadata: confidence_score (0.0-1.0), sources (array), discovered_at, last_updated
-
-**Usage:** Enhanced context for specialists (Market Intelligence, Campaign Strategy). Single row updated continuously.
-
----
-
-### 3. Workflow Outcomes (Learning & Analytics)
-
-**Purpose:** Workflow execution tracking for agentic learning and continuous improvement.
-
-**Key Attributes:**
-- Identification: id, tracking_id (unique), thread_id, trace_id (LangSmith)
-- Message: sender_id, message_text, message_hash, media_id, platform
-- Routing: intent, department, routing_reasoning, routing_confidence, alternative_departments
-- Outcome: success, error_type, error_message, resolution_strategy, result_data (JSONB)
-- Performance: duration_seconds, started_at, ended_at
-- Learning: learned_patterns (JSONB), failure_warnings (JSONB), applied_strategies (array)
-
-**Usage:** Post-workflow analysis, adaptive routing, test synthesis, pattern recognition.
-
-**Views:**
-- v_success_rates - Success rate by department/intent (7-day window)
-- v_recent_failures - Last 50 failures for regression testing
-- v_edge_cases - Low-frequency patterns for test coverage
-
----
-
-### 4. Processed Messages (Webhook Idempotency)
+### 2. Processed Messages (Webhook Deduplication)
 
 **Purpose:** Prevent duplicate processing on webhook retry.
 
 **Key Attributes:**
-- Identity: message_id (WhatsApp wamid, PRIMARY KEY)
-- Context: sender_id, thread_id, received_at
-- Lifecycle: processed_at, expires_at (24h TTL)
+- **Identity:** message_id (TEXT, PRIMARY KEY - platform message ID like WhatsApp wamid)
+- **Context:** sender_id, thread_id
+- **Tracking:** received_at, processed_at
+- **Lifecycle:** expires_at (24-hour TTL), created_at
 
-**Usage:** Webhook handler checks message_id before processing. Automatic cleanup after 24 hours via scheduled function.
+**Schema:**
+```sql
+CREATE TABLE processed_messages (
+  message_id TEXT PRIMARY KEY,
+  sender_id TEXT NOT NULL,
+  thread_id TEXT NOT NULL,
+  received_at TIMESTAMPTZ NOT NULL,
+  processed_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 hours'),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_processed_messages_expires ON processed_messages(expires_at);
+```
+
+**Usage:**
+- Webhook handler checks message_id before processing
+- Atomic check-and-insert prevents race conditions
+- Automatic cleanup after 24 hours via scheduled job
 
 **Stored Procedure:** check_and_mark_processed() - Atomic check + insert in single DB call.
 
 ---
 
-### 5. Pending Approvals (HITL State Persistence)
+### 3. Media Files (User-Uploaded Media Lifecycle)
 
-**Purpose:** HITL state persistence - survive server restarts during approval wait.
+**Purpose:** Track user-uploaded media (WhatsApp images) with lifecycle management and cleanup.
 
 **Key Attributes:**
-- Workflow: thread_id, checkpoint_id, checkpoint_ns
-- Interrupt: interrupt_id (LangGraph ID for resumption), tool_call (JSONB arguments)
-- Context: draft_summary (human-readable), ai_message (JSONB for Command), agent_source
-- Lifecycle: created_at, expires_at (24h TTL)
-- Cleanup: image_path (temporary file to delete after approval)
+- **Identity:** id (UUID), platform (whatsapp/instagram/direct_upload), platform_media_id
+- **File Metadata:** file_path (local storage), file_type (image/video/audio/document), mime_type, file_size_bytes
+- **Deduplication:** content_hash (SHA256 for duplicate detection)
+- **Lifecycle:** downloaded_at, last_accessed_at, expires_at (30-day TTL)
+- **Entity Correlation:** used_by_entities (JSONB array - which products/campaigns use this)
+- **Cleanup:** archived (boolean), archived_at
 
-**Usage:** Runner stores HITL context before sending approval request. Retrieves on approval/rejection to resume workflow.
+**Schema:**
+```sql
+CREATE TABLE media_files (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  platform TEXT NOT NULL CHECK (platform IN ('whatsapp', 'instagram', 'direct_upload')),
+  platform_media_id TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  file_type TEXT NOT NULL CHECK (file_type IN ('image', 'video', 'audio', 'document')),
+  mime_type TEXT NOT NULL,
+  file_size_bytes BIGINT NOT NULL,
+  content_hash TEXT,
+  downloaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_accessed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '30 days'),
+  used_by_entities JSONB DEFAULT '[]'::jsonb,
+  archived BOOLEAN DEFAULT FALSE,
+  archived_at TIMESTAMPTZ,
+  CONSTRAINT unique_platform_media UNIQUE (platform, platform_media_id)
+);
+
+CREATE INDEX idx_media_files_expires ON media_files(expires_at) WHERE NOT archived;
+CREATE INDEX idx_media_files_hash ON media_files(content_hash);
+CREATE INDEX idx_media_files_entities ON media_files USING GIN (used_by_entities);
+```
+
+**Usage:**
+- User uploads image via WhatsApp → stored here with 30-day expiry
+- content_hash prevents duplicate downloads of same image
+- used_by_entities tracks which products/campaigns referenced this file
+- Daily cleanup job archives expired media
+- **Important:** User-uploaded media only; specialist-generated content goes to product_images
 
 ---
 
-### 6-8. LangGraph Tables (Framework-Managed)
+### 4. Conversation Threads (Thread Metadata & Archival)
 
-**checkpoints:** Workflow state snapshots (thread_id, checkpoint_id, checkpoint JSON).
+**Purpose:** Track conversation threads with activity metadata and archival policies.
 
-**checkpoint_blobs:** Binary large state objects (bytea).
+**Key Attributes:**
+- **Identity:** id (TEXT, thread_id from platform)
+- **Participant:** sender_id, platform (whatsapp/instagram/web)
+- **Activity Tracking:** first_message_at, last_message_at, message_count
+- **Context Summary:** recent_topics (array), active_workflows (JSONB)
+- **Lifecycle:** is_active (boolean), archived_at, auto_archive_at (30-day default)
+- **Traceability:** trace_ids (array of workflow trace IDs)
+- **Timestamps:** created_at, updated_at
 
-**checkpoint_writes:** Incremental state writes for performance.
+**Schema:**
+```sql
+CREATE TABLE conversation_threads (
+  id TEXT PRIMARY KEY,
+  sender_id TEXT NOT NULL,
+  platform TEXT NOT NULL CHECK (platform IN ('whatsapp', 'instagram', 'web')),
+  first_message_at TIMESTAMPTZ NOT NULL,
+  last_message_at TIMESTAMPTZ NOT NULL,
+  message_count INT DEFAULT 0,
+  recent_topics TEXT[],
+  active_workflows JSONB DEFAULT '[]'::jsonb,
+  is_active BOOLEAN DEFAULT TRUE,
+  archived_at TIMESTAMPTZ,
+  auto_archive_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '30 days'),
+  trace_ids TEXT[],
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-**Usage:** LangGraph persistence layer. Managed by framework, not application code.
+CREATE INDEX idx_threads_sender ON conversation_threads(sender_id);
+CREATE INDEX idx_threads_active ON conversation_threads(is_active, last_message_at DESC);
+CREATE INDEX idx_threads_archive ON conversation_threads(auto_archive_at) WHERE is_active;
+```
 
-**Monitoring View:** v_checkpoint_forks - Detects concurrent workflow processing (race conditions).
+**Usage:**
+- Updated on each message (last_message_at, message_count)
+- recent_topics and active_workflows provide PM context for multi-turn conversations
+- User dashboard queries active threads per sender
+- Automatic archival after 30 days of inactivity
+- trace_ids enable cross-conversation workflow traceability
 
 ---
 
-### 9. Routing History (Lightweight Analytics)
+### 5-8. LangGraph Tables (Framework-Managed)
 
-**Purpose:** High-volume routing metrics without full workflow data overhead.
+**Purpose:** LangGraph state persistence, HITL resumption, time-travel debugging.
 
-**Key Attributes:**
-- Link: workflow_id (FK to workflow_outcomes)
-- Routing: intent, department, confidence_score
-- Outcome: success, duration_seconds
+**Tables:**
+- `checkpoints` - Workflow state snapshots (thread_id, checkpoint_id, checkpoint JSONB)
+- `checkpoint_blobs` - Binary large objects (bytea)
+- `checkpoint_writes` - Incremental state writes (performance optimization)
+- `checkpoint_migrations` - Schema versioning
 
-**Usage:** Fast routing analytics for performance dashboards.
+**Usage:**
+- Framework-owned, managed by LangGraph
+- Enables HITL (interrupt/resume via checkpoints)
+- Provides time-travel debugging
+- Never modify schema (breaks LangGraph compatibility)
+
+**HITL Flow:**
+```python
+# PM tool triggers interrupt (interrupt_on=True in DeepAgents config)
+pm.stream(...)
+→ LangGraph creates checkpoint with __interrupt__ state
+→ Runner detects interrupt, sends approval request to user
+→ User approves/edits/rejects
+→ Runner creates Command with interrupt_id
+→ LangGraph resumes from checkpoint
+```
+
+**Monitoring:**
+```sql
+-- Check checkpoint growth
+SELECT
+  COUNT(*) as total_checkpoints,
+  COUNT(DISTINCT thread_id) as unique_threads,
+  pg_size_pretty(pg_total_relation_size('checkpoints')) as table_size
+FROM checkpoints;
+```
+
+---
+
+### 9-10. DeepAgents Store Tables (Framework-Managed)
+
+**Purpose:** DeepAgents long-term memory across conversations.
+
+**Tables:**
+- `store` - Key-value store (prefix, key, value JSONB, TTL)
+- `store_migrations` - Schema versioning
+
+**Usage:**
+- Company profile loaded once, stored with key `company:{company_id}`
+- Injected into PM via DeepAgents middleware
+- Cross-conversation memory (user preferences, learned patterns from LangSmith)
+- TTL-based cleanup for temporary context
+
+**Example:**
+```python
+# Load company context once
+company_profile = storage.get_company_profile()
+store.put(
+    ("company", company_profile.id),
+    company_profile.model_dump()
+)
+
+# DeepAgents middleware auto-injects into PM context
+pm = create_deep_agent(..., store=store)
+```
+
+---
+
+### 11. Audit Log (Compliance Trail)
+
+**Purpose:** Automatic audit trail for all database changes (compliance requirement).
+
+**Schema:**
+```sql
+CREATE TABLE audit_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  table_name TEXT NOT NULL,
+  record_id UUID NOT NULL,
+  operation TEXT NOT NULL CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE')),
+  old_values JSONB,
+  new_values JSONB,
+  changed_fields TEXT[] DEFAULT ARRAY[]::TEXT[],
+  changed_by TEXT,  -- User/system identifier
+  changed_at TIMESTAMPTZ DEFAULT NOW(),
+  change_reason TEXT,
+  session_id TEXT,
+  ip_address INET,
+  user_agent TEXT
+);
+
+CREATE INDEX idx_audit_log_table_record ON audit_log(table_name, record_id);
+CREATE INDEX idx_audit_log_changed_at ON audit_log(changed_at DESC);
+```
+
+**Usage:**
+- Automatic triggers on all business tables (products, campaigns, etc.)
+- Captures old_values vs new_values
+- Tracks changed_fields array for efficient queries
+- Compliance audits: "Who changed product price on date X?"
+
+**Why Not LangSmith:**
+- Needs to track ALL database changes, not just agent operations
+- Includes manual database updates, scripts, migrations
+- Compliance requirement (immutable audit trail)
 
 ---
 
@@ -467,7 +666,19 @@ Cross-workflow entities reused across multiple domains.
 
 **Usage:** Visual Assets Specialist organizes images. Marketing campaigns reuse product images.
 
-**Constraint:** Exactly ONE of product_family_id OR product_id must be set.
+**Relationships:**
+- (N) ← (1) product_families (CASCADE)
+- (N) ← (1) products (CASCADE)
+
+**Constraint:** At least ONE of product_family_id OR product_id must be set.
+
+**Recommendation - Add Missing Constraint:**
+```sql
+ALTER TABLE product_images
+ADD CONSTRAINT chk_product_images_link CHECK (
+  product_family_id IS NOT NULL OR product_id IS NOT NULL
+);
+```
 
 **Current Data:** 0 images (ready for population).
 
@@ -495,10 +706,11 @@ Cross-workflow entities reused across multiple domains.
 
 ### 10. Customer Segments (Audience Strategies)
 
-**Purpose:** B2B/B2C/D2C messaging strategies per product family.
+**Purpose:** Messaging strategies for products AND campaigns - supports product-specific, campaign-specific, and global company segments.
 
 **Key Attributes:**
-- Identity: id (UUID), product_family_id (FK)
+- Identity: id (UUID)
+- Ownership: product_family_id (FK, nullable), campaign_id (FK, nullable)
 - Segment: segment_type (b2b/b2c/d2c/wholesale/enterprise/retail), segment_label
 - Messaging: tone (professional/casual/technical/emotional/educational/aspirational)
 - Strategy: key_benefits (array), pain_points (array)
@@ -506,11 +718,34 @@ Cross-workflow entities reused across multiple domains.
 - Pricing: pricing_notes
 - Audit: created_at, updated_at
 
-**Usage:** Market Intelligence Specialist defines segments. Content & SEO Specialist tailors content per segment. Marketing campaigns select target segments.
+**Usage:**
+- **Product Onboarding:** Market Intelligence Specialist defines product-specific segments
+- **Marketing Campaigns:** Audience Intelligence Specialist defines campaign-specific segments (holiday shoppers, retargeting audiences)
+- **Company-Wide:** Global segments (eco-conscious buyers, price-sensitive customers)
 
 **Relationships:**
-- (N) ← (1) product_families
+- (N) ← (1) product_families (CASCADE, optional)
+- (N) ← (1) campaigns (CASCADE, optional)
 - (1) → (N) marketing_content (segment-specific content)
+
+**Recommendation - Add Campaign Support:**
+```sql
+ALTER TABLE customer_segments
+ALTER COLUMN product_family_id DROP NOT NULL,
+ADD COLUMN campaign_id UUID,
+ADD CONSTRAINT fk_customer_segments_campaign
+  FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+ADD CONSTRAINT chk_segment_ownership CHECK (
+  (product_family_id IS NOT NULL) OR
+  (campaign_id IS NOT NULL) OR
+  (product_family_id IS NULL AND campaign_id IS NULL)  -- Global segments
+);
+```
+
+**Rationale:**
+- Product segments: product_family_id set, campaign_id NULL
+- Campaign segments: campaign_id set, product_family_id NULL
+- Global segments: both NULL (reusable across products and campaigns)
 
 **Current Data:** 0 (ready for population).
 
@@ -524,7 +759,7 @@ Cross-workflow entities reused across multiple domains.
 
 **Key Attributes:**
 - Identity: id (UUID)
-- Links: product_family_id (FK), product_id (FK), customer_segment_id (FK), industry_naics_code (FK), **campaign_id (FK, NEW)**, **campaign_asset_id (FK, NEW)**
+- Links: product_family_id (FK, nullable), product_id (FK, nullable), customer_segment_id (FK, nullable), industry_naics_code (FK, nullable), campaign_id (FK, nullable), campaign_asset_id (FK, nullable)
 - Platform: platform (instagram/facebook/twitter/linkedin/youtube/tiktok/website/email/catalog)
 - Type: content_type (post/story/reel/video/carousel/ad/description/title/caption/subject_line/catalog_description)
 - Content: content_text, content_metadata (JSONB platform-specific)
@@ -538,7 +773,41 @@ Cross-workflow entities reused across multiple domains.
 - **Product Onboarding:** Content & SEO Specialist generates platform content (campaign_id = NULL)
 - **Marketing Campaigns:** Platform Adaptation + Ad Copy Specialists generate campaign content (campaign_id IS NOT NULL)
 
-**Constraint:** At least ONE targeting field required (product_family, product, segment, industry, OR campaign).
+**Relationships:**
+- (N) ← (1) product_families (CASCADE)
+- (N) ← (1) products (CASCADE)
+- (N) ← (1) customer_segments (SET NULL)
+- (N) ← (1) industries (SET NULL)
+- (N) ← (1) campaigns (CASCADE)
+- (N) ← (1) campaign_assets (SET NULL)
+
+**Recommendation - Add Campaign Foreign Keys:**
+```sql
+ALTER TABLE marketing_content
+ADD COLUMN campaign_id UUID,
+ADD COLUMN campaign_asset_id UUID,
+ADD CONSTRAINT fk_marketing_content_campaign
+  FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+ADD CONSTRAINT fk_marketing_content_campaign_asset
+  FOREIGN KEY (campaign_asset_id) REFERENCES campaign_assets(id) ON DELETE SET NULL;
+```
+
+**Recommendation - Add Targeting Constraint:**
+```sql
+ALTER TABLE marketing_content
+ADD CONSTRAINT chk_marketing_content_target CHECK (
+  product_family_id IS NOT NULL OR
+  product_id IS NOT NULL OR
+  customer_segment_id IS NOT NULL OR
+  industry_naics_code IS NOT NULL OR
+  campaign_id IS NOT NULL
+);
+```
+
+**Rationale:**
+- campaign_id CASCADE: Campaign deletion cascades to all campaign content
+- campaign_asset_id SET NULL: Content survives asset deletion (just loses asset reference)
+- Constraint ensures content is targeted (prevents orphaned content with no association)
 
 **Current Data:** 0 (ready for population).
 
