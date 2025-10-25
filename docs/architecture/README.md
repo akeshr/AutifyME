@@ -14,7 +14,18 @@ Timeless design blueprints and implementation ground truth.
 | **[AGENTS_DESIGN.md](./core/AGENTS_DESIGN.md)** | Canonical agent hierarchy and context engineering patterns (design blueprint) |
 | **[ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./core/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md)** | ✅ **Ground truth** - as-built implementation verified from code |
 | **[PROJECT_MANAGER_DESIGN.md](./core/PROJECT_MANAGER_DESIGN.md)** | PM agent role, intent classification, delegation patterns |
+| **[WORKFLOW_DESIGN_STRATEGY.md](./core/WORKFLOW_DESIGN_STRATEGY.md)** | Workflow orchestration patterns and sequencing strategies |
 | **[ARCHITECTURE_IMPROVEMENTS.md](./core/ARCHITECTURE_IMPROVEMENTS.md)** | Evolution and design decision history |
+
+---
+
+## Architectural Analysis & Vision
+
+High-level architectural reviews and alignment with vision.
+
+| Document | Purpose |
+| --- | --- |
+| **[COMPREHENSIVE_ARCHITECTURAL_REVIEW.md](./COMPREHENSIVE_ARCHITECTURAL_REVIEW.md)** | Complete architecture analysis against vision goals (updated Oct 25) |
 
 ---
 
@@ -25,8 +36,30 @@ Workflow-specific designs and orchestration patterns.
 | Document | Purpose |
 | --- | --- |
 | **[WHATSAPP_CATALOGING_WORKFLOW.md](./workflows/WHATSAPP_CATALOGING_WORKFLOW.md)** | Current cataloging implementation (end-to-end) |
+| **[PRODUCT_ONBOARDING_COMPLETE_DESIGN.md](./workflows/PRODUCT_ONBOARDING_COMPLETE_DESIGN.md)** | Product onboarding workflow - 5 specialists, 4 HITL points, complete spec |
 | **[WEBHOOK_IDEMPOTENCY_DEEP_DIVE.md](./workflows/WEBHOOK_IDEMPOTENCY_DEEP_DIVE.md)** | Webhook idempotency and deduplication patterns |
+
+---
+
+## Operational & Debugging (`workflows/`)
+
+Monitoring, debugging, and operational patterns.
+
+| Document | Purpose |
+| --- | --- |
 | **[MONITORING_QUERIES.md](./workflows/MONITORING_QUERIES.md)** | Database queries for monitoring and debugging |
+| **[TRACE_CORRELATION.md](./workflows/TRACE_CORRELATION.md)** | Trace debugging patterns and correlation strategies |
+| **[BUG3_ROOT_CAUSE_ANALYSIS.md](./workflows/BUG3_ROOT_CAUSE_ANALYSIS.md)** | Bug fix post-mortem (cataloging workflow) |
+
+---
+
+## Technical Debt & Refactoring (`workflows/`)
+
+Active refactoring plans and technical debt tracking.
+
+| Document | Purpose |
+| --- | --- |
+| **[RUNNER_V2_REFACTORING_PLAN.md](./workflows/RUNNER_V2_REFACTORING_PLAN.md)** | ⚙️ In Progress - Runner refactoring to separate concerns |
 
 ---
 
@@ -123,10 +156,17 @@ Before implementing any feature:
 
 ## Historical Archive
 
-Old debugging sessions, bug fixes, and refactor docs moved to `../historical/`:
+Old debugging sessions, bug fixes, refactor docs, research, and planning artifacts moved to `../historical/`:
 - `historical/bug-fixes/` - Bug fix summaries and post-mortems
 - `historical/refactors/` - Refactoring session notes and implementation summaries
 - `historical/debug-sessions/` - Debugging analyses and audits
-- `historical/design-specs/` - Unimplemented design specifications
+- `historical/design-specs/` - Unimplemented design specifications and rejected alternatives
+  - `design-specs/product-onboarding-alternatives/` - Rejected product onboarding designs
+  - `design-specs/hitl-patterns/` - HITL implementation proposals (not yet implemented)
+- `historical/research/` - Pre-implementation research and investigation
+  - `research/deepagents/` - DeepAgents library research (Oct 2025)
+- `historical/migrations/` - Completed migration documentation
+  - `migrations/v1-upgrade/` - LangChain v1 alpha → v1 stable migration (Oct 2025)
+- `historical/planning/` - Time-bound implementation plans (now historical)
 
 These are kept for reference but don't clutter active navigation.
