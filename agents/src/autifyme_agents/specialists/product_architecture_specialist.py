@@ -30,10 +30,8 @@ from typing import Any
 from langchain.tools import tool
 from pydantic import BaseModel, Field
 
-from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
-
 
 # =============================================================================
 # Data Models - Product Architecture Specialist Outputs

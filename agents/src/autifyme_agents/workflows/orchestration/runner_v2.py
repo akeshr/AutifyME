@@ -49,7 +49,6 @@ User approval → Runner → Approval Analyzer → BatchApprovalResponse → Com
 
 from __future__ import annotations
 
-import json
 import logging
 
 # Threading removed - not needed for single-tenant architecture

@@ -33,7 +33,6 @@ from pydantic import BaseModel, Field
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
-
 # =============================================================================
 # Data Models - Visual Assets Specialist Outputs
 # =============================================================================
@@ -130,8 +129,9 @@ def assess_image_quality(image_path: str) -> dict[str, Any]:
     Returns:
         Quality assessment with score and recommendations
     """
-    from PIL import Image
     import os
+
+    from PIL import Image
 
     try:
         # Get file metadata

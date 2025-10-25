@@ -35,7 +35,6 @@ from pydantic import BaseModel, Field
 
 from autifyme_agents.core.prompt_loader import load_prompt
 
-
 # =============================================================================
 # Data Models - Campaign Strategy Specialist Outputs
 # =============================================================================

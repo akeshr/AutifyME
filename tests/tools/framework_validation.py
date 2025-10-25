@@ -11,8 +11,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from tools import (
     execute_scenario,
-    get_trace_overview,
     get_run_details,
+    get_trace_overview,
     list_recent_tests,
     record_test_execution,
 )
@@ -54,7 +54,7 @@ def test_basic_cataloging():
     print(f"  Products created: {result.products_created}")
 
     if result.errors:
-        print(f"  Errors:")
+        print("  Errors:")
         for error in result.errors:
             print(f"    - {error}")
 
@@ -72,7 +72,7 @@ def test_basic_cataloging():
     print(f"  Total runs: {overview.total_runs}")
     print(f"  Total cost: ${overview.total_cost}")
     print(f"  Total latency: {overview.total_latency_ms}ms")
-    print(f"\n  Hierarchical Run Tree:")
+    print("\n  Hierarchical Run Tree:")
     for root in overview.run_tree:
         print_run_tree(root, indent=2)
 
@@ -121,7 +121,7 @@ def test_basic_cataloging():
             print(f"    {llm_run.name}: {tokens} tokens, {llm_run.duration_ms}ms")
         print(f"  Total tokens: {total_tokens}")
 
-    print(f"\n[Step 5] Test Result Summary:")
+    print("\n[Step 5] Test Result Summary:")
     print(f"  Overall: {'PASS' if result.success else 'FAIL'}")
     print(f"  Trace URL: {result.trace_url}")
 
@@ -143,7 +143,7 @@ def test_rejection_scenario():
     print(f"  Products created: {result.products_created}")
 
     if result.errors:
-        print(f"  Errors:")
+        print("  Errors:")
         for error in result.errors:
             print(f"    - {error}")
 
@@ -151,7 +151,7 @@ def test_rejection_scenario():
 
     if result.trace_id != "unknown":
         overview = get_trace_overview(result.trace_id)
-        print(f"\n[Step 2] Trace Overview:")
+        print("\n[Step 2] Trace Overview:")
         print(f"  Total runs: {overview.total_runs}")
         print(f"  Products should be 0 (rejected): {result.products_created}")
         print(f"  Trace URL: {result.trace_url}")
@@ -190,10 +190,10 @@ def main():
     test1_result = test_basic_cataloging()
 
     # Test 2: Rejection scenario
-    test2_result = test_rejection_scenario()
+    test_rejection_scenario()
 
     # Test 3: History tracking
-    history = test_history_tracking()
+    test_history_tracking()
 
     # Final summary
     print_header("VALIDATION SUMMARY")
@@ -211,7 +211,7 @@ def main():
     print("  4. Document framework improvements needed")
 
     if test1_result:
-        print(f"\nTrace URL for detailed review:")
+        print("\nTrace URL for detailed review:")
         print(f"  {test1_result.trace_url}")
 
     print("\n" + "=" * 80)

@@ -34,7 +34,6 @@ from pydantic import BaseModel, Field
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 
-
 # =============================================================================
 # Data Models - Content & SEO Specialist Outputs
 # =============================================================================
@@ -330,7 +329,7 @@ def generate_platform_content(
     hashtags = []
     if platform in ["instagram", "facebook", "twitter"]:
         # Simple keyword-based hashtag generation
-        words = product_name.split() + [f for f in key_features[:3]]
+        words = product_name.split() + list(key_features[:3])
         hashtags = [f"#{word.replace(' ', '')}" for word in words[:5]]
 
     return {

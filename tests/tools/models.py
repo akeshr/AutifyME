@@ -3,9 +3,9 @@
 All return types for the 5 essential observation tools.
 """
 from datetime import datetime
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Any
 
+from pydantic import BaseModel, Field
 
 # ============================================================================
 # Execution Tool Models
@@ -32,7 +32,7 @@ class ExecutionResult(BaseModel):
     execution_time_seconds: float
     """Total execution time."""
 
-    errors: List[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
     """List of error messages if failed."""
 
 
@@ -61,16 +61,16 @@ class RunNode(BaseModel):
     start_time: datetime
     """When run started."""
 
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     """When run ended."""
 
     duration_ms: int
     """Duration in milliseconds."""
 
-    error: Optional[str] = None
+    error: str | None = None
     """High-level error message if failed (not full traceback)."""
 
-    children: List['RunNode'] = Field(default_factory=list)
+    children: list['RunNode'] = Field(default_factory=list)
     """Child runs (recursive tree structure)."""
 
 
@@ -92,23 +92,23 @@ class TraceOverview(BaseModel):
     total_latency_ms: int
     """Total execution time in milliseconds."""
 
-    run_tree: List[RunNode]
+    run_tree: list[RunNode]
     """Hierarchical tree of all runs."""
 
 
 class RunMetadata(BaseModel):
     """Metadata for a specific run."""
 
-    model: Optional[str] = None
+    model: str | None = None
     """Model used (e.g., 'gpt-4')."""
 
-    total_tokens: Optional[int] = None
+    total_tokens: int | None = None
     """Token usage."""
 
-    latency_ms: Optional[int] = None
+    latency_ms: int | None = None
     """Latency in milliseconds."""
 
-    parent_run_id: Optional[str] = None
+    parent_run_id: str | None = None
     """Parent run ID for context."""
 
 
@@ -127,13 +127,13 @@ class RunDetails(BaseModel):
     run_type: str
     """Run type: 'chain' | 'llm' | 'tool'."""
 
-    inputs: Dict[str, Any] = Field(default_factory=dict)
+    inputs: dict[str, Any] = Field(default_factory=dict)
     """Full inputs (prompts, tool arguments, etc)."""
 
-    outputs: Optional[Dict[str, Any]] = None
+    outputs: dict[str, Any] | None = None
     """Full outputs if successful (structured output, tool results)."""
 
-    error: Optional[str] = None
+    error: str | None = None
     """Full error message and traceback if failed."""
 
     metadata: RunMetadata
@@ -146,7 +146,7 @@ class ToolCall(BaseModel):
     name: str
     """Tool name."""
 
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     """Tool arguments."""
 
 
@@ -169,10 +169,10 @@ class Message(BaseModel):
     content: str
     """Message content (text, JSON, etc)."""
 
-    tool_calls: Optional[List[ToolCall]] = None
+    tool_calls: list[ToolCall] | None = None
     """Tool calls made by assistant."""
 
-    tool_results: Optional[List[ToolResult]] = None
+    tool_results: list[ToolResult] | None = None
     """Tool results returned."""
 
 
@@ -185,7 +185,7 @@ class RunMessages(BaseModel):
     run_id: str
     """Run ID."""
 
-    messages: List[Message]
+    messages: list[Message]
     """All messages in conversation."""
 
 
@@ -202,10 +202,10 @@ class HITLDecision(BaseModel):
     action: str
     """User action: 'approved' | 'edited' | 'rejected'."""
 
-    original_data: Dict[str, Any]
+    original_data: dict[str, Any]
     """Original extracted product data."""
 
-    edited_data: Optional[Dict[str, Any]] = None
+    edited_data: dict[str, Any] | None = None
     """Edited data if action was 'edited'."""
 
 
@@ -227,7 +227,7 @@ class WorkflowTrace(BaseModel):
     is_hitl_interrupt: bool
     """Whether this trace ended with HITL interrupt."""
 
-    hitl_decisions: List[HITLDecision] = Field(default_factory=list)
+    hitl_decisions: list[HITLDecision] = Field(default_factory=list)
     """User decisions extracted from resume trace inputs."""
 
 
@@ -247,7 +247,7 @@ class WorkflowStory(BaseModel):
     total_traces: int
     """Number of traces analyzed."""
 
-    traces: List[WorkflowTrace]
+    traces: list[WorkflowTrace]
     """All traces in chronological order."""
 
     products_extracted: int
@@ -304,7 +304,7 @@ class TestExecution(BaseModel):
 class TestHistory(BaseModel):
     """History of test executions."""
 
-    tests: List[TestExecution]
+    tests: list[TestExecution]
     """List of test executions, newest first."""
 
 
@@ -329,36 +329,36 @@ class LLMCallNode(BaseModel):
     """Hierarchy level: 'orchestrator' | 'department' | 'specialist'."""
 
     # Prompt content
-    system_prompt: Optional[str] = None
+    system_prompt: str | None = None
     """Full system prompt (extracted from first message if type=system)."""
 
-    user_messages: List[Dict[str, Any]] = Field(default_factory=list)
+    user_messages: list[dict[str, Any]] = Field(default_factory=list)
     """All user/context messages sent to LLM (excludes system message)."""
 
-    assistant_output: Optional[Dict[str, Any]] = None
+    assistant_output: dict[str, Any] | None = None
     """Generated response from LLM (structured or text)."""
 
     # Metadata
-    model: Optional[str] = None
+    model: str | None = None
     """Model used (e.g., 'gpt-4o-mini')."""
 
-    total_tokens: Optional[int] = None
+    total_tokens: int | None = None
     """Token usage for this LLM call."""
 
-    latency_ms: Optional[int] = None
+    latency_ms: int | None = None
     """Latency in milliseconds."""
 
     status: str
     """Status: 'success' | 'error'."""
 
-    error: Optional[str] = None
+    error: str | None = None
     """Error message if failed."""
 
     # Hierarchy context
-    parent_agent: Optional[str] = None
+    parent_agent: str | None = None
     """Parent agent name for context (who delegated to this agent)."""
 
-    children: List['LLMCallNode'] = Field(default_factory=list)
+    children: list['LLMCallNode'] = Field(default_factory=list)
     """Child LLM calls (recursive tree structure)."""
 
 
@@ -386,7 +386,7 @@ class LLMTraceTree(BaseModel):
     total_cost: float
     """Total cost in dollars."""
 
-    llm_tree: List[LLMCallNode]
+    llm_tree: list[LLMCallNode]
     """Hierarchical tree of LLM calls (root calls only)."""
 
 

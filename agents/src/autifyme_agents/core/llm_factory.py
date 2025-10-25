@@ -83,7 +83,7 @@ def get_llm(
             )
     elif provider == "anthropic":
         # Enable prompt caching for cost and latency benefits
-        llm = ChatAnthropic(  # type: ignore[call-arg]
+        llm = ChatAnthropic(
             model=model,
             temperature=temperature,
             timeout=timeout,

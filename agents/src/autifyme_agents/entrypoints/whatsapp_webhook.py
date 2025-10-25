@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse
@@ -174,7 +174,9 @@ def _process_message_async(
         # Send typing indicator (Phase 1: single call, lasts 25s or until message sent)
         # WhatsApp API: marks message as read + shows "typing..." for 25s
         try:
-            runner.channel.client.send_typing_indicator(message_id)
+            # Cast to WhatsAppChannel to access WhatsApp-specific client methods
+            whatsapp_channel = cast(WhatsAppChannel, runner.channel)
+            whatsapp_channel.client.send_typing_indicator(message_id)
             logger.debug(
                 "Typing indicator sent (message marked as read)",
                 extra={"message_id": message_id, "sender": sender}

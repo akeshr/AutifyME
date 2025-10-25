@@ -18,38 +18,37 @@ Tool count: 7 essential observation tools
 # Execution tool
 from .execution import execute_scenario
 
-# Trace analysis tools
-from .trace_analysis import (
-    get_trace_overview,
-    get_run_details,
-    get_run_messages,
-    get_workflow_story,
-    get_llm_trace_tree,
-)
-
-# Test history tools
-from .test_history import list_recent_tests, record_test_execution, clear_test_history
-
 # Models (for type hints and return types)
 from .models import (
     ExecutionResult,
-    TraceOverview,
-    RunNode,
-    RunDetails,
-    RunMessages,
-    Message,
-    TestHistory,
-    TestExecution,
-    RunMetadata,
-    ToolCall,
-    ToolResult,
-    WorkflowStory,
-    WorkflowTrace,
     HITLDecision,
     LLMCallNode,
     LLMTraceTree,
+    Message,
+    RunDetails,
+    RunMessages,
+    RunMetadata,
+    RunNode,
+    TestExecution,
+    TestHistory,
+    ToolCall,
+    ToolResult,
+    TraceOverview,
+    WorkflowStory,
+    WorkflowTrace,
 )
 
+# Test history tools
+from .test_history import clear_test_history, list_recent_tests, record_test_execution
+
+# Trace analysis tools
+from .trace_analysis import (
+    get_llm_trace_tree,
+    get_run_details,
+    get_run_messages,
+    get_trace_overview,
+    get_workflow_story,
+)
 
 __all__ = [
     # Execution

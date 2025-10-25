@@ -52,19 +52,6 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.integrations.storage import get_store
 from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
-from autifyme_agents.specialists.content_seo_specialist import (
-    create_content_seo_specialist,
-)
-from autifyme_agents.specialists.market_intelligence_specialist import (
-    create_market_intelligence_specialist,
-)
-from autifyme_agents.specialists.product_architecture_specialist import (
-    create_product_architecture_specialist,
-)
-from autifyme_agents.specialists.taxonomy_specialist import create_taxonomy_specialist
-from autifyme_agents.specialists.visual_assets_specialist import (
-    create_visual_assets_specialist,
-)
 from autifyme_agents.specialists.ad_copy_specialist import create_ad_copy_specialist
 from autifyme_agents.specialists.audience_intelligence_specialist import (
     create_audience_intelligence_specialist,
@@ -72,11 +59,24 @@ from autifyme_agents.specialists.audience_intelligence_specialist import (
 from autifyme_agents.specialists.campaign_strategy_specialist import (
     create_campaign_strategy_specialist,
 )
+from autifyme_agents.specialists.content_seo_specialist import (
+    create_content_seo_specialist,
+)
+from autifyme_agents.specialists.market_intelligence_specialist import (
+    create_market_intelligence_specialist,
+)
 from autifyme_agents.specialists.marketing_content_specialist import (
     create_marketing_content_specialist,
 )
 from autifyme_agents.specialists.platform_adaptation_specialist import (
     create_platform_adaptation_specialist,
+)
+from autifyme_agents.specialists.product_architecture_specialist import (
+    create_product_architecture_specialist,
+)
+from autifyme_agents.specialists.taxonomy_specialist import create_taxonomy_specialist
+from autifyme_agents.specialists.visual_assets_specialist import (
+    create_visual_assets_specialist,
 )
 from autifyme_agents.tools.campaign_persistence_tools import (
     create_save_campaign_tool,

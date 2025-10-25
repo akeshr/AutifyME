@@ -32,7 +32,6 @@ from pydantic import BaseModel, Field
 
 from autifyme_agents.core.prompt_loader import load_prompt
 
-
 # =============================================================================
 # Data Models - Market Intelligence Specialist Outputs
 # =============================================================================
@@ -192,9 +191,8 @@ def analyze_price_positioning(
         if base_price < 500:
             if suggested_positioning == "luxury":
                 suggested_positioning = "premium"
-        elif base_price > 5000:
-            if suggested_positioning == "budget":
-                suggested_positioning = "mid-range"
+        elif base_price > 5000 and suggested_positioning == "budget":
+            suggested_positioning = "mid-range"
 
     # Generate pricing recommendations
     price_multipliers = {

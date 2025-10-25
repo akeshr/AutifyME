@@ -5,10 +5,9 @@ Provides execute_scenario() to run workflow tests programmatically.
 import time
 import uuid
 from pathlib import Path
-from typing import Optional
 
-from langsmith import Client
 from dotenv import load_dotenv
+from langsmith import Client
 
 # Ensure .env is loaded
 load_dotenv()
@@ -75,7 +74,7 @@ class _SilentConsoleChannel(MessagingChannel):
 def execute_scenario(
     scenario_id: str,
     hitl_mode: str = "auto_approve",
-    media_path: Optional[str] = None,
+    media_path: str | None = None,
 ) -> ExecutionResult:
     """Execute test scenario programmatically.
 
