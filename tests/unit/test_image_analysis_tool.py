@@ -6,7 +6,6 @@ and error handling for the 2-level architecture tool.
 
 import base64
 import io
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest

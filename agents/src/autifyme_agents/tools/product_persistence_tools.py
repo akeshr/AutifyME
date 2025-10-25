@@ -54,7 +54,6 @@ from tenacity import (
 )
 
 from autifyme_agents.core.exceptions import (
-    ConfigurationError,
     ExternalAPIError,
     classify_api_error,
 )

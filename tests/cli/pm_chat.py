@@ -142,7 +142,7 @@ def interactive_mode():
 
             if user_input.lower() == "new":
                 message_count = 0
-                thread_id = f"local_test_{Path('.').absolute().stat().st_mtime}"
+                thread_id = f"local_test_{Path().absolute().stat().st_mtime}"
                 print(f"[Started new conversation: {thread_id}]")
                 continue
 

@@ -4,12 +4,10 @@ Provides persistent storage and retrieval of test execution history.
 Stores results in JSON file for simple persistence without external dependencies.
 """
 import json
-from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
 
-from .models import TestExecution, TestHistory, ExecutionResult
-
+from .models import ExecutionResult, TestExecution, TestHistory
 
 # History file location (in tests/tools directory)
 HISTORY_FILE = Path(__file__).parent / ".test_history.json"
@@ -25,9 +23,9 @@ def _load_history() -> list[dict]:
         return []
 
     try:
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+        with open(HISTORY_FILE, encoding="utf-8") as f:
             return json.load(f)
-    except (json.JSONDecodeError, IOError):
+    except (OSError, json.JSONDecodeError):
         # Corrupted file - start fresh
         return []
 

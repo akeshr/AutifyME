@@ -7,27 +7,23 @@ Implements 3-level hierarchical analysis for token efficiency:
 
 Token savings: 25x vs naive full dump approach.
 """
-from typing import Dict, List
-from langsmith import Client
-from datetime import datetime
 from dotenv import load_dotenv
+from langsmith import Client
 
 from .models import (
-    TraceOverview,
-    RunNode,
-    RunDetails,
-    RunMetadata,
-    RunMessages,
-    Message,
-    ToolCall,
-    ToolResult,
-    WorkflowStory,
-    WorkflowTrace,
     HITLDecision,
     LLMCallNode,
     LLMTraceTree,
+    Message,
+    RunDetails,
+    RunMessages,
+    RunMetadata,
+    RunNode,
+    ToolCall,
+    TraceOverview,
+    WorkflowStory,
+    WorkflowTrace,
 )
-
 
 # Initialize LangSmith client
 _client = None
@@ -100,7 +96,7 @@ def get_trace_overview(trace_id: str) -> TraceOverview:
         )
 
     # Build hierarchy and collect stats
-    runs_by_id = {str(run.id): run for run in runs}
+    {str(run.id): run for run in runs}
     root_runs = []
     total_cost = 0.0
     total_latency_ms = 0
@@ -268,20 +264,18 @@ def get_run_messages(run_id: str) -> RunMessages:
                 )
 
     # Also check outputs for assistant response
-    if run.outputs:
-        if isinstance(run.outputs, dict):
-            if "content" in run.outputs:
-                messages_list.append(
-                    Message(
-                        role="assistant",
-                        content=str(run.outputs["content"]),
-                    )
-                )
+    if run.outputs and isinstance(run.outputs, dict) and "content" in run.outputs:
+        messages_list.append(
+            Message(
+                role="assistant",
+                content=str(run.outputs["content"]),
+            )
+        )
 
     return RunMessages(run_id=str(run.id), messages=messages_list)
 
 
-def get_workflow_story(trace_ids: List[str]) -> WorkflowStory:
+def get_workflow_story(trace_ids: list[str]) -> WorkflowStory:
     """Get complete HITL workflow narrative across multiple traces.
 
     HITL workflows span multiple traces (initial → interrupt → resume).
@@ -402,18 +396,12 @@ def _detect_hitl_interrupt(overview: TraceOverview) -> bool:
         if "HumanInTheLoop" in node.name or "interrupt" in node.name.lower():
             return True
         # Check children recursively
-        for child in node.children:
-            if has_interrupt(child):
-                return True
-        return False
+        return any(has_interrupt(child) for child in node.children)
 
-    for root in overview.run_tree:
-        if has_interrupt(root):
-            return True
-    return False
+    return any(has_interrupt(root) for root in overview.run_tree)
 
 
-def _extract_hitl_decisions(trace_id: str) -> List[HITLDecision]:
+def _extract_hitl_decisions(trace_id: str) -> list[HITLDecision]:
     """Extract user HITL decisions from resume trace inputs."""
     client = _get_client()
 
@@ -502,7 +490,7 @@ def _classify_hierarchy_level(agent_name: str) -> str:
     name_lower = agent_name.lower()
 
     # Orchestrators (PM, project manager, LangGraph root)
-    if ("pm" == name_lower or
+    if (name_lower == "pm" or
         "project" in name_lower and "manager" in name_lower or
         "langgraph" in name_lower):
         return "orchestrator"
@@ -518,7 +506,7 @@ def _classify_hierarchy_level(agent_name: str) -> str:
     return "unknown"
 
 
-def _extract_system_prompt(messages: List) -> str:
+def _extract_system_prompt(messages: list) -> str:
     """Extract system prompt from messages list.
 
     Args:
