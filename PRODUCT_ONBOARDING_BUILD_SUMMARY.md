@@ -3,6 +3,7 @@
 **Date:** 2025-10-24
 **Status:** ✅ **COMPLETE** - Production-Grade Implementation
 **Architecture:** 5-Specialist Domain-Driven, PM-Orchestrated, HITL at PM Level
+**Reference:** This implementation serves as the canonical reference for `DOMAIN_DESIGN_GUIDELINES.md`
 
 ---
 
@@ -529,6 +530,29 @@ Basic Project Manager (Legacy)
 6. **Atomic Transactions** - All 9 tables or none for product families, data integrity guaranteed
 7. **Clean Architecture** - Hexagonal pattern, specialists ↔ PM ↔ persistence cleanly separated
 8. **Validated Pattern** - Follows production architecture (SubAgent dicts, PM orchestration, HITL at PM level)
+
+---
+
+## Reference for Future Domains
+
+**This implementation is the canonical reference for designing new AutifyME domains.**
+
+All architectural patterns, design decisions, and implementation strategies from this build have been documented in:
+
+📖 **[DOMAIN_DESIGN_GUIDELINES.md](../architecture/core/DOMAIN_DESIGN_GUIDELINES.md)**
+
+**When designing new workflows (Marketing, Inventory, CRM, etc.):**
+1. Read DOMAIN_DESIGN_GUIDELINES.md first
+2. Reference this Product Onboarding implementation as working example
+3. Follow the same architectural patterns
+4. Reuse specialists where possible
+5. Maintain clean separation (PM → Specialists → Tools → Persistence)
+
+**Key Files to Reference:**
+- `agents/src/autifyme_agents/workflows/project_manager.py` - Generic PM pattern
+- `agents/src/autifyme_agents/specialists/*_specialist.py` - Domain specialist pattern
+- `agents/src/autifyme_agents/tools/product_persistence_tools.py` - Atomic persistence pattern
+- `agents/src/autifyme_agents/prompts/` - Prompt engineering pattern
 
 ---
 

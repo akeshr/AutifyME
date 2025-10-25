@@ -121,7 +121,7 @@ Taxonomy  Market    Visual   Content/SEO
 - Agent configuration with DeepAgents
 - Structured output: ProductArchitectureDraft
 - Temperature: 0 (deterministic)
-- Model: gpt-4o or claude-3-5-sonnet-20241022
+- Model: gpt-4.1-mini (via PM orchestration)
 
 **2. Tool: `analyze_product_multimodal`**
 - Input: image_paths, user_text, company_context

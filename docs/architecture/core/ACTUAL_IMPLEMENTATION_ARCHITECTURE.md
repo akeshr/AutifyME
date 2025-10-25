@@ -4,6 +4,7 @@
 **Status:** ✅ Verified (2-Level Architecture v1.0.0)
 **Last Updated:** 2-Level refactoring complete - PM → Specialist → Tools
 **Purpose:** Ground truth - actual implementation as coded
+**Design Guidelines:** See [DOMAIN_DESIGN_GUIDELINES.md](./DOMAIN_DESIGN_GUIDELINES.md) for architectural standards when building new workflows
 
 ---
 
