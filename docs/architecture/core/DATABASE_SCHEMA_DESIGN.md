@@ -1,8 +1,8 @@
 # AutifyME Enterprise Database Schema Design
 
-**Version:** 3.0.0
-**Date:** 2025-01-25
-**Status:** ✅ Master Reference - LangSmith-First Architecture
+**Version:** 3.1.0
+**Date:** 2025-10-25
+**Status:** 🔄 Implementation Roadmap - Marketing Tables Pending
 **Purpose:** Comprehensive enterprise-grade database architecture for all AutifyME workflows
 
 ---
@@ -11,11 +11,11 @@
 
 This document defines the **complete enterprise database architecture** for AutifyME across all workflows and domains. The schema supports:
 
-- ✅ **Product Onboarding** - Variant families, SKU architecture, multi-system taxonomy (9 tables)
-- ✅ **Marketing Campaigns** - Multi-platform orchestration, creative management, performance tracking (4 new + 1 extended)
-- 🚀 **Platform Integration (Phase 2)** - 8 advertising platforms prioritized: Meta, Google Ads, Amazon, YouTube (Phase 1) → X, LinkedIn, TikTok (Phase 2+). Includes credentials, rate limiting, metrics, webhooks (7 new + 4 extended)
-- ✅ **Infrastructure** - Operational foundation, media management, thread tracking (11 tables)
-- 🔮 **Future Workflows** - Inventory, CRM, Analytics (extensible foundation)
+- ✅ **Product Onboarding - FULLY IMPLEMENTED** - Variant families, SKU architecture, multi-system taxonomy (14 tables, 64 products, 7 families)
+- ❌ **Marketing Campaigns - DESIGN COMPLETE, NOT IMPLEMENTED** - Multi-platform orchestration, creative management, performance tracking (4 new tables + 2 table extensions needed)
+- 🚀 **Platform Integration (Phase 3)** - 8 advertising platforms prioritized: Meta, Google Ads, Amazon, YouTube (Phase 1) → X, LinkedIn, TikTok (Phase 2+). Includes credentials, rate limiting, metrics, webhooks (7 new + 4 extended)
+- ✅ **Infrastructure - PARTIALLY IMPLEMENTED** - Operational foundation, media management, thread tracking (20 tables implemented, recommendations need review)
+- 🔮 **Future Workflows (Phase 4+)** - Inventory, CRM, Analytics (extensible foundation, requirements documented below)
 
 **Design Principles:**
 - **LangSmith-First Architecture** - LangSmith is source of truth for workflow tracing, learning, and observability
@@ -28,9 +28,18 @@ This document defines the **complete enterprise database architecture** for Auti
 - **Hybrid Abstraction** - Generic models + JSONB extensions for platform-specific features
 
 **Total Schema:**
-- **39 Tables** across 5 categories (32 current + 7 Phase 2)
+- **34 Tables Currently Implemented** (20 infrastructure/framework, 14 product domain)
+- **4 Marketing Tables Ready for Migration** (campaigns, campaign_products, campaign_assets, campaign_channels)
+- **2 Table Extensions Needed** (customer_segments, marketing_content)
+- **7 Platform Integration Tables (Phase 3)** - Future implementation
 - **9 Automatic Triggers** for history and audit trails
-- **LangSmith Integration** for workflow tracing and learning (no duplicate tracking tables)
+- **LangSmith Integration** for workflow tracing and learning
+
+**Implementation Priority:**
+1. **Phase 1 (COMPLETE):** Product Onboarding - 14 tables, 5 specialists, atomic persistence ✅
+2. **Phase 2 (NEXT):** Marketing Campaigns - 4 new tables + 2 extensions, 5 specialists, persistence tool
+3. **Phase 3 (FUTURE):** Platform Integration - 7 tables for API credentials, rate limits, metrics
+4. **Phase 4+ (FUTURE):** CRM, Inventory, Analytics - Requirements documented below
 
 ---
 
@@ -56,79 +65,96 @@ Core platform functionality for operational requirements, framework support, and
 | `store_migrations` | DeepAgents schema versioning | Framework (DeepAgents) |
 | `audit_log` | Automatic audit trail (database triggers) | Compliance |
 
-**Recommendation - Delete Obsolete Tables:**
+**⚠️ Architecture Decision Needed - Potential Table Consolidation:**
 
-LangSmith provides superior workflow tracing and learning capabilities. The following tables duplicate LangSmith functionality and should be removed:
+**Current Implementation:** 34 tables including some that may overlap with LangSmith capabilities.
 
-```sql
-DROP TABLE IF EXISTS routing_history CASCADE;
-DROP TABLE IF EXISTS workflow_outcomes CASCADE;
-DROP TABLE IF EXISTS company_intelligence CASCADE;
-DROP TABLE IF EXISTS pending_approvals CASCADE;
-```
+**Tables Under Review:**
+- `workflow_outcomes` - 1,111 rows currently tracking execution metadata
+- `company_intelligence` - Designed for auto-discovered brand metadata
+- `routing_history` - Designed for routing decision tracking
+- `pending_approvals` - Designed for HITL state (may be redundant with LangGraph checkpoints)
 
-**Rationale:**
-- `workflow_outcomes` - LangSmith traces provide complete execution tracking with better query capabilities
-- `company_intelligence` - Learning patterns should be queried from LangSmith and cached as needed
-- `routing_history` - LangSmith traces show routing decisions with full context
-- `pending_approvals` - LangGraph checkpoints handle HITL state persistence
+**LangSmith-First Architecture Consideration:**
+LangSmith provides workflow tracing, learning, and observability. However, we need to validate:
+1. **workflow_outcomes** - May be useful as local cache for fast queries (LangSmith requires API calls)
+2. **company_intelligence** - May be needed for frequently-accessed company context
+3. **routing_history** - Likely redundant (LangSmith traces contain routing decisions)
+4. **pending_approvals** - Likely redundant (LangGraph checkpoints handle HITL)
+
+**Recommendation:** Review actual usage in codebase before deletion. If unused, remove in Phase 2 cleanup.
+
+**Note:** Current design already uses LangSmith for tracing and LangGraph checkpoints for HITL. These tables may be from earlier architecture iterations.
 
 ---
 
-### Category 2: Product Domain Tables (14 Tables)
+### Category 2: Product Domain Tables (14 Tables) ✅ FULLY IMPLEMENTED
 
 Product catalog, variant management, and e-commerce operations.
 
-| Table | Purpose | Current Rows |
-|-------|---------|--------------|
-| `categories` | Hierarchical product taxonomy | 10 |
-| `industries` | NAICS 2022 industry classification | 74 |
-| `product_families` | Parent products with variants | 7 |
-| `variant_axes` | Variant dimensions (size, color, etc.) | 24 |
-| `variant_values` | Specific variant values | 102 |
-| `products` | Individual SKUs/variants | 64 |
-| `product_variant_values` | M:N product-to-variant junctions | 45 |
-| `product_images` | Product visual assets | 0 |
-| `product_family_industries` | Multi-industry targeting | 0 |
-| `customer_segments` | Audience messaging strategies | 0 |
-| `marketing_content` | Platform-specific content | 0 |
-| `product_price_history` | Temporal price tracking | 52 |
-| `product_inventory_history` | Temporal stock tracking | 35 |
-| `audit_log` | Universal change audit trail | 82 |
+**Implementation Status:** All 14 tables implemented and populated with production data.
+
+| Table | Purpose | Current Rows | Status |
+|-------|---------|--------------|--------|
+| `categories` | Hierarchical product taxonomy | 10 | ✅ Implemented |
+| `industries` | NAICS 2022 industry classification | 74 | ✅ Implemented |
+| `product_families` | Parent products with variants | 7 | ✅ Implemented |
+| `variant_axes` | Variant dimensions (size, color, etc.) | 24 | ✅ Implemented |
+| `variant_values` | Specific variant values | 102 | ✅ Implemented |
+| `products` | Individual SKUs/variants | 64 | ✅ Implemented |
+| `product_variant_values` | M:N product-to-variant junctions | 45 | ✅ Implemented |
+| `product_images` | Product visual assets | 0 | ✅ Implemented (empty) |
+| `product_family_industries` | Multi-industry targeting | 0 | ✅ Implemented (empty) |
+| `customer_segments` | Audience messaging strategies | 0 | ✅ Implemented (needs extension) |
+| `marketing_content` | Platform-specific content | 0 | ✅ Implemented (needs extension) |
+| `product_price_history` | Temporal price tracking | 52 | ✅ Implemented |
+| `product_inventory_history` | Temporal stock tracking | 35 | ✅ Implemented |
+| `audit_log` | Universal change audit trail | 82 | ✅ Implemented |
 
 ---
 
-### Category 3: Marketing Domain Tables (4 New + 1 Extended)
+### Category 3: Marketing Domain Tables (4 New + 2 Extensions) ❌ NOT IMPLEMENTED - PHASE 2
 
 Campaign management, creative assets, and multi-platform orchestration.
 
-| Table | Purpose | Status |
-|-------|---------|--------|
-| `campaigns` | Campaign metadata, budget, timeline | **NEW** |
-| `campaign_products` | M:N campaign-to-product links | **NEW** |
-| `campaign_assets` | Creative asset library | **NEW** |
-| `campaign_channels` | Platform-specific configurations | **NEW** |
-| `marketing_content` | Platform content with campaign links | **EXTENDED** (added campaign_id, campaign_asset_id) |
+**Implementation Status:** Schema designed but tables NOT YET CREATED. Ready for migration implementation.
+
+**Prerequisites:**
+- customer_segments table needs campaign_id column addition
+- marketing_content table needs campaign_id and campaign_asset_id columns addition
+
+| Table | Purpose | Status | Migration Priority |
+|-------|---------|--------|---------------------|
+| `campaigns` | Campaign metadata, budget, timeline | ❌ **NOT IMPLEMENTED** | Priority 1 (Core) |
+| `campaign_products` | M:N campaign-to-product links | ❌ **NOT IMPLEMENTED** | Priority 2 (Junction) |
+| `campaign_assets` | Creative asset library | ❌ **NOT IMPLEMENTED** | Priority 3 (Assets) |
+| `campaign_channels` | Platform-specific configurations | ❌ **NOT IMPLEMENTED** | Priority 4 (Platform) |
+| `customer_segments` | Add campaign_id FK (nullable) | ⚠️ **NEEDS EXTENSION** | Priority 5 (Extension) |
+| `marketing_content` | Add campaign_id, campaign_asset_id FKs | ⚠️ **NEEDS EXTENSION** | Priority 6 (Extension) |
 
 ---
 
-### Category 4: Platform Integration Tables (Phase 2 - 7 New + 4 Extended)
+### Category 4: Platform Integration Tables (Phase 3 - 7 New + 4 Extended) 🚀 FUTURE
 
 External advertising platform integrations (Meta, Google Ads, Amazon, YouTube, X, LinkedIn, TikTok).
 
-| Table | Purpose | Status |
-|-------|---------|--------|
-| `platform_credentials` | Encrypted OAuth tokens and API keys | **PHASE 2** |
-| `platform_rate_limits` | Per-platform quota tracking | **PHASE 2** |
-| `platform_api_errors` | Error logging and retry tracking | **PHASE 2** |
-| `platform_webhook_events` | Real-time webhook event queue | **PHASE 2** |
-| `campaign_performance` | Normalized cross-platform metrics | **PHASE 2** |
-| `campaign_performance_raw` | Platform-specific metrics (JSONB) | **PHASE 2** |
-| `platform_campaign_mapping` | AutifyME ↔ Platform ID mapping | **PHASE 2** |
-| `campaigns` | Added platform_config (JSONB) | **EXTENDED** |
-| `campaign_channels` | Added sync tracking columns | **EXTENDED** |
-| `campaign_assets` | Added platform upload tracking | **EXTENDED** |
-| `marketing_content` | No changes (ready for Phase 2) | **READY** |
+**Implementation Status:** Future phase after Marketing Campaign domain is complete.
+
+**Dependency:** Requires Marketing Campaign tables (Phase 2) to be implemented first.
+
+| Table | Purpose | Status | Phase |
+|-------|---------|--------|-------|
+| `platform_credentials` | Encrypted OAuth tokens and API keys | 🚀 **PHASE 3** | After Marketing |
+| `platform_rate_limits` | Per-platform quota tracking | 🚀 **PHASE 3** | After Marketing |
+| `platform_api_errors` | Error logging and retry tracking | 🚀 **PHASE 3** | After Marketing |
+| `platform_webhook_events` | Real-time webhook event queue | 🚀 **PHASE 3** | After Marketing |
+| `campaign_performance` | Normalized cross-platform metrics | 🚀 **PHASE 3** | After Marketing |
+| `campaign_performance_raw` | Platform-specific metrics (JSONB) | 🚀 **PHASE 3** | After Marketing |
+| `platform_campaign_mapping` | AutifyME ↔ Platform ID mapping | 🚀 **PHASE 3** | After Marketing |
+| `campaigns` | Added platform_config (JSONB) | ⏳ **EXTENSION** | With Platform Integration |
+| `campaign_channels` | Added sync tracking columns | ⏳ **EXTENSION** | With Platform Integration |
+| `campaign_assets` | Added platform upload tracking | ⏳ **EXTENSION** | With Platform Integration |
+| `marketing_content` | No changes (already ready) | ✅ **READY** | No changes needed |
 
 ---
 
@@ -870,9 +896,70 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 
 ## Marketing Domain Tables
 
-### 1. Campaigns (Campaign Orchestration)
+❌ **IMPLEMENTATION STATUS: NOT IMPLEMENTED - PHASE 2 PRIORITY**
+
+All marketing tables below are designed but NOT YET CREATED in database. Implementation planned for Phase 2 after schema approval.
+
+---
+
+## Phase 2 Migration Plan - Marketing Campaign Tables
+
+**Implementation Approach:** 6 sequential migrations to be created via Supabase MCP.
+
+**Migration Sequence:**
+
+1. **Migration: `campaigns`** (Priority 1)
+   - Core campaign entity (no dependencies)
+   - Columns: metadata, budget, timeline, lifecycle, performance aggregates
+   - Indexes: status+date, type, date range
+   - Constraints: date validation, enum checks
+
+2. **Migration: `campaign_products`** (Priority 2)
+   - M:N junction for campaign → products/families
+   - Columns: promotion details, pricing, performance per product
+   - Indexes: campaign, product_family, product, primary product uniqueness
+   - Constraints: requires either product_family_id OR product_id
+
+3. **Migration: `campaign_assets`** (Priority 3)
+   - Creative asset library per campaign
+   - Columns: asset metadata, approval status, versioning, usage tracking
+   - Indexes: campaign, asset_type, active assets
+   - Constraints: asset_type enumeration
+
+4. **Migration: `campaign_channels`** (Priority 4)
+   - Platform-specific configurations
+   - Columns: platform IDs, budget allocation, config JSONB, performance
+   - Indexes: campaign, platform, status
+   - Constraints: unique (campaign, platform), platform enumeration
+
+5. **Migration: Extend `customer_segments`** (Priority 5)
+   - Add: `campaign_id` column (UUID, FK to campaigns, nullable)
+   - Modify: `product_family_id` to nullable
+   - Add: Check constraint for segment ownership (product OR campaign OR global)
+   - Purpose: Support campaign-specific, product-specific, and global segments
+
+6. **Migration: Extend `marketing_content`** (Priority 6)
+   - Add: `campaign_id` column (UUID, FK to campaigns, nullable, CASCADE delete)
+   - Add: `campaign_asset_id` column (UUID, FK to campaign_assets, nullable, SET NULL)
+   - Add: Check constraint ensuring content is targeted
+   - Indexes: campaign, campaign+platform, asset
+   - Purpose: Separate product content (campaign_id NULL) from campaign content (campaign_id NOT NULL)
+
+**Migration Verification:**
+- Verify 4 new tables created
+- Verify 2 existing tables extended with nullable FKs
+- Verify all foreign keys and indexes created
+- Verify check constraints enforced
+
+**Rollback Strategy:** Reverse order (6 → 1), drop extensions first, then tables.
+
+---
+
+### 1. Campaigns (Campaign Orchestration) ❌ NOT IMPLEMENTED
 
 **Purpose:** Top-level campaign metadata, budget, timeline, and lifecycle management.
+
+**Implementation Status:** Schema designed, migration SQL ready, NOT YET CREATED.
 
 **Key Attributes:**
 - Identity: id (UUID), campaign_id (business ID, unique), name, description
@@ -895,15 +982,17 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 - (1) → (N) campaign_channels (platform configs)
 - (1) → (N) marketing_content (via campaign_id)
 
-**Status:** NEW table for marketing domain.
+**Status:** ❌ NOT IMPLEMENTED - NEW table for marketing domain (Phase 2).
 
 **Constraint:** planned_end_date >= planned_start_date.
 
 ---
 
-### 2. Campaign Products (Promoted Products Junction)
+### 2. Campaign Products (Promoted Products Junction) ❌ NOT IMPLEMENTED
 
 **Purpose:** M:N junction linking campaigns to products they promote.
+
+**Implementation Status:** Schema designed, migration SQL ready, NOT YET CREATED.
 
 **Key Attributes:**
 - Identity: id (UUID), campaign_id (FK)
@@ -920,15 +1009,17 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 - (N) ← (1) campaigns
 - (N) → (1) product_families OR products (exactly one)
 
-**Status:** NEW table for marketing domain.
+**Status:** ❌ NOT IMPLEMENTED - NEW table for marketing domain (Phase 2).
 
 **Constraint:** Exactly ONE of product_family_id OR product_id must be set.
 
 ---
 
-### 3. Campaign Assets (Creative Library)
+### 3. Campaign Assets (Creative Library) ❌ NOT IMPLEMENTED
 
 **Purpose:** Campaign-specific creative asset library (images, videos, graphics).
+
+**Implementation Status:** Schema designed, migration SQL ready, NOT YET CREATED.
 
 **Key Attributes:**
 - Identity: id (UUID), campaign_id (FK)
@@ -946,15 +1037,17 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 - (N) ← (1) campaigns
 - Referenced by marketing_content via campaign_asset_id
 
-**Status:** NEW table for marketing domain.
+**Status:** ❌ NOT IMPLEMENTED - NEW table for marketing domain (Phase 2).
 
 **Note:** Separate from product_images (product photography vs campaign creative).
 
 ---
 
-### 4. Campaign Channels (Platform Configurations)
+### 4. Campaign Channels (Platform Configurations) ❌ NOT IMPLEMENTED
 
 **Purpose:** Platform-specific campaign configurations and tracking IDs.
+
+**Implementation Status:** Schema designed, migration SQL ready, NOT YET CREATED.
 
 **Key Attributes:**
 - Identity: id (UUID), campaign_id (FK)
@@ -973,17 +1066,21 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 - (N) ← (1) campaigns
 - Implicitly links to marketing_content via (campaign_id + platform) match
 
-**Status:** NEW table for marketing domain.
+**Status:** ❌ NOT IMPLEMENTED - NEW table for marketing domain (Phase 2).
 
 **Constraint:** UNIQUE (campaign_id, platform) - one config per campaign per platform.
 
 ---
 
-## Platform Integration Tables (Phase 2)
+## Platform Integration Tables (Phase 3) 🚀 FUTURE
 
-### 1. Platform Credentials (Encrypted Token Storage)
+**Implementation Status:** Future implementation after Marketing Campaign domain (Phase 2) is complete.
+
+### 1. Platform Credentials (Encrypted Token Storage) 🚀 PHASE 3
 
 **Purpose:** Encrypted storage for OAuth tokens, API keys, and platform credentials with auto-refresh capability.
+
+**Implementation Status:** Future phase, requires Marketing Campaign tables first.
 
 **Key Attributes:**
 - Identity: id (UUID), company_id (FK)
@@ -999,7 +1096,7 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 - (N) ← (1) companies (single-tenant)
 - Implicitly referenced by platform_api_errors, platform_rate_limits
 
-**Status:** PHASE 2 (platform integration implementation)
+**Status:** 🚀 PHASE 3 (platform integration implementation, after Marketing domain)
 
 **Security:**
 - Encryption key NEVER stored in database
@@ -1010,9 +1107,11 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 
 ---
 
-### 2. Platform Rate Limits (Quota Tracking)
+### 2. Platform Rate Limits (Quota Tracking) 🚀 PHASE 3
 
 **Purpose:** Per-platform quota tracking with adaptive throttling to prevent rate limit violations.
+
+**Implementation Status:** Future phase, requires Marketing Campaign tables first.
 
 **Key Attributes:**
 - Identity: id (UUID), company_id (FK), platform (TEXT)
@@ -1030,15 +1129,17 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 **Relationships:**
 - (N) ← (1) companies (single-tenant)
 
-**Status:** PHASE 2 (platform integration implementation)
+**Status:** 🚀 PHASE 3 (platform integration implementation, after Marketing domain)
 
 **Constraint:** UNIQUE (company_id, platform, limit_type)
 
 ---
 
-### 3. Platform API Errors (Error Logging & Retry)
+### 3. Platform API Errors (Error Logging & Retry) 🚀 PHASE 3
 
 **Purpose:** Centralized error logging with intelligent retry tracking for platform API failures.
+
+**Implementation Status:** Future phase, requires Marketing Campaign tables first.
 
 **Key Attributes:**
 - Identity: id (UUID), company_id (FK), platform (TEXT)
@@ -1056,15 +1157,17 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 **Relationships:**
 - (N) ← (1) companies (single-tenant)
 
-**Status:** PHASE 2 (platform integration implementation)
+**Status:** 🚀 PHASE 3 (platform integration implementation, after Marketing domain)
 
 **Index:** idx_platform_api_errors_unresolved ON (company_id, platform, created_at DESC) WHERE resolved_at IS NULL
 
 ---
 
-### 4. Platform Webhook Events (Real-Time Event Queue)
+### 4. Platform Webhook Events (Real-Time Event Queue) 🚀 PHASE 3
 
 **Purpose:** Real-time webhook event queue for platforms that support webhooks (Meta, TikTok).
+
+**Implementation Status:** Future phase, requires Marketing Campaign tables first.
 
 **Key Attributes:**
 - Identity: id (UUID), company_id (FK), platform (meta/tiktok)
@@ -1082,15 +1185,17 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 **Relationships:**
 - (N) ← (1) companies (single-tenant)
 
-**Status:** PHASE 2 (platform integration implementation)
+**Status:** 🚀 PHASE 3 (platform integration implementation, after Marketing domain)
 
 **Index:** idx_webhook_events_unprocessed ON (company_id, platform, received_at) WHERE processed = false
 
 ---
 
-### 5. Campaign Performance (Normalized Metrics)
+### 5. Campaign Performance (Normalized Metrics) 🚀 PHASE 3
 
 **Purpose:** Normalized cross-platform metrics for fast queries, aggregation, and comparison.
+
+**Implementation Status:** Future phase, requires Marketing Campaign tables first.
 
 **Key Attributes:**
 - Identity: id (UUID), campaign_id (FK), channel_id (FK nullable)
@@ -1114,7 +1219,7 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 - (N) ← (1) campaign_channels (nullable for campaign-wide aggregates)
 - (1) → (N) campaign_performance_raw (platform-specific details)
 
-**Status:** PHASE 2 (platform integration implementation)
+**Status:** 🚀 PHASE 3 (platform integration implementation, after Marketing domain)
 
 **Constraint:** UNIQUE (campaign_id, channel_id, date, hour)
 
@@ -1124,9 +1229,11 @@ ADD CONSTRAINT chk_marketing_content_target CHECK (
 
 ---
 
-### 6. Campaign Performance Raw (Platform-Specific Metrics)
+### 6. Campaign Performance Raw (Platform-Specific Metrics) 🚀 PHASE 3
 
 **Purpose:** Platform-specific metrics in JSONB for detailed analysis and platform-unique data.
+
+**Implementation Status:** Future phase, requires Marketing Campaign tables first.
 
 **Key Attributes:**
 - Identity: id (UUID), performance_id (FK to campaign_performance)
@@ -1168,15 +1275,17 @@ TikTok: {
 **Relationships:**
 - (N) ← (1) campaign_performance (one raw per normalized)
 
-**Status:** PHASE 2 (platform integration implementation)
+**Status:** 🚀 PHASE 3 (platform integration implementation, after Marketing domain)
 
 **Constraint:** UNIQUE (performance_id, platform)
 
 ---
 
-### 7. Platform Campaign Mapping (External ID Tracking)
+### 7. Platform Campaign Mapping (External ID Tracking) 🚀 PHASE 3
 
 **Purpose:** Bi-directional mapping between AutifyME campaigns and platform campaign IDs across hierarchies.
+
+**Implementation Status:** Future phase, requires Marketing Campaign tables first.
 
 **Key Attributes:**
 - Identity: id (UUID), campaign_id (FK to campaigns), channel_id (FK to campaign_channels), platform (TEXT)
@@ -1210,7 +1319,7 @@ LinkedIn (4-level via metadata):
 - (N) ← (1) campaign_channels
 - Implicitly referenced by campaign_performance, platform_api_errors
 
-**Status:** PHASE 2 (platform integration implementation)
+**Status:** 🚀 PHASE 3 (platform integration implementation, after Marketing domain)
 
 **Constraint:** UNIQUE (channel_id, platform)
 
@@ -1576,26 +1685,168 @@ TikTok Smart Creative:
 
 ---
 
+## Future Domain Requirements (Phase 4+)
+
+### CRM Domain (Customer Relationship Management)
+
+**Strategic Priority:** Phase 4 - Customer engagement and retention workflows
+
+**Core Entities:**
+1. **customers** - Customer profiles (B2B companies or D2C individuals)
+   - Identity: id, customer_type (b2b_company/d2c_individual), company_name, contact_name
+   - Contact: email, phone, address, social profiles
+   - Classification: customer_segment_id (FK), industry_naics_code (FK)
+   - Lifecycle: lifecycle_stage (lead/prospect/customer/churned), acquisition_source, ltv (lifetime value)
+
+2. **customer_interactions** - All touchpoints (chat, email, calls, meetings)
+   - Interaction metadata, sentiment analysis, action items
+   - Links to conversation_threads for WhatsApp continuity
+
+3. **customer_orders** - Purchase history
+   - Links to products, order_items, fulfillment status
+   - Enables retention workflows, upsell recommendations
+
+4. **customer_preferences** - Personalization data
+   - Communication preferences, product preferences
+   - Privacy consent tracking (GDPR compliance)
+
+**Reused Tables:**
+- customer_segments (already supports global segments)
+- industries (B2B customer classification)
+- products (order line items)
+- marketing_content (personalized messaging)
+
+**Workflow Examples:**
+- Lead nurturing campaigns based on engagement
+- Churn prediction and retention offers
+- Upsell recommendations based on purchase history
+- Personalized content delivery
+
+---
+
+### Inventory Management Domain
+
+**Strategic Priority:** Phase 4 - Multi-location stock tracking and fulfillment
+
+**Core Entities:**
+1. **inventory_locations** - Warehouses, stores, fulfillment centers
+   - Location metadata, capacity, operational hours
+
+2. **inventory_movements** - Stock transfers, adjustments, receipts
+   - Movement type (transfer/adjustment/receipt/return/sale)
+   - Source/destination locations
+   - Audit trail for shrinkage detection
+
+3. **inventory_counts** - Physical count reconciliation
+   - Scheduled counts, cycle counts, variance tracking
+
+4. **inventory_forecasts** - Demand predictions
+   - ML-based forecasting, seasonal patterns
+   - Reorder point recommendations
+
+**Reused Tables:**
+- products (SKU inventory)
+- product_inventory_history (already tracks changes)
+- audit_log (automatic audit trail)
+
+**Workflow Examples:**
+- Automated reorder point alerts
+- Multi-location inventory allocation
+- Demand forecasting for seasonal products
+- Shrinkage and variance reporting
+
+---
+
+### Analytics Domain
+
+**Strategic Priority:** Phase 5 - Data-driven insights and optimization
+
+**Core Entities:**
+1. **attribution_events** - Multi-touch attribution
+   - Customer journey touchpoints
+   - Attribution models (first-touch, last-touch, linear, time-decay)
+   - Revenue attribution across campaigns
+
+2. **content_ab_tests** - Experimentation framework
+   - A/B test definitions, variants, outcomes
+   - Statistical significance tracking
+
+3. **customer_journey_snapshots** - Funnel analysis
+   - Stage transitions, conversion rates
+   - Drop-off analysis
+
+4. **predictive_insights** - ML-generated insights
+   - Churn predictions, LTV predictions
+   - Product recommendation scores
+   - Dynamic pricing recommendations
+
+**Reused Tables:**
+- campaigns, campaign_performance (attribution source)
+- customer_interactions (journey events)
+- marketing_content (content variants)
+- products (recommendation targets)
+
+**Workflow Examples:**
+- Multi-touch campaign attribution
+- A/B testing platform content
+- Customer lifetime value prediction
+- Dynamic pricing optimization
+
+---
+
+### Cross-Domain Integration Strategy
+
+**Shared Entities Continue to Scale:**
+- `customer_segments` - Used by Product, Marketing, CRM, Analytics
+- `industries` - Used by Product, Marketing, CRM
+- `marketing_content` - Used by Product, Marketing, CRM (personalization)
+- `products` - Used by Product, Marketing, CRM (orders), Inventory
+
+**Data Flow Patterns:**
+- **Product → CRM:** Customer purchases tracked in customer_orders
+- **CRM → Marketing:** Customer segments drive campaign targeting
+- **Marketing → Analytics:** Campaign performance feeds attribution
+- **Inventory → CRM:** Stock availability impacts customer experience
+
+**Extensibility Principles:**
+- New domains add tables without breaking existing workflows
+- Foreign keys maintain referential integrity
+- Temporal tracking (history tables) for all critical entities
+- Automatic audit_log triggers for compliance
+
+---
+
 ## Summary Statistics
 
-**Total Schema:**
-- **34 Tables** (9 infrastructure, 14 product, 4 marketing, 7 shared)
+**Implementation Status (v3.1.0):**
+
+**Phase 1 - Product Onboarding: ✅ COMPLETE**
+- **14 Tables Implemented** (categories, industries, product_families, variant_axes, variant_values, products, product_variant_values, product_images, product_family_industries, customer_segments, marketing_content, product_price_history, product_inventory_history, audit_log)
 - **9 Automatic Triggers** (price history, inventory history, audit log)
-- **Multiple Views** (success rates, failures, edge cases, checkpoint forks)
+- **Production Data:** 64 SKUs, 7 families, 24 variant axes, 102 variant values, 74 industries
 
-**Current Data Volume:**
+**Phase 2 - Marketing Campaigns: ❌ NOT IMPLEMENTED**
+- **4 New Tables Designed:** campaigns, campaign_products, campaign_assets, campaign_channels
+- **2 Table Extensions Needed:** customer_segments (add campaign_id), marketing_content (add campaign_id, campaign_asset_id)
+- **Status:** Schema complete, migration SQL ready, awaiting approval and implementation
+
+**Phase 3 - Platform Integration: 🚀 FUTURE**
+- **7 Tables Designed:** platform_credentials, platform_rate_limits, platform_api_errors, platform_webhook_events, campaign_performance, campaign_performance_raw, platform_campaign_mapping
+- **4 Table Extensions Designed:** campaigns, campaign_channels, campaign_assets, marketing_content
+- **Status:** Depends on Phase 2 completion
+
+**Phase 4+ - Future Domains: 🔮 REQUIREMENTS DOCUMENTED**
+- **CRM Domain:** 4 core tables (customers, customer_interactions, customer_orders, customer_preferences)
+- **Inventory Domain:** 4 core tables (inventory_locations, inventory_movements, inventory_counts, inventory_forecasts)
+- **Analytics Domain:** 4 core tables (attribution_events, content_ab_tests, customer_journey_snapshots, predictive_insights)
+- **Status:** Requirements documented, ready for design when needed
+
+**Current Infrastructure:**
+- **34 Tables Live** (20 infrastructure/framework, 14 product domain)
 - **Companies:** 1 row (single-tenant)
-- **Products:** 64 SKUs across 7 families
-- **Variants:** 24 axes, 102 values, 45 junctions
-- **Industries:** 74 NAICS codes
-- **Workflows:** 1,111 tracked executions
-- **Messages:** 86 processed (24h window)
-
-**Ready for Marketing:**
-- **Campaigns:** 0 (schema ready)
-- **Campaign Assets:** 0 (schema ready)
-- **Marketing Content:** 0 (schema ready)
-- All indexes created, constraints enforced
+- **Workflows Executed:** 1,111 total (859 successful, 252 failed)
+- **Messages Processed:** Via processed_messages deduplication table
+- **Framework Tables:** LangGraph checkpoints, DeepAgents store, audit_log all operational
 
 ---
 
@@ -1612,10 +1863,39 @@ TikTok Smart Creative:
 
 ---
 
+## Next Steps - Marketing Campaign Implementation
+
+**Phase 2 Priority Actions:**
+
+1. **Schema Approval Discussion** - Review this updated schema document
+2. **Migration SQL Generation** - Create Supabase migrations for 4 new tables + 2 extensions
+3. **Migration Execution** - Apply migrations via Supabase MCP
+4. **Verification** - Validate schema, indexes, constraints
+5. **Marketing Domain Implementation** - Build 5 specialists + persistence tool
+6. **Testing** - Workflow validation and trace analysis
+
+**Discussion Points:**
+- Approve marketing table schema as designed?
+- Confirm customer_segments and marketing_content extensions?
+- Review infrastructure table consolidation recommendations?
+- Validate future domain requirements (CRM, Inventory, Analytics)?
+
+---
+
+**Document Metadata:**
+
+**Version:** 3.1.0
 **Last Updated:** 2025-10-25
-**Next Review:** After marketing campaign implementation
+**Status:** Ready for Marketing Phase 2 - Awaiting Approval
+**Next Review:** After Marketing Campaign implementation complete
+
+**Change Log:**
+- **v3.1.0 (2025-10-25):** Added implementation status markers, marketing readiness assessment, future domain requirements (CRM/Inventory/Analytics), phase prioritization
+- **v3.0.0 (2025-01-25):** LangSmith-First Architecture, comprehensive schema design
+
 **Related Documents:**
-- DOMAIN_DESIGN_GUIDELINES.md - Architectural standards for new workflows
-- ACTUAL_IMPLEMENTATION_ARCHITECTURE.md - Implementation patterns
-- PRODUCT_ONBOARDING_BUILD_SUMMARY.md - Product domain reference implementation
-- MARKETING_DOMAIN_ANALYSIS.md - Marketing workflow design
+- `DOMAIN_DESIGN_GUIDELINES.md` - Architectural standards for new workflows
+- `ACTUAL_IMPLEMENTATION_ARCHITECTURE.md` - Implementation patterns
+- `PRODUCT_ONBOARDING_BUILD_SUMMARY.md` - Product domain reference implementation
+- `MARKETING_DOMAIN_ANALYSIS.md` - Marketing workflow design
+- `COMPREHENSIVE_ARCHITECTURAL_REVIEW.md` - Complete system audit

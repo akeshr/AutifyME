@@ -9,16 +9,26 @@ Architecture:
 
 Current Workflow Implementation:
 - Product Onboarding: 5 domain specialists for enterprise-grade product families
+- Marketing Campaigns: 6 domain specialists (5 new + 1 reused) for campaign creation
 
-Domain Specialists (5):
+Domain Specialists (11 total):
+
+Product Onboarding (5):
 1. Product Architecture - Variant structure and SKU design
 2. Taxonomy - Multi-system classification (internal, Google, NAICS)
 3. Market Intelligence - Positioning, segments, industry use cases
-4. Visual Assets - Image organization and quality
+4. Visual Assets - Image organization and quality (reused in marketing)
 5. Content & SEO - Descriptions, meta tags, platform content
 
+Marketing Campaigns (6):
+6. Campaign Strategy - Objectives, KPIs, budget, timeline
+7. Audience Intelligence - Customer segments and targeting
+8. Marketing Content - Narratives, headlines, CTAs
+9. Visual Assets - Creative assets (reused from product onboarding)
+10. Platform Adaptation - Platform-specific formatting
+11. Ad Copy - Paid ad copy with A/B variants
+
 Future Workflows:
-- Marketing campaigns
 - Inventory management
 - CRM operations
 - Competitive analysis
@@ -54,6 +64,22 @@ from autifyme_agents.specialists.product_architecture_specialist import (
 from autifyme_agents.specialists.taxonomy_specialist import create_taxonomy_specialist
 from autifyme_agents.specialists.visual_assets_specialist import (
     create_visual_assets_specialist,
+)
+from autifyme_agents.specialists.ad_copy_specialist import create_ad_copy_specialist
+from autifyme_agents.specialists.audience_intelligence_specialist import (
+    create_audience_intelligence_specialist,
+)
+from autifyme_agents.specialists.campaign_strategy_specialist import (
+    create_campaign_strategy_specialist,
+)
+from autifyme_agents.specialists.marketing_content_specialist import (
+    create_marketing_content_specialist,
+)
+from autifyme_agents.specialists.platform_adaptation_specialist import (
+    create_platform_adaptation_specialist,
+)
+from autifyme_agents.tools.campaign_persistence_tools import (
+    create_save_campaign_tool,
 )
 from autifyme_agents.tools.product_persistence_tools import (
     create_save_product_family_tool,
@@ -92,12 +118,22 @@ def create_project_manager(
     Create Project Manager - main orchestrator for all AutifyME workflows.
 
     Current Implementation:
-    Orchestrates 5 domain specialists for product onboarding workflow:
+    Orchestrates 11 domain specialists for 2 workflows:
+
+    Product Onboarding (5 specialists):
     - Product Architecture Specialist (variant structure)
     - Taxonomy Specialist (multi-system classification)
     - Market Intelligence Specialist (positioning & segments)
     - Visual Assets Specialist (image organization)
     - Content & SEO Specialist (content generation)
+
+    Marketing Campaigns (6 specialists):
+    - Campaign Strategy Specialist (objectives, KPIs, budget, timeline)
+    - Audience Intelligence Specialist (customer segments, targeting)
+    - Marketing Content Specialist (narratives, headlines, CTAs)
+    - Visual Assets Specialist (reused from product onboarding)
+    - Platform Adaptation Specialist (platform-specific formatting)
+    - Ad Copy Specialist (paid ad copy with A/B variants)
 
     Architecture:
     - PM = DeepAgent with SubAgents
@@ -137,7 +173,7 @@ def create_project_manager(
     # PM Tools - HITL Persistence ONLY
     # ==========================================================================
     # PM owns persistence tools for implemented workflows
-    # Currently: save_product_family (product onboarding)
+    # Currently: save_product_family (product onboarding), save_campaign (marketing)
     # Platform media tools if channel provided
     pm_tools: list[Any] = []
 
@@ -148,18 +184,26 @@ def create_project_manager(
 
     # HITL persistence tools - PM level only
     pm_tools.append(create_save_product_family_tool(storage))
+    pm_tools.append(create_save_campaign_tool(storage))
 
     # ==========================================================================
     # Specialists - Domain Experts (Analysis Only, No Persistence)
     # ==========================================================================
-    # 5 domain specialists for product onboarding workflow
-    # New workflows will add additional specialists here
+    # 11 domain specialists for 2 workflows (product onboarding + marketing)
+    # Visual Assets specialist is shared between workflows
     subagents: list[Any] = [
+        # Product Onboarding (5 specialists)
         create_product_architecture_specialist(),
         create_taxonomy_specialist(storage),
         create_market_intelligence_specialist(),
-        create_visual_assets_specialist(),
+        create_visual_assets_specialist(),  # Shared with marketing
         create_content_seo_specialist(),
+        # Marketing Campaigns (5 new specialists + 1 reused)
+        create_campaign_strategy_specialist(),
+        create_audience_intelligence_specialist(),
+        create_marketing_content_specialist(),
+        create_platform_adaptation_specialist(),
+        create_ad_copy_specialist(),
     ]
 
     # ==========================================================================
@@ -168,7 +212,8 @@ def create_project_manager(
     # Persistence tools trigger HITL interrupts
     # PM presents data to user, gets approval, persists atomically
     interrupt_configs: dict[str, bool] = {
-        "save_product_family": True,
+        "save_product_family": True,  # Product onboarding workflow
+        "save_campaign": True,  # Marketing campaign workflow
     }
 
     # ==========================================================================
