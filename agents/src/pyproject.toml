@@ -6,14 +6,14 @@ authors = [{ name = "Abhi" }]
 requires-python = ">=3.12"
 dependencies = [
     # Core Agentic Framework (LangChain v1 stable)
-    "langchain==1.0.0",
-    "langgraph==1.0.0",
-    "langgraph-prebuilt==1.0.0",
-    "langgraph-checkpoint==2.1.2",
-    "langgraph-checkpoint-postgres==2.0.25",
+    "langchain==1.0.2",
+    "langgraph==1.0.1",
+    "langgraph-prebuilt==1.0.1",
+    "langgraph-checkpoint==3.0.0",
+    "langgraph-checkpoint-postgres==3.0.0",
     "langsmith",
     # Advanced Agent Implementation
-    "deepagents==0.1.1",  # Stable v1-compatible release (Oct 18, 2025)
+    "deepagents==0.1.4",  # Latest stable release (Oct 23, 2025)
     # LLM Providers (v1 stable)
     "langchain-openai==1.0.0",
     "langchain-anthropic==1.0.0",

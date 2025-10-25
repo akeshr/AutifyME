@@ -97,31 +97,6 @@ uv run mypy .
 
 **Documentation**: `docs/architecture/` organized by concern (core/, workflows/, tech/, testing/), plus `historical/`, `deployment/`, `roadmap/`
 
-**Database**: `database/migrations/` - SQL migration files
-
-**Critical**: CLI tools (pm_chat, simulate) are in `tests/cli/`, NOT in agents package. They're test infrastructure.
-
-### Local Testing
-
-**Philosophy**: Iterate locally first (terminal) → Automated scenarios → Production (WhatsApp)
-
-**CLI Tools** (all in `tests/cli/`):
-```bash
-# Fastest: Direct PM testing
-uv run python tests/cli/pm_chat.py --interactive
-
-# Full workflow with HITL
-uv run python tests/cli/simulate.py "Catalog these sneakers"
-```
-
-**Autonomous Framework** (primary testing method):
-```python
-from tests.tools import execute_scenario, get_trace_overview
-result = execute_scenario("Catalog Nike shoes Rs 1000", hitl_mode="auto_approve")
-overview = get_trace_overview(result.trace_id)
-```
-
-**Complete guide**: `docs/architecture/testing/LOCAL_TESTING_STRATEGY.md`
 
 ### Autonomous Testing Framework
 
@@ -143,32 +118,25 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 ### Configuration
 
 **Environment Variables** (`agents/src/autifyme_agents/core/config.py`):
-- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- `DATABASE_URL` (PostgreSQL for LangGraph checkpointer)
-- `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
-- `OPENAI_API_KEY`, `LANGSMITH_API_KEY`
 
-**Prerequisites**: Python 3.11+, `uv`, PostgreSQL
+**Prerequisites**: Python 3.12+, `uv`, PostgreSQL
 
 ### Architectural Canon
 
 **Navigation hub**: `docs/architecture/README.md` - All docs categorized by concern
 
 **Must-read before changes**:
+- `core/DOMAIN_DESIGN_GUIDELINES.md` - **[CRITICAL]** Architectural standards for new domains/workflows - ALWAYS reference when designing new workflows
 - `core/AGENTS_DESIGN.md` - Hierarchical model, context engineering
 - `core/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md` - **[GROUND TRUTH]** As-built implementation
-- `tech/PROMPT_ENGINEERING_STANDARDS.md` - **[CRITICAL]** Prompt design standards
 - `tech/LANGCHAIN_V1_FEATURES.md` - LangChain v1 native patterns
-- `workflows/WHATSAPP_CATALOGING_WORKFLOW.md` - Current implementation
-
-**Autonomous testing**: Use `.claude/skills/autonomous-testing.md` skill (see Autonomous Testing Framework section above)
 
 **Complete index with 30+ docs**: See `docs/architecture/README.md`
 
 ### Common Gotchas
 
-**LangChain v1 Alpha**:
-- Prerelease stack (`langchain==1.0.0a12`, `langgraph==1.0.0a4`, `deepagents==0.0.11`)
+**LangChain v1**:
+- Prerelease stack (`langchain==1.0.0`, `langgraph==1.0.0`, `deepagents==0.1.4`)
 - APIs unstable; verify with `inspect`/`dir` before use
 
 **Windows**:
@@ -181,18 +149,10 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 
 **Error Handling**:
 - Tools must raise `ToolException` (prevents infinite loops)
-- `handle_errors=True` for self-healing, `False` for fail-fast
-
-**Context Management**:
-- Never pass full conversation history to specialists
-- Middleware injects context; tools stay context-light
-- Use `{messages}` / `{agent_scratchpad}` contract
-
 ### Quick Navigation
 
 - **Project Status**: `README.md`
-- **Architecture Docs**: `docs/architecture/README.md` (navigation hub)
+- **[CRITICAL]Architecture Docs**: `docs/architecture/README.md` (navigation hub)
 - **LangSmith Traces**: https://smith.langchain.com
-- **Roadmap**: `docs/roadmap/IMPLEMENTATION_ROADMAP.md`
 - Always use safe_print instaed of print
 - Always use testing framework for doing any test scenarios
