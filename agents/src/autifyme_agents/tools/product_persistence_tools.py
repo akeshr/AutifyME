@@ -102,7 +102,7 @@ class ProductSKUInput(BaseModel):
     variant_values: list[str] = Field(
         ..., description="List of variant value SKU codes that define this product"
     )
-    price: float = Field(..., description="Specific price for this variant")
+    price: float = Field(..., gt=0, description="Specific price for this variant (must be positive)")
     stock_quantity: int = Field(default=0, description="Current inventory")
     availability: str = Field(
         default="in_stock",
@@ -213,7 +213,7 @@ class ProductFamilyInput(BaseModel):
     category_id: str | None = Field(None, description="Category UUID (must exist in categories table)")
 
     # Pricing and attributes
-    base_price: float = Field(..., description="Base price before variant adjustments")
+    base_price: float = Field(..., gt=0, description="Base price before variant adjustments (must be positive)")
     price_currency: str = Field(default="INR", description="3-letter currency code")
     material: str | None = None
     condition: str = Field(default="new", description="One of: new, refurbished, used")
@@ -777,18 +777,18 @@ def create_save_product_family_tool(storage: SupabaseStorageClient) -> object:
                 tags=tags,
                 google_product_category=google_product_category,
                 custom_attributes=custom_attributes,
-                variant_axes=[VariantAxisInput(**axis) for axis in variant_axes],
-                variant_values=[VariantValueInput(**val) for val in variant_values],
-                products=[ProductSKUInput(**prod) for prod in products],
-                images=[ProductImageInput(**img) for img in (images or [])],
+                variant_axes=[axis if isinstance(axis, VariantAxisInput) else VariantAxisInput(**axis) for axis in variant_axes],
+                variant_values=[val if isinstance(val, VariantValueInput) else VariantValueInput(**val) for val in variant_values],
+                products=[prod if isinstance(prod, ProductSKUInput) else ProductSKUInput(**prod) for prod in products],
+                images=[img if isinstance(img, ProductImageInput) else ProductImageInput(**img) for img in (images or [])],
                 industry_targets=[
-                    IndustryTargetInput(**target) for target in (industry_targets or [])
+                    target if isinstance(target, IndustryTargetInput) else IndustryTargetInput(**target) for target in (industry_targets or [])
                 ],
                 customer_segments=[
-                    CustomerSegmentInput(**seg) for seg in (customer_segments or [])
+                    seg if isinstance(seg, CustomerSegmentInput) else CustomerSegmentInput(**seg) for seg in (customer_segments or [])
                 ],
                 marketing_content=[
-                    MarketingContentInput(**content) for content in (marketing_content or [])
+                    content if isinstance(content, MarketingContentInput) else MarketingContentInput(**content) for content in (marketing_content or [])
                 ],
                 created_by=created_by,
             )

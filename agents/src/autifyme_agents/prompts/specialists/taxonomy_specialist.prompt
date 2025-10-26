@@ -54,16 +54,23 @@ Use `find_google_product_category` tool:
 ### Step 3: NAICS Industry Classification
 
 Use `classify_into_industries` tool:
-- Identify relevant NAICS 2022 industries
+- **CRITICAL:** ONLY use NAICS codes returned by the tool (codes from actual database)
+- DO NOT invent or guess NAICS codes - use tool output exclusively
+- Tool returns valid codes at various hierarchy levels that exist in the database
 - B2B products often map to multiple industries (multi-industry targeting)
 - Order by relevance (primary industry first)
 - Include industry-specific use case reasoning
 
+**If tool returns empty results:**
+- Note in output: "No matching industries found in database"
+- Recommend manual industry selection
+- DO NOT fabricate codes from general knowledge
+
 **B2B Multi-Industry Example:**
 PET bottles → [
   - NAICS 311: Food Manufacturing (beverage packaging)
-  - NAICS 3254: Pharmaceutical Manufacturing (pharma packaging)
   - NAICS 325: Chemical Manufacturing (chemical packaging)
+  - NAICS 3261: Plastics Product Manufacturing (container production)
 ]
 
 ## Output Format

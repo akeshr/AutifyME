@@ -130,7 +130,7 @@ def _persist_event(payload: dict[str, Any]) -> Path:
     return path
 
 
-def _process_message_async(
+async def _process_message_async(
     runner: WorkflowRunner,
     sender: str,
     text: str | None,
@@ -191,7 +191,7 @@ def _process_message_async(
 
         # Process workflow (may take >5 seconds for complex catalogs)
         # Typing indicator automatically stops when workflow sends response message
-        runner.handle_message(sender, text, media_id, sender_name=sender_name)
+        await runner.handle_message(sender, text, media_id, sender_name=sender_name)
 
         logger.info(
             "Background workflow processing completed",

@@ -3,7 +3,9 @@
 Instead of pattern matching, AI (OpenAI) reads PM messages and responds intelligently,
 detecting issues and debugging in real-time.
 """
+import asyncio
 import json
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -15,6 +17,10 @@ from openai import OpenAI
 
 # Ensure .env is loaded
 load_dotenv()
+
+# Windows-specific fix: psycopg async requires SelectorEventLoop
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
@@ -110,7 +116,7 @@ def _ask_ai_how_to_respond(
         for turn in conversation_history
     ]) if conversation_history else "No previous conversation"
 
-    prompt = f"""You are testing the AutifyME autonomous PM agent by acting as a real user.
+    prompt = f"""You are a BUSINESS USER testing the AutifyME PM agent. You are NOT the PM - you are the customer/user.
 
 **Scenario:** {scenario_context}
 
@@ -120,31 +126,43 @@ def _ask_ai_how_to_respond(
 **PM's Latest Messages:**
 {messages_text}
 
+**WHO YOU ARE:**
+- You are a BUSINESS USER who wants to onboard products or create campaigns
+- You are NOT the PM agent - the PM works FOR you
+- The PM asks YOU questions, YOU answer them
+- The PM does the work, YOU provide requirements and approve results
+
 **Your Task:**
 Read PM's messages and decide how to respond. You have 4 options:
 
-1. **respond**: PM is asking a question or needs information → provide appropriate response
-2. **approve**: PM is requesting approval for a product/campaign → approve it
-3. **reject**: PM is requesting approval but there's a clear issue → reject it
-4. **debug**: Something is wrong with PM's behavior → stop testing and debug
+1. **respond**: PM asks a question → YOU answer as a business user would
+2. **approve**: PM presents work for approval → YOU approve it
+3. **reject**: PM's work has clear errors → YOU reject it
+4. **debug**: PM is broken/stuck → trigger debugging
+
+**Response Guidelines:**
+- Keep responses SHORT (1-2 sentences as a user would)
+- Answer PM's questions directly - don't ask the PM to do things
+- When PM asks for details, provide them (e.g., "It's a 500ml PET jar")
+- When PM presents results, approve/reject them
+- NEVER say things like "Please share the details" - YOU are the one sharing details
 
 **Decision Criteria:**
 
-- If PM asks a question → respond naturally
-- If PM presents a product family for approval → approve (unless data looks wrong)
-- If PM is stuck, repeating itself, or not calling tools → debug
-- If PM says "onboarding complete" but didn't ask for approval → debug (PM should call save_product_family which triggers HITL)
-- If PM calls specialists but doesn't persist results → debug
+- If PM asks "what type of container?" → respond: "PET jars" (not "please share the type")
+- If PM presents product for approval → approve: "approved"
+- If PM is repeating itself or stuck → debug
+- If PM says "complete" but didn't call save_product_family → debug
 
-Return JSON with this structure:
+Return JSON:
 {{
     "action": "respond" | "approve" | "reject" | "debug",
-    "response_text": "what to send to PM",
-    "reasoning": "why you chose this action",
-    "debug_reason": "specific issue detected (if action=debug)"
+    "response_text": "YOUR response AS A USER",
+    "reasoning": "why you chose this",
+    "debug_reason": "issue detected (if debug)"
 }}
 
-Think like a user, but watch for architectural issues. Be helpful but catch bugs.
+Remember: YOU are the user, PM serves YOU. Answer PM's questions, don't ask PM to provide things.
 """
 
     try:
@@ -183,7 +201,7 @@ Think like a user, but watch for architectural issues. Be helpful but catch bugs
     return decision
 
 
-def intelligent_execute_scenario(
+async def intelligent_execute_scenario(
     scenario_id: str,
     media_path: str | None = None,
     max_turns: int = 10,
@@ -205,7 +223,7 @@ def intelligent_execute_scenario(
     # Setup components
     storage: StorageInterface = get_storage()
     channel = _IntelligentConsoleChannel()
-    checkpointer = get_checkpointer()
+    # Don't pass checkpointer - runner will create AsyncPostgresSaver lazily for async execution
 
     # Create workflow handler
     from autifyme_agents.workflows.handlers.cataloging_handler import CatalogingWorkflowHandler
@@ -215,7 +233,7 @@ def intelligent_execute_scenario(
         channel=channel,
         storage=storage,
         workflow_handler=workflow_handler,
-        checkpointer=checkpointer,
+        checkpointer=None,  # Async runner will create AsyncPostgresSaver
     )
 
     # Generate unique sender
@@ -245,7 +263,7 @@ def intelligent_execute_scenario(
 
         # Send initial message
         safe_print(f"[USER -> PM] {scenario_id}")
-        runner.handle_message(
+        await runner.handle_message(
             sender=unique_sender,
             text=scenario_id,
             media_id=media_path if media_path else None,
@@ -334,7 +352,7 @@ def intelligent_execute_scenario(
                 safe_print(f"\n[USER -> PM] {response_text}")
 
                 # Send response to PM
-                runner.handle_message(
+                await runner.handle_message(
                     sender=unique_sender,
                     text=response_text,
                     media_id=None,
@@ -366,8 +384,11 @@ def intelligent_execute_scenario(
                     metadata = run.extra.get("metadata", {})
                     langsmith_thread_id = metadata.get("langsmith.thread_id")
                     if langsmith_thread_id == thread_id:
-                        trace_id = str(run.trace_id)
-                        trace_url = f"https://smith.langchain.com/public/{run.session_id}/r/{trace_id}"
+                        # Safely extract trace info with None checks
+                        trace_id = str(run.trace_id) if run.trace_id else None
+                        session_id = run.session_id if hasattr(run, 'session_id') and run.session_id else None
+                        if trace_id and session_id:
+                            trace_url = f"https://smith.langchain.com/public/{session_id}/r/{trace_id}"
                         break
 
             if not trace_id:
