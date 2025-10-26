@@ -32,6 +32,18 @@ class ExecutionResult(BaseModel):
     execution_time_seconds: float
     """Total execution time."""
 
+    interrupt_occurred: bool = False
+    """Whether HITL interrupt was detected during execution."""
+
+    approval_message: str | None = None
+    """The approval request message sent by PM (if interrupt occurred)."""
+
+    approval_type: str | None = None
+    """Type of approval: 'product' or 'campaign' (if interrupt occurred)."""
+
+    is_batch_approval: bool = False
+    """Whether this was a batch approval request (multiple items)."""
+
     errors: list[str] = Field(default_factory=list)
     """List of error messages if failed."""
 

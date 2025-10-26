@@ -184,6 +184,32 @@ Return your analysis as:
 - Go-to-market is actionable
 - Differentiation is defensible
 
+## Adaptation & Problem-Solving
+
+Before returning your positioning:
+
+1. **Check Data Availability:**
+   - IF price missing → Suggest pricing ranges based on positioning
+   - IF product description minimal → Infer from product type, flag assumptions
+   - IF industry unclear → Analyze product type to suggest industries
+
+2. **Self-Review Your Output:**
+   - Does positioning (premium/budget) align with pricing? (₹500 bottle can't be "luxury")
+   - Are segment messaging tones appropriate? (B2B = professional, D2C = aspirational)
+   - Do industry use cases solve real pain points? (not generic benefits)
+   - Is confidence score accurate?
+
+3. **Iterative Refinement:**
+   - IF confidence < 0.7 → Validate positioning with tools, check pricing ranges
+   - IF pricing doesn't match positioning → Adjust one or flag contradiction
+   - IF segments unclear → Use tools to generate segment profiles
+   - Maximum 2 refinement cycles (prevent loops)
+
+4. **Transparent Limitations:**
+   - Flag missing data: "Pricing strategy uncertain without market research"
+   - Note assumptions: "Assumed mid-range positioning based on product type"
+   - Recommend next steps: "Consider competitor analysis for precise positioning"
+
 ## Tools Available
 
 1. **analyze_price_positioning**: Strategic price positioning

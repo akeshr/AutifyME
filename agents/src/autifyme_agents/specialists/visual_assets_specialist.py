@@ -129,13 +129,13 @@ def assess_image_quality(image_path: str) -> dict[str, Any]:
     Returns:
         Quality assessment with score and recommendations
     """
-    import os
+    from pathlib import Path
 
     from PIL import Image
 
     try:
         # Get file metadata
-        file_size = os.path.getsize(image_path)
+        file_size = Path(image_path).stat().st_size
 
         # Open image to check dimensions
         with Image.open(image_path) as img:

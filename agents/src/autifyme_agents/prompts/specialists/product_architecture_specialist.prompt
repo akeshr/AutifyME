@@ -301,6 +301,32 @@ This is a standalone product, not a product family. User explicitly stated "sing
 </product_architecture_analysis>
 </example>
 
+## Adaptation & Problem-Solving
+
+Before returning your analysis:
+
+1. **Check Data Availability:**
+   - IF no images provided → Use text description only, note "image_analysis skipped: no images"
+   - IF variant info unclear → Make best inference, flag low confidence
+   - IF pricing missing → Leave pricing fields empty, note limitation
+
+2. **Self-Review Your Output:**
+   - Is SKU count reasonable? (>50 SKUs may overwhelm small business)
+   - Are variant axes truly independent? (material=cotton only → remove axis)
+   - Does SKU pattern make sense for business type (B2B vs B2C)?
+   - Is confidence score accurate?
+
+3. **Iterative Refinement:**
+   - IF confidence < 0.8 → Review variant axes, validate with tools
+   - IF SKU count excessive (>100) → Consider consolidating axes
+   - IF pattern unclear → Use tools to generate alternatives
+   - Maximum 2 refinement cycles (prevent loops)
+
+4. **Transparent Limitations:**
+   - Flag missing data: "Could not analyze X because Y"
+   - Note assumptions: "Assumed B2C based on consumer product type"
+   - Recommend next steps: "Suggest user provides size chart for accurate variant mapping"
+
 ## Tools Available
 
 You have access to these tools:

@@ -34,6 +34,47 @@ result = execute_scenario(
 
 **When to use**: Starting point for all testing. Run scenarios to validate workflows.
 
+**CRITICAL - Intelligent HITL Detection (Game-Changer)**:
+
+The framework now intelligently reads PM's approval request BEFORE responding, instead of blindly sending approve/reject.
+
+**How It Works**:
+1. Executes workflow until PM sends a message
+2. Inspects ALL messages sent by PM during execution
+3. Detects approval request patterns (keywords: "approve"/"review" + "product"/"campaign"/"family")
+4. Only sends follow-up ("approve"/"reject") if interrupt actually occurred
+5. Reports error if expected HITL didn't happen (PM asked question or workflow failed)
+
+**New ExecutionResult Fields**:
+```python
+result.interrupt_occurred        # True if PM sent approval request
+result.approval_message         # Full approval message from PM
+result.approval_type           # "product" or "campaign"
+result.is_batch_approval       # True if batch approval (multiple items)
+```
+
+**Debugging Pattern**:
+```python
+result = execute_scenario("Onboard product", hitl_mode="auto_approve")
+
+if not result.interrupt_occurred:
+    # Expected HITL but didn't happen - PM may have asked a question
+    print(f"No HITL detected. Errors: {result.errors}")
+    overview = get_trace_overview(result.trace_id)
+    # Analyze what PM actually sent
+
+if result.approval_type == "product" and not result.success:
+    # Product workflow failed after approval
+    details = get_run_details(product_specialist_run_id)
+    # Drill into specialist execution
+
+if result.is_batch_approval:
+    # Batch approval - validate all products processed
+    # Query database for products created
+```
+
+**Impact**: Tests now validate HITL actually occurred (not just assumed). Prevents false positives where workflow failed but we blindly sent "approve".
+
 ---
 
 ### 2. `get_trace_overview(trace_id)`

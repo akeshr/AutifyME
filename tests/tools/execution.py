@@ -22,12 +22,18 @@ from .models import ExecutionResult
 
 
 class _SilentConsoleChannel(MessagingChannel):
-    """Console channel for programmatic execution - minimal output."""
+    """Console channel for programmatic execution - minimal output.
+
+    Mimics WhatsAppChannel to ensure tool names match PM expectations.
+    """
 
     def __init__(self, hitl_mode: str = "auto_approve"):
         self.hitl_mode = hitl_mode
         self.messages_sent = []
         self.approval_count = 0  # Track product count for mixed mode
+        # Mimic WhatsAppChannel class name so platform tools are named correctly
+        # PM prompt expects "download_whatsapp_media" tool
+        self.__class__.__name__ = "WhatsAppChannel"
 
     def format_thread_id(self, sender: str) -> str:
         return f"console:{sender}"
@@ -68,7 +74,16 @@ class _SilentConsoleChannel(MessagingChannel):
         return {"status": "sent"}
 
     def download_media(self, media_id: str) -> Path:
-        return Path(media_id)
+        """Return resolved absolute path for media file.
+
+        For testing, media_id is already the file path from execute_scenario(media_path=...).
+        Just need to resolve to absolute path.
+        """
+        path = Path(media_id)
+        if not path.is_absolute():
+            # Resolve relative to current working directory
+            path = path.resolve()
+        return path
 
 
 def execute_scenario(
@@ -133,9 +148,33 @@ def execute_scenario(
             media_id=media_path if media_path else None,
         )
 
-        # Auto-respond to HITL if in auto mode
-        if hitl_mode in ["auto_approve", "auto_reject", "mixed"]:
-            time.sleep(0.1)  # Brief pause
+        # INTELLIGENT HITL HANDLING: Check if interrupt actually occurred
+        interrupt_occurred = False
+        approval_context = {}
+
+        # Inspect messages sent by PM to detect HITL approval request
+        for msg in channel.messages_sent:
+            if msg.get("type") == "text":
+                message_text = msg.get("message", "")
+
+                # Detect approval request patterns
+                is_approval_request = (
+                    ("approve" in message_text.lower() or "review" in message_text.lower()) and
+                    ("product" in message_text.lower() or "campaign" in message_text.lower() or "family" in message_text.lower())
+                )
+
+                if is_approval_request:
+                    interrupt_occurred = True
+                    approval_context = {
+                        "message": message_text,
+                        "type": "product" if "product" in message_text.lower() else "campaign",
+                        "is_batch": "batch" in message_text.lower(),
+                    }
+                    break
+
+        # Only respond if interrupt actually occurred
+        if interrupt_occurred and hitl_mode in ["auto_approve", "auto_reject", "mixed"]:
+            time.sleep(0.1)  # Brief pause for checkpoint persistence
 
             # Determine follow-up text based on mode
             if hitl_mode == "auto_approve":
@@ -160,6 +199,9 @@ def execute_scenario(
                 text=follow_up,
                 media_id=None,
             )
+        elif not interrupt_occurred and hitl_mode in ["auto_approve", "auto_reject", "mixed"]:
+            # No interrupt detected - workflow completed without HITL or PM asked a question
+            errors.append("Expected HITL interrupt but none occurred. PM may have asked a question or workflow failed.")
 
         # Query LangSmith for trace by thread_id AFTER workflow completes
         # (get_current_run_tree() doesn't work outside traced context)
@@ -224,5 +266,9 @@ def execute_scenario(
         trace_id=trace_id or "unknown",
         products_created=products_created,
         execution_time_seconds=round(execution_time, 2),
+        interrupt_occurred=interrupt_occurred,
+        approval_message=approval_context.get("message") if approval_context else None,
+        approval_type=approval_context.get("type") if approval_context else None,
+        is_batch_approval=approval_context.get("is_batch", False) if approval_context else False,
         errors=errors,
     )

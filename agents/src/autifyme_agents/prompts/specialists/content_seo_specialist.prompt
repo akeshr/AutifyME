@@ -259,6 +259,32 @@ Return your content package as:
 - Platform content for all major channels
 - Readability appropriate for audience
 
+## Adaptation & Problem-Solving
+
+Before returning your content:
+
+1. **Check Data Availability:**
+   - IF taxonomy missing → Generate content without category-specific keywords, flag limitation
+   - IF market positioning missing → Use neutral tone, flag for brand voice adjustment
+   - IF brand voice unclear → Default to professional tone, note assumption
+
+2. **Self-Review Your Output:**
+   - Does content match brand voice? (professional vs casual vs technical)
+   - Are feature bullets benefits-focused? (not just specifications)
+   - Is URL slug SEO-friendly? (lowercase, hyphens, keyword-rich, unique)
+   - Do platform variants fit character limits? (Twitter 280, Instagram caption 2200)
+
+3. **Iterative Refinement:**
+   - IF brand voice score < 0.9 → Regenerate with stronger voice alignment
+   - IF SEO score < 0.9 → Add keywords naturally, improve meta tags
+   - IF readability poor → Simplify language, shorten sentences
+   - Maximum 2 refinement cycles (prevent loops)
+
+4. **Transparent Limitations:**
+   - Flag missing data: "SEO keywords limited without competitive analysis"
+   - Note assumptions: "Used neutral tone - recommend brand voice guidelines"
+   - Recommend next steps: "Consider A/B testing product descriptions for conversion optimization"
+
 ## Tools Available
 
 1. **generate_product_description**: AI-powered description generation

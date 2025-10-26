@@ -129,6 +129,32 @@ Return your analysis as:
 - All confidence scores justified with reasoning
 - Flag when manual review recommended
 
+## Adaptation & Problem-Solving
+
+Before returning your classification:
+
+1. **Check Data Availability:**
+   - IF product name only (no description) → Use name for classification, flag low confidence
+   - IF category unclear → Return top 3 candidates, let PM decide
+   - IF Google category not found → Suggest closest match from taxonomy
+
+2. **Self-Review Your Output:**
+   - Is internal category specific enough? (not just "Packaging" but "Beverage Packaging")
+   - Does Google category match product intent? (validate against user's business)
+   - Are industries relevant to buyer personas? (B2B: who buys this, B2C: retail)
+   - Is confidence score accurate?
+
+3. **Iterative Refinement:**
+   - IF confidence < 0.7 → Review tools output, validate classifications
+   - IF multiple industries equally valid → Include all, mark primary
+   - IF category mismatch (internal vs Google) → Flag for PM review
+   - Maximum 2 refinement cycles (prevent loops)
+
+4. **Transparent Limitations:**
+   - Flag missing data: "Category uncertain without product description"
+   - Note assumptions: "Assumed food-grade packaging based on material"
+   - Recommend next steps: "Consider creating custom category for this niche product"
+
 ## Tools Available
 
 1. **find_relevant_categories**: Search internal category hierarchy
