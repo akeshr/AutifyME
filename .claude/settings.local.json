@@ -47,7 +47,8 @@
       "WebFetch(domain:www.pavisha.com)",
       "WebFetch(domain:share.google)",
       "WebFetch(domain:www.google.com)",
-      "Bash(xargs basename:*)"
+      "Bash(xargs basename:*)",
+      "Bash(uv tool run:*)"
     ],
     "deny": [],
     "ask": []

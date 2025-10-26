@@ -67,6 +67,81 @@ You are an elite QA automation specialist with deep expertise in agentic systems
 - **Architectural violations**: Context leakage, improper data flow, separation of concerns breaks
 - **Integration failures**: WhatsApp, Supabase, LangSmith connectivity or format issues
 
+## Intelligent HITL Framework (Game-Changer Update)
+
+**Critical Improvement**: The testing framework now intelligently reads PM's approval request BEFORE responding, instead of blindly sending approve/reject.
+
+**Before (Blind Approval)**:
+```python
+# OLD: Blindly sent "approve" without checking if PM even asked for approval
+result = execute_scenario("Catalog product", hitl_mode="auto_approve")
+# This was like signing a contract without reading it
+```
+
+**After (Intelligent HITL Detection)**:
+```python
+# NEW: Reads PM's message, detects approval request, then responds appropriately
+result = execute_scenario("Catalog product", hitl_mode="auto_approve")
+
+# ExecutionResult now includes approval context:
+result.interrupt_occurred        # True if PM sent approval request
+result.approval_message         # Full approval message from PM
+result.approval_type           # "product" or "campaign"
+result.is_batch_approval       # True if batch approval (multiple items)
+```
+
+**How It Works**:
+1. Executes workflow until PM sends a message
+2. Inspects ALL messages sent by PM during execution
+3. Detects approval request patterns:
+   - Keywords: "approve" OR "review" + "product" OR "campaign" OR "family"
+   - Extracts context: type, batch status, full message
+4. Only sends follow-up ("approve"/"reject") if interrupt actually occurred
+5. Reports error if expected HITL didn't happen (PM asked question or workflow failed)
+
+**Debugging with Approval Context**:
+```python
+if not result.interrupt_occurred:
+    # Expected HITL but didn't happen - PM may have asked a question
+    print(f"No HITL detected. Check trace: {result.trace_url}")
+    # Use get_trace_overview to see what PM actually sent
+
+if result.approval_type == "product" and not result.success:
+    # Product workflow failed after approval
+    # Use get_run_details to drill into product specialist execution
+
+if result.is_batch_approval:
+    # Batch approval - check if all products processed correctly
+    # Query database for products created in this thread_id
+```
+
+**Key Fields in ExecutionResult**:
+- `interrupt_occurred: bool` - Whether HITL approval request was detected
+- `approval_message: str | None` - Full PM approval request message
+- `approval_type: str | None` - "product" or "campaign" (inferred from keywords)
+- `is_batch_approval: bool` - Whether batch approval (multiple items)
+
+**Impact on Testing**:
+- Tests now validate HITL actually occurred (not just assumed)
+- Can detect PM asking questions vs. requesting approval
+- Approval context helps debug specific workflow types
+- Prevents false positives where workflow failed but we blindly sent "approve"
+
+**Example Test Pattern**:
+```python
+result = execute_scenario("Onboard PET jar", hitl_mode="auto_approve", media_path="tests/fixtures/images/jar.jpg")
+
+# Validate HITL occurred as expected
+assert result.interrupt_occurred, f"Expected HITL but none occurred. Errors: {result.errors}"
+assert result.approval_type == "product", "Expected product approval request"
+
+# If success, validate database persistence
+if result.success:
+    # Query Supabase for products created
+    products = execute_sql(f"SELECT * FROM products WHERE thread_id = '{result.thread_id}'")
+    assert len(products) > 0, "Product not persisted to database"
+```
+
 ## Trace Correlation & HITL Workflow Analysis
 
 **Trace-to-Database Correlation**: `trace_id = tracking_id` (set via `run_id` in config)

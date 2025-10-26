@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import platform
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -11,8 +13,14 @@ import httpx
 
 from autifyme_agents.core.config import settings
 
-# Use /tmp for media downloads on serverless platforms
-MEDIA_DIR = Path("/tmp/media_downloads")
+# Use platform-appropriate temp directory for media downloads
+# Serverless (Linux): /tmp/media_downloads
+# Windows: %TEMP%\media_downloads
+# macOS: /tmp/media_downloads
+if platform.system() == "Windows":
+    MEDIA_DIR = Path(tempfile.gettempdir()) / "media_downloads"
+else:
+    MEDIA_DIR = Path("/tmp/media_downloads")
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
 

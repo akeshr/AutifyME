@@ -96,6 +96,17 @@ class OutcomeTrackingMiddleware:
         """
         # Case 1: HITL interrupt
         if interrupt_value:
+            # Infer workflow type from interrupt (save_product_family or save_campaign)
+            intent, department = self._infer_workflow_from_interrupt(interrupt_value)
+            if intent and department:
+                self.tracker.track_routing_decision(
+                    tracking_id=tracking_id,
+                    intent=intent,
+                    department=department,
+                    reasoning=f"PM routed to {department} workflow (inferred from HITL interrupt)",
+                    confidence=None,
+                )
+
             self.tracker.track_workflow_end(
                 tracking_id=tracking_id,
                 success=True,
@@ -160,3 +171,35 @@ class OutcomeTrackingMiddleware:
             "successfully cataloged" in getattr(msg, "content", "").lower()
             for msg in messages
         )
+
+    def _infer_workflow_from_interrupt(self, interrupt_value: Any) -> tuple[str | None, str | None]:
+        """Infer workflow type from HITL interrupt.
+
+        Pragmatic approach: Infer intent/department from which persistence tool triggered HITL.
+
+        Args:
+            interrupt_value: The interrupt value from LangGraph
+
+        Returns:
+            Tuple of (intent, department) or (None, None) if unable to infer
+        """
+        # Interrupt value structure: list of dicts with 'name' field for tool calls
+        if not interrupt_value or not isinstance(interrupt_value, list):
+            return None, None
+
+        for item in interrupt_value:
+            if not isinstance(item, dict):
+                continue
+
+            tool_name = item.get("name", "")
+
+            # Product onboarding workflow
+            if "save_product_family" in tool_name:
+                return "product_onboarding", "product"
+
+            # Marketing campaign workflow
+            if "save_campaign" in tool_name:
+                return "marketing_campaign", "marketing"
+
+        # Unable to infer
+        return None, None

@@ -174,7 +174,8 @@ Format your response as JSON:
 
         # Parse JSON response
         import json
-        data = json.loads(content.strip().strip("```json").strip("```"))
+        cleaned = content.strip().removeprefix("```json").removeprefix("```").removesuffix("```")
+        data = json.loads(cleaned)
 
         return {
             "short_description": data["short"][:160],
