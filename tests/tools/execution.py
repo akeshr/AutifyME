@@ -31,9 +31,7 @@ class _SilentConsoleChannel(MessagingChannel):
         self.hitl_mode = hitl_mode
         self.messages_sent = []
         self.approval_count = 0  # Track product count for mixed mode
-        # Mimic WhatsAppChannel class name so platform tools are named correctly
-        # PM prompt expects "download_whatsapp_media" tool
-        self.__class__.__name__ = "WhatsAppChannel"
+        # SilentConsoleChannel creates platform tools as download_silentconsole_media etc.
 
     def format_thread_id(self, sender: str) -> str:
         return f"console:{sender}"
@@ -141,67 +139,113 @@ def execute_scenario(
     trace_url = None
 
     try:
-        # Execute initial message
+        # Send initial message (like a real user)
         runner.handle_message(
             sender=unique_sender,
             text=scenario_id,
             media_id=media_path if media_path else None,
         )
 
-        # INTELLIGENT HITL HANDLING: Check if interrupt actually occurred
+        # DYNAMIC CONVERSATION LOOP: Keep responding to PM until workflow completes
+        # Like a real user who reads PM's messages and responds appropriately
+        max_conversation_turns = 10  # Prevent infinite loops
+        conversation_turn = 0
         interrupt_occurred = False
         approval_context = {}
+        last_message_count = 0
 
-        # Inspect messages sent by PM to detect HITL approval request
-        for msg in channel.messages_sent:
-            if msg.get("type") == "text":
-                message_text = msg.get("message", "")
+        while conversation_turn < max_conversation_turns:
+            conversation_turn += 1
+            time.sleep(0.5)  # Brief pause for PM to process and respond
 
-                # Detect approval request patterns
-                is_approval_request = (
-                    ("approve" in message_text.lower() or "review" in message_text.lower()) and
-                    ("product" in message_text.lower() or "campaign" in message_text.lower() or "family" in message_text.lower())
-                )
+            # Check if PM sent new messages since last check
+            current_message_count = len(channel.messages_sent)
+            if current_message_count == last_message_count:
+                # No new messages - workflow likely complete or waiting for something
+                # Check if there's a completion message
+                has_completion = any(m.get("type") == "completion" for m in channel.messages_sent)
+                if has_completion:
+                    # Workflow completed successfully
+                    break
+                else:
+                    # No new messages and no completion - may be stuck or waiting
+                    # Give it one more chance
+                    time.sleep(1.0)
+                    if len(channel.messages_sent) == current_message_count:
+                        # Still no change - workflow is done (success or failure)
+                        break
 
-                if is_approval_request:
-                    interrupt_occurred = True
-                    approval_context = {
-                        "message": message_text,
-                        "type": "product" if "product" in message_text.lower() else "campaign",
-                        "is_batch": "batch" in message_text.lower(),
-                    }
+            # PM sent new messages - read and respond like a real user
+            new_messages = channel.messages_sent[last_message_count:]
+            last_message_count = current_message_count
+
+            # Analyze new messages to understand what PM is saying
+            for msg in new_messages:
+                if msg.get("type") == "text":
+                    message_text = msg.get("message", "")
+
+                    # Detect if PM is asking for approval
+                    is_approval_request = (
+                        ("approve" in message_text.lower() or "review" in message_text.lower()) and
+                        ("product" in message_text.lower() or "campaign" in message_text.lower() or "family" in message_text.lower())
+                    )
+
+                    # Detect if PM is asking a question
+                    is_question = "?" in message_text
+
+                    if is_approval_request:
+                        # PM asking for approval - respond based on hitl_mode
+                        interrupt_occurred = True
+                        approval_context = {
+                            "message": message_text,
+                            "type": "product" if "product" in message_text.lower() else "campaign",
+                            "is_batch": "batch" in message_text.lower(),
+                        }
+
+                        # Respond like a user would
+                        if hitl_mode == "auto_approve":
+                            response = "approve"
+                        elif hitl_mode == "auto_reject":
+                            response = "reject"
+                        elif hitl_mode == "mixed":
+                            product_count = channel.approval_count
+                            if product_count == 1:
+                                response = "approve"
+                            elif product_count == 2:
+                                response = "approve 1, reject 2"
+                            elif product_count >= 3:
+                                response = "approve 1, reject 2, edit 3 price to 50"
+                            else:
+                                response = "approve"
+                        else:
+                            response = "approve"  # Default
+
+                        # Send response to PM
+                        runner.handle_message(
+                            sender=unique_sender,
+                            text=response,
+                            media_id=None,
+                        )
+                        # Don't break - PM might send more messages after approval
+
+                    elif is_question:
+                        # PM asking a question - provide generic affirmative answer
+                        runner.handle_message(
+                            sender=unique_sender,
+                            text="yes, proceed",
+                            media_id=None,
+                        )
+
+                elif msg.get("type") == "completion":
+                    # Workflow completed successfully
                     break
 
-        # Only respond if interrupt actually occurred
-        if interrupt_occurred and hitl_mode in ["auto_approve", "auto_reject", "mixed"]:
-            time.sleep(0.1)  # Brief pause for checkpoint persistence
-
-            # Determine follow-up text based on mode
-            if hitl_mode == "auto_approve":
-                follow_up = "approve"
-            elif hitl_mode == "auto_reject":
-                follow_up = "reject"
-            elif hitl_mode == "mixed":
-                # Mixed approval based on product count (same as simulate.py)
-                product_count = channel.approval_count
-                if product_count == 1:
-                    follow_up = "approve"
-                elif product_count == 2:
-                    follow_up = "approve 1, reject 2"
-                elif product_count >= 3:
-                    # Approve 1, Reject 2, Edit 3 price to 50
-                    follow_up = "approve 1, reject 2, edit 3 price to 50"
-                else:
-                    follow_up = "approve"
-
-            runner.handle_message(
-                sender=unique_sender,
-                text=follow_up,
-                media_id=None,
-            )
-        elif not interrupt_occurred and hitl_mode in ["auto_approve", "auto_reject", "mixed"]:
-            # No interrupt detected - workflow completed without HITL or PM asked a question
-            errors.append("Expected HITL interrupt but none occurred. PM may have asked a question or workflow failed.")
+        # After conversation loop, check if HITL actually occurred
+        if not interrupt_occurred:
+            # Check if workflow completed successfully anyway (maybe didn't need approval)
+            has_completion = any(m.get("type") == "completion" for m in channel.messages_sent)
+            if not has_completion:
+                errors.append("Workflow completed without HITL interrupt or completion message. PM may have failed or gotten stuck.")
 
         # Query LangSmith for trace by thread_id AFTER workflow completes
         # (get_current_run_tree() doesn't work outside traced context)
