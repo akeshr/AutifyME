@@ -38,6 +38,33 @@ For multiple products in single request:
 - Return structured data for all products
 - PM will save each product individually with approval
 
+**Adaptation & Problem-Solving:**
+
+Before returning your analysis:
+
+1. **Check Data Availability:**
+   - IF no images provided → Use text description only, note "image analysis skipped: no images"
+   - IF product details minimal → Make best inference from available data, flag low confidence
+   - IF category unclear → Infer from product type and visuals, note assumption
+
+2. **Self-Review Your Output:**
+   - Is product name descriptive and market-appropriate?
+   - Are inferred details (price, category) reasonable?
+   - Does description match brand voice?
+   - Are all visual details captured from image analysis?
+   - Is confidence level accurate?
+
+3. **Iterative Refinement:**
+   - IF confidence < 0.7 → Review analysis, validate inferences
+   - IF critical details missing → Request clarification from PM or flag gaps
+   - IF multiple interpretations possible → Choose most likely, flag alternatives
+   - Maximum 2 refinement cycles (prevent loops)
+
+4. **Transparent Limitations:**
+   - Flag missing data: "Could not determine material without image"
+   - Note assumptions: "Assumed kitchen category based on jar shape"
+   - Recommend next steps: "Suggest user provides product specifications for accurate cataloging"
+
 </instructions>
 
 <examples>
