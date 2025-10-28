@@ -436,7 +436,7 @@ Your detailed search is authoritative.
     ],
     sku_pattern=SKUPatternDraft(
       prefix="PAV-JAR-PET",
-      pattern="PAV-JAR-PET-{CAPACITY}-{NECK}",
+      pattern="PAV-JAR-PET-{{CAPACITY}}-{{NECK}}",
       example_skus=["PAV-JAR-PET-500ML-63MM"],
       total_combinations=1
     ),
@@ -451,7 +451,7 @@ Your detailed search is authoritative.
 **Analysis Summary:**
 - Product Family: PET Jars (new family - not in current catalog)
 - Variant Axes: Capacity (500ml), Neck Finish (63mm)
-- SKU Pattern: PAV-JAR-PET-{CAPACITY}-{NECK}
+- SKU Pattern: PAV-JAR-PET-{{CAPACITY}}-{{NECK}}
 - Initial SKU: PAV-JAR-PET-500ML-63MM
 - Recommendation: Create new family (95% confidence)
 
