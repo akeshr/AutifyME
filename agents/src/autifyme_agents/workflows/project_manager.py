@@ -23,6 +23,10 @@ from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.tools.campaign_persistence_tools import (
     create_save_campaign_tool,
 )
+from autifyme_agents.tools.pm_context_tools import (
+    create_get_category_info_tool,
+    create_search_catalog_summary_tool,
+)
 from autifyme_agents.tools.product_persistence_tools import (
     create_save_product_family_tool,
 )
@@ -104,9 +108,14 @@ def create_project_manager(
     # PM Tools
     pm_tools: list[Any] = []
 
+    # Platform-specific tools (media download)
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
         pm_tools.extend(create_platform_media_tools(channel))
+
+    # NEW Phase 1B: Context query tools (on-demand detail lookups)
+    pm_tools.append(create_search_catalog_summary_tool(storage))
+    pm_tools.append(create_get_category_info_tool(storage))
 
     # HITL persistence tools
     pm_tools.append(create_save_product_family_tool(storage))
