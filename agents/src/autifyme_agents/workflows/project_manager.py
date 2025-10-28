@@ -77,7 +77,7 @@ def _load_prompt(company_profile: CompanyProfile, base_context: Any) -> str:
     ) + "\n\n" + catalog_summary_text + "\n" + taxonomy_text
 
 
-def create_project_manager(
+async def create_project_manager(
     company_profile: CompanyProfile,
     *,
     model: BaseChatModel | None = None,
@@ -114,10 +114,10 @@ def create_project_manager(
     store = get_store()
 
     # Load base context (catalog summary + taxonomy tree)
-    # Uses asyncio.run() to call async middleware from sync function
+    # Uses await since we're in async context
     # Gracefully degrades to empty summaries if DB unavailable
     logger.info("Loading base context for PM (catalog summary + taxonomy tree)")
-    base_context = asyncio.run(load_base_context(company_profile, storage))
+    base_context = await load_base_context(company_profile, storage)
     logger.info(
         "Base context loaded",
         extra={

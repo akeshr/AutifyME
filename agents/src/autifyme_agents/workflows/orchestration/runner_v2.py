@@ -582,7 +582,7 @@ class WorkflowRunner:
 
     async def _create_project_manager(self) -> Any:
         """Create PM instance with company context and channel."""
-        return create_project_manager(
+        return await create_project_manager(
             company_profile=self.company_profile,
             checkpointer=await self._get_async_checkpointer(),
             storage=self.storage,

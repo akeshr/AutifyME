@@ -2,8 +2,8 @@
 
 **Date:** October 28, 2025
 **Last Updated:** October 28, 2025
-**Status:** ✅ Phase 1 Complete - Ready for Phase 2
-**Current Task:** Phase 1 Validation Complete
+**Status:** ✅ Phase 1 Complete | 🎯 Phase 2 Design Complete - Ready for Implementation
+**Current Phase:** Phase 2 - Product Architecture Specialist
 **Strategy:** Incremental build-up - unplug all specialists, perfect PM core, add specialists one by one
 
 ---
@@ -995,70 +995,421 @@ All 5 scenarios from behavior validation passed:
 
 ---
 
-## Phase 2: Add Product Architecture Specialist ⏸️ PAUSED (4-5 hours)
+## Phase 2: Add Product Architecture Specialist 🎯 READY TO START (4-5 hours)
 
 ### Goal
-First specialist integrated - enables deep product structure analysis.
+First specialist integrated - enables deep product structure analysis through autonomous domain expertise.
 
-**Status:** Paused pending Phase 1 revision
+**Status:** Design Complete - Ready for Implementation
 
-### Revised Understanding of Specialist Role
+---
 
-**OLD Understanding:**
-- Specialist receives raw user message
-- Specialist does ALL analysis (basic + deep)
-- Specialist returns structured output
+### FINALIZED DESIGN: Autonomous Intelligent Specialist
 
-**NEW Understanding:**
-- Specialist receives ENRICHED input from PM
-- PM already understood basics (what product, basic structure)
-- Specialist focuses on DEEP analysis:
-  - Detailed variant axis identification
-  - SKU pattern design (naming conventions, hierarchies)
-  - Catalog search and matching (autonomous create vs update)
-  - Complex structural decisions (variant vs attribute, consolidation)
+**Core Principle:** Context, Not Instructions
 
-**Example Input to Specialist (NEW):**
+PM provides **enriched product context**, specialist autonomously decides analysis approach.
+
+---
+
+### Specialist's Unique Domain Expertise
+
+**What Specialist Brings (that PM doesn't have):**
+
+1. **Variant Structure Theory**
+   - Variant axis identification with domain rules
+   - Compatibility constraints (28mm neck only with 500ml+)
+   - Industry patterns (pharma = amber bottles only)
+
+2. **SKU Architecture Patterns**
+   - Hierarchical naming conventions
+   - Industry best practices (B2B vs B2C naming)
+   - Uniqueness guarantees
+
+3. **Catalog Matching Algorithms**
+   - Fuzzy matching with material/brand/use-case filters
+   - Confidence scoring
+   - Autonomous create vs update vs add-variant decisions
+
+4. **Pricing Structure Strategy**
+   - Base + variant adjustments
+   - Bulk tier design
+
+5. **Completeness Validation**
+   - Missing field detection
+   - Confidence scoring
+   - Quality assessment
+
+---
+
+### PM → Specialist Delegation Pattern
+
+**✅ PM Provides (Enriched Context):**
+
 ```
-PM → Product Architecture Specialist:
+Product onboarding for PET jars.
 
-"Analyze PET jar family for catalog onboarding.
+PRODUCT DETAILS:
+- Type: PET jars (transparent, food-grade)
+- Capacities: 250ml, 500ml, 1L
+- Price: Rs 35/unit (for 500ml)
+- Material: Food-grade PET
+- Target: Food packaging, B2B bulk orders
 
-Context:
-- Company: Pavisha (B2B packaging manufacturer, India)
-- Product: PET jars for food packaging
-- Capacities: 250ml, 500ml, 1L (3 variants on size axis)
-- Material: Food-grade transparent PET
-- Base price: Rs 30 (for 500ml)
-- Target market: Food & beverage industry (B2B bulk orders)
-- Image analysis: Transparent cylindrical jar, wide mouth, screw-top compatible
+IMAGES:
+C:/Temp/jar_front.jpg
+C:/Temp/jar_side.jpg
 
-My understanding:
-- This is a product FAMILY (not standalone)
-- Single variant axis: capacity (250ml, 500ml, 1L)
-- Material is constant (PET), not a variant dimension
-- B2B context: Bulk pricing, technical specifications matter
+PM'S BASIC ANALYSIS:
+Analyzed first image - transparent cylindrical jar, wide mouth opening,
+screw-top compatible, food-grade quality appearance.
 
-Your task:
-- Design detailed variant structure
-- Calculate SKU combinations
-- Generate SKU naming pattern (consider B2B naming conventions)
-- Search catalog for existing PET jar families (autonomous matching)
-- Recommend: create new family OR add to existing OR ask user
+PM'S CATALOG AWARENESS:
+Quick search found no 'PET jar' families (summary level).
+Your detailed search is authoritative.
 
-Return ProductArchitectureDraft with your expert analysis."
+COMPANY CONTEXT:
+state.company_profile has SKU conventions, brand info
+state.base_context has catalog summary, taxonomy tree
 ```
 
-**Compare to OLD Input:**
+**❌ PM Does NOT Provide:**
+- ❌ Step-by-step instructions ("First do X, then Y")
+- ❌ Conversation history ("User said this, then changed mind")
+- ❌ User intent interpretation ("User wants new product line")
+- ❌ Company details (in state, specialist reads directly)
+
+**Rationale:**
+- Specialist is autonomous expert, knows its job
+- PM synthesizes conversation → product facts only
+- Specialist reads company context from state
+- Trust intelligent LLMs to decide methodology
+
+---
+
+### Specialist State Access (Automatic via DeepAgents)
+
+**✅ Specialist Receives (Auto-Populated by DeepAgents):**
+- `state.company_profile` - Company name, brand, SKU conventions
+- `state.base_context.catalog_summary` - Product families overview
+- `state.base_context.taxonomy_tree` - Category structure
+- `state.specialist_results` - Other specialists' outputs (if sequential)
+
+**❌ Specialist Does NOT Receive:**
+- `state.messages` - Conversation history (excluded by DeepAgents)
+- `state.todos` - PM's todo list (excluded by DeepAgents)
+
+**Usage:**
+- Specialist reads `state.company_profile.sku_prefix_pattern` for naming conventions
+- Specialist reads `state.base_context.catalog_summary` for awareness
+- No token duplication in task description
+
+---
+
+### Tool Allocation Strategy
+
+#### Image Analysis Tool
+**✅ Both PM and Specialist Use**
+
+**PM's Usage:**
+- When: If images provided, analyze FIRST image only
+- Purpose: Basic understanding for intelligent conversation
+- Depth: Product type, rough dimensions, obvious features
+- Pass to specialist: Image file paths (not analysis - let specialist re-analyze)
+
+**Specialist's Usage:**
+- When: If PM provides image paths in delegation
+- Purpose: Deep domain analysis for structural decisions
+- Depth: ALL images, materials, quality, variant cues
+- Never: Hallucinate paths - only use explicit paths from PM
+
+#### Catalog Search Tools
+**✅ Both Search, Different Roles**
+
+**PM's search_catalog_summary:**
+- When: If PM identified product type from user/image
+- Purpose: Quick awareness for conversation ("We have PET Bottles family")
+- NOT for: Final create vs update decisions
+- Include in delegation: Yes, marked as "summary awareness only"
+
+**Specialist's search_product_families:**
+- When: Always (FIRST step in specialist analysis)
+- Purpose: Authoritative create vs update decision
+- Features: Fuzzy matching, filters, confidence scoring
+- PM trusts: Specialist's recommendation overrides PM's summary
+
+---
+
+### Multi-Turn Conversation Pattern
+
+**Specialist Signals → PM Handles:**
+
 ```
-PM → Product Architecture Specialist:
+Specialist returns:
+  confidence_score=0.4
+  flags=["Material unclear - could be PET or HDPE"]
 
-"catalog this" + [image]
+PM interprets flags:
+PM asks user: "Is this PET or HDPE material?"
+
+User clarifies: "PET"
+
+PM re-delegates with updated facts:
+"Material: PET (confirmed by user)"
 ```
 
-**NEW input is ENRICHED** → Specialist can focus on deep analysis, not basic understanding.
+**Rules:**
+- ✅ Specialist NEVER asks questions directly
+- ✅ Specialist signals uncertainty via confidence + flags
+- ✅ PM interprets → asks user → re-delegates with facts
+- ✅ Specialist is stateless (each call independent)
 
-**Status:** Will resume after Phase 1 revised
+---
+
+### Sequential Specialist Collaboration
+
+**Content & SEO Specialist (runs AFTER Taxonomy + Market Intelligence):**
+
+```python
+# Content specialist reads from state:
+taxonomy = state.specialist_results["taxonomy_specialist"]
+market = state.specialist_results["market_intelligence_specialist"]
+
+# Uses outputs to inform content generation
+# No PM synthesis needed - direct specialist collaboration
+```
+
+---
+
+### Error Handling: Graceful Degradation
+
+**Specialist handles failures autonomously:**
+
+```python
+# Image analysis fails
+try:
+    image_result = image_analysis_tool(path)
+except ToolException:
+    image_result = None
+    flags.append("Image analysis failed - text-only analysis")
+    confidence_score *= 0.8
+
+# Catalog search fails
+try:
+    search = search_product_families(...)
+except DatabaseError:
+    search = None
+    flags.append("Catalog search unavailable - assuming create_new")
+    recommendation = "create_new"
+    confidence_score *= 0.7
+
+# Return degraded output with transparency
+return ProductArchitectureDraft(
+    confidence_score=final_confidence,
+    flags=all_flags,
+    ...
+)
+```
+
+**PM interprets and recovers:**
+- If confidence < 0.7 → Review flags → Ask user for missing info
+- If critical failure → Retry specialist
+- If persistent failure → Inform user, offer manual entry
+
+---
+
+### Specialist Prompt Architecture
+
+**Pattern:**
+
+```xml
+<background_information>
+You are Product Architecture Specialist.
+[Domain expertise description]
+</background_information>
+
+<your_responsibilities>
+You autonomously:
+- Analyze product structure from PM's enriched context
+- Search catalog to determine create vs update
+- Design variant architecture and SKU patterns
+- Handle missing data gracefully
+- Signal uncertainty with confidence scores
+- Return structured ProductArchitectureDraft
+
+You decide when to use tools, how to handle edge cases.
+</your_responsibilities>
+
+<state_access>
+You have access to parent state:
+- state.company_profile - SKU conventions, brand info
+- state.base_context - Catalog summary, taxonomy tree
+
+Use these for context-aware decisions.
+</state_access>
+
+<instructions>
+PM provides enriched product context.
+You autonomously determine analysis approach.
+
+[Detailed domain methodology]
+</instructions>
+```
+
+---
+
+### PM Prompt Architecture
+
+**Delegation Pattern:**
+
+```xml
+<delegation_to_specialists>
+When delegating to Product Architecture Specialist:
+
+Provide ENRICHED PRODUCT CONTEXT (not instructions):
+
+1. Product details (synthesized from conversation):
+   - Type, materials, dimensions, pricing
+   - Latest values if user corrected information
+
+2. Image file paths if available
+
+3. Your basic analysis from image_analysis_tool
+
+4. Your catalog awareness (mark as non-authoritative):
+   "My catalog search (summary): [result]. Your detailed search is authoritative."
+
+5. Pointers to state:
+   "Company context in state.company_profile"
+   "Catalog awareness in state.base_context"
+
+DO NOT:
+- Give step-by-step instructions
+- Pass conversation history or user intent
+- Duplicate state data in text
+- Micromanage specialist methodology
+
+Trust specialist autonomy. They know their job.
+</delegation_to_specialists>
+```
+
+---
+
+## Phase 2 Implementation Tasks
+
+### Task 2.1: Update Specialist Prompt
+**File:** `product_architecture_specialist.prompt`
+
+**Goal:** Make prompt autonomous and context-driven (not instruction-driven)
+
+**Key Updates:**
+- Emphasize autonomous decision-making
+- Document state access patterns
+- Remove micromanagement language
+- Show context-based delegation examples
+- Include graceful degradation patterns
+
+---
+
+### Task 2.2: Review & Optimize Specialist Tools
+**Critical Question:** Do we need all these tools, or can intelligent LLM reason through some?
+
+**Current Tools:**
+- search_product_families
+- image_analysis_tool
+- calculate_sku_combinations
+- generate_sku_pattern
+
+**Review Needed:** Which are essential vs which LLM can handle autonomously?
+
+---
+
+### Task 2.3: Update PM Prompt for Context Delegation
+**File:** `project_manager_intelligent.prompt`
+
+**Goal:** Add delegation pattern for Product Architecture Specialist
+
+**Pattern:** Enriched context (product facts), NOT step-by-step instructions
+
+---
+
+### Task 2.4: Integrate Specialist with PM
+**File:** `project_manager.py`
+
+**Changes:**
+- Add specialist to subagents list
+- Pass storage for search tool
+- Update initial_state tracking
+
+---
+
+### Task 2.5: Test Specialist Isolation
+**Test 5 Scenarios:**
+1. New product (no catalog match)
+2. Existing product (add variant)
+3. Ambiguous match
+4. Missing data (graceful degradation)
+5. Image analysis failure
+
+**Validate:** Autonomy, confidence scoring, flag transparency
+
+---
+
+### Task 2.6: Test PM → Specialist End-to-End
+**Flow:** User vague request → PM enriches → Delegate → Specialist analyzes → PM presents
+
+**Validate Delegation:**
+- Context-rich (product facts, images, PM analysis)
+- NO instructions or conversation history
+- State pointers included
+
+---
+
+### Task 2.7: PM Handles Specialist Recommendations
+**Implement:** PM interprets specialist signals (create_new/add_variant/ask_user, confidence, flags)
+
+**Multi-Turn:** Low confidence → PM asks user → Re-delegate
+
+---
+
+### Task 2.8: Documentation & Commit
+**Update plan, capture learnings, commit Phase 2**
+
+---
+
+## Phase 2 Success Criteria
+
+**✅ When Phase 2 is Complete:**
+
+1. **Specialist Integration:**
+   - Product Architecture Specialist integrated with PM
+   - Tools wired correctly (search, image, SKU)
+   - Structured output (ProductArchitectureDraft)
+
+2. **Autonomous Operation:**
+   - Specialist autonomously decides analysis approach
+   - PM provides context, not instructions
+   - Specialist reads state (company_profile, base_context)
+
+3. **Delegation Pattern:**
+   - PM writes enriched product context
+   - NO conversation history passed
+   - NO step-by-step instructions
+   - State pointers included
+
+4. **Error Handling:**
+   - Graceful degradation working (flags + confidence)
+   - PM interprets specialist signals
+   - Multi-turn clarification flow working
+
+5. **All Test Scenarios Pass:**
+   - New product, add variant, ambiguous match
+   - Missing data, image failures
+   - End-to-end PM → Specialist flow
+
+**Then Proceed to Phase 3:** Add Taxonomy Specialist (runs in parallel with Product Architecture)
+
+---
 
 ### Task 2.1: Review Product Architecture Specialist Prompt
 **File:** `agents/src/autifyme_agents/prompts/specialists/product_architecture_specialist.prompt`

@@ -13,6 +13,17 @@ Project-specific guidance for AutifyME codebase. Communication style is defined 
 - PM composes specialists dynamically based on workflow needs
 - Ask before building: "Which domains/workflows will reuse this specialist?"
 
+### **[CRITICAL] Intelligence-First Design Principle**
+Modern LLMs are highly capable: massive context windows (200K+ tokens), strong reasoning, autonomous problem-solving. This fundamentally shapes our architecture:
+
+- **Trust intelligence over control:** Give agents problems + rich context, not step-by-step recipes
+- **Minimal scaffolding:** Avoid over-engineering; let agents reason about goals and adapt dynamically
+- **Context enables autonomy:** Rich, well-structured context beats rigid orchestration
+- **Design for reasoning, not automation:** Agents should analyze situations and decide, not follow scripts
+- **Don't handhold:** If an LLM with full context can figure it out, don't hardcode the logic
+
+**Implication:** When designing agents/workflows, ask: "Am I overspecifying? Can I give this agent the goal + context and trust it to reason?" Default to less structure, more intelligence.
+
 ### Design-First Process
 - Create/update specs under `docs/architecture/` before implementation (user flow, agent interplay, components, schemas)
 - Validate design preserves hierarchical data flow and context discipline
