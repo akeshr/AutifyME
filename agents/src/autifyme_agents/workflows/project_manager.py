@@ -6,6 +6,8 @@ to appropriate specialists, synthesizes results, and persists via HITL-enabled t
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import TYPE_CHECKING, Any
 
 from deepagents import create_deep_agent
@@ -15,6 +17,7 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.integrations.storage import get_store
+from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.tools.campaign_persistence_tools import (
@@ -26,6 +29,8 @@ from autifyme_agents.tools.product_persistence_tools import (
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
@@ -83,6 +88,19 @@ def create_project_manager(
     instructions = _load_prompt(company_profile)
     store = get_store()
 
+    # Load base context (catalog summary + taxonomy tree)
+    # Uses asyncio.run() to call async middleware from sync function
+    # Gracefully degrades to empty summaries if DB unavailable
+    logger.info("Loading base context for PM (catalog summary + taxonomy tree)")
+    base_context = asyncio.run(load_base_context(company_profile, storage))
+    logger.info(
+        "Base context loaded",
+        extra={
+            "catalog_families": base_context.catalog_summary.total_families,
+            "taxonomy_categories": base_context.taxonomy_tree.total_categories,
+        }
+    )
+
     # PM Tools
     pm_tools: list[Any] = []
 
@@ -116,14 +134,15 @@ def create_project_manager(
 
     initial_state = {
         "company_profile": company_profile.model_dump(),
-        "status": "idle",
+        "base_context": base_context.model_dump(),  # NEW: Catalog + taxonomy awareness
+        "status": "intelligent_core",  # Updated status (Phase 1A complete)
         "current_workflow": None,
         "specialist_results": {},
     }
 
     return project_manager.with_config(
         {
-            "metadata": {"version": "1.0.0"},
+            "metadata": {"version": "1.0.0-phase1a"},  # Track build-up phase
             "initial_state": initial_state,
         }
     )
