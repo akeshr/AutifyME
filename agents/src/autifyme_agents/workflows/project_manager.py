@@ -143,9 +143,17 @@ async def create_project_manager(
     pm_tools.append(create_search_catalog_summary_tool(storage))
     pm_tools.append(create_get_category_info_tool(storage))
 
-    # HITL persistence tools
+    # HITL persistence tools (CREATE/UPDATE)
     pm_tools.append(create_save_product_family_tool(storage))
     pm_tools.append(create_save_campaign_tool(storage))
+
+    # Product CRUD tools (READ/DELETE)
+    from autifyme_agents.tools.product_crud_tools import (
+        create_query_product_data_tool,
+        create_delete_product_data_tool,
+    )
+    pm_tools.append(create_query_product_data_tool(storage))
+    pm_tools.append(create_delete_product_data_tool(storage))
 
     # Product Architecture Specialist (structure, variants, SKUs)
     product_architecture_specialist = create_product_architecture_specialist(storage)

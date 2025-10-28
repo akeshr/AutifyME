@@ -334,6 +334,206 @@ Return complete structured object with:
 
 ---
 
+## CRUD Intent Classification (Autonomous Decision-Making)
+
+After searching catalog, **autonomously determine which draft_type to return** based on user intent and search results.
+
+### Classification Rules
+
+**1. FULL_FAMILY (ProductArchitectureDraft) - CREATE**
+- **Trigger:** `search recommendation = "create_new"` AND no matches found
+- **OR:** User explicitly says "new product family"
+- **Intent:** Create entirely new product family
+- **Return:** Complete architecture with all axes, values, SKU pattern
+
+**2. VARIANT_ADDITION (VariantAdditionDraft) - CREATE**
+- **Trigger:** `search recommendation = "add_variant"` OR `recommendation = "update_existing"`
+- **AND:** User mentions new VALUE for EXISTING axis
+- **AND:** Search returns family with variant config
+- **Logic:**
+  1. Extract existing axis from `search.matches[0].variant_axes`
+  2. Check if user's value exists in `search.matches[0].variant_values` for that axis
+  3. If NOT exists → variant_addition
+  4. Calculate NEW SKUs only (combinations with new value)
+- **Return:** Only new variant values + new SKUs (NOT full family)
+- **Example:** "Add 2L capacity" where capacity axis exists
+
+**3. AXIS_ADDITION (AxisAdditionDraft) - CREATE**
+- **Trigger:** `search recommendation = "add_variant"` OR similar match
+- **AND:** User mentions NEW AXIS that doesn't exist in `search.matches[0].variant_axes`
+- **Examples:** "Add material options", "Make size a variant"
+- **Logic:**
+  1. Check `search.matches[0].variant_axes` for axis with this name
+  2. If NOT found → axis_addition
+  3. Calculate impact: `old_sku_count × new_axis_value_count`
+  4. Warn if total SKUs > 100
+- **Return:** New axis definition + impact assessment
+
+**4. FAMILY_UPDATE (FamilyUpdateDraft) - UPDATE**
+- **Trigger:** `search recommendation = "update_existing"` AND exact match
+- **AND:** User wants to change FIELDS (not structure)
+- **Keywords:** "change", "update", "set", "modify", "add segment", "add industry"
+- **Examples:** "Change price", "Update description", "Mark as out of stock", "Add B2B segment"
+- **Logic:**
+  1. Identify which fields user wants to change
+  2. Extract new values from context
+  3. Determine scope: family-level OR SKU-level OR auxiliary tables
+  4. Map to appropriate nested update list (family_field_updates, sku_field_updates, etc.)
+- **Return:** Only field updates across affected tables
+
+**5. QUERY (ProductQueryDraft) - READ**
+- **Trigger:** User asks questions or requests data
+- **Keywords:** "show", "list", "what", "which", "get", "view", "display", "tell me"
+- **Examples:** "Show me all SKUs", "What industries are we targeting?", "List all images"
+- **Logic:**
+  1. Identify what data user wants to see
+  2. Map to appropriate retrieve flags (retrieve_all_skus, retrieve_industry_targets, etc.)
+  3. Find family_id from search
+- **Return:** Query specification with retrieve flags
+
+**6. DELETION (ProductDeletionDraft) - DELETE**
+- **Trigger:** User wants to remove data
+- **Keywords:** "delete", "remove", "discontinue", "archive", "drop"
+- **Examples:** "Remove Amber color", "Delete PET Bottles family", "Discontinue SKU"
+- **Logic:**
+  1. Determine deletion scope (entire_family, variant_axis, variant_value, specific_skus, etc.)
+  2. **CRITICAL:** Calculate impact analysis
+     - Find all affected SKUs
+     - Count affected images, content, etc.
+     - Calculate total records
+     - Determine if reversible (soft delete possible?)
+  3. Include warning messages if high impact
+- **Return:** Deletion spec WITH complete impact analysis
+- **Safety:** Always include impact preview for user confirmation
+
+**7. AMBIGUOUS (AmbiguousDraft) - CLARIFY**
+- **Trigger:** `search recommendation = "ask_user"`
+- **OR:** Multiple matches with similar scores (all > 0.6)
+- **OR:** Confidence < 0.7 after analysis
+- **OR:** Missing critical data (price, variant values, etc.)
+- **Logic:**
+  1. Identify what's unclear (which family? new or variant? missing data?)
+  2. Formulate clarification questions
+  3. Suggest possible interpretations
+- **Return:** Questions for PM to ask user
+
+### Decision Flow Examples
+
+#### Example 1: Variant Addition
+
+```
+User: "Add 2L to PET Bottles"
+
+1. Search: search_product_families(name="PET Bottles")
+   → Result: match found, recommendation="add_variant"
+   → variant_axes: [capacity (250ML, 500ML, 1L), color (CLR, AMB)]
+
+2. Analyze user request:
+   → User mentions: "2L"
+   → Axis implied: "capacity" (from "L" unit)
+
+3. Check existing:
+   → Axis "capacity" EXISTS in variant_axes ✓
+   → Value "2L" NOT in existing values ✓
+
+4. Classification: VARIANT_ADDITION
+
+5. Calculate new SKUs:
+   → New value "2L" × existing colors (CLR, AMB) = 2 new SKUs
+
+6. Return: VariantAdditionDraft(
+     draft_type="variant_addition",
+     existing_family_id=...,
+     target_axis_name="capacity",
+     new_variant_values=[{value: "2L", sku_code: "2L"}],
+     new_skus=[PAV-BTL-2L-CLR, PAV-BTL-2L-AMB],
+     ...
+   )
+```
+
+#### Example 2: Field Update
+
+```
+User: "Change base price to Rs 35"
+
+1. Search: Find exact family match
+
+2. Analyze user request:
+   → Keyword: "change" → UPDATE
+   → Field: "base_price"
+   → New value: 35
+
+3. Classification: FAMILY_UPDATE
+
+4. Map to table: product_families.base_price
+
+5. Return: FamilyUpdateDraft(
+     draft_type="family_update",
+     existing_family_id=...,
+     family_field_updates={"base_price": 35.0},
+     update_summary="Update base price from Rs 30 to Rs 35"
+   )
+```
+
+#### Example 3: Query
+
+```
+User: "Show me all SKUs for PET Bottles"
+
+1. Search: Find family
+
+2. Analyze user request:
+   → Keyword: "show" → READ
+   → What: "all SKUs"
+
+3. Classification: QUERY
+
+4. Return: ProductQueryDraft(
+     draft_type="query",
+     family_id=...,
+     retrieve_all_skus=True
+   )
+```
+
+#### Example 4: Deletion with Impact
+
+```
+User: "Remove Amber color option"
+
+1. Search: Find family with Amber in variant_values
+
+2. Analyze user request:
+   → Keyword: "remove" → DELETE
+   → Target: variant_value "AMB"
+
+3. Calculate impact:
+   → Find SKUs with "AMB": PAV-BTL-250ML-AMB, PAV-BTL-500ML-AMB, PAV-BTL-1L-AMB
+   → Count: 3 SKUs
+   → Check images: 5 images specific to Amber SKUs
+   → Check content: 2 marketing posts
+   → Total records: 10
+
+4. Classification: DELETION
+
+5. Return: ProductDeletionDraft(
+     draft_type="deletion",
+     deletion_scope="variant_value",
+     target_value_sku_code="AMB",
+     soft_delete=True,
+     impact_analysis=DeletionImpactAnalysis(
+       affected_skus=["PAV-BTL-250ML-AMB", ...],
+       affected_images=5,
+       affected_content=2,
+       total_records=10,
+       reversible=True,
+       warning_message="3 SKUs will be discontinued"
+     ),
+     requires_explicit_confirmation=True
+   )
+```
+
+---
+
 ## Example: Context-Based Delegation
 
 **PM Provides (Product Facts):**

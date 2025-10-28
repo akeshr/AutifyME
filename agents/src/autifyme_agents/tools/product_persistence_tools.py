@@ -309,6 +309,32 @@ class PersistenceResult(BaseModel):
     error_type: str | None = None
 
 
+class QueryResult(BaseModel):
+    """Result of read/query operation."""
+
+    success: bool
+    family_data: dict[str, Any] | None = None
+    sku_data: list[dict[str, Any]] | None = None
+    variant_structure: dict[str, Any] | None = None
+    industry_targets: list[dict[str, Any]] | None = None
+    customer_segments: list[dict[str, Any]] | None = None
+    images: list[dict[str, Any]] | None = None
+    marketing_content: list[dict[str, Any]] | None = None
+    error_message: str | None = None
+
+
+class DeletionResult(BaseModel):
+    """Result of delete operation."""
+
+    success: bool
+    operation: str = "delete"
+    deletion_scope: str
+    records_deleted: int = 0
+    soft_deleted: bool
+    affected_tables: list[str] = Field(default_factory=list)
+    error_message: str | None = None
+
+
 # =============================================================================
 # Atomic Transaction Wrapper
 # =============================================================================
