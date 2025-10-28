@@ -48,15 +48,33 @@ def _load_prompt(company_profile: CompanyProfile, base_context: Any) -> str:
     """Load and format PM prompt with company context and base context.
 
     Phase 1C: Using intelligent prompt with catalog/taxonomy awareness.
-    Prompt has access to base_context via initial_state (no need to format into prompt text).
+    Base context is formatted into system prompt so LLM can see the actual data.
     """
     # Phase 1C: Intelligent PM with context awareness
     prompt_template = load_prompt("project_manager_intelligent.prompt")
+
+    # Format catalog summary for prompt
+    catalog_summary_text = f"""
+**Your Catalog Summary (Loaded at Startup):**
+- Total Product Families: {base_context.catalog_summary.total_families}
+- Total SKUs: {base_context.catalog_summary.total_skus}
+- Family Names: {', '.join(base_context.catalog_summary.family_names)}
+- Top Categories: {', '.join(base_context.catalog_summary.top_categories)}
+"""
+
+    # Format taxonomy tree (just root categories for now)
+    root_categories = [cat.name for cat in base_context.taxonomy_tree.root_categories]
+    taxonomy_text = f"""
+**Your Taxonomy Tree (Loaded at Startup):**
+- Total Categories: {base_context.taxonomy_tree.total_categories}
+- Root Categories: {', '.join(root_categories)}
+"""
+
     return prompt_template.format(
         company_name=company_profile.name,
         brand_voice=company_profile.brand_voice,
         target_audience=company_profile.target_audience,
-    )
+    ) + "\n\n" + catalog_summary_text + "\n" + taxonomy_text
 
 
 def create_project_manager(
