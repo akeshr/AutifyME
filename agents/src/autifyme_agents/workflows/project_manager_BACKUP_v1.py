@@ -1,24 +1,37 @@
 """
 Project Manager - Main orchestrator for all AutifyME workflows.
 
-BUILD-UP STATUS: Minimal PM (Phase 0)
-- Core orchestration framework
-- Intent detection
-- Media handling
-- HITL persistence tools (available but not callable yet)
-- NO SPECIALISTS YET (will add incrementally)
-
 Architecture:
 - PM orchestrates domain specialists via DeepAgents SubAgent pattern
 - Specialists analyze and generate (no persistence)
 - PM owns HITL persistence tools
 - PM detects workflow intent, delegates to specialists, synthesizes results, persists
 
-Current Implementation:
-- Phase 0: Minimal PM core (0 specialists)
-- Phase 1-6: Product Onboarding specialists (target: 5)
-- Phase 7-11: Marketing Campaign specialists (target: 6)
-- Phase 12: Final integration and polish
+Current Workflow Implementation:
+- Product Onboarding: 5 domain specialists for enterprise-grade product families
+- Marketing Campaigns: 6 domain specialists (5 new + 1 reused) for campaign creation
+
+Domain Specialists (11 total):
+
+Product Onboarding (5):
+1. Product Architecture - Variant structure and SKU design
+2. Taxonomy - Multi-system classification (internal, Google, NAICS)
+3. Market Intelligence - Positioning, segments, industry use cases
+4. Visual Assets - Image organization and quality (reused in marketing)
+5. Content & SEO - Descriptions, meta tags, platform content
+
+Marketing Campaigns (6):
+6. Campaign Strategy - Objectives, KPIs, budget, timeline
+7. Audience Intelligence - Customer segments and targeting
+8. Marketing Content - Narratives, headlines, CTAs
+9. Visual Assets - Creative assets (reused from product onboarding)
+10. Platform Adaptation - Platform-specific formatting
+11. Ad Copy - Paid ad copy with A/B variants
+
+Future Workflows:
+- Inventory management
+- CRM operations
+- Competitive analysis
 
 HITL Strategy:
 - PM level only (interrupt_on for persistence tools)
@@ -39,6 +52,32 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.integrations.storage import get_store
 from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
+from autifyme_agents.specialists.ad_copy_specialist import create_ad_copy_specialist
+from autifyme_agents.specialists.audience_intelligence_specialist import (
+    create_audience_intelligence_specialist,
+)
+from autifyme_agents.specialists.campaign_strategy_specialist import (
+    create_campaign_strategy_specialist,
+)
+from autifyme_agents.specialists.content_seo_specialist import (
+    create_content_seo_specialist,
+)
+from autifyme_agents.specialists.market_intelligence_specialist import (
+    create_market_intelligence_specialist,
+)
+from autifyme_agents.specialists.marketing_content_specialist import (
+    create_marketing_content_specialist,
+)
+from autifyme_agents.specialists.platform_adaptation_specialist import (
+    create_platform_adaptation_specialist,
+)
+from autifyme_agents.specialists.product_architecture_specialist import (
+    create_product_architecture_specialist,
+)
+from autifyme_agents.specialists.taxonomy_specialist import create_taxonomy_specialist
+from autifyme_agents.specialists.visual_assets_specialist import (
+    create_visual_assets_specialist,
+)
 from autifyme_agents.tools.campaign_persistence_tools import (
     create_save_campaign_tool,
 )
@@ -59,7 +98,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
 
 def _load_prompt(company_profile: CompanyProfile) -> str:
     """Load and format PM prompt with company context."""
-    prompt_template = load_prompt("project_manager_minimal.prompt")
+    prompt_template = load_prompt("project_manager.prompt")
     return prompt_template.format(
         company_name=company_profile.name,
         brand_voice=company_profile.brand_voice,
@@ -76,26 +115,35 @@ def create_project_manager(
     channel: MessagingChannel | None = None,
 ) -> Any:
     """
-    Create Minimal Project Manager - core orchestration only (Phase 0).
+    Create Project Manager - main orchestrator for all AutifyME workflows.
 
-    Current: 0 specialists (building up incrementally)
+    Current Implementation:
+    Orchestrates 11 domain specialists for 2 workflows:
 
-    Capabilities:
-    - Intent detection (recognize: product_onboarding, marketing, operations, unknown)
-    - Media handling (download attachments from platform)
-    - Planning tools (write_todos for complex workflows)
-    - HITL framework (persistence tools available but not callable yet)
-    - Error communication (clear messages about current limitations)
+    Product Onboarding (5 specialists):
+    - Product Architecture Specialist (variant structure)
+    - Taxonomy Specialist (multi-system classification)
+    - Market Intelligence Specialist (positioning & segments)
+    - Visual Assets Specialist (image organization)
+    - Content & SEO Specialist (content generation)
 
-    Specialists will be added incrementally:
-    - Phase 2-6: Product Onboarding (5 specialists)
-    - Phase 7-11: Marketing Campaigns (6 specialists)
+    Marketing Campaigns (6 specialists):
+    - Campaign Strategy Specialist (objectives, KPIs, budget, timeline)
+    - Audience Intelligence Specialist (customer segments, targeting)
+    - Marketing Content Specialist (narratives, headlines, CTAs)
+    - Visual Assets Specialist (reused from product onboarding)
+    - Platform Adaptation Specialist (platform-specific formatting)
+    - Ad Copy Specialist (paid ad copy with A/B variants)
 
     Architecture:
     - PM = DeepAgent with SubAgents
-    - Specialists = SubAgent dicts (will be added incrementally)
+    - Specialists = SubAgent dicts (analysis only)
     - PM owns HITL persistence tools
     - PM orchestrates workflow: delegate → synthesize → present → persist
+
+    Extensibility:
+    Designed to support future workflows (marketing, inventory, CRM)
+    by adding new specialists and persistence tools as needed.
 
     Args:
         company_profile: Company context for brand voice and positioning
@@ -122,10 +170,11 @@ def create_project_manager(
     store = get_store()
 
     # ==========================================================================
-    # PM Tools - Minimal Set
+    # PM Tools - HITL Persistence ONLY
     # ==========================================================================
-    # Platform media tools (if channel provided)
-    # HITL persistence tools (available but PM won't call them yet)
+    # PM owns persistence tools for implemented workflows
+    # Currently: save_product_family (product onboarding), save_campaign (marketing)
+    # Platform media tools if channel provided
     pm_tools: list[Any] = []
 
     if channel is not None:
@@ -133,19 +182,29 @@ def create_project_manager(
 
         pm_tools.extend(create_platform_media_tools(channel))
 
-    # HITL persistence tools - available for framework testing
-    # PM won't call these yet (no specialist data to persist)
+    # HITL persistence tools - PM level only
     pm_tools.append(create_save_product_family_tool(storage))
     pm_tools.append(create_save_campaign_tool(storage))
 
     # ==========================================================================
-    # Specialists - EMPTY (Incremental Build-Up)
+    # Specialists - Domain Experts (Analysis Only, No Persistence)
     # ==========================================================================
-    # Phase 0: 0 specialists (minimal PM core)
-    # Phase 2: Add Product Architecture Specialist
-    # Phase 3: Add Taxonomy Specialist
-    # ... (continue build-up)
-    subagents: list[Any] = []
+    # 11 domain specialists for 2 workflows (product onboarding + marketing)
+    # Visual Assets specialist is shared between workflows
+    subagents: list[Any] = [
+        # Product Onboarding (5 specialists)
+        create_product_architecture_specialist(storage),  # Includes catalog search for intelligent matching
+        create_taxonomy_specialist(storage),
+        create_market_intelligence_specialist(),
+        create_visual_assets_specialist(),  # Shared with marketing
+        create_content_seo_specialist(),
+        # Marketing Campaigns (5 new specialists + 1 reused)
+        create_campaign_strategy_specialist(),
+        create_audience_intelligence_specialist(),
+        create_marketing_content_specialist(),
+        create_platform_adaptation_specialist(),
+        create_ad_copy_specialist(),
+    ]
 
     # ==========================================================================
     # HITL Configuration - PM Level Only
@@ -158,13 +217,13 @@ def create_project_manager(
     }
 
     # ==========================================================================
-    # Create Minimal DeepAgent
+    # Create DeepAgent
     # ==========================================================================
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
-        subagents=subagents,  # EMPTY - will add incrementally
+        subagents=subagents,
         interrupt_on=interrupt_configs,
         checkpointer=checkpointer,
         store=store,
@@ -177,9 +236,7 @@ def create_project_manager(
     # ==========================================================================
     initial_state = {
         "company_profile": company_profile.model_dump(),
-        "status": "minimal",  # Track build-up state
-        "build_phase": "phase_0_minimal",  # Track which phase
-        "integrated_specialists": [],  # Track which specialists are active
+        "status": "idle",
         "current_workflow": None,  # product_onboarding, marketing, inventory, etc.
         "specialist_results": {},  # Track specialist outputs
     }
@@ -187,8 +244,7 @@ def create_project_manager(
     return project_manager.with_config(
         {
             "metadata": {
-                "version": "1.0.0-minimal",
-                "build_phase": "phase_0",
+                "version": "1.0.0",
             },
             "initial_state": initial_state,
         }

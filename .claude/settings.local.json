@@ -50,7 +50,8 @@
       "Bash(xargs basename:*)",
       "Bash(uv tool run:*)",
       "SlashCommand(/test-intelligent)",
-      "Bash(supabase --version:*)"
+      "Bash(supabase --version:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
