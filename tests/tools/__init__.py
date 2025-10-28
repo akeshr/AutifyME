@@ -15,8 +15,9 @@ Tool count: 7 essential observation tools
 - list_recent_tests: Test history for progress tracking
 """
 
-# Execution tool
+# Execution tools
 from .execution import execute_scenario
+from .intelligent_execution import intelligent_execute_scenario
 
 # Models (for type hints and return types)
 from .models import (
@@ -53,6 +54,7 @@ from .trace_analysis import (
 __all__ = [
     # Execution
     "execute_scenario",
+    "intelligent_execute_scenario",
     "ExecutionResult",
     # Trace Analysis
     "get_trace_overview",

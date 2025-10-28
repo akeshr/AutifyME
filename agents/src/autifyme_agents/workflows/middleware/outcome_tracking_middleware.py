@@ -33,7 +33,7 @@ class OutcomeTrackingMiddleware:
         self.tracker = outcome_tracker
         self.workflow_handler = workflow_handler
 
-    def execute_with_tracking(
+    async def execute_with_tracking(
         self,
         thread_id: str,
         incoming_message: IncomingMessage,
@@ -50,7 +50,7 @@ class OutcomeTrackingMiddleware:
         Args:
             thread_id: Conversation thread ID
             incoming_message: Structured incoming message
-            pm_invoker: Callable that accepts tracking_id and returns (result, interrupt_value)
+            pm_invoker: Async callable that accepts tracking_id and returns (result, interrupt_value)
 
         Returns:
             Tuple of (result, interrupt_value, tracking_id)
@@ -61,7 +61,7 @@ class OutcomeTrackingMiddleware:
 
         try:
             # Invoke PM with tracking_id (passed as run_id)
-            result, interrupt_value = pm_invoker(tracking_id)
+            result, interrupt_value = await pm_invoker(tracking_id)
 
             # Set trace correlation (tracking_id = trace_id when passed as run_id)
             self.tracker.set_trace_id(tracking_id, tracking_id)

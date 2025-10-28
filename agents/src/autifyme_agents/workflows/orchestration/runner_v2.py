@@ -184,7 +184,7 @@ class WorkflowRunner:
         logger.info("Generic HITL Framework initialized - approval_analyzer architecture")
         logger.info("=" * 80)
 
-    def handle_message(
+    async def handle_message(
         self,
         sender: str,
         text: str | None,
@@ -212,9 +212,9 @@ class WorkflowRunner:
         # Single-tenant architecture - no locking needed
         # FastAPI background tasks + database checkpointing provide sufficient concurrency control
         thread_id = self.channel.format_thread_id(sender)
-        self._execute_workflow(thread_id, sender, text, media_id, sender_name)
+        await self._execute_workflow(thread_id, sender, text, media_id, sender_name)
 
-    def _execute_workflow(
+    async def _execute_workflow(
         self,
         thread_id: str,
         sender: str,
@@ -259,7 +259,7 @@ class WorkflowRunner:
 
         try:
             # Execute with automatic outcome tracking via middleware
-            result, interrupt_value, tracking_id = self.tracking_middleware.execute_with_tracking(
+            result, interrupt_value, tracking_id = await self.tracking_middleware.execute_with_tracking(
                 thread_id=thread_id,
                 incoming_message=incoming_message,
                 pm_invoker=lambda tid: self._invoke_pm(thread_id, raw_payload, run_id=tid),
@@ -293,7 +293,7 @@ class WorkflowRunner:
             logger.exception("PM invocation failed", exc_info=exc)
             self.channel.send_error(sender, "processing")
 
-    def _handle_resume_flow(
+    async def _handle_resume_flow(
         self,
         pm: Any,
         config: dict[str, Any],
@@ -318,7 +318,7 @@ class WorkflowRunner:
         # Extract conversation history
         conversation_history = []
         try:
-            state_snapshot = pm.get_state(config)
+            state_snapshot = await pm.aget_state(config)
             if state_snapshot and hasattr(state_snapshot, 'values'):
                 conversation_history = state_snapshot.values.get("messages", [])
         except Exception as e:
@@ -367,7 +367,7 @@ class WorkflowRunner:
             )
 
             event_count = 0
-            for event in pm.stream(command_obj, config=config, stream_mode="values"):
+            async for event in pm.astream(command_obj, config=config, stream_mode="values"):
                 event_count += 1
                 last_event = event
                 if "__interrupt__" in event:
@@ -401,7 +401,7 @@ class WorkflowRunner:
             logger.error("Command execution failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
             raise
 
-    def _handle_new_message_flow(
+    async def _handle_new_message_flow(
         self,
         pm: Any,
         config: dict[str, Any],
@@ -469,7 +469,7 @@ class WorkflowRunner:
         accumulated_interrupts: list[Any] = []
 
         try:
-            for event in pm.stream(payload, config=config, stream_mode="values"):
+            async for event in pm.astream(payload, config=config, stream_mode="values"):
                 last_event = event
                 if "__interrupt__" in event:
                     interrupts = event.get("__interrupt__") or []
@@ -511,7 +511,7 @@ class WorkflowRunner:
             logger.error("PM streaming failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
             raise
 
-    def _invoke_pm(
+    async def _invoke_pm(
         self,
         thread_id: str,
         raw_payload: dict[str, Any],
@@ -540,7 +540,7 @@ class WorkflowRunner:
         """
         # Create PM and config
         try:
-            pm = self._create_project_manager()
+            pm = await self._create_project_manager()
             config = self._build_config(thread_id, run_id=run_id)
         except Exception as e:
             logger.error("PM initialization failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
@@ -548,7 +548,7 @@ class WorkflowRunner:
 
         # Check for pending interrupts
         try:
-            state_snapshot = pm.get_state(config)
+            state_snapshot = await pm.aget_state(config)
             pending_interrupts_list = InterruptUnpacker.unpack_interrupts(state_snapshot, thread_id=thread_id)
 
             flow_type = "resume" if pending_interrupts_list else "new_message"
@@ -569,21 +569,22 @@ class WorkflowRunner:
 
         # Route to appropriate flow
         if pending_interrupts_list:
-            return self._handle_resume_flow(pm, config, thread_id, raw_payload, pending_interrupts_list)
+            return await self._handle_resume_flow(pm, config, thread_id, raw_payload, pending_interrupts_list)
         else:
-            return self._handle_new_message_flow(pm, config, thread_id, raw_payload)
+            return await self._handle_new_message_flow(pm, config, thread_id, raw_payload)
 
-    def _get_checkpointer(self) -> BaseCheckpointSaver[Any]:
-        """Get checkpointer instance."""
+    async def _get_async_checkpointer(self) -> BaseCheckpointSaver[Any]:
+        """Get async checkpointer instance."""
         if self._checkpointer:
             return self._checkpointer
-        return get_checkpointer()
+        from autifyme_agents.integrations.storage.postgres_saver_factory import get_async_checkpointer
+        return await get_async_checkpointer()
 
-    def _create_project_manager(self) -> Any:
+    async def _create_project_manager(self) -> Any:
         """Create PM instance with company context and channel."""
-        return create_project_manager(
+        return await create_project_manager(
             company_profile=self.company_profile,
-            checkpointer=self._get_checkpointer(),
+            checkpointer=await self._get_async_checkpointer(),
             storage=self.storage,
             channel=self.channel,
         )

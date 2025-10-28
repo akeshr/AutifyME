@@ -70,6 +70,17 @@ class CompanyProfile(BaseModel):
     style_preferences: list[str] | None = Field(default_factory=list, description="Style keywords.")
     industry: str | None = Field(None, description="Company's industry vertical.")
 
+    # SKU Naming Conventions (for Product Architecture Specialist)
+    sku_naming_convention: dict[str, Any] | None = Field(
+        None,
+        description=(
+            "Company-specific SKU naming rules for autonomous pattern generation. "
+            "Example: {'prefix_format': 'BRAND-CATEGORY', 'separator': '-', "
+            "'variant_code_length': '3-5', 'uppercase': True, "
+            "'examples': ['PAV-BTL-500ML-CLR', 'PAV-JAR-1L-AMB']}"
+        )
+    )
+
     model_config = ConfigDict(from_attributes=True)
 
 

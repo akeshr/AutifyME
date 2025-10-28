@@ -1,21 +1,33 @@
 # CLAUDE.md
 
-Project-specific guidance for AutifyME codebase. Communication style is defined in `.claude/output-styles/jarvis.md`. **CRITICAL** DO NOT USE EMOJIS.
+Project-specific guidance for AutifyME codebase. Communication style is defined in `.claude/output-styles/jarvis.md`. **[CRITICAL] DO NOT USE EMOJIS**.
 
 ---
 
 ## PART I: ARCHITECTURAL RULES
 
 ### Vision & North Star
-- Deliver full hierarchical agentic organization (PM → Departments → Specialists → Tools) from day one
-- Sequence workflows pragmatically without architectural shortcuts
-- Ensure components scale across departments and support future workflows
-- Ask before building: "How will this serve another department?"
+- **2-Level Architecture:** PM → Specialists → Tools (direct specialist visibility enables dynamic planning)
+- Deliver autonomous agentic organization with dynamic planning and adaptation
+- **Domain-centric design:** Build reusable domain specialists, not workflow-specific agents
+- PM composes specialists dynamically based on workflow needs
+- Ask before building: "Which domains/workflows will reuse this specialist?"
+
+### **[CRITICAL] Intelligence-First Design Principle**
+Modern LLMs are highly capable: massive context windows (200K+ tokens), strong reasoning, autonomous problem-solving. This fundamentally shapes our architecture:
+
+- **Trust intelligence over control:** Give agents problems + rich context, not step-by-step recipes
+- **Minimal scaffolding:** Avoid over-engineering; let agents reason about goals and adapt dynamically
+- **Context enables autonomy:** Rich, well-structured context beats rigid orchestration
+- **Design for reasoning, not automation:** Agents should analyze situations and decide, not follow scripts
+- **Don't handhold:** If an LLM with full context can figure it out, don't hardcode the logic
+
+**Implication:** When designing agents/workflows, ask: "Am I overspecifying? Can I give this agent the goal + context and trust it to reason?" Default to less structure, more intelligence.
 
 ### Design-First Process
 - Create/update specs under `docs/architecture/` before implementation (user flow, agent interplay, components, schemas)
-- Align with architectural canon (see below)
 - Validate design preserves hierarchical data flow and context discipline
+- Ensure specialists are domain experts, not workflow executors
 
 ### Deep Research & Architectural Analysis
 - **Think exhaustively for critical decisions**: Enumerate all permutation combinations, edge cases, platform-specific behaviors
@@ -45,21 +57,34 @@ Project-specific guidance for AutifyME codebase. Communication style is defined 
 - Use `create_agent` for specialists, `create_deep_agent` for orchestrators, maintain `{messages}`/`{agent_scratchpad}` contract
 - HITL via DeepAgents `tool_configs` + HumanInTheLoopMiddleware (not interrupt_before/after)
 - Delegate cross-cutting concerns to middleware (tools stay focused, reusable, context-light)
-- Design specialists/tools for single responsibility and cross-department reuse
-- Keep department outputs structured and composable for DeepAgents orchestration
+- Design specialists/tools for single responsibility and reuse across workflows
 - Use multimodal payloads, avoid brittle prompt hacks
 
+### Autonomous Behavior Standards
+- **Dynamic Planning:** Agents analyze context and plan adaptively, not follow rigid recipes
+- **Graceful Adaptation:** Handle missing data, tool failures, and edge cases with fallback strategies
+- **Self-Review:** Critique outputs before returning; iterate when confidence is low
+- **Transparent Communication:** Flag limitations, assumptions, and data gaps clearly
+- **Learning Orientation:** System should improve from past executions
+
+### Prompt Engineering for Autonomy
+- **Version prompts alongside code** - avoid hardcoded instructions in agent logic
+- **Follow `PROMPT_ENGINEERING_STANDARDS.md`** - no Python code in prompts, use XML structure, canonical examples, right altitude for hierarchy level
+- **Design for autonomy, not recipes:** Prompts should enable dynamic decision-making, not prescribe rigid execution sequences
+- **PM prompts enable planning:** Analyze context first, then plan adaptively (not "Phase 1→2→3")
+- **Specialist prompts enable adaptation:** Handle missing data, self-review outputs, iterate when confidence is low
+- **Avoid hardcoded orchestration:** Let agents decide sequence based on available data and dependencies
+- **Enable transparent failures:** Agents should flag limitations and adapt, not silently fail or rigidly error
+
 ### Documentation & Libraries
-- Version prompts alongside code; avoid hardcoded instructions
-- **Prompt Engineering**: Follow `PROMPT_ENGINEERING_STANDARDS.md` - no Python code in prompts, use XML structure, canonical examples, right altitude for hierarchy level
 - Update architectural docs in lockstep with major decisions
 - **Library verification priority**: (1) Official docs + source code, (2) Python REPL inspection (`uv run python -c`), (3) Local docs
 - Always verify APIs with `inspect`/`dir` before depending on them
 - Capture context-engineering strategies and extension points for reuse
 
 ### Documentation Strategy
-- **Check first, then decide**: Review existing docs before creating new ones; update rather than duplicate
-- **Create only when necessary**: Novel topics, complex specifications, long-term architectural impact
+- **[CRITICAL]Check first, then decide**: Review existing docs before creating new ones; update rather than duplicate
+- **[CRITICAL]Create only when necessary**: Novel topics, complex specifications, long-term architectural impact
 - **Make scannable**: Date/status header, executive summary, tables/schemas/examples, implementation checklists
 - **Connect the dots**: Link related docs, mark open questions, align with architectural canon
 
@@ -91,47 +116,26 @@ uv run mypy .
 
 ### Repository Structure
 
-**Production**: `agents/src/autifyme_agents/` - Core, departments, specialists, tools, workflows, entrypoints, integrations, schemas, prompts
+**Production**: `agents/src/autifyme_agents/` - Core, specialists, tools, workflows, entrypoints, integrations, schemas, prompts
 
 **Testing**: `tests/` - tools/ (autonomous framework), unit, integration, cli (simulate.py, pm_chat.py), fixtures, synthesizer, archived/ (historical)
 
 **Documentation**: `docs/architecture/` organized by concern (core/, workflows/, tech/, testing/), plus `historical/`, `deployment/`, `roadmap/`
 
-
-### Autonomous Testing Framework
-
-**Claude can autonomously test, analyze, and improve the agentic system.**
-
-**Methodology**: `.claude/skills/autonomous-testing.md` (complete testing workflow)
-**Agent**: `.claude/agents/workflow-tester.md` (invoke for autonomous testing)
-**Architecture**: `docs/architecture/testing/AUTONOMOUS_TESTING_FRAMEWORK.md`
-
 ### API Verification
 
-Always verify library APIs with REPL before implementing (LangChain v1 alpha is unstable):
+Always verify library APIs with REPL before implementing (LangChain v1):
 ```bash
 uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test code"
 ```
 
 **Complete guide**: `docs/architecture/tech/UV_REPL_BEST_PRACTICES.md`
 
-### Configuration
-
-**Environment Variables** (`agents/src/autifyme_agents/core/config.py`):
-
 **Prerequisites**: Python 3.12+, `uv`, PostgreSQL
 
 ### Architectural Canon
 
 **Navigation hub**: `docs/architecture/README.md` - All docs categorized by concern
-
-**Must-read before changes**:
-- `core/DOMAIN_DESIGN_GUIDELINES.md` - **[CRITICAL]** Architectural standards for new domains/workflows - ALWAYS reference when designing new workflows
-- `core/AGENTS_DESIGN.md` - Hierarchical model, context engineering
-- `core/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md` - **[GROUND TRUTH]** As-built implementation
-- `tech/LANGCHAIN_V1_FEATURES.md` - LangChain v1 native patterns
-
-**Complete index with 30+ docs**: See `docs/architecture/README.md`
 
 ### Common Gotchas
 
@@ -143,16 +147,13 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 - Use `.venv\Scripts\activate` (not `source`)
 - Git line endings: LF (`.gitattributes`)
 
-**Database**:
-- LangGraph needs raw PostgreSQL string (`postgresql://...`)
-- Supabase may need `?sslmode=require`
-
 **Error Handling**:
 - Tools must raise `ToolException` (prevents infinite loops)
+
 ### Quick Navigation
 
 - **Project Status**: `README.md`
-- **[CRITICAL]Architecture Docs**: `docs/architecture/README.md` (navigation hub)
+- **Architecture Docs**: `docs/architecture/README.md` (navigation hub)
 - **LangSmith Traces**: https://smith.langchain.com
-- Always use safe_print instaed of print
-- Always use testing framework for doing any test scenarios
+- Always use `safe_print` instead of `print`
+- Always use testing framework for test scenarios
