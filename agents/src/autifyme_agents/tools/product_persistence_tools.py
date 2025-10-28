@@ -65,6 +65,30 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# Platform Normalization Mapping
+# =============================================================================
+# Maps business-layer platform names to database schema platform values
+# Preserves business clarity in prompts while maintaining data model integrity
+PLATFORM_MAPPING = {
+    # Catalog/feed-based platforms (all map to 'catalog')
+    "google_shopping": "catalog",
+    "facebook_catalog": "catalog",
+    "instagram_shopping": "catalog",
+    "amazon_product_feed": "catalog",
+    # Social platforms (direct mapping)
+    "instagram": "instagram",
+    "facebook": "facebook",
+    "twitter": "twitter",
+    "linkedin": "linkedin",
+    "youtube": "youtube",
+    "tiktok": "tiktok",
+    # Other platforms (direct mapping)
+    "website": "website",
+    "email": "email",
+}
+
+
+# =============================================================================
 # Data Models for Product Family Persistence
 # =============================================================================
 
@@ -227,6 +251,16 @@ class ProductFamilyInput(BaseModel):
     google_product_category: str | None = None
     custom_attributes: dict[str, Any] | None = None
 
+    # Catalog matching (from Product Architecture Specialist search)
+    matched_family_id: str | None = Field(
+        None,
+        description="UUID of existing product family if catalog search found a match"
+    )
+    match_recommendation: str | None = Field(
+        None,
+        description="Recommendation from catalog search: 'create_new', 'add_variant', or 'ask_user'"
+    )
+
     # Variant structure
     variant_axes: list[VariantAxisInput] = Field(
         ..., description="Variant dimensions (size, color, etc.)"
@@ -360,15 +394,73 @@ async def save_product_family_atomic(
     """
     result = PersistenceResult(success=False)
 
+    # Initialize maps that will be populated based on match recommendation
+    axis_id_map: dict[str, UUID] = {}
+    value_id_map: dict[str, UUID] = {}
+    family_id: UUID | None = None
+
+    # ========================================================================
+    # CATALOG MATCHING: Handle search results from Product Architecture Specialist
+    # ========================================================================
+    if product_family.match_recommendation == "ask_user":
+        # Exact match found - require user confirmation before proceeding
+        raise ToolException(
+            f"CATALOG MATCH FOUND: A product family with business_id='{product_family.product_group_id}' "
+            f"or SKU prefix='{product_family.sku_prefix}' already exists (ID: {product_family.matched_family_id}). "
+            f"Please confirm: Are you trying to (1) Update the existing family, (2) Add a new variant, or (3) Create a separate family? "
+            f"This is an exact match requiring user decision."
+        )
+
+    elif product_family.match_recommendation == "add_variant":
+        # Variant of existing family - use existing family_id, skip family creation
+        if not product_family.matched_family_id:
+            raise ToolException(
+                "match_recommendation='add_variant' but no matched_family_id provided"
+            )
+
+        logger.info(
+            f"Adding variants to existing family {product_family.matched_family_id}",
+            extra={"product_group_id": product_family.product_group_id}
+        )
+
+        # Use existing family ID (skip Step 1)
+        family_id = UUID(product_family.matched_family_id)
+        result.product_family_id = family_id
+
+        # Load existing variant axes to use their IDs
+        client = storage._ensure_client()
+        existing_axes_response = client.table("variant_axes").select("*").eq("product_family_id", str(family_id)).execute()
+
+        axis_id_map = {
+            axis["name"]: UUID(axis["id"])
+            for axis in existing_axes_response.data
+        }
+
+        # Load existing variant values
+        existing_values_response = client.table("variant_values").select("*").in_("variant_axis_id", [str(v) for v in axis_id_map.values()]).execute()
+
+        value_id_map = {
+            val["sku_code"]: UUID(val["id"])
+            for val in existing_values_response.data
+        }
+
+        logger.info(
+            f"Loaded existing structure: {len(axis_id_map)} axes, {len(value_id_map)} values",
+            extra={"family_id": str(family_id)}
+        )
+
+    # else: match_recommendation is None or "create_new" -> proceed normally
+
     try:
         async with atomic_product_persistence(storage) as client:
             # ===================================================================
-            # STEP 1: Insert product_families
+            # STEP 1: Insert product_families (SKIP if add_variant)
             # ===================================================================
-            family_payload = {
-                "product_group_id": product_family.product_group_id,
-                "sku_prefix": product_family.sku_prefix,
-                "name": product_family.name,
+            if product_family.match_recommendation != "add_variant":
+                family_payload = {
+                    "product_group_id": product_family.product_group_id,
+                    "sku_prefix": product_family.sku_prefix,
+                    "name": product_family.name,
                 "description": product_family.description,
                 "brand": product_family.brand,
                 "category_id": product_family.category_id,
@@ -397,63 +489,115 @@ async def save_product_family_atomic(
             )
 
             # ===================================================================
-            # STEP 2: Insert variant_axes
+            # STEP 2: Insert variant_axes (SKIP if add_variant)
             # ===================================================================
-            axis_id_map: dict[str, UUID] = {}
+            if product_family.match_recommendation == "add_variant":
+                # Use existing axis IDs loaded earlier
+                logger.info(f"Using {len(axis_id_map)} existing variant axes")
+                # Populate result with existing IDs
+                for axis_name, axis_id in axis_id_map.items():
+                    result.variant_axis_ids[axis_name] = axis_id
+            else:
+                # Create new axes for new family
+                axis_id_map = {}  # Clear and rebuild for new family
 
-            for axis in product_family.variant_axes:
-                axis_payload = {
-                    "product_family_id": str(family_id),
-                    "name": axis.name,
-                    "display_label": axis.display_label,
-                    "sort_order": axis.sort_order,
-                    "schema_property": axis.schema_property,
-                }
+                for axis in product_family.variant_axes:
+                    axis_payload = {
+                        "product_family_id": str(family_id),
+                        "name": axis.name,
+                        "display_label": axis.display_label,
+                        "sort_order": axis.sort_order,
+                        "schema_property": axis.schema_property,
+                    }
 
-                axis_response = client.table("variant_axes").insert(axis_payload).execute()
+                    axis_response = client.table("variant_axes").insert(axis_payload).execute()
 
-                if not axis_response.data:
-                    raise ToolException(f"Failed to insert variant_axis: {axis.name}")
+                    if not axis_response.data:
+                        raise ToolException(f"Failed to insert variant_axis: {axis.name}")
 
-                axis_id = UUID(axis_response.data[0]["id"])
-                axis_id_map[axis.name] = axis_id
-                result.variant_axis_ids[axis.name] = axis_id
+                    axis_id = UUID(axis_response.data[0]["id"])
+                    axis_id_map[axis.name] = axis_id
+                    result.variant_axis_ids[axis.name] = axis_id
 
-            logger.info(f"Inserted {len(axis_id_map)} variant axes")
+                logger.info(f"Inserted {len(axis_id_map)} variant axes")
 
             # ===================================================================
-            # STEP 3: Insert variant_values
+            # STEP 3: Insert variant_values (INSERT ONLY NEW if add_variant)
             # ===================================================================
-            value_id_map: dict[str, UUID] = {}  # sku_code -> value_id
+            if product_family.match_recommendation == "add_variant":
+                # Check which values are new and insert only those
+                new_values_count = 0
+                for value in product_family.variant_values:
+                    # Check if value already exists
+                    if value.sku_code in value_id_map:
+                        logger.debug(f"Variant value {value.sku_code} already exists, skipping")
+                        continue
 
-            for value in product_family.variant_values:
-                axis_id = axis_id_map.get(value.variant_axis_name)
-                if not axis_id:
-                    raise ToolException(
-                        f"Variant value references unknown axis: {value.variant_axis_name}"
-                    )
+                    # Insert new variant value
+                    axis_id = axis_id_map.get(value.variant_axis_name)
+                    if not axis_id:
+                        raise ToolException(
+                            f"Variant value references unknown axis: {value.variant_axis_name}"
+                        )
 
-                value_payload = {
-                    "variant_axis_id": str(axis_id),
-                    "value": value.value,
-                    "display_label": value.display_label or value.value,
-                    "sku_code": value.sku_code,
-                    "color_hex": value.color_hex,
-                    "image_url": value.image_url,
-                    "price_adjustment": value.price_adjustment,
-                    "sort_order": value.sort_order,
-                }
+                    value_payload = {
+                        "variant_axis_id": str(axis_id),
+                        "value": value.value,
+                        "display_label": value.display_label or value.value,
+                        "sku_code": value.sku_code,
+                        "color_hex": value.color_hex,
+                        "image_url": value.image_url,
+                        "price_adjustment": value.price_adjustment,
+                        "sort_order": value.sort_order,
+                    }
 
-                value_response = client.table("variant_values").insert(value_payload).execute()
+                    value_response = client.table("variant_values").insert(value_payload).execute()
 
-                if not value_response.data:
-                    raise ToolException(f"Failed to insert variant_value: {value.sku_code}")
+                    if not value_response.data:
+                        raise ToolException(f"Failed to insert variant_value: {value.sku_code}")
 
-                value_id = UUID(value_response.data[0]["id"])
-                value_id_map[value.sku_code] = value_id
-                result.variant_value_ids[value.sku_code] = value_id
+                    value_id = UUID(value_response.data[0]["id"])
+                    value_id_map[value.sku_code] = value_id
+                    new_values_count += 1
 
-            logger.info(f"Inserted {len(value_id_map)} variant values")
+                logger.info(f"Inserted {new_values_count} new variant values, using {len(value_id_map)} total")
+
+                # Populate result with all IDs (existing + new)
+                for sku_code, value_id in value_id_map.items():
+                    result.variant_value_ids[sku_code] = value_id
+
+            else:
+                # Create all new values for new family
+                value_id_map = {}  # Clear and rebuild for new family (sku_code -> value_id)
+
+                for value in product_family.variant_values:
+                    axis_id = axis_id_map.get(value.variant_axis_name)
+                    if not axis_id:
+                        raise ToolException(
+                            f"Variant value references unknown axis: {value.variant_axis_name}"
+                        )
+
+                    value_payload = {
+                        "variant_axis_id": str(axis_id),
+                        "value": value.value,
+                        "display_label": value.display_label or value.value,
+                        "sku_code": value.sku_code,
+                        "color_hex": value.color_hex,
+                        "image_url": value.image_url,
+                        "price_adjustment": value.price_adjustment,
+                        "sort_order": value.sort_order,
+                    }
+
+                    value_response = client.table("variant_values").insert(value_payload).execute()
+
+                    if not value_response.data:
+                        raise ToolException(f"Failed to insert variant_value: {value.sku_code}")
+
+                    value_id = UUID(value_response.data[0]["id"])
+                    value_id_map[value.sku_code] = value_id
+                    result.variant_value_ids[value.sku_code] = value_id
+
+                logger.info(f"Inserted {len(value_id_map)} variant values")
 
             # ===================================================================
             # STEP 4: Insert products (individual SKUs)
@@ -596,8 +740,13 @@ async def save_product_family_atomic(
             # STEP 9: Insert marketing_content
             # ===================================================================
             for content in product_family.marketing_content:
+                # Normalize platform name (google_shopping -> catalog, etc.)
+                normalized_platform = PLATFORM_MAPPING.get(
+                    content.platform.lower(), content.platform
+                )
+
                 content_payload = {
-                    "platform": content.platform,
+                    "platform": normalized_platform,
                     "content_type": content.content_type,
                     "content_text": content.content_text,
                     "content_metadata": content.content_metadata or {},
@@ -725,6 +874,8 @@ def create_save_product_family_tool(storage: SupabaseStorageClient) -> object:
         tags: list[str] | None = None,
         google_product_category: str | None = None,
         custom_attributes: dict | None = None,
+        matched_family_id: str | None = None,
+        match_recommendation: str | None = None,
         images: list[dict] | None = None,
         industry_targets: list[dict] | None = None,
         customer_segments: list[dict] | None = None,
@@ -777,6 +928,8 @@ def create_save_product_family_tool(storage: SupabaseStorageClient) -> object:
                 tags=tags,
                 google_product_category=google_product_category,
                 custom_attributes=custom_attributes,
+                matched_family_id=matched_family_id,
+                match_recommendation=match_recommendation,
                 variant_axes=[axis if isinstance(axis, VariantAxisInput) else VariantAxisInput(**axis) for axis in variant_axes],
                 variant_values=[val if isinstance(val, VariantValueInput) else VariantValueInput(**val) for val in variant_values],
                 products=[prod if isinstance(prod, ProductSKUInput) else ProductSKUInput(**prod) for prod in products],

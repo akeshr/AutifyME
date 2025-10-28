@@ -6,23 +6,26 @@ Domain Expertise:
 - Variant axis identification (dimensions that vary: size, color, material, etc.)
 - SKU architecture design (naming conventions, combinations)
 - Composition pattern understanding (how variants relate to family)
+- **NEW: Intelligent catalog matching for autonomous create vs update decisions**
 
 Responsibilities:
+- **Search catalog FIRST** for existing product families (autonomous intelligence)
 - Analyze multimodal input (user descriptions + images)
 - Identify variant dimensions and values
 - Calculate total SKU combinations
 - Generate SKU naming patterns
-- Return structured ProductArchitectureDraft
+- Recommend: create new, update existing, or add variant
+- Return structured ProductArchitectureDraft with match analysis
 
 Does NOT:
-- Persist to database (PM handles persistence with HITL)
+- Persist to database (PM handles persistence)
 - Generate marketing content (Content Specialist handles this)
 - Classify into taxonomy (Taxonomy Specialist handles this)
 
 Architecture Pattern:
 - SubAgent dict format (NOT create_agent)
-- Returns structured Pydantic models
-- PM orchestrates delegation and approval
+- Returns structured Pydantic models with intelligent match recommendations
+- PM orchestrates delegation and uses recommendations for autonomous decisions
 """
 
 from typing import Any
@@ -31,7 +34,9 @@ from langchain.tools import tool
 from pydantic import BaseModel, Field
 
 from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
+from autifyme_agents.tools.product_search_tools import ProductFamilySearchResult
 
 # =============================================================================
 # Data Models - Product Architecture Specialist Outputs
@@ -92,6 +97,12 @@ class ProductArchitectureDraft(BaseModel):
     # Material and condition
     material: str | None = Field(None, description="Primary material")
     condition: str = Field(default="new", description="new, refurbished, or used")
+
+    # **NEW: Intelligent matching for autonomous decisions**
+    catalog_match_analysis: ProductFamilySearchResult | None = Field(
+        None,
+        description="Results from catalog search - enables autonomous create vs update decisions"
+    )
 
     # Analysis metadata
     confidence_score: float = Field(
@@ -257,50 +268,61 @@ def generate_sku_pattern(
 # =============================================================================
 
 
-def create_product_architecture_specialist() -> dict[str, Any]:
+def create_product_architecture_specialist(storage: StorageInterface | None = None) -> dict[str, Any]:
     """
     Create Product Architecture Specialist as SubAgent spec.
 
     Specialist Responsibilities:
+    - **Search catalog FIRST** for existing product families (enables autonomous decisions)
     - Analyze product from multimodal input (images + user description)
     - Identify variant structure (axes and values)
     - Design SKU architecture (naming pattern, combinations)
-    - Return ProductArchitectureDraft for PM review
+    - Recommend action: create new / update existing / add variant
+    - Return ProductArchitectureDraft with match analysis for PM
 
     Architecture:
     - SubAgent dict format (DeepAgents pattern)
-    - Analysis tools only (no persistence)
-    - Returns structured Pydantic model
-    - PM handles HITL and persistence
+    - Analysis + intelligent search tools
+    - Returns structured Pydantic model with match recommendations
+    - PM uses recommendations for autonomous create vs update decisions
+
+    Args:
+        storage: Storage interface for catalog search (required for intelligent matching)
 
     Returns:
         SubAgent spec with:
         - name: specialist identifier
         - description: delegation criteria
-        - tools: analysis tools
+        - tools: analysis + search tools
         - system_prompt: domain expertise instructions
     """
     system_prompt = load_prompt("specialists/product_architecture_specialist.prompt")
 
     description = (
         "Analyzes product structure and designs variant architecture. "
-        "Identifies variant dimensions (size, color, material, etc.), "
-        "calculates SKU combinations, and generates naming patterns. "
-        "Returns ProductArchitectureDraft with complete variant structure for PM review."
+        "Searches catalog for existing product families to determine if this is a new family, "
+        "new variant of existing family, or update to existing product. "
+        "Identifies variant dimensions (size, color, material, etc.), calculates SKU combinations, "
+        "generates naming patterns, and recommends action. "
+        "Returns ProductArchitectureDraft with catalog match analysis."
     )
 
-    # Tools for variant architecture analysis
+    # Tools for intelligent product architecture analysis
     tools = [
         image_analysis_tool,  # Multimodal product analysis
         calculate_sku_combinations,  # SKU count calculation
         generate_sku_pattern,  # SKU naming design
     ]
 
+    # Add catalog search tool if storage provided (enables autonomous matching)
+    if storage:
+        from autifyme_agents.tools.product_search_tools import create_search_product_families_tool
+        tools.append(create_search_product_families_tool(storage))
+
     return {
         "name": "product_architecture_specialist",
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
-        # No response_format - specialist should return conversational analysis
-        # PM will extract ProductArchitectureDraft from specialist's messages
+        "response_format": ProductArchitectureDraft,  # Enforce structured output
     }

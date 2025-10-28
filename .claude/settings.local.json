@@ -49,7 +49,8 @@
       "WebFetch(domain:www.google.com)",
       "Bash(xargs basename:*)",
       "Bash(uv tool run:*)",
-      "SlashCommand(/test-intelligent)"
+      "SlashCommand(/test-intelligent)",
+      "Bash(supabase --version:*)"
     ],
     "deny": [],
     "ask": []

@@ -193,7 +193,7 @@ def create_project_manager(
     # Visual Assets specialist is shared between workflows
     subagents: list[Any] = [
         # Product Onboarding (5 specialists)
-        create_product_architecture_specialist(),
+        create_product_architecture_specialist(storage),  # Includes catalog search for intelligent matching
         create_taxonomy_specialist(storage),
         create_market_intelligence_specialist(),
         create_visual_assets_specialist(),  # Shared with marketing

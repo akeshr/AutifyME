@@ -391,4 +391,5 @@ def create_taxonomy_specialist(storage: StorageInterface) -> dict[str, Any]:
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
+        "response_format": TaxonomyClassificationDraft,  # Enforce structured output
     }

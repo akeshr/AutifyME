@@ -1,0 +1,348 @@
+"""Product Family Search Tools - Intelligent catalog matching for autonomous decisions.
+
+Architecture:
+- Specialists use these tools to find existing product families
+- Fuzzy matching on business_id, name, brand, material
+- Returns confidence scores for autonomous decision-making
+- PM uses results to decide: create new, update existing, or ask user
+
+Design Philosophy:
+- Autonomous: High-confidence matches enable auto-decisions
+- Intelligent: Multi-factor matching with reasoning
+- Self-improving: Confidence thresholds tunable over time
+"""
+
+import logging
+from typing import Any
+
+from langchain.tools import tool
+from langchain_core.tools import ToolException
+from pydantic import BaseModel, Field
+
+from autifyme_agents.core.exceptions import classify_api_error
+from autifyme_agents.core.ports import StorageInterface
+
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Data Models
+# =============================================================================
+
+
+class ProductFamilyMatch(BaseModel):
+    """A single product family match result."""
+
+    family_id: str = Field(..., description="UUID of matched product family")
+    product_group_id: str = Field(..., description="Business identifier (e.g., 'PACK-PET-JAR')")
+    name: str = Field(..., description="Product family name")
+    brand: str = Field(..., description="Brand name")
+    material: str | None = Field(None, description="Primary material")
+    sku_prefix: str = Field(..., description="SKU prefix")
+    base_price: float = Field(..., description="Base price")
+
+    # Match analysis
+    match_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Overall confidence score"
+    )
+    match_type: str = Field(
+        ...,
+        description="Type of match: 'exact', 'variant_candidate', 'similar', 'weak'"
+    )
+    match_factors: dict[str, Any] = Field(
+        ...,
+        description="Breakdown of what matched: business_id, name, brand, material"
+    )
+    reasoning: str = Field(
+        ..., description="Human-readable explanation of why this matched"
+    )
+
+
+class ProductFamilySearchResult(BaseModel):
+    """Results from product family search."""
+
+    query_summary: str = Field(..., description="Summary of search criteria")
+    matches: list[ProductFamilyMatch] = Field(
+        default_factory=list, description="Ranked matches (best first)"
+    )
+    total_found: int = Field(..., description="Total families found in search")
+    recommendation: str = Field(
+        ...,
+        description="Suggested action: 'create_new', 'update_existing', 'add_variant', 'ask_user'"
+    )
+    confidence: float = Field(
+        ..., ge=0.0, le=1.0, description="Confidence in recommendation"
+    )
+
+
+# =============================================================================
+# Matching Logic
+# =============================================================================
+
+
+def _calculate_match_score(
+    query_business_id: str | None,
+    query_name: str,
+    query_brand: str,
+    query_material: str | None,
+    existing_family: dict[str, Any],
+) -> tuple[float, dict[str, Any], str]:
+    """Calculate match score between query and existing family.
+
+    Returns:
+        Tuple of (score, factors, match_type)
+    """
+    factors = {
+        "business_id_match": False,
+        "name_similarity": 0.0,
+        "brand_match": False,
+        "material_match": False,
+    }
+
+    score_components = []
+
+    # Business ID match (strongest signal - 0.5 weight)
+    if query_business_id and query_business_id.upper() == existing_family.get("product_group_id", "").upper():
+        factors["business_id_match"] = True
+        score_components.append(0.5)
+
+    # Name similarity (0.3 weight)
+    query_name_normalized = query_name.lower().strip()
+    existing_name_normalized = existing_family.get("name", "").lower().strip()
+
+    # Simple token-based similarity
+    query_tokens = set(query_name_normalized.split())
+    existing_tokens = set(existing_name_normalized.split())
+
+    if query_tokens and existing_tokens:
+        intersection = query_tokens & existing_tokens
+        union = query_tokens | existing_tokens
+        name_similarity = len(intersection) / len(union)
+        factors["name_similarity"] = name_similarity
+        score_components.append(name_similarity * 0.3)
+
+    # Brand match (0.15 weight) - only apply if brand provided in query
+    if query_brand and query_brand.lower().strip():
+        if query_brand.lower().strip() == existing_family.get("brand", "").lower().strip():
+            factors["brand_match"] = True
+            score_components.append(0.15)
+
+    # Material match (0.05 weight)
+    if query_material and existing_family.get("material"):
+        if query_material.lower().strip() == existing_family.get("material", "").lower().strip():
+            factors["material_match"] = True
+            score_components.append(0.05)
+
+    total_score = sum(score_components)
+
+    # Determine match type
+    if total_score >= 0.9:
+        match_type = "exact"
+    elif total_score >= 0.7:
+        match_type = "variant_candidate"
+    elif total_score >= 0.4:
+        match_type = "similar"
+    else:
+        match_type = "weak"
+
+    return total_score, factors, match_type
+
+
+def _build_reasoning(factors: dict[str, Any], match_type: str, score: float) -> str:
+    """Build human-readable reasoning for match."""
+    reasons = []
+
+    if factors["business_id_match"]:
+        reasons.append("Exact business ID match")
+
+    if factors["name_similarity"] > 0.7:
+        reasons.append(f"High name similarity ({factors['name_similarity']:.0%})")
+    elif factors["name_similarity"] > 0.4:
+        reasons.append(f"Moderate name similarity ({factors['name_similarity']:.0%})")
+
+    if factors["brand_match"]:
+        reasons.append("Same brand")
+
+    if factors["material_match"]:
+        reasons.append("Same material")
+
+    if not reasons:
+        reasons.append("Low similarity across all factors")
+
+    reasoning = f"{match_type.replace('_', ' ').title()} ({score:.0%} confidence): {', '.join(reasons)}"
+    return reasoning
+
+
+def _recommend_action(matches: list[ProductFamilyMatch]) -> tuple[str, float]:
+    """Recommend action based on match results.
+
+    Returns:
+        Tuple of (action, confidence)
+    """
+    if not matches:
+        return "create_new", 0.95
+
+    best_match = matches[0]
+
+    # Exact match - update existing
+    if best_match.match_type == "exact":
+        return "update_existing", best_match.match_score
+
+    # Variant candidate - likely new variant of existing family
+    if best_match.match_type == "variant_candidate":
+        return "add_variant", best_match.match_score
+
+    # Multiple similar matches - ambiguous
+    if len(matches) > 1 and matches[1].match_score > 0.5:
+        return "ask_user", 0.4
+
+    # Single similar match - probably new family but show user the similar one
+    if best_match.match_type == "similar":
+        return "ask_user", 0.6
+
+    # Weak or no matches - create new
+    return "create_new", 0.8
+
+
+# =============================================================================
+# Search Tool
+# =============================================================================
+
+
+def create_search_product_families_tool(storage: StorageInterface) -> object:
+    """Create tool for searching existing product families.
+
+    Tool is given to specialists (Product Architecture) for intelligent matching.
+
+    Args:
+        storage: Storage adapter for database operations
+
+    Returns:
+        LangChain tool for product family search
+    """
+
+    @tool("search_product_families")
+    def search_product_families(
+        product_group_id: str | None = None,
+        name: str | None = None,
+        brand: str | None = None,
+        material: str | None = None,
+        limit: int = 5,
+    ) -> ProductFamilySearchResult:
+        """Search for existing product families in catalog using fuzzy matching.
+
+        Use this tool BEFORE creating a new product family to check if it already exists
+        or if the incoming product is a new variant of an existing family.
+
+        Matching logic:
+        - Exact business_id match = highest confidence (exact match or update)
+        - High name similarity + same brand = variant candidate
+        - Moderate similarity = ask user to confirm
+        - Low/no matches = create new family
+
+        Args:
+            product_group_id: Business identifier to search for (e.g., "PACK-PET-JAR")
+            name: Product family name to match against
+            brand: Brand name to filter by
+            material: Material to match (e.g., "PET", "Glass")
+            limit: Max number of results to return (default 5)
+
+        Returns:
+            ProductFamilySearchResult with ranked matches and recommendation
+        """
+        try:
+            # Build query - start with all active families
+            query = storage._ensure_client().table("product_families").select("*")
+            query = query.eq("is_active", True)
+
+            # Apply filters
+            if product_group_id:
+                # Exact match on business ID
+                query = query.eq("product_group_id", product_group_id.upper())
+            elif brand:
+                # If no business_id, filter by brand at minimum
+                query = query.eq("brand", brand)
+
+            # Execute query
+            response = query.limit(50).execute()  # Get more for fuzzy matching
+
+            if not response.data:
+                return ProductFamilySearchResult(
+                    query_summary=f"Searched for: business_id={product_group_id}, name={name}, brand={brand}",
+                    matches=[],
+                    total_found=0,
+                    recommendation="create_new",
+                    confidence=0.95,
+                )
+
+            # Calculate match scores for all results
+            all_matches = []
+
+            for family in response.data:
+                score, factors, match_type = _calculate_match_score(
+                    query_business_id=product_group_id,
+                    query_name=name or "",
+                    query_brand=brand or "",
+                    query_material=material,
+                    existing_family=family,
+                )
+
+                # Only include if score > 0.2 (filter out very weak matches)
+                # Lower threshold allows name + material matches even without brand
+                if score > 0.2:
+                    reasoning = _build_reasoning(factors, match_type, score)
+
+                    match = ProductFamilyMatch(
+                        family_id=family["id"],
+                        product_group_id=family["product_group_id"],
+                        name=family["name"],
+                        brand=family["brand"],
+                        material=family.get("material"),
+                        sku_prefix=family["sku_prefix"],
+                        base_price=family["base_price"],
+                        match_score=score,
+                        match_type=match_type,
+                        match_factors=factors,
+                        reasoning=reasoning,
+                    )
+                    all_matches.append(match)
+
+            # Sort by score (highest first)
+            all_matches.sort(key=lambda m: m.match_score, reverse=True)
+
+            # Take top N matches
+            top_matches = all_matches[:limit]
+
+            # Recommend action
+            action, confidence = _recommend_action(top_matches)
+
+            query_summary = (
+                f"Searched for: business_id={product_group_id}, name={name}, brand={brand}, material={material}. "
+                f"Found {len(all_matches)} potential matches."
+            )
+
+            return ProductFamilySearchResult(
+                query_summary=query_summary,
+                matches=top_matches,
+                total_found=len(all_matches),
+                recommendation=action,
+                confidence=confidence,
+            )
+
+        except Exception as e:
+            logger.error(
+                "Product family search failed",
+                exc_info=True,
+                extra={
+                    "error_type": type(e).__name__,
+                    "error_msg": str(e),
+                    "query_params": {
+                        "product_group_id": product_group_id,
+                        "name": name,
+                        "brand": brand,
+                    }
+                }
+            )
+            raise classify_api_error(e, "search_product_families", "Supabase") from e
+
+    return search_product_families
