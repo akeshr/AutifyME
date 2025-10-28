@@ -1,7 +1,9 @@
 # Specialist Build-Up Integration Plan
 
 **Date:** October 28, 2025
-**Status:** 🚧 In Progress
+**Last Updated:** October 28, 2025
+**Status:** 🚧 In Progress - Phase 1 (Intelligent PM Core)
+**Current Task:** Context Feeding Strategy Implementation
 **Strategy:** Incremental build-up - unplug all specialists, perfect PM core, add specialists one by one
 
 ---
@@ -133,6 +135,236 @@ PM:
 
 ---
 
+## CONTEXT FEEDING STRATEGY ✅ DECIDED (October 28, 2025)
+
+### The Foundational Question
+
+**For Intelligent PM to work, HOW does PM get context?**
+
+PM needs:
+- Company context (brand, products, capabilities)
+- Existing catalog (to know "do we have this?")
+- Taxonomy structure (to suggest classifications)
+- User conversation history
+
+**Critical Decision:** When/how does this context get loaded?
+
+---
+
+### Four Options Analyzed
+
+#### Option A: PM Has Context Query Tools
+PM actively queries DB for context on-demand
+
+**Verdict:** ⚠️ Works but adds latency per message (200-500ms)
+
+---
+
+#### Option B: Context Loaded at Startup
+Load full catalog/taxonomy at PM construction
+
+**Verdict:** ❌ Doesn't scale (10K products → 50K+ tokens), stale data risk
+
+---
+
+#### Option C: Specialists Query, PM Learns
+PM has no context until specialists return data
+
+**Verdict:** ❌ Violates Intelligent PM paradigm (PM stays "dumb")
+
+---
+
+#### Option D: Hybrid (Base Context + Query Details) ✅ CHOSEN
+Load lightweight **base context** at startup, query **details** on-demand
+
+**Why This Wins:**
+1. **PM is intelligent from message 1** (has base context for discussion)
+2. **Scales** (base = 1-2K tokens, details queried only when needed)
+3. **Mostly fresh** (base refreshed every 15min, details always current)
+4. **Resilient** (DB down → uses stale base, degrades gracefully)
+5. **Efficient** (PM gets summaries, specialists get full details - no duplication)
+
+---
+
+### Option D Implementation Design
+
+#### Base Context (Injected at Startup)
+
+```python
+class PMBaseContext(BaseModel):
+    """Lightweight context, loaded at PM startup, refreshed every 15min"""
+
+    # Already have
+    company_profile: CompanyProfile
+
+    # NEW: Catalog summary
+    catalog_summary: CatalogSummary
+    # Example: {
+    #   "total_families": 7,
+    #   "total_skus": 200,
+    #   "family_names": ["PET Bottles", "Glass Jars", ...],
+    #   "top_categories": ["Food & Beverage", "Personal Care"]
+    # }
+
+    # NEW: Taxonomy tree structure
+    taxonomy_tree: TaxonomyTree
+    # Example: {
+    #   "root_categories": [
+    #     {"id": "...", "name": "Food & Beverage", "children": [...]},
+    #   ]
+    # }
+
+    # FUTURE: Recent activity summary
+    recent_activity: list[str] = []
+```
+
+**Token Cost:** ~1-2K tokens (acceptable, always in PM state)
+
+---
+
+#### PM Query Tools (On-Demand Details)
+
+```python
+# NEW tools for PM (summary-level only):
+
+1. search_catalog_summary(query: str) -> CatalogSearchSummary
+   # Returns: Matching family names, IDs, variant counts (NOT full product data)
+   # Use: PM checks if product exists before delegation
+   # Cost: 200-500ms query latency
+
+2. get_category_info(category_name: str) -> CategoryInfo
+   # Returns: Category details, product count (NOT full product list)
+   # Use: PM needs category context for discussion
+   # Cost: 200-500ms query latency
+```
+
+---
+
+#### Specialist Query Tools (Unchanged)
+
+```python
+# Specialists keep existing tools (FULL detail level):
+
+Product Architecture Specialist:
+- search_product_families(product_group_id, name, brand, material)
+  # Returns: FULL product data, match recommendations, confidence scores
+
+Taxonomy Specialist:
+- find_relevant_categories(keywords)
+  # Returns: FULL category matches with descriptions
+
+# No duplication: PM = summaries, Specialists = full details
+```
+
+---
+
+### Context Flow Example
+
+**Scenario: User sends "catalog this" + image**
+
+```
+[PM Startup via ContextMiddleware]
+PMBaseContext loaded:
+  - company_profile: Pavisha (B2B packaging manufacturer)
+  - catalog_summary: {7 families, 200 SKUs, ["PET Bottles", "Glass Jars", ...]}
+  - taxonomy_tree: [Food & Bev → Packaging, Personal Care → Containers]
+
+═══════════════════════════════════════
+
+User: "catalog this" + [jar.jpg]
+
+PM (reasoning):
+  Step 1: Analyze image → "PET jar, ~500ml, transparent"
+  Step 2: Check base context → catalog_summary shows ["PET Bottles", "Glass Jars"]
+  Step 3: Query details → search_catalog_summary("PET jar") → No matches
+  Step 4: Ask clarifying questions → "I see 500ml PET jar. Price? Target market?"
+
+User: "Rs 30, food packaging, B2B"
+
+PM (reasoning):
+  Now I have complete context:
+  - Product: PET jar, 500ml, Rs 30
+  - Market: Food packaging, B2B
+  - Decision: ENRICH and delegate to Product Architecture Specialist
+
+PM → Product Architecture Specialist:
+"Analyze PET jar family for B2B food packaging.
+
+Context (from my understanding):
+- Company: Pavisha (B2B packaging, India)
+- Product: PET jars, transparent, food-grade
+- Variant: 500ml capacity
+- Price: Rs 30 (base)
+- Target: Food industry, B2B bulk
+- Image analysis: Transparent, wide mouth, screw-top
+- Catalog search: No existing PET jar families (create new)
+
+Your task: Design variant structure, SKU pattern, confirm catalog search."
+
+═══════════════════════════════════════
+
+Product Architecture Specialist (receives ENRICHED input):
+  - PM already did basic understanding
+  - I focus on DEEP analysis (variant axes, SKU patterns, catalog matching)
+
+  Step 1: Confirm catalog search (full query with scoring)
+  Step 2: Design variant structure (capacity + neck + color)
+  Step 3: Generate SKU pattern (PAV-JAR-PET-{capacity}-{neck}-{color})
+
+  Returns: ProductArchitectureDraft with full analysis
+
+PM synthesizes and continues workflow...
+```
+
+---
+
+### Scenario Matrix Results
+
+| Scenario | A (Query) | B (Startup) | C (Specialists) | D (Hybrid) ✅ |
+|----------|-----------|-------------|-----------------|--------------|
+| New product (no match) | ✅ Query shows none | ✅ Memory shows none | ❌ Can't know | ✅ Base + query |
+| New variant (existing) | ✅ Query finds family | ⚠️ Stale risk | ❌ Can't know | ✅ Base + query |
+| Vague request + image | ✅ Query → discuss | ✅ Memory → discuss | ❌ Blind delegate | ✅ Base + query |
+| Large catalog (10K SKUs) | ✅ Query filters | ❌ Token bloat | ✅ Scales | ✅ Scales |
+| User asks "what products?" | ✅ Query & answer | ✅ Answer from memory | ❌ Can't answer | ✅ Answer from base |
+| DB unavailable | ⚠️ Queries fail | ❌ Startup fails | ⚠️ Specialist fails | ✅ Degrade gracefully |
+| Performance (latency) | ⚠️ +200-500ms | ✅ Instant | ✅ No overhead | ✅ Instant (base) |
+| Token efficiency | ✅ Query results only | ❌ Full catalog | ✅ Efficient | ✅ Base (1-2K) + queries |
+
+**Winner: Option D (10/8 scenarios perfect)**
+
+---
+
+### Trade-offs Explicitly Accepted
+
+**⚠️ Base context slightly stale (15 min refresh window):**
+- **Acceptable:** Summary stats don't change rapidly
+- **Mitigation:** Detail queries always fresh, PM discovers updates before persistence
+- **Risk:** PM says "we have 7 families" but actually 8 (one added 5 min ago)
+- **Impact:** Low (discovered during specialist delegation)
+
+**⚠️ Increased complexity (middleware + refresh logic):**
+- **Acceptable:** Benefits (intelligent + scalable + resilient) outweigh cost
+- **Mitigation:** Clear separation of concerns, comprehensive testing
+- **Risk:** More moving parts = more potential failures
+- **Impact:** Medium (managed with good engineering)
+
+**⚠️ Two query patterns (PM summaries, specialist details):**
+- **Acceptable:** Different granularity, not duplication
+- **Mitigation:** Clear contracts on what PM vs specialists query
+- **Risk:** Could query similar data twice
+- **Impact:** Low (caching middleware prevents this)
+
+---
+
+### Decision Status
+
+**✅ APPROVED: Option D (Hybrid Base + Query)**
+
+**Next:** Implement in Phase 1 (broken into Phase 1A-D)
+
+---
+
 ## Phase 0: Preparation ✅ COMPLETE (2 hours)
 
 ### Task 0.1: Backup Current State ✅
@@ -162,173 +394,114 @@ PM:
 
 ---
 
-## Phase 1: Perfect Minimal PM ⚠️ NEEDS REVISION (4-6 hours)
+## Phase 1: Build Intelligent PM Core 🚧 IN PROGRESS (11-15 hours)
 
-### Goal (ORIGINAL)
-PM with ZERO specialists, perfected core orchestration logic.
+**Status:** Context Feeding Strategy ✅ Decided → Implementation Starting
+**Timeline:** October 28-29, 2025
+**Goal:** PM with intelligent capabilities (ZERO specialists, but fully context-aware)
 
-**Original Result:** ✅ PASSED basic test (intent detection, honest communication)
-**Trace:** https://smith.langchain.com/public/7f12717c-b16c-45af-b251-4cff09e5c6da/r/9159e0bf-e02d-44c9-8a8f-62a3cf052df4
-**Commit:** a2010b5
+### Phase 1 Overview
 
-### Why Revision Needed
+**Original Approach (Revised):**
+- Phase 1 initially created "minimal PM" with no context → too dumb
+- Discovered PM needs intelligence BEFORE specialists are added
+- Decided on Hybrid Context Feeding (Option D) for intelligence
 
-**Problem Discovered:** Phase 1 PM was TOO MINIMAL
-- ❌ No image analysis capability
-- ❌ No domain knowledge
-- ❌ No intelligent discussion
-- ❌ Just says "specialists coming soon" (not useful)
+**New Approach (4 Sub-Phases):**
+1. **Phase 1A:** Base Context Infrastructure (models + middleware)
+2. **Phase 1B:** PM Query Tools (summary-level queries)
+3. **Phase 1C:** Intelligent PM Prompt (domain knowledge + discussion patterns)
+4. **Phase 1D:** End-to-End Testing (all scenarios from matrix)
 
-**New Understanding:** PM should be INTELLIGENT from Phase 1
-- ✅ Can analyze images
-- ✅ Has domain knowledge
-- ✅ Can discuss with user
-- ✅ Understands intent deeply
+---
 
-### Revised Goal
-PM with ZERO specialists BUT with intelligent capabilities:
-- Intent understanding (deep, not just keyword matching)
-- Image analysis (understand what user sent)
-- Domain knowledge (B2B packaging, product concepts)
-- Company context (Pavisha details)
-- User discussion (ask clarifying questions)
-- Strategic planning
+### Phase 1A: Base Context Infrastructure ⏳ NEXT (3-4 hours)
 
-**Status:** NEEDS REWORK based on new paradigm
+**Goal:** Create infrastructure to load and inject base context into PM at startup
 
-### Task 1.1: Define Minimal PM Responsibilities
-**Core Capabilities (No Specialists):**
-- Intent detection (recognize: product onboarding, marketing campaign, operations, unknown)
-- Media handling (download attachments from platform)
-- Planning tools (write_todos for complex workflows)
-- HITL persistence (save_product_family, save_campaign triggers)
-- Error communication (clear messages to user)
-- Specialist delegation framework (ready but empty)
+#### Task 1A.1: Create Pydantic Models for Base Context
+**File:** `agents/src/autifyme_agents/schemas/context_models.py` (NEW)
 
-**Does NOT:**
-- Analyze products (will delegate to Product Architecture Specialist)
-- Classify taxonomy (will delegate to Taxonomy Specialist)
-- Generate content (will delegate to Content Specialist)
-- Create campaigns (will delegate to Campaign Specialists)
+**Models to Create:**
+```python
+class CatalogSummary(BaseModel):
+    """Lightweight catalog summary for PM base context"""
+    total_families: int
+    total_skus: int
+    family_names: list[str]  # Just names, not full data
+    top_categories: list[str]
+    last_updated: datetime
 
-### Task 1.2: Write Minimal PM Prompt
-**Location:** `agents/src/autifyme_agents/prompts/project_manager_minimal.prompt`
+class TaxonomyTree(BaseModel):
+    """Taxonomy structure for PM understanding"""
+    root_categories: list[CategoryNode]
+    # CategoryNode = {id, name, children: list[CategoryNode]}
 
-**Structure:**
-```xml
-<background_information>
-You are the Project Manager for {company_name}, the central orchestrator.
-
-Current Capabilities: MINIMAL (no specialists yet)
-- Intent detection
-- Media download
-- Planning with write_todos
-- Error communication
-
-Future: Specialists will be added incrementally for domain expertise.
-</background_information>
-
-<available_tools>
-## Platform Tools
-- download_{platform}_media: Download user attachments
-
-## Planning Tools
-- write_todos: Track multi-step workflows
-
-## Persistence Tools (HITL-enabled - DO NOT USE YET)
-- save_product_family: Persist products (requires specialist data)
-- save_campaign: Persist campaigns (requires specialist data)
-</available_tools>
-
-<instructions>
-## Your Current Role
-
-With NO specialists available yet, you:
-1. Detect user intent (product onboarding, marketing, operations, unknown)
-2. Download media if user sends attachments
-3. Respond: "I've detected a [INTENT] request. Specialists are being added incrementally. Currently, I cannot process this yet."
-
-## Intent Detection
-
-Classify requests into:
-- **product_onboarding**: Catalog, add product, new SKU, onboard item
-- **marketing_campaign**: Campaign, ads, content, promote, marketing
-- **operations**: Inventory, orders, shipping, billing
-- **unknown**: Cannot classify
-
-## Media Handling
-
-If user sends media (image/video/document):
-- Call download_{platform}_media(media_id)
-- Store file path
-- Mention in response: "I've downloaded your [media_type]"
-
-## Communication
-
-Be honest about current limitations:
-- "I understand you want to [INTENT]"
-- "I've downloaded your attachments"
-- "Specialists are being integrated - this capability will be available soon"
-</instructions>
-
-<examples>
-## Example 1: Product Onboarding Request
-<example>
-<user_input>
-Platform: WhatsApp
-Text: "Catalog PET jar 500ml Rs 30"
-Media: [image_id: abc123]
-</user_input>
-
-<your_reasoning>
-- Intent: product_onboarding (keyword "catalog")
-- Media: Yes, need to download
-- Action: Download media, acknowledge request, explain limitation
-</your_reasoning>
-
-<your_action>
-→ download_whatsapp_media(media_id="abc123")
-← file_path: "C:\Temp\media_downloads\abc123.jpg"
-</your_action>
-
-<your_response>
-"I've detected a product onboarding request and downloaded your image. Product Architecture Specialist is being integrated next - this workflow will be available soon."
-</your_response>
-</example>
-
-## Example 2: Marketing Campaign Request
-<example>
-<user_input>
-Platform: WhatsApp
-Text: "Create summer campaign for bottles"
-</user_input>
-
-<your_reasoning>
-- Intent: marketing_campaign (keyword "campaign")
-- Media: No
-- Action: Acknowledge, explain limitation
-</your_reasoning>
-
-<your_response>
-"I understand you want to create a summer marketing campaign for bottles. Campaign specialists are being integrated - this capability will be available soon."
-</your_response>
-</example>
-</examples>
-
-<output_format>
-Single message response:
-- Acknowledge intent
-- Mention media download if applicable
-- Set expectation about current limitations
-</output_format>
+class PMBaseContext(BaseModel):
+    """Complete base context injected at PM startup"""
+    company_profile: CompanyProfile  # Already exists
+    catalog_summary: CatalogSummary  # NEW
+    taxonomy_tree: TaxonomyTree  # NEW
+    recent_activity: list[str] = []  # FUTURE
 ```
 
-### Task 1.3: Implement Minimal PM
+**Validation:**
+- REPL test: Instantiate models with sample data
+- Verify serialization: `model.model_dump()`, `model.model_dump_json()`
+- Token estimate: Serialize and count (target: <2K tokens)
+
+---
+
+#### Task 1A.2: Create Context Middleware
+**File:** `agents/src/autifyme_agents/middleware/context_middleware.py` (NEW)
+
+**Purpose:** Load base context from DB and inject into PM initial state
+
+**Functions:**
+```python
+async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
+    """Query DB for lightweight catalog summary"""
+    # Query: SELECT COUNT(*), family names, categories
+    # Return: CatalogSummary
+
+async def load_taxonomy_tree(storage: StorageInterface) -> TaxonomyTree:
+    """Query DB for taxonomy tree structure"""
+    # Query: Categories with parent-child relationships
+    # Return: TaxonomyTree
+
+async def load_base_context(
+    company_profile: CompanyProfile,
+    storage: StorageInterface
+) -> PMBaseContext:
+    """Load complete base context for PM"""
+    catalog_summary = await load_catalog_summary(storage)
+    taxonomy_tree = await load_taxonomy_tree(storage)
+    return PMBaseContext(
+        company_profile=company_profile,
+        catalog_summary=catalog_summary,
+        taxonomy_tree=taxonomy_tree,
+    )
+```
+
+**Error Handling:**
+- DB unavailable → Return empty summaries with flag `stale=True`
+- Graceful degradation → PM can still operate with limited context
+
+**Validation:**
+- REPL test with real DB connection
+- Test with DB unavailable (should not crash)
+- Verify query performance (<500ms)
+
+---
+
+#### Task 1A.3: Integrate Middleware with PM
 **File:** `agents/src/autifyme_agents/workflows/project_manager.py`
 
 **Changes:**
 ```python
-def create_project_manager(
+from autifyme_agents.middleware.context_middleware import load_base_context
+
+async def create_project_manager(
     company_profile: CompanyProfile,
     *,
     model: BaseChatModel | None = None,
@@ -336,186 +509,454 @@ def create_project_manager(
     storage: StorageInterface,
     channel: MessagingChannel | None = None,
 ) -> Any:
-    """
-    Create Minimal Project Manager - core orchestration only.
+    """Create Intelligent Project Manager with base context"""
 
-    Current: 0 specialists (building up incrementally)
+    # Load base context (NEW)
+    base_context = await load_base_context(company_profile, storage)
 
-    Capabilities:
-    - Intent detection
-    - Media download
-    - Planning (write_todos)
-    - HITL framework (persistence tools available but not callable yet)
-    """
-
-    if checkpointer is None:
-        raise ValueError("checkpointer is required")
-    if storage is None:
-        raise ValueError("storage is required")
-
-    llm = _resolve_model(model)
-    instructions = load_prompt("project_manager_minimal.prompt").format(
-        company_name=company_profile.name,
-        brand_voice=company_profile.brand_voice,
-        target_audience=company_profile.target_audience,
-    )
-    store = get_store()
-
-    # PM Tools - minimal set
-    pm_tools: list[Any] = []
-
-    if channel is not None:
-        from autifyme_agents.tools.platform_tools import create_platform_media_tools
-        pm_tools.extend(create_platform_media_tools(channel))
-
-    # HITL persistence tools (available but PM won't call them yet)
-    # Kept for framework testing
-    pm_tools.append(create_save_product_family_tool(storage))
-    pm_tools.append(create_save_campaign_tool(storage))
-
-    # NO SPECIALISTS YET - will add incrementally
-    subagents: list[Any] = []
-
-    # HITL config (for future)
-    interrupt_configs: dict[str, bool] = {
-        "save_product_family": True,
-        "save_campaign": True,
-    }
-
-    # Create minimal DeepAgent
-    project_manager = create_deep_agent(
-        tools=pm_tools,
-        system_prompt=instructions,
-        model=llm,
-        subagents=subagents,  # EMPTY
-        interrupt_on=interrupt_configs,
-        checkpointer=checkpointer,
-        store=store,
-        use_longterm_memory=True,
-        context_schema=CompanyContext,
-    )
+    # ... (rest of PM setup)
 
     initial_state = {
-        "company_profile": company_profile.model_dump(),
-        "status": "minimal",  # Track build-up state
-        "integrated_specialists": [],  # Track which specialists are active
+        "base_context": base_context.model_dump(),  # NEW
+        "status": "intelligent_core",
+        "integrated_specialists": [],
         "specialist_results": {},
     }
 
-    return project_manager.with_config(
-        {
-            "metadata": {
-                "version": "1.0.0-minimal",
-            },
-            "initial_state": initial_state,
-        }
-    )
+    return project_manager.with_config(...)
 ```
 
-### Task 1.4: Test Minimal PM
-**Test Cases:**
-1. **Intent Detection:** Send "catalog jar" → PM detects product_onboarding
-2. **Media Download:** Send image → PM downloads and stores path
-3. **Planning:** Send complex request → PM uses write_todos
-4. **Honest Communication:** PM acknowledges limitation, doesn't hallucinate
-
 **Validation:**
-- PM loads without errors
-- Intent detection works
-- Media download succeeds
-- No crashes, no hallucinations
+- PM starts successfully with base context
+- `initial_state["base_context"]` populated
+- Token count in acceptable range (<2K for base context)
+
+---
+
+#### Task 1A.4: Test Base Context Infrastructure
+**Test:** PM has base context at startup
 
 **Command:**
 ```bash
-uv run python tests/cli/test_specialist_isolated.py --mode=minimal_pm
+uv run python -c "
+from dotenv import load_dotenv; load_dotenv('.env')
+from autifyme_agents.workflows.project_manager import create_project_manager
+from autifyme_agents.integrations.storage import get_storage
+from autifyme_agents.schemas.models import CompanyProfile
+
+storage = get_storage()
+profile = CompanyProfile(name='Test Co', ...)
+pm = await create_project_manager(profile, storage=storage, ...)
+print('Base Context:', pm.initial_state['base_context'])
+"
+```
+
+**Success Criteria:**
+- ✅ PM loads without errors
+- ✅ `base_context` present in initial state
+- ✅ `catalog_summary` has realistic data
+- ✅ `taxonomy_tree` has structure
+- ✅ Total tokens <2K
+
+**Commit:**
+```bash
+git add .
+git commit -m "Phase 1A: Base Context Infrastructure
+
+- Create CatalogSummary, TaxonomyTree, PMBaseContext models
+- Implement context middleware (load_base_context)
+- Integrate with PM initial state
+- Test base context injection
+
+Status: PM now has catalog/taxonomy awareness at startup"
 ```
 
 ---
 
-## Phase 1 (REVISED): Build Intelligent PM Core 🚧 PLANNING (6-8 hours)
+### Phase 1B: PM Query Tools ⏳ PENDING (3-4 hours)
 
-### Goal
-PM with intelligent capabilities (ZERO specialists yet):
-- Multimodal understanding (analyze images)
-- Domain knowledge (B2B packaging, product concepts)
-- Company context (Pavisha: B2B packaging manufacturer in India)
-- Intelligent discussion (ask clarifying questions)
-- Strategic planning (understand → discuss → plan → prepare for delegation)
+**Goal:** Add summary-level query tools for PM to get details on-demand
 
-### Revised Responsibilities
+#### Task 1B.1: Create PM Context Query Tools
+**File:** `agents/src/autifyme_agents/tools/pm_context_tools.py` (NEW)
 
-**PM Should Be Able To:**
+**Tools:**
+```python
+1. search_catalog_summary(query: str) -> CatalogSearchSummary
+   # Input: "PET jar", "bottles"
+   # Output: List of matching family names, IDs, variant counts
+   # NOT full product data
 
-1. **Understand User Intent (Deep, Not Surface):**
-   - Analyze images to see what user sent
-   - Understand product from visual + text cues
-   - Recognize product patterns (jars, bottles, containers)
-   - Classify domains (product onboarding, marketing, operations)
+2. get_category_info(category_name: str) -> CategoryInfo
+   # Input: "Food & Beverage"
+   # Output: Category details, subcategories, product count
+   # NOT full product list
+```
 
-2. **Have Intelligent Discussions:**
-   - Ask clarifying questions when info missing
-   - Example: Image of jar → "I see a 500ml PET jar. What's the price? Do you have other sizes?"
-   - Guide user to provide complete information
-   - Don't blindly delegate with incomplete data
+**Implementation Pattern:**
+- Use `@tool` decorator from LangChain
+- Accept `storage: StorageInterface` parameter
+- Return Pydantic models (structured output)
+- Raise `ToolException` on errors
 
-3. **Know Company Context:**
-   - Pavisha = B2B packaging manufacturer (India)
-   - Product types: PET bottles, HDPE containers, glass jars, closures
-   - Target market: Food, beverage, pharma, personal care industries
-   - Pricing context: Budget-friendly, bulk orders
-   - Brand voice: Professional, helpful, technical expertise
+**Validation:**
+- REPL test each tool independently
+- Verify query performance (<500ms)
+- Test with various inputs (exact match, fuzzy, no match)
 
-4. **Have Domain Knowledge:**
-   - B2B vs B2C differences (bulk vs retail)
-   - Packaging domain knowledge (materials, capacities, grades)
-   - Product structure concepts (families, variants, SKUs)
-   - When to ask what questions
+---
 
-5. **Plan Strategically:**
-   - Understand what data is needed for downstream specialists
-   - Enrich data before delegation
-   - Example: Instead of passing "catalog this" to specialist, pass:
-     "Analyze PET jar family. B2B packaging. 3 capacities: 250ml, 500ml, 1L. Base price Rs 30. Company: Pavisha. Image shows transparent food-grade PET."
+#### Task 1B.2: Add Query Tools to PM
+**File:** `agents/src/autifyme_agents/workflows/project_manager.py`
 
-6. **Prepare for Future Specialists:**
-   - Know what Product Architecture Specialist will need (structure, variants, SKUs)
-   - Know what Taxonomy Specialist will need (category, industry, use cases)
-   - But can't call them yet (Phase 1 = 0 specialists)
-   - Can describe what WILL happen when specialists are added
+**Changes:**
+```python
+from autifyme_agents.tools.pm_context_tools import (
+    create_search_catalog_summary_tool,
+    create_get_category_info_tool,
+)
 
-### Revised Tasks
+def create_project_manager(...):
+    # PM Tools
+    pm_tools: list[Any] = []
 
-#### Task 1.1: Add Image Analysis to PM ⏳
-- Add `image_analysis_tool` to PM tools
-- Update PM prompt with image understanding guidance
-- Test: Send image + vague text → PM analyzes and asks smart questions
+    # Platform tools (existing)
+    if channel is not None:
+        pm_tools.extend(create_platform_media_tools(channel))
 
-#### Task 1.2: Add Domain Knowledge to PM ⏳
-- Update PM prompt with packaging domain knowledge
-- B2B vs B2C context
-- Product structure concepts (families, variants)
-- Common product types (jars, bottles, containers)
+    # NEW: Context query tools
+    pm_tools.append(create_search_catalog_summary_tool(storage))
+    pm_tools.append(create_get_category_info_tool(storage))
 
-#### Task 1.3: Add Company Context to PM ⏳
-- Update PM prompt with Pavisha details
-- Company profile: B2B packaging manufacturer
-- Product catalog: PET, HDPE, glass
-- Target market: Food, beverage, pharma
-- Brand voice: Professional, technical
+    # Image analysis tool (NEW - for multimodal PM)
+    pm_tools.append(image_analysis_tool)
 
-#### Task 1.4: Add Discussion Capability ⏳
-- Update PM prompt with clarifying question patterns
-- Examples of smart questions to ask
-- When to ask (missing data, ambiguous intent)
-- How to guide user to complete information
+    # HITL persistence tools (existing)
+    pm_tools.append(create_save_product_family_tool(storage))
+    pm_tools.append(create_save_campaign_tool(storage))
 
-#### Task 1.5: Test Intelligent PM ⏳
-- Test scenario: Image + "catalog this" → PM analyzes, asks questions
-- Test scenario: Vague request → PM guides user
-- Test scenario: Complete request → PM understands, plans (but can't execute yet)
-- Validate: PM is intelligent, not just routing
+    # ... rest of PM setup
+```
 
-**Status:** NEEDS TO START based on new paradigm
+**Validation:**
+- PM loads with new tools
+- Tools appear in PM's tool list
+- No import errors
+
+---
+
+#### Task 1B.3: Test PM Query Tools
+**Test:** PM can query catalog and taxonomy
+
+**Command:**
+```bash
+uv run python tests/cli/pm_chat.py
+```
+
+**Interaction:**
+```
+User: "What products do we make?"
+PM: [Uses base_context.catalog_summary] "We have 7 product families: PET Bottles, Glass Jars, ..."
+
+User: "Do we have PET jars?"
+PM: [Calls search_catalog_summary("PET jar")] "Let me check... [query result] Yes/No..."
+
+User: "What categories do we serve?"
+PM: [Uses base_context.taxonomy_tree] "We serve Food & Beverage, Personal Care, ..."
+```
+
+**Success Criteria:**
+- ✅ PM uses base context for quick answers
+- ✅ PM queries details when needed
+- ✅ Query latency acceptable (<500ms)
+- ✅ PM doesn't hallucinate (answers from data)
+
+**Commit:**
+```bash
+git commit -m "Phase 1B: PM Query Tools
+
+- Create search_catalog_summary and get_category_info tools
+- Add tools to PM
+- Test PM can query context on-demand
+
+Status: PM can now ask DB for details beyond base context"
+```
+
+---
+
+### Phase 1C: Intelligent PM Prompt ⏳ PENDING (3-4 hours)
+
+**Goal:** Update PM prompt with domain knowledge, discussion patterns, enrichment strategies
+
+#### Task 1C.1: Design Intelligent PM Prompt
+**File:** `agents/src/autifyme_agents/prompts/project_manager_intelligent.prompt` (NEW)
+
+**Structure:** (Following PROMPT_ENGINEERING_STANDARDS.md)
+```xml
+<background_information>
+You are the Intelligent Project Manager for {company_name}.
+
+You have BASE CONTEXT (loaded at startup):
+- Company profile: {company_name}, {brand_voice}, {target_audience}
+- Catalog summary: {catalog_summary}
+- Taxonomy tree: {taxonomy_tree}
+
+You have QUERY TOOLS for details:
+- search_catalog_summary: Find product families by name
+- get_category_info: Get category details
+
+You are MULTIMODAL:
+- Analyze images to understand products
+- Combine visual + text understanding
+
+Your role: INTELLIGENT ORCHESTRATOR
+- Understand user intent deeply (not just keywords)
+- Ask clarifying questions when info missing
+- Enrich data before delegating to specialists
+- Plan strategically based on context
+</background_information>
+
+<available_tools>
+## Context Tools
+- search_catalog_summary: Find families in catalog
+- get_category_info: Get taxonomy details
+
+## Analysis Tools
+- image_analysis_tool: Analyze product images
+
+## Platform Tools
+- download_{platform}_media: Get user attachments
+
+## Specialist Delegation (Phase 2+)
+[Specialists will be added incrementally]
+
+## Persistence Tools (HITL)
+- save_product_family: Persist after specialist analysis
+- save_campaign: Persist campaign data
+</available_tools>
+
+<instructions>
+## Your Intelligence
+
+### 1. Understand User Intent (Deep Analysis)
+
+When user sends message:
+1. Analyze any images (if present) → What product? What details visible?
+2. Check base context → Do we have this? Similar products?
+3. Extract user intent → Product onboarding? Marketing? Question?
+4. Identify missing info → Price? Quantities? Target market?
+
+### 2. Have Intelligent Discussions
+
+If info missing, DON'T blindly delegate. ASK:
+- Image of jar + "catalog this" → "I see a PET jar, ~500ml. What's the price? Target market?"
+- "Add new product" (no details) → "What product? Do you have images? Price?"
+- "Create campaign" (vague) → "Campaign for which products? What's the goal?"
+
+### 3. Use Your Context
+
+Base context (instant access):
+- catalog_summary: Know what families exist
+- taxonomy_tree: Know categories/industries
+- company_profile: Know brand voice, capabilities
+
+Query tools (when needed):
+- search_catalog_summary: Check if product exists
+- get_category_info: Get category details
+
+### 4. Enrich Before Delegating
+
+When you have complete info, delegate with ENRICHED input:
+
+BAD (raw delegation):
+→ Product Architecture Specialist: "catalog this" + [image]
+
+GOOD (enriched delegation):
+→ Product Architecture Specialist: "Analyze PET jar family for B2B food packaging.
+   Context: Company Pavisha (B2B packaging India), 3 capacities (250ml, 500ml, 1L),
+   base price Rs 30, transparent food-grade PET. Image shows wide mouth, screw-top.
+   Catalog search: No existing PET jar families. Your task: Design variant structure,
+   SKU pattern, confirm search."
+
+### 5. Plan Strategically
+
+Product onboarding workflow (when specialists available):
+1. Understand product (your job: image analysis, questions)
+2. Check catalog (your job: base context + query)
+3. Delegate to specialists WITH enriched context:
+   - Product Architecture Specialist (structure, SKUs)
+   - Taxonomy Specialist (categories, industries)
+   - Market Intelligence Specialist (positioning, segments)
+   - Visual Assets Specialist (if images)
+   - Content & SEO Specialist (after others complete)
+4. Synthesize outputs
+5. Present for HITL approval
+6. Persist to database
+
+### 6. Current Limitations
+
+No specialists integrated yet (Phase 1):
+- Can analyze and discuss intelligently
+- Can check catalog and answer questions
+- CANNOT complete workflows (need specialists)
+- Be honest: "I understand your request. Specialists are being integrated for [workflow]."
+</instructions>
+
+<examples>
+[2-3 canonical examples of intelligent PM behavior]
+
+Example 1: Vague product onboarding
+Example 2: Complete product onboarding (with discussion)
+Example 3: User question about catalog
+</examples>
+
+<output_format>
+Natural conversation with user.
+- Use base context to inform responses
+- Query for details when needed
+- Ask clarifying questions intelligently
+- Be honest about current capabilities
+</output_format>
+```
+
+---
+
+#### Task 1C.2: Update PM to Use Intelligent Prompt
+**File:** `agents/src/autifyme_agents/workflows/project_manager.py`
+
+**Changes:**
+```python
+instructions = load_prompt("project_manager_intelligent.prompt").format(
+    company_name=company_profile.name,
+    brand_voice=company_profile.brand_voice,
+    target_audience=company_profile.target_audience,
+    catalog_summary=base_context.catalog_summary.model_dump_json(),
+    taxonomy_tree=base_context.taxonomy_tree.model_dump_json(),
+)
+```
+
+---
+
+#### Task 1C.3: Test Intelligent PM Prompt
+**Test Scenarios:**
+1. Vague request + image → PM analyzes, asks questions
+2. Complete request → PM understands, prepares for delegation
+3. User question → PM answers from base context
+4. Missing info → PM guides user to provide details
+
+**Success Criteria:**
+- ✅ PM asks intelligent questions (not generic)
+- ✅ PM uses base context in responses
+- ✅ PM enriches understanding through discussion
+- ✅ PM prepares enriched input for future delegation
+
+**Commit:**
+```bash
+git commit -m "Phase 1C: Intelligent PM Prompt
+
+- Create project_manager_intelligent.prompt
+- Add domain knowledge, discussion patterns, enrichment strategies
+- Update PM to use intelligent prompt
+- Test PM intelligence across scenarios
+
+Status: PM is now intelligent orchestrator (context-aware, multimodal, discussion-capable)"
+```
+
+---
+
+### Phase 1D: End-to-End Testing ⏳ PENDING (2-3 hours)
+
+**Goal:** Validate PM handles all scenarios from context feeding matrix
+
+#### Task 1D.1: Comprehensive Scenario Testing
+
+**Test Matrix:** (From context feeding analysis)
+
+| Scenario | Test Case | Expected PM Behavior |
+|----------|-----------|---------------------|
+| New product (no match) | "Catalog PET jar" + image | Analyze image → Check base context → Query catalog → "No existing PET jars, need price..." |
+| Existing product variant | "Add 750ml to bottles" | Check base context → Query details → "I see we have PET Bottles family. 750ml is new variant..." |
+| Vague request | Image only, no text | Analyze image → "I see PET jar, ~500ml. What's price? Target market?" |
+| User question | "What products do we make?" | Use base context → "We have 7 families: [list]" |
+| Large catalog (future) | Simulate 10K products | Base context still <2K tokens, queries filter effectively |
+| DB unavailable | Simulate DB down | Degrade gracefully → "Using cached context, may be slightly stale" |
+
+**Validation:**
+- ✅ All 6 scenarios pass
+- ✅ PM uses base context appropriately
+- ✅ PM queries when needed (not every message)
+- ✅ PM asks intelligent questions
+- ✅ PM prepares enriched context for delegation
+- ✅ No hallucinations (answers from data)
+
+---
+
+#### Task 1D.2: Performance Validation
+
+**Metrics:**
+- Base context token size: <2K tokens ✅
+- Query latency: <500ms per query ✅
+- PM response time: <5s (including queries) ✅
+- No memory leaks, no crashes ✅
+
+---
+
+#### Task 1D.3: LangSmith Trace Review
+
+**Check Traces:**
+- PM correctly uses base context (visible in state)
+- PM queries only when needed (not redundant)
+- PM tool calls are appropriate
+- PM reasoning is sound
+
+---
+
+#### Task 1D.4: Final Phase 1 Commit
+
+**Commit:**
+```bash
+git add .
+git commit -m "Phase 1D: End-to-End Testing - PHASE 1 COMPLETE ✅
+
+Comprehensive testing across all scenarios:
+- ✅ New product (no match)
+- ✅ Existing product variant
+- ✅ Vague request + image
+- ✅ User questions
+- ✅ Large catalog (scalability)
+- ✅ DB unavailable (resilience)
+
+Performance metrics:
+- Base context: <2K tokens
+- Query latency: <500ms
+- Response time: <5s
+
+Phase 1 Status: COMPLETE
+- PM has base context (catalog summary, taxonomy tree)
+- PM can query details on-demand
+- PM is intelligent (multimodal, discussion-capable, context-aware)
+- PM enriches data before delegation (ready for Phase 2)
+
+Next: Phase 2 - Add Product Architecture Specialist"
+```
+
+---
+
+### Phase 1 Success Criteria (Overall)
+
+**✅ When Phase 1 is complete:**
+1. PM has base context at startup (company + catalog + taxonomy)
+2. PM can query DB for summary-level details
+3. PM analyzes images (multimodal understanding)
+4. PM asks intelligent clarifying questions
+5. PM checks catalog before responding
+6. PM enriches understanding through discussion
+7. PM prepares enriched input for future specialists
+8. PM handles all scenarios (new/existing/vague/questions/errors)
+9. PM scales (10K+ products, base context still <2K tokens)
+10. PM is resilient (degrades gracefully if DB down)
+
+**Then proceed to Phase 2:** Add Product Architecture Specialist (receives enriched input from intelligent PM)
 
 ---
 
@@ -1301,6 +1742,6 @@ Status: Production Ready"
 
 ---
 
-**Last Updated:** January 28, 2025
+**Last Updated:** October 28, 2025
 **Author:** Claude (with user guidance)
 **Status:** Awaiting user approval to proceed
