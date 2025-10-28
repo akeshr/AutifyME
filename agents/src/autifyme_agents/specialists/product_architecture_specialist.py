@@ -6,10 +6,10 @@ Domain Expertise:
 - Variant axis identification (dimensions that vary: size, color, material, etc.)
 - SKU architecture design (naming conventions, combinations)
 - Composition pattern understanding (how variants relate to family)
-- **NEW: Intelligent catalog matching for autonomous create vs update decisions**
+- Intelligent catalog matching for autonomous create vs update decisions
 
 Responsibilities:
-- **Search catalog FIRST** for existing product families (autonomous intelligence)
+- Search catalog for existing product families (autonomous intelligence)
 - Analyze multimodal input (user descriptions + images)
 - Identify variant dimensions and values
 - Calculate total SKU combinations
@@ -98,7 +98,7 @@ class ProductArchitectureDraft(BaseModel):
     material: str | None = Field(None, description="Primary material")
     condition: str = Field(default="new", description="new, refurbished, or used")
 
-    # **NEW: Intelligent matching for autonomous decisions**
+    # Intelligent matching for autonomous decisions
     catalog_match_analysis: ProductFamilySearchResult | None = Field(
         None,
         description="Results from catalog search - enables autonomous create vs update decisions"
@@ -123,16 +123,6 @@ class ProductArchitectureDraft(BaseModel):
 # Tools - Product Architecture Analysis
 # =============================================================================
 
-# NOTE: calculate_sku_combinations and generate_sku_pattern tools removed.
-# Modern LLMs can handle SKU calculations (basic multiplication) and pattern
-# generation (string formatting) autonomously. Tools reserved for external
-# system access only (database, APIs, vision).
-#
-# Specialist prompt includes instructions for:
-# - SKU calculation: Multiply variant axis value counts
-# - Pattern generation: Follow company conventions from state.company_profile
-# - Existing family extension: Use patterns from search_product_families results
-
 
 # =============================================================================
 # Specialist Factory
@@ -144,7 +134,7 @@ def create_product_architecture_specialist(storage: StorageInterface | None = No
     Create Product Architecture Specialist as SubAgent spec.
 
     Specialist Responsibilities:
-    - **Search catalog FIRST** for existing product families (enables autonomous decisions)
+    - Search catalog for existing product families (enables autonomous decisions)
     - Analyze product from multimodal input (images + user description)
     - Identify variant structure (axes and values)
     - Design SKU architecture (naming pattern, combinations)
@@ -153,7 +143,7 @@ def create_product_architecture_specialist(storage: StorageInterface | None = No
 
     Architecture:
     - SubAgent dict format (DeepAgents pattern)
-    - Analysis + intelligent search tools
+    - Analysis and intelligent search tools
     - Returns structured Pydantic model with match recommendations
     - PM uses recommendations for autonomous create vs update decisions
 
@@ -164,7 +154,7 @@ def create_product_architecture_specialist(storage: StorageInterface | None = No
         SubAgent spec with:
         - name: specialist identifier
         - description: delegation criteria
-        - tools: analysis + search tools
+        - tools: analysis and search tools
         - system_prompt: domain expertise instructions
     """
     system_prompt = load_prompt("specialists/product_architecture_specialist.prompt")
@@ -178,14 +168,10 @@ def create_product_architecture_specialist(storage: StorageInterface | None = No
         "Returns ProductArchitectureDraft with catalog match analysis."
     )
 
-    # Tools for intelligent product architecture analysis
-    # Only 2 tools: image analysis (vision) + search (database access)
-    # LLM handles SKU calculations and pattern generation autonomously
     tools = [
-        image_analysis_tool,  # Multimodal product analysis
+        image_analysis_tool,
     ]
 
-    # Add catalog search tool if storage provided (enables autonomous matching)
     if storage:
         from autifyme_agents.tools.product_search_tools import create_search_product_families_tool
         tools.append(create_search_product_families_tool(storage))
@@ -195,5 +181,5 @@ def create_product_architecture_specialist(storage: StorageInterface | None = No
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
-        "response_format": ProductArchitectureDraft,  # Enforce structured output
+        "response_format": ProductArchitectureDraft,
     }

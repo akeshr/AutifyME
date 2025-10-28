@@ -50,10 +50,8 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
 def _load_prompt(company_profile: CompanyProfile, base_context: Any) -> str:
     """Load and format PM prompt with company context and base context.
 
-    Phase 1C: Using intelligent prompt with catalog/taxonomy awareness.
     Base context is formatted into system prompt so LLM can see the actual data.
     """
-    # Phase 1C: Intelligent PM with context awareness
     prompt_template = load_prompt("project_manager_intelligent.prompt")
 
     # Format catalog summary for prompt
@@ -141,7 +139,7 @@ async def create_project_manager(
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
         pm_tools.extend(create_platform_media_tools(channel))
 
-    # NEW Phase 1B: Context query tools (on-demand detail lookups)
+    # Context query tools (on-demand detail lookups)
     pm_tools.append(create_search_catalog_summary_tool(storage))
     pm_tools.append(create_get_category_info_tool(storage))
 
@@ -149,12 +147,12 @@ async def create_project_manager(
     pm_tools.append(create_save_product_family_tool(storage))
     pm_tools.append(create_save_campaign_tool(storage))
 
-    # Phase 2: Product Architecture Specialist (structure, variants, SKUs)
+    # Product Architecture Specialist (structure, variants, SKUs)
     product_architecture_specialist = create_product_architecture_specialist(storage)
 
     # Specialists (SubAgent pattern)
     subagents: list[Any] = [
-        product_architecture_specialist,  # Phase 2: First specialist integrated
+        product_architecture_specialist,
     ]
 
     # HITL configuration
@@ -176,15 +174,15 @@ async def create_project_manager(
 
     initial_state = {
         "company_profile": company_profile.model_dump(),
-        "base_context": base_context.model_dump(),  # Phase 1B: Catalog + taxonomy awareness
-        "status": "phase_2_product_architecture",  # Phase 2: Product Architecture Specialist integrated
+        "base_context": base_context.model_dump(),
+        "status": "product_architecture_integrated",
         "current_workflow": None,
-        "specialist_results": {},  # Stores specialist outputs for sequential collaboration
+        "specialist_results": {},
     }
 
     return project_manager.with_config(
         {
-            "metadata": {"version": "1.0.0-phase1a"},  # Track build-up phase
+            "metadata": {"version": "1.0.0"},
             "initial_state": initial_state,
         }
     )
