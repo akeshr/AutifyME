@@ -20,6 +20,9 @@ from autifyme_agents.integrations.storage import get_store
 from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
+from autifyme_agents.specialists.product_architecture_specialist import (
+    create_product_architecture_specialist,
+)
 from autifyme_agents.tools.campaign_persistence_tools import (
     create_save_campaign_tool,
 )
@@ -146,8 +149,13 @@ async def create_project_manager(
     pm_tools.append(create_save_product_family_tool(storage))
     pm_tools.append(create_save_campaign_tool(storage))
 
+    # Phase 2: Product Architecture Specialist (structure, variants, SKUs)
+    product_architecture_specialist = create_product_architecture_specialist(storage)
+
     # Specialists (SubAgent pattern)
-    subagents: list[Any] = []
+    subagents: list[Any] = [
+        product_architecture_specialist,  # Phase 2: First specialist integrated
+    ]
 
     # HITL configuration
     interrupt_configs: dict[str, bool] = {
@@ -168,10 +176,10 @@ async def create_project_manager(
 
     initial_state = {
         "company_profile": company_profile.model_dump(),
-        "base_context": base_context.model_dump(),  # NEW: Catalog + taxonomy awareness
-        "status": "intelligent_core",  # Updated status (Phase 1A complete)
+        "base_context": base_context.model_dump(),  # Phase 1B: Catalog + taxonomy awareness
+        "status": "phase_2_product_architecture",  # Phase 2: Product Architecture Specialist integrated
         "current_workflow": None,
-        "specialist_results": {},
+        "specialist_results": {},  # Stores specialist outputs for sequential collaboration
     }
 
     return project_manager.with_config(

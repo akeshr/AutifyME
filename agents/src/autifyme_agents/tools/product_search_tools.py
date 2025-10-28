@@ -30,6 +30,33 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
+class VariantAxisInfo(BaseModel):
+    """Variant axis definition from an existing product family.
+
+    Represents a dimension along which variants differ (e.g., capacity, color, neck_finish).
+    Used when adding variants to existing families to maintain SKU pattern consistency.
+    """
+    axis_id: str = Field(..., description="UUID of variant axis")
+    name: str = Field(..., description="Internal axis name (e.g., 'capacity', 'color')")
+    display_label: str = Field(..., description="Human-readable label (e.g., 'Capacity', 'Color')")
+    sort_order: int = Field(..., description="Display order in UI")
+
+
+class VariantValueInfo(BaseModel):
+    """Variant value from an existing product family.
+
+    Represents a specific value for a variant axis (e.g., '500ml' for capacity, 'Clear' for color).
+    Includes SKU code used in pattern generation.
+    """
+    value_id: str = Field(..., description="UUID of variant value")
+    axis_id: str = Field(..., description="Parent variant axis UUID")
+    axis_name: str = Field(..., description="Parent axis name for grouping")
+    value: str = Field(..., description="Internal value (e.g., '500ml', 'Clear')")
+    display_label: str | None = Field(None, description="Optional UI label")
+    sku_code: str = Field(..., description="SKU code (e.g., '500ML', 'CLR')")
+    sort_order: int = Field(..., description="Display order within axis")
+
+
 class ProductFamilyMatch(BaseModel):
     """A single product family match result."""
 
@@ -40,6 +67,16 @@ class ProductFamilyMatch(BaseModel):
     material: str | None = Field(None, description="Primary material")
     sku_prefix: str = Field(..., description="SKU prefix")
     base_price: float = Field(..., description="Base price")
+
+    # Variant configuration (for add_variant scenarios)
+    variant_axes: list[VariantAxisInfo] | None = Field(
+        None,
+        description="Variant axes configured for this family (enables extending existing SKU patterns)"
+    )
+    variant_values: list[VariantValueInfo] | None = Field(
+        None,
+        description="Existing variant values per axis (for SKU pattern consistency)"
+    )
 
     # Match analysis
     match_score: float = Field(
@@ -251,8 +288,11 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
             ProductFamilySearchResult with ranked matches and recommendation
         """
         try:
-            # Build query - start with all active families
-            query = storage._ensure_client().table("product_families").select("*")
+            # Build query - join with variant axes and values for complete SKU config
+            # Nested select: product_families → variant_axes → variant_values
+            query = storage._ensure_client().table("product_families").select(
+                "*,variant_axes(id,name,display_label,sort_order,variant_values(id,value,display_label,sku_code,sort_order))"
+            )
             query = query.eq("is_active", True)
 
             # Apply filters
@@ -292,6 +332,36 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
                 if score > 0.2:
                     reasoning = _build_reasoning(factors, match_type, score)
 
+                    # Parse variant configuration if available
+                    variant_axes_list = None
+                    variant_values_list = None
+
+                    if family.get("variant_axes"):
+                        variant_axes_list = []
+                        variant_values_list = []
+
+                        for axis in family["variant_axes"]:
+                            # Add axis info
+                            variant_axes_list.append(VariantAxisInfo(
+                                axis_id=axis["id"],
+                                name=axis["name"],
+                                display_label=axis["display_label"],
+                                sort_order=axis["sort_order"],
+                            ))
+
+                            # Add all values for this axis
+                            if axis.get("variant_values"):
+                                for value in axis["variant_values"]:
+                                    variant_values_list.append(VariantValueInfo(
+                                        value_id=value["id"],
+                                        axis_id=axis["id"],
+                                        axis_name=axis["name"],
+                                        value=value["value"],
+                                        display_label=value.get("display_label"),
+                                        sku_code=value["sku_code"],
+                                        sort_order=value["sort_order"],
+                                    ))
+
                     match = ProductFamilyMatch(
                         family_id=family["id"],
                         product_group_id=family["product_group_id"],
@@ -300,6 +370,8 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
                         material=family.get("material"),
                         sku_prefix=family["sku_prefix"],
                         base_price=family["base_price"],
+                        variant_axes=variant_axes_list,
+                        variant_values=variant_values_list,
                         match_score=score,
                         match_type=match_type,
                         match_factors=factors,

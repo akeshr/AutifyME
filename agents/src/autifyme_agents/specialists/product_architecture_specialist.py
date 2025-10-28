@@ -123,144 +123,15 @@ class ProductArchitectureDraft(BaseModel):
 # Tools - Product Architecture Analysis
 # =============================================================================
 
-
-@tool
-def calculate_sku_combinations(variant_axes: list[dict[str, Any]]) -> dict[str, Any]:
-    """
-    Calculate total SKU combinations from variant axes.
-
-    Args:
-        variant_axes: List of variant axes with inferred_values
-            Example: [
-                {"name": "size", "inferred_values": ["S", "M", "L"]},
-                {"name": "color", "inferred_values": ["Red", "Blue"]}
-            ]
-
-    Returns:
-        Dict with:
-        - total_combinations: int (total SKUs)
-        - breakdown: str (human-readable explanation)
-        - is_manageable: bool (< 100 SKUs is manageable)
-    """
-    if not variant_axes:
-        return {
-            "total_combinations": 1,
-            "breakdown": "No variants - single standalone product",
-            "is_manageable": True,
-        }
-
-    total = 1
-    breakdown_parts = []
-
-    for axis in variant_axes:
-        values = axis.get("inferred_values", [])
-        count = len(values)
-        total *= count
-        breakdown_parts.append(f"{count} {axis['name']} options")
-
-    breakdown = " × ".join(breakdown_parts) + f" = {total} total SKUs"
-
-    return {
-        "total_combinations": total,
-        "breakdown": breakdown,
-        "is_manageable": total < 100,
-        "warning": (
-            f"Large SKU count ({total}) - consider reducing variant options"
-            if total >= 100
-            else None
-        ),
-    }
-
-
-@tool
-def generate_sku_pattern(
-    product_category: str, variant_axes: list[dict[str, Any]]
-) -> dict[str, Any]:
-    """
-    Generate SKU naming pattern based on product category and variants.
-
-    Args:
-        product_category: Product category (e.g., "footwear", "apparel", "accessories")
-        variant_axes: List of variant axes
-            Example: [
-                {"name": "size", "inferred_values": ["S", "M", "L"]},
-                {"name": "color", "inferred_values": ["Red", "Blue"]}
-            ]
-
-    Returns:
-        Dict with:
-        - prefix: str (SKU prefix)
-        - pattern: str (full pattern with placeholders)
-        - example_skus: list[str] (sample SKUs)
-        - reasoning: str (explanation)
-    """
-    # Generate prefix from category (first 3-4 uppercase letters)
-    prefix = product_category.upper()[:4].ljust(3, "X")
-
-    if not variant_axes:
-        return {
-            "prefix": prefix,
-            "pattern": f"{prefix}-001",
-            "example_skus": [f"{prefix}-001"],
-            "reasoning": "Standalone product with no variants - simple sequential numbering",
-        }
-
-    # Build pattern with variant placeholders
-    pattern_parts = [prefix]
-    example_values = []
-
-    for axis in variant_axes:
-        axis_name = axis["name"].upper()
-        pattern_parts.append(f"{{{axis_name}}}")
-
-        # Get first value for example
-        values = axis.get("inferred_values", [])
-        if values:
-            # Convert to SKU code (uppercase, limit to 3-5 chars)
-            example_code = values[0].upper().replace(" ", "")[:5]
-            example_values.append(example_code)
-
-    pattern = "-".join(pattern_parts)
-
-    # Generate example SKUs
-    example_skus = []
-    if len(variant_axes) >= 2:
-        # Generate a few combinations
-        axis1_values = variant_axes[0].get("inferred_values", [])[:3]
-        axis2_values = variant_axes[1].get("inferred_values", [])[:2]
-
-        for v1 in axis1_values:
-            for v2 in axis2_values:
-                code1 = v1.upper().replace(" ", "")[:5]
-                code2 = v2.upper().replace(" ", "")[:5]
-                parts = [prefix, code1, code2]
-                # Add remaining axes if exist
-                for axis in variant_axes[2:]:
-                    first_val = axis.get("inferred_values", [""])[0]
-                    parts.append(first_val.upper().replace(" ", "")[:5])
-                example_skus.append("-".join(parts))
-                if len(example_skus) >= 5:
-                    break
-            if len(example_skus) >= 5:
-                break
-    else:
-        # Single variant axis
-        for value in variant_axes[0].get("inferred_values", [])[:5]:
-            code = value.upper().replace(" ", "")[:5]
-            example_skus.append(f"{prefix}-{code}")
-
-    reasoning = (
-        f"Pattern uses {len(variant_axes)} variant dimensions. "
-        f"Each SKU uniquely identifies a product by {', '.join([a['name'] for a in variant_axes])}. "
-        f"Format is hierarchical: PREFIX-{'-'.join([a['name'].upper() for a in variant_axes])}"
-    )
-
-    return {
-        "prefix": prefix,
-        "pattern": pattern,
-        "example_skus": example_skus[:5],
-        "reasoning": reasoning,
-    }
+# NOTE: calculate_sku_combinations and generate_sku_pattern tools removed.
+# Modern LLMs can handle SKU calculations (basic multiplication) and pattern
+# generation (string formatting) autonomously. Tools reserved for external
+# system access only (database, APIs, vision).
+#
+# Specialist prompt includes instructions for:
+# - SKU calculation: Multiply variant axis value counts
+# - Pattern generation: Follow company conventions from state.company_profile
+# - Existing family extension: Use patterns from search_product_families results
 
 
 # =============================================================================
@@ -308,10 +179,10 @@ def create_product_architecture_specialist(storage: StorageInterface | None = No
     )
 
     # Tools for intelligent product architecture analysis
+    # Only 2 tools: image analysis (vision) + search (database access)
+    # LLM handles SKU calculations and pattern generation autonomously
     tools = [
         image_analysis_tool,  # Multimodal product analysis
-        calculate_sku_combinations,  # SKU count calculation
-        generate_sku_pattern,  # SKU naming design
     ]
 
     # Add catalog search tool if storage provided (enables autonomous matching)
