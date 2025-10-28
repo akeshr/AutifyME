@@ -128,7 +128,6 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 **Must-read before changes**:
 - `core/DOMAIN_DESIGN_GUIDELINES.md` - **[CRITICAL]** Architectural standards for new domains/workflows - ALWAYS reference when designing new workflows
 - `core/AGENTS_DESIGN.md` - Hierarchical model, context engineering
-- `core/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md` - **[GROUND TRUTH]** As-built implementation
 - `tech/LANGCHAIN_V1_FEATURES.md` - LangChain v1 native patterns
 
 **Complete index with 30+ docs**: See `docs/architecture/README.md`

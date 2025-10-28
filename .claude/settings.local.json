@@ -48,7 +48,8 @@
       "WebFetch(domain:share.google)",
       "WebFetch(domain:www.google.com)",
       "Bash(xargs basename:*)",
-      "Bash(uv tool run:*)"
+      "Bash(uv tool run:*)",
+      "SlashCommand(/test-intelligent)"
     ],
     "deny": [],
     "ask": []
