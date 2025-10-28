@@ -4,6 +4,7 @@ Tests PM's actual conversational behavior without manual input.
 Validates intelligent prompt is working correctly.
 """
 
+import asyncio
 import uuid
 
 from autifyme_agents.integrations.storage.postgres_saver_factory import (
@@ -55,7 +56,7 @@ def invoke_pm_and_print(pm, message: str, thread_id: str):
         return None
 
 
-def main():
+async def main():
     """Run all behavior tests automatically."""
     print("\n" + "=" * 80)
     print("         PHASE 1 BEHAVIOR VALIDATION (AUTOMATED)")
@@ -67,7 +68,7 @@ def main():
 
     # Create PM once for all tests
     print("\nInitializing PM...")
-    pm = create_project_manager(
+    pm = await create_project_manager(
         company_profile=company_profile,
         checkpointer=checkpointer,
         storage=storage,
@@ -153,4 +154,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

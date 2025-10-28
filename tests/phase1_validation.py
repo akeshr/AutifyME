@@ -145,7 +145,7 @@ def test_query_tools():
     # Don't cleanup - other tests need storage
 
 
-def test_pm_initialization():
+async def test_pm_initialization():
     """Test 3: PM initializes with all components."""
     print_header("Test 3: PM Initialization")
 
@@ -154,7 +154,7 @@ def test_pm_initialization():
     checkpointer = get_checkpointer()
 
     start_time = time.time()
-    pm = create_project_manager(
+    pm = await create_project_manager(
         company_profile=company_profile, checkpointer=checkpointer, storage=storage
     )
     init_time = (time.time() - start_time) * 1000
@@ -212,7 +212,7 @@ def test_scenario_matrix():
     # Don't cleanup - other tests need storage
 
 
-def test_performance_summary():
+async def test_performance_summary():
     """Test 5: Overall performance validation."""
     print_header("Test 5: Performance Summary")
 
@@ -222,13 +222,13 @@ def test_performance_summary():
     # Measure full PM creation with base context
     start_time = time.time()
 
-    base_context = asyncio.run(load_base_context(company_profile, storage))
+    base_context = await load_base_context(company_profile, storage)
     context_json = base_context.model_dump_json()
     enc = tiktoken.get_encoding("cl100k_base")
     token_count = len(enc.encode(context_json))
 
     checkpointer = get_checkpointer()
-    pm = create_project_manager(
+    pm = await create_project_manager(
         company_profile=company_profile, checkpointer=checkpointer, storage=storage
     )
 
@@ -262,9 +262,9 @@ def main():
         # Run tests
         asyncio.run(test_base_context_loading())
         test_query_tools()
-        test_pm_initialization()
+        asyncio.run(test_pm_initialization())
         test_scenario_matrix()
-        test_performance_summary()
+        asyncio.run(test_performance_summary())
 
         # Summary
         print_header("PHASE 1 VALIDATION SUMMARY")

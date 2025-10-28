@@ -7,6 +7,7 @@ Tests PM's actual conversational behavior to validate:
 - Follows intelligent prompt guidance
 """
 
+import asyncio
 import uuid
 
 from autifyme_agents.integrations.storage.postgres_saver_factory import (
@@ -58,7 +59,7 @@ def invoke_pm(pm, message: str, thread_id: str):
         return None
 
 
-def test_scenario_1_user_question():
+async def test_scenario_1_user_question():
     """Scenario 1: User asks about catalog (should use base context)."""
     print_scenario(
         "User Catalog Question",
@@ -69,7 +70,7 @@ def test_scenario_1_user_question():
     company_profile = storage.get_company_profile()
     checkpointer = get_checkpointer()
 
-    pm = create_project_manager(
+    pm = await create_project_manager(
         company_profile=company_profile,
         checkpointer=checkpointer,
         storage=storage,
@@ -90,7 +91,7 @@ def test_scenario_1_user_question():
     input("\nPress Enter to continue to next scenario...")
 
 
-def test_scenario_2_catalog_check():
+async def test_scenario_2_catalog_check():
     """Scenario 2: User asks if specific product exists (should query)."""
     print_scenario(
         "Product Existence Check",
@@ -101,7 +102,7 @@ def test_scenario_2_catalog_check():
     company_profile = storage.get_company_profile()
     checkpointer = get_checkpointer()
 
-    pm = create_project_manager(
+    pm = await create_project_manager(
         company_profile=company_profile,
         checkpointer=checkpointer,
         storage=storage,
@@ -122,7 +123,7 @@ def test_scenario_2_catalog_check():
     input("\nPress Enter to continue to next scenario...")
 
 
-def test_scenario_3_vague_request():
+async def test_scenario_3_vague_request():
     """Scenario 3: Vague product request (should ask clarifying questions)."""
     print_scenario(
         "Vague Product Request",
@@ -133,7 +134,7 @@ def test_scenario_3_vague_request():
     company_profile = storage.get_company_profile()
     checkpointer = get_checkpointer()
 
-    pm = create_project_manager(
+    pm = await create_project_manager(
         company_profile=company_profile,
         checkpointer=checkpointer,
         storage=storage,
@@ -155,7 +156,7 @@ def test_scenario_3_vague_request():
     input("\nPress Enter to continue to next scenario...")
 
 
-def test_scenario_4_complete_request():
+async def test_scenario_4_complete_request():
     """Scenario 4: Complete product request (should prepare enriched context)."""
     print_scenario(
         "Complete Product Request",
@@ -166,7 +167,7 @@ def test_scenario_4_complete_request():
     company_profile = storage.get_company_profile()
     checkpointer = get_checkpointer()
 
-    pm = create_project_manager(
+    pm = await create_project_manager(
         company_profile=company_profile,
         checkpointer=checkpointer,
         storage=storage,
@@ -193,7 +194,7 @@ def test_scenario_4_complete_request():
     input("\nPress Enter to continue to next scenario...")
 
 
-def test_scenario_5_ambiguous_match():
+async def test_scenario_5_ambiguous_match():
     """Scenario 5: Ambiguous product match (should clarify)."""
     print_scenario(
         "Ambiguous Product Match",
@@ -204,7 +205,7 @@ def test_scenario_5_ambiguous_match():
     company_profile = storage.get_company_profile()
     checkpointer = get_checkpointer()
 
-    pm = create_project_manager(
+    pm = await create_project_manager(
         company_profile=company_profile,
         checkpointer=checkpointer,
         storage=storage,
@@ -226,7 +227,7 @@ def test_scenario_5_ambiguous_match():
     input("\nPress Enter to finish...")
 
 
-def main():
+async def main():
     """Run all interactive behavior tests."""
     print("\n")
     print("=" * 80)
@@ -245,11 +246,11 @@ def main():
     input("\nPress Enter to start tests...")
 
     try:
-        test_scenario_1_user_question()
-        test_scenario_2_catalog_check()
-        test_scenario_3_vague_request()
-        test_scenario_4_complete_request()
-        test_scenario_5_ambiguous_match()
+        await test_scenario_1_user_question()
+        await test_scenario_2_catalog_check()
+        await test_scenario_3_vague_request()
+        await test_scenario_4_complete_request()
+        await test_scenario_5_ambiguous_match()
 
         print_separator()
         print("INTERACTIVE BEHAVIOR TESTS COMPLETE")
@@ -271,4 +272,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

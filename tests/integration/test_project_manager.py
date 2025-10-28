@@ -32,11 +32,12 @@ def sample_company_profile():
 class TestProjectManagerIntegration:
     """Integration tests for Project Manager orchestration."""
 
-    def test_create_project_manager_basic(self, sample_company_profile, mock_storage):
+    @pytest.mark.asyncio
+    async def test_create_project_manager_basic(self, sample_company_profile, mock_storage):
         """PM should be created successfully with required dependencies."""
         checkpointer = MemorySaver()
 
-        pm = create_project_manager(
+        pm = await create_project_manager(
             company_profile=sample_company_profile,
             checkpointer=checkpointer,
             storage=mock_storage,
@@ -46,10 +47,11 @@ class TestProjectManagerIntegration:
         assert hasattr(pm, "invoke")
         assert hasattr(pm, "stream")
 
-    def test_project_manager_requires_checkpointer(self, sample_company_profile, mock_storage):
+    @pytest.mark.asyncio
+    async def test_project_manager_requires_checkpointer(self, sample_company_profile, mock_storage):
         """PM creation should fail without checkpointer (DeepAgents requirement)."""
         with pytest.raises((ValueError, TypeError)) as exc_info:
-            create_project_manager(
+            await create_project_manager(
                 company_profile=sample_company_profile,
                 checkpointer=None,
                 storage=mock_storage,
@@ -58,12 +60,13 @@ class TestProjectManagerIntegration:
         # DeepAgents requires a checkpointer
         assert exc_info is not None
 
-    def test_project_manager_requires_storage(self, sample_company_profile):
+    @pytest.mark.asyncio
+    async def test_project_manager_requires_storage(self, sample_company_profile):
         """PM creation should fail without storage adapter."""
         checkpointer = MemorySaver()
 
         with pytest.raises((ValueError, AttributeError)) as exc_info:
-            create_project_manager(
+            await create_project_manager(
                 company_profile=sample_company_profile,
                 checkpointer=checkpointer,
                 storage=None,
@@ -71,11 +74,12 @@ class TestProjectManagerIntegration:
 
         assert exc_info is not None
 
-    def test_project_manager_has_interrupt_config(self, sample_company_profile, mock_storage):
+    @pytest.mark.asyncio
+    async def test_project_manager_has_interrupt_config(self, sample_company_profile, mock_storage):
         """PM should be configured with HITL interrupts for save_product."""
         checkpointer = MemorySaver()
 
-        pm = create_project_manager(
+        pm = await create_project_manager(
             company_profile=sample_company_profile,
             checkpointer=checkpointer,
             storage=mock_storage,
@@ -87,7 +91,8 @@ class TestProjectManagerIntegration:
         assert pm is not None
 
     @pytest.mark.skip(reason="Requires real LLM - use for manual testing")
-    def test_project_manager_cataloging_delegation(
+    @pytest.mark.asyncio
+    async def test_project_manager_cataloging_delegation(
         self,
         sample_company_profile,
         mock_storage,
@@ -95,7 +100,7 @@ class TestProjectManagerIntegration:
         """PM should successfully delegate to cataloging department."""
         checkpointer = MemorySaver()
 
-        pm = create_project_manager(
+        pm = await create_project_manager(
             company_profile=sample_company_profile,
             checkpointer=checkpointer,
             storage=mock_storage,
@@ -121,11 +126,12 @@ class TestProjectManagerIntegration:
         assert len(result["messages"]) > 0
 
     @pytest.mark.skip(reason="Requires real LLM - use for manual testing")
-    def test_project_manager_streaming(self, sample_company_profile, mock_storage):
+    @pytest.mark.asyncio
+    async def test_project_manager_streaming(self, sample_company_profile, mock_storage):
         """PM should support streaming for real-time updates."""
         checkpointer = MemorySaver()
 
-        pm = create_project_manager(
+        pm = await create_project_manager(
             company_profile=sample_company_profile,
             checkpointer=checkpointer,
             storage=mock_storage,
@@ -145,11 +151,12 @@ class TestProjectManagerIntegration:
         # Should receive at least one event
         assert len(events) > 0
 
-    def test_project_manager_initial_state(self, sample_company_profile, mock_storage):
+    @pytest.mark.asyncio
+    async def test_project_manager_initial_state(self, sample_company_profile, mock_storage):
         """PM should initialize with proper state structure."""
         checkpointer = MemorySaver()
 
-        pm = create_project_manager(
+        pm = await create_project_manager(
             company_profile=sample_company_profile,
             checkpointer=checkpointer,
             storage=mock_storage,
@@ -166,14 +173,15 @@ class TestProjectManagerIntegration:
 class TestProjectManagerConfiguration:
     """Unit tests for PM configuration and setup."""
 
-    def test_project_manager_uses_custom_model(self, sample_company_profile, mock_storage):
+    @pytest.mark.asyncio
+    async def test_project_manager_uses_custom_model(self, sample_company_profile, mock_storage):
         """PM should accept custom model override."""
         from autifyme_agents.core.llm_factory import get_llm
 
         checkpointer = MemorySaver()
         custom_model = get_llm(model="gpt-4.1-mini-2025-04-14", temperature=0.5)
 
-        pm = create_project_manager(
+        pm = await create_project_manager(
             company_profile=sample_company_profile,
             checkpointer=checkpointer,
             storage=mock_storage,
@@ -199,7 +207,8 @@ class TestProjectManagerConfiguration:
 class TestProjectManagerEndToEnd:
     """End-to-end tests for PM with full workflow."""
 
-    def test_pm_text_only_cataloging_workflow(
+    @pytest.mark.asyncio
+    async def test_pm_text_only_cataloging_workflow(
         self,
         sample_company_profile,
         mock_storage,
@@ -207,7 +216,7 @@ class TestProjectManagerEndToEnd:
         """Full E2E: Text-only product cataloging through PM."""
         checkpointer = MemorySaver()
 
-        pm = create_project_manager(
+        pm = await create_project_manager(
             company_profile=sample_company_profile,
             checkpointer=checkpointer,
             storage=mock_storage,
@@ -230,11 +239,12 @@ class TestProjectManagerEndToEnd:
         assert "messages" in result
         assert len(result["messages"]) > 0
 
-    def test_pm_with_interrupt_workflow(self, sample_company_profile, mock_storage):
+    @pytest.mark.asyncio
+    async def test_pm_with_interrupt_workflow(self, sample_company_profile, mock_storage):
         """Full E2E: Cataloging with HITL interrupt on save_product."""
         checkpointer = MemorySaver()
 
-        pm = create_project_manager(
+        pm = await create_project_manager(
             company_profile=sample_company_profile,
             checkpointer=checkpointer,
             storage=mock_storage,

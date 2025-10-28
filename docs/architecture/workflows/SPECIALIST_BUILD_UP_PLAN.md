@@ -1311,16 +1311,44 @@ Trust specialist autonomy. They know their job.
 
 ---
 
-### Task 2.2: Review & Optimize Specialist Tools
-**Critical Question:** Do we need all these tools, or can intelligent LLM reason through some?
+### Task 2.2: Optimize Specialist Tools (Trust Intelligent LLMs)
+**Decision:** Reduce from 4 tools to 2 tools
 
-**Current Tools:**
-- search_product_families
-- image_analysis_tool
-- calculate_sku_combinations
-- generate_sku_pattern
+**✅ KEEP (Essential - External System Access):**
 
-**Review Needed:** Which are essential vs which LLM can handle autonomously?
+1. **search_product_families** - Database access
+   - Returns existing product families with fuzzy matching
+   - **CRITICAL:** Must return full SKU configuration when match found:
+     - sku_prefix, sku_pattern, variant_axes, variant_values
+   - Enables specialist to extend existing patterns (not regenerate)
+
+2. **image_analysis_tool** - Vision capabilities
+   - Multimodal product understanding
+   - Required for image-based analysis
+
+**❌ REMOVE (LLM Can Handle Autonomously):**
+
+3. ~~calculate_sku_combinations~~
+   - Basic multiplication (3 sizes × 2 colors = 6 SKUs)
+   - LLM can calculate and check if > 100 threshold
+   - Move logic to prompt instructions
+
+4. ~~generate_sku_pattern~~
+   - String formatting and naming conventions
+   - LLM can generate following rules from state.company_profile
+   - For existing families: Uses pattern from search results
+   - For new families: Generates from company conventions
+
+**Implementation:**
+- Remove tool files: calculate_sku_combinations, generate_sku_pattern
+- Update specialist prompt with SKU calculation/pattern generation instructions
+- Add sku_naming_convention to state.company_profile schema
+- Verify search_product_families returns full SKU config
+
+**Rationale:**
+- Trust intelligent LLMs for reasoning (not basic math/string manipulation)
+- Tools only for external system access (DB, APIs)
+- Simpler architecture, more flexible specialist behavior
 
 ---
 
@@ -1411,12 +1439,140 @@ Trust specialist autonomy. They know their job.
 
 ---
 
-### Task 2.1: Review Product Architecture Specialist Prompt
-**File:** `agents/src/autifyme_agents/prompts/specialists/product_architecture_specialist.prompt`
+## Phase 2 Next Steps - Implementation Order
 
-**Audit Against Standards:**
-- [ ] XML structure (background, tools, instructions, examples, output)
-- [ ] No code snippets (only Pydantic model names)
+### Step 1: Tool Optimization (Immediate)
+**Task:** Remove unnecessary tools, enhance search tool
+
+**Actions:**
+1. Check search_product_families tool returns full SKU config
+2. Remove calculate_sku_combinations tool file
+3. Remove generate_sku_pattern tool file
+4. Update specialist factory to use only 2 tools
+
+**Why First:** Clean foundation before prompt updates
+
+---
+
+### Step 2: Schema Enhancement
+**Task:** Add SKU naming conventions to company_profile
+
+**Actions:**
+1. Update CompanyProfile schema with sku_naming_convention
+2. Update company context loading to include conventions
+3. Verify state.company_profile accessible to specialist
+
+**Why Second:** Enables specialist to generate patterns from conventions
+
+---
+
+### Step 3: Specialist Prompt Update
+**Task:** Make autonomous, context-driven, include SKU reasoning
+
+**Actions:**
+1. Add autonomous decision-making emphasis
+2. Document state access patterns
+3. Add SKU calculation instructions (multiply variant axes)
+4. Add SKU pattern generation from company conventions
+5. Update examples to show context-based delegation
+6. Remove tool-specific instructions for removed tools
+
+**Why Third:** Prompt works with optimized tools and enhanced schema
+
+---
+
+### Step 4: PM Prompt Update
+**Task:** Add delegation pattern for Product Architecture Specialist
+
+**Actions:**
+1. Add delegation section with enriched context pattern
+2. Include examples showing product facts (not instructions)
+3. Document state pointer usage
+
+**Why Fourth:** PM knows how to delegate after specialist is ready
+
+---
+
+### Step 5: PM Integration
+**Task:** Wire specialist into PM
+
+**Actions:**
+1. Import specialist factory
+2. Add to subagents list
+3. Update initial_state tracking
+
+**Why Fifth:** Integration after all components ready
+
+---
+
+### Step 6: Isolated Testing
+**Task:** Test specialist with 5 scenarios
+
+**Scenarios:**
+1. New product (create_new)
+2. Existing family (add_variant, uses existing SKU pattern)
+3. Ambiguous match (ask_user)
+4. Missing data (graceful degradation)
+5. Image failure (text-only analysis)
+
+**Why Sixth:** Validate specialist works independently
+
+---
+
+### Step 7: End-to-End Testing
+**Task:** Test PM → Specialist flow
+
+**Flow:**
+1. User vague request
+2. PM enriches context
+3. PM delegates with product facts
+4. Specialist analyzes
+5. PM presents results
+
+**Validate:**
+- Delegation is context-rich (not instructions)
+- Specialist returns structured output
+- PM handles recommendations
+
+**Why Seventh:** Validate integration works
+
+---
+
+### Step 8: Multi-Turn Testing
+**Task:** Test low confidence scenarios
+
+**Flow:**
+1. Specialist returns low confidence + flags
+2. PM interprets flags
+3. PM asks user for clarification
+4. PM re-delegates with updated facts
+
+**Why Eighth:** Validate error handling and recovery
+
+---
+
+### Step 9: Documentation & Commit
+**Task:** Capture learnings, commit phase
+
+**Why Last:** Complete phase cleanly
+
+---
+
+## Immediate Next Action
+
+**START HERE:** Step 1 - Tool Optimization
+
+**First Command:**
+Check if search_product_families returns full SKU configuration
+
+```bash
+# Check search tool output schema
+grep -r "sku_prefix\|sku_pattern" agents/src/autifyme_agents/tools/product_search_tools.py
+```
+
+**Then:** Remove calculate_sku_combinations and generate_sku_pattern tools
+
+---
 - [ ] Right altitude (low-medium: domain execution)
 - [ ] 2-4 canonical examples (diverse scenarios)
 - [ ] Tool references match implementations

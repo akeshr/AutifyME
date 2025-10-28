@@ -18,6 +18,7 @@ Usage:
     uv run python -m autifyme_agents.cli.pm_chat --interactive
 """
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -30,7 +31,7 @@ from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.workflows.project_manager import create_project_manager
 
 
-def chat_with_pm(message: str, image_path: Path | None = None, thread_id: str = "local_test"):
+async def chat_with_pm(message: str, image_path: Path | None = None, thread_id: str = "local_test"):
     """Send a message to PM and print response.
 
     Args:
@@ -48,7 +49,7 @@ def chat_with_pm(message: str, image_path: Path | None = None, thread_id: str = 
     checkpointer = get_checkpointer()
 
     # Create PM
-    pm = create_project_manager(
+    pm = await create_project_manager(
         company_profile=company_profile,
         checkpointer=checkpointer,
         storage=storage,
@@ -95,7 +96,7 @@ def chat_with_pm(message: str, image_path: Path | None = None, thread_id: str = 
         raise
 
 
-def interactive_mode():
+async def interactive_mode():
     """Interactive chat loop."""
     print("=" * 60)
     print("PM INTERACTIVE CHAT")
@@ -148,7 +149,7 @@ def interactive_mode():
 
             # Send message
             message_count += 1
-            chat_with_pm(user_input, media_path, thread_id)
+            await chat_with_pm(user_input, media_path, thread_id)
             media_path = None  # Reset after use
 
         except KeyboardInterrupt:
@@ -179,7 +180,7 @@ def main():
             return
 
         if sys.argv[1] in ["--interactive", "-i"]:
-            interactive_mode()
+            asyncio.run(interactive_mode())
             return
 
         if sys.argv[1] in ["--media", "--image", "-img"]:
@@ -188,12 +189,12 @@ def main():
                 sys.exit(1)
             media_path = Path(sys.argv[2])
             message = " ".join(sys.argv[3:])
-            chat_with_pm(message, media_path)
+            asyncio.run(chat_with_pm(message, media_path))
             return
 
         # Default: treat all args as message
         message = " ".join(sys.argv[1:])
-        chat_with_pm(message)
+        asyncio.run(chat_with_pm(message))
     else:
         # No args: show help
         print(__doc__)
