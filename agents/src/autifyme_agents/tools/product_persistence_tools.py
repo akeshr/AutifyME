@@ -290,6 +290,7 @@ class PersistenceResult(BaseModel):
     """Result of atomic product family persistence."""
 
     success: bool
+    operation: str | None = Field(None, description="'create' or 'update'")
     product_family_id: UUID | None = None
     variant_axis_ids: dict[str, UUID] = Field(
         default_factory=dict, description="Map of axis_name -> axis_id"
@@ -364,46 +365,81 @@ async def save_product_family_atomic(
     storage: SupabaseStorageClient, product_family: ProductFamilyInput
 ) -> PersistenceResult:
     """
-    Atomically persist complete product family across 9 tables.
+    Atomically persist or update complete product family across 9 tables.
+
+    Operation Types:
+    - CREATE: New product family (product_group_id doesn't exist)
+    - UPDATE: Existing product family (product_group_id exists) - merges changes
+    - ADD_VARIANT: Add new variants to existing family (match_recommendation="add_variant")
 
     Transaction order (respects foreign key dependencies):
-    1. product_families (parent)
-    2. variant_axes (references family)
-    3. variant_values (references axes)
-    4. products (references family)
-    5. product_variant_values (references products + values)
-    6. product_family_industries (references family + industries)
-    7. customer_segments (references family)
-    8. product_images (references family or products)
-    9. marketing_content (references family/products/segments/industries)
+    1. product_families (parent) - INSERT or UPDATE
+    2. variant_axes (references family) - MERGE (insert new, update existing)
+    3. variant_values (references axes) - MERGE (insert new, update existing)
+    4. products (references family) - MERGE (insert new, update existing)
+    5. product_variant_values (M:N junctions) - DELETE+INSERT per product
+    6. product_family_industries - DELETE+INSERT all (for updates)
+    7. customer_segments - DELETE+INSERT all (for updates)
+    8. product_images - DELETE+INSERT all (for updates)
+    9. marketing_content - DELETE+INSERT all (for updates)
 
     Automatic triggers handle:
-    - product_price_history
-    - product_inventory_history
-    - audit_log
+    - product_price_history (on products.price change)
+    - product_inventory_history (on products.stock_quantity change)
+    - audit_log (on all INSERT/UPDATE/DELETE operations)
 
     Args:
         storage: Supabase storage client
         product_family: Complete product family specification
 
     Returns:
-        PersistenceResult with all generated UUIDs or error details
+        PersistenceResult with operation type and all UUIDs or error details
 
     Raises:
         ToolException: On validation failure or database error
     """
     result = PersistenceResult(success=False)
 
-    # Initialize maps that will be populated based on match recommendation
+    # Initialize maps that will be populated based on operation type
     axis_id_map: dict[str, UUID] = {}
     value_id_map: dict[str, UUID] = {}
     family_id: UUID | None = None
+    operation_type: str = "create"  # Default to create, will change if updating
+
+    # ========================================================================
+    # EXISTENCE CHECK: Determine if this is CREATE or UPDATE
+    # ========================================================================
+    client = storage._ensure_client()
+
+    # Check if product_group_id already exists
+    existing_family_check = client.table("product_families").select("id").eq("product_group_id", product_family.product_group_id).execute()
+
+    if existing_family_check.data:
+        # Product family exists - this is an UPDATE operation
+        operation_type = "update"
+        family_id = UUID(existing_family_check.data[0]["id"])
+        result.product_family_id = family_id
+        result.operation = "update"
+
+        logger.info(
+            f"Existing product family found with product_group_id='{product_family.product_group_id}' - performing UPDATE",
+            extra={"family_id": str(family_id), "product_group_id": product_family.product_group_id}
+        )
+    else:
+        # New product family - CREATE operation
+        operation_type = "create"
+        result.operation = "create"
+
+        logger.info(
+            f"No existing product family found - performing CREATE",
+            extra={"product_group_id": product_family.product_group_id}
+        )
 
     # ========================================================================
     # CATALOG MATCHING: Handle search results from Product Architecture Specialist
     # ========================================================================
-    if product_family.match_recommendation == "ask_user":
-        # Exact match found - require user confirmation before proceeding
+    if product_family.match_recommendation == "ask_user" and operation_type == "create":
+        # Exact match found but this is a new create - require user confirmation
         raise ToolException(
             f"CATALOG MATCH FOUND: A product family with business_id='{product_family.product_group_id}' "
             f"or SKU prefix='{product_family.sku_prefix}' already exists (ID: {product_family.matched_family_id}). "
@@ -411,7 +447,7 @@ async def save_product_family_atomic(
             f"This is an exact match requiring user decision."
         )
 
-    elif product_family.match_recommendation == "add_variant":
+    elif product_family.match_recommendation == "add_variant" and operation_type == "create":
         # Variant of existing family - use existing family_id, skip family creation
         if not product_family.matched_family_id:
             raise ToolException(
@@ -426,9 +462,10 @@ async def save_product_family_atomic(
         # Use existing family ID (skip Step 1)
         family_id = UUID(product_family.matched_family_id)
         result.product_family_id = family_id
+        operation_type = "add_variant"
+        result.operation = "add_variant"
 
         # Load existing variant axes to use their IDs
-        client = storage._ensure_client()
         existing_axes_response = client.table("variant_axes").select("*").eq("product_family_id", str(family_id)).execute()
 
         axis_id_map = {
@@ -449,56 +486,146 @@ async def save_product_family_atomic(
             extra={"family_id": str(family_id)}
         )
 
-    # else: match_recommendation is None or "create_new" -> proceed normally
+    # ========================================================================
+    # LOAD EXISTING DATA: If UPDATE, load existing structure
+    # ========================================================================
+    if operation_type == "update":
+        # Load existing variant axes
+        existing_axes_response = client.table("variant_axes").select("*").eq("product_family_id", str(family_id)).execute()
+
+        axis_id_map = {
+            axis["name"]: UUID(axis["id"])
+            for axis in existing_axes_response.data
+        }
+
+        # Load existing variant values
+        if axis_id_map:
+            existing_values_response = client.table("variant_values").select("*").in_("variant_axis_id", [str(v) for v in axis_id_map.values()]).execute()
+
+            value_id_map = {
+                val["sku_code"]: UUID(val["id"])
+                for val in existing_values_response.data
+            }
+
+        logger.info(
+            f"Loaded existing structure for update: {len(axis_id_map)} axes, {len(value_id_map)} values",
+            extra={"family_id": str(family_id)}
+        )
 
     try:
         async with atomic_product_persistence(storage) as client:
             # ===================================================================
-            # STEP 1: Insert product_families (SKIP if add_variant)
+            # STEP 1: Insert or Update product_families
             # ===================================================================
-            if product_family.match_recommendation != "add_variant":
+            if operation_type == "update":
+                # UPDATE existing product family
                 family_payload = {
-                    "product_group_id": product_family.product_group_id,
                     "sku_prefix": product_family.sku_prefix,
                     "name": product_family.name,
-                "description": product_family.description,
-                "brand": product_family.brand,
-                "category_id": product_family.category_id,
-                "base_price": product_family.base_price,
-                "price_currency": product_family.price_currency,
-                "material": product_family.material,
-                "condition": product_family.condition,
-                "lifecycle_stage": product_family.lifecycle_stage,
-                "tags": product_family.tags or [],
-                "google_product_category": product_family.google_product_category,
-                "custom_attributes": product_family.custom_attributes or {},
-                "created_by": product_family.created_by,
-            }
+                    "description": product_family.description,
+                    "brand": product_family.brand,
+                    "category_id": product_family.category_id,
+                    "base_price": product_family.base_price,
+                    "price_currency": product_family.price_currency,
+                    "material": product_family.material,
+                    "condition": product_family.condition,
+                    "lifecycle_stage": product_family.lifecycle_stage,
+                    "tags": product_family.tags or [],
+                    "google_product_category": product_family.google_product_category,
+                    "custom_attributes": product_family.custom_attributes or {},
+                    "updated_at": "now()",  # Trigger timestamp update
+                }
 
-            family_response = client.table("product_families").insert(family_payload).execute()
+                family_response = client.table("product_families").update(family_payload).eq("id", str(family_id)).execute()
 
-            if not family_response.data:
-                raise ToolException("Failed to insert product_families record")
+                if not family_response.data:
+                    raise ToolException("Failed to update product_families record")
 
-            family_id = UUID(family_response.data[0]["id"])
-            result.product_family_id = family_id
+                logger.info(
+                    f"Updated product_family: {family_id}",
+                    extra={"product_group_id": product_family.product_group_id},
+                )
 
-            logger.info(
-                f"Inserted product_family: {family_id}",
-                extra={"product_group_id": product_family.product_group_id},
-            )
+            elif operation_type in ["create", "add_variant"]:
+                # INSERT new product family (skip if add_variant already set family_id)
+                if operation_type == "create":
+                    family_payload = {
+                        "product_group_id": product_family.product_group_id,
+                        "sku_prefix": product_family.sku_prefix,
+                        "name": product_family.name,
+                        "description": product_family.description,
+                        "brand": product_family.brand,
+                        "category_id": product_family.category_id,
+                        "base_price": product_family.base_price,
+                        "price_currency": product_family.price_currency,
+                        "material": product_family.material,
+                        "condition": product_family.condition,
+                        "lifecycle_stage": product_family.lifecycle_stage,
+                        "tags": product_family.tags or [],
+                        "google_product_category": product_family.google_product_category,
+                        "custom_attributes": product_family.custom_attributes or {},
+                        "created_by": product_family.created_by,
+                    }
+
+                    family_response = client.table("product_families").insert(family_payload).execute()
+
+                    if not family_response.data:
+                        raise ToolException("Failed to insert product_families record")
+
+                    family_id = UUID(family_response.data[0]["id"])
+                    result.product_family_id = family_id
+
+                    logger.info(
+                        f"Inserted product_family: {family_id}",
+                        extra={"product_group_id": product_family.product_group_id},
+                    )
+                # else: add_variant already set family_id, skip family creation
 
             # ===================================================================
-            # STEP 2: Insert variant_axes (SKIP if add_variant)
+            # STEP 2: Insert or Merge variant_axes
             # ===================================================================
-            if product_family.match_recommendation == "add_variant":
-                # Use existing axis IDs loaded earlier
-                logger.info(f"Using {len(axis_id_map)} existing variant axes")
-                # Populate result with existing IDs
-                for axis_name, axis_id in axis_id_map.items():
-                    result.variant_axis_ids[axis_name] = axis_id
+            if operation_type in ["add_variant", "update"]:
+                # Use existing axis IDs, insert new ones if needed
+                logger.info(f"Using {len(axis_id_map)} existing variant axes, checking for new ones")
+
+                for axis in product_family.variant_axes:
+                    if axis.name in axis_id_map:
+                        # Axis exists, optionally update display_label/sort_order
+                        axis_id = axis_id_map[axis.name]
+                        result.variant_axis_ids[axis.name] = axis_id
+
+                        # Update axis metadata if changed
+                        axis_update_payload = {
+                            "display_label": axis.display_label,
+                            "sort_order": axis.sort_order,
+                            "schema_property": axis.schema_property,
+                        }
+                        client.table("variant_axes").update(axis_update_payload).eq("id", str(axis_id)).execute()
+                        logger.debug(f"Updated variant_axis: {axis.name}")
+                    else:
+                        # New axis, insert it
+                        axis_payload = {
+                            "product_family_id": str(family_id),
+                            "name": axis.name,
+                            "display_label": axis.display_label,
+                            "sort_order": axis.sort_order,
+                            "schema_property": axis.schema_property,
+                        }
+
+                        axis_response = client.table("variant_axes").insert(axis_payload).execute()
+
+                        if not axis_response.data:
+                            raise ToolException(f"Failed to insert variant_axis: {axis.name}")
+
+                        axis_id = UUID(axis_response.data[0]["id"])
+                        axis_id_map[axis.name] = axis_id
+                        result.variant_axis_ids[axis.name] = axis_id
+                        logger.info(f"Inserted new variant_axis: {axis.name}")
+
+                logger.info(f"Variant axes merged: {len(axis_id_map)} total")
+
             else:
-                # Create new axes for new family
+                # Create all new axes for new family (operation_type == "create")
                 axis_id_map = {}  # Clear and rebuild for new family
 
                 for axis in product_family.variant_axes:
@@ -522,52 +649,65 @@ async def save_product_family_atomic(
                 logger.info(f"Inserted {len(axis_id_map)} variant axes")
 
             # ===================================================================
-            # STEP 3: Insert variant_values (INSERT ONLY NEW if add_variant)
+            # STEP 3: Insert or Merge variant_values
             # ===================================================================
-            if product_family.match_recommendation == "add_variant":
+            if operation_type in ["add_variant", "update"]:
                 # Check which values are new and insert only those
                 new_values_count = 0
-                for value in product_family.variant_values:
-                    # Check if value already exists
-                    if value.sku_code in value_id_map:
-                        logger.debug(f"Variant value {value.sku_code} already exists, skipping")
-                        continue
+                updated_values_count = 0
 
-                    # Insert new variant value
+                for value in product_family.variant_values:
                     axis_id = axis_id_map.get(value.variant_axis_name)
                     if not axis_id:
                         raise ToolException(
                             f"Variant value references unknown axis: {value.variant_axis_name}"
                         )
 
-                    value_payload = {
-                        "variant_axis_id": str(axis_id),
-                        "value": value.value,
-                        "display_label": value.display_label or value.value,
-                        "sku_code": value.sku_code,
-                        "color_hex": value.color_hex,
-                        "image_url": value.image_url,
-                        "price_adjustment": value.price_adjustment,
-                        "sort_order": value.sort_order,
-                    }
+                    # Check if value already exists
+                    if value.sku_code in value_id_map:
+                        # Value exists, update it
+                        value_id = value_id_map[value.sku_code]
+                        value_update_payload = {
+                            "value": value.value,
+                            "display_label": value.display_label or value.value,
+                            "color_hex": value.color_hex,
+                            "image_url": value.image_url,
+                            "price_adjustment": value.price_adjustment,
+                            "sort_order": value.sort_order,
+                        }
 
-                    value_response = client.table("variant_values").insert(value_payload).execute()
+                        client.table("variant_values").update(value_update_payload).eq("id", str(value_id)).execute()
+                        result.variant_value_ids[value.sku_code] = value_id
+                        updated_values_count += 1
+                        logger.debug(f"Updated variant value {value.sku_code}")
+                    else:
+                        # Insert new variant value
+                        value_payload = {
+                            "variant_axis_id": str(axis_id),
+                            "value": value.value,
+                            "display_label": value.display_label or value.value,
+                            "sku_code": value.sku_code,
+                            "color_hex": value.color_hex,
+                            "image_url": value.image_url,
+                            "price_adjustment": value.price_adjustment,
+                            "sort_order": value.sort_order,
+                        }
 
-                    if not value_response.data:
-                        raise ToolException(f"Failed to insert variant_value: {value.sku_code}")
+                        value_response = client.table("variant_values").insert(value_payload).execute()
 
-                    value_id = UUID(value_response.data[0]["id"])
-                    value_id_map[value.sku_code] = value_id
-                    new_values_count += 1
+                        if not value_response.data:
+                            raise ToolException(f"Failed to insert variant_value: {value.sku_code}")
 
-                logger.info(f"Inserted {new_values_count} new variant values, using {len(value_id_map)} total")
+                        value_id = UUID(value_response.data[0]["id"])
+                        value_id_map[value.sku_code] = value_id
+                        result.variant_value_ids[value.sku_code] = value_id
+                        new_values_count += 1
+                        logger.info(f"Inserted new variant value: {value.sku_code}")
 
-                # Populate result with all IDs (existing + new)
-                for sku_code, value_id in value_id_map.items():
-                    result.variant_value_ids[sku_code] = value_id
+                logger.info(f"Variant values merged: {new_values_count} new, {updated_values_count} updated, {len(value_id_map)} total")
 
             else:
-                # Create all new values for new family
+                # Create all new values for new family (operation_type == "create")
                 value_id_map = {}  # Clear and rebuild for new family (sku_code -> value_id)
 
                 for value in product_family.variant_values:
@@ -600,14 +740,24 @@ async def save_product_family_atomic(
                 logger.info(f"Inserted {len(value_id_map)} variant values")
 
             # ===================================================================
-            # STEP 4: Insert products (individual SKUs)
+            # STEP 4: Insert or Update products (individual SKUs)
             # ===================================================================
             product_id_map: dict[str, UUID] = {}
 
+            # Load existing products if updating
+            if operation_type in ["update", "add_variant"]:
+                existing_products_response = client.table("products").select("id, sku").eq("product_family_id", str(family_id)).execute()
+                product_id_map = {
+                    prod["sku"]: UUID(prod["id"])
+                    for prod in existing_products_response.data
+                }
+                logger.info(f"Loaded {len(product_id_map)} existing products")
+
+            new_products_count = 0
+            updated_products_count = 0
+
             for product in product_family.products:
                 product_payload = {
-                    "product_family_id": str(family_id),
-                    "sku": product.sku,
                     "name": product.name,
                     "description": product.description,
                     "price": product.price,
@@ -620,23 +770,52 @@ async def save_product_family_atomic(
                     "link": product.link,
                 }
 
-                product_response = client.table("products").insert(product_payload).execute()
+                if product.sku in product_id_map:
+                    # UPDATE existing product
+                    product_id = product_id_map[product.sku]
+                    product_response = client.table("products").update(product_payload).eq("id", str(product_id)).execute()
 
-                if not product_response.data:
-                    raise ToolException(f"Failed to insert product: {product.sku}")
+                    if not product_response.data:
+                        raise ToolException(f"Failed to update product: {product.sku}")
 
-                product_id = UUID(product_response.data[0]["id"])
-                product_id_map[product.sku] = product_id
-                result.product_ids[product.sku] = product_id
+                    result.product_ids[product.sku] = product_id
+                    updated_products_count += 1
+                    logger.debug(f"Updated product: {product.sku}")
+                else:
+                    # INSERT new product
+                    product_payload["product_family_id"] = str(family_id)
+                    product_payload["sku"] = product.sku
 
-            logger.info(f"Inserted {len(product_id_map)} products (SKUs)")
+                    product_response = client.table("products").insert(product_payload).execute()
+
+                    if not product_response.data:
+                        raise ToolException(f"Failed to insert product: {product.sku}")
+
+                    product_id = UUID(product_response.data[0]["id"])
+                    product_id_map[product.sku] = product_id
+                    result.product_ids[product.sku] = product_id
+                    new_products_count += 1
+                    logger.info(f"Inserted new product: {product.sku}")
+
+            if operation_type in ["update", "add_variant"]:
+                logger.info(f"Products merged: {new_products_count} new, {updated_products_count} updated, {len(product_id_map)} total")
+            else:
+                logger.info(f"Inserted {len(product_id_map)} products (SKUs)")
 
             # ===================================================================
-            # STEP 5: Insert product_variant_values (M:N junctions)
+            # STEP 5: Insert or Update product_variant_values (M:N junctions)
             # ===================================================================
+            junctions_created = 0
+
             for product in product_family.products:
                 product_id = product_id_map[product.sku]
 
+                # For updates: Delete existing junctions for this product and recreate
+                # This is simpler than diff logic and handles changes cleanly
+                if operation_type in ["update", "add_variant"]:
+                    client.table("product_variant_values").delete().eq("product_id", str(product_id)).execute()
+
+                # Insert junctions for this product
                 for sku_code in product.variant_values:
                     value_id = value_id_map.get(sku_code)
                     if not value_id:
@@ -650,12 +829,18 @@ async def save_product_family_atomic(
                     }
 
                     client.table("product_variant_values").insert(junction_payload).execute()
+                    junctions_created += 1
 
-            logger.info("Inserted product_variant_values junctions")
+            logger.info(f"{'Recreated' if operation_type in ['update', 'add_variant'] else 'Inserted'} {junctions_created} product_variant_values junctions")
 
             # ===================================================================
-            # STEP 6: Insert product_family_industries
+            # STEP 6: Insert or Update product_family_industries
             # ===================================================================
+            # For updates: Delete existing and recreate (simpler than diff logic)
+            if operation_type == "update" and product_family.industry_targets:
+                client.table("product_family_industries").delete().eq("product_family_id", str(family_id)).execute()
+                logger.debug("Deleted existing industry targets for update")
+
             for industry in product_family.industry_targets:
                 # Resolve NAICS code to closest existing parent if exact match doesn't exist
                 resolved_naics = industry.industry_naics_code
@@ -699,8 +884,13 @@ async def save_product_family_atomic(
             logger.info(f"Inserted {len(result.industry_target_ids)} industry targets")
 
             # ===================================================================
-            # STEP 7: Insert customer_segments
+            # STEP 7: Insert or Update customer_segments
             # ===================================================================
+            # For updates: Delete existing and recreate (simpler than diff logic)
+            if operation_type == "update" and product_family.customer_segments:
+                client.table("customer_segments").delete().eq("product_family_id", str(family_id)).execute()
+                logger.debug("Deleted existing customer segments for update")
+
             segment_id_map: dict[str, UUID] = {}  # segment_type -> segment_id
 
             for segment in product_family.customer_segments:
@@ -726,8 +916,13 @@ async def save_product_family_atomic(
             logger.info(f"Inserted {len(result.customer_segment_ids)} customer segments")
 
             # ===================================================================
-            # STEP 8: Insert product_images
+            # STEP 8: Insert or Update product_images
             # ===================================================================
+            # For updates: Delete existing family-level images and recreate
+            if operation_type == "update" and product_family.images:
+                client.table("product_images").delete().eq("product_family_id", str(family_id)).execute()
+                logger.debug("Deleted existing product images for update")
+
             for image in product_family.images:
                 image_payload = {
                     "url": image.url,
@@ -760,8 +955,13 @@ async def save_product_family_atomic(
             logger.info(f"Inserted {len(result.image_ids)} images")
 
             # ===================================================================
-            # STEP 9: Insert marketing_content
+            # STEP 9: Insert or Update marketing_content
             # ===================================================================
+            # For updates: Delete existing family-level content and recreate
+            if operation_type == "update" and product_family.marketing_content:
+                client.table("marketing_content").delete().eq("product_family_id", str(family_id)).execute()
+                logger.debug("Deleted existing marketing content for update")
+
             for content in product_family.marketing_content:
                 # Normalize platform name (google_shopping -> catalog, etc.)
                 normalized_platform = PLATFORM_MAPPING.get(
@@ -813,9 +1013,11 @@ async def save_product_family_atomic(
             result.success = True
 
             logger.info(
-                "Product family persistence completed successfully",
+                f"Product family {operation_type.upper()} completed successfully",
                 extra={
+                    "operation": operation_type,
                     "product_family_id": str(family_id),
+                    "product_group_id": product_family.product_group_id,
                     "total_products": len(result.product_ids),
                     "total_images": len(result.image_ids),
                     "total_marketing_content": len(result.marketing_content_ids),
