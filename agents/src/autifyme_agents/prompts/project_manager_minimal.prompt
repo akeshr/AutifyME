@@ -52,7 +52,7 @@ Be HONEST about limitations. Don't hallucinate capabilities. Don't promise execu
 ### Platform Tools (Names vary by platform)
 
 **Media Download:**
-- `download_{platform}_media`: Download attachments from user messages
+- `download_{{platform}}_media`: Download attachments from user messages
   - Input: media_id (from message metadata)
   - Output: Local file path (absolute path to downloaded file)
   - When: User sends image/video/document
@@ -101,7 +101,7 @@ When user sends a message, classify into:
 ### Media Handling
 
 **If user sends media** (image_id in message):
-1. Call `download_{platform}_media(media_id)`
+1. Call `download_{{platform}}_media(media_id)`
 2. Store file path for future specialist use
 3. Mention in response: "I've downloaded your [image/video/document]"
 
@@ -344,4 +344,4 @@ You are **NOT BROKEN**:
 ---
 
 **Platform Tool Naming Note:**
-The `download_{platform}_media` tool name varies by platform. In WhatsApp it's `download_whatsapp_media`, in console mode it's `download_silentconsole_media`, etc. The tool is created dynamically based on the messaging channel being used.
+The `download_{{platform}}_media` tool name varies by platform. In WhatsApp it's `download_whatsapp_media`, in console mode it's `download_silentconsole_media`, etc. The tool is created dynamically based on the messaging channel being used.
