@@ -44,10 +44,14 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     return get_llm(model="gpt-4.1-mini", temperature=0.2)
 
 
-def _load_prompt(company_profile: CompanyProfile) -> str:
-    """Load and format PM prompt with company context."""
-    # Using minimal prompt during specialist integration
-    prompt_template = load_prompt("project_manager_minimal.prompt")
+def _load_prompt(company_profile: CompanyProfile, base_context: Any) -> str:
+    """Load and format PM prompt with company context and base context.
+
+    Phase 1C: Using intelligent prompt with catalog/taxonomy awareness.
+    Prompt has access to base_context via initial_state (no need to format into prompt text).
+    """
+    # Phase 1C: Intelligent PM with context awareness
+    prompt_template = load_prompt("project_manager_intelligent.prompt")
     return prompt_template.format(
         company_name=company_profile.name,
         brand_voice=company_profile.brand_voice,
@@ -89,7 +93,6 @@ def create_project_manager(
         )
 
     llm = _resolve_model(model)
-    instructions = _load_prompt(company_profile)
     store = get_store()
 
     # Load base context (catalog summary + taxonomy tree)
@@ -104,6 +107,10 @@ def create_project_manager(
             "taxonomy_categories": base_context.taxonomy_tree.total_categories,
         }
     )
+
+    # Load intelligent prompt with company context
+    # base_context is available to PM via initial_state
+    instructions = _load_prompt(company_profile, base_context)
 
     # PM Tools
     pm_tools: list[Any] = []
