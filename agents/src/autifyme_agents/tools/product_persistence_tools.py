@@ -657,9 +657,32 @@ async def save_product_family_atomic(
             # STEP 6: Insert product_family_industries
             # ===================================================================
             for industry in product_family.industry_targets:
+                # Resolve NAICS code to closest existing parent if exact match doesn't exist
+                resolved_naics = industry.industry_naics_code
+                naics_to_try = [industry.industry_naics_code]
+
+                # Generate parent codes (e.g., 311999 -> 31199, 3119, 311, 31)
+                code = industry.industry_naics_code
+                while len(code) > 2:
+                    code = code[:-1]
+                    naics_to_try.append(code)
+
+                # Try each code from most specific to least specific
+                for naics_code in naics_to_try:
+                    check_response = client.table("industries").select("naics_code").eq("naics_code", naics_code).execute()
+                    if check_response.data:
+                        resolved_naics = naics_code
+                        if naics_code != industry.industry_naics_code:
+                            logger.info(f"Resolved NAICS code {industry.industry_naics_code} to parent code {naics_code}")
+                        break
+                else:
+                    # No matching code found at all - skip this industry
+                    logger.warning(f"No matching NAICS code found for {industry.industry_naics_code} or any parent codes - skipping industry")
+                    continue
+
                 industry_payload = {
                     "product_family_id": str(family_id),
-                    "industry_naics_code": industry.industry_naics_code,
+                    "industry_naics_code": resolved_naics,
                     "industry_use_case": industry.industry_use_case,
                     "industry_benefits": industry.industry_benefits,
                     "compliance_notes": industry.compliance_notes,
