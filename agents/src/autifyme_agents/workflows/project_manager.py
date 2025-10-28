@@ -1,29 +1,7 @@
-"""
-Project Manager - Main orchestrator for all AutifyME workflows.
+"""Project Manager - Central orchestrator for AutifyME workflows.
 
-BUILD-UP STATUS: Minimal PM (Phase 0)
-- Core orchestration framework
-- Intent detection
-- Media handling
-- HITL persistence tools (available but not callable yet)
-- NO SPECIALISTS YET (will add incrementally)
-
-Architecture:
-- PM orchestrates domain specialists via DeepAgents SubAgent pattern
-- Specialists analyze and generate (no persistence)
-- PM owns HITL persistence tools
-- PM detects workflow intent, delegates to specialists, synthesizes results, persists
-
-Current Implementation:
-- Phase 0: Minimal PM core (0 specialists)
-- Phase 1-6: Product Onboarding specialists (target: 5)
-- Phase 7-11: Marketing Campaign specialists (target: 6)
-- Phase 12: Final integration and polish
-
-HITL Strategy:
-- PM level only (interrupt_on for persistence tools)
-- User sees complete data before persistence
-- Single approval point with full context
+Orchestrates domain specialists via SubAgent pattern. Detects intent, delegates
+to appropriate specialists, synthesizes results, and persists via HITL-enabled tools.
 """
 
 from __future__ import annotations
@@ -59,6 +37,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
 
 def _load_prompt(company_profile: CompanyProfile) -> str:
     """Load and format PM prompt with company context."""
+    # Using minimal prompt during specialist integration
     prompt_template = load_prompt("project_manager_minimal.prompt")
     return prompt_template.format(
         company_name=company_profile.name,
@@ -75,37 +54,20 @@ def create_project_manager(
     storage: StorageInterface,
     channel: MessagingChannel | None = None,
 ) -> Any:
-    """
-    Create Minimal Project Manager - core orchestration only (Phase 0).
+    """Create Project Manager agent.
 
-    Current: 0 specialists (building up incrementally)
-
-    Capabilities:
-    - Intent detection (recognize: product_onboarding, marketing, operations, unknown)
-    - Media handling (download attachments from platform)
-    - Planning tools (write_todos for complex workflows)
-    - HITL framework (persistence tools available but not callable yet)
-    - Error communication (clear messages about current limitations)
-
-    Specialists will be added incrementally:
-    - Phase 2-6: Product Onboarding (5 specialists)
-    - Phase 7-11: Marketing Campaigns (6 specialists)
-
-    Architecture:
-    - PM = DeepAgent with SubAgents
-    - Specialists = SubAgent dicts (will be added incrementally)
-    - PM owns HITL persistence tools
-    - PM orchestrates workflow: delegate → synthesize → present → persist
+    PM orchestrates domain specialists for business workflows. Uses SubAgent pattern
+    for specialist delegation and HITL-enabled persistence tools.
 
     Args:
         company_profile: Company context for brand voice and positioning
-        model: Optional LLM override (defaults to gpt-4.1-mini)
-        checkpointer: LangGraph checkpointer for state persistence (required)
-        storage: Storage adapter for database operations (required)
-        channel: Messaging channel for platform-specific operations (optional)
+        model: LLM for orchestration (defaults to gpt-4.1-mini)
+        checkpointer: LangGraph checkpointer for state persistence
+        storage: Storage adapter for database operations
+        channel: Messaging channel for platform-specific operations
 
     Returns:
-        Compiled DeepAgent ready for workflow orchestration
+        Compiled DeepAgent
     """
     if checkpointer is None:
         raise ValueError(
@@ -121,50 +83,30 @@ def create_project_manager(
     instructions = _load_prompt(company_profile)
     store = get_store()
 
-    # ==========================================================================
-    # PM Tools - Minimal Set
-    # ==========================================================================
-    # Platform media tools (if channel provided)
-    # HITL persistence tools (available but PM won't call them yet)
+    # PM Tools
     pm_tools: list[Any] = []
 
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
-
         pm_tools.extend(create_platform_media_tools(channel))
 
-    # HITL persistence tools - available for framework testing
-    # PM won't call these yet (no specialist data to persist)
+    # HITL persistence tools
     pm_tools.append(create_save_product_family_tool(storage))
     pm_tools.append(create_save_campaign_tool(storage))
 
-    # ==========================================================================
-    # Specialists - EMPTY (Incremental Build-Up)
-    # ==========================================================================
-    # Phase 0: 0 specialists (minimal PM core)
-    # Phase 2: Add Product Architecture Specialist
-    # Phase 3: Add Taxonomy Specialist
-    # ... (continue build-up)
+    # Specialists (SubAgent pattern)
     subagents: list[Any] = []
 
-    # ==========================================================================
-    # HITL Configuration - PM Level Only
-    # ==========================================================================
-    # Persistence tools trigger HITL interrupts
-    # PM presents data to user, gets approval, persists atomically
+    # HITL configuration
     interrupt_configs: dict[str, bool] = {
-        "save_product_family": True,  # Product onboarding workflow
-        "save_campaign": True,  # Marketing campaign workflow
+        "save_product_family": True,
+        "save_campaign": True,
     }
-
-    # ==========================================================================
-    # Create Minimal DeepAgent
-    # ==========================================================================
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
-        subagents=subagents,  # EMPTY - will add incrementally
+        subagents=subagents,
         interrupt_on=interrupt_configs,
         checkpointer=checkpointer,
         store=store,
@@ -172,24 +114,16 @@ def create_project_manager(
         context_schema=CompanyContext,
     )
 
-    # ==========================================================================
-    # Initial State
-    # ==========================================================================
     initial_state = {
         "company_profile": company_profile.model_dump(),
-        "status": "minimal",  # Track build-up state
-        "build_phase": "phase_0_minimal",  # Track which phase
-        "integrated_specialists": [],  # Track which specialists are active
-        "current_workflow": None,  # product_onboarding, marketing, inventory, etc.
-        "specialist_results": {},  # Track specialist outputs
+        "status": "idle",
+        "current_workflow": None,
+        "specialist_results": {},
     }
 
     return project_manager.with_config(
         {
-            "metadata": {
-                "version": "1.0.0-minimal",
-                "build_phase": "phase_0",
-            },
+            "metadata": {"version": "1.0.0"},
             "initial_state": initial_state,
         }
     )
