@@ -93,7 +93,7 @@ def _ask_ai_how_to_respond(
     scenario_context: str,
     conversation_history: list[dict],
 ) -> dict:
-    """Ask AI (OpenAI gpt-4.1-nano) how to respond to PM's messages.
+    """Ask AI (OpenAI gpt-4.1-mini) how to respond to PM's messages.
 
     Returns:
         {
@@ -116,9 +116,22 @@ def _ask_ai_how_to_respond(
         for turn in conversation_history
     ]) if conversation_history else "No previous conversation"
 
-    prompt = f"""You are a BUSINESS USER testing the AutifyME PM agent. You are NOT the PM - you are the customer/user.
+    # Extract initial request from conversation history to maintain consistency
+    initial_request = conversation_history[0]['user'] if conversation_history else "N/A"
 
-**Scenario:** {scenario_context}
+    prompt = f"""You are roleplaying as a BUSINESS USER testing the AutifyME PM agent.
+
+**CRITICAL: Your Character Consistency**
+You made this initial request to the PM:
+"{initial_request}"
+
+ALWAYS stay consistent with your initial request. Do NOT change product details mid-conversation.
+- If you said "glass bottles" initially, NEVER say "PET jar" later
+- If you said "250ml, 500ml, 1L", don't invent new sizes
+- Maintain the same product type, prices, and details throughout
+
+**Full Test Scenario (for context only):**
+{scenario_context}
 
 **Conversation History:**
 {history_text}
@@ -127,52 +140,52 @@ def _ask_ai_how_to_respond(
 {messages_text}
 
 **WHO YOU ARE:**
-- You are a BUSINESS USER who wants to onboard products or create campaigns
-- You are NOT the PM agent - the PM works FOR you
-- The PM asks YOU questions, YOU answer them
-- The PM does the work, YOU provide requirements and approve results
+- A business owner/manager who submitted the initial request above
+- The PM works FOR you - you give requirements, PM does the work
+- You answer PM's clarifying questions with details from YOUR initial request
+- You approve/reject PM's presented work
 
 **Your Task:**
-Read PM's messages and decide how to respond. You have 4 options:
+Decide how to respond to PM. You have 4 actions:
 
-1. **respond**: PM asks a question → YOU answer as a business user would
-2. **approve**: PM presents work for approval → YOU approve it
-3. **reject**: PM's work has clear errors → YOU reject it
-4. **debug**: PM is broken/stuck → trigger debugging
+1. **respond**: PM asks a question → Answer it (use details from YOUR initial request)
+2. **approve**: PM presents work for approval → Approve it ("yes, proceed" or similar)
+3. **reject**: PM's work has clear errors → Reject with reason
+4. **debug**: PM is broken/looping/stuck → Trigger debug mode
 
-**Response Guidelines:**
-- Keep responses SHORT (1-2 sentences as a user would)
-- Answer PM's questions directly - don't ask the PM to do things
-- When PM asks for details, provide them (e.g., "It's a 500ml PET jar")
-- When PM presents results, approve/reject them
-- NEVER say things like "Please share the details" - YOU are the one sharing details
+**Response Rules:**
+- Keep responses SHORT and natural (1-2 sentences)
+- Answer PM's questions with information from YOUR initial request
+- If PM asks for clarification on something you already mentioned, provide the same detail again
+- If PM presents results, approve with "yes" or "approved" or "proceed"
+- NEVER invent NEW product details not in your initial request
+- NEVER ask PM to do things - YOU answer PM's questions
 
-**Decision Criteria:**
-
-- If PM asks "what type of container?" → respond: "PET jars" (not "please share the type")
-- If PM presents product for approval → approve: "approved"
-- If PM is repeating itself or stuck → debug
-- If PM says "complete" but didn't call save_product_family → debug
+**Examples:**
+- PM asks "What material?" and your initial request mentioned "glass" → respond: "Glass, food-grade quality"
+- PM asks "What sizes?" and your initial request mentioned "250ml, 500ml, 1L" → respond: "We make 250ml, 500ml, and 1L sizes"
+- PM presents operation for approval → approve: "Yes, please proceed"
+- PM repeats same question 3+ times → debug: "PM is stuck in a loop"
 
 Return JSON:
 {{
     "action": "respond" | "approve" | "reject" | "debug",
-    "response_text": "YOUR response AS A USER",
-    "reasoning": "why you chose this",
-    "debug_reason": "issue detected (if debug)"
+    "response_text": "your response as the user",
+    "reasoning": "why you chose this action",
+    "debug_reason": "issue description (only if action=debug)"
 }}
 
-Remember: YOU are the user, PM serves YOU. Answer PM's questions, don't ask PM to provide things.
+CRITICAL: Stay consistent with your initial request "{initial_request}". Never contradict it.
 """
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",  # Fast and cheap for test orchestration
+            model="gpt-4.1-mini",  # Better reasoning than nano
             max_tokens=500,
             temperature=0,
             response_format={"type": "json_object"},
             messages=[
-                {"role": "system", "content": "You are a test orchestration AI. Return valid JSON only."},
+                {"role": "system", "content": "You are a test orchestration AI simulating a business user. Maintain character consistency. Return valid JSON only."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -201,6 +214,39 @@ Remember: YOU are the user, PM serves YOU. Answer PM's questions, don't ask PM t
     return decision
 
 
+def _parse_scenario(scenario_text: str) -> tuple[str, str]:
+    """Parse scenario text to extract initial request and full context.
+
+    Args:
+        scenario_text: Full scenario with Initial Request, Expected Behavior, etc.
+
+    Returns:
+        (initial_request, full_scenario) tuple
+        - initial_request: Just the user's initial request text
+        - full_scenario: Complete scenario for AI context
+    """
+    # Look for "**Initial Request:**" marker
+    if "**Initial Request:**" in scenario_text:
+        # Extract text after "**Initial Request:**" and before next "**" section
+        parts = scenario_text.split("**Initial Request:**", 1)
+        if len(parts) == 2:
+            remaining = parts[1]
+            # Find next ** section (or end of text)
+            next_section_idx = remaining.find("\n\n**")
+            if next_section_idx != -1:
+                initial_request = remaining[:next_section_idx].strip()
+            else:
+                initial_request = remaining.strip()
+
+            # Remove quotes if present
+            initial_request = initial_request.strip('"').strip("'").strip()
+
+            return initial_request, scenario_text
+
+    # Fallback: use entire text as both
+    return scenario_text, scenario_text
+
+
 async def intelligent_execute_scenario(
     scenario_id: str,
     media_path: str | None = None,
@@ -208,7 +254,7 @@ async def intelligent_execute_scenario(
 ) -> ExecutionResult:
     """Execute test scenario with AI as intelligent test user.
 
-    AI (OpenAI gpt-4.1-nano) reads PM's messages, responds naturally, and detects issues in real-time.
+    AI (OpenAI gpt-4.1-mini) reads PM's messages, responds naturally, and detects issues in real-time.
 
     Args:
         scenario_id: Scenario identifier or custom prompt text
@@ -219,6 +265,9 @@ async def intelligent_execute_scenario(
         ExecutionResult with debugging info if issues detected
     """
     start_time = time.time()
+
+    # Parse scenario to extract initial request
+    initial_request, full_scenario = _parse_scenario(scenario_id)
 
     # Setup components
     storage: StorageInterface = get_storage()
@@ -255,22 +304,22 @@ async def intelligent_execute_scenario(
 
     try:
         safe_print(f"\n{'='*80}")
-        safe_print("INTELLIGENT TESTING MODE - AI as Test User (OpenAI gpt-4.1-nano)")
+        safe_print("INTELLIGENT TESTING MODE - AI as Test User (OpenAI gpt-4.1-mini)")
         safe_print(f"{'='*80}")
-        safe_print(f"Scenario: {scenario_id}")
+        safe_print(f"Scenario: {scenario_id[:80]}...")  # Show abbreviated scenario name
         safe_print(f"Thread: {thread_id}")
         safe_print(f"{'='*80}\n")
 
-        # Send initial message
-        safe_print(f"[USER -> PM] {scenario_id}")
+        # Send initial request to PM (not full scenario)
+        safe_print(f"[USER -> PM] {initial_request}")
         await runner.handle_message(
             sender=unique_sender,
-            text=scenario_id,
+            text=initial_request,
             media_id=media_path if media_path else None,
         )
 
         conversation_history.append({
-            "user": scenario_id,
+            "user": initial_request,
             "pm_response": "pending..."
         })
 
@@ -299,7 +348,7 @@ async def intelligent_execute_scenario(
                         # Ask AI if this is normal or if we should debug
                         decision = _ask_ai_how_to_respond(
                             pm_messages=[{"type": "silence", "message": "PM stopped responding"}],
-                            scenario_context=scenario_id,
+                            scenario_context=full_scenario,
                             conversation_history=conversation_history,
                         )
                         if decision["action"] == "debug":
@@ -330,7 +379,7 @@ async def intelligent_execute_scenario(
             safe_print(f"\n[AI] Analyzing PM's messages...")
             decision = _ask_ai_how_to_respond(
                 pm_messages=new_messages,
-                scenario_context=scenario_id,
+                scenario_context=full_scenario,
                 conversation_history=conversation_history,
             )
 
