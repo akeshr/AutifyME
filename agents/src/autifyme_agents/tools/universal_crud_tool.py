@@ -273,12 +273,14 @@ class OperationExecutor:
 
             # Insert entity
             result = await self._insert_entity(table_schema.name, resolved_entity)
-            entity_id = result.get("id") or result.get(table_schema.primary_key)
 
+            # Store the full inserted entity for reference resolution
+            # This allows $step_N.id, $step_N.sku_prefix, etc.
+            entity_id = result.get("id") or result.get(table_schema.primary_key)
             if entity_id:
-                # Store by primary key or unique identifier
-                key = resolved_entity.get(table_schema.primary_key) or str(entity_id)
-                created_ids[key] = entity_id
+                created_ids = result  # Store full entity with all fields
+                # Note: For multi-entity inserts, this would need to be a list
+                # Current design assumes single entity per step for dependency resolution
 
         return {"ids": created_ids, "count": len(operation.new_entities)}
 
