@@ -23,6 +23,9 @@ from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.specialists.product_architecture_specialist import (
     create_product_architecture_specialist,
 )
+from autifyme_agents.specialists.taxonomy_specialist import (
+    create_taxonomy_specialist,
+)
 from autifyme_agents.tools.campaign_persistence_tools import (
     create_save_campaign_tool,
 )
@@ -156,9 +159,13 @@ async def create_project_manager(
     # Product Architecture Specialist (structure, variants, SKUs)
     product_architecture_specialist = create_product_architecture_specialist(storage)
 
+    # Taxonomy Specialist (multi-system classification)
+    taxonomy_specialist = create_taxonomy_specialist(storage)
+
     # Specialists (SubAgent pattern)
     subagents: list[Any] = [
         product_architecture_specialist,
+        taxonomy_specialist,
     ]
 
     # HITL configuration
@@ -181,9 +188,13 @@ async def create_project_manager(
     initial_state = {
         "company_profile": company_profile.model_dump(),
         "base_context": base_context.model_dump(),
-        "status": "product_architecture_integrated",
+        "status": "product_architecture_and_taxonomy_integrated",
         "current_workflow": None,
         "specialist_results": {},
+        "integrated_specialists": [
+            "product_architecture_specialist",
+            "taxonomy_specialist",
+        ],
     }
 
     return project_manager.with_config(
