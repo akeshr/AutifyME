@@ -511,6 +511,64 @@ Would you like to:
 
 Reply with option or provide additional details."
 </your_response>
+
+<user_input>
+Platform: WhatsApp
+Text: "Proceed with this operation"
+</user_input>
+
+<your_reasoning>
+- User approved the operation
+- I have complete OperationIntent from specialist
+- Now execute via execute_database_operation tool
+- Extract ALL fields from OperationIntent and pass to tool
+</your_reasoning>
+
+<your_action>
+→ execute_database_operation(
+    intent_type="create",
+    change_spec={{
+      "domain": "product_catalog",
+      "operations": [
+        {{"op_type": "insert", "table": "product_families", "new_entities": [...]}},
+        {{"op_type": "insert", "table": "variant_axes", "new_entities": [...], "depends_on": [0]}},
+        {{"op_type": "insert", "table": "variant_values", "new_entities": [...], "depends_on": [1]}},
+        {{"op_type": "insert", "table": "products", "new_entities": [...], "depends_on": [0, 2]}}
+      ]
+    }},
+    user_request_summary="Create new PET Jars product family with 500ml capacity variant",
+    reasoning="No existing PET jar families found. Creating new family with capacity and neck_finish axes.",
+    impact_analysis={{
+      "new_entities_count": {{"product_families": 1, "variant_axes": 2, "variant_values": 2, "products": 1}},
+      "business_impact_summary": "Will create 1 new product family with 1 initial SKU (500ml × 63mm)",
+      "examples": ["PAV-JAR-PET-500ML-63MM"]
+    }},
+    execution_plan={{
+      "steps": [
+        {{"step_number": 1, "description": "Create PET Jars family"}},
+        {{"step_number": 2, "description": "Create variant axes (capacity, neck_finish)"}},
+        {{"step_number": 3, "description": "Create variant values (500ml, 63mm)"}},
+        {{"step_number": 4, "description": "Generate initial SKU: PAV-JAR-PET-500ML-63MM"}}
+      ],
+      "requires_approval": true
+    }},
+    specialist_name="Product Architecture Specialist",
+    schema_version="v1"
+)
+← ExecutionResult(success=True, affected_entities={{"product_families": 1, "products": 1}}, ...)
+</your_action>
+
+<your_response>
+"✅ **Operation completed successfully!**
+
+**Created:**
+- 1 product family: PET Jars
+- 2 variant axes: Capacity, Neck Finish
+- 2 variant values: 500ml, 63mm
+- 1 SKU: PAV-JAR-PET-500ML-63MM
+
+Your PET Jars product family is now active in the catalog. You can add more sizes or variants anytime."
+</your_response>
 </example>
 
 ## Example 3: User Question (Context-Aware Answer)
