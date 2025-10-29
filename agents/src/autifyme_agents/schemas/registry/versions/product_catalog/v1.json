@@ -1,0 +1,893 @@
+{
+  "version": "v1",
+  "domain": "product_catalog",
+  "description": "Product catalog schema with variant structure, marketing content, and multi-industry targeting",
+  "tables": {
+    "product_families": {
+      "name": "product_families",
+      "description": "Parent table for product families with base metadata",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_group_id": {
+          "name": "product_group_id",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": false,
+          "unique": true,
+          "description": "Business identifier (e.g., 'SHOE-AIR-MAX')"
+        },
+        "sku_prefix": {
+          "name": "sku_prefix",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "description": "SKU prefix for all variants"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": false,
+          "description": "Product family name"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": false,
+          "description": "Family-level description"
+        },
+        "brand": {
+          "name": "brand",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": false,
+          "description": "Brand name"
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "categories.id",
+          "description": "Category reference"
+        },
+        "base_price": {
+          "name": "base_price",
+          "type": "decimal",
+          "nullable": false,
+          "description": "Base price before variant adjustments"
+        },
+        "price_currency": {
+          "name": "price_currency",
+          "type": "varchar",
+          "max_length": 3,
+          "nullable": false,
+          "default": "INR",
+          "description": "3-letter currency code"
+        },
+        "material": {
+          "name": "material",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "Primary material"
+        },
+        "condition": {
+          "name": "condition",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "default": "new",
+          "description": "One of: new, refurbished, used"
+        },
+        "lifecycle_stage": {
+          "name": "lifecycle_stage",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "default": "regular",
+          "description": "One of: new_arrival, regular, clearance, discontinued"
+        },
+        "tags": {
+          "name": "tags",
+          "type": "array",
+          "nullable": true,
+          "description": "Array of tag strings"
+        },
+        "google_product_category": {
+          "name": "google_product_category",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": true,
+          "description": "Google Product Category taxonomy"
+        },
+        "custom_attributes": {
+          "name": "custom_attributes",
+          "type": "jsonb",
+          "nullable": true,
+          "description": "Custom attributes as JSON"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": true,
+          "description": "User/agent identifier"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [],
+      "business_rules": [],
+      "indexes": ["product_group_id", "sku_prefix", "brand"]
+    },
+    "variant_axes": {
+      "name": "variant_axes",
+      "description": "Variant dimensions (size, color, capacity, etc.)",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "product_families.id",
+          "description": "Parent product family"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": false,
+          "description": "Snake_case name (e.g., 'size', 'color')"
+        },
+        "display_label": {
+          "name": "display_label",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": false,
+          "description": "Human-readable label"
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "description": "Display order"
+        },
+        "schema_property": {
+          "name": "schema_property",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "Schema.org property mapping"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Axes belong to product family"
+        }
+      ],
+      "business_rules": [
+        {
+          "rule_type": "generate_sku_explosion",
+          "trigger": "after_insert",
+          "handler": "generate_sku_explosion_for_new_axis",
+          "parameters": {
+            "scope": "new_axis",
+            "warn_threshold": 100
+          },
+          "description": "Calculate SKU explosion when new axis added (new_axis × existing_variants)",
+          "enabled": false
+        }
+      ],
+      "indexes": ["product_family_id"]
+    },
+    "variant_values": {
+      "name": "variant_values",
+      "description": "Individual variant values within each axis",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "variant_axis_id": {
+          "name": "variant_axis_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "variant_axes.id",
+          "description": "Parent variant axis"
+        },
+        "value": {
+          "name": "value",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": false,
+          "description": "Actual value (e.g., 'Medium', 'Red')"
+        },
+        "display_label": {
+          "name": "display_label",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": false,
+          "description": "Human-readable label"
+        },
+        "sku_code": {
+          "name": "sku_code",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "description": "SKU component code (e.g., 'M', 'RED')"
+        },
+        "color_hex": {
+          "name": "color_hex",
+          "type": "varchar",
+          "max_length": 7,
+          "nullable": true,
+          "description": "Hex color code if axis is 'color'"
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "varchar",
+          "max_length": 2048,
+          "nullable": true,
+          "description": "Swatch image URL if needed"
+        },
+        "price_adjustment": {
+          "name": "price_adjustment",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0.0",
+          "description": "Price delta vs base price"
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "description": "Display order"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "variant_axes",
+          "foreign_key": "variant_axis_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Values belong to variant axis"
+        }
+      ],
+      "business_rules": [
+        {
+          "rule_type": "generate_new_skus",
+          "trigger": "after_insert",
+          "handler": "generate_skus_for_new_variant_value",
+          "parameters": {
+            "scope": "new_value",
+            "combine_with_existing": true
+          },
+          "description": "Generate SKUs for new value combined with existing variants",
+          "enabled": false
+        }
+      ],
+      "indexes": ["variant_axis_id", "sku_code"]
+    },
+    "products": {
+      "name": "products",
+      "description": "Individual product SKUs (combinations of variant values)",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "product_families.id",
+          "description": "Parent product family"
+        },
+        "sku": {
+          "name": "sku",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": false,
+          "unique": true,
+          "description": "Unique SKU identifier"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "max_length": 500,
+          "nullable": false,
+          "description": "Variant-specific name"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": false,
+          "description": "Full product description"
+        },
+        "price": {
+          "name": "price",
+          "type": "decimal",
+          "nullable": false,
+          "description": "Specific price for this variant"
+        },
+        "stock_quantity": {
+          "name": "stock_quantity",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "description": "Current inventory"
+        },
+        "availability": {
+          "name": "availability",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "default": "in_stock",
+          "description": "One of: in_stock, out_of_stock, preorder, backorder, discontinued"
+        },
+        "is_primary_variant": {
+          "name": "is_primary_variant",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "description": "Hero variant shown first"
+        },
+        "sale_price": {
+          "name": "sale_price",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Sale price if on sale"
+        },
+        "sale_price_start": {
+          "name": "sale_price_start",
+          "type": "timestamp",
+          "nullable": true,
+          "description": "Sale start date"
+        },
+        "sale_price_end": {
+          "name": "sale_price_end",
+          "type": "timestamp",
+          "nullable": true,
+          "description": "Sale end date"
+        },
+        "link": {
+          "name": "link",
+          "type": "varchar",
+          "max_length": 2048,
+          "nullable": true,
+          "description": "Product URL"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Products belong to product family"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_family_id", "sku"]
+    },
+    "product_variant_values": {
+      "name": "product_variant_values",
+      "description": "Junction table mapping products to their variant values",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "products.id",
+          "description": "Product reference"
+        },
+        "variant_value_id": {
+          "name": "variant_value_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "variant_values.id",
+          "description": "Variant value reference"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "many_to_many",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Maps products to variant values"
+        },
+        {
+          "type": "many_to_many",
+          "target_table": "variant_values",
+          "foreign_key": "variant_value_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Maps variant values to products"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_id", "variant_value_id"]
+    },
+    "product_family_industries": {
+      "name": "product_family_industries",
+      "description": "Multi-industry targeting for B2B products",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "product_families.id",
+          "description": "Product family reference"
+        },
+        "industry_naics_code": {
+          "name": "industry_naics_code",
+          "type": "varchar",
+          "max_length": 10,
+          "nullable": false,
+          "description": "NAICS code"
+        },
+        "industry_use_case": {
+          "name": "industry_use_case",
+          "type": "text",
+          "nullable": true,
+          "description": "How product solves problems in this industry"
+        },
+        "industry_benefits": {
+          "name": "industry_benefits",
+          "type": "array",
+          "nullable": true,
+          "description": "Array of benefit strings"
+        },
+        "compliance_notes": {
+          "name": "compliance_notes",
+          "type": "text",
+          "nullable": true,
+          "description": "Compliance and regulatory notes"
+        },
+        "is_primary_industry": {
+          "name": "is_primary_industry",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "description": "Main target industry"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Industries belong to product family"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_family_id", "industry_naics_code"]
+    },
+    "customer_segments": {
+      "name": "customer_segments",
+      "description": "Customer segment messaging and targeting",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "product_families.id",
+          "description": "Product family reference"
+        },
+        "segment_type": {
+          "name": "segment_type",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "description": "One of: b2b, b2c, d2c, wholesale, enterprise, retail"
+        },
+        "segment_label": {
+          "name": "segment_label",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": false,
+          "description": "Human-readable label"
+        },
+        "tone": {
+          "name": "tone",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "description": "One of: professional, casual, technical, emotional, educational, aspirational"
+        },
+        "key_benefits": {
+          "name": "key_benefits",
+          "type": "array",
+          "nullable": true,
+          "description": "Array of benefit strings"
+        },
+        "pain_points": {
+          "name": "pain_points",
+          "type": "array",
+          "nullable": true,
+          "description": "Array of pain point strings"
+        },
+        "primary_channels": {
+          "name": "primary_channels",
+          "type": "array",
+          "nullable": true,
+          "description": "Array of channel names"
+        },
+        "content_formats": {
+          "name": "content_formats",
+          "type": "array",
+          "nullable": true,
+          "description": "Array of format strings"
+        },
+        "pricing_notes": {
+          "name": "pricing_notes",
+          "type": "text",
+          "nullable": true,
+          "description": "Pricing notes for this segment"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Segments belong to product family"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_family_id", "segment_type"]
+    },
+    "product_images": {
+      "name": "product_images",
+      "description": "Product images (family-level or SKU-specific)",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "product_families.id",
+          "description": "Product family reference"
+        },
+        "url": {
+          "name": "url",
+          "type": "varchar",
+          "max_length": 2048,
+          "nullable": false,
+          "description": "Image URL or path"
+        },
+        "alt_text": {
+          "name": "alt_text",
+          "type": "varchar",
+          "max_length": 500,
+          "nullable": true,
+          "description": "Alt text for accessibility"
+        },
+        "image_type": {
+          "name": "image_type",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "default": "gallery",
+          "description": "One of: primary, gallery, thumbnail, lifestyle, closeup, video_thumbnail"
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "description": "Display order"
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "nullable": true,
+          "description": "Image width in pixels"
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "nullable": true,
+          "description": "Image height in pixels"
+        },
+        "file_size_bytes": {
+          "name": "file_size_bytes",
+          "type": "bigint",
+          "nullable": true,
+          "description": "File size in bytes"
+        },
+        "whatsapp_media_id": {
+          "name": "whatsapp_media_id",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": true,
+          "description": "WhatsApp media ID if uploaded"
+        },
+        "is_primary": {
+          "name": "is_primary",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "description": "Hero image"
+        },
+        "for_sku": {
+          "name": "for_sku",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": true,
+          "description": "SKU-specific image (null = family-level)"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Images belong to product family"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_family_id", "for_sku"]
+    },
+    "marketing_content": {
+      "name": "marketing_content",
+      "description": "Platform-specific marketing content",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "product_families.id",
+          "description": "Product family reference"
+        },
+        "platform": {
+          "name": "platform",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "description": "One of: instagram, facebook, twitter, linkedin, youtube, tiktok, website, email, catalog"
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "description": "One of: post, story, reel, video, carousel, ad, description, title, caption, subject_line, catalog_description"
+        },
+        "content_text": {
+          "name": "content_text",
+          "type": "text",
+          "nullable": false,
+          "description": "Actual content text"
+        },
+        "content_metadata": {
+          "name": "content_metadata",
+          "type": "jsonb",
+          "nullable": true,
+          "description": "Platform-specific metadata"
+        },
+        "hashtags": {
+          "name": "hashtags",
+          "type": "array",
+          "nullable": true,
+          "description": "Array of hashtag strings"
+        },
+        "keywords": {
+          "name": "keywords",
+          "type": "array",
+          "nullable": true,
+          "description": "Array of keyword strings"
+        },
+        "meta_title": {
+          "name": "meta_title",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": true,
+          "description": "Meta title for SEO"
+        },
+        "meta_description": {
+          "name": "meta_description",
+          "type": "varchar",
+          "max_length": 500,
+          "nullable": true,
+          "description": "Meta description for SEO"
+        },
+        "for_sku": {
+          "name": "for_sku",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": true,
+          "description": "SKU-specific content (null = family-level)"
+        },
+        "for_customer_segment": {
+          "name": "for_customer_segment",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": true,
+          "description": "Segment-specific content"
+        },
+        "for_industry": {
+          "name": "for_industry",
+          "type": "varchar",
+          "max_length": 10,
+          "nullable": true,
+          "description": "Industry-specific content (NAICS code)"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Content belongs to product family"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_family_id", "platform", "for_sku"]
+    }
+  }
+}
