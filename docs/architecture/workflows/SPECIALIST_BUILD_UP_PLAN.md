@@ -2114,14 +2114,25 @@ Existing workflows continue unchanged. New capabilities are opt-in based on user
 
 ---
 
-## Phase 2C: Dynamic Schema-Driven CRUD 🔄 DESIGN COMPLETE (8-10 hours)
+## Phase 2C: Dynamic Schema-Driven CRUD 🔄 IN PROGRESS (9-11 hours total)
 
 ### Goal
 Transform static CRUD architecture into future-proof, schema-driven system. Eliminate hard-coded operation types, table names, and routing logic. Enable zero-code deployment for new tables and operations.
 
-**Status:** 🔄 Design Complete - Implementation Pending
+**Status:** 🔄 Implementation In Progress (5/11 hours complete - 45%)
 
 **Date Started:** October 29, 2025
+
+**Progress:**
+- ✅ Task 2C.1: Schema Metadata Layer (3h) - COMPLETE
+- ✅ Task 2C.2: Generic Intent Models (1h) - COMPLETE
+- ⏳ Task 2C.3: Universal CRUD Tool (3h) - Core complete, needs storage adapter + tests
+- ✅ Task 2C.4: Schema Query Tool (30m) - COMPLETE
+- ⏳ Task 2C.5: Specialist Prompt Enhancement (2h) - IN PROGRESS
+- ⏳ Task 2C.6: PM Workflow Simplification (1h) - PENDING
+- ⏳ Task 2C.7: Business Rules Migration (1h) - PENDING
+- ⏳ Task 2C.8: Testing & Validation (2h) - PENDING
+- ⏳ Task 2C.9: Cleanup Obsolete Code (1h) - PENDING
 
 **Architectural Shift:** Static discriminated union → Dynamic schema-driven intent system
 
@@ -2204,10 +2215,10 @@ Transform static CRUD architecture into future-proof, schema-driven system. Elim
 - Version evolution tests
 
 **Deliverables:**
-- [ ] Schema models defined
-- [ ] Product catalog v1 schema extracted
-- [ ] SchemaRegistry with get_version()
-- [ ] Unit tests passing
+- [x] Schema models defined
+- [x] Product catalog v1 schema extracted
+- [x] SchemaRegistry with get_version()
+- [x] Unit tests passing (27 tests, all passing)
 
 ---
 
@@ -2224,9 +2235,9 @@ Transform static CRUD architecture into future-proof, schema-driven system. Elim
   - Change response_format from `ProductArchitectureResponse` (Union) to `OperationIntent`
 
 **Deliverables:**
-- [ ] OperationIntent model complete
-- [ ] Specialist response_format updated
-- [ ] Models validated with Pydantic
+- [x] OperationIntent model complete
+- [x] Specialist response_format updated
+- [x] Models validated with Pydantic
 
 ---
 
@@ -2250,10 +2261,11 @@ Transform static CRUD architecture into future-proof, schema-driven system. Elim
 - Rollback tests
 
 **Deliverables:**
-- [ ] Universal tool implemented
-- [ ] OperationExecutor complete
-- [ ] Reference resolution working ($step_N.field)
-- [ ] Unit tests passing (90%+ coverage)
+- [x] Universal tool implemented (core complete)
+- [x] OperationExecutor complete (dependency resolution, reference resolution, rollback)
+- [x] Reference resolution working ($step_N.field)
+- [ ] Storage adapter implementation (pending)
+- [ ] Unit tests passing (90%+ coverage) (pending)
 
 ---
 
@@ -2268,9 +2280,11 @@ Transform static CRUD architecture into future-proof, schema-driven system. Elim
 - Attach `get_product_schema` to product specialist tools
 
 **Deliverables:**
-- [ ] get_product_schema tool created
-- [ ] Tool attached to specialist
-- [ ] Returns current schema version
+- [x] get_product_schema tool created
+- [x] get_table_schema tool created (bonus)
+- [x] list_available_tables tool created (bonus)
+- [x] Tools attached to specialist
+- [x] Returns current schema version
 
 ---
 
@@ -2364,6 +2378,51 @@ Transform static CRUD architecture into future-proof, schema-driven system. Elim
 - [ ] Future-proofing test passes (fake table)
 - [ ] Performance benchmarks acceptable
 - [ ] Backward compatibility verified
+
+---
+
+#### Task 2C.9: Cleanup Obsolete Code (1 hour)
+
+**Remove/Deprecate Obsolete Code:**
+
+After Phase 2C, the following code becomes obsolete:
+
+**Phase 2B Code to Remove:**
+- `agents/src/autifyme_agents/schemas/product_drafts.py` - 7 hard-coded draft types (replaced by OperationIntent)
+- `agents/src/autifyme_agents/tools/product_crud_tools.py` - Specialized READ/DELETE tools (replaced by universal tool)
+- Old tool functions in `product_persistence_tools.py`:
+  - `create_save_product_family_tool` (replaced by execute_database_operation)
+  - Related: `add_variant_values`, `add_variant_axis`, `update_product_fields` (if created in Phase 2B)
+
+**Prompt Updates to Remove:**
+- `prompts/specialists/product_architecture_specialist.prompt`:
+  - Remove hard-coded CRUD classification logic (~200 lines)
+  - Remove references to 7 draft types
+  - Remove operation-specific examples tied to old drafts
+
+**Update PM Integration:**
+- `workflows/project_manager.py`:
+  - Remove imports for 6 old specialized tools
+  - Remove old tool attachments
+  - Keep only: execute_database_operation, get_product_schema
+
+**Documentation Cleanup:**
+- Mark `docs/architecture/PRODUCT_SPECIALIST_CRUD_IMPLEMENTATION.md` as deprecated
+  - Add deprecation notice pointing to DYNAMIC_SCHEMA_DRIVEN_ARCHITECTURE.md
+  - Keep for historical reference
+
+**Verification:**
+- Run all tests to ensure no dependencies on removed code
+- Check imports across codebase for references to removed modules
+- Update any documentation that references old patterns
+
+**Deliverables:**
+- [ ] product_drafts.py removed
+- [ ] Old CRUD tools removed
+- [ ] PM tool imports updated
+- [ ] Specialist prompt cleaned
+- [ ] Documentation updated with deprecation notices
+- [ ] All tests still passing
 
 ---
 

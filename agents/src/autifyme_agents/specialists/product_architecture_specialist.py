@@ -81,15 +81,24 @@ def create_product_architecture_specialist(
         "Handles any operation on any table through schema-driven planning."
     )
 
+    # Core tools
     tools = [
         image_analysis_tool,
     ]
 
+    # Schema query tools (for dynamic planning)
+    from autifyme_agents.tools.schema_tools import (
+        get_product_schema,
+        get_table_schema,
+        list_available_tables,
+    )
+    tools.extend([get_product_schema, get_table_schema, list_available_tables])
+
+    # Storage-dependent tools
     if storage:
         from autifyme_agents.tools.product_search_tools import (
             create_search_product_families_tool,
         )
-
         tools.append(create_search_product_families_tool(storage))
 
     return {
