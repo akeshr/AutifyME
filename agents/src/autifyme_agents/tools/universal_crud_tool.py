@@ -21,6 +21,7 @@ from typing import Any
 from langchain.tools import tool
 from langchain_core.tools import ToolException
 
+from autifyme_agents.core.business_rules import BusinessRuleHandlers
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.operation_intent import (
     ExecutionResult,
@@ -28,7 +29,11 @@ from autifyme_agents.schemas.operation_intent import (
     Operation,
     OperationIntent,
 )
-from autifyme_agents.schemas.registry import SchemaRegistry, SchemaValidator
+from autifyme_agents.schemas.registry import (
+    BusinessRuleTrigger,
+    SchemaRegistry,
+    SchemaValidator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +62,7 @@ class OperationExecutor:
         self.storage = storage
         self.schema = schema
         self.validator = SchemaValidator(schema)
+        self.business_rules = BusinessRuleHandlers(storage, schema)
 
     async def execute_plan(
         self,
@@ -245,7 +251,7 @@ class OperationExecutor:
         context: dict[int, dict[str, Any]],
     ) -> dict[str, Any]:
         """
-        Execute INSERT operation with reference resolution.
+        Execute INSERT operation with reference resolution and business rules.
 
         Args:
             operation: Insert operation
@@ -271,8 +277,28 @@ class OperationExecutor:
                     f"Validation failed for {table_schema.name}: {validation.errors}"
                 )
 
+            # BEFORE_INSERT business rules
+            rule_context = {
+                "operation": operation,
+                "table": table_schema.name,
+                "entities": [resolved_entity],
+            }
+            self.business_rules.execute_rules_for_trigger(
+                table_schema.name,
+                BusinessRuleTrigger.BEFORE_INSERT,
+                rule_context,
+            )
+
             # Insert entity
             result = await self._insert_entity(table_schema.name, resolved_entity)
+
+            # AFTER_INSERT business rules
+            rule_context["inserted_entity"] = result
+            self.business_rules.execute_rules_for_trigger(
+                table_schema.name,
+                BusinessRuleTrigger.AFTER_INSERT,
+                rule_context,
+            )
 
             # Store the full inserted entity for reference resolution
             # This allows $step_N.id, $step_N.sku_prefix, etc.

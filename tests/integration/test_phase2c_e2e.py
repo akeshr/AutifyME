@@ -961,6 +961,219 @@ class TestFullE2EExecution:
 
 
 # =============================================================================
+# Test Suite 8: Business Rules
+# =============================================================================
+
+
+class TestBusinessRules:
+    """Test business rule execution and validation."""
+
+    @pytest.mark.asyncio
+    async def test_sku_uniqueness_prevents_duplicates(self, operation_executor, test_storage):
+        """Test SKU uniqueness business rule prevents duplicate SKUs."""
+        family_id = str(uuid.uuid4())
+
+        # Configure SKU uniqueness business rule for products table
+        from autifyme_agents.schemas.registry import BusinessRule, BusinessRuleTrigger
+
+        products_table = operation_executor.schema.get_table("products")
+        products_table.business_rules = [
+            BusinessRule(
+                rule_type="sku_uniqueness",
+                trigger=BusinessRuleTrigger.BEFORE_INSERT,
+                handler="validate_sku_uniqueness",
+                enabled=True,
+            )
+        ]
+
+        # Seed database with family and existing product
+        test_storage.tables["product_families"].append(
+            {
+                "id": family_id,
+                "product_group_id": "TEST-FAMILY",
+                "sku_prefix": "TST",
+                "name": "Test Family",
+                "description": "Test",
+                "brand": "TestBrand",
+                "base_price": 10.00,
+                "price_currency": "INR",
+                "condition": "new",
+                "lifecycle_stage": "regular",
+            }
+        )
+        test_storage.tables["products"].append(
+            {
+                "id": str(uuid.uuid4()),
+                "product_family_id": family_id,
+                "sku": "TST-EXISTING",
+                "sku_code": "EXISTING-SKU",
+                "name": "Existing Product",
+                "description": "Existing",
+                "price": 10.00,
+            }
+        )
+
+        # Try to insert product with same SKU
+        steps = [
+            ExecutionStep(
+                step_number=1,
+                description="Insert product with duplicate SKU",
+                operation=Operation(
+                    op_type="insert",
+                    table="products",
+                    new_entities=[
+                        {
+                            "product_family_id": family_id,
+                            "sku": "TST-NEW",
+                            "sku_code": "EXISTING-SKU",  # Duplicate!
+                            "name": "New Product",
+                            "description": "New",
+                            "price": 10.00,
+                        }
+                    ],
+                ),
+            )
+        ]
+
+        # Execute - should fail due to SKU uniqueness rule
+        result = await operation_executor.execute_plan(steps)
+
+        # Verify failure
+        assert result.success is False
+        assert "Duplicate SKU" in result.error_message or "SKU" in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_sku_uniqueness_allows_unique_skus(self, operation_executor, test_storage):
+        """Test SKU uniqueness allows unique SKUs."""
+        family_id = str(uuid.uuid4())
+
+        # Seed database with family and existing product
+        test_storage.tables["product_families"].append(
+            {
+                "id": family_id,
+                "product_group_id": "TEST-FAMILY",
+                "sku_prefix": "TST",
+                "name": "Test Family",
+                "description": "Test",
+                "brand": "TestBrand",
+                "base_price": 10.00,
+                "price_currency": "INR",
+                "condition": "new",
+                "lifecycle_stage": "regular",
+            }
+        )
+        test_storage.tables["products"].append(
+            {
+                "id": str(uuid.uuid4()),
+                "product_family_id": family_id,
+                "sku": "TST-EXISTING",
+                "sku_code": "EXISTING-SKU",
+                "name": "Existing Product",
+                "description": "Existing",
+                "price": 10.00,
+            }
+        )
+
+        # Insert product with different SKU
+        steps = [
+            ExecutionStep(
+                step_number=1,
+                description="Insert product with unique SKU",
+                operation=Operation(
+                    op_type="insert",
+                    table="products",
+                    new_entities=[
+                        {
+                            "product_family_id": family_id,
+                            "sku": "TST-NEW",
+                            "sku_code": "NEW-UNIQUE-SKU",  # Unique
+                            "name": "New Product",
+                            "description": "New",
+                            "price": 10.00,
+                        }
+                    ],
+                ),
+            )
+        ]
+
+        # Execute - should succeed
+        result = await operation_executor.execute_plan(steps)
+
+        # Verify success
+        assert result.success is True
+        assert len(test_storage.tables["products"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_business_rules_trigger_on_insert(self, operation_executor, test_storage):
+        """Test business rules are triggered during INSERT operations."""
+        # Track if business rule was called
+        rule_executed = {"before": False, "after": False}
+
+        def mock_before_insert(rule, context):
+            rule_executed["before"] = True
+            return {"status": "valid"}
+
+        def mock_after_insert(rule, context):
+            rule_executed["after"] = True
+            return {"status": "valid"}
+
+        # Register mock handlers
+        operation_executor.business_rules.register("test_before", mock_before_insert)
+        operation_executor.business_rules.register("test_after", mock_after_insert)
+
+        # Add business rules to schema (temporarily)
+        from autifyme_agents.schemas.registry import BusinessRule, BusinessRuleTrigger
+
+        product_families = operation_executor.schema.get_table("product_families")
+        product_families.business_rules = [
+            BusinessRule(
+                rule_type="test_rule_before",
+                trigger=BusinessRuleTrigger.BEFORE_INSERT,
+                handler="test_before",
+                enabled=True,
+            ),
+            BusinessRule(
+                rule_type="test_rule_after",
+                trigger=BusinessRuleTrigger.AFTER_INSERT,
+                handler="test_after",
+                enabled=True,
+            ),
+        ]
+
+        # Execute insert
+        steps = [
+            ExecutionStep(
+                step_number=1,
+                description="Insert with business rules",
+                operation=Operation(
+                    op_type="insert",
+                    table="product_families",
+                    new_entities=[
+                        {
+                            "product_group_id": "TEST",
+                            "sku_prefix": "TST",
+                            "name": "Test",
+                            "description": "Test",
+                            "brand": "TestBrand",
+                            "base_price": 10.00,
+                            "price_currency": "INR",
+                            "condition": "new",
+                            "lifecycle_stage": "regular",
+                        }
+                    ],
+                ),
+            )
+        ]
+
+        result = await operation_executor.execute_plan(steps)
+
+        # Verify business rules were triggered
+        assert result.success is True
+        assert rule_executed["before"] is True
+        assert rule_executed["after"] is True
+
+
+# =============================================================================
 # Pytest Configuration
 # =============================================================================
 
