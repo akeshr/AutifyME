@@ -505,47 +505,124 @@ class OperationExecutor:
     # =========================================================================
 
     async def _insert_entity(self, table: str, entity: dict[str, Any]) -> dict[str, Any]:
-        """Insert single entity and return created record with ID."""
-        # Storage adapter implementation
-        # This is a placeholder - actual implementation depends on storage interface
-        result = await self.storage.execute(
-            f"INSERT INTO {table}",
-            entity
-        )
-        return result
+        """Insert single entity and return created record with ID.
+
+        Args:
+            table: Table name
+            entity: Entity data to insert
+
+        Returns:
+            Inserted entity with generated ID
+
+        Raises:
+            ToolException: On insert failure
+        """
+        try:
+            client = self.storage._ensure_client()
+            result = client.table(table).insert(entity).execute()
+
+            if not result.data or len(result.data) == 0:
+                raise ToolException(f"Insert to {table} returned no data")
+
+            return result.data[0]  # Return first inserted record
+        except Exception as e:
+            logger.error(f"Failed to insert into {table}", exc_info=True)
+            raise ToolException(f"Insert failed for {table}: {str(e)}") from e
 
     async def _update_entities(
         self, table: str, filter: dict[str, Any], updates: dict[str, Any]
     ) -> int:
-        """Update entities matching filter and return count."""
-        # Storage adapter implementation
-        result = await self.storage.execute(
-            f"UPDATE {table} WHERE",
-            filter,
-            updates
-        )
-        return result.get("count", 0)
+        """Update entities matching filter and return count.
+
+        Args:
+            table: Table name
+            filter: WHERE conditions as dict
+            updates: Fields to update
+
+        Returns:
+            Number of updated entities
+
+        Raises:
+            ToolException: On update failure
+        """
+        try:
+            client = self.storage._ensure_client()
+            query = client.table(table).update(updates)
+
+            # Apply filters
+            for key, value in filter.items():
+                query = query.eq(key, value)
+
+            result = query.execute()
+            return len(result.data) if result.data else 0
+        except Exception as e:
+            logger.error(f"Failed to update {table}", exc_info=True)
+            raise ToolException(f"Update failed for {table}: {str(e)}") from e
 
     async def _delete_entities(self, table: str, filter: dict[str, Any]) -> int:
-        """Delete entities matching filter and return count."""
-        # Storage adapter implementation
-        result = await self.storage.execute(
-            f"DELETE FROM {table} WHERE",
-            filter
-        )
-        return result.get("count", 0)
+        """Delete entities matching filter and return count.
+
+        Args:
+            table: Table name
+            filter: WHERE conditions as dict
+
+        Returns:
+            Number of deleted entities
+
+        Raises:
+            ToolException: On delete failure
+        """
+        try:
+            client = self.storage._ensure_client()
+            query = client.table(table).delete()
+
+            # Apply filters
+            for key, value in filter.items():
+                query = query.eq(key, value)
+
+            result = query.execute()
+            return len(result.data) if result.data else 0
+        except Exception as e:
+            logger.error(f"Failed to delete from {table}", exc_info=True)
+            raise ToolException(f"Delete failed for {table}: {str(e)}") from e
 
     async def _query_entities(
-        self, table: str, filter: dict[str, Any], include_relations: list[str]
+        self, table: str, filter: dict[str, Any], include_relations: list[str] | None = None
     ) -> list[dict[str, Any]]:
-        """Query entities with optional relation includes."""
-        # Storage adapter implementation
-        result = await self.storage.execute(
-            f"SELECT FROM {table} WHERE",
-            filter,
-            include_relations
-        )
-        return result.get("entities", [])
+        """Query entities with optional relation includes.
+
+        Args:
+            table: Table name
+            filter: WHERE conditions as dict
+            include_relations: Related tables to include (Supabase foreign key syntax)
+
+        Returns:
+            List of matching entities
+
+        Raises:
+            ToolException: On query failure
+        """
+        try:
+            client = self.storage._ensure_client()
+
+            # Build select clause with relations
+            select_clause = "*"
+            if include_relations:
+                # Supabase relation syntax: table(...) for foreign keys
+                relation_selects = [f"{rel}(*)" for rel in include_relations]
+                select_clause = f"*, {', '.join(relation_selects)}"
+
+            query = client.table(table).select(select_clause)
+
+            # Apply filters
+            for key, value in filter.items():
+                query = query.eq(key, value)
+
+            result = query.execute()
+            return result.data if result.data else []
+        except Exception as e:
+            logger.error(f"Failed to query {table}", exc_info=True)
+            raise ToolException(f"Query failed for {table}: {str(e)}") from e
 
 
 # =============================================================================
