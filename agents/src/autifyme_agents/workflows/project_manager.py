@@ -30,8 +30,9 @@ from autifyme_agents.tools.pm_context_tools import (
     create_get_category_info_tool,
     create_search_catalog_summary_tool,
 )
-from autifyme_agents.tools.product_persistence_tools import (
-    create_save_product_family_tool,
+from autifyme_agents.tools.schema_tools import get_product_schema
+from autifyme_agents.tools.universal_crud_tool import (
+    create_execute_database_operation_tool,
 )
 
 if TYPE_CHECKING:
@@ -143,17 +144,14 @@ async def create_project_manager(
     pm_tools.append(create_search_catalog_summary_tool(storage))
     pm_tools.append(create_get_category_info_tool(storage))
 
-    # HITL persistence tools (CREATE/UPDATE)
-    pm_tools.append(create_save_product_family_tool(storage))
-    pm_tools.append(create_save_campaign_tool(storage))
+    # Schema query tool (for dynamic operation planning)
+    pm_tools.append(get_product_schema)
 
-    # Product CRUD tools (READ/DELETE)
-    from autifyme_agents.tools.product_crud_tools import (
-        create_query_product_data_tool,
-        create_delete_product_data_tool,
-    )
-    pm_tools.append(create_query_product_data_tool(storage))
-    pm_tools.append(create_delete_product_data_tool(storage))
+    # Universal CRUD tool (replaces specialized tools for product operations)
+    pm_tools.append(create_execute_database_operation_tool(storage))
+
+    # Campaign persistence tool (HITL-enabled for marketing campaigns)
+    pm_tools.append(create_save_campaign_tool(storage))
 
     # Product Architecture Specialist (structure, variants, SKUs)
     product_architecture_specialist = create_product_architecture_specialist(storage)
@@ -165,7 +163,7 @@ async def create_project_manager(
 
     # HITL configuration
     interrupt_configs: dict[str, bool] = {
-        "save_product_family": True,
+        "execute_database_operation": True,
         "save_campaign": True,
     }
     project_manager = create_deep_agent(

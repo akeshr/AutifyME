@@ -1,33 +1,30 @@
 """
-Product Architecture Specialist - Complete CRUD operations for product architecture.
+Product Architecture Specialist - Dynamic schema-driven CRUD operations.
 
 Domain Expertise:
 - Product structure analysis (family vs variants)
 - Variant axis identification (dimensions that vary: size, color, material, etc.)
 - SKU architecture design (naming conventions, combinations)
 - Intelligent catalog matching for autonomous create vs update decisions
-- Complete CRUD operations (Create, Read, Update, Delete)
+- Schema-driven operation planning (queries schema, generates execution plans)
 
 Responsibilities:
-- Search catalog for existing product families (autonomous intelligence)
+- Query product catalog schema dynamically
+- Search catalog for existing product families
 - Classify user intent into CRUD operations
-- Return appropriate draft type based on intent:
-  * CREATE: ProductArchitectureDraft, VariantAdditionDraft, AxisAdditionDraft
-  * READ: ProductQueryDraft
-  * UPDATE: FamilyUpdateDraft
-  * DELETE: ProductDeletionDraft (with impact analysis)
-  * CLARIFY: AmbiguousDraft
+- Generate OperationIntent with execution plan
+- Calculate impact analysis from schema + current data
 
 Does NOT:
-- Persist to database (PM handles persistence)
+- Persist to database (PM handles persistence via universal tool)
 - Generate marketing content (Content Specialist handles this)
 - Classify into taxonomy (Taxonomy Specialist handles this)
 
 Architecture Pattern:
-- SubAgent dict format with Union response type
-- Autonomous intent classification
-- Discriminated union with 7 draft types
-- PM routes based on draft_type discriminator
+- SubAgent dict format with OperationIntent response
+- Schema-driven planning (no hard-coded operation types)
+- Single generic model (replaces 7 hard-coded draft types)
+- Dynamic execution plan generation
 """
 
 from typing import Any
@@ -36,8 +33,8 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
-# Import all draft types from centralized schema
-from autifyme_agents.schemas.product_drafts import ProductArchitectureResponse
+# Import generic operation intent (replaces all hard-coded draft types)
+from autifyme_agents.schemas.operation_intent import OperationIntent
 
 
 # =============================================================================
@@ -49,55 +46,59 @@ def create_product_architecture_specialist(
     storage: StorageInterface | None = None,
 ) -> dict[str, Any]:
     """
-    Create Product Architecture Specialist with complete CRUD capabilities.
+    Create Product Architecture Specialist with schema-driven CRUD.
 
     Specialist Responsibilities:
-    - Search catalog for existing product families (enables autonomous decisions)
-    - Classify user intent into CRUD operations
-    - Return appropriate draft type:
-      * CREATE: full_family, variant_addition, axis_addition
-      * READ: query
-      * UPDATE: family_update
-      * DELETE: deletion (with impact analysis)
-      * CLARIFY: ambiguous
+    - Query product catalog schema dynamically
+    - Search catalog for existing product families
+    - Classify user intent (create/read/update/delete)
+    - Generate OperationIntent with execution plan
+    - Calculate impact analysis from schema + data
 
     Architecture:
     - SubAgent dict format (DeepAgents pattern)
-    - Union response type (7 draft types)
-    - Discriminated union via draft_type field
-    - PM routes based on draft_type
+    - OperationIntent response (single generic model)
+    - Schema-driven planning (no hard-coded operation types)
+    - Dynamic execution plan generation
 
     Args:
-        storage: Storage interface for catalog search (required for intelligent matching)
+        storage: Storage interface for catalog search + schema query
 
     Returns:
         SubAgent spec with:
         - name: specialist identifier
         - description: delegation criteria
-        - tools: analysis and search tools
-        - system_prompt: domain expertise instructions
-        - response_format: Union of all draft types
+        - tools: analysis, search, and schema query tools
+        - system_prompt: schema-driven planning instructions
+        - response_format: OperationIntent (single model)
     """
     system_prompt = load_prompt("specialists/product_architecture_specialist.prompt")
 
     description = (
-        "Product architecture specialist with complete CRUD capabilities. "
-        "Searches catalog to determine operation type (create/read/update/delete), "
-        "analyzes product structure, designs variant architecture, "
-        "and returns appropriate draft type based on user intent. "
-        "Returns one of 7 draft types: full_family, variant_addition, axis_addition, "
-        "family_update, query, deletion, or ambiguous."
+        "Product architecture specialist with schema-driven CRUD. "
+        "Queries schema dynamically, searches catalog, classifies intent, "
+        "and generates OperationIntent with execution plan. "
+        "Handles any operation on any table through schema-driven planning."
     )
 
+    # Core tools
     tools = [
         image_analysis_tool,
     ]
 
+    # Schema query tools (for dynamic planning)
+    from autifyme_agents.tools.schema_tools import (
+        get_product_schema,
+        get_table_schema,
+        list_available_tables,
+    )
+    tools.extend([get_product_schema, get_table_schema, list_available_tables])
+
+    # Storage-dependent tools
     if storage:
         from autifyme_agents.tools.product_search_tools import (
             create_search_product_families_tool,
         )
-
         tools.append(create_search_product_families_tool(storage))
 
     return {
@@ -105,5 +106,5 @@ def create_product_architecture_specialist(
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
-        "response_format": ProductArchitectureResponse,  # Union type
+        "response_format": OperationIntent,  # Single generic model
     }
