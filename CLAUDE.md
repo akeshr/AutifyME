@@ -24,6 +24,17 @@ Modern LLMs are highly capable: massive context windows (200K+ tokens), strong r
 
 **Implication:** When designing agents/workflows, ask: "Am I overspecifying? Can I give this agent the goal + context and trust it to reason?" Default to less structure, more intelligence.
 
+### **[CRITICAL] ULTRATHINK: First-Principles Engineering**
+Every change—whether design, architecture, or code—must meet this standard:
+
+- **Clean, production-ready from first principles:** No shortcuts, no "we'll fix it later"
+- **Dynamic, future-proof architecture:** Design for extensibility and evolution, not just current requirements
+- **From-scratch mindset:** Approach every change as if building fresh—question existing patterns, refactor fearlessly, eliminate technical debt
+- **Zero tolerance for compromise:** Architecture integrity is non-negotiable; if existing code violates principles, fix the foundation
+- **Without any constraints:** Ignore legacy code limitations, existing patterns, or "how it's done now"—design the ideal solution first, then implement it
+
+**ULTRATHINK means:** Before every implementation, pause and ask: "If I were designing this from scratch with everything I know now, would I build it this way?" If not, refactor to the right architecture first. Operate unconstrained—the right architecture justifies any necessary refactoring.
+
 ### Design-First Process
 - Create/update specs under `docs/architecture/` before implementation (user flow, agent interplay, components, schemas)
 - Validate design preserves hierarchical data flow and context discipline
