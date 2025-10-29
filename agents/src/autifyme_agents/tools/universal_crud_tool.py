@@ -897,7 +897,36 @@ def create_execute_database_operation_tool(storage: StorageInterface):
             )
         """
         try:
-            # Construct OperationIntent from flat parameters
+            # Load schema first (needed for timestamp auto-population)
+            schema = SchemaRegistry.get_version(
+                version=schema_version,
+                domain=change_spec.get("domain", "product_catalog")
+            )
+
+            # Auto-populate timestamp fields in change_spec BEFORE constructing OperationIntent
+            from datetime import datetime, timezone
+            for operation_dict in change_spec.get("operations", []):
+                table_name = operation_dict.get("table")
+                if not table_name:
+                    continue
+
+                table_schema = schema.get_table(table_name)
+                op_type = operation_dict.get("op_type")
+
+                # For INSERT operations, populate created_at and updated_at
+                if op_type == "insert" and operation_dict.get("new_entities"):
+                    for entity in operation_dict["new_entities"]:
+                        if 'created_at' in table_schema.columns and 'created_at' not in entity:
+                            entity['created_at'] = datetime.now(timezone.utc).isoformat()
+                        if 'updated_at' in table_schema.columns and 'updated_at' not in entity:
+                            entity['updated_at'] = datetime.now(timezone.utc).isoformat()
+
+                # For UPDATE operations, populate updated_at
+                elif op_type == "update" and operation_dict.get("field_updates"):
+                    if 'updated_at' in table_schema.columns and 'updated_at' not in operation_dict["field_updates"]:
+                        operation_dict["field_updates"]['updated_at'] = datetime.now(timezone.utc).isoformat()
+
+            # Construct OperationIntent from flat parameters (timestamps now populated in change_spec)
             operation_intent = OperationIntent(
                 intent_type=intent_type,
                 change_spec=change_spec,
@@ -917,30 +946,6 @@ def create_execute_database_operation_tool(storage: StorageInterface):
                     "schema_version": schema_version,
                 }
             )
-
-            # Load schema
-            schema = SchemaRegistry.get_version(
-                version=schema_version,
-                domain=operation_intent.change_spec.domain
-            )
-
-            # Auto-populate timestamp fields BEFORE validation
-            from datetime import datetime, timezone
-            for operation in operation_intent.change_spec.operations:
-                table_schema = schema.get_table(operation.table)
-
-                # For INSERT operations, populate created_at and updated_at
-                if operation.op_type == "insert" and operation.new_entities:
-                    for entity in operation.new_entities:
-                        if 'created_at' in table_schema.columns and 'created_at' not in entity:
-                            entity['created_at'] = datetime.now(timezone.utc).isoformat()
-                        if 'updated_at' in table_schema.columns and 'updated_at' not in entity:
-                            entity['updated_at'] = datetime.now(timezone.utc).isoformat()
-
-                # For UPDATE operations, populate updated_at
-                elif operation.op_type == "update" and operation.field_updates:
-                    if 'updated_at' in table_schema.columns and 'updated_at' not in operation.field_updates:
-                        operation.field_updates['updated_at'] = datetime.now(timezone.utc).isoformat()
 
             # Validate against schema
             validator = SchemaValidator(schema)

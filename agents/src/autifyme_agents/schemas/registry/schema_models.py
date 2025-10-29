@@ -397,7 +397,7 @@ class SchemaValidator:
             return result
 
         # Validate entities if present
-        new_entities = operation.get("new_entities", [])
+        new_entities = operation.get("new_entities") or []
         for i, entity in enumerate(new_entities):
             entity_result = self.validate_entity(table_name, entity)
             if not entity_result.valid:
