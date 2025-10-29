@@ -1,9 +1,9 @@
 # Specialist Build-Up Integration Plan
 
 **Date:** October 28, 2025
-**Last Updated:** October 28, 2025
+**Last Updated:** October 29, 2025
 **Status:** ✅ Phase 1 Complete | ✅ Phase 2 Complete | ✅ Phase 2B Complete (CRUD Enhancement)
-**Current Phase:** Phase 3 - Taxonomy Specialist (Ready to Start)
+**Current Phase:** Phase 2C - Dynamic Schema-Driven CRUD (Design Complete, Ready for Implementation)
 **Strategy:** Incremental build-up - unplug all specialists, perfect PM core, add specialists one by one
 
 ---
@@ -2111,6 +2111,313 @@ Existing workflows continue unchanged. New capabilities are opt-in based on user
 **Primary:** `aef7b92` - Implement complete CRUD architecture for Product Architecture Specialist
 
 **Branch:** `claude/review-product-specialist-architecture-011CUa5Zn1NSsuJ61Wjjm5La`
+
+---
+
+## Phase 2C: Dynamic Schema-Driven CRUD 🔄 DESIGN COMPLETE (8-10 hours)
+
+### Goal
+Transform static CRUD architecture into future-proof, schema-driven system. Eliminate hard-coded operation types, table names, and routing logic. Enable zero-code deployment for new tables and operations.
+
+**Status:** 🔄 Design Complete - Implementation Pending
+
+**Date Started:** October 29, 2025
+
+**Architectural Shift:** Static discriminated union → Dynamic schema-driven intent system
+
+---
+
+### Problem Statement
+
+**Current Architecture (Phase 2B) Limitations:**
+
+1. **Hard-Coded Draft Types:** 7 draft types enumerated. Adding "BundleCreation" → code deployment
+2. **Hard-Coded Tools:** 6 specialized tools. Adding `product_warranties` table → update 3+ tools
+3. **Hard-Coded Routing:** PM match/case on 7 types. New operation → add case statement
+4. **Schema in Code:** Table/column names hard-coded in tools. Schema evolution → tool rewrites
+
+**Future-Proofing Gap:**
+- Add warranty table → 5+ file changes + deployment
+- Add bundle operation → new draft type + tool + routing
+- New business rule → hard-code in tool logic
+- LLM can reason about schemas, but architecture doesn't leverage it
+
+**User Question:** "Is this design dynamic and future safe? If a new table comes, does code need changes?"
+**Answer with Phase 2B:** ❌ Yes, code changes required
+
+**Answer with Phase 2C:** ✅ No, schema metadata update only
+
+---
+
+### Solution: Schema-Driven Architecture
+
+**Core Innovation:**
+- Database schema as runtime metadata (JSON, not code)
+- LLM queries schema, generates generic `OperationIntent`
+- Single universal tool executes any operation on any table
+- Business rules as metadata, executed dynamically
+
+**Key Components:**
+
+1. **SchemaRegistry:** Version-controlled metadata (tables, relationships, business rules)
+2. **OperationIntent:** Single generic model (replaces 7 draft types)
+3. **Universal Tool:** `execute_database_operation` (replaces 6 specialized tools)
+4. **OperationExecutor:** Schema-aware execution engine
+5. **Specialist Enhancement:** Queries schema, generates intents dynamically
+6. **PM Simplification:** Generic presentation, no routing logic
+
+---
+
+### Architecture Comparison
+
+| Aspect | Phase 2B (Static) | Phase 2C (Dynamic) |
+|--------|------------------|-------------------|
+| **Draft Types** | 7 hard-coded | 1 generic (OperationIntent) |
+| **Tools** | 6 specialized | 1 universal |
+| **Schema Knowledge** | Hard-coded in tools | Runtime metadata (JSON) |
+| **New Tables** | Update 3+ tools + drafts | Update schema JSON only |
+| **New Operations** | Add draft + tool + routing | LLM generates intent |
+| **Business Rules** | Hard-coded in tools | Metadata-driven, reusable |
+| **PM Routing** | match/case on 7 types | Generic presentation |
+| **LLM Utilization** | Low (recipe following) | High (schema reasoning) |
+| **Deployment** | Code changes required | Metadata-only updates |
+
+---
+
+### Implementation Plan
+
+**Total Effort:** 8-10 hours
+
+#### Task 2C.1: Schema Metadata Layer (3 hours)
+
+**Create:**
+- `agents/src/autifyme_agents/schemas/registry/schema_models.py` - Core models
+  - `TableSchema`, `ColumnSchema`, `Relationship`, `BusinessRule`
+  - `SchemaRegistry` with versioning
+- `agents/src/autifyme_agents/schemas/registry/product_catalog_v1.json` - Schema data
+  - Extract all 9 product tables as metadata
+  - Define relationships, constraints
+
+**Testing:**
+- Unit tests for schema loading
+- Validation tests
+- Version evolution tests
+
+**Deliverables:**
+- [ ] Schema models defined
+- [ ] Product catalog v1 schema extracted
+- [ ] SchemaRegistry with get_version()
+- [ ] Unit tests passing
+
+---
+
+#### Task 2C.2: Generic Intent Models (1 hour)
+
+**Create:**
+- `agents/src/autifyme_agents/schemas/operation_intent.py`
+  - `OperationIntent` (replaces 7 draft types)
+  - `ChangeSpecification`, `Operation`
+  - `ImpactAnalysis`, `ExecutionPlan`, `ExecutionStep`
+
+**Update:**
+- `agents/src/autifyme_agents/specialists/product_architecture_specialist.py`
+  - Change response_format from `ProductArchitectureResponse` (Union) to `OperationIntent`
+
+**Deliverables:**
+- [ ] OperationIntent model complete
+- [ ] Specialist response_format updated
+- [ ] Models validated with Pydantic
+
+---
+
+#### Task 2C.3: Universal CRUD Tool (3 hours)
+
+**Create:**
+- `agents/src/autifyme_agents/tools/universal_crud_tool.py`
+  - `execute_database_operation` tool
+  - `OperationExecutor` class with:
+    - `execute_plan()` - Multi-step with dependencies
+    - `_execute_operation()` - Generic handler
+    - `_execute_insert()`, `_execute_update()`, `_execute_delete()`, `_execute_query()`
+    - `_resolve_references()` - Foreign key resolution ($step_N.field)
+    - `_trigger_business_rules()` - Dynamic rule execution
+  - `SchemaValidator` - Runtime validation
+
+**Testing:**
+- Unit tests for each executor method
+- Reference resolution tests
+- Dependency ordering tests
+- Rollback tests
+
+**Deliverables:**
+- [ ] Universal tool implemented
+- [ ] OperationExecutor complete
+- [ ] Reference resolution working ($step_N.field)
+- [ ] Unit tests passing (90%+ coverage)
+
+---
+
+#### Task 2C.4: Schema Query Tool (30 minutes)
+
+**Create:**
+- `agents/src/autifyme_agents/tools/schema_tools.py`
+  - `get_product_schema` tool
+  - Returns schema metadata for specialist planning
+
+**Add to Specialist:**
+- Attach `get_product_schema` to product specialist tools
+
+**Deliverables:**
+- [ ] get_product_schema tool created
+- [ ] Tool attached to specialist
+- [ ] Returns current schema version
+
+---
+
+#### Task 2C.5: Specialist Prompt Enhancement (2 hours)
+
+**Update:**
+- `agents/src/autifyme_agents/prompts/specialists/product_architecture_specialist.prompt`
+  - Remove hard-coded CRUD classification (200 lines)
+  - Add schema-driven planning guidance:
+    - Query schema at start
+    - Generate operations from schema
+    - Calculate impacts dynamically
+    - Create execution plans with dependencies
+  - Add examples for common patterns
+  - Reference resolution syntax ($step_N.field)
+
+**Deliverables:**
+- [ ] Prompt updated with schema-driven guidance
+- [ ] CRUD classification removed
+- [ ] Examples added for OperationIntent generation
+- [ ] Impact calculation logic documented
+
+---
+
+#### Task 2C.6: PM Workflow Simplification (1 hour)
+
+**Update:**
+- `agents/src/autifyme_agents/workflows/project_manager.py`
+  - Remove 6 specialized tools (add_variant_values, etc.)
+  - Add single `execute_database_operation` tool
+  - Add `get_product_schema` tool (for PM context)
+
+**Update:**
+- `agents/src/autifyme_agents/prompts/workflows/project_manager.prompt`
+  - Remove hard-coded routing (7 case statements)
+  - Add generic HITL presentation template
+  - Single tool invocation pattern
+
+**Deliverables:**
+- [ ] PM uses single universal tool
+- [ ] Hard-coded routing removed
+- [ ] Generic HITL template created
+
+---
+
+#### Task 2C.7: Business Rules Migration (1 hour)
+
+**Migrate Existing Rules:**
+- SKU generation logic → BusinessRule metadata
+- Price calculation → Reusable handler
+- Validation rules → Handler functions
+
+**Create:**
+- `agents/src/autifyme_agents/business_rules/handlers.py`
+  - `BusinessRuleHandlers` registry
+  - Handlers for: `generate_sku_explosion`, `validate_price_range`, etc.
+
+**Update Schema:**
+- Add business_rules to variant_axes, variant_values tables
+
+**Deliverables:**
+- [ ] BusinessRuleHandlers registry created
+- [ ] SKU generation migrated
+- [ ] Schema includes business rules
+
+---
+
+#### Task 2C.8: Testing & Validation (2 hours)
+
+**E2E Tests:**
+- All 7 current operations (create family, add variant, update field, query, delete)
+- New table test (add fake `product_warranties` table, verify works)
+- New operation test (bundle creation with junction table)
+- Performance benchmarks (vs Phase 2B)
+
+**Integration Tests:**
+- Specialist generates valid OperationIntent
+- PM presents correctly
+- Tool executes successfully
+- Business rules trigger
+
+**Backward Compatibility:**
+- Existing workflows still work
+- No regression in functionality
+- Performance within 2x of Phase 2B
+
+**Test Coverage Target:** 85%+
+
+**Deliverables:**
+- [ ] All 7 current operations pass
+- [ ] Future-proofing test passes (fake table)
+- [ ] Performance benchmarks acceptable
+- [ ] Backward compatibility verified
+
+---
+
+### Success Metrics
+
+**Quantitative:**
+1. ✅ Add new table with ZERO code changes (metadata only)
+2. ✅ Specialist generates valid OperationIntent 95%+ accuracy
+3. ✅ Execution time < 2x Phase 2B baseline
+4. ✅ All existing operations pass (100% backward compatible)
+5. ✅ Test coverage 85%+
+
+**Qualitative:**
+1. ✅ Developers can add tables without touching tool code
+2. ✅ New operations "just work" with LLM reasoning
+3. ✅ Schema evolution is version-controlled and auditable
+4. ✅ Business rules are reusable across domains
+
+---
+
+### Documentation
+
+📄 **Comprehensive Design Document:**
+[`docs/architecture/core/DYNAMIC_SCHEMA_DRIVEN_ARCHITECTURE.md`](../../core/DYNAMIC_SCHEMA_DRIVEN_ARCHITECTURE.md)
+
+**Includes:**
+- Complete architecture overview
+- Schema metadata layer design
+- OperationIntent model specification
+- Universal tool implementation
+- Specialist integration patterns
+- PM workflow simplification
+- Future-proofing examples
+- Code examples and appendices
+
+---
+
+### Dependencies
+
+**Requires:**
+- ✅ Phase 2B complete (baseline functionality)
+- ✅ DeepAgents Union support (already verified)
+- ✅ LangChain v1 structured outputs
+
+**Blocks:**
+- Phase 3 (Taxonomy Specialist) - Can proceed in parallel
+- Future specialist additions - Will benefit from dynamic architecture
+
+---
+
+### Approval Required
+
+**Design Review:** ✅ Complete
+**User Approval:** ⏳ Pending
 
 ---
 
