@@ -27,6 +27,14 @@ class Operation(BaseModel):
         None, description="Entities to insert (list of column:value dicts)"
     )
 
+    # Named entity references for cross-operation dependencies
+    entity_refs: dict[str, int] | None = Field(
+        None,
+        description="Map of semantic names to entity indices for cross-operation references. "
+                    "Example: {'prod_500ml_clear': 0, 'prod_1l_amber': 1} maps names to "
+                    "indices in new_entities array. Used with $ref:name syntax in dependent operations."
+    )
+
     # For UPDATE operations
     target_filter: dict[str, Any] | None = Field(
         None, description="Filter to identify records to update (e.g., {'id': 'uuid-123'})"
@@ -132,7 +140,13 @@ class ExecutionStep(BaseModel):
 
     step_number: int = Field(..., description="Step sequence number (1-indexed)")
     description: str = Field(..., description="Human-readable step description")
-    operation: Operation = Field(..., description="Operation to execute")
+
+    operation_index: int = Field(
+        ...,
+        description="Index into change_spec.operations[] (0-based). "
+                    "References the operation to execute, avoiding data duplication."
+    )
+
     rollback_on_failure: bool = Field(
         default=True, description="Rollback all previous steps if this fails"
     )
@@ -278,7 +292,7 @@ def create_simple_intent(
                 ExecutionStep(
                     step_number=1,
                     description=f"{intent_type.upper()} {table}",
-                    operation=operation,
+                    operation_index=0,  # Reference first (and only) operation
                 )
             ]
         ),

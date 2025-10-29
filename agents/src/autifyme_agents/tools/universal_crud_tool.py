@@ -67,13 +67,15 @@ class OperationExecutor:
     async def execute_plan(
         self,
         steps: list[ExecutionStep],
+        operations: list[Operation],
         rollback_on_error: bool = True,
     ) -> ExecutionResult:
         """
         Execute multi-step plan with dependency resolution.
 
         Args:
-            steps: List of execution steps
+            steps: List of execution steps (references operations by index)
+            operations: List of operations to execute (from change_spec)
             rollback_on_error: Roll back completed steps if error occurs
 
         Returns:
@@ -90,21 +92,38 @@ class OperationExecutor:
 
         try:
             # Sort steps by dependencies (topological order)
-            sorted_steps = self._resolve_dependencies(steps)
+            sorted_steps = self._resolve_dependencies(steps, operations)
 
             for step in sorted_steps:
+                # Resolve operation by index
+                if step.operation_index < 0 or step.operation_index >= len(operations):
+                    raise ToolException(
+                        f"Invalid operation_index {step.operation_index} in step {step.step_number}. "
+                        f"Must be 0-{len(operations)-1}"
+                    )
+                operation = operations[step.operation_index]
+
                 logger.info(
                     f"Executing step {step.step_number}: {step.description}",
-                    extra={"step": step.step_number, "operation": step.operation.op_type}
+                    extra={"step": step.step_number, "operation": operation.op_type}
                 )
 
                 # Execute operation
-                result = await self._execute_operation(step.operation, created_ids)
+                result = await self._execute_operation(operation, created_ids)
                 completed_steps.append((step, result))
 
                 # Store created IDs for dependent operations
-                if step.operation.op_type == "insert" and result.get("ids"):
-                    created_ids[step.step_number] = result["ids"]
+                if operation.op_type == "insert" and result.get("ids"):
+                    ids = result["ids"]
+                    # Check if this is named refs or single entity
+                    # Named refs: {"ref_name": {entity}, "ref_name2": {entity}}
+                    # Single entity: {"id": "uuid", "name": "value", ...}
+                    if isinstance(ids, dict) and "id" not in ids:
+                        # No "id" field means this is a named refs dict, not an entity
+                        created_ids[step.step_number] = {"_refs": ids}
+                    else:
+                        # Has "id" field or not a dict - single entity (legacy)
+                        created_ids[step.step_number] = ids
 
                 logger.info(
                     f"Step {step.step_number} completed successfully",
@@ -116,7 +135,7 @@ class OperationExecutor:
 
             return ExecutionResult(
                 success=True,
-                affected_entities=self._count_affected(completed_steps),
+                affected_entities=self._count_affected(completed_steps, operations),
                 created_ids=created_ids,
                 execution_time_ms=execution_time_ms,
                 steps_completed=len(completed_steps),
@@ -138,7 +157,7 @@ class OperationExecutor:
             rollback_performed = False
             if rollback_on_error and completed_steps:
                 try:
-                    await self._rollback(completed_steps)
+                    await self._rollback(completed_steps, operations)
                     rollback_performed = True
                     logger.info("Rollback completed successfully")
                 except Exception as rollback_error:
@@ -160,12 +179,15 @@ class OperationExecutor:
                 steps_total=len(steps),
             )
 
-    def _resolve_dependencies(self, steps: list[ExecutionStep]) -> list[ExecutionStep]:
+    def _resolve_dependencies(
+        self, steps: list[ExecutionStep], operations: list[Operation]
+    ) -> list[ExecutionStep]:
         """
         Sort steps by dependencies (topological order).
 
         Args:
             steps: Unsorted execution steps
+            operations: Operations referenced by steps
 
         Returns:
             Steps sorted by dependencies
@@ -179,7 +201,8 @@ class OperationExecutor:
         adjacency = defaultdict(list)
 
         for step in steps:
-            for dep in step.operation.depends_on:
+            operation = operations[step.operation_index]
+            for dep in operation.depends_on:
                 if dep not in step_map:
                     raise ToolException(
                         f"Step {step.step_number} depends on non-existent step {dep}"
@@ -264,9 +287,10 @@ class OperationExecutor:
         if not operation.new_entities:
             return {"ids": {}, "count": 0}
 
-        created_ids = {}
+        inserted_entities = {}
+        last_result = None
 
-        for entity in operation.new_entities:
+        for idx, entity in enumerate(operation.new_entities):
             # Resolve foreign key references from context
             resolved_entity = self._resolve_references(entity, context)
 
@@ -303,15 +327,25 @@ class OperationExecutor:
                 rule_context,
             )
 
-            # Store the full inserted entity for reference resolution
-            # This allows $step_N.id, $step_N.sku_prefix, etc.
-            entity_id = result.get("id") or result.get(table_schema.primary_key)
-            if entity_id:
-                created_ids = result  # Store full entity with all fields
-                # Note: For multi-entity inserts, this would need to be a list
-                # Current design assumes single entity per step for dependency resolution
+            # Store result for tracking
+            last_result = result
 
-        return {"ids": created_ids, "count": len(operation.new_entities)}
+            # Store with named reference if provided
+            if operation.entity_refs:
+                for ref_name, entity_idx in operation.entity_refs.items():
+                    if entity_idx == idx:
+                        inserted_entities[ref_name] = result
+                        break
+
+        # Return named refs or single entity for backward compatibility
+        if inserted_entities:
+            # Multiple entities with named refs
+            return {"ids": inserted_entities, "count": len(operation.new_entities)}
+        elif last_result:
+            # Single entity (legacy pattern)
+            return {"ids": last_result, "count": len(operation.new_entities)}
+        else:
+            return {"ids": {}, "count": 0}
 
     async def _execute_update(
         self,
@@ -415,13 +449,13 @@ class OperationExecutor:
         """
         Resolve foreign key references from execution context.
 
-        Supports $step_N.field syntax for referencing created IDs:
-        - "$step_1.family_id" → context[1]["family_id"]
-        - "$step_2.axis_id" → context[2]["axis_id"]
+        Supports two reference formats:
+        1. Step field reference: "$step_1.family_id" → context[1]["family_id"]
+        2. Named reference: "$ref:prod_500ml_clear" → context[N]["_refs"]["prod_500ml_clear"]["id"]
 
         Args:
             data: Dict potentially containing references
-            context: Map of step_number → {field: value}
+            context: Map of step_number → {field: value} or {_refs: {name: entity}}
 
         Returns:
             Data with references resolved to actual values
@@ -429,26 +463,34 @@ class OperationExecutor:
         resolved = {}
 
         for key, value in data.items():
-            if isinstance(value, str) and value.startswith("$step_"):
-                # Parse reference: $step_1.family_id
-                match = re.match(r"\$step_(\d+)\.(.+)", value)
-                if match:
-                    step_num = int(match.group(1))
-                    field_name = match.group(2)
+            if isinstance(value, str):
+                # Named reference: $ref:entity_name
+                if value.startswith("$ref:"):
+                    ref_name = value[5:]  # Remove "$ref:" prefix
+                    resolved[key] = self._resolve_named_ref(ref_name, context)
+                # Step field reference: $step_N.field
+                elif value.startswith("$step_"):
+                    match = re.match(r"\$step_(\d+)\.(.+)", value)
+                    if match:
+                        step_num = int(match.group(1))
+                        field_name = match.group(2)
 
-                    if step_num not in context:
-                        raise ToolException(
-                            f"Reference to non-existent step {step_num} in '{value}'"
-                        )
+                        if step_num not in context:
+                            raise ToolException(
+                                f"Reference to non-existent step {step_num} in '{value}'"
+                            )
 
-                    if field_name not in context[step_num]:
-                        raise ToolException(
-                            f"Field '{field_name}' not found in step {step_num} context"
-                        )
+                        if field_name not in context[step_num]:
+                            raise ToolException(
+                                f"Field '{field_name}' not found in step {step_num} context"
+                            )
 
-                    resolved[key] = context[step_num][field_name]
+                        resolved[key] = context[step_num][field_name]
+                    else:
+                        raise ToolException(f"Invalid reference syntax: '{value}'")
                 else:
-                    raise ToolException(f"Invalid reference syntax: '{value}'")
+                    # Regular string value (not a reference)
+                    resolved[key] = value
             elif isinstance(value, dict):
                 # Recursively resolve nested dicts
                 resolved[key] = self._resolve_references(value, context)
@@ -462,6 +504,63 @@ class OperationExecutor:
                 resolved[key] = value
 
         return resolved
+
+    def _resolve_named_ref(
+        self, ref_name: str, context: dict[int, dict[str, Any]]
+    ) -> str:
+        """
+        Resolve named entity reference to its ID.
+
+        Searches through all steps for a named reference and returns the entity's ID.
+
+        Context structure with named refs:
+        {
+            1: {
+                "_refs": {
+                    "prod_500ml_clear": {"id": "uuid-123", "sku": "PET-BTL-500ML-..."},
+                    "prod_1l_amber": {"id": "uuid-456", ...}
+                }
+            }
+        }
+
+        Args:
+            ref_name: Named reference (e.g., "prod_500ml_clear")
+            context: Execution context with step results
+
+        Returns:
+            Entity ID (UUID string)
+
+        Raises:
+            ToolException: If reference not found
+        """
+        # Search all steps for named reference
+        for step_num, step_context in context.items():
+            if isinstance(step_context, dict) and "_refs" in step_context:
+                refs = step_context["_refs"]
+                if ref_name in refs:
+                    entity = refs[ref_name]
+                    if "id" in entity:
+                        return entity["id"]
+                    else:
+                        raise ToolException(
+                            f"Named reference '{ref_name}' found but entity has no 'id' field"
+                        )
+
+        # Reference not found - provide helpful error
+        all_refs = []
+        for step_context in context.values():
+            if isinstance(step_context, dict) and "_refs" in step_context:
+                all_refs.extend(step_context["_refs"].keys())
+
+        if all_refs:
+            raise ToolException(
+                f"Named reference '{ref_name}' not found. "
+                f"Available references: {', '.join(sorted(all_refs))}"
+            )
+        else:
+            raise ToolException(
+                f"Named reference '{ref_name}' not found. No named references available in context."
+            )
 
     def _populate_timestamps(
         self, table_schema: Any, data: dict[str, Any], is_update: bool
@@ -495,13 +594,16 @@ class OperationExecutor:
         return result
 
     def _count_affected(
-        self, completed_steps: list[tuple[ExecutionStep, dict[str, Any]]]
+        self,
+        completed_steps: list[tuple[ExecutionStep, dict[str, Any]]],
+        operations: list[Operation]
     ) -> dict[str, int]:
         """
         Count affected entities by table.
 
         Args:
             completed_steps: List of (step, result) tuples
+            operations: Operations list for resolving step.operation_index
 
         Returns:
             Map of table_name → affected_count
@@ -509,20 +611,24 @@ class OperationExecutor:
         affected = defaultdict(int)
 
         for step, result in completed_steps:
-            table = step.operation.table
+            operation = operations[step.operation_index]
+            table = operation.table
             count = result.get("count", 0)
             affected[table] += count
 
         return dict(affected)
 
     async def _rollback(
-        self, completed_steps: list[tuple[ExecutionStep, dict[str, Any]]]
+        self,
+        completed_steps: list[tuple[ExecutionStep, dict[str, Any]]],
+        operations: list[Operation],
     ) -> None:
         """
         Rollback completed steps in reverse order.
 
         Args:
             completed_steps: Steps to rollback
+            operations: Operations list for resolving step.operation_index
 
         Note: This is a best-effort rollback. For true ACID transactions,
         database-level transaction support is needed.
@@ -534,29 +640,36 @@ class OperationExecutor:
 
         for step, result in reversed(completed_steps):
             try:
-                if step.operation.op_type == "insert":
+                operation = operations[step.operation_index]
+                if operation.op_type == "insert":
                     # Delete inserted entities
                     created_ids = result.get("ids", {})
                     if created_ids:
-                        for entity_id in created_ids.values():
-                            await self._delete_entities(
-                                step.operation.table,
-                                {"id": entity_id}
-                            )
+                        # Handle both named refs and direct IDs
+                        if isinstance(created_ids, dict):
+                            for entity_data in created_ids.values():
+                                if isinstance(entity_data, dict) and "id" in entity_data:
+                                    entity_id = entity_data["id"]
+                                else:
+                                    entity_id = entity_data
+                                await self._delete_entities(
+                                    operation.table,
+                                    {"id": entity_id}
+                                )
                         logger.info(
-                            f"Rolled back INSERT for {step.operation.table}",
+                            f"Rolled back INSERT for {operation.table}",
                             extra={"count": len(created_ids)}
                         )
-                elif step.operation.op_type == "update":
+                elif operation.op_type == "update":
                     # Cannot roll back updates without storing original values
                     logger.warning(
-                        f"Cannot roll back UPDATE for {step.operation.table} (original values not stored)"
+                        f"Cannot roll back UPDATE for {operation.table} (original values not stored)"
                     )
-                elif step.operation.op_type == "delete":
+                elif operation.op_type == "delete":
                     # Cannot roll back hard deletes
                     if not result.get("soft_delete", False):
                         logger.warning(
-                            f"Cannot roll back hard DELETE for {step.operation.table}"
+                            f"Cannot roll back hard DELETE for {operation.table}"
                         )
             except Exception as e:
                 logger.error(
@@ -836,6 +949,7 @@ def create_execute_database_operation_tool(storage: StorageInterface):
             executor = OperationExecutor(storage, schema)
             result = await executor.execute_plan(
                 steps=operation_intent.execution_plan.steps,
+                operations=operation_intent.change_spec.operations,
                 rollback_on_error=True,
             )
 

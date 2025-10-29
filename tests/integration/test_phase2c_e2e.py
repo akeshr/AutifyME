@@ -308,11 +308,7 @@ class TestCreateOperations:
                     ExecutionStep(
                         step_number=1,
                         description="Insert product family",
-                        operation=Operation(
-                            op_type="insert",
-                            table="product_families",
-                            new_entities=[{}],
-                        ),
+                        operation_index=0,
                     )
                 ]
             ),
@@ -346,7 +342,7 @@ class TestCreateOperations:
                     ExecutionStep(
                         step_number=1,
                         description="Test",
-                        operation=Operation(op_type="insert", table="test", new_entities=[]),
+                        operation_index=0,
                     )
                 ]
             ),
@@ -444,37 +440,43 @@ class TestDependencyResolution:
     def test_dependency_resolution_sorts_correctly(self, operation_executor):
         """Test executor resolves dependencies in correct order."""
         # Create steps with dependencies
-        step1 = ExecutionStep(
-            step_number=1,
-            description="Step 1",
-            operation=Operation(op_type="insert", table="product_families", new_entities=[]),
-        )
-        step2 = ExecutionStep(
-            step_number=2,
-            description="Step 2 (depends on 1)",
-            operation=Operation(
+        operations = [
+            Operation(op_type="insert", table="product_families", new_entities=[]),
+            Operation(
                 op_type="insert",
                 table="variant_axes",
                 new_entities=[],
                 depends_on=[1],
             ),
-        )
-        step3 = ExecutionStep(
-            step_number=3,
-            description="Step 3 (depends on 2)",
-            operation=Operation(
+            Operation(
                 op_type="insert",
                 table="variant_values",
                 new_entities=[],
                 depends_on=[2],
             ),
+        ]
+
+        step1 = ExecutionStep(
+            step_number=1,
+            description="Step 1",
+            operation_index=0,
+        )
+        step2 = ExecutionStep(
+            step_number=2,
+            description="Step 2 (depends on 1)",
+            operation_index=1,
+        )
+        step3 = ExecutionStep(
+            step_number=3,
+            description="Step 3 (depends on 2)",
+            operation_index=2,
         )
 
         # Pass in wrong order intentionally
         steps = [step3, step1, step2]
 
         # Resolve dependencies
-        sorted_steps = operation_executor._resolve_dependencies(steps)
+        sorted_steps = operation_executor._resolve_dependencies(steps, operations)
 
         # Should be sorted: 1 → 2 → 3
         assert sorted_steps[0].step_number == 1
@@ -485,25 +487,30 @@ class TestDependencyResolution:
         """Test executor detects circular dependencies."""
         from langchain_core.tools import ToolException
 
+        operations = [
+            Operation(
+                op_type="insert", table="test", new_entities=[], depends_on=[2]
+            ),
+            Operation(
+                op_type="insert", table="test", new_entities=[], depends_on=[1]
+            ),
+        ]
+
         step1 = ExecutionStep(
             step_number=1,
             description="Step 1",
-            operation=Operation(
-                op_type="insert", table="test", new_entities=[], depends_on=[2]
-            ),
+            operation_index=0,
         )
         step2 = ExecutionStep(
             step_number=2,
             description="Step 2",
-            operation=Operation(
-                op_type="insert", table="test", new_entities=[], depends_on=[1]
-            ),
+            operation_index=1,
         )
 
         steps = [step1, step2]
 
         with pytest.raises(ToolException, match="Circular dependencies"):
-            operation_executor._resolve_dependencies(steps)
+            operation_executor._resolve_dependencies(steps, operations)
 
 
 # =============================================================================
@@ -660,34 +667,39 @@ class TestFullE2EExecution:
         """Test E2E: Create product family with INSERT operations."""
         family_id = str(uuid.uuid4())
 
+        # Create operations
+        operations = [
+            Operation(
+                op_type="insert",
+                table="product_families",
+                new_entities=[
+                    {
+                        "id": family_id,
+                        "product_group_id": "TEST-BOTTLES",
+                        "sku_prefix": "TEST-BTL",
+                        "name": "Test Water Bottles",
+                        "description": "Test product family",
+                        "brand": "TestBrand",
+                        "base_price": 25.00,
+                        "price_currency": "INR",
+                        "condition": "new",
+                        "lifecycle_stage": "regular",
+                    }
+                ],
+            )
+        ]
+
         # Create execution steps
         steps = [
             ExecutionStep(
                 step_number=1,
                 description="Insert product family",
-                operation=Operation(
-                    op_type="insert",
-                    table="product_families",
-                    new_entities=[
-                        {
-                            "id": family_id,
-                            "product_group_id": "TEST-BOTTLES",
-                            "sku_prefix": "TEST-BTL",
-                            "name": "Test Water Bottles",
-                            "description": "Test product family",
-                            "brand": "TestBrand",
-                            "base_price": 25.00,
-                            "price_currency": "INR",
-                            "condition": "new",
-                            "lifecycle_stage": "regular",
-                        }
-                    ],
-                ),
+                operation_index=0,
             )
         ]
 
         # Execute
-        result = await operation_executor.execute_plan(steps)
+        result = await operation_executor.execute_plan(steps, operations)
 
         # Verify success
         assert result.success is True
@@ -706,49 +718,54 @@ class TestFullE2EExecution:
         """Test E2E: Multi-step operation with foreign key dependencies."""
         # Step 1: Insert product family
         # Step 2: Insert variant axis (depends on step 1)
+        operations = [
+            Operation(
+                op_type="insert",
+                table="product_families",
+                new_entities=[
+                    {
+                        "product_group_id": "TEST-JARS",
+                        "sku_prefix": "JAR",
+                        "name": "Test Jars",
+                        "description": "Test jars",
+                        "brand": "TestBrand",
+                        "base_price": 30.00,
+                        "price_currency": "INR",
+                        "condition": "new",
+                        "lifecycle_stage": "regular",
+                    }
+                ],
+            ),
+            Operation(
+                op_type="insert",
+                table="variant_axes",
+                new_entities=[
+                    {
+                        "product_family_id": "$step_1.id",  # Reference to step 1
+                        "name": "capacity",
+                        "display_label": "Capacity",
+                        "sort_order": 1,
+                    }
+                ],
+                depends_on=[1],
+            ),
+        ]
+
         steps = [
             ExecutionStep(
                 step_number=1,
                 description="Insert product family",
-                operation=Operation(
-                    op_type="insert",
-                    table="product_families",
-                    new_entities=[
-                        {
-                            "product_group_id": "TEST-JARS",
-                            "sku_prefix": "JAR",
-                            "name": "Test Jars",
-                            "description": "Test jars",
-                            "brand": "TestBrand",
-                            "base_price": 30.00,
-                            "price_currency": "INR",
-                            "condition": "new",
-                            "lifecycle_stage": "regular",
-                        }
-                    ],
-                ),
+                operation_index=0,
             ),
             ExecutionStep(
                 step_number=2,
                 description="Insert variant axis with foreign key reference",
-                operation=Operation(
-                    op_type="insert",
-                    table="variant_axes",
-                    new_entities=[
-                        {
-                            "product_family_id": "$step_1.id",  # Reference to step 1
-                            "name": "capacity",
-                            "display_label": "Capacity",
-                            "sort_order": 1,
-                        }
-                    ],
-                    depends_on=[1],
-                ),
+                operation_index=1,
             ),
         ]
 
         # Execute
-        result = await operation_executor.execute_plan(steps)
+        result = await operation_executor.execute_plan(steps, operations)
 
         # Verify success
         assert result.success is True
@@ -776,21 +793,25 @@ class TestFullE2EExecution:
         )
 
         # Update operation
+        operations = [
+            Operation(
+                op_type="update",
+                table="product_families",
+                target_filter={"id": family_id},
+                field_updates={"name": "Updated Name", "base_price": 35.00},
+            )
+        ]
+
         steps = [
             ExecutionStep(
                 step_number=1,
                 description="Update product family name",
-                operation=Operation(
-                    op_type="update",
-                    table="product_families",
-                    target_filter={"id": family_id},
-                    field_updates={"name": "Updated Name", "base_price": 35.00},
-                ),
+                operation_index=0,
             )
         ]
 
         # Execute
-        result = await operation_executor.execute_plan(steps)
+        result = await operation_executor.execute_plan(steps, operations)
 
         # Verify
         assert result.success is True
@@ -817,21 +838,25 @@ class TestFullE2EExecution:
         assert len(test_storage.tables["variant_values"]) == 1
 
         # Delete operation
+        operations = [
+            Operation(
+                op_type="delete",
+                table="variant_values",
+                delete_filter={"id": variant_id},
+                soft_delete=False,  # Hard delete for test
+            )
+        ]
+
         steps = [
             ExecutionStep(
                 step_number=1,
                 description="Delete variant value",
-                operation=Operation(
-                    op_type="delete",
-                    table="variant_values",
-                    delete_filter={"id": variant_id},
-                    soft_delete=False,  # Hard delete for test
-                ),
+                operation_index=0,
             )
         ]
 
         # Execute
-        result = await operation_executor.execute_plan(steps)
+        result = await operation_executor.execute_plan(steps, operations)
 
         # Verify
         assert result.success is True
@@ -843,102 +868,110 @@ class TestFullE2EExecution:
     @pytest.mark.asyncio
     async def test_e2e_complex_multi_step(self, operation_executor, test_storage):
         """Test E2E: Complex 5-step operation with multiple dependencies."""
+        operations = [
+            Operation(
+                op_type="insert",
+                table="product_families",
+                new_entities=[
+                    {
+                        "product_group_id": "COMPLEX",
+                        "sku_prefix": "CPX",
+                        "name": "Complex Product",
+                        "description": "Multi-step test",
+                        "brand": "TestBrand",
+                        "base_price": 50.00,
+                        "price_currency": "INR",
+                        "condition": "new",
+                        "lifecycle_stage": "regular",
+                    }
+                ],
+            ),
+            Operation(
+                op_type="insert",
+                table="variant_axes",
+                new_entities=[
+                    {
+                        "product_family_id": "$step_1.id",
+                        "name": "size",
+                        "display_label": "Size",
+                        "sort_order": 1,
+                    }
+                ],
+                depends_on=[1],
+            ),
+            Operation(
+                op_type="insert",
+                table="variant_axes",
+                new_entities=[
+                    {
+                        "product_family_id": "$step_1.id",
+                        "name": "color",
+                        "display_label": "Color",
+                        "sort_order": 2,
+                    }
+                ],
+                depends_on=[1],
+            ),
+            Operation(
+                op_type="insert",
+                table="variant_values",
+                new_entities=[
+                    {
+                        "variant_axis_id": "$step_2.id",
+                        "value": "Large",
+                        "display_label": "Large",  # Required field
+                        "sku_code": "L",
+                        "sort_order": 1,
+                    }
+                ],
+                depends_on=[2],
+            ),
+            Operation(
+                op_type="insert",
+                table="variant_values",
+                new_entities=[
+                    {
+                        "variant_axis_id": "$step_3.id",
+                        "value": "Blue",
+                        "display_label": "Blue",  # Required field
+                        "sku_code": "BLU",
+                        "sort_order": 1,
+                    }
+                ],
+                depends_on=[3],
+            ),
+        ]
+
         steps = [
             ExecutionStep(
                 step_number=1,
                 description="Create family",
-                operation=Operation(
-                    op_type="insert",
-                    table="product_families",
-                    new_entities=[
-                        {
-                            "product_group_id": "COMPLEX",
-                            "sku_prefix": "CPX",
-                            "name": "Complex Product",
-                            "description": "Multi-step test",
-                            "brand": "TestBrand",
-                            "base_price": 50.00,
-                            "price_currency": "INR",
-                            "condition": "new",
-                            "lifecycle_stage": "regular",
-                        }
-                    ],
-                ),
+                operation_index=0,
             ),
             ExecutionStep(
                 step_number=2,
                 description="Create axis 1",
-                operation=Operation(
-                    op_type="insert",
-                    table="variant_axes",
-                    new_entities=[
-                        {
-                            "product_family_id": "$step_1.id",
-                            "name": "size",
-                            "display_label": "Size",
-                            "sort_order": 1,
-                        }
-                    ],
-                    depends_on=[1],
-                ),
+                operation_index=1,
             ),
             ExecutionStep(
                 step_number=3,
                 description="Create axis 2",
-                operation=Operation(
-                    op_type="insert",
-                    table="variant_axes",
-                    new_entities=[
-                        {
-                            "product_family_id": "$step_1.id",
-                            "name": "color",
-                            "display_label": "Color",
-                            "sort_order": 2,
-                        }
-                    ],
-                    depends_on=[1],
-                ),
+                operation_index=2,
             ),
             ExecutionStep(
                 step_number=4,
                 description="Create variant value for size",
-                operation=Operation(
-                    op_type="insert",
-                    table="variant_values",
-                    new_entities=[
-                        {
-                            "variant_axis_id": "$step_2.id",
-                            "value": "Large",
-                            "display_label": "Large",  # Required field
-                            "sku_code": "L",
-                            "sort_order": 1,
-                        }
-                    ],
-                    depends_on=[2],
-                ),
+                operation_index=3,
             ),
             ExecutionStep(
                 step_number=5,
                 description="Create variant value for color",
-                operation=Operation(
-                    op_type="insert",
-                    table="variant_values",
-                    new_entities=[
-                        {
-                            "variant_axis_id": "$step_3.id",
-                            "value": "Blue",
-                            "display_label": "Blue",  # Required field
-                            "sku_code": "BLU",
-                            "sort_order": 1,
-                        }
-                    ],
-                    depends_on=[3],
-                ),
+                operation_index=4,
             ),
         ]
 
         # Execute all 5 steps
-        result = await operation_executor.execute_plan(steps)
+        result = await operation_executor.execute_plan(steps, operations)
 
         # Verify complete success
         assert result.success is True
@@ -1014,29 +1047,33 @@ class TestBusinessRules:
         )
 
         # Try to insert product with same SKU
+        operations = [
+            Operation(
+                op_type="insert",
+                table="products",
+                new_entities=[
+                    {
+                        "product_family_id": family_id,
+                        "sku": "TST-NEW",
+                        "sku_code": "EXISTING-SKU",  # Duplicate!
+                        "name": "New Product",
+                        "description": "New",
+                        "price": 10.00,
+                    }
+                ],
+            )
+        ]
+
         steps = [
             ExecutionStep(
                 step_number=1,
                 description="Insert product with duplicate SKU",
-                operation=Operation(
-                    op_type="insert",
-                    table="products",
-                    new_entities=[
-                        {
-                            "product_family_id": family_id,
-                            "sku": "TST-NEW",
-                            "sku_code": "EXISTING-SKU",  # Duplicate!
-                            "name": "New Product",
-                            "description": "New",
-                            "price": 10.00,
-                        }
-                    ],
-                ),
+                operation_index=0,
             )
         ]
 
         # Execute - should fail due to SKU uniqueness rule
-        result = await operation_executor.execute_plan(steps)
+        result = await operation_executor.execute_plan(steps, operations)
 
         # Verify failure
         assert result.success is False
@@ -1075,29 +1112,33 @@ class TestBusinessRules:
         )
 
         # Insert product with different SKU
+        operations = [
+            Operation(
+                op_type="insert",
+                table="products",
+                new_entities=[
+                    {
+                        "product_family_id": family_id,
+                        "sku": "TST-NEW",
+                        "sku_code": "NEW-UNIQUE-SKU",  # Unique
+                        "name": "New Product",
+                        "description": "New",
+                        "price": 10.00,
+                    }
+                ],
+            )
+        ]
+
         steps = [
             ExecutionStep(
                 step_number=1,
                 description="Insert product with unique SKU",
-                operation=Operation(
-                    op_type="insert",
-                    table="products",
-                    new_entities=[
-                        {
-                            "product_family_id": family_id,
-                            "sku": "TST-NEW",
-                            "sku_code": "NEW-UNIQUE-SKU",  # Unique
-                            "name": "New Product",
-                            "description": "New",
-                            "price": 10.00,
-                        }
-                    ],
-                ),
+                operation_index=0,
             )
         ]
 
         # Execute - should succeed
-        result = await operation_executor.execute_plan(steps)
+        result = await operation_executor.execute_plan(steps, operations)
 
         # Verify success
         assert result.success is True
@@ -1141,31 +1182,35 @@ class TestBusinessRules:
         ]
 
         # Execute insert
+        operations = [
+            Operation(
+                op_type="insert",
+                table="product_families",
+                new_entities=[
+                    {
+                        "product_group_id": "TEST",
+                        "sku_prefix": "TST",
+                        "name": "Test",
+                        "description": "Test",
+                        "brand": "TestBrand",
+                        "base_price": 10.00,
+                        "price_currency": "INR",
+                        "condition": "new",
+                        "lifecycle_stage": "regular",
+                    }
+                ],
+            )
+        ]
+
         steps = [
             ExecutionStep(
                 step_number=1,
                 description="Insert with business rules",
-                operation=Operation(
-                    op_type="insert",
-                    table="product_families",
-                    new_entities=[
-                        {
-                            "product_group_id": "TEST",
-                            "sku_prefix": "TST",
-                            "name": "Test",
-                            "description": "Test",
-                            "brand": "TestBrand",
-                            "base_price": 10.00,
-                            "price_currency": "INR",
-                            "condition": "new",
-                            "lifecycle_stage": "regular",
-                        }
-                    ],
-                ),
+                operation_index=0,
             )
         ]
 
-        result = await operation_executor.execute_plan(steps)
+        result = await operation_executor.execute_plan(steps, operations)
 
         # Verify business rules were triggered
         assert result.success is True
