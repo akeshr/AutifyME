@@ -439,20 +439,20 @@ class TestDependencyResolution:
 
     def test_dependency_resolution_sorts_correctly(self, operation_executor):
         """Test executor resolves dependencies in correct order."""
-        # Create steps with dependencies
+        # Create steps with dependencies (depends_on uses operation indices, not step numbers)
         operations = [
             Operation(op_type="insert", table="product_families", new_entities=[]),
             Operation(
                 op_type="insert",
                 table="variant_axes",
                 new_entities=[],
-                depends_on=[1],
+                depends_on=[0],  # Depends on operation 0
             ),
             Operation(
                 op_type="insert",
                 table="variant_values",
                 new_entities=[],
-                depends_on=[2],
+                depends_on=[1],  # Depends on operation 1
             ),
         ]
 
@@ -489,10 +489,10 @@ class TestDependencyResolution:
 
         operations = [
             Operation(
-                op_type="insert", table="test", new_entities=[], depends_on=[2]
+                op_type="insert", table="test", new_entities=[], depends_on=[1]  # Depends on op 1
             ),
             Operation(
-                op_type="insert", table="test", new_entities=[], depends_on=[1]
+                op_type="insert", table="test", new_entities=[], depends_on=[0]  # Depends on op 0
             ),
         ]
 
@@ -747,7 +747,7 @@ class TestFullE2EExecution:
                         "sort_order": 1,
                     }
                 ],
-                depends_on=[1],
+                depends_on=[0],  # Depends on operation 0 (product_families)
             ),
         ]
 
@@ -897,7 +897,7 @@ class TestFullE2EExecution:
                         "sort_order": 1,
                     }
                 ],
-                depends_on=[1],
+                depends_on=[0],  # Depends on operation 0 (product_families)
             ),
             Operation(
                 op_type="insert",
@@ -910,7 +910,7 @@ class TestFullE2EExecution:
                         "sort_order": 2,
                     }
                 ],
-                depends_on=[1],
+                depends_on=[0],  # Depends on operation 0 (product_families)
             ),
             Operation(
                 op_type="insert",
@@ -924,7 +924,7 @@ class TestFullE2EExecution:
                         "sort_order": 1,
                     }
                 ],
-                depends_on=[2],
+                depends_on=[1],  # Depends on operation 1 (size axis)
             ),
             Operation(
                 op_type="insert",
@@ -938,7 +938,7 @@ class TestFullE2EExecution:
                         "sort_order": 1,
                     }
                 ],
-                depends_on=[3],
+                depends_on=[2],  # Depends on operation 2 (color axis)
             ),
         ]
 

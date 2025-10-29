@@ -96,7 +96,7 @@ class OutcomeTrackingMiddleware:
         """
         # Case 1: HITL interrupt
         if interrupt_value:
-            # Infer workflow type from interrupt (save_product_family or save_campaign)
+            # Infer workflow type from interrupt (execute_database_operation or save_campaign)
             intent, department = self._infer_workflow_from_interrupt(interrupt_value)
             if intent and department:
                 self.tracker.track_routing_decision(
@@ -193,8 +193,8 @@ class OutcomeTrackingMiddleware:
 
             tool_name = item.get("name", "")
 
-            # Product onboarding workflow
-            if "save_product_family" in tool_name:
+            # Product onboarding workflow (Phase 2C: universal execute_database_operation)
+            if "execute_database_operation" in tool_name or "save_product_family" in tool_name:
                 return "product_onboarding", "product"
 
             # Marketing campaign workflow

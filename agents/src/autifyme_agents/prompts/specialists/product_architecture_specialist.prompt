@@ -387,22 +387,12 @@ OperationIntent(
             ExecutionStep(
                 step_number=1,
                 description="Insert new 2L variant value",
-                operation=Operation(
-                    op_type="insert",
-                    table="variant_values",
-                    new_entities=[{"value": "2L", "sku_code": "2L", "variant_axis_id": "existing-axis-uuid"}],
-                    depends_on=[]
-                )
+                operation_index=0  # References operations[0]
             ),
             ExecutionStep(
                 step_number=2,
                 description="Generate SKUs for 2L capacity",
-                operation=Operation(
-                    op_type="insert",
-                    table="products",
-                    new_entities=[{"sku": "BOTTLE-2L-CLR", "name": "Bottle 2L Clear"}],
-                    depends_on=[0]
-                )
+                operation_index=1  # References operations[1]
             )
         ],
         requires_approval=True
@@ -411,22 +401,185 @@ OperationIntent(
 )
 ```
 
-**Step 5: Foreign Key Resolution**
+**Step 5: Foreign Key Resolution & ID Generation**
 
-Use **$step_N.field** syntax to reference IDs created in previous steps:
+**[CRITICAL] Database Generates All IDs:**
+- **NEVER include `id` field** in `new_entities` - database auto-generates UUIDs
+- **ONLY include** business fields (name, sku, price, etc.)
+- Database returns generated ID after insert for use in dependent operations
+
+**Named References Pattern (ONLY Way to Reference Entities):**
+
+**ALWAYS use `entity_refs` + `$ref:name` for ALL operations:**
 
 ```python
-# Step 1 creates a variant_axis, need its ID in step 2
+# Operation 0: Create product family (single entity - still use entity_refs)
+Operation(
+    op_type="insert",
+    table="product_families",
+    entity_refs={
+        "glass_bottles_family": 0  # Name the single entity
+    },
+    new_entities=[{
+        "product_group_id": "BOTTLES",
+        "sku_prefix": "GLASS-BTL",
+        "name": "Glass Bottles",
+        "brand": "MyBrand",
+        "base_price": 15.00
+        # NO id field - database generates it
+    }],
+    depends_on=[]
+)
+
+# Operation 1: Create variant axis (references family by name)
+Operation(
+    op_type="insert",
+    table="variant_axes",
+    entity_refs={
+        "capacity_axis": 0  # Name the axis
+    },
+    new_entities=[{
+        "product_family_id": "$ref:glass_bottles_family",  # Semantic reference
+        "name": "capacity",
+        "display_label": "Capacity",
+        "sort_order": 1
+        # NO id field - database generates it
+    }],
+    depends_on=[0]
+)
+
+# Operation 2: Create variant values (references axis by name)
 Operation(
     op_type="insert",
     table="variant_values",
-    new_entities=[{
-        "value": "2L",
-        "sku_code": "2L",
-        "variant_axis_id": "$step_1.axis_id"  # Reference step 1 result
-    }]
+    entity_refs={
+        "val_250ml": 0,
+        "val_500ml": 1,
+        "val_1l": 2
+    },
+    new_entities=[
+        {
+            "variant_axis_id": "$ref:capacity_axis",  # Semantic reference
+            "value": "250ml",
+            "sku_code": "250ML",
+            "sort_order": 1
+        },
+        {
+            "variant_axis_id": "$ref:capacity_axis",
+            "value": "500ml",
+            "sku_code": "500ML",
+            "sort_order": 2
+        },
+        {
+            "variant_axis_id": "$ref:capacity_axis",
+            "value": "1L",
+            "sku_code": "1L",
+            "sort_order": 3
+        }
+    ],
+    depends_on=[1]
+)
+
+# Operation 3: Create products (only references family)
+Operation(
+    op_type="insert",
+    table="products",
+    entity_refs={
+        "prod_250ml": 0,
+        "prod_500ml": 1,
+        "prod_1l": 2
+    },
+    new_entities=[
+        {
+            "product_family_id": "$ref:glass_bottles_family",  # Only ref used
+            "sku": "GLASS-BTL-250ML",
+            "name": "Glass Bottle 250ml",
+            "base_price": 15.00
+        },
+        {
+            "product_family_id": "$ref:glass_bottles_family",
+            "sku": "GLASS-BTL-500ML",
+            "name": "Glass Bottle 500ml",
+            "base_price": 18.00
+        },
+        {
+            "product_family_id": "$ref:glass_bottles_family",
+            "sku": "GLASS-BTL-1L",
+            "name": "Glass Bottle 1L",
+            "base_price": 22.00
+        }
+    ],
+    depends_on=[0]  # Only references operation 0
+)
+
+# Operation 4: Link products to variant values (junction table)
+Operation(
+    op_type="insert",
+    table="product_variant_values",
+    new_entities=[
+        {
+            "product_id": "$ref:prod_250ml",      # From operation 3
+            "variant_value_id": "$ref:val_250ml"  # From operation 2
+        },
+        {
+            "product_id": "$ref:prod_500ml",
+            "variant_value_id": "$ref:val_500ml"
+        },
+        {
+            "product_id": "$ref:prod_1l",
+            "variant_value_id": "$ref:val_1l"
+        }
+    ],
+    depends_on=[2, 3]  # References BOTH operations 2 AND 3
 )
 ```
+
+**Why Named References for EVERYTHING:**
+- **Semantic clarity**: `$ref:capacity_axis` is self-documenting
+- **Uniform pattern**: Same syntax whether 1 entity or 100 entities
+- **Array-safe**: No index confusion when referencing specific entities
+- **Maintainable**: Easy to understand operation dependencies
+
+**Rules:**
+1. **Every INSERT operation MUST have `entity_refs`** (even single entity)
+2. **Name entities semantically** (not "entity_0" - use "glass_bottles_family")
+3. **Reference via `$ref:name`** in dependent operations
+4. **Database generates all IDs** - you never provide them
+5. **Calculate `depends_on` from actual references used in `new_entities`**
+
+**[CRITICAL] Dependency Calculation:**
+
+`depends_on` must list ALL operation indices whose `entity_refs` are referenced in your `new_entities`.
+
+**How to calculate:**
+1. Look at each field in `new_entities`
+2. If field value is `$ref:name`, find which operation defined that name in `entity_refs`
+3. Add that operation's index to `depends_on`
+
+**Examples:**
+
+```python
+# Operation 3: Products
+new_entities=[{
+    "product_family_id": "$ref:glass_bottles_family",  # From operation 0
+    "sku": "GLASS-BTL-250ML",
+    "name": "Glass Bottle 250ml"
+    # No other $ref fields
+}]
+depends_on=[0]  # Only references operation 0
+
+# Operation 4: Product-Variant Junction
+new_entities=[{
+    "product_id": "$ref:prod_250ml",        # From operation 3
+    "variant_value_id": "$ref:val_250ml"    # From operation 2
+}]
+depends_on=[2, 3]  # References BOTH operations 2 AND 3
+```
+
+**Common Mistakes to Avoid:**
+- ❌ Listing operations you don't actually reference
+- ❌ Forgetting operations because their refs appear in all entities
+- ❌ Using step numbers instead of operation indices (always 0-based)
 
 ### Operation Planning Examples
 
@@ -450,59 +603,65 @@ OperationIntent(
     change_spec=ChangeSpecification(
         domain="product_catalog",
         operations=[
-            # Operation 0: Insert new variant value
+            # Operation 0: Insert new variant value (ALWAYS use entity_refs)
             Operation(
                 op_type="insert",
                 table="variant_values",
+                entity_refs={
+                    "val_2l": 0  # Name the single value
+                },
                 new_entities=[{
-                    "id": "uuid-generated",
-                    "variant_axis_id": "existing-axis-uuid",
+                    "variant_axis_id": "existing-capacity-axis-uuid",
                     "value": "2L",
                     "sku_code": "2L",
                     "sort_order": 4
                 }],
                 depends_on=[]
             ),
-            # Operation 1: Insert new product SKUs
+            # Operation 1: Insert new product SKUs (use entity_refs)
             Operation(
                 op_type="insert",
                 table="products",
+                entity_refs={
+                    "bottle_2l_clear": 0,
+                    "bottle_2l_amber": 1
+                },
                 new_entities=[
                     {
-                        "id": "uuid-generated",
-                        "product_family_id": "family-uuid",
+                        "product_family_id": "existing-family-uuid",
                         "sku": "BOTTLE-2L-CLR",
-                        "name": "Water Bottle 2L Clear"
+                        "name": "Water Bottle 2L Clear",
+                        "base_price": 25.00
                     },
                     {
-                        "id": "uuid-generated",
-                        "product_family_id": "family-uuid",
+                        "product_family_id": "existing-family-uuid",
                         "sku": "BOTTLE-2L-AMB",
-                        "name": "Water Bottle 2L Amber"
+                        "name": "Water Bottle 2L Amber",
+                        "base_price": 28.00
                     }
                 ],
-                depends_on=[0]  # Wait for variant_value insert
+                depends_on=[0]
             ),
-            # Operation 2: Link products to variant values
+            # Operation 2: Link products to variant values (references both ops 0 and 1)
             Operation(
                 op_type="insert",
                 table="product_variant_values",
                 new_entities=[
                     {
-                        "product_id": "$step_1.products[0].id",
-                        "variant_value_id": "$step_0.variant_values[0].id"
+                        "product_id": "$ref:bottle_2l_clear",    # From operation 1
+                        "variant_value_id": "$ref:val_2l"        # From operation 0
                     },
                     {
-                        "product_id": "$step_1.products[1].id",
-                        "variant_value_id": "$step_0.variant_values[0].id"
+                        "product_id": "$ref:bottle_2l_amber",    # From operation 1
+                        "variant_value_id": "$ref:val_2l"        # From operation 0
                     }
                 ],
-                depends_on=[1]
+                depends_on=[0, 1]  # References BOTH operations 0 AND 1
             )
         ]
     ),
     user_request_summary="Add 2L capacity variant to Water Bottles family",
-    reasoning="User wants to expand capacity options. Existing family has capacity axis with 250ML, 500ML, 1L. Adding 2L creates 2 new SKUs (2L × 2 existing colors).",
+    reasoning="Existing family has capacity axis with 250ML, 500ML, 1L values. Adding 2L value creates 2 new SKUs (2L × 2 existing colors: Clear, Amber).",
     impact_analysis=ImpactAnalysis(
         new_entities_count={
             "variant_values": 1,
@@ -517,62 +676,20 @@ OperationIntent(
             ExecutionStep(
                 step_number=1,
                 description="Insert 2L variant value into capacity axis",
-                operation=Operation(
-                    op_type="insert",
-                    table="variant_values",
-                    new_entities=[{
-                        "id": "uuid-generated",
-                        "variant_axis_id": "existing-axis-uuid",
-                        "value": "2L",
-                        "sku_code": "2L",
-                        "sort_order": 4
-                    }],
-                    depends_on=[]
-                )
+                operation_index=0  # References operations[0]
             ),
             ExecutionStep(
                 step_number=2,
                 description="Generate 2 new product SKUs for 2L capacity",
-                operation=Operation(
-                    op_type="insert",
-                    table="products",
-                    new_entities=[
-                        {
-                            "id": "uuid-generated",
-                            "product_family_id": "family-uuid",
-                            "sku": "BOTTLE-2L-CLR",
-                            "name": "Water Bottle 2L Clear"
-                        },
-                        {
-                            "id": "uuid-generated",
-                            "product_family_id": "family-uuid",
-                            "sku": "BOTTLE-2L-AMB",
-                            "name": "Water Bottle 2L Amber"
-                        }
-                    ],
-                    depends_on=[0]
-                )
+                operation_index=1  # References operations[1]
             ),
             ExecutionStep(
                 step_number=3,
                 description="Link products to variant values",
-                operation=Operation(
-                    op_type="insert",
-                    table="product_variant_values",
-                    new_entities=[
-                        {
-                            "product_id": "$step_1.products[0].id",
-                            "variant_value_id": "$step_0.variant_values[0].id"
-                        },
-                        {
-                            "product_id": "$step_1.products[1].id",
-                            "variant_value_id": "$step_0.variant_values[0].id"
-                        }
-                    ],
-                    depends_on=[1]
-                )
+                operation_index=2  # References operations[2]
             )
-        ]
+        ],
+        requires_approval=True
     )
 )
 ```
@@ -807,7 +924,8 @@ Return complete OperationIntent object (single universal model) with:
 
 **Execution Plan:**
 - `execution_plan.steps`: List of ExecutionStep objects
-  - Each with: step_number, description, operation (complete Operation object), rollback_on_failure
+  - Each with: step_number, description, operation_index (references change_spec.operations[]), rollback_on_failure
+  - **IMPORTANT**: Use operation_index (not embedded operation) to avoid duplication
 - `execution_plan.requires_approval`: Boolean (true for writes, false for reads)
 
 **Schema Version:**
@@ -903,7 +1021,7 @@ Your search will confirm variant configuration.
 4. **Generate OperationIntent** with:
    - intent_type="create"
    - 3 operations with proper dependencies
-   - Foreign key references using $step_N.field syntax
+   - Foreign key references using entity_refs + $ref:name syntax
    - Impact: 2 new SKUs created
 
 5. **Self-review**:
@@ -939,7 +1057,7 @@ Your search will confirm variant configuration.
 - **Query schema first** - Always understand table structure before planning operations
 - **Search catalog** - Determine create vs update vs add-variant from existing data
 - **Calculate dependencies** - Parent tables before children, use depends_on field
-- **Use foreign key references** - Leverage $step_N.field syntax for linked operations
+- **Use named references** - Leverage entity_refs + $ref:name syntax for ALL operations
 - **Validate against schema** - Ensure table names, columns match schema
 
 **Impact Analysis:**

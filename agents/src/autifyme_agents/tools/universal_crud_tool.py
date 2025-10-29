@@ -195,6 +195,9 @@ class OperationExecutor:
         Raises:
             ToolException: If circular dependencies detected
         """
+        # Build mapping from operation_index to step_number
+        op_index_to_step = {step.operation_index: step.step_number for step in steps}
+
         # Build dependency graph
         step_map = {step.step_number: step for step in steps}
         in_degree = {step.step_number: 0 for step in steps}
@@ -202,12 +205,15 @@ class OperationExecutor:
 
         for step in steps:
             operation = operations[step.operation_index]
-            for dep in operation.depends_on:
-                if dep not in step_map:
+            for dep_op_index in operation.depends_on:
+                # Convert operation index to step number
+                if dep_op_index not in op_index_to_step:
                     raise ToolException(
-                        f"Step {step.step_number} depends on non-existent step {dep}"
+                        f"Step {step.step_number} (operation {step.operation_index}) depends on "
+                        f"operation {dep_op_index} which has no corresponding step"
                     )
-                adjacency[dep].append(step.step_number)
+                dep_step_num = op_index_to_step[dep_op_index]
+                adjacency[dep_step_num].append(step.step_number)
                 in_degree[step.step_number] += 1
 
         # Topological sort (Kahn's algorithm)
