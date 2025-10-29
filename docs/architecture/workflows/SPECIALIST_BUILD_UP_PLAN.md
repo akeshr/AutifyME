@@ -2119,7 +2119,7 @@ Existing workflows continue unchanged. New capabilities are opt-in based on user
 ### Goal
 Transform static CRUD architecture into future-proof, schema-driven system. Eliminate hard-coded operation types, table names, and routing logic. Enable zero-code deployment for new tables and operations.
 
-**Status:** 🔄 Implementation In Progress (7/11 hours complete - 64%)
+**Status:** 🔄 Implementation In Progress (8/11 hours complete - 73%)
 
 **Date Started:** October 29, 2025
 
@@ -2129,7 +2129,7 @@ Transform static CRUD architecture into future-proof, schema-driven system. Elim
 - ⏳ Task 2C.3: Universal CRUD Tool (3h) - Core complete, needs storage adapter + tests
 - ✅ Task 2C.4: Schema Query Tool (30m) - COMPLETE
 - ✅ Task 2C.5: Specialist Prompt Enhancement (2h) - COMPLETE
-- ⏳ Task 2C.6: PM Workflow Simplification (1h) - PENDING
+- ✅ Task 2C.6: PM Workflow Simplification (1h) - COMPLETE
 - ⏳ Task 2C.7: Business Rules Migration (1h) - PENDING
 - ⏳ Task 2C.8: Testing & Validation (2h) - PENDING
 - ⏳ Task 2C.9: Cleanup Obsolete Code (1h) - PENDING
@@ -2326,9 +2326,15 @@ Transform static CRUD architecture into future-proof, schema-driven system. Elim
   - Single tool invocation pattern
 
 **Deliverables:**
-- [ ] PM uses single universal tool
-- [ ] Hard-coded routing removed
-- [ ] Generic HITL template created
+- [x] PM workflow updated with universal tool imports
+- [x] Removed specialized tools (query_product_data, delete_product_data, save_product_family)
+- [x] Added execute_database_operation universal tool
+- [x] Added get_product_schema tool for PM context
+- [x] Updated HITL interrupt config (execute_database_operation)
+- [x] PM prompt updated with OperationIntent structure documentation
+- [x] Updated tool descriptions (schema tools, universal CRUD)
+- [x] Updated specialist capabilities section (schema-driven planning)
+- [x] Updated Example 2 with OperationIntent format and generic HITL template
 
 ---
 
