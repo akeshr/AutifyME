@@ -452,14 +452,14 @@ Your detailed search is authoritative.
     change_spec=ChangeSpecification(
       domain="product_catalog",
       operations=[
-        Operation(op_type="insert", table="product_families", new_entities=[{...}]),
-        Operation(op_type="insert", table="variant_axes", new_entities=[{...}], depends_on=[0]),
-        Operation(op_type="insert", table="variant_values", new_entities=[{...}], depends_on=[1]),
-        Operation(op_type="insert", table="products", new_entities=[{...}], depends_on=[0, 2])
+        Operation(op_type="insert", table="product_families", new_entities=[{{...}}]),
+        Operation(op_type="insert", table="variant_axes", new_entities=[{{...}}], depends_on=[0]),
+        Operation(op_type="insert", table="variant_values", new_entities=[{{...}}], depends_on=[1]),
+        Operation(op_type="insert", table="products", new_entities=[{{...}}], depends_on=[0, 2])
       ]
     ),
     impact_analysis=ImpactAnalysis(
-      new_entities_count={"product_families": 1, "variant_axes": 2, "variant_values": 2, "products": 1},
+      new_entities_count={{"product_families": 1, "variant_axes": 2, "variant_values": 2, "products": 1}},
       business_impact_summary="Will create 1 new product family with 1 initial SKU (500ml × 63mm)",
       examples=["PAV-JAR-PET-500ML-63MM"]
     ),

@@ -270,6 +270,9 @@ class OperationExecutor:
             # Resolve foreign key references from context
             resolved_entity = self._resolve_references(entity, context)
 
+            # Auto-populate timestamp fields (created_at, updated_at) if table has them
+            resolved_entity = self._populate_timestamps(table_schema, resolved_entity, is_update=False)
+
             # Validate against schema
             validation = self.validator.validate_entity(table_schema.name, resolved_entity)
             if not validation.valid:
@@ -333,6 +336,9 @@ class OperationExecutor:
         # Resolve references in filter and updates
         resolved_filter = self._resolve_references(operation.target_filter, context)
         resolved_updates = self._resolve_references(operation.field_updates, context)
+
+        # Auto-populate updated_at timestamp if table has it
+        resolved_updates = self._populate_timestamps(table_schema, resolved_updates, is_update=True)
 
         # Update entities
         count = await self._update_entities(
@@ -456,6 +462,37 @@ class OperationExecutor:
                 resolved[key] = value
 
         return resolved
+
+    def _populate_timestamps(
+        self, table_schema: Any, data: dict[str, Any], is_update: bool
+    ) -> dict[str, Any]:
+        """
+        Auto-populate timestamp fields (created_at, updated_at) based on schema.
+
+        Args:
+            table_schema: Table schema metadata with column definitions
+            data: Entity data dict
+            is_update: If True, only populate updated_at; if False, populate both
+
+        Returns:
+            Data with timestamps populated
+        """
+        from datetime import datetime, timezone
+
+        result = data.copy()
+
+        # Check if table has timestamp columns
+        columns = table_schema.columns if hasattr(table_schema, 'columns') else {}
+
+        # Auto-populate created_at for INSERTs (if not already provided)
+        if not is_update and 'created_at' in columns and 'created_at' not in result:
+            result['created_at'] = datetime.now(timezone.utc).isoformat()
+
+        # Auto-populate updated_at for both INSERTs and UPDATEs (if not already provided)
+        if 'updated_at' in columns and 'updated_at' not in result:
+            result['updated_at'] = datetime.now(timezone.utc).isoformat()
+
+        return result
 
     def _count_affected(
         self, completed_steps: list[tuple[ExecutionStep, dict[str, Any]]]
@@ -740,6 +777,24 @@ def create_execute_database_operation_tool(storage: StorageInterface):
                 version=schema_version,
                 domain=operation_intent.change_spec.domain
             )
+
+            # Auto-populate timestamp fields BEFORE validation
+            from datetime import datetime, timezone
+            for operation in operation_intent.change_spec.operations:
+                table_schema = schema.get_table(operation.table)
+
+                # For INSERT operations, populate created_at and updated_at
+                if operation.op_type == "insert" and operation.new_entities:
+                    for entity in operation.new_entities:
+                        if 'created_at' in table_schema.columns and 'created_at' not in entity:
+                            entity['created_at'] = datetime.now(timezone.utc).isoformat()
+                        if 'updated_at' in table_schema.columns and 'updated_at' not in entity:
+                            entity['updated_at'] = datetime.now(timezone.utc).isoformat()
+
+                # For UPDATE operations, populate updated_at
+                elif operation.op_type == "update" and operation.field_updates:
+                    if 'updated_at' in table_schema.columns and 'updated_at' not in operation.field_updates:
+                        operation.field_updates['updated_at'] = datetime.now(timezone.utc).isoformat()
 
             # Validate against schema
             validator = SchemaValidator(schema)

@@ -387,14 +387,22 @@ OperationIntent(
             ExecutionStep(
                 step_number=1,
                 description="Insert new 2L variant value",
-                operation=Operation(...),
-                validation_checks=["Ensure value doesn't already exist"]
+                operation=Operation(
+                    op_type="insert",
+                    table="variant_values",
+                    new_entities=[{"value": "2L", "sku_code": "2L", "variant_axis_id": "existing-axis-uuid"}],
+                    depends_on=[]
+                )
             ),
             ExecutionStep(
                 step_number=2,
                 description="Generate SKUs for 2L capacity",
-                operation=Operation(...),
-                validation_checks=["SKU codes must be unique"]
+                operation=Operation(
+                    op_type="insert",
+                    table="products",
+                    new_entities=[{"sku": "BOTTLE-2L-CLR", "name": "Bottle 2L Clear"}],
+                    depends_on=[0]
+                )
             )
         ],
         requires_approval=True
@@ -509,19 +517,60 @@ OperationIntent(
             ExecutionStep(
                 step_number=1,
                 description="Insert 2L variant value into capacity axis",
-                operation=operations[0],
-                validation_checks=["Value '2L' doesn't already exist in capacity axis"]
+                operation=Operation(
+                    op_type="insert",
+                    table="variant_values",
+                    new_entities=[{
+                        "id": "uuid-generated",
+                        "variant_axis_id": "existing-axis-uuid",
+                        "value": "2L",
+                        "sku_code": "2L",
+                        "sort_order": 4
+                    }],
+                    depends_on=[]
+                )
             ),
             ExecutionStep(
                 step_number=2,
                 description="Generate 2 new product SKUs for 2L capacity",
-                operation=operations[1],
-                validation_checks=["SKU codes BOTTLE-2L-CLR, BOTTLE-2L-AMB are unique"]
+                operation=Operation(
+                    op_type="insert",
+                    table="products",
+                    new_entities=[
+                        {
+                            "id": "uuid-generated",
+                            "product_family_id": "family-uuid",
+                            "sku": "BOTTLE-2L-CLR",
+                            "name": "Water Bottle 2L Clear"
+                        },
+                        {
+                            "id": "uuid-generated",
+                            "product_family_id": "family-uuid",
+                            "sku": "BOTTLE-2L-AMB",
+                            "name": "Water Bottle 2L Amber"
+                        }
+                    ],
+                    depends_on=[0]
+                )
             ),
             ExecutionStep(
                 step_number=3,
                 description="Link products to variant values",
-                operation=operations[2]
+                operation=Operation(
+                    op_type="insert",
+                    table="product_variant_values",
+                    new_entities=[
+                        {
+                            "product_id": "$step_1.products[0].id",
+                            "variant_value_id": "$step_0.variant_values[0].id"
+                        },
+                        {
+                            "product_id": "$step_1.products[1].id",
+                            "variant_value_id": "$step_0.variant_values[0].id"
+                        }
+                    ],
+                    depends_on=[1]
+                )
             )
         ]
     )
@@ -567,8 +616,13 @@ OperationIntent(
             ExecutionStep(
                 step_number=1,
                 description="Update product_families.base_price to Rs 35",
-                operation=operations[0],
-                validation_checks=["Price must be positive decimal"]
+                operation=Operation(
+                    op_type="update",
+                    table="product_families",
+                    target_filter={"id": "family-uuid-from-search"},
+                    field_updates={"base_price": 35.00},
+                    depends_on=[]
+                )
             )
         ]
     )
@@ -629,8 +683,15 @@ OperationIntent(
             ExecutionStep(
                 step_number=1,
                 description="Delete Amber variant value (cascades to 3 products and related data)",
-                operation=operations[0],
-                validation_checks=["Confirm no active orders for Amber SKUs"]
+                operation=Operation(
+                    op_type="delete",
+                    table="variant_values",
+                    target_filter={
+                        "variant_axis_id": "color-axis-uuid",
+                        "sku_code": "AMB"
+                    },
+                    depends_on=[]
+                )
             )
         ],
         requires_approval=True  # High-impact deletion
@@ -675,7 +736,13 @@ OperationIntent(
             ExecutionStep(
                 step_number=1,
                 description="Query products table for Water Bottles family",
-                operation=operations[0]
+                operation=Operation(
+                    op_type="query",
+                    table="products",
+                    query_filter={"product_family_id": "family-uuid"},
+                    include_relations=["variant_values"],
+                    depends_on=[]
+                )
             )
         ],
         requires_approval=False  # Read operations don't need approval
@@ -740,7 +807,7 @@ Return complete OperationIntent object (single universal model) with:
 
 **Execution Plan:**
 - `execution_plan.steps`: List of ExecutionStep objects
-  - Each with: step_number, description, operation, validation_checks
+  - Each with: step_number, description, operation (complete Operation object), rollback_on_failure
 - `execution_plan.requires_approval`: Boolean (true for writes, false for reads)
 
 **Schema Version:**
