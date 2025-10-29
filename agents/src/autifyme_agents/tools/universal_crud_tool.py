@@ -716,7 +716,13 @@ def create_execute_database_operation_tool(storage: StorageInterface):
 
     @tool("execute_database_operation")
     async def execute_database_operation(
-        intent: dict[str, Any],
+        intent_type: str,
+        change_spec: dict[str, Any],
+        user_request_summary: str,
+        reasoning: str,
+        impact_analysis: dict[str, Any],
+        execution_plan: dict[str, Any],
+        specialist_name: str | None = None,
         schema_version: str = "v1",
     ) -> dict[str, Any]:
         """
@@ -726,7 +732,13 @@ def create_execute_database_operation_tool(storage: StorageInterface):
         Works with current 9 tables and future tables without code changes.
 
         Args:
-            intent: OperationIntent serialized as dict
+            intent_type: High-level intent classification (create/read/update/delete)
+            change_spec: Specification of table operations
+            user_request_summary: Summary of user's original request
+            reasoning: Why specialist classified this way (for transparency)
+            impact_analysis: Impact assessment for HITL
+            execution_plan: Multi-step execution plan with dependencies
+            specialist_name: Which specialist generated this intent (optional)
             schema_version: Schema version to validate against (default: v1)
 
         Returns:
@@ -737,31 +749,46 @@ def create_execute_database_operation_tool(storage: StorageInterface):
 
         Examples:
             # Create product family
-            intent = {
-                "intent_type": "create",
-                "change_spec": {
+            execute_database_operation(
+                intent_type="create",
+                change_spec={
                     "operations": [
                         {"table": "product_families", "op_type": "insert", ...}
                     ]
                 },
-                ...
-            }
+                user_request_summary="Create new product family",
+                reasoning="User requested new family creation",
+                impact_analysis={...},
+                execution_plan={...}
+            )
 
             # Add variant value
-            intent = {
-                "intent_type": "create",
-                "change_spec": {
+            execute_database_operation(
+                intent_type="create",
+                change_spec={
                     "operations": [
                         {"table": "variant_values", "op_type": "insert", ...},
                         {"table": "products", "op_type": "insert", "depends_on": [0]}
                     ]
                 },
-                ...
-            }
+                user_request_summary="Add new variant value",
+                reasoning="User requested new color option",
+                impact_analysis={...},
+                execution_plan={...}
+            )
         """
         try:
-            # Parse intent
-            operation_intent = OperationIntent(**intent)
+            # Construct OperationIntent from flat parameters
+            operation_intent = OperationIntent(
+                intent_type=intent_type,
+                change_spec=change_spec,
+                user_request_summary=user_request_summary,
+                reasoning=reasoning,
+                impact_analysis=impact_analysis,
+                execution_plan=execution_plan,
+                specialist_name=specialist_name,
+                schema_version=schema_version,
+            )
 
             logger.info(
                 f"Executing database operation: {operation_intent.intent_type}",

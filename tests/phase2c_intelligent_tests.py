@@ -261,36 +261,42 @@ async def run_scenario_test(scenario_name: str, scenario_desc: str):
         max_turns=15,  # Allow more turns for complex scenarios
     )
 
+    # Safe print helper to handle Unicode
+    def safe_print(text):
+        try:
+            print(text)
+        except UnicodeEncodeError:
+            print(text.encode('ascii', 'replace').decode('ascii'))
+
     # Print result summary
-    print(f"\n[RESULT]: {'SUCCESS' if result.success else 'FAILED'}")
-    print(f"[Time]:  Duration: {result.execution_time_ms}ms")
-    print(f"[Turns]: {result.conversation_turns}")
+    safe_print(f"\n[RESULT]: {'SUCCESS' if result.success else 'FAILED'}")
+    safe_print(f"[Time]:  Duration: {result.execution_time_seconds}s")
 
     if result.trace_url:
-        print(f"[Trace]: {result.trace_url}")
+        safe_print(f"[Trace]: {result.trace_url}")
 
     if not result.success:
-        print(f"\n[Warning]:  FAILURE REASON:")
-        print(f"   {result.debug_reason or result.errors}")
+        safe_print(f"\n[Warning]:  FAILURE REASON:")
+        safe_print(f"   {result.errors}")
 
-        if result.trace_id:
-            print(f"\n[Analyzing]: trace...")
+        if result.trace_id and result.trace_id != "unknown":
+            safe_print(f"\n[Analyzing]: trace...")
             try:
                 # Get trace overview
                 overview = get_trace_overview(result.trace_id)
-                print(f"\n   Trace Overview:")
-                print(f"   - Total runs: {overview.get('total_runs', 'N/A')}")
-                print(f"   - Errors: {overview.get('error_count', 0)}")
+                safe_print(f"\n   Trace Overview:")
+                safe_print(f"   - Total runs: {overview.get('total_runs', 'N/A')}")
+                safe_print(f"   - Errors: {overview.get('error_count', 0)}")
 
                 # Get LLM call tree
                 tree = get_llm_trace_tree(result.trace_id)
                 if tree:
-                    print(f"\n   LLM Call Tree:")
+                    safe_print(f"\n   LLM Call Tree:")
                     for call in tree[:5]:  # Show first 5 calls
-                        print(f"   - {call.get('name', 'Unknown')}: {call.get('status', 'N/A')}")
+                        safe_print(f"   - {call.get('name', 'Unknown')}: {call.get('status', 'N/A')}")
 
             except Exception as e:
-                print(f"   (Could not analyze trace: {e})")
+                safe_print(f"   (Could not analyze trace: {e})")
 
     return result
 
@@ -302,10 +308,17 @@ async def run_all_phase2c_tests():
     Returns:
         Dict of scenario results
     """
-    print("\n" + "="*80)
-    print("PHASE 2C INTELLIGENT TESTING SUITE")
-    print("="*80)
-    print("\nAI (gpt-4.1-nano) acts as real user, detecting architectural violations.\n")
+    # Safe print helper
+    def safe_print(text):
+        try:
+            print(text)
+        except UnicodeEncodeError:
+            print(text.encode('ascii', 'replace').decode('ascii'))
+
+    safe_print("\n" + "="*80)
+    safe_print("PHASE 2C INTELLIGENT TESTING SUITE")
+    safe_print("="*80)
+    safe_print("\nAI (gpt-4.1-nano) acts as real user, detecting architectural violations.\n")
 
     results = {}
 
@@ -314,45 +327,42 @@ async def run_all_phase2c_tests():
             result = await run_scenario_test(scenario_name, scenario_desc)
             results[scenario_name] = {
                 "success": result.success,
-                "execution_time_ms": result.execution_time_ms,
-                "conversation_turns": result.conversation_turns,
+                "execution_time_seconds": result.execution_time_seconds,
                 "trace_url": result.trace_url,
-                "debug_reason": result.debug_reason,
                 "errors": result.errors,
             }
 
             # Pause between scenarios to avoid rate limits
-            print("\nWaiting 3 seconds before next scenario...")
+            safe_print("\nWaiting 3 seconds before next scenario...")
             await asyncio.sleep(3)
 
         except Exception as e:
-            print(f"\n[EXCEPTION]: {e}")
+            safe_print(f"\n[EXCEPTION]: {e}")
             results[scenario_name] = {
                 "success": False,
                 "error": str(e),
             }
 
     # Print summary
-    print("\n" + "="*80)
-    print("TEST SUITE SUMMARY")
-    print("="*80 + "\n")
+    safe_print("\n" + "="*80)
+    safe_print("TEST SUITE SUMMARY")
+    safe_print("="*80 + "\n")
 
     success_count = sum(1 for r in results.values() if r.get("success", False))
     total_count = len(results)
 
-    print(f"[PASSED]: {success_count}/{total_count}")
-    print(f"[FAILED]: {total_count - success_count}/{total_count}")
+    safe_print(f"[PASSED]: {success_count}/{total_count}")
+    safe_print(f"[FAILED]: {total_count - success_count}/{total_count}")
 
-    print(f"\n{'Scenario':<35} {'Result':<10} {'Turns':<8} {'Time (ms)'}")
-    print("-" * 80)
+    safe_print(f"\n{'Scenario':<35} {'Result':<10} {'Time (s)':<12}")
+    safe_print("-" * 80)
 
     for name, result in results.items():
         status = "PASS" if result.get("success", False) else "FAIL"
-        turns = result.get("conversation_turns", "N/A")
-        time_ms = result.get("execution_time_ms", "N/A")
-        print(f"{name:<35} {status:<10} {turns!s:<8} {time_ms}")
+        time_s = result.get("execution_time_seconds", "N/A")
+        safe_print(f"{name:<35} {status:<10} {time_s!s:<12}")
 
-    print("\n" + "="*80)
+    safe_print("\n" + "="*80)
 
     return results
 
