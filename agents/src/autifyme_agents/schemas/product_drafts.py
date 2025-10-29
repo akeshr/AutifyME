@@ -13,7 +13,7 @@ Design Philosophy:
 - Extensibility: Easy to add new draft types
 """
 
-from typing import Any, Literal
+from typing import Any, Literal, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -85,7 +85,10 @@ class VariantValueUpdate(BaseModel):
     sku_code: str = Field(..., description="Which value to update (by SKU code)")
     field_updates: dict[str, Any] = Field(
         ...,
-        description="Fields: value, display_label, price_adjustment, color_hex, image_url, sort_order",
+        description=(
+            "Fields: value, display_label, price_adjustment, "
+            "color_hex, image_url, sort_order"
+        ),
     )
 
 
@@ -96,7 +99,10 @@ class IndustryTargetUpdate(BaseModel):
     operation: Literal["add", "update", "remove"]
     field_updates: dict[str, Any] | None = Field(
         None,
-        description="For add/update: industry_use_case, industry_benefits, compliance_notes, is_primary_industry",
+        description=(
+            "For add/update: industry_use_case, industry_benefits, "
+            "compliance_notes, is_primary_industry"
+        ),
     )
 
 
@@ -107,7 +113,10 @@ class CustomerSegmentUpdate(BaseModel):
     operation: Literal["add", "update", "remove"]
     field_updates: dict[str, Any] | None = Field(
         None,
-        description="For add/update: segment_label, tone, key_benefits, pain_points, primary_channels, etc.",
+        description=(
+            "For add/update: segment_label, tone, key_benefits, "
+            "pain_points, primary_channels, etc."
+        ),
     )
 
 
@@ -132,7 +141,10 @@ class MarketingContentUpdate(BaseModel):
     operation: Literal["add", "update", "remove"]
     field_updates: dict[str, Any] | None = Field(
         None,
-        description="For add/update: content_text, hashtags, keywords, meta_title, meta_description, etc.",
+        description=(
+            "For add/update: content_text, hashtags, keywords, "
+            "meta_title, meta_description, etc."
+        ),
     )
 
 
@@ -341,7 +353,10 @@ class FamilyUpdateDraft(BaseModel):
     # ===== Table 4: variant_values =====
     variant_value_updates: list[VariantValueUpdate] | None = Field(
         None,
-        description="Update value attributes (price_adjustment, color_hex, display_label, sort_order)",
+        description=(
+            "Update value attributes (price_adjustment, color_hex, "
+            "display_label, sort_order)"
+        ),
     )
 
     # ===== Table 6: product_family_industries =====
@@ -540,8 +555,6 @@ class AmbiguousDraft(BaseModel):
 # =============================================================================
 # Union Type for Specialist Response
 # =============================================================================
-
-from typing import Union
 
 ProductArchitectureResponse = Union[
     ProductArchitectureDraft,  # CREATE: New family

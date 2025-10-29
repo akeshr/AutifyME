@@ -16,17 +16,12 @@ Design Philosophy:
 
 import logging
 from typing import Any
-from uuid import UUID
 
 from langchain.tools import tool
 from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field
 
-from autifyme_agents.core.exceptions import classify_api_error
 from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
-
-# Import draft types and result models
-from autifyme_agents.schemas.product_drafts import ProductQueryDraft, ProductDeletionDraft
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +252,8 @@ def create_delete_product_data_tool(storage: SupabaseStorageClient) -> object:
         Args:
             family_id: Product family UUID
             deletion_scope: One of: entire_family, specific_skus, variant_axis,
-                           variant_value, industry_target, customer_segment, images, marketing_content
+                variant_value, industry_target, customer_segment,
+                images, marketing_content
             soft_delete: If True, mark as inactive. If False, hard delete from DB
             target_skus: For specific_skus scope
             target_axis_name: For variant_axis scope
