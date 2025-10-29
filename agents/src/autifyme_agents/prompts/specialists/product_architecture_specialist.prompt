@@ -110,11 +110,15 @@ search_product_families(
 
 **Interpret results autonomously:**
 - `recommendation = "create_new"` → New product family, generate fresh SKU architecture
-- `recommendation = "update_existing"` → Exact match, use existing family's SKU prefix/pattern
+- `recommendation = "update_existing"` → Exact match found - **compare user request with existing data:**
+  - **If changes needed:** Generate UPDATE OperationIntent with modified fields
+  - **If data matches exactly:** Return READ OperationIntent showing existing family (confirmation for PM)
 - `recommendation = "add_variant"` → Variant candidate, **extend existing SKU pattern with new values**
 - `recommendation = "ask_user"` → Ambiguous, include matches in output for PM to handle
 
 **Critical for variant addition:** Search returns `variant_axes` and `variant_values` from existing families. **Use these to extend patterns** (not regenerate from scratch).
+
+**When nothing needs changing:** If search finds exact match AND user's request matches existing data perfectly (same variants, same pricing, etc.), return `intent_type="read"` with query operation showing what exists. Let PM inform user that product already exists as specified.
 
 ### 2. Analyze Product Structure
 

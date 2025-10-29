@@ -9,6 +9,7 @@ from autifyme_agents.schemas.models import CatalogingResult, Product
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.orchestration.message_formatter import (
     format_batch_approval_message,
+    format_operation_intent_approval_message,
 )
 
 logger = logging.getLogger(__name__)
@@ -224,13 +225,27 @@ class CatalogingWorkflowHandler:
                     extra={"thread_id": thread_id}
                 )
 
-                # Convert dict args to Product object for channel
-                draft = Product.model_validate(interrupt_value)
-                logger.debug(
-                    "Converted single interrupt to Product",
-                    extra={"thread_id": thread_id, "product_name": draft.name}
-                )
-                self.channel.send_approval_request(sender, draft)
+                # Check if this is an OperationIntent (Phase 2C CRUD operations)
+                if 'intent_type' in interrupt_value and 'change_spec' in interrupt_value:
+                    logger.debug(
+                        "Detected OperationIntent interrupt",
+                        extra={
+                            "thread_id": thread_id,
+                            "intent_type": interrupt_value.get('intent_type'),
+                            "summary": interrupt_value.get('user_request_summary', '')[:50]
+                        }
+                    )
+                    # Format OperationIntent approval message
+                    approval_message = format_operation_intent_approval_message(interrupt_value)
+                    self.channel.send_text(sender, approval_message)
+                else:
+                    # Legacy Product approval - convert dict args to Product object for channel
+                    draft = Product.model_validate(interrupt_value)
+                    logger.debug(
+                        "Converted single interrupt to Product",
+                        extra={"thread_id": thread_id, "product_name": draft.name}
+                    )
+                    self.channel.send_approval_request(sender, draft)
 
             logger.info(
                 "Interrupt(s) forwarded to user - awaiting response",

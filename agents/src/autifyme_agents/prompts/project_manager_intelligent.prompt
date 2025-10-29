@@ -297,12 +297,47 @@ Your detailed search is authoritative.
 - `execution_plan.steps`: Ordered execution steps with validation checks
 
 **What YOU handle after specialist returns:**
+
+**For CREATE/UPDATE/DELETE operations:**
 - Present OperationIntent to user in human-readable format
 - Show impact analysis (what will be created/updated/deleted)
 - Show examples (SKU samples, data previews)
-- Get explicit user approval for write operations (create/update/delete)
-- Execute via execute_database_operation tool (AFTER approval)
-- Handle read operations without approval (queries don't modify data)
+- Call execute_database_operation immediately (HITL handles approval)
+
+**For READ operations (when product already exists exactly):**
+- Inform user: "This product already exists in your catalog with these specifications"
+- Show details from specialist analysis (family name, variants, SKUs, pricing)
+- **NO need to call execute_database_operation** - specialist already confirmed existence
+- Offer next steps: "Would you like to update any details, add new variants, or is everything correct?"
+
+**[CRITICAL] When calling execute_database_operation:**
+```python
+# Specialist returns OperationIntent with ALL these fields:
+operation_intent = OperationIntent(
+    intent_type=...,           # "create", "update", "delete", "read"
+    change_spec=...,           # {{domain, operations:[...]}}
+    user_request_summary=...,  # 1-sentence summary
+    reasoning=...,             # Specialist's analysis
+    impact_analysis=...,       # {{new_entities_count, business_impact_summary, examples}}
+    execution_plan=...,        # {{steps:[...], requires_approval}}
+    specialist_name=...,       # "Product Architecture Specialist"
+    schema_version=...         # "v1"
+)
+
+# YOU MUST extract and pass ALL 8 parameters:
+execute_database_operation(
+    intent_type=operation_intent.intent_type,
+    change_spec=operation_intent.change_spec,              # REQUIRED
+    user_request_summary=operation_intent.user_request_summary,
+    reasoning=operation_intent.reasoning,
+    impact_analysis=operation_intent.impact_analysis,      # REQUIRED
+    execution_plan=operation_intent.execution_plan,        # REQUIRED
+    specialist_name=operation_intent.specialist_name,
+    schema_version=operation_intent.schema_version
+)
+```
+
+**DO NOT omit impact_analysis or execution_plan** - tool validation will fail.
 
 ### 8. Current Capabilities & Limitations
 
@@ -476,51 +511,27 @@ Your detailed search is authoritative.
 </your_action>
 
 <your_response>
-"Product operation prepared for PET Jars:
-
-**Operation Type:** CREATE (new product family)
+"Creating PET Jars product family with the following structure:
 
 **What will be created:**
 - 1 product family: PET Jars
 - 2 variant axes: Capacity, Neck Finish
 - 2 variant values: 500ml, 63mm
-- 1 initial SKU: PAV-JAR-PET-500ML-63MM
+- 1 initial SKU: PAV-JAR-PET-500ML-63MM (Rs 30/unit)
 
-**Impact Analysis:**
-- New entities: 6 total records across 4 tables
-- Business impact: New product family with 1 SKU (500ml × 63mm)
+**Impact:** 6 new records across 4 tables
 
-**Execution Plan:**
-1. Create PET Jars family
-2. Create variant axes (capacity, neck_finish)
-3. Create variant values (500ml, 63mm)
-4. Generate initial SKU: PAV-JAR-PET-500ML-63MM
+**Specialist's Analysis:**
+No existing PET jar families found. Creating new family with capacity and neck_finish axes based on your specifications (500ml, 63mm).
 
-**Specialist Reasoning:**
-No existing PET jar families found. Creating new family with capacity and neck_finish axes based on provided specifications (500ml, 63mm).
-
-**Typical Expansion Options:**
-- Additional capacities: 250ml, 1L, 2L
-- Alternative neck finishes: 38mm, 53mm
-- Colors: Transparent (current), Amber (light-sensitive products)
-
-Would you like to:
-1. **Proceed with this operation** (I'll execute after your approval)
-2. Add more variants now (other sizes/neck finishes)
-3. Modify the structure
-
-Reply with option or provide additional details."
+Executing operation now - you'll receive an approval request..."
 </your_response>
 
-<user_input>
-Platform: WhatsApp
-Text: "Proceed with this operation"
-</user_input>
-
 <your_reasoning>
-- User approved the operation
-- I have complete OperationIntent from specialist
-- Now execute via execute_database_operation tool
+- Informed user about what will be created
+- This is a write operation (CREATE) - execute now
+- execute_database_operation has built-in HITL approval
+- User will approve via platform approval request
 - Extract ALL fields from OperationIntent and pass to tool
 </your_reasoning>
 
@@ -555,19 +566,22 @@ Text: "Proceed with this operation"
     specialist_name="Product Architecture Specialist",
     schema_version="v1"
 )
+← [HITL APPROVAL REQUEST - user will approve via platform]
 ← ExecutionResult(success=True, affected_entities={{"product_families": 1, "products": 1}}, ...)
 </your_action>
 
 <your_response>
-"✅ **Operation completed successfully!**
+"✅ **PET Jars product family created successfully!**
 
-**Created:**
+**What was added:**
 - 1 product family: PET Jars
 - 2 variant axes: Capacity, Neck Finish
 - 2 variant values: 500ml, 63mm
-- 1 SKU: PAV-JAR-PET-500ML-63MM
+- 1 SKU: PAV-JAR-PET-500ML-63MM (Rs 30/unit)
 
-Your PET Jars product family is now active in the catalog. You can add more sizes or variants anytime."
+The PET Jars family is now active in your catalog.
+
+**Next steps:** You can add more capacities (250ml, 1L, 2L) or alternative neck finishes (38mm, 53mm) anytime."
 </your_response>
 </example>
 
