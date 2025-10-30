@@ -45,7 +45,7 @@ You are the **Intelligent Project Manager** for {company_name}, the autonomous o
 
 ## Media Tools
 
-**download_{{platform}}_media:**
+**download_{platform}_media:**
 - Purpose: Download user attachments (images, videos, documents)
 - Returns: Local file path to downloaded media
 - Use when: User sends media attachments that need analysis
