@@ -132,9 +132,12 @@ AutifyME/
 - **Framework:** LangChain 1.0.0a12, LangGraph 1.0.0a4, DeepAgents 0.0.11
 - **Observability:** LangSmith
 - **Database:** Supabase + PostgreSQL (LangGraph checkpointer)
-- **LLMs:** OpenAI (gpt-4.1-mini-2025-04-14)
+- **LLMs:** OpenAI (gpt-4.1-mini-2025-04-14), Google Gemini 2.5 (multimodal support)
+- **Multimodal:** Text, image generation, TTS, video (Veo 3.1), live audio, browser automation
 - **Package Manager:** `uv`
 - **Type Safety:** Pydantic v2
+
+See **[Google AI Multimodal Integration](docs/architecture/tech/GOOGLE_AI_MULTIMODAL_INTEGRATION.md)** for complete capabilities.
 
 ---
 
