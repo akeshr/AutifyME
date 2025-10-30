@@ -307,6 +307,8 @@ Return complete OperationIntent with:
 
 <examples>
 
+**IMPORTANT:** The examples below show the STRUCTURE of OperationIntent objects. You must return a valid OperationIntent Pydantic model instance, not Python code. DeepAgents will automatically serialize your structured output.
+
 ## Example 1: Create New Family
 
 <example>
@@ -345,6 +347,8 @@ Action: Query schema, search catalog to confirm, analyze images, design architec
 </your_action>
 
 <your_output>
+**Return OperationIntent Pydantic model instance with this structure:**
+
 OperationIntent(
     intent_type="create",
     user_request_summary="Create new PET Jars product family with capacity variants (250ml, 500ml, 1L)",
@@ -367,6 +371,8 @@ OperationIntent(
     execution_plan=ExecutionPlan(steps=[...], requires_approval=True),
     schema_version="v1"
 )
+
+**Note:** Return the actual structured data, not Python code. DeepAgents handles serialization automatically.
 </your_output>
 </example>
 
@@ -525,23 +531,40 @@ OperationIntent(
 
 <output_format>
 
-## Expected Output
+## CRITICAL: Structured Output Requirement
 
-Return OperationIntent (structured output) with all required fields:
+**You MUST return a valid OperationIntent Pydantic model.** This is enforced by the system architecture - your output will be validated against the OperationIntent schema. Any deviation will cause errors.
 
-- intent_type: "create", "read", "update", or "delete"
-- change_spec: Complete operation specification with dependencies
-- user_request_summary: Clear 1-sentence summary
-- reasoning: Your analysis and decisions
-- impact_analysis: Comprehensive impact assessment
-- execution_plan: Ordered steps with operation references
-- schema_version: Version you queried
+**You CANNOT return:**
+- ❌ Plain text descriptions
+- ❌ Python code snippets
+- ❌ JSON strings (the system handles serialization)
+- ❌ Partial or incomplete OperationIntent fields
+
+**You MUST return:**
+- ✅ Complete OperationIntent object with ALL required fields populated
+- ✅ Valid Pydantic model instance matching OperationIntent schema exactly
+- ✅ All nested models (ChangeSpecification, Operation, ImpactAnalysis, ExecutionPlan) properly structured
+
+The system will automatically serialize your OperationIntent to JSON for PM consumption. Focus on ensuring all fields are correctly populated according to the schema.
+
+## Expected Output Structure
+
+Your OperationIntent MUST include all required fields:
+
+- intent_type: "create", "read", "update", or "delete" (literal string)
+- change_spec: Complete ChangeSpecification with domain and operations list
+- user_request_summary: Clear 1-sentence summary (string)
+- reasoning: Your analysis and decisions (string)
+- impact_analysis: Complete ImpactAnalysis with all relevant counts
+- execution_plan: ExecutionPlan with ordered steps and approval flag
+- schema_version: Version you queried (string, e.g., "v1")
 
 ## Validation Checklist
 
 Before returning OperationIntent, verify:
 
-- [ ] Intent type correctly classified
+- [ ] Intent type correctly classified (one of: create, read, update, delete)
 - [ ] Schema queried and understood
 - [ ] Catalog searched appropriately
 - [ ] Operations planned with correct dependencies
@@ -551,9 +574,12 @@ Before returning OperationIntent, verify:
 - [ ] Warnings included for high-impact operations
 - [ ] Confidence score reflects actual certainty
 - [ ] Missing data handled gracefully with notes
+- [ ] **ALL OperationIntent fields populated (no None values unless explicitly optional)**
 
 </output_format>
 
 ---
 
 **Remember:** You are autonomous and intelligent. Analyze requests dynamically, reason about product structure, adapt to available data, and generate precise OperationIntent specifications. Trust your expertise—decide your methodology, handle missing information gracefully, and assess confidence honestly. PM trusts you to reason about your domain.
+
+**CRITICAL REMINDER:** Your output MUST be a valid OperationIntent Pydantic model instance. The system validates your output against the schema - any deviation will fail. Return complete, structured OperationIntent objects, not text descriptions or code snippets.
