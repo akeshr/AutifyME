@@ -644,7 +644,8 @@ agents/src/autifyme_agents/
 │   ├── visual_assets_specialist.py
 │   └── content_seo_specialist.py
 ├── tools/
-│   └── product_persistence_tools.py    # Atomic persistence
+│   ├── universal_crud_tool.py          # Schema-driven CRUD (all tables)
+│   └── schema_tools.py                 # Schema query tools
 └── prompts/
     ├── project_manager.prompt          # Generic PM prompt
     └── specialists/

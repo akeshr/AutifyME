@@ -71,6 +71,7 @@ Library patterns, prompt engineering, and development practices.
 | Document | Purpose |
 | --- | --- |
 | **[TECH_STACK.md](./tech/TECH_STACK.md)** | Technology choices organized by architecture layer |
+| **[EXECUTABLE_SCHEMA_COMPLETE.md](./tech/EXECUTABLE_SCHEMA_COMPLETE.md)** | ✅ **Phase 2D+2E Complete** - Executable schema + transaction support (76 tests, production-ready) |
 | **[LANGCHAIN_V1_FEATURES.md](./tech/LANGCHAIN_V1_FEATURES.md)** | LangChain v1 native patterns (HITL, error handling, structured outputs) |
 | **[LANGGRAPH_V1_FEATURES.md](./tech/LANGGRAPH_V1_FEATURES.md)** | LangGraph orchestration patterns and gotchas |
 | **[LANGSMITH_FEATURES.md](./tech/LANGSMITH_FEATURES.md)** | LangSmith tracing and debugging |
