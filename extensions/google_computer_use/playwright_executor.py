@@ -38,7 +38,7 @@ except ImportError:
         "Install with: uv pip install playwright && playwright install chromium"
     )
 
-from .google_computer_use import ActionExecutor, ActionType, BrowserState, ComputerAction
+from .agent import ActionExecutor, ActionType, BrowserState, ComputerAction
 
 
 class PlaywrightExecutor(ActionExecutor):

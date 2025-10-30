@@ -30,12 +30,12 @@ from enum import Enum
 from typing import Any, Callable, Literal
 
 try:
-    import google.generativeai as genai
-    from google.generativeai import types
+    from google import genai
+    from google.genai import types
 except ImportError:
     raise ImportError(
-        "google-generativeai package required for Computer Use. "
-        "Install with: uv pip install google-generativeai"
+        "google-genai package required for Computer Use. "
+        "Install with: uv pip install google-genai"
     )
 
 
@@ -207,9 +207,8 @@ class ComputerUseAgent:
                 "GOOGLE_API_KEY environment variable or api_key parameter required"
             )
 
-        # Configure Gemini client
-        genai.configure(api_key=self.api_key)
-        self.client = genai.Client()
+        # Create Gemini client with API key
+        self.client = genai.Client(api_key=self.api_key)
 
         # Model name
         self.model = "gemini-2.5-computer-use-preview-10-2025"
