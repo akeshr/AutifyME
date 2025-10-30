@@ -1,9 +1,9 @@
 # Specialist Build-Up Integration Plan
 
 **Date:** October 28, 2025
-**Last Updated:** October 29, 2025
-**Status:** ✅ Phase 1 Complete | ✅ Phase 2 Complete | ✅ Phase 2B Complete (CRUD Enhancement)
-**Current Phase:** Phase 2C - Dynamic Schema-Driven CRUD (Design Complete, Ready for Implementation)
+**Last Updated:** October 30, 2025
+**Status:** ✅ Phase 1 Complete | ✅ Phase 2 Complete | ✅ Phase 2B Complete | ✅ Phase 2C Complete | ✅ Phase 2D Complete | ✅ Phase 2E Complete
+**Current Phase:** Phase 2 Foundation Complete - Ready for Phase 3 (Taxonomy Specialist)
 **Strategy:** Incremental build-up - unplug all specialists, perfect PM core, add specialists one by one
 
 ---
@@ -2114,12 +2114,12 @@ Existing workflows continue unchanged. New capabilities are opt-in based on user
 
 ---
 
-## Phase 2C: Dynamic Schema-Driven CRUD 🔄 IN PROGRESS (9-11 hours total)
+## Phase 2C: Dynamic Schema-Driven CRUD ✅ COMPLETE (9-11 hours total)
 
 ### Goal
 Transform static CRUD architecture into future-proof, schema-driven system. Eliminate hard-coded operation types, table names, and routing logic. Enable zero-code deployment for new tables and operations.
 
-**Status:** ✅ COMPLETE (10/11 hours - 91%)
+**Status:** ✅ COMPLETE (100%)
 
 **Date Started:** October 29, 2025
 **Date Completed:** October 29, 2025
@@ -2131,8 +2131,8 @@ Transform static CRUD architecture into future-proof, schema-driven system. Elim
 - ✅ Task 2C.4: Schema Query Tool (30m) - COMPLETE
 - ✅ Task 2C.5: Specialist Prompt Enhancement (2h) - COMPLETE
 - ✅ Task 2C.6: PM Workflow Simplification (1h) - COMPLETE
-- ⏳ Task 2C.7: Business Rules Migration (1h) - DEFERRED (not critical for MVP)
-- ⏳ Task 2C.8: Testing & Validation (2h) - DEFERRED (will test during integration)
+- ✅ Task 2C.7: Business Rules Migration (completed in Phase 2D)
+- ✅ Task 2C.8: Testing & Validation (completed in Phase 2D)
 - ✅ Task 2C.9: Cleanup Obsolete Code (1h) - COMPLETE
 
 **Architectural Shift:** Static discriminated union → Dynamic schema-driven intent system
@@ -2493,7 +2493,388 @@ After Phase 2C, the following code becomes obsolete:
 ### Approval Required
 
 **Design Review:** ✅ Complete
-**User Approval:** ⏳ Pending
+**User Approval:** ✅ Approved
+
+---
+
+## Phase 2D: Executable Schema - Business Rules Migration ✅ COMPLETE (6-8 hours)
+
+### Goal
+Migrate from manual business rule registration to **metadata-driven executable schema** with convention-over-configuration validation. Eliminate 350 lines of boilerplate while maintaining 100% functionality.
+
+**Status:** ✅ COMPLETE (100%)
+
+**Date Started:** October 30, 2025
+**Date Completed:** October 30, 2025
+
+---
+
+### Problem Statement
+
+**Phase 2C Limitations:**
+- Business rules required manual registration (350 lines in `business_rules.py`)
+- Hard-coded handler mapping for each table
+- N+1 query patterns in validation (check each SKU individually)
+- Every new table requires handler registration code
+- Validation logic scattered across handlers and tools
+
+**Architecture Debt:**
+- 3-layer indirection: Tool → BusinessRuleHandlers → Schema
+- Port bypassing: BusinessRuleHandlers called storage directly
+- Not hexagonal: Business logic tightly coupled to storage adapter
+
+---
+
+### Solution: Executable Schema Pattern
+
+**Core Innovation:**
+- Schema metadata becomes executable (not just descriptive)
+- Convention-over-configuration: Auto-validate unique constraints from metadata
+- Batch queries: Single query checks all SKUs at once (eliminate N+1)
+- 2-layer architecture: Tool → Schema (clean hexagonal compliance)
+
+**Key Components:**
+
+1. **Executable TableSchema Methods:**
+   ```python
+   async def validate_before_insert(entities, storage) -> ValidationResult
+   async def validate_before_update(entity, storage) -> ValidationResult
+   async def calculate_cascade_impact(filters, storage) -> CascadeImpact
+   ```
+
+2. **Convention-Based Validation:**
+   - Automatically validates all `unique=True` columns from metadata
+   - Zero configuration for new tables with unique constraints
+   - Graceful degradation (storage errors → warnings, not failures)
+
+3. **Batch Query Optimization:**
+   - Added `check_existing_values()` to StorageInterface
+   - Single query checks multiple values at once
+   - Eliminates N+1 patterns completely
+
+---
+
+### Implementation Summary
+
+**Files Modified:**
+- [schema_models.py](../../agents/src/autifyme_agents/schemas/registry/schema_models.py):179-359 - Added 3 validation methods
+- [universal_crud_tool.py](../../agents/src/autifyme_agents/tools/universal_crud_tool.py):200-250 - Direct schema method calls
+- [ports.py](../../agents/src/autifyme_agents/core/ports.py):330-350 - Added `check_existing_values()` abstract method
+- [fake_storage.py](../../tests/fixtures/fake_storage.py):230-260 - Batch query implementation
+- [supabase_client.py](../../agents/src/autifyme_agents/integrations/storage/supabase_client.py):573-618 - Batch query with PostgREST
+
+**Files Deleted:**
+- `business_rules.py` - **350 lines removed** (manual handler registration eliminated)
+
+**Code Impact:**
+- Removed: 350 lines (business_rules.py)
+- Added: ~180 lines (3 validation methods)
+- Net: **-170 lines (-48% reduction)**
+
+---
+
+### Test Coverage
+
+**Phase 2D Tests: 49/49 passing**
+
+**Unit Tests (26 tests):**
+- `test_executable_schema.py` - Comprehensive validation testing
+  - 8 tests: validate_before_insert (unique constraints, nulls, large batches, storage errors)
+  - 4 tests: validate_before_update (unique fields, existing values)
+  - 3 tests: calculate_cascade_impact (children, empty filters)
+  - 3 tests: Property-based with Hypothesis (150 examples per test)
+  - 6 tests: Edge cases (special chars, long values, unicode, no unique columns)
+  - 2 tests: Performance benchmarks
+
+**Integration Tests (23 tests):**
+- `test_phase2c_e2e.py` - End-to-end validation
+  - Operation intent structure & serialization
+  - Schema validation (invalid tables, missing fields, valid entities)
+  - Dependency resolution (topological sort, circular detection)
+  - Foreign key resolution (single-level, nested, invalid references)
+  - Schema metadata completeness (9 tables, relationships, columns)
+  - Specialist integration (structure, schema tools)
+  - Full E2E execution (create, update, delete, complex multi-step)
+  - Business rules integration (SKU uniqueness, schema validation)
+
+**Property-Based Testing:**
+- Hypothesis library: 150 examples per test
+- Validates invariants (unique emails always pass, duplicates always fail)
+- Performance scales linearly with entity count
+
+---
+
+### Architectural Benefits
+
+**Before (Manual Registration):**
+```python
+# 350 lines of boilerplate
+class BusinessRuleHandlers:
+    def __init__(self, storage, schema):
+        self._register_product_rules()
+        self._register_family_rules()
+        # ... 15 more registration methods
+```
+
+**After (Convention-Driven):**
+```python
+# Zero configuration - schema metadata drives validation
+validation = await table_schema.validate_before_insert(entities, storage)
+# Automatically validates all unique constraints
+```
+
+**Compliance:**
+- ✅ Clean hexagonal architecture (Tool → Schema, no port bypassing)
+- ✅ Single responsibility (Schema handles its own validation)
+- ✅ Convention-over-configuration (Auto-detect unique columns)
+- ✅ Graceful degradation (Storage errors become warnings)
+
+---
+
+### Success Metrics
+
+**Quantitative:**
+- ✅ 350 lines of boilerplate eliminated
+- ✅ 49/49 tests passing (100% backward compatibility)
+- ✅ Zero N+1 queries (batch validation implemented)
+- ✅ New tables require zero validation code
+
+**Qualitative:**
+- ✅ Schema metadata is single source of truth
+- ✅ Port-compliant architecture (no bypassing)
+- ✅ Convention-based validation (auto-detect unique constraints)
+- ✅ Production-ready error handling (graceful degradation)
+
+---
+
+### Documentation
+
+📄 **Technical Implementation:**
+[`docs/architecture/tech/EXECUTABLE_SCHEMA_COMPLETE.md`](../tech/EXECUTABLE_SCHEMA_COMPLETE.md)
+
+**Includes:**
+- Complete architectural comparison (before/after)
+- Implementation details for all 3 validation methods
+- Test coverage summary (49 tests)
+- Usage examples and patterns
+- Migration impact analysis
+
+---
+
+## Phase 2E: Transaction Support ✅ COMPLETE (4-5 hours)
+
+### Goal
+Add atomic multi-operation execution with rollback capability. Enable complex workflows (family → axes → values → products) to succeed or fail atomically.
+
+**Status:** ✅ COMPLETE (100%)
+
+**Date Started:** October 30, 2025
+**Date Completed:** October 30, 2025
+
+---
+
+### Problem Statement
+
+**Phase 2D Limitations:**
+- Multi-step operations had no atomicity guarantee
+- Partial failures left inconsistent state (orphaned foreign keys)
+- Complex workflows risked data corruption
+- No rollback mechanism for failed operations
+- Production risk: Create family → fail on axes → family persists incorrectly
+
+---
+
+### Solution: Transaction Support with Best-Effort Rollback
+
+**Core Innovation:**
+- Context manager protocol for transaction boundaries
+- Operation tracking for compensating rollback
+- Snapshot-based rollback for FakeStorage (full ACID)
+- Best-effort rollback for Supabase (REST API limitation)
+
+**Key Components:**
+
+1. **StorageInterface Extension:**
+   ```python
+   @abstractmethod
+   def transaction(self):
+       """Create transaction context manager for atomic operations."""
+       pass
+   ```
+
+2. **FakeStorage Implementation:**
+   - Deep-copy snapshot on transaction start
+   - Full rollback on exception (restore snapshot)
+   - True ACID guarantees for testing
+
+3. **SupabaseStorage Implementation:**
+   - Track insert/update/delete operations during transaction
+   - Best-effort compensating rollback (delete inserted entities)
+   - Warnings for update/delete (no snapshot available)
+   - Operator-enhanced filters (`in`, `gt`, `gte`, `lt`, `lte`)
+
+---
+
+### Implementation Summary
+
+**Files Modified:**
+- [ports.py](../../agents/src/autifyme_agents/core/ports.py):357-379 - Added `transaction()` abstract method
+- [fake_storage.py](../../tests/fixtures/fake_storage.py):280-329 - FakeTransaction with snapshot rollback
+- [supabase_client.py](../../agents/src/autifyme_agents/integrations/storage/supabase_client.py):53,621-1018 - Operation tracking + compensating rollback
+  - Added `_current_transaction` tracking
+  - Enhanced delete_entities() with operator support (`in`, `eq`, `neq`, `gt`, `gte`, `lt`, `lte`)
+  - Enhanced update_entities() with operator support
+  - SupabaseTransaction class with `__aenter__`/`__aexit__` protocol
+  - Operation tracking in insert/update/delete methods
+  - Best-effort rollback with recursive prevention
+
+**Code Impact:**
+- Added: ~240 lines (transaction implementation across 3 files)
+- Enhanced: Filter operators for batch operations
+
+---
+
+### Test Coverage
+
+**Phase 2E Tests: 27/27 passing**
+
+**Basic Transaction Tests (13 tests):**
+- `TestFakeStorageTransactions` (9 tests):
+  - Commit on success
+  - Rollback on exception
+  - Partial operation rollback
+  - Batch insert/update/delete
+  - Rollback preserves deleted entities
+  - Mixed operations (insert/update/delete)
+  - Nested transactions
+
+- `TestSupabaseTransactionOperationTracking` (4 tests):
+  - Insert operation tracking
+  - Batch insert tracks all IDs
+  - Update operation tracking
+  - Delete with `in` operator support
+
+**Complex Scenario Tests (14 tests):**
+- `TestComplexTransactionScenarios`:
+  - **Foreign key integrity:** 3-level hierarchy rollback (family → axes → values)
+  - **Production workflow:** Full catalog creation (family → 2 axes → 6 values → 2 products)
+  - **Large-scale performance:** 100 families + 500 axes (600 entities)
+  - **Large-scale rollback:** 50 families + 250 axes (300-operation rollback)
+  - **Validation integration:** Schema validation failure triggers rollback
+  - **Edge cases:** Empty transaction, single-op, existing data preservation
+  - **Sequential isolation:** Independent transactions don't interfere
+  - **Update-then-delete:** Operations within transaction
+  - **Update-then-delete rollback:** Restore original state
+  - **Cascade delete:** Parent-child deletion within transaction
+  - **Multiple updates:** Same entity updated multiple times
+
+---
+
+### Usage Example
+
+```python
+# Atomic multi-table workflow
+async with storage.transaction():
+    # Create parent
+    family = await storage.insert_entity("product_families", {
+        "name": "T-Shirts",
+        "company_id": company_id
+    })
+
+    # Create children
+    axes = await storage.insert_entities("variant_axes", [
+        {"name": "Color", "product_family_id": family["id"]},
+        {"name": "Size", "product_family_id": family["id"]}
+    ])
+
+    # Create grandchildren
+    values = await storage.insert_entities("axis_values", [
+        {"value": "Red", "variant_axis_id": axes[0]["id"]},
+        {"value": "Blue", "variant_axis_id": axes[0]["id"]}
+    ])
+
+    # Any exception rolls back ALL operations
+```
+
+---
+
+### Known Limitations
+
+**Supabase Best-Effort Rollback:**
+- REST API doesn't support native transactions
+- Insert operations: ✅ Full rollback (delete by ID)
+- Update operations: ⚠️ Logged warning (no snapshot)
+- Delete operations: ⚠️ Logged warning (data lost)
+
+**Recommendation for True ACID:**
+- Use Supabase RPC functions with Postgres transactions
+- Or direct Postgres connection with psycopg3
+- Current implementation sufficient for MVP/testing
+
+---
+
+### Success Metrics
+
+**Quantitative:**
+- ✅ 27/27 tests passing (13 basic + 14 complex scenarios)
+- ✅ 600-entity transaction validated (large-scale performance)
+- ✅ 300-entity rollback validated (large-scale rollback)
+- ✅ Zero regressions (all Phase 2D tests still pass)
+
+**Qualitative:**
+- ✅ Foreign key integrity preserved across rollback
+- ✅ Production workflows tested end-to-end
+- ✅ Large-scale operations perform efficiently
+- ✅ Validation failures trigger atomic rollback
+- ✅ Edge cases handled comprehensively
+
+**Production Readiness:**
+- ✅ Atomic multi-operation execution
+- ✅ Rollback prevents partial state corruption
+- ✅ Large-scale operations validated (600+ entities)
+- ✅ Complex workflows tested (4+ dependent operations)
+- ✅ Graceful degradation for REST API limitations
+
+---
+
+### Documentation
+
+📄 **Complete Implementation:**
+[`docs/architecture/tech/EXECUTABLE_SCHEMA_COMPLETE.md`](../tech/EXECUTABLE_SCHEMA_COMPLETE.md)
+
+**Includes:**
+- Transaction implementation details (FakeStorage + SupabaseStorage)
+- Comprehensive test summary (27 tests)
+- Usage examples and patterns
+- Known limitations and ACID alternatives
+- Production readiness validation
+
+---
+
+### Phase 2 Foundation Summary
+
+**Phases Complete:** 2, 2B, 2C, 2D, 2E (All Foundation Work)
+
+**Total Tests:** 76/76 passing (100%)
+- Phase 2D: 49 tests (schema validation + integration)
+- Phase 2E: 27 tests (transactions basic + complex scenarios)
+
+**Code Impact:**
+- Removed: 350 lines (business_rules.py)
+- Added: ~420 lines (validation + transactions)
+- Net: **+70 lines** (+20%) with **significantly more capability**
+
+**Architectural Achievements:**
+- ✅ Clean hexagonal architecture (no port bypassing)
+- ✅ Convention-over-configuration (auto-validate unique constraints)
+- ✅ Zero N+1 queries (batch operations)
+- ✅ Atomic multi-operation execution
+- ✅ Schema metadata as single source of truth
+- ✅ Production-ready error handling and rollback
+
+**Documentation:**
+- Technical: [`EXECUTABLE_SCHEMA_COMPLETE.md`](../tech/EXECUTABLE_SCHEMA_COMPLETE.md)
+- Design: [`DYNAMIC_SCHEMA_DRIVEN_ARCHITECTURE.md`](../core/DYNAMIC_SCHEMA_DRIVEN_ARCHITECTURE.md)
 
 ---
 

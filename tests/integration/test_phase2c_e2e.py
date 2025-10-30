@@ -39,6 +39,9 @@ from autifyme_agents.tools.universal_crud_tool import (
     create_execute_database_operation_tool,
 )
 
+# Import FakeStorage from fixtures
+from tests.fixtures.fake_storage import FakeStorage
+
 
 # =============================================================================
 # Fixtures - Test Database Setup
@@ -53,172 +56,8 @@ def test_schema():
 
 @pytest.fixture
 def test_storage():
-    """Create enhanced mock storage with Phase 2C database operations."""
-
-    class Phase2CTestStorage:
-        """Mock storage implementing Supabase operations for Phase 2C testing."""
-
-        def __init__(self):
-            # In-memory database tables
-            self.tables: dict[str, list[dict[str, Any]]] = {
-                "product_families": [],
-                "variant_axes": [],
-                "variant_values": [],
-                "products": [],
-                "product_variant_values": [],
-                "product_family_industries": [],
-                "customer_segments": [],
-                "product_images": [],
-                "marketing_content": [],
-            }
-            self._mock_client = None
-
-        def _ensure_client(self):
-            """Return mock Supabase client."""
-            if self._mock_client is None:
-                self._mock_client = self._MockSupabaseClient(self.tables)
-            return self._mock_client
-
-        class _MockSupabaseClient:
-            """Mock Supabase client for table operations."""
-
-            def __init__(self, tables: dict[str, list[dict[str, Any]]]):
-                self.tables = tables
-
-            def table(self, table_name: str):
-                """Return mock table interface."""
-                return self._MockTable(table_name, self.tables)
-
-            class _MockTable:
-                """Mock table interface with insert/update/delete/select."""
-
-                def __init__(self, table_name: str, tables: dict[str, list[dict[str, Any]]]):
-                    self.table_name = table_name
-                    self.tables = tables
-                    self._query = {"filter": {}, "select": "*"}
-
-                def insert(self, data: dict[str, Any] | list[dict[str, Any]]):
-                    """Mock insert operation - returns self for chaining."""
-                    self._query["insert_data"] = data
-                    return self
-
-                def update(self, updates: dict[str, Any]):
-                    """Mock update operation - returns self for chaining."""
-                    self._query["updates"] = updates
-                    return self
-
-                def delete(self):
-                    """Mock delete operation - returns self for chaining."""
-                    self._query["delete"] = True
-                    return self
-
-                def select(self, columns: str = "*"):
-                    """Mock select operation - returns self for chaining."""
-                    self._query["select"] = columns
-                    return self
-
-                def eq(self, column: str, value: Any):
-                    """Mock equality filter - returns self for chaining."""
-                    self._query["filter"][column] = value
-                    return self
-
-                def execute(self):
-                    """Execute the built query."""
-                    # Handle INSERT
-                    if "insert_data" in self._query:
-                        return self._execute_insert()
-
-                    # Handle DELETE
-                    if self._query.get("delete"):
-                        return self._execute_delete()
-
-                    # Handle UPDATE
-                    if "updates" in self._query:
-                        return self._execute_update()
-
-                    # Handle SELECT (default)
-                    return self._execute_select()
-
-                def _execute_insert(self):
-                    """Execute insert operation."""
-                    data = self._query["insert_data"]
-                    entities = [data] if isinstance(data, dict) else data
-                    inserted = []
-
-                    for entity in entities:
-                        # Generate ID if not present
-                        if "id" not in entity or entity["id"] is None:
-                            entity["id"] = str(uuid.uuid4())
-
-                        # Add timestamps if not present
-                        if "created_at" in self._get_table_columns():
-                            entity.setdefault("created_at", "2025-01-01T00:00:00Z")
-                        if "updated_at" in self._get_table_columns():
-                            entity.setdefault("updated_at", "2025-01-01T00:00:00Z")
-
-                        self.tables[self.table_name].append(entity.copy())
-                        inserted.append(entity.copy())
-
-                    return self._MockResponse(inserted)
-
-                def _execute_delete(self):
-                    """Execute delete with filters."""
-                    filter_dict = self._query["filter"]
-                    deleted = []
-
-                    remaining = []
-                    for entity in self.tables[self.table_name]:
-                        if self._matches_filter(entity, filter_dict):
-                            deleted.append(entity)
-                        else:
-                            remaining.append(entity)
-
-                    self.tables[self.table_name] = remaining
-                    return self._MockResponse(deleted)
-
-                def _execute_update(self):
-                    """Execute update with filters."""
-                    filter_dict = self._query["filter"]
-                    updates = self._query["updates"]
-                    updated = []
-
-                    for entity in self.tables[self.table_name]:
-                        if self._matches_filter(entity, filter_dict):
-                            entity.update(updates)
-                            updated.append(entity.copy())
-
-                    return self._MockResponse(updated)
-
-                def _execute_select(self):
-                    """Execute select with filters."""
-                    filter_dict = self._query["filter"]
-                    results = []
-
-                    for entity in self.tables[self.table_name]:
-                        if self._matches_filter(entity, filter_dict):
-                            results.append(entity.copy())
-
-                    return self._MockResponse(results)
-
-                def _matches_filter(self, entity: dict, filter_dict: dict) -> bool:
-                    """Check if entity matches all filter conditions."""
-                    for key, value in filter_dict.items():
-                        if entity.get(key) != value:
-                            return False
-                    return True
-
-                def _get_table_columns(self) -> set[str]:
-                    """Return expected columns for this table."""
-                    # Simplified - just common columns
-                    return {"id", "created_at", "updated_at"}
-
-                class _MockResponse:
-                    """Mock Supabase response."""
-
-                    def __init__(self, data: list[dict[str, Any]]):
-                        self.data = data
-
-    return Phase2CTestStorage()
+    """Create FakeStorage implementing StorageInterface for Phase 2C testing."""
+    return FakeStorage()
 
 
 @pytest.fixture
@@ -1003,21 +842,8 @@ class TestBusinessRules:
 
     @pytest.mark.asyncio
     async def test_sku_uniqueness_prevents_duplicates(self, operation_executor, test_storage):
-        """Test SKU uniqueness business rule prevents duplicate SKUs."""
+        """Test SKU uniqueness validation prevents duplicate SKUs."""
         family_id = str(uuid.uuid4())
-
-        # Configure SKU uniqueness business rule for products table
-        from autifyme_agents.schemas.registry import BusinessRule, BusinessRuleTrigger
-
-        products_table = operation_executor.schema.get_table("products")
-        products_table.business_rules = [
-            BusinessRule(
-                rule_type="sku_uniqueness",
-                trigger=BusinessRuleTrigger.BEFORE_INSERT,
-                handler="validate_sku_uniqueness",
-                enabled=True,
-            )
-        ]
 
         # Seed database with family and existing product
         test_storage.tables["product_families"].append(
@@ -1038,15 +864,14 @@ class TestBusinessRules:
             {
                 "id": str(uuid.uuid4()),
                 "product_family_id": family_id,
-                "sku": "TST-EXISTING",
-                "sku_code": "EXISTING-SKU",
+                "sku": "TST-EXISTING",  # Existing SKU
                 "name": "Existing Product",
                 "description": "Existing",
                 "price": 10.00,
             }
         )
 
-        # Try to insert product with same SKU
+        # Try to insert product with same SKU (schema auto-validates unique constraint)
         operations = [
             Operation(
                 op_type="insert",
@@ -1054,8 +879,7 @@ class TestBusinessRules:
                 new_entities=[
                     {
                         "product_family_id": family_id,
-                        "sku": "TST-NEW",
-                        "sku_code": "EXISTING-SKU",  # Duplicate!
+                        "sku": "TST-EXISTING",  # Duplicate!
                         "name": "New Product",
                         "description": "New",
                         "price": 10.00,
@@ -1072,12 +896,14 @@ class TestBusinessRules:
             )
         ]
 
-        # Execute - should fail due to SKU uniqueness rule
+        # Execute - should fail due to schema-driven uniqueness validation
         result = await operation_executor.execute_plan(steps, operations)
 
         # Verify failure
         assert result.success is False
-        assert "Duplicate SKU" in result.error_message or "SKU" in result.error_message
+        assert ("TST-EXISTING" in result.error_message or
+                "Duplicate" in result.error_message or
+                "unique" in result.error_message.lower())
 
     @pytest.mark.asyncio
     async def test_sku_uniqueness_allows_unique_skus(self, operation_executor, test_storage):
@@ -1145,52 +971,34 @@ class TestBusinessRules:
         assert len(test_storage.tables["products"]) == 2
 
     @pytest.mark.asyncio
-    async def test_business_rules_trigger_on_insert(self, operation_executor, test_storage):
-        """Test business rules are triggered during INSERT operations."""
-        # Track if business rule was called
-        rule_executed = {"before": False, "after": False}
+    async def test_schema_validation_executes_on_insert(self, operation_executor, test_storage):
+        """Test schema validation executes during INSERT operations."""
+        # Seed a product family to test unique constraint validation
+        test_storage.tables["product_families"].append(
+            {
+                "id": str(uuid.uuid4()),
+                "product_group_id": "EXISTING-GROUP",
+                "sku_prefix": "EXT",
+                "name": "Existing Family",
+                "description": "Test",
+                "brand": "TestBrand",
+                "base_price": 10.00,
+                "price_currency": "INR",
+                "condition": "new",
+                "lifecycle_stage": "regular",
+            }
+        )
 
-        def mock_before_insert(rule, context):
-            rule_executed["before"] = True
-            return {"status": "valid"}
-
-        def mock_after_insert(rule, context):
-            rule_executed["after"] = True
-            return {"status": "valid"}
-
-        # Register mock handlers
-        operation_executor.business_rules.register("test_before", mock_before_insert)
-        operation_executor.business_rules.register("test_after", mock_after_insert)
-
-        # Add business rules to schema (temporarily)
-        from autifyme_agents.schemas.registry import BusinessRule, BusinessRuleTrigger
-
-        product_families = operation_executor.schema.get_table("product_families")
-        product_families.business_rules = [
-            BusinessRule(
-                rule_type="test_rule_before",
-                trigger=BusinessRuleTrigger.BEFORE_INSERT,
-                handler="test_before",
-                enabled=True,
-            ),
-            BusinessRule(
-                rule_type="test_rule_after",
-                trigger=BusinessRuleTrigger.AFTER_INSERT,
-                handler="test_after",
-                enabled=True,
-            ),
-        ]
-
-        # Execute insert
+        # Try to insert with valid data (should pass schema validation)
         operations = [
             Operation(
                 op_type="insert",
                 table="product_families",
                 new_entities=[
                     {
-                        "product_group_id": "TEST",
-                        "sku_prefix": "TST",
-                        "name": "Test",
+                        "product_group_id": "NEW-GROUP",  # Different from existing
+                        "sku_prefix": "NEW",
+                        "name": "New Family",
                         "description": "Test",
                         "brand": "TestBrand",
                         "base_price": 10.00,
@@ -1205,17 +1013,16 @@ class TestBusinessRules:
         steps = [
             ExecutionStep(
                 step_number=1,
-                description="Insert with business rules",
+                description="Insert with schema validation",
                 operation_index=0,
             )
         ]
 
         result = await operation_executor.execute_plan(steps, operations)
 
-        # Verify business rules were triggered
+        # Verify schema validation passed and insert succeeded
         assert result.success is True
-        assert rule_executed["before"] is True
-        assert rule_executed["after"] is True
+        assert len(test_storage.tables["product_families"]) == 2
 
 
 # =============================================================================

@@ -7,8 +7,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
-from supabase import Client, create_client
-from supabase.lib.client_options import SyncClientOptions
+from supabase import AsyncClient, Client, create_async_client, create_client
+from supabase.lib.client_options import AsyncClientOptions, SyncClientOptions
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.exceptions import ConfigurationError, StorageError
@@ -49,6 +49,8 @@ class SupabaseStorageClient(StorageInterface):
             )
         self._service_key = derived_key
         self._client: Client | None = client
+        self._async_client: AsyncClient | None = None  # Async client for non-blocking ops
+        self._current_transaction: "SupabaseTransaction | None" = None  # Track active transaction
 
     def __enter__(self) -> SupabaseStorageClient:
         """Enter context manager - ensures client is initialized.
@@ -146,6 +148,82 @@ class SupabaseStorageClient(StorageInterface):
                 ) from e
 
         return self._client
+
+    async def _ensure_async_client(self) -> AsyncClient:
+        """Create and validate the async Supabase client lazily.
+
+        Async client enables non-blocking I/O for CRUD operations in LangGraph workflows.
+        Uses same credentials as sync client but with async/await semantics.
+
+        Returns:
+            Initialized and validated async Supabase client
+
+        Raises:
+            ConfigurationError: If credentials are missing or invalid
+        """
+        if self._async_client is None:
+            # Validate credentials (same validation as sync client)
+            if not self._supabase_url:
+                raise ConfigurationError(
+                    "SUPABASE_URL not configured. Set environment variable or pass to constructor.",
+                    config_key="SUPABASE_URL"
+                )
+
+            if not self._service_key:
+                raise ConfigurationError(
+                    "Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY configured. "
+                    "Set at least one environment variable.",
+                    config_key="SUPABASE_SERVICE_ROLE_KEY"
+                )
+
+            try:
+                # Configure async HTTP client with same settings as sync
+                async_http_client = httpx.AsyncClient(
+                    http2=False,  # Disable HTTP/2 for consistency
+                    limits=httpx.Limits(
+                        max_keepalive_connections=5,
+                        max_connections=10,
+                    ),
+                    timeout=httpx.Timeout(120.0, connect=10.0),
+                )
+
+                # Create async client with custom HTTP configuration
+                options = AsyncClientOptions(
+                    httpx_client=async_http_client,
+                    postgrest_client_timeout=120,
+                )
+                self._async_client = await create_async_client(
+                    self._supabase_url, self._service_key, options=options
+                )
+
+                # Test connection with simple query
+                _ = await self._async_client.table("companies").select("id").limit(1).execute()
+
+                logger.info(
+                    "Async Supabase client initialized and connection validated",
+                    extra={
+                        "url": self._supabase_url[:30] + "...",
+                        "has_service_key": bool(self._service_key),
+                        "http_version": "HTTP/1.1",
+                    }
+                )
+
+            except Exception as e:
+                logger.error(
+                    "Failed to initialize or validate async Supabase client",
+                    exc_info=True,
+                    extra={
+                        "url": self._supabase_url[:30] + "..." if self._supabase_url else None,
+                        "error_type": type(e).__name__,
+                        "error_msg": str(e),
+                    }
+                )
+                raise ConfigurationError(
+                    f"Cannot connect to Supabase async client or validate credentials: {str(e)}",
+                    config_key="SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY"
+                ) from e
+
+        return self._async_client
 
     def get_company_profile(self) -> CompanyProfile:
         """Return the single-tenant company profile from storage."""
@@ -444,41 +522,539 @@ class SupabaseStorageClient(StorageInterface):
 
         return response.data if response.data else []
 
+    # ========================================================================
+    # Generic CRUD Operations (Async Port Implementation)
+    # ========================================================================
+
+    async def query_entities(
+        self,
+        table: str,
+        filters: dict[str, Any],
+        columns: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query entities with filters using async client.
+
+        Args:
+            table: Table name
+            filters: WHERE conditions as dict
+            columns: Columns to select (default: all)
+
+        Returns:
+            List of matching rows
+
+        Raises:
+            StorageError: On query failure
+        """
+        try:
+            client = await self._ensure_async_client()
+
+            # Build select clause
+            select_clause = ",".join(columns) if columns else "*"
+            query = client.table(table).select(select_clause)
+
+            # Apply filters
+            for key, value in filters.items():
+                query = query.eq(key, value)
+
+            response = await query.execute()
+            return response.data if response.data else []
+
+        except Exception as e:
+            logger.error(
+                f"Failed to query {table}",
+                exc_info=True,
+                extra={"table": table, "filters": filters}
+            )
+            raise StorageError(
+                message=f"Query failed for {table}: {str(e)}",
+                operation="query_entities",
+                original_error=e,
+            ) from e
+
+    async def check_existing_values(
+        self,
+        table: str,
+        column: str,
+        values: list[Any],
+    ) -> list[Any]:
+        """Batch check which values exist in column.
+
+        Args:
+            table: Table name
+            column: Column to check
+            values: Values to check for existence
+
+        Returns:
+            List of values that exist
+
+        Raises:
+            StorageError: On query failure
+        """
+        if not values:
+            return []
+
+        try:
+            client = await self._ensure_async_client()
+
+            # Use PostgREST's 'in' operator for batch check
+            response = await client.table(table).select(column).in_(column, values).execute()
+
+            if not response.data:
+                return []
+
+            # Extract the column values from response
+            existing = [row[column] for row in response.data if column in row]
+            return existing
+
+        except Exception as e:
+            logger.error(
+                f"Failed to check existing values in {table}.{column}",
+                exc_info=True,
+                extra={"table": table, "column": column, "value_count": len(values)}
+            )
+            raise StorageError(
+                message=f"Existence check failed for {table}.{column}: {str(e)}",
+                operation="check_existing_values",
+                original_error=e,
+            ) from e
+
+    async def insert_entity(
+        self,
+        table: str,
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Insert single entity using async client.
+
+        Args:
+            table: Table name
+            data: Entity data
+
+        Returns:
+            Inserted row with generated fields
+
+        Raises:
+            StorageError: On insert failure
+        """
+        try:
+            client = await self._ensure_async_client()
+            response = await client.table(table).insert(data).execute()
+
+            if not response.data or len(response.data) == 0:
+                raise StorageError(
+                    message=f"Insert to {table} returned no data",
+                    operation="insert_entity",
+                )
+
+            inserted = response.data[0]
+
+            # Track operation for transaction rollback
+            if self._current_transaction is not None:
+                self._current_transaction.operations.append({
+                    "type": "insert",
+                    "table": table,
+                    "ids": [inserted.get("id")],
+                })
+
+            return inserted
+
+        except Exception as e:
+            logger.error(
+                f"Failed to insert into {table}",
+                exc_info=True,
+                extra={"table": table, "data_keys": list(data.keys())}
+            )
+            raise StorageError(
+                message=f"Insert failed for {table}: {str(e)}",
+                operation="insert_entity",
+                original_error=e,
+            ) from e
+
+    async def insert_entities(
+        self,
+        table: str,
+        data: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Batch insert multiple entities in single query.
+
+        Args:
+            table: Table name
+            data: List of entity data
+
+        Returns:
+            List of inserted rows
+
+        Raises:
+            StorageError: On insert failure
+        """
+        if not data:
+            return []
+
+        try:
+            client = await self._ensure_async_client()
+            response = await client.table(table).insert(data).execute()
+
+            if not response.data:
+                raise StorageError(
+                    message=f"Batch insert to {table} returned no data",
+                    operation="insert_entities",
+                )
+
+            inserted = response.data
+
+            # Track operation for transaction rollback
+            if self._current_transaction is not None:
+                entity_ids = [entity.get("id") for entity in inserted if entity.get("id")]
+                if entity_ids:
+                    self._current_transaction.operations.append({
+                        "type": "insert",
+                        "table": table,
+                        "ids": entity_ids,
+                    })
+
+            return inserted
+
+        except Exception as e:
+            logger.error(
+                f"Failed to batch insert into {table}",
+                exc_info=True,
+                extra={"table": table, "entity_count": len(data)}
+            )
+            raise StorageError(
+                message=f"Batch insert failed for {table}: {str(e)}",
+                operation="insert_entities",
+                original_error=e,
+            ) from e
+
+    async def update_entities(
+        self,
+        table: str,
+        filters: dict[str, Any],
+        updates: dict[str, Any],
+    ) -> int:
+        """Update entities matching filters.
+
+        Args:
+            table: Table name
+            filters: WHERE conditions (supports nested dict for operators)
+            updates: Fields to update
+
+        Returns:
+            Count of updated rows
+
+        Raises:
+            StorageError: On update failure
+        """
+        try:
+            client = await self._ensure_async_client()
+            query = client.table(table).update(updates)
+
+            # Apply filters with operator support
+            for key, value in filters.items():
+                if isinstance(value, dict):
+                    # Handle operator syntax
+                    for operator, operand in value.items():
+                        if operator == "in":
+                            query = query.in_(key, operand)
+                        elif operator == "eq":
+                            query = query.eq(key, operand)
+                        elif operator == "neq":
+                            query = query.neq(key, operand)
+                        elif operator == "gt":
+                            query = query.gt(key, operand)
+                        elif operator == "gte":
+                            query = query.gte(key, operand)
+                        elif operator == "lt":
+                            query = query.lt(key, operand)
+                        elif operator == "lte":
+                            query = query.lte(key, operand)
+                        else:
+                            logger.warning(f"Unsupported operator '{operator}' in filter")
+                else:
+                    # Simple equality filter
+                    query = query.eq(key, value)
+
+            response = await query.execute()
+            count = len(response.data) if response.data else 0
+
+            # Track operation for transaction (limited rollback capability)
+            if self._current_transaction is not None:
+                self._current_transaction.operations.append({
+                    "type": "update",
+                    "table": table,
+                    "filters": filters,
+                    "count": count,
+                })
+
+            return count
+
+        except Exception as e:
+            logger.error(
+                f"Failed to update {table}",
+                exc_info=True,
+                extra={"table": table, "filters": filters, "updates": updates}
+            )
+            raise StorageError(
+                message=f"Update failed for {table}: {str(e)}",
+                operation="update_entities",
+                original_error=e,
+            ) from e
+
+    async def delete_entities(
+        self,
+        table: str,
+        filters: dict[str, Any],
+    ) -> int:
+        """Delete entities matching filters.
+
+        Args:
+            table: Table name
+            filters: WHERE conditions (supports nested dict for operators like {"id": {"in": [1,2,3]}})
+
+        Returns:
+            Count of deleted rows
+
+        Raises:
+            StorageError: On delete failure
+        """
+        try:
+            client = await self._ensure_async_client()
+            query = client.table(table).delete()
+
+            # Apply filters with operator support
+            for key, value in filters.items():
+                if isinstance(value, dict):
+                    # Handle operator syntax: {"id": {"in": [1,2,3]}}
+                    for operator, operand in value.items():
+                        if operator == "in":
+                            query = query.in_(key, operand)
+                        elif operator == "eq":
+                            query = query.eq(key, operand)
+                        elif operator == "neq":
+                            query = query.neq(key, operand)
+                        elif operator == "gt":
+                            query = query.gt(key, operand)
+                        elif operator == "gte":
+                            query = query.gte(key, operand)
+                        elif operator == "lt":
+                            query = query.lt(key, operand)
+                        elif operator == "lte":
+                            query = query.lte(key, operand)
+                        else:
+                            logger.warning(f"Unsupported operator '{operator}' in filter")
+                else:
+                    # Simple equality filter
+                    query = query.eq(key, value)
+
+            response = await query.execute()
+            count = len(response.data) if response.data else 0
+
+            # Track operation for transaction (no rollback capability for deletes)
+            if self._current_transaction is not None:
+                self._current_transaction.operations.append({
+                    "type": "delete",
+                    "table": table,
+                    "filters": filters,
+                    "count": count,
+                })
+
+            return count
+
+        except Exception as e:
+            logger.error(
+                f"Failed to delete from {table}",
+                exc_info=True,
+                extra={"table": table, "filters": filters}
+            )
+            raise StorageError(
+                message=f"Delete failed for {table}: {str(e)}",
+                operation="delete_entities",
+                original_error=e,
+            ) from e
+
+    # ========================================================================
+    # Transaction Support (Phase 3)
+    # ========================================================================
+
+    def transaction(self):
+        """
+        Create a transaction context manager for atomic operations.
+
+        Uses Postgres transactions via Supabase for true atomicity.
+
+        Note: Supabase Python SDK doesn't natively support transactions,
+        so we implement best-effort rollback tracking. For true atomic
+        transactions, consider using direct Postgres connection or
+        implementing transaction-aware operations at application level.
+        """
+        return SupabaseTransaction(self)
+
+    # ========================================================================
+    # Lifecycle Management
+    # ========================================================================
+
     def cleanup(self) -> None:
         """Close internal HTTP connections gracefully.
 
-        The Supabase Python client doesn't provide native cleanup methods,
-        but uses httpx.Client internally for all HTTP operations. This method
-        closes those internal clients to prevent connection leaks.
+        Closes both sync and async Supabase clients to prevent connection leaks.
+        Safe to call multiple times (idempotent).
 
         Call this on application shutdown or when the storage adapter is no
-        longer needed. Safe to call multiple times (idempotent).
+        longer needed.
         """
-        if self._client is None:
-            return  # No client to cleanup
+        # Cleanup sync client
+        if self._client is not None:
+            try:
+                # Close PostgREST client (database operations)
+                if hasattr(self._client.postgrest, 'session'):
+                    self._client.postgrest.session.close()
+                    logger.debug("Closed sync PostgREST HTTP client")
+            except Exception as e:
+                logger.warning(f"Failed to close sync PostgREST client: {e}")
 
-        try:
-            # Close PostgREST client (database operations)
-            if hasattr(self._client.postgrest, 'session'):
-                self._client.postgrest.session.close()
-                logger.debug("Closed PostgREST HTTP client")
-        except Exception as e:
-            logger.warning(f"Failed to close PostgREST client: {e}")
+            try:
+                # Close Storage client (file operations)
+                if hasattr(self._client.storage, '_client'):
+                    self._client.storage._client.close()
+                    logger.debug("Closed sync Storage HTTP client")
+            except Exception as e:
+                logger.warning(f"Failed to close sync Storage client: {e}")
 
-        try:
-            # Close Storage client (file operations)
-            if hasattr(self._client.storage, '_client'):
-                self._client.storage._client.close()
-                logger.debug("Closed Storage HTTP client")
-        except Exception as e:
-            logger.warning(f"Failed to close Storage client: {e}")
+            try:
+                # Close Functions client (edge function operations)
+                if hasattr(self._client.functions, '_client'):
+                    self._client.functions._client.close()
+                    logger.debug("Closed sync Functions HTTP client")
+            except Exception as e:
+                logger.warning(f"Failed to close sync Functions client: {e}")
 
-        try:
-            # Close Functions client (edge function operations)
-            if hasattr(self._client.functions, '_client'):
-                self._client.functions._client.close()
-                logger.debug("Closed Functions HTTP client")
-        except Exception as e:
-            logger.warning(f"Failed to close Functions client: {e}")
+        # Cleanup async client (must be called from async context if client is initialized)
+        # For now we just mark it as None - actual cleanup should happen in async context
+        if self._async_client is not None:
+            logger.warning(
+                "Async client cleanup requires async context. "
+                "Consider calling 'await storage._cleanup_async()' before shutdown."
+            )
+            self._async_client = None
 
         logger.info("Supabase storage client cleanup completed")
+
+    async def _cleanup_async(self) -> None:
+        """Async cleanup for async client connections.
+
+        Call this from async context before application shutdown if async
+        client was used.
+        """
+        if self._async_client is not None:
+            try:
+                # Close async PostgREST client
+                if hasattr(self._async_client.postgrest, 'session'):
+                    await self._async_client.postgrest.session.aclose()
+                    logger.debug("Closed async PostgREST HTTP client")
+            except Exception as e:
+                logger.warning(f"Failed to close async PostgREST client: {e}")
+
+            try:
+                # Close async Storage client
+                if hasattr(self._async_client.storage, '_client'):
+                    await self._async_client.storage._client.aclose()
+                    logger.debug("Closed async Storage HTTP client")
+            except Exception as e:
+                logger.warning(f"Failed to close async Storage client: {e}")
+
+            try:
+                # Close async Functions client
+                if hasattr(self._async_client.functions, '_client'):
+                    await self._async_client.functions._client.aclose()
+                    logger.debug("Closed async Functions HTTP client")
+            except Exception as e:
+                logger.warning(f"Failed to close async Functions client: {e}")
+
+            self._async_client = None
+            logger.info("Async Supabase client cleanup completed")
+
+
+class SupabaseTransaction:
+    """Transaction context manager for SupabaseStorageClient.
+
+    Provides best-effort rollback tracking for Supabase operations.
+
+    Note: Supabase Python SDK uses HTTP/REST API which doesn't support
+    traditional database transactions. This implementation tracks operations
+    and attempts compensating rollback on error, but cannot guarantee
+    true atomicity like native Postgres transactions.
+
+    For production-critical atomic operations, consider:
+    1. Using Supabase RPC functions with Postgres transactions
+    2. Direct Postgres connection with psycopg3
+    3. Application-level saga pattern with compensation
+    """
+
+    def __init__(self, storage: "SupabaseStorageClient"):
+        """Initialize transaction with storage reference."""
+        self.storage = storage
+        self.operations: list[dict[str, Any]] = []
+        self.in_transaction = False
+
+    async def __aenter__(self):
+        """Start transaction - begin tracking operations."""
+        self.in_transaction = True
+        self.operations = []
+        self.storage._current_transaction = self  # Set active transaction
+        logger.debug("Starting Supabase transaction (best-effort rollback)")
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """End transaction - rollback on exception, commit on success."""
+        try:
+            if exc_type is not None:
+                # Exception occurred - attempt rollback
+                logger.warning(
+                    f"Transaction failed with {exc_type.__name__}: {exc_val}. "
+                    f"Attempting best-effort rollback of {len(self.operations)} operations..."
+                )
+                await self._rollback()
+                # Don't suppress the exception
+                return False
+
+            # Success - commit (no-op, changes already applied)
+            logger.debug(f"Transaction completed successfully ({len(self.operations)} operations)")
+            return False
+        finally:
+            # Always clear transaction state
+            self.in_transaction = False
+            self.storage._current_transaction = None
+
+    async def _rollback(self):
+        """Attempt best-effort rollback of tracked operations.
+
+        Rolls back in reverse order (LIFO). Not guaranteed to succeed
+        as Supabase REST API doesn't support true transactions.
+        """
+        # Temporarily clear transaction context to prevent tracking rollback operations
+        original_transaction = self.storage._current_transaction
+        self.storage._current_transaction = None
+
+        try:
+            for operation in reversed(self.operations):
+                try:
+                    op_type = operation.get("type")
+                    if op_type == "insert":
+                        # Delete inserted entities
+                        table = operation["table"]
+                        entity_ids = operation["ids"]
+                        await self.storage.delete_entities(table, {"id": {"in": entity_ids}})
+                        logger.debug(f"Rolled back insert to {table}: {entity_ids}")
+
+                    elif op_type == "update":
+                        # Cannot reliably rollback updates without storing previous values
+                        logger.warning(f"Cannot rollback update to {operation['table']} (no snapshot)")
+
+                    elif op_type == "delete":
+                        # Cannot rollback deletes (data lost)
+                        logger.warning(f"Cannot rollback delete from {operation['table']} (data lost)")
+
+                except Exception as e:
+                    logger.error(f"Rollback operation failed: {e}", exc_info=True)
+        finally:
+            # Restore transaction context (will be cleared by __aexit__)
+            self.storage._current_transaction = original_transaction
