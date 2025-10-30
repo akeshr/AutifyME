@@ -48,12 +48,21 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     return get_llm(model="gpt-4.1-mini", temperature=0.2)
 
 
-def _load_prompt(company_profile: CompanyProfile, base_context: Any) -> str:
+def _load_prompt(
+    company_profile: CompanyProfile,
+    base_context: Any,
+    channel: MessagingChannel | None = None,
+) -> str:
     """Load and format PM prompt with company context and base context.
 
     Base context is formatted into system prompt so LLM can see the actual data.
     """
     prompt_template = load_prompt("project_manager_intelligent.prompt")
+
+    # Extract platform name from channel (same logic as platform_tools.py)
+    platform_name = "unknown"
+    if channel is not None:
+        platform_name = channel.__class__.__name__.replace("Channel", "").lower()
 
     # Format catalog summary for prompt
     catalog_summary_text = f"""
@@ -76,6 +85,7 @@ def _load_prompt(company_profile: CompanyProfile, base_context: Any) -> str:
         company_name=company_profile.name,
         brand_voice=company_profile.brand_voice,
         target_audience=company_profile.target_audience,
+        platform=platform_name,
     ) + "\n\n" + catalog_summary_text + "\n" + taxonomy_text
 
 
@@ -130,7 +140,7 @@ async def create_project_manager(
 
     # Load intelligent prompt with company context
     # base_context is available to PM via initial_state
-    instructions = _load_prompt(company_profile, base_context)
+    instructions = _load_prompt(company_profile, base_context, channel)
 
     # PM Tools
     pm_tools: list[Any] = []
