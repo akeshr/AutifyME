@@ -71,9 +71,13 @@ Library patterns, prompt engineering, and development practices.
 | Document | Purpose |
 | --- | --- |
 | **[TECH_STACK.md](./tech/TECH_STACK.md)** | Technology choices organized by architecture layer |
+| **[EXECUTABLE_SCHEMA_COMPLETE.md](./tech/EXECUTABLE_SCHEMA_COMPLETE.md)** | ✅ **Phase 2D+2E Complete** - Executable schema + transaction support (76 tests, production-ready) |
 | **[LANGCHAIN_V1_FEATURES.md](./tech/LANGCHAIN_V1_FEATURES.md)** | LangChain v1 native patterns (HITL, error handling, structured outputs) |
 | **[LANGGRAPH_V1_FEATURES.md](./tech/LANGGRAPH_V1_FEATURES.md)** | LangGraph orchestration patterns and gotchas |
 | **[LANGSMITH_FEATURES.md](./tech/LANGSMITH_FEATURES.md)** | LangSmith tracing and debugging |
+| **[GOOGLE_AI_MULTIMODAL_INTEGRATION.md](./tech/GOOGLE_AI_MULTIMODAL_INTEGRATION.md)** | ✅ Complete Google AI infrastructure - Gemini 2.5, image gen (Nano Banana), TTS, video (Veo 3.1), live audio, browser automation |
+| **[GOOGLE_COMPUTER_USE_GUIDE.md](./tech/GOOGLE_COMPUTER_USE_GUIDE.md)** | Browser automation with Gemini Computer Use (optional extension) |
+| **[PROMPT_OPTIMIZATION_TOOLS_ANALYSIS.md](./tech/PROMPT_OPTIMIZATION_TOOLS_ANALYSIS.md)** | Research on prompt optimization tools (Vertex AI, DSPy, cross-provider) |
 | **[PROMPT_ENGINEERING_STANDARDS.md](./tech/PROMPT_ENGINEERING_STANDARDS.md)** | **[CRITICAL]** Prompt design standards (Anthropic best practices) |
 | **[LIBRARY_NATIVE_PATTERNS.md](./tech/LIBRARY_NATIVE_PATTERNS.md)** | Prefer library-native solutions over custom code |
 | **[UV_REPL_BEST_PRACTICES.md](./tech/UV_REPL_BEST_PRACTICES.md)** | API verification workflow using Python REPL |

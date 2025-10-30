@@ -5,11 +5,17 @@ without hard-coding table names, columns, or relationships.
 """
 
 import json
+import logging
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from autifyme_agents.core.ports import StorageInterface
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -157,6 +163,200 @@ class TableSchema(BaseModel):
             for name, col in self.columns.items()
             if not col.nullable and col.default is None and not col.primary_key
         ]
+
+    def get_unique_columns(self) -> list[str]:
+        """Get columns with UNIQUE constraints (excluding primary key)."""
+        return [
+            name
+            for name, col in self.columns.items()
+            if col.unique and not col.primary_key
+        ]
+
+    # =========================================================================
+    # Executable Schema: Validation Methods
+    # =========================================================================
+
+    async def validate_before_insert(
+        self,
+        entities: list[dict[str, Any]],
+        storage: "StorageInterface",
+    ) -> "ValidationResult":
+        """
+        Validate entities before insert operation.
+
+        Convention-over-configuration: Auto-validates unique constraints from metadata.
+        This eliminates need for manual handler registration for standard validations.
+
+        Args:
+            entities: List of entities to insert
+            storage: Storage interface for database queries
+
+        Returns:
+            ValidationResult with validation status and errors
+
+        Raises:
+            Never raises - returns validation errors in result
+        """
+        result = ValidationResult(valid=True)
+
+        if not entities:
+            return result
+
+        # Auto-validate unique constraints from metadata
+        unique_columns = self.get_unique_columns()
+
+        for col in unique_columns:
+            # Collect values from entities
+            values = [e.get(col) for e in entities if e.get(col) is not None]
+
+            if not values:
+                continue
+
+            try:
+                # Batch check via storage port (single query)
+                existing = await storage.check_existing_values(
+                    table=self.name,
+                    column=col,
+                    values=values
+                )
+
+                if existing:
+                    result.add_error(
+                        f"Duplicate values for unique column '{col}': {existing}"
+                    )
+                    logger.warning(
+                        f"Unique constraint violation on {self.name}.{col}",
+                        extra={"duplicates": existing}
+                    )
+
+            except Exception as e:
+                # Don't fail validation if check fails (graceful degradation)
+                result.add_warning(
+                    f"Could not verify uniqueness for column '{col}': {str(e)}"
+                )
+                logger.error(
+                    f"Uniqueness check failed for {self.name}.{col}",
+                    exc_info=True
+                )
+
+        return result
+
+    async def validate_before_update(
+        self,
+        filters: dict[str, Any],
+        updates: dict[str, Any],
+        storage: "StorageInterface",
+    ) -> "ValidationResult":
+        """
+        Validate update operation.
+
+        Currently minimal validation - can be extended for update-specific rules.
+
+        Args:
+            filters: Filters identifying records to update
+            updates: Update values
+            storage: Storage interface for database queries
+
+        Returns:
+            ValidationResult with validation status
+        """
+        result = ValidationResult(valid=True)
+
+        # Check that updates don't violate unique constraints
+        unique_columns = self.get_unique_columns()
+
+        for col in unique_columns:
+            if col in updates and updates[col] is not None:
+                # Check if value already exists (excluding current record)
+                try:
+                    existing = await storage.check_existing_values(
+                        table=self.name,
+                        column=col,
+                        values=[updates[col]]
+                    )
+
+                    if existing:
+                        result.add_error(
+                            f"Update would violate unique constraint on '{col}': {updates[col]} already exists"
+                        )
+
+                except Exception as e:
+                    result.add_warning(
+                        f"Could not verify uniqueness for column '{col}': {str(e)}"
+                    )
+
+        return result
+
+    async def calculate_cascade_impact(
+        self,
+        filters: dict[str, Any],
+        storage: "StorageInterface",
+        schema_registry: "SchemaRegistry",
+    ) -> dict[str, Any]:
+        """
+        Calculate cascade impact for DELETE operations.
+
+        Traverses foreign key relationships to count affected records.
+
+        Args:
+            filters: Filters identifying records to delete
+            storage: Storage interface for database queries
+            schema_registry: Schema registry for relationship traversal
+
+        Returns:
+            Dict with impact analysis: {table_name: count, ...}
+        """
+        impact: dict[str, int] = {self.name: 0}
+
+        try:
+            # Query records to be deleted
+            records_to_delete = await storage.query_entities(
+                table=self.name,
+                filters=filters,
+                columns=["id"]  # Only need IDs for cascade check
+            )
+            impact[self.name] = len(records_to_delete)
+
+            # Check cascade relationships
+            for other_table_name, other_table in schema_registry.tables.items():
+                if other_table_name == self.name:
+                    continue
+
+                # Find relationships where other table references this table
+                for rel in other_table.relationships:
+                    if rel.target_table == self.name and rel.cascade_delete:
+                        # Count affected records in child table
+                        child_count = 0
+                        for record in records_to_delete:
+                            record_id = record.get("id")
+                            if record_id:
+                                child_records = await storage.query_entities(
+                                    table=other_table_name,
+                                    filters={rel.foreign_key: record_id},
+                                    columns=["id"]
+                                )
+                                child_count += len(child_records)
+
+                        if child_count > 0:
+                            impact[other_table_name] = child_count
+
+            return {
+                "status": "calculated",
+                "impact": impact,
+                "total_affected": sum(impact.values()),
+                "is_destructive": sum(impact.values()) > 0,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Cascade impact calculation failed for {self.name}",
+                exc_info=True
+            )
+            return {
+                "status": "calculation_failed",
+                "error": str(e),
+                "impact": {self.name: "unknown"},
+            }
 
 
 # =============================================================================

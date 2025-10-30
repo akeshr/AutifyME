@@ -203,6 +203,182 @@ class StorageInterface(ABC):
         pass
 
     # ========================================================================
+    # Generic CRUD Operations (Hexagonal Architecture - Port Methods)
+    # ========================================================================
+
+    @abstractmethod
+    async def query_entities(
+        self,
+        table: str,
+        filters: dict[str, Any],
+        columns: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Query entities with filters.
+
+        Args:
+            table: Table name
+            filters: WHERE conditions as dict (e.g., {"is_active": True})
+            columns: Columns to select (default: all columns)
+
+        Returns:
+            List of matching rows as dicts
+
+        Example:
+            rows = await storage.query_entities(
+                "products",
+                {"product_family_id": family_id, "is_active": True},
+                ["id", "sku_code", "name"]
+            )
+        """
+        pass
+
+    @abstractmethod
+    async def check_existing_values(
+        self,
+        table: str,
+        column: str,
+        values: list[Any],
+    ) -> list[Any]:
+        """
+        Batch check which values exist in a column.
+
+        Eliminates N+1 queries for uniqueness validation.
+
+        Args:
+            table: Table name
+            column: Column to check
+            values: List of values to check for existence
+
+        Returns:
+            List of values that already exist in the table
+
+        Example:
+            # Check which SKUs already exist
+            existing_skus = await storage.check_existing_values(
+                "products", "sku_code", ["SKU-001", "SKU-002", "SKU-003"]
+            )
+            # Returns ["SKU-001"] if only SKU-001 exists
+        """
+        pass
+
+    @abstractmethod
+    async def insert_entity(
+        self,
+        table: str,
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Insert single entity.
+
+        Args:
+            table: Table name
+            data: Entity data to insert
+
+        Returns:
+            Inserted row with generated fields (id, created_at, etc.)
+
+        Raises:
+            StorageError: On insert failure
+        """
+        pass
+
+    @abstractmethod
+    async def insert_entities(
+        self,
+        table: str,
+        data: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """
+        Batch insert multiple entities in single query.
+
+        Args:
+            table: Table name
+            data: List of entity data to insert
+
+        Returns:
+            List of inserted rows with generated fields
+
+        Raises:
+            StorageError: On insert failure
+        """
+        pass
+
+    @abstractmethod
+    async def update_entities(
+        self,
+        table: str,
+        filters: dict[str, Any],
+        updates: dict[str, Any],
+    ) -> int:
+        """
+        Update entities matching filters.
+
+        Args:
+            table: Table name
+            filters: WHERE conditions as dict
+            updates: Fields to update
+
+        Returns:
+            Count of updated rows
+
+        Raises:
+            StorageError: On update failure
+        """
+        pass
+
+    @abstractmethod
+    async def delete_entities(
+        self,
+        table: str,
+        filters: dict[str, Any],
+    ) -> int:
+        """
+        Delete entities matching filters.
+
+        Args:
+            table: Table name
+            filters: WHERE conditions as dict
+
+        Returns:
+            Count of deleted rows
+
+        Raises:
+            StorageError: On delete failure
+        """
+        pass
+
+    # ========================================================================
+    # Transaction Support (Phase 3)
+    # ========================================================================
+
+    @abstractmethod
+    def transaction(self):
+        """
+        Create a transaction context manager for atomic operations.
+
+        Usage:
+            async with storage.transaction():
+                family = await storage.insert_entity("product_families", data)
+                axes = await storage.insert_entities("variant_axes", axes_data)
+                products = await storage.insert_entities("products", products_data)
+                # Auto-rollback on any exception
+
+        Returns:
+            Async context manager for transaction handling
+
+        Raises:
+            StorageError: On transaction failure
+
+        Notes:
+            - All operations within the context are atomic (all-or-nothing)
+            - Exceptions trigger automatic rollback
+            - Nested transactions may not be supported (adapter-specific)
+            - Adapters without transaction support should provide best-effort rollback
+        """
+        pass
+
+    # ========================================================================
     # Lifecycle Management
     # ========================================================================
 

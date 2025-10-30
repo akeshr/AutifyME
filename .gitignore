@@ -45,6 +45,7 @@ agents/venv/
 .coverage
 htmlcov/
 .tox/
+.hypothesis/
 
 # Jupyter Notebooks
 .ipynb_checkpoints

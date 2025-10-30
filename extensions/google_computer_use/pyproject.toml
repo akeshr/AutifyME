@@ -1,0 +1,40 @@
+[project]
+name = "autifyme-google-computer-use"
+version = "0.1.0"
+description = "Optional Google Computer Use extension for AutifyME - Browser automation with Gemini 2.5"
+authors = [{ name = "Abhi" }]
+requires-python = ">=3.12"
+readme = "README.md"
+
+dependencies = [
+    "google-generativeai>=0.8.0",
+]
+
+[project.optional-dependencies]
+# Playwright executor (heavy dependency - install only when needed)
+playwright = [
+    "playwright>=1.40.0",
+]
+
+# Development dependencies
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/autifyme"
+Documentation = "https://github.com/yourusername/autifyme/tree/main/extensions/google_computer_use"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = ["*.py"]
+
+[tool.hatch.build.targets.wheel]
+# Package the current directory as google_computer_use
+only-include = ["__init__.py", "agent.py", "playwright_executor.py"]
+# Map to google_computer_use package
+sources = {"" = "google_computer_use"}

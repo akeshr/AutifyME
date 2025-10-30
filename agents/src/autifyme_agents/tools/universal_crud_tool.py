@@ -21,7 +21,6 @@ from typing import Any
 from langchain.tools import tool
 from langchain_core.tools import ToolException
 
-from autifyme_agents.core.business_rules import BusinessRuleHandlers
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.operation_intent import (
     ExecutionResult,
@@ -30,7 +29,6 @@ from autifyme_agents.schemas.operation_intent import (
     OperationIntent,
 )
 from autifyme_agents.schemas.registry import (
-    BusinessRuleTrigger,
     SchemaRegistry,
     SchemaValidator,
 )
@@ -62,7 +60,6 @@ class OperationExecutor:
         self.storage = storage
         self.schema = schema
         self.validator = SchemaValidator(schema)
-        self.business_rules = BusinessRuleHandlers(storage, schema)
 
     async def execute_plan(
         self,
@@ -293,6 +290,22 @@ class OperationExecutor:
         if not operation.new_entities:
             return {"ids": {}, "count": 0}
 
+        # Schema-driven validation: Auto-validate unique constraints from metadata
+        logger.debug(f"Validating {len(operation.new_entities)} entities for {table_schema.name}")
+        schema_validation = await table_schema.validate_before_insert(
+            operation.new_entities,
+            self.storage
+        )
+        if not schema_validation.valid:
+            raise ToolException(
+                f"Schema validation failed for {table_schema.name}: {schema_validation.errors}"
+            )
+        if schema_validation.warnings:
+            logger.warning(
+                f"Schema validation warnings for {table_schema.name}",
+                extra={"warnings": schema_validation.warnings}
+            )
+
         inserted_entities = {}
         last_result = None
 
@@ -310,28 +323,8 @@ class OperationExecutor:
                     f"Validation failed for {table_schema.name}: {validation.errors}"
                 )
 
-            # BEFORE_INSERT business rules
-            rule_context = {
-                "operation": operation,
-                "table": table_schema.name,
-                "entities": [resolved_entity],
-            }
-            self.business_rules.execute_rules_for_trigger(
-                table_schema.name,
-                BusinessRuleTrigger.BEFORE_INSERT,
-                rule_context,
-            )
-
             # Insert entity
             result = await self._insert_entity(table_schema.name, resolved_entity)
-
-            # AFTER_INSERT business rules
-            rule_context["inserted_entity"] = result
-            self.business_rules.execute_rules_for_trigger(
-                table_schema.name,
-                BusinessRuleTrigger.AFTER_INSERT,
-                rule_context,
-            )
 
             # Store result for tracking
             last_result = result
@@ -380,6 +373,22 @@ class OperationExecutor:
         # Auto-populate updated_at timestamp if table has it
         resolved_updates = self._populate_timestamps(table_schema, resolved_updates, is_update=True)
 
+        # Schema-driven validation: Validate unique constraints on updates
+        schema_validation = await table_schema.validate_before_update(
+            resolved_filter,
+            resolved_updates,
+            self.storage
+        )
+        if not schema_validation.valid:
+            raise ToolException(
+                f"Update validation failed for {table_schema.name}: {schema_validation.errors}"
+            )
+        if schema_validation.warnings:
+            logger.warning(
+                f"Update validation warnings for {table_schema.name}",
+                extra={"warnings": schema_validation.warnings}
+            )
+
         # Update entities
         count = await self._update_entities(
             table_schema.name, resolved_filter, resolved_updates
@@ -409,13 +418,55 @@ class OperationExecutor:
 
         resolved_filter = self._resolve_references(operation.delete_filter, context)
 
-        if operation.soft_delete:
-            # Soft delete - mark as inactive
-            count = await self._update_entities(
-                table_schema.name,
-                resolved_filter,
-                {"is_active": False, "deleted_at": "now()"}
+        # Schema-driven cascade impact calculation
+        impact_result = await table_schema.calculate_cascade_impact(
+            resolved_filter,
+            self.storage,
+            self.schema
+        )
+        if impact_result.get("status") == "calculated":
+            logger.info(
+                f"Cascade impact for {table_schema.name}",
+                extra={
+                    "impact": impact_result.get("impact", {}),
+                    "total_affected": impact_result.get("total_affected", 0),
+                    "is_destructive": impact_result.get("is_destructive", False)
+                }
             )
+        elif impact_result.get("status") == "calculation_failed":
+            logger.warning(
+                f"Cascade impact calculation failed for {table_schema.name}",
+                extra={"error": impact_result.get("error")}
+            )
+
+        if operation.soft_delete:
+            # Soft delete - mark as inactive (schema-aware)
+            # Only set columns that exist in the table schema
+            updates = {}
+
+            # Check if table has is_active column
+            if "is_active" in table_schema.columns:
+                updates["is_active"] = False
+
+            # Check if table has deleted_at column
+            if "deleted_at" in table_schema.columns:
+                # Use proper ISO timestamp instead of string literal "now()"
+                from datetime import UTC, datetime
+                updates["deleted_at"] = datetime.now(UTC).isoformat()
+
+            # If no soft-delete columns exist, fall back to hard delete
+            if not updates:
+                logger.warning(
+                    f"Table {table_schema.name} has no soft-delete columns (is_active, deleted_at). "
+                    f"Performing hard delete instead."
+                )
+                count = await self._delete_entities(table_schema.name, resolved_filter)
+            else:
+                count = await self._update_entities(
+                    table_schema.name,
+                    resolved_filter,
+                    updates
+                )
         else:
             # Hard delete
             count = await self._delete_entities(table_schema.name, resolved_filter)
@@ -691,6 +742,8 @@ class OperationExecutor:
     async def _insert_entity(self, table: str, entity: dict[str, Any]) -> dict[str, Any]:
         """Insert single entity and return created record with ID.
 
+        Uses storage port method (no direct adapter access).
+
         Args:
             table: Table name
             entity: Entity data to insert
@@ -702,13 +755,8 @@ class OperationExecutor:
             ToolException: On insert failure
         """
         try:
-            client = self.storage._ensure_client()
-            result = client.table(table).insert(entity).execute()
-
-            if not result.data or len(result.data) == 0:
-                raise ToolException(f"Insert to {table} returned no data")
-
-            return result.data[0]  # Return first inserted record
+            # Use port method instead of direct Supabase client access
+            return await self.storage.insert_entity(table, entity)
         except Exception as e:
             logger.error(f"Failed to insert into {table}", exc_info=True)
             raise ToolException(f"Insert failed for {table}: {str(e)}") from e
@@ -717,6 +765,8 @@ class OperationExecutor:
         self, table: str, filter: dict[str, Any], updates: dict[str, Any]
     ) -> int:
         """Update entities matching filter and return count.
+
+        Uses storage port method (no direct adapter access).
 
         Args:
             table: Table name
@@ -730,21 +780,16 @@ class OperationExecutor:
             ToolException: On update failure
         """
         try:
-            client = self.storage._ensure_client()
-            query = client.table(table).update(updates)
-
-            # Apply filters
-            for key, value in filter.items():
-                query = query.eq(key, value)
-
-            result = query.execute()
-            return len(result.data) if result.data else 0
+            # Use port method instead of direct Supabase client access
+            return await self.storage.update_entities(table, filter, updates)
         except Exception as e:
             logger.error(f"Failed to update {table}", exc_info=True)
             raise ToolException(f"Update failed for {table}: {str(e)}") from e
 
     async def _delete_entities(self, table: str, filter: dict[str, Any]) -> int:
         """Delete entities matching filter and return count.
+
+        Uses storage port method (no direct adapter access).
 
         Args:
             table: Table name
@@ -757,15 +802,8 @@ class OperationExecutor:
             ToolException: On delete failure
         """
         try:
-            client = self.storage._ensure_client()
-            query = client.table(table).delete()
-
-            # Apply filters
-            for key, value in filter.items():
-                query = query.eq(key, value)
-
-            result = query.execute()
-            return len(result.data) if result.data else 0
+            # Use port method instead of direct Supabase client access
+            return await self.storage.delete_entities(table, filter)
         except Exception as e:
             logger.error(f"Failed to delete from {table}", exc_info=True)
             raise ToolException(f"Delete failed for {table}: {str(e)}") from e
