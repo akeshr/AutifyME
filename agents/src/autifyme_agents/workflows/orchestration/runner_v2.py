@@ -273,15 +273,30 @@ class WorkflowRunner:
                 logger.warning("No result from PM - cannot send response", extra={"thread_id": thread_id})
                 return
 
-            # Debug: Log result structure
+            # Debug: Log result structure and message details
             messages = result.get("messages", [])
-            logger.debug(
-                "PM result received",
+
+            # Log message types and content preview
+            message_details = []
+            for i, msg in enumerate(messages[-5:]):  # Last 5 messages
+                msg_type = getattr(msg, "type", None) or getattr(msg, "__class__", type(msg)).__name__
+                content_preview = str(getattr(msg, "content", ""))[:100] if hasattr(msg, "content") else "NO_CONTENT"
+                tool_calls = getattr(msg, "tool_calls", None)
+                message_details.append({
+                    "index": len(messages) - 5 + i if len(messages) > 5 else i,
+                    "type": msg_type,
+                    "content_preview": content_preview,
+                    "has_tool_calls": bool(tool_calls) if tool_calls is not None else None,
+                })
+
+            logger.info(
+                "PM result received - analyzing messages",
                 extra={
                     "thread_id": thread_id,
                     "has_messages": bool(messages),
                     "message_count": len(messages),
                     "result_keys": list(result.keys()) if isinstance(result, dict) else None,
+                    "last_messages": message_details,
                 }
             )
 
@@ -303,6 +318,7 @@ class WorkflowRunner:
                     extra={
                         "thread_id": thread_id,
                         "message_count": len(messages),
+                        "last_5_messages_details": message_details,
                     }
                 )
 
