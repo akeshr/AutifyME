@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -50,6 +51,7 @@ class SupabaseStorageClient(StorageInterface):
         self._service_key = derived_key
         self._client: Client | None = client
         self._async_client: AsyncClient | None = None  # Async client for non-blocking ops
+        self._async_client_loop: asyncio.AbstractEventLoop | None = None  # Track which loop owns client
         self._current_transaction: SupabaseTransaction | None = None  # Track active transaction
 
     def __enter__(self) -> SupabaseStorageClient:
@@ -155,13 +157,44 @@ class SupabaseStorageClient(StorageInterface):
         Async client enables non-blocking I/O for CRUD operations in LangGraph workflows.
         Uses same credentials as sync client but with async/await semantics.
 
+        Event Loop Awareness:
+        Detects when running in a different event loop (e.g., Lambda container reuse)
+        and automatically recreates the client to prevent "Event loop is closed" errors.
+
         Returns:
             Initialized and validated async Supabase client
 
         Raises:
             ConfigurationError: If credentials are missing or invalid
         """
-        if self._async_client is None:
+        # Get current event loop
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop - this shouldn't happen in async context
+            current_loop = None
+
+        # Check if client exists AND was created in current loop
+        needs_new_client = (
+            self._async_client is None
+            or self._async_client_loop is None
+            or self._async_client_loop != current_loop
+        )
+
+        if needs_new_client:
+            # Cleanup old client if exists (from different loop)
+            if self._async_client is not None:
+                logger.debug(
+                    "Event loop changed - cleaning up old async client",
+                    extra={
+                        "old_loop": id(self._async_client_loop) if self._async_client_loop else None,
+                        "new_loop": id(current_loop) if current_loop else None
+                    }
+                )
+                # Safe cleanup: just nullify, let GC handle httpx connections
+                # (avoid calling aclose() on closed loop)
+                self._async_client = None
+                self._async_client_loop = None
             # Validate credentials (same validation as sync client)
             if not self._supabase_url:
                 raise ConfigurationError(
@@ -196,6 +229,9 @@ class SupabaseStorageClient(StorageInterface):
                     self._supabase_url, self._service_key, options=options
                 )
 
+                # Store which loop owns this client
+                self._async_client_loop = current_loop
+
                 # Test connection with simple query
                 _ = await self._async_client.table("companies").select("id").limit(1).execute()
 
@@ -205,6 +241,7 @@ class SupabaseStorageClient(StorageInterface):
                         "url": self._supabase_url[:30] + "...",
                         "has_service_key": bool(self._service_key),
                         "http_version": "HTTP/1.1",
+                        "event_loop_id": id(current_loop) if current_loop else None,
                     }
                 )
 
@@ -1047,14 +1084,14 @@ class SupabaseStorageClient(StorageInterface):
             except Exception as e:
                 logger.warning(f"Failed to close sync Functions client: {e}")
 
-        # Cleanup async client (must be called from async context if client is initialized)
-        # For now we just mark it as None - actual cleanup should happen in async context
+        # Cleanup async client - safe nullification (GC handles httpx connections)
+        # Explicit cleanup via _cleanup_async() is better but not required
         if self._async_client is not None:
-            logger.warning(
-                "Async client cleanup requires async context. "
-                "Consider calling 'await storage._cleanup_async()' before shutdown."
+            logger.debug(
+                "Async client cleanup - nullifying references for GC"
             )
             self._async_client = None
+            self._async_client_loop = None
 
         logger.info("Supabase storage client cleanup completed")
 
@@ -1090,6 +1127,7 @@ class SupabaseStorageClient(StorageInterface):
                 logger.warning(f"Failed to close async Functions client: {e}")
 
             self._async_client = None
+            self._async_client_loop = None
             logger.info("Async Supabase client cleanup completed")
 
 
