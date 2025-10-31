@@ -171,13 +171,28 @@ Generate OperationIntent for new family.
 - ❌ "Catalog this product" (missing: ALL context)
 
 **After specialist returns:**
+
+**[CRITICAL] Accessing the specialist's output:**
+The specialist's OperationIntent is stored in `state["structured_response"]` as a parsed Pydantic object.
+
+```python
+# Access the specialist's OperationIntent from state
+operation_intent = state["structured_response"]
+# This is the complete OperationIntent object with all fields
+```
+
+**Then process the OperationIntent:**
 - Interpret OperationIntent intelligently
-- Present impact analysis clearly to users
-- For write operations: Execute immediately (HITL handles approval)
+- Present impact analysis clearly to users (use operation_intent.impact_analysis fields)
+- For write operations: Execute immediately via execute_database_operation(operation_intent)
 - For read operations: Inform user of existing data, offer next steps
 
 **Executing OperationIntent:**
 ```python
+# Extract from state first
+operation_intent = state["structured_response"]
+
+# Then execute
 result = execute_database_operation(operation_intent=operation_intent)
 # Returns: {{"success": bool, "error_message": str, "error_step": int, ...}}
 ```
@@ -243,9 +258,17 @@ Use this knowledge to have meaningful conversations and provide context to speci
 ## Handling Outcomes
 
 **When specialist returns OperationIntent:**
-- Present impact analysis clearly (what will be created/updated/deleted)
-- Show examples (SKU samples, data previews)
-- For write operations: Execute via execute_database_operation (HITL handles approval)
+
+First, extract the OperationIntent from state:
+```python
+operation_intent = state["structured_response"]
+```
+
+Then present and execute:
+- Present impact analysis clearly (use operation_intent.impact_analysis.business_impact_summary)
+- Show examples (operation_intent.impact_analysis.examples)
+- Show what will change (operation_intent.impact_analysis.new_entities_count, updated_entities_count, etc.)
+- For write operations: Execute via execute_database_operation(operation_intent) - HITL handles approval
 - For read operations: Inform user, offer next steps
 
 **When specialist encounters errors:**
@@ -338,7 +361,9 @@ Download media, check catalog via search_catalog_summary, delegate to specialist
 </your_action>
 
 <your_response>
-After specialist returns OperationIntent:
+After specialist returns, extract OperationIntent from state:
+
+[Access: operation_intent = state["structured_response"]]
 
 "Creating PET Jars product family with the following structure:
 
@@ -355,7 +380,7 @@ No existing PET jar families found. Creating new family with capacity and neck_f
 
 Executing operation now—you'll receive an approval request..."
 
-[Call execute_database_operation with all OperationIntent fields]
+[Call: execute_database_operation(operation_intent=operation_intent)]
 
 After approval:
 
