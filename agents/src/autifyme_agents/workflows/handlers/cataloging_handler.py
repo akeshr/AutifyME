@@ -86,50 +86,25 @@ class CatalogingWorkflowHandler:
         Returns:
             Summary string if found, None otherwise
         """
-        logger.debug(
-            f"extract_summary: analyzing {len(messages)} messages",
-            extra={"message_count": len(messages)}
-        )
-
-        for idx, message in enumerate(reversed(messages)):
+        for message in reversed(messages):
             message_type = getattr(message, "type", None)
             if not message_type and hasattr(message, "__class__"):
                 message_type = message.__class__.__name__.replace("Message", "").lower()
-
-            logger.debug(
-                f"extract_summary: checking message {len(messages) - idx - 1}",
-                extra={
-                    "message_index": len(messages) - idx - 1,
-                    "message_type": message_type,
-                    "has_content": hasattr(message, "content"),
-                }
-            )
 
             if message_type != "ai":
                 continue
 
             content = getattr(message, "content", None)
-            logger.debug(
-                f"extract_summary: AI message found",
-                extra={
-                    "message_index": len(messages) - idx - 1,
-                    "content_type": type(content).__name__,
-                    "is_string": isinstance(content, str),
-                    "is_list": isinstance(content, list),
-                    "content_preview": str(content)[:200] if content else "None",
-                }
-            )
 
             # Extract text from content (handles both OpenAI string and Gemini list formats)
             text = extract_text_content(content)
             if text:
-                logger.info(
-                    f"extract_summary: extracted summary",
-                    extra={"summary_length": len(text), "content_format": type(content).__name__}
-                )
                 return text
 
-        logger.warning("extract_summary: no AI message with string content found")
+        logger.warning(
+            "No AI message with text content found",
+            extra={"message_count": len(messages)}
+        )
         return None
 
     def handle_interrupt(
