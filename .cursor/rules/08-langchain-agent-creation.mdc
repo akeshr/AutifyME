@@ -1,5 +1,5 @@
 ---
-globs: "agents/src/autifyme_agents/departments/**/*.py,agents/src/autifyme_agents/workflows/**/*.py"
+alwaysApply: false
 ---
 # Rule: LangChain v1 Agent Creation
 

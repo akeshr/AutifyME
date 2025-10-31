@@ -1,5 +1,5 @@
 ---
-globs: "agents/src/autifyme_agents/tools/**/*.py,agents/src/autifyme_agents/core/middleware.py"
+alwaysApply: false
 ---
 # Rule: Middleware for Cross-Cutting Concerns in Tools
 
