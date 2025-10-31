@@ -1,5 +1,5 @@
 ---
-globs: "agents/src/autifyme_agents/specialists/**/*.py"
+alwaysApply: false
 ---
 # Rule: Multimodal Prompts (Vision/Audio)
 

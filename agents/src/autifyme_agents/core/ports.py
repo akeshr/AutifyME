@@ -239,6 +239,7 @@ class StorageInterface(ABC):
         table: str,
         column: str,
         values: list[Any],
+        exclude_ids: list[Any] | None = None,
     ) -> list[Any]:
         """
         Batch check which values exist in a column.
@@ -249,6 +250,8 @@ class StorageInterface(ABC):
             table: Table name
             column: Column to check
             values: List of values to check for existence
+            exclude_ids: Optional list of record IDs to exclude from check
+                        (enables idempotent update validation)
 
         Returns:
             List of values that already exist in the table
@@ -259,6 +262,69 @@ class StorageInterface(ABC):
                 "products", "sku_code", ["SKU-001", "SKU-002", "SKU-003"]
             )
             # Returns ["SKU-001"] if only SKU-001 exists
+
+            # Check uniqueness for update (exclude record being updated)
+            existing_skus = await storage.check_existing_values(
+                "products", "sku_code", ["SKU-001"],
+                exclude_ids=["uuid-123"]
+            )
+            # Returns [] if SKU-001 only exists on record uuid-123
+        """
+        pass
+
+    @abstractmethod
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: bool = False,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]] | int:
+        """
+        Advanced query with relations, pattern matching, and counting.
+
+        Supports complex queries needed by middleware and tools without
+        requiring direct adapter access.
+
+        Args:
+            table: Table name
+            filters: Exact match filters (e.g., {"is_active": True})
+            columns: Columns to select (default: all columns)
+            relations: Related tables to include using PostgREST syntax
+                      (e.g., ["categories(*)", "variant_axes(variant_values(*))"])
+            search_patterns: Case-insensitive LIKE patterns
+                            (e.g., {"name": "%bottle%", "brand": "%acme%"})
+            count_only: If True, return count instead of rows
+            limit: Maximum rows to return
+
+        Returns:
+            List of matching rows (as dicts) if count_only=False, else int count
+
+        Example:
+            # Query with relations
+            families = await storage.query_advanced(
+                "product_families",
+                filters={"is_active": True},
+                relations=["categories(*)", "variant_axes(*)"],
+                limit=10
+            )
+
+            # Search with ILIKE
+            families = await storage.query_advanced(
+                "product_families",
+                search_patterns={"name": "%bottle%"},
+                columns=["id", "name", "sku_prefix"]
+            )
+
+            # Get count
+            count = await storage.query_advanced(
+                "products",
+                filters={"product_family_id": family_id},
+                count_only=True
+            )
         """
         pass
 
@@ -353,7 +419,7 @@ class StorageInterface(ABC):
     # ========================================================================
 
     @abstractmethod
-    def transaction(self):
+    def transaction(self) -> Any:
         """
         Create a transaction context manager for atomic operations.
 

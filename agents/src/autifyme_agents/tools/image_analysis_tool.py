@@ -9,15 +9,18 @@ from product images. Returns structured ImageAnalysisResult.
 import base64
 import io
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from langchain.tools import tool
-from langchain_core.tools import ToolException
 from PIL import Image
 from pydantic import Field
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
+from autifyme_agents.core.tool_error_handler import (
+    build_agent_error_response,
+    build_success_response,
+)
 
 # Vision model optimal dimensions (OpenAI recommends max 2048px)
 MAX_DIMENSION = 2048
@@ -96,7 +99,7 @@ def image_analysis_tool(
         str,
         Field(description="File path to product image (e.g., '/tmp/media_downloads/product.jpg')")
     ],
-) -> ImageAnalysisResult:
+) -> dict[str, Any]:
     """Analyze product image to extract visual attributes using Vision API.
 
     Extracts colors, materials, style tags, dimensions, and generates detailed
@@ -106,21 +109,20 @@ def image_analysis_tool(
         image_path: Path to image file on local filesystem
 
     Returns:
-        ImageAnalysisResult with visual description, colors, materials, style, etc.
-
-    Raises:
-        ToolException: When image analysis fails, enabling LLM self-healing
+        Dict with analysis results or error:
+        - On success: {"success": True, "visual_description": str, "identified_colors": [...], "identified_materials": [...], ...}
+        - On error: {"success": False, "error": str, "error_type": str, "image_path": str}
 
     Example:
         >>> result = image_analysis_tool("/tmp/product.jpg")
-        >>> print(result.visual_description)
+        >>> print(result["visual_description"])
         "Blue leather sneakers with white sole..."
-        >>> print(result.identified_colors)
+        >>> print(result["identified_colors"])
         ["blue", "white"]
     """
     try:
         # Get vision-capable LLM
-        llm = get_llm(provider="openai", model="gpt-5-mini")
+        llm = get_llm(provider="google", model="gemini-2.5-flash")
 
         # Convert image to base64 data URI
         image_uri = _encode_image_to_base64_uri(image_path)
@@ -159,28 +161,43 @@ Be specific and objective. Describe what you actually see."""
 
         result = structured_llm.invoke(messages)
 
-        # Ensure return type matches
+        # Convert to dict for consistent return format
         if isinstance(result, ImageAnalysisResult):
-            return result
-        # If dict, convert to ImageAnalysisResult
+            return build_success_response(result.model_dump())
+        # If dict, convert to ImageAnalysisResult then serialize
         if isinstance(result, dict):
-            return ImageAnalysisResult(**result)
+            analysis = ImageAnalysisResult(**result)
+            return build_success_response(analysis.model_dump())
 
         # Unexpected result type
-        raise ToolException(
-            f"Unexpected result type from Vision API: {type(result)}"
+        return build_agent_error_response(
+            exception=ValueError(f"Expected ImageAnalysisResult but got {type(result)}"),
+            context={"image_path": image_path},
+            fallback_type="ANALYSIS_ERROR",
+            fallback_action=(
+                "Vision API integration issue. Retry analysis or inform user. "
+                "If persistent, contact system administrator."
+            ),
         )
 
-    except ToolException:
-        # Re-raise ToolException as-is
-        raise
     except FileNotFoundError as exc:
         # Image file not found
-        raise ToolException(
-            f"Image file not found: {image_path}"
-        ) from exc
+        return build_agent_error_response(
+            exception=exc,
+            context={"image_path": image_path},
+            fallback_type="ANALYSIS_ERROR",
+            fallback_action=(
+                "Verify image_path is correct. Check if image was downloaded successfully. "
+                "Request image from user again if missing."
+            ),
+        )
     except Exception as exc:
-        # All other failures (PIL errors, API errors, etc.)
-        raise ToolException(
-            f"Failed to analyze image at '{image_path}': {str(exc)}"
-        ) from exc
+        return build_agent_error_response(
+            exception=exc,
+            context={"image_path": image_path},
+            fallback_type="ANALYSIS_ERROR",
+            fallback_action=(
+                "Unexpected error during image analysis. Retry once. "
+                "If fails again, continue workflow without visual analysis and inform user."
+            ),
+        )

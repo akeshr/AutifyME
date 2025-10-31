@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -50,7 +51,8 @@ class SupabaseStorageClient(StorageInterface):
         self._service_key = derived_key
         self._client: Client | None = client
         self._async_client: AsyncClient | None = None  # Async client for non-blocking ops
-        self._current_transaction: "SupabaseTransaction | None" = None  # Track active transaction
+        self._async_client_loop: asyncio.AbstractEventLoop | None = None  # Track which loop owns client
+        self._current_transaction: SupabaseTransaction | None = None  # Track active transaction
 
     def __enter__(self) -> SupabaseStorageClient:
         """Enter context manager - ensures client is initialized.
@@ -155,13 +157,44 @@ class SupabaseStorageClient(StorageInterface):
         Async client enables non-blocking I/O for CRUD operations in LangGraph workflows.
         Uses same credentials as sync client but with async/await semantics.
 
+        Event Loop Awareness:
+        Detects when running in a different event loop (e.g., Lambda container reuse)
+        and automatically recreates the client to prevent "Event loop is closed" errors.
+
         Returns:
             Initialized and validated async Supabase client
 
         Raises:
             ConfigurationError: If credentials are missing or invalid
         """
-        if self._async_client is None:
+        # Get current event loop
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop - this shouldn't happen in async context
+            current_loop = None
+
+        # Check if client exists AND was created in current loop
+        needs_new_client = (
+            self._async_client is None
+            or self._async_client_loop is None
+            or self._async_client_loop != current_loop
+        )
+
+        if needs_new_client:
+            # Cleanup old client if exists (from different loop)
+            if self._async_client is not None:
+                logger.debug(
+                    "Event loop changed - cleaning up old async client",
+                    extra={
+                        "old_loop": id(self._async_client_loop) if self._async_client_loop else None,
+                        "new_loop": id(current_loop) if current_loop else None
+                    }
+                )
+                # Safe cleanup: just nullify, let GC handle httpx connections
+                # (avoid calling aclose() on closed loop)
+                self._async_client = None
+                self._async_client_loop = None
             # Validate credentials (same validation as sync client)
             if not self._supabase_url:
                 raise ConfigurationError(
@@ -196,6 +229,9 @@ class SupabaseStorageClient(StorageInterface):
                     self._supabase_url, self._service_key, options=options
                 )
 
+                # Store which loop owns this client
+                self._async_client_loop = current_loop
+
                 # Test connection with simple query
                 _ = await self._async_client.table("companies").select("id").limit(1).execute()
 
@@ -205,6 +241,7 @@ class SupabaseStorageClient(StorageInterface):
                         "url": self._supabase_url[:30] + "...",
                         "has_service_key": bool(self._service_key),
                         "http_version": "HTTP/1.1",
+                        "event_loop_id": id(current_loop) if current_loop else None,
                     }
                 )
 
@@ -552,9 +589,37 @@ class SupabaseStorageClient(StorageInterface):
             select_clause = ",".join(columns) if columns else "*"
             query = client.table(table).select(select_clause)
 
-            # Apply filters
+            # Apply filters (support both simple and operator-based)
             for key, value in filters.items():
-                query = query.eq(key, value)
+                if isinstance(value, dict):
+                    # Advanced filter with operator: {"in": [...], "gt": ..., etc.}
+                    for operator, operand in value.items():
+                        if operator == "in":
+                            query = query.in_(key, operand)
+                        elif operator == "eq":
+                            query = query.eq(key, operand)
+                        elif operator == "neq":
+                            query = query.neq(key, operand)
+                        elif operator == "gt":
+                            query = query.gt(key, operand)
+                        elif operator == "gte":
+                            query = query.gte(key, operand)
+                        elif operator == "lt":
+                            query = query.lt(key, operand)
+                        elif operator == "lte":
+                            query = query.lte(key, operand)
+                        elif operator == "like":
+                            query = query.like(key, operand)
+                        elif operator == "ilike":
+                            query = query.ilike(key, operand)
+                        else:
+                            raise ValueError(f"Unsupported filter operator: {operator}")
+                elif isinstance(value, list):
+                    # List value - use IN operator
+                    query = query.in_(key, value)
+                else:
+                    # Simple equality filter
+                    query = query.eq(key, value)
 
             response = await query.execute()
             return response.data if response.data else []
@@ -576,6 +641,7 @@ class SupabaseStorageClient(StorageInterface):
         table: str,
         column: str,
         values: list[Any],
+        exclude_ids: list[Any] | None = None,
     ) -> list[Any]:
         """Batch check which values exist in column.
 
@@ -583,6 +649,8 @@ class SupabaseStorageClient(StorageInterface):
             table: Table name
             column: Column to check
             values: Values to check for existence
+            exclude_ids: Optional list of record IDs to exclude from check
+                        (enables idempotent update validation)
 
         Returns:
             List of values that exist
@@ -597,7 +665,13 @@ class SupabaseStorageClient(StorageInterface):
             client = await self._ensure_async_client()
 
             # Use PostgREST's 'in' operator for batch check
-            response = await client.table(table).select(column).in_(column, values).execute()
+            query = client.table(table).select(column).in_(column, values)
+
+            # Exclude specific IDs from check (for update validation)
+            if exclude_ids:
+                query = query.not_.in_("id", exclude_ids)
+
+            response = await query.execute()
 
             if not response.data:
                 return []
@@ -615,6 +689,96 @@ class SupabaseStorageClient(StorageInterface):
             raise StorageError(
                 message=f"Existence check failed for {table}.{column}: {str(e)}",
                 operation="check_existing_values",
+                original_error=e,
+            ) from e
+
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: bool = False,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]] | int:
+        """Advanced query with relations, pattern matching, and counting.
+
+        Args:
+            table: Table name
+            filters: Exact match filters
+            columns: Columns to select
+            relations: Related tables using PostgREST syntax
+            search_patterns: ILIKE patterns for search
+            count_only: Return count instead of rows
+            limit: Maximum rows to return
+
+        Returns:
+            List of rows or count
+
+        Raises:
+            StorageError: On query failure
+        """
+        try:
+            client = await self._ensure_async_client()
+
+            # Build select clause with relations
+            if count_only:
+                select_clause = "*"  # Count needs at least one column
+            elif columns and not relations:
+                select_clause = ",".join(columns)
+            elif relations:
+                # Include columns and relations
+                base_cols = ",".join(columns) if columns else "*"
+                relation_clauses = [f"{rel}" for rel in relations]
+                select_clause = f"{base_cols},{','.join(relation_clauses)}"
+            else:
+                select_clause = "*"
+
+            query = client.table(table).select(
+                select_clause,
+                count="exact" if count_only else None
+            )
+
+            # Apply exact match filters
+            if filters:
+                for key, value in filters.items():
+                    if isinstance(value, list):
+                        # List value - use IN operator
+                        query = query.in_(key, value)
+                    else:
+                        query = query.eq(key, value)
+
+            # Apply ILIKE search patterns
+            if search_patterns:
+                for key, pattern in search_patterns.items():
+                    query = query.ilike(key, pattern)
+
+            # Apply limit
+            if limit:
+                query = query.limit(limit)
+
+            response = await query.execute()
+
+            # Return count or rows
+            if count_only:
+                return response.count if response.count is not None else 0
+
+            return response.data if response.data else []
+
+        except Exception as e:
+            logger.error(
+                f"Advanced query failed for {table}",
+                exc_info=True,
+                extra={
+                    "table": table,
+                    "filters": filters,
+                    "search_patterns": search_patterns,
+                }
+            )
+            raise StorageError(
+                message=f"Advanced query failed for {table}: {str(e)}",
+                operation="query_advanced",
                 original_error=e,
             ) from e
 
@@ -769,6 +933,9 @@ class SupabaseStorageClient(StorageInterface):
                             query = query.lte(key, operand)
                         else:
                             logger.warning(f"Unsupported operator '{operator}' in filter")
+                elif isinstance(value, list):
+                    # List value - use IN operator
+                    query = query.in_(key, value)
                 else:
                     # Simple equality filter
                     query = query.eq(key, value)
@@ -841,6 +1008,9 @@ class SupabaseStorageClient(StorageInterface):
                             query = query.lte(key, operand)
                         else:
                             logger.warning(f"Unsupported operator '{operator}' in filter")
+                elif isinstance(value, list):
+                    # List value - use IN operator
+                    query = query.in_(key, value)
                 else:
                     # Simple equality filter
                     query = query.eq(key, value)
@@ -875,7 +1045,7 @@ class SupabaseStorageClient(StorageInterface):
     # Transaction Support (Phase 3)
     # ========================================================================
 
-    def transaction(self):
+    def transaction(self) -> "SupabaseTransaction":
         """
         Create a transaction context manager for atomic operations.
 
@@ -927,14 +1097,14 @@ class SupabaseStorageClient(StorageInterface):
             except Exception as e:
                 logger.warning(f"Failed to close sync Functions client: {e}")
 
-        # Cleanup async client (must be called from async context if client is initialized)
-        # For now we just mark it as None - actual cleanup should happen in async context
+        # Cleanup async client - safe nullification (GC handles httpx connections)
+        # Explicit cleanup via _cleanup_async() is better but not required
         if self._async_client is not None:
-            logger.warning(
-                "Async client cleanup requires async context. "
-                "Consider calling 'await storage._cleanup_async()' before shutdown."
+            logger.debug(
+                "Async client cleanup - nullifying references for GC"
             )
             self._async_client = None
+            self._async_client_loop = None
 
         logger.info("Supabase storage client cleanup completed")
 
@@ -970,6 +1140,7 @@ class SupabaseStorageClient(StorageInterface):
                 logger.warning(f"Failed to close async Functions client: {e}")
 
             self._async_client = None
+            self._async_client_loop = None
             logger.info("Async Supabase client cleanup completed")
 
 
@@ -989,13 +1160,13 @@ class SupabaseTransaction:
     3. Application-level saga pattern with compensation
     """
 
-    def __init__(self, storage: "SupabaseStorageClient"):
+    def __init__(self, storage: SupabaseStorageClient):
         """Initialize transaction with storage reference."""
         self.storage = storage
         self.operations: list[dict[str, Any]] = []
         self.in_transaction = False
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "SupabaseTransaction":
         """Start transaction - begin tracking operations."""
         self.in_transaction = True
         self.operations = []
@@ -1003,7 +1174,7 @@ class SupabaseTransaction:
         logger.debug("Starting Supabase transaction (best-effort rollback)")
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
         """End transaction - rollback on exception, commit on success."""
         try:
             if exc_type is not None:
@@ -1024,7 +1195,7 @@ class SupabaseTransaction:
             self.in_transaction = False
             self.storage._current_transaction = None
 
-    async def _rollback(self):
+    async def _rollback(self) -> None:
         """Attempt best-effort rollback of tracked operations.
 
         Rolls back in reverse order (LIFO). Not guaranteed to succeed

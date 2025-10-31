@@ -7,6 +7,7 @@ from typing import Any
 
 from autifyme_agents.schemas.models import CatalogingResult, Product
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.workflows.message_utils import extract_text_content
 from autifyme_agents.workflows.orchestration.message_formatter import (
     format_batch_approval_message,
     format_operation_intent_approval_message,
@@ -89,13 +90,21 @@ class CatalogingWorkflowHandler:
             message_type = getattr(message, "type", None)
             if not message_type and hasattr(message, "__class__"):
                 message_type = message.__class__.__name__.replace("Message", "").lower()
+
             if message_type != "ai":
                 continue
 
             content = getattr(message, "content", None)
-            if isinstance(content, str):
-                return content
 
+            # Extract text from content (handles both OpenAI string and Gemini list formats)
+            text = extract_text_content(content)
+            if text:
+                return text
+
+        logger.warning(
+            "No AI message with text content found",
+            extra={"message_count": len(messages)}
+        )
         return None
 
     def handle_interrupt(

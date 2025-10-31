@@ -8,12 +8,12 @@ Tests autonomous capabilities:
 """
 
 import asyncio
-import os
 import sys
 from pathlib import Path
 
 # Load environment variables from AutifyME root
 from dotenv import load_dotenv
+
 root_dir = Path(__file__).parent.parent.parent.parent
 env_path = root_dir / ".env"
 load_dotenv(env_path)

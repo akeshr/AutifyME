@@ -8,8 +8,8 @@ from langchain_openai import ChatOpenAI
 
 
 def get_llm(
-    provider: str = "openai",
-    model: str = "gpt-4.1-mini",
+    provider: str = "google",
+    model: str = "gemini-2.5-flash-lite",
     temperature: float = 0.0,
     tags: list[str] | None = None,
     reasoning_effort: str = "low",
@@ -61,9 +61,11 @@ def get_llm(
         max_output_tokens: Maximum tokens in response. Must be > 0. Default varies by model.
             Gemini 2.5 models support up to 65K output tokens.
         thinking_budget: Thinking budget in tokens for Gemini 2.5 models with adaptive thinking.
-            Higher values allow more reasoning time for complex problems.
+            Default: 0 (disabled) for Flash/Flash-Lite models to optimize speed/cost.
+            Set to higher values (e.g., 4096, 8192) for complex reasoning tasks.
+            Note: Pro models have minimum of 128 tokens (cannot fully disable).
         include_thoughts: Whether to include chain-of-thought reasoning in response.
-            Useful for understanding model's reasoning process.
+            Default: False (hidden). Set True to see model's reasoning process.
         safety_settings: Dict mapping HarmCategory to HarmBlockThreshold for content filtering.
             Categories: DANGEROUS_CONTENT, HATE_SPEECH, HARASSMENT, SEXUALLY_EXPLICIT.
             Thresholds: BLOCK_NONE, BLOCK_LOW_AND_ABOVE, BLOCK_MEDIUM_AND_ABOVE, BLOCK_ONLY_HIGH.
@@ -173,6 +175,12 @@ def get_llm(
             "model": model,
             "temperature": temperature,
         }
+
+        # CRITICAL: Disable thinking by default for Flash/Flash-Lite models
+        # Gemini 2.5 has adaptive thinking enabled by default which wastes time/money
+        # Set thinking_budget=0 to disable (only works for Flash/Flash-Lite, not Pro)
+        if thinking_budget is None and ("flash" in model.lower()):
+            thinking_budget = 0
 
         # Add optional parameters only if provided
         if timeout is not None:

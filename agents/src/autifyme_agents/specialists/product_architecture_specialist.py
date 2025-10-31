@@ -29,13 +29,12 @@ Architecture Pattern:
 
 from typing import Any
 
-from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
+from autifyme_agents.core.prompt_loader import load_prompt
 
 # Import generic operation intent (replaces all hard-coded draft types)
 from autifyme_agents.schemas.operation_intent import OperationIntent
-
+from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 # =============================================================================
 # Specialist Factory
@@ -99,7 +98,11 @@ def create_product_architecture_specialist(
         from autifyme_agents.tools.product_search_tools import (
             create_search_product_families_tool,
         )
+        from autifyme_agents.tools.query_database_tool import (
+            create_query_database_tool,
+        )
         tools.append(create_search_product_families_tool(storage))
+        tools.append(create_query_database_tool(storage))
 
     return {
         "name": "product_architecture_specialist",

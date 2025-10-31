@@ -387,7 +387,7 @@
           "type": "boolean",
           "nullable": false,
           "default": "false",
-          "description": "Hero variant shown first"
+          "description": "Hero variant shown first. CONSTRAINT: Only one product per family can have is_primary_variant=true (enforced by partial unique index)."
         },
         "sale_price": {
           "name": "sale_price",
@@ -549,7 +549,7 @@
           "type": "boolean",
           "nullable": false,
           "default": "false",
-          "description": "Main target industry"
+          "description": "Main target industry. CONSTRAINT: Only one industry per family can have is_primary_industry=true (enforced by partial unique index)."
         },
         "created_at": {
           "name": "created_at",

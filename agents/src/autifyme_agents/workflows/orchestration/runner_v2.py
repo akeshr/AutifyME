@@ -60,7 +60,6 @@ from langgraph.errors import GraphInterrupt, GraphRecursionError
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.handlers.approval_coordinator import ApprovalCoordinator
@@ -271,19 +270,40 @@ class WorkflowRunner:
                 return
 
             if not result:
+                logger.warning("No result from PM - cannot send response", extra={"thread_id": thread_id})
                 return
 
+            # Extract messages from result
+            messages = result.get("messages", [])
+
+            logger.debug(
+                "PM result received",
+                extra={
+                    "thread_id": thread_id,
+                    "message_count": len(messages),
+                }
+            )
+
             # Send workflow-specific completion to user
-            cataloging_result = self.workflow_handler.extract_result(result.get("messages", []))
+            cataloging_result = self.workflow_handler.extract_result(messages)
             if cataloging_result:
                 self.channel.send_completion(sender, cataloging_result)
                 logger.info("Workflow completed", extra={"thread_id": thread_id, "tracking_id": tracking_id})
                 return
 
             # Send conversational response
-            summary = self.workflow_handler.extract_summary(result.get("messages", []))
+            summary = self.workflow_handler.extract_summary(messages)
             if summary:
                 self.channel.send_text(sender, summary)
+                logger.info("Conversational response sent", extra={"thread_id": thread_id})
+            else:
+                logger.warning(
+                    "No response extracted from PM messages",
+                    extra={
+                        "thread_id": thread_id,
+                        "message_count": len(messages),
+                    }
+                )
 
         except GraphRecursionError as exc:
             logger.exception("PM recursion limit exceeded", exc_info=exc)
@@ -577,7 +597,9 @@ class WorkflowRunner:
         """Get async checkpointer instance."""
         if self._checkpointer:
             return self._checkpointer
-        from autifyme_agents.integrations.storage.postgres_saver_factory import get_async_checkpointer
+        from autifyme_agents.integrations.storage.postgres_saver_factory import (
+            get_async_checkpointer,
+        )
         return await get_async_checkpointer()
 
     async def _create_project_manager(self) -> Any:

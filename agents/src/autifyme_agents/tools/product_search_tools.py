@@ -16,7 +16,6 @@ import logging
 from typing import Any
 
 from langchain.tools import tool
-from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field
 
 from autifyme_agents.core.exceptions import classify_api_error
@@ -159,16 +158,14 @@ def _calculate_match_score(
         score_components.append(name_similarity * 0.3)
 
     # Brand match (0.15 weight) - only apply if brand provided in query
-    if query_brand and query_brand.lower().strip():
-        if query_brand.lower().strip() == existing_family.get("brand", "").lower().strip():
-            factors["brand_match"] = True
-            score_components.append(0.15)
+    if query_brand and query_brand.lower().strip() and query_brand.lower().strip() == existing_family.get("brand", "").lower().strip():
+        factors["brand_match"] = True
+        score_components.append(0.15)
 
     # Material match (0.05 weight)
-    if query_material and existing_family.get("material"):
-        if query_material.lower().strip() == existing_family.get("material", "").lower().strip():
-            factors["material_match"] = True
-            score_components.append(0.05)
+    if query_material and existing_family.get("material") and query_material.lower().strip() == existing_family.get("material", "").lower().strip():
+        factors["material_match"] = True
+        score_components.append(0.05)
 
     total_score = sum(score_components)
 

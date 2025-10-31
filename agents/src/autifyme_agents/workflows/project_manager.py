@@ -6,7 +6,6 @@ to appropriate specialists, synthesizes results, and persists via HITL-enabled t
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -42,18 +41,27 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
-    """Return configured LLM for PM. Defaults to gpt-4.1-mini for orchestration."""
+    """Return configured LLM for PM. Defaults to gemini-2.5-flash for orchestration."""
     if model is not None:
         return model
-    return get_llm(model="gpt-4.1-mini", temperature=0.2)
+    return get_llm(provider="google", model="gemini-2.5-flash-lite", temperature=0.2)
 
 
-def _load_prompt(company_profile: CompanyProfile, base_context: Any) -> str:
+def _load_prompt(
+    company_profile: CompanyProfile,
+    base_context: Any,
+    channel: MessagingChannel | None = None,
+) -> str:
     """Load and format PM prompt with company context and base context.
 
     Base context is formatted into system prompt so LLM can see the actual data.
     """
     prompt_template = load_prompt("project_manager_intelligent.prompt")
+
+    # Extract platform name from channel (same logic as platform_tools.py)
+    platform_name = "unknown"
+    if channel is not None:
+        platform_name = channel.__class__.__name__.replace("Channel", "").lower()
 
     # Format catalog summary for prompt
     catalog_summary_text = f"""
@@ -76,6 +84,7 @@ def _load_prompt(company_profile: CompanyProfile, base_context: Any) -> str:
         company_name=company_profile.name,
         brand_voice=company_profile.brand_voice,
         target_audience=company_profile.target_audience,
+        platform=platform_name,
     ) + "\n\n" + catalog_summary_text + "\n" + taxonomy_text
 
 
@@ -130,7 +139,7 @@ async def create_project_manager(
 
     # Load intelligent prompt with company context
     # base_context is available to PM via initial_state
-    instructions = _load_prompt(company_profile, base_context)
+    instructions = _load_prompt(company_profile, base_context, channel)
 
     # PM Tools
     pm_tools: list[Any] = []
@@ -166,6 +175,11 @@ async def create_project_manager(
         "execute_database_operation": True,
         "save_campaign": True,
     }
+
+    # Note: create_deep_agent adds SummarizationMiddleware by default
+    # No need to pass custom middleware - use default configuration
+    # Default: triggers at ~170K tokens, keeps last 6 messages
+
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,

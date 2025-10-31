@@ -1,5 +1,5 @@
 ---
-globs: "agents/src/autifyme_agents/**/*.py"
+alwaysApply: false
 ---
 # Rule: Async/Sync Best Practices
 

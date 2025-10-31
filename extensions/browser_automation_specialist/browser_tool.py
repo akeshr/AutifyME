@@ -6,7 +6,7 @@ making it available to LangChain agents.
 
 from typing import Annotated
 
-from langchain_core.tools import tool, ToolException
+from langchain_core.tools import ToolException, tool
 from pydantic import Field
 
 try:

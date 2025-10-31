@@ -24,7 +24,8 @@ For full implementation, use Google's official Live API client library.
 """
 
 import os
-from typing import AsyncIterator, Callable, Literal
+from collections.abc import Callable
+from typing import Any
 
 try:
     import google.genai as genai
@@ -33,7 +34,7 @@ except ImportError:
     raise ImportError(
         "google-generativeai package with Live API support required. "
         "Install with: uv pip install google-generativeai[live]"
-    )
+    ) from None
 
 
 class GeminiLiveSession:
@@ -86,7 +87,7 @@ class GeminiLiveSession:
             )
 
         # Configure client
-        genai.configure(api_key=self.api_key)
+        genai.configure(api_key=self.api_key)  # type: ignore[attr-defined]
         self.client = genai.Client()
         self._session: AsyncSession | None = None
 
@@ -116,13 +117,13 @@ class GeminiLiveSession:
             config["system_instruction"] = self.system_instruction
 
         # Create session
-        self._session = await self.client.live.connect(**config)
+        self._session = await self.client.live.connect(**config)  # type: ignore[attr-defined]
 
         # Register callbacks
         if audio_callback:
-            self._session.on_audio(audio_callback)
+            self._session.on_audio(audio_callback)  # type: ignore[union-attr]
         if text_callback:
-            self._session.on_text(text_callback)
+            self._session.on_text(text_callback)  # type: ignore[union-attr]
 
     async def send_audio(self, audio_bytes: bytes) -> None:
         """
@@ -133,7 +134,7 @@ class GeminiLiveSession:
         """
         if not self._session:
             raise RuntimeError("Session not started. Call start() first.")
-        await self._session.send_audio(audio_bytes)
+        await self._session.send_audio(audio_bytes)  # type: ignore[attr-defined]
 
     async def send_text(self, text: str) -> None:
         """
@@ -144,7 +145,7 @@ class GeminiLiveSession:
         """
         if not self._session:
             raise RuntimeError("Session not started. Call start() first.")
-        await self._session.send_text(text)
+        await self._session.send_text(text)  # type: ignore[attr-defined]
 
     async def send_video(self, video_frame: bytes, mime_type: str = "image/jpeg") -> None:
         """
@@ -156,7 +157,7 @@ class GeminiLiveSession:
         """
         if not self._session:
             raise RuntimeError("Session not started. Call start() first.")
-        await self._session.send_video(video_frame, mime_type=mime_type)
+        await self._session.send_video(video_frame, mime_type=mime_type)  # type: ignore[attr-defined]
 
     async def close(self) -> None:
         """Close Live API session and WebSocket connection."""
@@ -164,12 +165,12 @@ class GeminiLiveSession:
             await self._session.close()
             self._session = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "GeminiLiveSession":
         """Context manager entry."""
         await self.start()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit."""
         await self.close()
 

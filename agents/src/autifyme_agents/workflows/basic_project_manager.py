@@ -20,18 +20,28 @@ if TYPE_CHECKING:
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
-    """Return configured LLM for PM. Defaults to gpt-4.1-mini."""
+    """Return configured LLM for PM. Defaults to gemini-2.5-flash."""
     if model is not None:
         return model
-    return get_llm(model="gpt-4.1-mini", temperature=0.2)
+    return get_llm(provider="google", model="gemini-2.5-flash-lite", temperature=0.2)
 
 
-def _load_prompt(company_profile: CompanyProfile) -> str:
+def _load_prompt(
+    company_profile: CompanyProfile,
+    channel: MessagingChannel | None = None,
+) -> str:
     prompt_template = load_prompt("basic_project_manager.prompt")
+
+    # Extract platform name from channel (same logic as platform_tools.py)
+    platform_name = "unknown"
+    if channel is not None:
+        platform_name = channel.__class__.__name__.replace("Channel", "").lower()
+
     return prompt_template.format(
         company_name=company_profile.name,
         brand_voice=company_profile.brand_voice,
         target_audience=company_profile.target_audience,
+        platform=platform_name,
     )
 
 
@@ -65,7 +75,7 @@ def create_project_manager(
         raise ValueError("storage is required for Project Manager (tools dependency)")
 
     llm = _resolve_model(model)
-    instructions = _load_prompt(company_profile)
+    instructions = _load_prompt(company_profile, channel)
 
     store = get_store()
 

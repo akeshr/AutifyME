@@ -4,7 +4,7 @@ Tests both FakeStorage and SupabaseStorageClient transaction implementations.
 """
 
 import pytest
-from autifyme_agents.core.exceptions import StorageError
+
 from tests.fixtures.fake_storage import FakeStorage
 
 
@@ -187,14 +187,14 @@ class TestFakeStorageTransactions:
     async def test_nested_transactions_not_supported(self, storage):
         """Nested transactions should work but share same snapshot."""
         async with storage.transaction():
-            family1 = await storage.insert_entity(
+            await storage.insert_entity(
                 "product_families",
                 {"name": "Family 1", "company_id": "test-company"}
             )
 
             # Inner transaction (shares outer snapshot)
             async with storage.transaction():
-                family2 = await storage.insert_entity(
+                await storage.insert_entity(
                     "product_families",
                     {"name": "Family 2", "company_id": "test-company"}
                 )
@@ -238,7 +238,7 @@ class TestSupabaseTransactionOperationTracking:
         storage._ensure_async_client = mock_ensure_client
 
         # Execute insert
-        result = await storage.insert_entity("test_table", {"name": "Test"})
+        await storage.insert_entity("test_table", {"name": "Test"})
 
         # Verify operation tracked
         assert len(storage._current_transaction.operations) == 1
@@ -281,7 +281,7 @@ class TestSupabaseTransactionOperationTracking:
         storage._ensure_async_client = mock_ensure_client
 
         # Execute batch insert
-        result = await storage.insert_entities(
+        await storage.insert_entities(
             "test_table",
             [{"name": "Test 1"}, {"name": "Test 2"}, {"name": "Test 3"}]
         )
@@ -329,7 +329,7 @@ class TestSupabaseTransactionOperationTracking:
         storage._ensure_async_client = mock_ensure_client
 
         # Execute update
-        count = await storage.update_entities(
+        await storage.update_entities(
             "test_table",
             {"status": "active"},
             {"is_published": True}
@@ -496,7 +496,7 @@ class TestComplexTransactionScenarios:
             )
 
             # 3. Create axis values
-            color_values = await storage.insert_entities(
+            await storage.insert_entities(
                 "axis_values",
                 [
                     {"value": "Red", "variant_axis_id": axes[0]["id"]},
@@ -505,7 +505,7 @@ class TestComplexTransactionScenarios:
                 ]
             )
 
-            size_values = await storage.insert_entities(
+            await storage.insert_entities(
                 "axis_values",
                 [
                     {"value": "S", "variant_axis_id": axes[1]["id"]},
@@ -515,7 +515,7 @@ class TestComplexTransactionScenarios:
             )
 
             # 4. Create products (would normally be variants, simplified here)
-            products = await storage.insert_entities(
+            await storage.insert_entities(
                 "products",
                 [
                     {
@@ -616,7 +616,7 @@ class TestComplexTransactionScenarios:
         with pytest.raises(ValueError):
             async with storage.transaction():
                 # Insert family
-                family = await storage.insert_entity(
+                await storage.insert_entity(
                     "product_families",
                     {"name": "Test Family", "company_id": "test-company"}
                 )
@@ -650,7 +650,7 @@ class TestComplexTransactionScenarios:
     async def test_single_operation_transaction(self, storage):
         """Transaction with single operation should work correctly."""
         async with storage.transaction():
-            family = await storage.insert_entity(
+            await storage.insert_entity(
                 "product_families",
                 {"name": "Single", "company_id": "test-company"}
             )
@@ -669,7 +669,7 @@ class TestComplexTransactionScenarios:
         # Transaction that fails
         with pytest.raises(ValueError):
             async with storage.transaction():
-                new_family = await storage.insert_entity(
+                await storage.insert_entity(
                     "product_families",
                     {"name": "New", "company_id": "test-company"}
                 )

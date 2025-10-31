@@ -14,7 +14,6 @@ Validates:
 import asyncio
 import sys
 import uuid
-from typing import Any
 
 import pytest
 
@@ -41,7 +40,6 @@ from autifyme_agents.tools.universal_crud_tool import (
 
 # Import FakeStorage from fixtures
 from tests.fixtures.fake_storage import FakeStorage
-
 
 # =============================================================================
 # Fixtures - Test Database Setup

@@ -15,11 +15,13 @@ Key Features:
 
 import logging
 import re
+import time
 from collections import defaultdict
+from datetime import UTC
 from typing import Any
 
 from langchain.tools import tool
-from langchain_core.tools import ToolException
+from langchain_core.tools import BaseTool, ToolException
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.operation_intent import (
@@ -34,6 +36,83 @@ from autifyme_agents.schemas.registry import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Validation Helpers
+# =============================================================================
+
+
+def _validate_operation_completeness(
+    operations: list[Operation],
+    impact_analysis: dict[str, Any],
+) -> None:
+    """
+    Validate that operations contain complete data matching impact analysis.
+
+    Checks that entity counts in operations match the counts claimed in impact_analysis.
+    Prevents partial data from reaching database (e.g., 18 entities when impact says 36).
+
+    Args:
+        operations: List of Operation objects
+        impact_analysis: ImpactAnalysis dict with entity counts
+
+    Raises:
+        ToolException: If operation data is incomplete or mismatched with impact
+    """
+    new_entities_count = impact_analysis.get("new_entities_count", {})
+    updated_entities_count = impact_analysis.get("updated_entities_count", {})
+    deleted_entities_count = impact_analysis.get("deleted_entities_count", {})
+
+    for idx, operation in enumerate(operations):
+        op_type = operation.op_type
+        table = operation.table
+
+        # Validate INSERT operations
+        if op_type == "insert" and hasattr(operation, "new_entities") and operation.new_entities:
+            actual_count = len(operation.new_entities)
+            expected_count = new_entities_count.get(table, 0)
+
+            if expected_count > 0 and actual_count != expected_count:
+                raise ToolException(
+                    f"Operation {idx} incomplete: {table} insert has {actual_count} entities "
+                    f"but impact_analysis claims {expected_count}. "
+                    f"Specialist must provide ALL entities - partial lists are FORBIDDEN. "
+                    f"Expected all {expected_count} entities in new_entities array."
+                )
+
+        # Validate UPDATE operations (check field_updates with dict values)
+        if op_type == "update" and hasattr(operation, "field_updates") and operation.field_updates:
+            expected_count = updated_entities_count.get(table, 0)
+
+            # Check if any field_update value is a dict mapping UUID -> value
+            for field_name, field_value in operation.field_updates.items():
+                if isinstance(field_value, dict):
+                    actual_count = len(field_value)
+
+                    if expected_count > 0 and actual_count != expected_count:
+                        raise ToolException(
+                            f"Operation {idx} incomplete: {table} update field '{field_name}' "
+                            f"has {actual_count} entity-specific values but impact_analysis claims {expected_count}. "
+                            f"All {expected_count} entities must have values specified."
+                        )
+
+        # Validate DELETE operations (check delete_filter with ID lists)
+        if op_type == "delete" and hasattr(operation, "delete_filter") and operation.delete_filter:
+            expected_count = deleted_entities_count.get(table, 0)
+
+            # Check if delete_filter has a list of IDs
+            if "id" in operation.delete_filter:
+                filter_value = operation.delete_filter["id"]
+                if isinstance(filter_value, list):
+                    actual_count = len(filter_value)
+
+                    if expected_count > 0 and actual_count != expected_count:
+                        raise ToolException(
+                            f"Operation {idx} incomplete: {table} delete targets {actual_count} entities "
+                            f"but impact_analysis claims {expected_count}. "
+                            f"Delete filter must include all {expected_count} entity IDs."
+                        )
 
 
 # =============================================================================
@@ -65,116 +144,159 @@ class OperationExecutor:
         self,
         steps: list[ExecutionStep],
         operations: list[Operation],
-        rollback_on_error: bool = True,
     ) -> ExecutionResult:
         """
-        Execute multi-step plan with dependency resolution.
+        Execute multi-step plan with ACID guarantees.
+
+        All operations execute within a database transaction for atomicity.
+        Database automatically rolls back on any error.
 
         Args:
             steps: List of execution steps (references operations by index)
             operations: List of operations to execute (from change_spec)
-            rollback_on_error: Roll back completed steps if error occurs
 
         Returns:
             ExecutionResult with affected entities and created IDs
 
         Raises:
-            ToolException: On validation or execution failure
+            ToolException: On validation or execution failure (DB auto-rolls back)
         """
         import time
 
         start_time = time.time()
-        completed_steps: list[tuple[ExecutionStep, dict[str, Any]]] = []
-        created_ids: dict[int, dict[str, Any]] = {}
 
+        # Validate entire plan upfront (before transaction)
+        self._validate_plan(steps, operations)
+
+        # Execute all operations in database transaction
         try:
-            # Sort steps by dependencies (topological order)
-            sorted_steps = self._resolve_dependencies(steps, operations)
-
-            for step in sorted_steps:
-                # Resolve operation by index
-                if step.operation_index < 0 or step.operation_index >= len(operations):
-                    raise ToolException(
-                        f"Invalid operation_index {step.operation_index} in step {step.step_number}. "
-                        f"Must be 0-{len(operations)-1}"
-                    )
-                operation = operations[step.operation_index]
-
-                logger.info(
-                    f"Executing step {step.step_number}: {step.description}",
-                    extra={"step": step.step_number, "operation": operation.op_type}
-                )
-
-                # Execute operation
-                result = await self._execute_operation(operation, created_ids)
-                completed_steps.append((step, result))
-
-                # Store created IDs for dependent operations
-                if operation.op_type == "insert" and result.get("ids"):
-                    ids = result["ids"]
-                    # Check if this is named refs or single entity
-                    # Named refs: {"ref_name": {entity}, "ref_name2": {entity}}
-                    # Single entity: {"id": "uuid", "name": "value", ...}
-                    if isinstance(ids, dict) and "id" not in ids:
-                        # No "id" field means this is a named refs dict, not an entity
-                        created_ids[step.step_number] = {"_refs": ids}
-                    else:
-                        # Has "id" field or not a dict - single entity (legacy)
-                        created_ids[step.step_number] = ids
-
-                logger.info(
-                    f"Step {step.step_number} completed successfully",
-                    extra={"affected_rows": result.get("count", 0)}
-                )
-
-            # Calculate execution time
-            execution_time_ms = int((time.time() - start_time) * 1000)
-
-            return ExecutionResult(
-                success=True,
-                affected_entities=self._count_affected(completed_steps, operations),
-                created_ids=created_ids,
-                execution_time_ms=execution_time_ms,
-                steps_completed=len(completed_steps),
-                steps_total=len(sorted_steps),
-            )
-
+            async with self.storage.transaction():
+                return await self._execute_plan_internal(steps, operations, start_time)
         except Exception as e:
-            logger.error(
-                "Operation execution failed",
-                exc_info=True,
-                extra={
-                    "error_type": type(e).__name__,
-                    "steps_completed": len(completed_steps),
-                    "steps_total": len(steps),
-                }
-            )
-
-            # Rollback if requested
-            rollback_performed = False
-            if rollback_on_error and completed_steps:
-                try:
-                    await self._rollback(completed_steps, operations)
-                    rollback_performed = True
-                    logger.info("Rollback completed successfully")
-                except Exception as rollback_error:
-                    logger.error(
-                        "Rollback failed",
-                        exc_info=True,
-                        extra={"rollback_error": str(rollback_error)}
-                    )
-
+            # Transaction auto-rolled back by database
             execution_time_ms = int((time.time() - start_time) * 1000)
+
+            # Build actionable error message for agents
+            error_type = type(e).__name__
+            error_msg = str(e)
+
+            # Enhance error message with context
+            if "unique constraint" in error_msg.lower() or "already exists" in error_msg.lower():
+                actionable_msg = f"CONSTRAINT_VIOLATION: {error_msg}\n\nAgent Action: Check for duplicate values in unique fields (sku, email, etc.). Query existing data first or use different values."
+            elif "foreign key" in error_msg.lower() or "not found" in error_msg.lower():
+                actionable_msg = f"MISSING_REFERENCE: {error_msg}\n\nAgent Action: Ensure referenced entities exist. Create parent entities first (e.g., product_family before products)."
+            elif "validation failed" in error_msg.lower():
+                actionable_msg = f"VALIDATION_ERROR: {error_msg}\n\nAgent Action: Fix data format/values. Check schema requirements (required fields, data types, value ranges)."
+            elif "circular dependencies" in error_msg.lower():
+                actionable_msg = f"DEPENDENCY_ERROR: {error_msg}\n\nAgent Action: Reorder operations to resolve dependencies. Create parent entities before children."
+            else:
+                actionable_msg = f"{error_type}: {error_msg}\n\nAgent Action: Review operation structure and retry with corrections."
+
+            logger.error(
+                "Execution failed - transaction rolled back",
+                exc_info=True,
+                extra={"error_type": error_type, "error": error_msg}
+            )
 
             return ExecutionResult(
                 success=False,
-                error_message=str(e),
-                error_step=len(completed_steps) + 1 if completed_steps else 1,
-                rollback_performed=rollback_performed,
+                error_message=actionable_msg,
+                rollback_performed=True,
                 execution_time_ms=execution_time_ms,
-                steps_completed=len(completed_steps),
+                steps_completed=0,
                 steps_total=len(steps),
             )
+
+    def _validate_plan(
+        self,
+        steps: list[ExecutionStep],
+        operations: list[Operation],
+    ) -> None:
+        """
+        Validate entire plan before execution (fail-fast).
+
+        Checks:
+        - All operation indices are valid
+        - All referenced tables exist in schema
+        - No circular dependencies
+
+        Raises:
+            ToolException: On validation failure
+        """
+        # Validate operation indices
+        for step in steps:
+            if step.operation_index < 0 or step.operation_index >= len(operations):
+                raise ToolException(
+                    f"Invalid operation_index {step.operation_index} in step {step.step_number}. "
+                    f"Must be 0-{len(operations)-1}"
+                )
+
+        # Validate all tables exist in schema
+        for operation in operations:
+            try:
+                self.schema.get_table(operation.table)
+            except ValueError as e:
+                raise ToolException(f"Invalid table in plan: {str(e)}") from e
+
+        # Validate no circular dependencies
+        try:
+            self._resolve_dependencies(steps, operations)
+        except ToolException:
+            # Re-raise with context
+            raise
+
+    async def _execute_plan_internal(
+        self,
+        steps: list[ExecutionStep],
+        operations: list[Operation],
+        start_time: float,
+    ) -> ExecutionResult:
+        """Execute plan within transaction (all validation already done)."""
+        completed_steps: list[tuple[ExecutionStep, dict[str, Any]]] = []
+        created_ids: dict[int, dict[str, Any]] = {}
+
+        # Sort steps by dependencies (already validated in _validate_plan)
+        sorted_steps = self._resolve_dependencies(steps, operations)
+
+        for step in sorted_steps:
+            operation = operations[step.operation_index]
+
+            logger.info(
+                f"Executing step {step.step_number}: {step.description}",
+                extra={"step": step.step_number, "operation": operation.op_type}
+            )
+
+            # Execute operation
+            result = await self._execute_operation(operation, created_ids)
+            completed_steps.append((step, result))
+
+            # Store created IDs for dependent operations
+            if operation.op_type == "insert" and result.get("ids"):
+                ids = result["ids"]
+                # Check if this is named refs or single entity
+                if isinstance(ids, dict) and "id" not in ids:
+                    # Named refs dict
+                    created_ids[step.step_number] = {"_refs": ids}
+                else:
+                    # Single entity
+                    created_ids[step.step_number] = ids
+
+            logger.info(
+                f"Step {step.step_number} completed",
+                extra={"affected_rows": result.get("count", 0)}
+            )
+
+        # Success - calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
+
+        return ExecutionResult(
+            success=True,
+            affected_entities=self._count_affected(completed_steps, operations),
+            created_ids=created_ids,
+            execution_time_ms=execution_time_ms,
+            steps_completed=len(completed_steps),
+            steps_total=len(sorted_steps),
+        )
 
     def _resolve_dependencies(
         self, steps: list[ExecutionStep], operations: list[Operation]
@@ -279,6 +401,8 @@ class OperationExecutor:
         """
         Execute INSERT operation with reference resolution and business rules.
 
+        Optimizes bulk inserts by batching when entities have no cross-references.
+
         Args:
             operation: Insert operation
             table_schema: Table schema metadata
@@ -306,6 +430,30 @@ class OperationExecutor:
                 extra={"warnings": schema_validation.warnings}
             )
 
+        # Check if entities can be batch inserted (no cross-references)
+        can_batch = self._can_batch_insert(operation.new_entities)
+
+        if can_batch and len(operation.new_entities) > 1:
+            # OPTIMIZED: Batch insert all entities in single DB call
+            logger.debug(f"Batch inserting {len(operation.new_entities)} independent entities")
+            return await self._batch_insert_entities(
+                operation, table_schema, context
+            )
+        else:
+            # LEGACY: Sequential insert (has cross-references or single entity)
+            if not can_batch:
+                logger.debug("Using sequential insert (entities have cross-references)")
+            return await self._sequential_insert_entities(
+                operation, table_schema, context
+            )
+
+    async def _sequential_insert_entities(
+        self,
+        operation: Operation,
+        table_schema: Any,
+        context: dict[int, dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Sequential entity insertion (original behavior - for entities with cross-refs)."""
         inserted_entities = {}
         last_result = None
 
@@ -345,6 +493,81 @@ class OperationExecutor:
             return {"ids": last_result, "count": len(operation.new_entities)}
         else:
             return {"ids": {}, "count": 0}
+
+    async def _batch_insert_entities(
+        self,
+        operation: Operation,
+        table_schema: Any,
+        context: dict[int, dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Batch entity insertion (OPTIMIZED - for independent entities)."""
+        # Prepare all entities
+        resolved_entities = []
+        for entity in operation.new_entities:
+            # Resolve foreign key references from context
+            resolved_entity = self._resolve_references(entity, context)
+
+            # Auto-populate timestamp fields
+            resolved_entity = self._populate_timestamps(table_schema, resolved_entity, is_update=False)
+
+            # Validate against schema
+            validation = self.validator.validate_entity(table_schema.name, resolved_entity)
+            if not validation.valid:
+                raise ToolException(
+                    f"Validation failed for {table_schema.name}: {validation.errors}"
+                )
+
+            resolved_entities.append(resolved_entity)
+
+        # Batch insert all entities in single DB call
+        results = await self.storage.insert_entities(table_schema.name, resolved_entities)
+
+        # Map results to named refs if provided
+        inserted_entities = {}
+        if operation.entity_refs:
+            for ref_name, entity_idx in operation.entity_refs.items():
+                if entity_idx < len(results):
+                    inserted_entities[ref_name] = results[entity_idx]
+
+        # Return named refs or first entity for backward compatibility
+        if inserted_entities:
+            return {"ids": inserted_entities, "count": len(results)}
+        elif results:
+            return {"ids": results[0], "count": len(results)}
+        else:
+            return {"ids": {}, "count": 0}
+
+    def _can_batch_insert(self, entities: list[dict[str, Any]]) -> bool:
+        """
+        Check if entities can be batch inserted (no cross-references).
+
+        Entities CAN be batched if:
+        - No entity references another entity in same batch via $ref:
+
+        Args:
+            entities: List of entities to insert
+
+        Returns:
+            True if entities can be batch inserted, False if sequential insertion needed
+        """
+        # Scan all entities for $ref: references to other entities in same batch
+        for entity in entities:
+            for value in entity.values():
+                if isinstance(value, str) and value.startswith("$ref:"):
+                    # Found cross-reference - cannot batch
+                    return False
+                elif isinstance(value, dict):
+                    # Recursively check nested dicts
+                    if not self._can_batch_insert([value]):
+                        return False
+                elif isinstance(value, list):
+                    # Check list items
+                    for item in value:
+                        if isinstance(item, dict) and not self._can_batch_insert([item]) or isinstance(item, str) and item.startswith("$ref:"):
+                            return False
+
+        # No cross-references found - can batch
+        return True
 
     async def _execute_update(
         self,
@@ -591,7 +814,7 @@ class OperationExecutor:
             ToolException: If reference not found
         """
         # Search all steps for named reference
-        for step_num, step_context in context.items():
+        for _step_num, step_context in context.items():
             if isinstance(step_context, dict) and "_refs" in step_context:
                 refs = step_context["_refs"]
                 if ref_name in refs:
@@ -633,7 +856,7 @@ class OperationExecutor:
         Returns:
             Data with timestamps populated
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         result = data.copy()
 
@@ -642,11 +865,11 @@ class OperationExecutor:
 
         # Auto-populate created_at for INSERTs (if not already provided)
         if not is_update and 'created_at' in columns and 'created_at' not in result:
-            result['created_at'] = datetime.now(timezone.utc).isoformat()
+            result['created_at'] = datetime.now(UTC).isoformat()
 
         # Auto-populate updated_at for both INSERTs and UPDATEs (if not already provided)
         if 'updated_at' in columns and 'updated_at' not in result:
-            result['updated_at'] = datetime.now(timezone.utc).isoformat()
+            result['updated_at'] = datetime.now(UTC).isoformat()
 
         return result
 
@@ -674,66 +897,6 @@ class OperationExecutor:
             affected[table] += count
 
         return dict(affected)
-
-    async def _rollback(
-        self,
-        completed_steps: list[tuple[ExecutionStep, dict[str, Any]]],
-        operations: list[Operation],
-    ) -> None:
-        """
-        Rollback completed steps in reverse order.
-
-        Args:
-            completed_steps: Steps to rollback
-            operations: Operations list for resolving step.operation_index
-
-        Note: This is a best-effort rollback. For true ACID transactions,
-        database-level transaction support is needed.
-        """
-        logger.warning(
-            f"Rolling back {len(completed_steps)} completed steps",
-            extra={"steps_count": len(completed_steps)}
-        )
-
-        for step, result in reversed(completed_steps):
-            try:
-                operation = operations[step.operation_index]
-                if operation.op_type == "insert":
-                    # Delete inserted entities
-                    created_ids = result.get("ids", {})
-                    if created_ids:
-                        # Handle both named refs and direct IDs
-                        if isinstance(created_ids, dict):
-                            for entity_data in created_ids.values():
-                                if isinstance(entity_data, dict) and "id" in entity_data:
-                                    entity_id = entity_data["id"]
-                                else:
-                                    entity_id = entity_data
-                                await self._delete_entities(
-                                    operation.table,
-                                    {"id": entity_id}
-                                )
-                        logger.info(
-                            f"Rolled back INSERT for {operation.table}",
-                            extra={"count": len(created_ids)}
-                        )
-                elif operation.op_type == "update":
-                    # Cannot roll back updates without storing original values
-                    logger.warning(
-                        f"Cannot roll back UPDATE for {operation.table} (original values not stored)"
-                    )
-                elif operation.op_type == "delete":
-                    # Cannot roll back hard deletes
-                    if not result.get("soft_delete", False):
-                        logger.warning(
-                            f"Cannot roll back hard DELETE for {operation.table}"
-                        )
-            except Exception as e:
-                logger.error(
-                    f"Rollback failed for step {step.step_number}",
-                    exc_info=True,
-                    extra={"error": str(e)}
-                )
 
     # =========================================================================
     # Storage Adapter Methods
@@ -813,10 +976,12 @@ class OperationExecutor:
     ) -> list[dict[str, Any]]:
         """Query entities with optional relation includes.
 
+        Uses storage port method (no direct adapter access).
+
         Args:
             table: Table name
             filter: WHERE conditions as dict
-            include_relations: Related tables to include (Supabase foreign key syntax)
+            include_relations: Related tables to include (PostgREST foreign key syntax)
 
         Returns:
             List of matching entities
@@ -825,23 +990,17 @@ class OperationExecutor:
             ToolException: On query failure
         """
         try:
-            client = self.storage._ensure_client()
-
-            # Build select clause with relations
-            select_clause = "*"
+            # Format relations for PostgREST (e.g., "categories(*)")
+            formatted_relations = None
             if include_relations:
-                # Supabase relation syntax: table(...) for foreign keys
-                relation_selects = [f"{rel}(*)" for rel in include_relations]
-                select_clause = f"*, {', '.join(relation_selects)}"
+                formatted_relations = [f"{rel}(*)" for rel in include_relations]
 
-            query = client.table(table).select(select_clause)
-
-            # Apply filters
-            for key, value in filter.items():
-                query = query.eq(key, value)
-
-            result = query.execute()
-            return result.data if result.data else []
+            # Use port method with relation support
+            return await self.storage.query_advanced(
+                table=table,
+                filters=filter,
+                relations=formatted_relations
+            )
         except Exception as e:
             logger.error(f"Failed to query {table}", exc_info=True)
             raise ToolException(f"Query failed for {table}: {str(e)}") from e
@@ -852,7 +1011,7 @@ class OperationExecutor:
 # =============================================================================
 
 
-def create_execute_database_operation_tool(storage: StorageInterface):
+def create_execute_database_operation_tool(storage: StorageInterface) -> BaseTool:
     """
     Create universal database operation tool.
 
@@ -935,36 +1094,14 @@ def create_execute_database_operation_tool(storage: StorageInterface):
             )
         """
         try:
-            # Load schema first (needed for timestamp auto-population)
+            # Load schema for validation
             schema = SchemaRegistry.get_version(
                 version=schema_version,
                 domain=change_spec.get("domain", "product_catalog")
             )
 
-            # Auto-populate timestamp fields in change_spec BEFORE constructing OperationIntent
-            from datetime import datetime, timezone
-            for operation_dict in change_spec.get("operations", []):
-                table_name = operation_dict.get("table")
-                if not table_name:
-                    continue
-
-                table_schema = schema.get_table(table_name)
-                op_type = operation_dict.get("op_type")
-
-                # For INSERT operations, populate created_at and updated_at
-                if op_type == "insert" and operation_dict.get("new_entities"):
-                    for entity in operation_dict["new_entities"]:
-                        if 'created_at' in table_schema.columns and 'created_at' not in entity:
-                            entity['created_at'] = datetime.now(timezone.utc).isoformat()
-                        if 'updated_at' in table_schema.columns and 'updated_at' not in entity:
-                            entity['updated_at'] = datetime.now(timezone.utc).isoformat()
-
-                # For UPDATE operations, populate updated_at
-                elif op_type == "update" and operation_dict.get("field_updates"):
-                    if 'updated_at' in table_schema.columns and 'updated_at' not in operation_dict["field_updates"]:
-                        operation_dict["field_updates"]['updated_at'] = datetime.now(timezone.utc).isoformat()
-
-            # Construct OperationIntent from flat parameters (timestamps now populated in change_spec)
+            # Construct OperationIntent from flat parameters
+            # Note: Timestamps auto-populated in _populate_timestamps() during execution
             operation_intent = OperationIntent(
                 intent_type=intent_type,
                 change_spec=change_spec,
@@ -994,12 +1131,17 @@ def create_execute_database_operation_tool(storage: StorageInterface):
                         f"Schema validation failed: {validation.errors}"
                     )
 
+            # Validate completeness (operations match impact_analysis counts)
+            _validate_operation_completeness(
+                operations=operation_intent.change_spec.operations,
+                impact_analysis=operation_intent.impact_analysis.model_dump()
+            )
+
             # Execute plan
             executor = OperationExecutor(storage, schema)
             result = await executor.execute_plan(
                 steps=operation_intent.execution_plan.steps,
                 operations=operation_intent.change_spec.operations,
-                rollback_on_error=True,
             )
 
             if result.success:
@@ -1023,11 +1165,37 @@ def create_execute_database_operation_tool(storage: StorageInterface):
             return result.model_dump()
 
         except Exception as e:
+            # Catch errors that occur before execute_plan (schema validation, etc.)
+            # Return ExecutionResult instead of re-raising to allow agents to reason and retry
+            error_type = type(e).__name__
+            error_msg = str(e)
+
+            # Build actionable error message
+            if "schema validation" in error_msg.lower():
+                actionable_msg = f"SCHEMA_ERROR: {error_msg}\n\nAgent Action: Review change_spec structure. Ensure all required fields present and types correct."
+            elif "invalid table" in error_msg.lower():
+                actionable_msg = f"SCHEMA_ERROR: {error_msg}\n\nAgent Action: Use only valid table names from schema. Check available tables in schema registry."
+            elif "incomplete" in error_msg.lower():
+                actionable_msg = f"INCOMPLETE_DATA: {error_msg}\n\nAgent Action: Provide ALL entities claimed in impact_analysis. Partial data is forbidden."
+            else:
+                actionable_msg = f"{error_type}: {error_msg}\n\nAgent Action: Review operation structure and fix validation errors before retrying."
+
             logger.error(
-                "execute_database_operation failed",
+                "execute_database_operation failed before execution",
                 exc_info=True,
-                extra={"error_type": type(e).__name__, "error_msg": str(e)}
+                extra={"error_type": error_type, "error_msg": error_msg}
             )
-            raise ToolException(f"Database operation failed: {str(e)}") from e
+
+            # Return error result instead of throwing
+            error_result = ExecutionResult(
+                success=False,
+                error_message=actionable_msg,
+                error_step=0,  # Error before any steps executed
+                rollback_performed=False,
+                execution_time_ms=0,
+                steps_completed=0,
+                steps_total=0,
+            )
+            return error_result.model_dump()
 
     return execute_database_operation

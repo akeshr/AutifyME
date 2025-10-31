@@ -16,7 +16,6 @@ if sys.platform == 'win32':
 
 from tests.tools.intelligent_execution import intelligent_execute_scenario
 
-
 # Test scenario definition
 UPDATE_WITH_IMAGE_SCENARIO = """
 **Scenario:** UPDATE variant capacity from 500ml to 1L with product image
@@ -80,7 +79,7 @@ async def run_update_with_image_test():
     safe_print("\n" + "="*80)
     safe_print("INTELLIGENT TEST: Update 500ml to 1L with Image")
     safe_print("="*80)
-    safe_print("\nAI (gpt-4.1-mini) acts as real user with image attachment.\n")
+    safe_print("\nAI (Gemini 2.5 Flash) acts as real user with image attachment.\n")
 
     # Get image path
     fixture_image = Path(__file__).parent / "fixtures" / "images" / "PET_CAN_JAR_500ml.jpeg"
@@ -112,7 +111,7 @@ async def run_update_with_image_test():
         safe_print(f"Trace URL: {result.trace_url}")
 
     if not result.success:
-        safe_print(f"\nFailure Reason:")
+        safe_print("\nFailure Reason:")
         for error in result.errors:
             safe_print(f"  - {error}")
 

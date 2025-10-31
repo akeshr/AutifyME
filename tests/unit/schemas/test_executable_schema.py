@@ -12,8 +12,6 @@ works correctly across all scenarios before removing BusinessRuleHandlers.
 """
 
 import uuid
-from datetime import UTC, datetime
-from typing import Any
 
 import pytest
 from hypothesis import given, settings
@@ -23,18 +21,12 @@ from hypothesis import strategies as st
 pytestmark = pytest.mark.asyncio
 
 from autifyme_agents.schemas.registry import (
-    BusinessRule,
-    BusinessRuleTrigger,
     ColumnSchema,
     ColumnType,
-    Relationship,
-    RelationshipType,
     SchemaRegistry,
     TableSchema,
-    ValidationResult,
 )
 from tests.fixtures.fake_storage import FakeStorage
-
 
 # =============================================================================
 # Fixtures
@@ -348,6 +340,36 @@ class TestValidateBeforeUpdate:
         )
 
         assert result.valid
+
+    async def test_idempotent_update_to_same_value_passes(
+        self, simple_table, fake_storage
+    ):
+        """Idempotent update: updating record to same unique value it already has should pass.
+
+        This tests the critical fix for Issue #2 - exclude_ids prevents self-collision.
+        Scenario: Record has email='test@example.com', update same record to email='test@example.com'
+        Expected: Should PASS (idempotent operation, not a conflict)
+        """
+        # Create existing record with unique email
+        record_id = str(uuid.uuid4())
+        fake_storage.tables["test_table"] = [
+            {
+                "id": record_id,
+                "email": "test@example.com",
+                "username": "testuser",
+                "name": "Test User",
+            }
+        ]
+
+        # Update same record to same email value (idempotent update)
+        result = await simple_table.validate_before_update(
+            filters={"id": record_id},
+            updates={"email": "test@example.com", "name": "Test User Updated"},
+            storage=fake_storage,
+        )
+
+        # Should PASS - same record, same value = idempotent
+        assert result.valid, f"Idempotent update should pass, but got errors: {result.errors}"
 
 
 # =============================================================================
