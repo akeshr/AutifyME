@@ -85,17 +85,67 @@ class CatalogingWorkflowHandler:
         Returns:
             Summary string if found, None otherwise
         """
-        for message in reversed(messages):
+        logger.debug(
+            f"extract_summary: analyzing {len(messages)} messages",
+            extra={"message_count": len(messages)}
+        )
+
+        for idx, message in enumerate(reversed(messages)):
             message_type = getattr(message, "type", None)
             if not message_type and hasattr(message, "__class__"):
                 message_type = message.__class__.__name__.replace("Message", "").lower()
+
+            logger.debug(
+                f"extract_summary: checking message {len(messages) - idx - 1}",
+                extra={
+                    "message_index": len(messages) - idx - 1,
+                    "message_type": message_type,
+                    "has_content": hasattr(message, "content"),
+                }
+            )
+
             if message_type != "ai":
                 continue
 
             content = getattr(message, "content", None)
-            if isinstance(content, str):
+            logger.debug(
+                f"extract_summary: AI message found",
+                extra={
+                    "message_index": len(messages) - idx - 1,
+                    "content_type": type(content).__name__,
+                    "is_string": isinstance(content, str),
+                    "is_list": isinstance(content, list),
+                    "content_preview": str(content)[:200] if content else "None",
+                }
+            )
+
+            # Handle string content (OpenAI format)
+            if isinstance(content, str) and content.strip():
+                logger.info(
+                    f"extract_summary: extracted summary from string",
+                    extra={"summary_length": len(content)}
+                )
                 return content
 
+            # Handle list content (Gemini multimodal format)
+            # Gemini returns: [{"type": "text", "text": "actual message"}]
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        text = block.get("text", "")
+                        if text.strip():
+                            logger.info(
+                                f"extract_summary: extracted summary from list content",
+                                extra={"summary_length": len(text)}
+                            )
+                            return text
+
+                logger.warning(
+                    f"extract_summary: AI message has list content but no text blocks",
+                    extra={"content": content}
+                )
+
+        logger.warning("extract_summary: no AI message with string content found")
         return None
 
     def handle_interrupt(

@@ -276,18 +276,31 @@ class WorkflowRunner:
             # Debug: Log result structure and message details
             messages = result.get("messages", [])
 
-            # Log message types and content preview
+            # DETAILED LOGGING FOR GEMINI MESSAGE FORMAT DEBUGGING
             message_details = []
             for i, msg in enumerate(messages[-5:]):  # Last 5 messages
                 msg_type = getattr(msg, "type", None) or getattr(msg, "__class__", type(msg)).__name__
                 content_preview = str(getattr(msg, "content", ""))[:100] if hasattr(msg, "content") else "NO_CONTENT"
                 tool_calls = getattr(msg, "tool_calls", None)
-                message_details.append({
+
+                # CRITICAL: Log exact message structure for debugging
+                msg_dict = {
                     "index": len(messages) - 5 + i if len(messages) > 5 else i,
                     "type": msg_type,
+                    "class_name": msg.__class__.__name__ if hasattr(msg, "__class__") else "UNKNOWN",
+                    "has_type_attr": hasattr(msg, "type"),
+                    "type_attr_value": getattr(msg, "type", None),
+                    "content_type": type(getattr(msg, "content", None)).__name__,
                     "content_preview": content_preview,
                     "has_tool_calls": bool(tool_calls) if tool_calls is not None else None,
-                })
+                }
+                message_details.append(msg_dict)
+
+                # Log each message individually for clarity
+                logger.debug(
+                    f"Message {i} details: {msg_dict}",
+                    extra={"message_structure": msg_dict}
+                )
 
             logger.info(
                 "PM result received - analyzing messages",

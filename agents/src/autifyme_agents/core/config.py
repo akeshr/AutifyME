@@ -1,5 +1,4 @@
 from dotenv import load_dotenv
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
@@ -20,12 +19,12 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str
     SUPABASE_SERVICE_ROLE_KEY: str | None = None
     DATABASE_URL: str  # PostgreSQL connection for LangGraph checkpointer
-    WHATSAPP_PHONE_NUMBER_ID: str | None = Field(default=None, env="WHATSAPP_PHONE_NUMBER_ID")
-    WHATSAPP_BUSINESS_ACCOUNT_ID: str | None = Field(default=None, env="WHATSAPP_BUSINESS_ACCOUNT_ID")
-    WHATSAPP_ACCESS_TOKEN: str | None = Field(default=None, env="WHATSAPP_ACCESS_TOKEN")
-    WHATSAPP_API_VERSION: str = Field(default="v23.0", env="WHATSAPP_API_VERSION")
-    WHATSAPP_WEBHOOK_VERIFY_TOKEN: str | None = Field(default=None, env="WHATSAPP_WEBHOOK_VERIFY_TOKEN")
-    AGENT_RECURSION_LIMIT: int = Field(default=50, env="AGENT_RECURSION_LIMIT")
+    WHATSAPP_PHONE_NUMBER_ID: str | None = None
+    WHATSAPP_BUSINESS_ACCOUNT_ID: str | None = None
+    WHATSAPP_ACCESS_TOKEN: str | None = None
+    WHATSAPP_API_VERSION: str = "v23.0"
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: str | None = None
+    AGENT_RECURSION_LIMIT: int = 50
 
 
 # Create a single, globally accessible instance of the settings.
