@@ -526,10 +526,6 @@ class CustomerSegment(BaseModel):
     )
 
     # Metadata
-    is_primary: bool = Field(
-        default=False,
-        description="Whether this is the primary segment for the product family."
-    )
     created_at: datetime | None = Field(
         default=None,
         description="Creation timestamp (database-generated)."

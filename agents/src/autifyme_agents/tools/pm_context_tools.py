@@ -85,7 +85,7 @@ def create_search_catalog_summary_tool(storage: StorageInterface):
     """
 
     @tool
-    def search_catalog_summary(query: str) -> CatalogSearchSummary:
+    async def search_catalog_summary(query: str) -> CatalogSearchSummary:
         """Search catalog for product families matching query.
 
         Summary-level search (family names and counts only). Use this to:
@@ -107,22 +107,16 @@ def create_search_catalog_summary_tool(storage: StorageInterface):
             → matches: [{"name": "PET Bottles", "variant_count": 48}, {"name": "Glass Bottles", "variant_count": 24}]
         """
         try:
-            client = storage._ensure_client()
-
             # Case-insensitive substring search on product family names
-            # Use ilike for PostgreSQL case-insensitive LIKE
             search_pattern = f"%{query}%"
 
-            # Query product families with variant counts
-            families_response = (
-                client.table("product_families")
-                .select("id, name, category_id")
-                .ilike("name", search_pattern)
-                .limit(11)  # Fetch 11 to detect has_more
-                .execute()
+            # Query product families with search pattern
+            families = await storage.query_advanced(
+                table="product_families",
+                columns=["id", "name", "category_id"],
+                search_patterns={"name": search_pattern},
+                limit=11  # Fetch 11 to detect has_more
             )
-
-            families = families_response.data or []
 
             if not families:
                 return CatalogSearchSummary(
@@ -141,26 +135,22 @@ def create_search_catalog_summary_tool(storage: StorageInterface):
                 family_id = family["id"]
 
                 # Count variants for this family
-                variants_response = (
-                    client.table("products")
-                    .select("id", count="exact")
-                    .eq("product_family_id", family_id)
-                    .execute()
+                variant_count = await storage.query_advanced(
+                    table="products",
+                    filters={"product_family_id": family_id},
+                    count_only=True
                 )
-                variant_count = variants_response.count or 0
 
                 # Get category name if category_id exists
                 category_name = None
                 if family.get("category_id"):
                     try:
-                        category_response = (
-                            client.table("categories")
-                            .select("name")
-                            .eq("id", family["category_id"])
-                            .single()
-                            .execute()
+                        categories = await storage.query_entities(
+                            table="categories",
+                            filters={"id": family["category_id"]},
+                            columns=["name"]
                         )
-                        category_name = category_response.data.get("name") if category_response.data else None
+                        category_name = categories[0]["name"] if categories else None
                     except Exception as e:
                         logger.warning(f"Failed to fetch category name: {e}")
 
@@ -212,7 +202,7 @@ def create_get_category_info_tool(storage: StorageInterface):
     """
 
     @tool
-    def get_category_info(category_name: str) -> CategoryInfo:
+    async def get_category_info(category_name: str) -> CategoryInfo:
         """Get category details and product counts.
 
         Summary-level taxonomy query. Use this to:
@@ -231,58 +221,49 @@ def create_get_category_info_tool(storage: StorageInterface):
             → {id: "...", name: "Food & Beverage", subcategory_count: 3, product_family_count: 15}
         """
         try:
-            client = storage._ensure_client()
-
             # Case-insensitive exact match on category name
-            category_response = (
-                client.table("categories")
-                .select("id, name, parent_id")
-                .ilike("name", category_name)
-                .limit(1)
-                .execute()
+            categories = await storage.query_advanced(
+                table="categories",
+                columns=["id", "name", "parent_id"],
+                search_patterns={"name": category_name},
+                limit=1
             )
 
-            if not category_response.data or len(category_response.data) == 0:
+            if not categories:
                 raise ToolException(
                     f"Category '{category_name}' not found in taxonomy. "
                     "Check base_context.taxonomy_tree for available categories."
                 )
 
-            category = category_response.data[0]
+            category = categories[0]
             category_id = UUID(category["id"])
 
             # Get parent category name if exists
             parent_name = None
             if category.get("parent_id"):
                 try:
-                    parent_response = (
-                        client.table("categories")
-                        .select("name")
-                        .eq("id", category["parent_id"])
-                        .single()
-                        .execute()
+                    parents = await storage.query_entities(
+                        table="categories",
+                        filters={"id": category["parent_id"]},
+                        columns=["name"]
                     )
-                    parent_name = parent_response.data.get("name") if parent_response.data else None
+                    parent_name = parents[0]["name"] if parents else None
                 except Exception as e:
                     logger.warning(f"Failed to fetch parent category name: {e}")
 
             # Count subcategories
-            subcategories_response = (
-                client.table("categories")
-                .select("id", count="exact")
-                .eq("parent_id", str(category_id))
-                .execute()
+            subcategory_count = await storage.query_advanced(
+                table="categories",
+                filters={"parent_id": str(category_id)},
+                count_only=True
             )
-            subcategory_count = subcategories_response.count or 0
 
             # Count product families in this category
-            families_response = (
-                client.table("product_families")
-                .select("id", count="exact")
-                .eq("category_id", str(category_id))
-                .execute()
+            product_family_count = await storage.query_advanced(
+                table="product_families",
+                filters={"category_id": str(category_id)},
+                count_only=True
             )
-            product_family_count = families_response.count or 0
 
             logger.info(
                 "Category info retrieved",

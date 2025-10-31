@@ -99,7 +99,11 @@ def create_product_architecture_specialist(
         from autifyme_agents.tools.product_search_tools import (
             create_search_product_families_tool,
         )
+        from autifyme_agents.tools.query_database_tool import (
+            create_query_database_tool,
+        )
         tools.append(create_search_product_families_tool(storage))
+        tools.append(create_query_database_tool(storage))
 
     return {
         "name": "product_architecture_specialist",

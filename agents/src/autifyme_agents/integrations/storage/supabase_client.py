@@ -576,6 +576,7 @@ class SupabaseStorageClient(StorageInterface):
         table: str,
         column: str,
         values: list[Any],
+        exclude_ids: list[Any] | None = None,
     ) -> list[Any]:
         """Batch check which values exist in column.
 
@@ -583,6 +584,8 @@ class SupabaseStorageClient(StorageInterface):
             table: Table name
             column: Column to check
             values: Values to check for existence
+            exclude_ids: Optional list of record IDs to exclude from check
+                        (enables idempotent update validation)
 
         Returns:
             List of values that exist
@@ -597,7 +600,13 @@ class SupabaseStorageClient(StorageInterface):
             client = await self._ensure_async_client()
 
             # Use PostgREST's 'in' operator for batch check
-            response = await client.table(table).select(column).in_(column, values).execute()
+            query = client.table(table).select(column).in_(column, values)
+
+            # Exclude specific IDs from check (for update validation)
+            if exclude_ids:
+                query = query.not_.in_("id", exclude_ids)
+
+            response = await query.execute()
 
             if not response.data:
                 return []
@@ -615,6 +624,92 @@ class SupabaseStorageClient(StorageInterface):
             raise StorageError(
                 message=f"Existence check failed for {table}.{column}: {str(e)}",
                 operation="check_existing_values",
+                original_error=e,
+            ) from e
+
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: bool = False,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]] | int:
+        """Advanced query with relations, pattern matching, and counting.
+
+        Args:
+            table: Table name
+            filters: Exact match filters
+            columns: Columns to select
+            relations: Related tables using PostgREST syntax
+            search_patterns: ILIKE patterns for search
+            count_only: Return count instead of rows
+            limit: Maximum rows to return
+
+        Returns:
+            List of rows or count
+
+        Raises:
+            StorageError: On query failure
+        """
+        try:
+            client = await self._ensure_async_client()
+
+            # Build select clause with relations
+            if count_only:
+                select_clause = "*"  # Count needs at least one column
+            elif columns and not relations:
+                select_clause = ",".join(columns)
+            elif relations:
+                # Include columns and relations
+                base_cols = ",".join(columns) if columns else "*"
+                relation_clauses = [f"{rel}" for rel in relations]
+                select_clause = f"{base_cols},{','.join(relation_clauses)}"
+            else:
+                select_clause = "*"
+
+            query = client.table(table).select(
+                select_clause,
+                count="exact" if count_only else None
+            )
+
+            # Apply exact match filters
+            if filters:
+                for key, value in filters.items():
+                    query = query.eq(key, value)
+
+            # Apply ILIKE search patterns
+            if search_patterns:
+                for key, pattern in search_patterns.items():
+                    query = query.ilike(key, pattern)
+
+            # Apply limit
+            if limit:
+                query = query.limit(limit)
+
+            response = await query.execute()
+
+            # Return count or rows
+            if count_only:
+                return response.count if response.count is not None else 0
+
+            return response.data if response.data else []
+
+        except Exception as e:
+            logger.error(
+                f"Advanced query failed for {table}",
+                exc_info=True,
+                extra={
+                    "table": table,
+                    "filters": filters,
+                    "search_patterns": search_patterns,
+                }
+            )
+            raise StorageError(
+                message=f"Advanced query failed for {table}: {str(e)}",
+                operation="query_advanced",
                 original_error=e,
             ) from e
 

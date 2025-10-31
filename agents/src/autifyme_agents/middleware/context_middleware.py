@@ -41,17 +41,19 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
         Exception: If DB query fails (caller handles graceful degradation)
     """
     try:
-        client = storage._ensure_client()
-
         # Query 1: Total families (include category_id for top categories)
-        families_response = client.table("product_families").select("id, name, category_id").execute()
-        families = families_response.data or []
+        families = await storage.query_advanced(
+            table="product_families",
+            columns=["id", "name", "category_id"]
+        )
         total_families = len(families)
         family_names = [f["name"] for f in families]
 
-        # Query 2: Total SKUs
-        skus_response = client.table("products").select("id", count="exact").execute()
-        total_skus = skus_response.count or 0
+        # Query 2: Total SKUs (count only)
+        total_skus = await storage.query_advanced(
+            table="products",
+            count_only=True
+        )
 
         # Query 3: Top categories (from product families)
         # Get category_id from families, then lookup category names
@@ -68,13 +70,12 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
             top_cat_ids = sorted(category_counts.keys(), key=lambda x: category_counts[x], reverse=True)[:5]
 
             if top_cat_ids:
-                categories_response = (
-                    client.table("categories")
-                    .select("id, name")
-                    .in_("id", [str(c) for c in top_cat_ids])
-                    .execute()
+                # Query categories for top IDs
+                categories = await storage.query_entities(
+                    table="categories",
+                    filters={"id": {"in": [str(c) for c in top_cat_ids]}},
+                    columns=["id", "name"]
                 )
-                categories = categories_response.data or []
                 top_categories = [c["name"] for c in categories]
 
         logger.info(
@@ -120,15 +121,11 @@ async def load_taxonomy_tree(storage: StorageInterface) -> TaxonomyTree:
         Exception: If DB query fails (caller handles graceful degradation)
     """
     try:
-        client = storage._ensure_client()
-
         # Query all categories with parent_id
-        categories_response = (
-            client.table("categories")
-            .select("id, name, parent_id")
-            .execute()
+        categories_data = await storage.query_advanced(
+            table="categories",
+            columns=["id", "name", "parent_id"]
         )
-        categories_data = categories_response.data or []
 
         if not categories_data:
             logger.warning("No categories found in database - empty taxonomy tree")

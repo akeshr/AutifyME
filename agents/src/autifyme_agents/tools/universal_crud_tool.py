@@ -853,10 +853,12 @@ class OperationExecutor:
     ) -> list[dict[str, Any]]:
         """Query entities with optional relation includes.
 
+        Uses storage port method (no direct adapter access).
+
         Args:
             table: Table name
             filter: WHERE conditions as dict
-            include_relations: Related tables to include (Supabase foreign key syntax)
+            include_relations: Related tables to include (PostgREST foreign key syntax)
 
         Returns:
             List of matching entities
@@ -865,23 +867,17 @@ class OperationExecutor:
             ToolException: On query failure
         """
         try:
-            client = self.storage._ensure_client()
-
-            # Build select clause with relations
-            select_clause = "*"
+            # Format relations for PostgREST (e.g., "categories(*)")
+            formatted_relations = None
             if include_relations:
-                # Supabase relation syntax: table(...) for foreign keys
-                relation_selects = [f"{rel}(*)" for rel in include_relations]
-                select_clause = f"*, {', '.join(relation_selects)}"
+                formatted_relations = [f"{rel}(*)" for rel in include_relations]
 
-            query = client.table(table).select(select_clause)
-
-            # Apply filters
-            for key, value in filter.items():
-                query = query.eq(key, value)
-
-            result = query.execute()
-            return result.data if result.data else []
+            # Use port method with relation support
+            return await self.storage.query_advanced(
+                table=table,
+                filters=filter,
+                relations=formatted_relations
+            )
         except Exception as e:
             logger.error(f"Failed to query {table}", exc_info=True)
             raise ToolException(f"Query failed for {table}: {str(e)}") from e

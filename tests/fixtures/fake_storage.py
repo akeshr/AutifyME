@@ -181,17 +181,73 @@ class FakeStorage(StorageInterface):
         table: str,
         column: str,
         values: list[Any],
+        exclude_ids: list[Any] | None = None,
     ) -> list[Any]:
-        """Batch check which values exist."""
+        """Batch check which values exist, optionally excluding specific IDs."""
         table_data = self.tables.get(table, [])
         existing_values = []
 
         for row in table_data:
+            # Skip excluded IDs (for idempotent update validation)
+            if exclude_ids and row.get("id") in exclude_ids:
+                continue
+
             value = row.get(column)
             if value in values and value not in existing_values:
                 existing_values.append(value)
 
         return existing_values
+
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: bool = False,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]] | int:
+        """Advanced query with simplified implementation for testing.
+
+        Note: Relations are not fully implemented - just returns base data.
+        """
+        table_data = self.tables.get(table, [])
+
+        # Apply filters
+        results = []
+        for row in table_data:
+            # Exact match filters
+            if filters:
+                match = all(row.get(k) == v for k, v in filters.items())
+                if not match:
+                    continue
+
+            # ILIKE search patterns (simplified case-insensitive substring match)
+            if search_patterns:
+                pattern_match = all(
+                    pattern.strip("%").lower() in str(row.get(k, "")).lower()
+                    for k, pattern in search_patterns.items()
+                )
+                if not pattern_match:
+                    continue
+
+            # Column filtering
+            if columns:
+                filtered_row = {k: row.get(k) for k in columns}
+                results.append(filtered_row)
+            else:
+                results.append(row.copy())
+
+        # Apply limit
+        if limit and not count_only:
+            results = results[:limit]
+
+        # Return count or rows
+        if count_only:
+            return len(results)
+
+        return results
 
     async def insert_entity(
         self,

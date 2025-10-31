@@ -250,7 +250,8 @@ class TableSchema(BaseModel):
         """
         Validate update operation.
 
-        Currently minimal validation - can be extended for update-specific rules.
+        Validates unique constraints while supporting idempotent updates
+        (same record, same value = valid).
 
         Args:
             filters: Filters identifying records to update
@@ -265,14 +266,36 @@ class TableSchema(BaseModel):
         # Check that updates don't violate unique constraints
         unique_columns = self.get_unique_columns()
 
+        # Early exit if no unique columns being updated
+        if not any(col in updates and updates[col] is not None for col in unique_columns):
+            return result
+
+        # Get IDs of records being updated (to exclude from uniqueness check)
+        exclude_ids = []
+        try:
+            target_records = await storage.query_entities(
+                table=self.name,
+                filters=filters,
+                columns=["id"]
+            )
+            exclude_ids = [str(rec["id"]) for rec in target_records if "id" in rec]
+        except Exception as e:
+            logger.warning(
+                f"Could not query target record IDs for {self.name}",
+                exc_info=True,
+                extra={"filters": filters}
+            )
+            # Continue without exclude_ids - will do basic uniqueness check
+
+        # Validate unique constraints
         for col in unique_columns:
             if col in updates and updates[col] is not None:
-                # Check if value already exists (excluding current record)
                 try:
                     existing = await storage.check_existing_values(
                         table=self.name,
                         column=col,
-                        values=[updates[col]]
+                        values=[updates[col]],
+                        exclude_ids=exclude_ids if exclude_ids else None
                     )
 
                     if existing:
