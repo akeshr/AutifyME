@@ -10,6 +10,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from deepagents import create_deep_agent
+from langchain.agents.middleware import SummarizationMiddleware
 from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -175,15 +176,26 @@ async def create_project_manager(
         "execute_database_operation": True,
         "save_campaign": True,
     }
+
+    # Summarization middleware with reasonable threshold (30K tokens vs default 170K)
+    # Triggers summarization much earlier to prevent context bloat
+    # Keeps last 10 messages intact for immediate context
+    summarization_middleware = SummarizationMiddleware(
+        model=llm,
+        max_tokens_before_summary=30000,  # Trigger at 30K tokens (vs default 170K)
+        messages_to_keep=10,  # Keep last 10 messages (vs default 6)
+    )
+
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
         subagents=subagents,
+        middleware=[summarization_middleware],  # Custom summarization config
         interrupt_on=interrupt_configs,
         checkpointer=checkpointer,
         store=store,
-        use_longterm_memory=True,
+        use_longterm_memory=False,  # Disabled - using custom middleware instead
         context_schema=CompanyContext,
     )
 
