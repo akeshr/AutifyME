@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 
 def get_llm(
     provider: str = "google",
-    model: str = "gemini-2.5-flash",
+    model: str = "gemini-2.5-flash-lite",
     temperature: float = 0.0,
     tags: list[str] | None = None,
     reasoning_effort: str = "low",

@@ -66,7 +66,7 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
     """
     if llm is None:
         # Use gemini-2.5-flash for fast, deterministic approval interpretation
-        llm = get_llm(provider="google", model="gemini-2.5-flash", temperature=0.2)
+        llm = get_llm(provider="google", model="gemini-2.5-flash-lite", temperature=0.2)
 
     # Configure LLM for structured output
     # Use function_calling method to avoid OpenAI schema validation issues

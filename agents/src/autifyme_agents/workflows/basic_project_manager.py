@@ -23,7 +23,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     """Return configured LLM for PM. Defaults to gemini-2.5-flash."""
     if model is not None:
         return model
-    return get_llm(provider="google", model="gemini-2.5-flash", temperature=0.2)
+    return get_llm(provider="google", model="gemini-2.5-flash-lite", temperature=0.2)
 
 
 def _load_prompt(

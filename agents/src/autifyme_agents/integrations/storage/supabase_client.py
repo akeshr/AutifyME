@@ -743,7 +743,11 @@ class SupabaseStorageClient(StorageInterface):
             # Apply exact match filters
             if filters:
                 for key, value in filters.items():
-                    query = query.eq(key, value)
+                    if isinstance(value, list):
+                        # List value - use IN operator
+                        query = query.in_(key, value)
+                    else:
+                        query = query.eq(key, value)
 
             # Apply ILIKE search patterns
             if search_patterns:
