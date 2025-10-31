@@ -1063,14 +1063,25 @@ def create_execute_database_operation_tool(storage: StorageInterface):
             return result.model_dump()
 
         except ToolException as e:
-            # ToolException should propagate to LangChain framework for proper handling
+            # Catch ToolException and return ExecutionResult so PM can reason and potentially retry
+            # This allows PM to analyze error_message and delegate back to specialist for correction
             logger.error(
                 "execute_database_operation failed with ToolException",
                 exc_info=True,
                 extra={"error_type": "ToolException", "error_msg": str(e)}
             )
-            # Re-raise ToolException so LangChain can handle it properly
-            raise
+
+            # Return error result so PM can handle gracefully (retry, delegate to specialist, etc.)
+            error_result = ExecutionResult(
+                success=False,
+                error_message=str(e),  # Clear error message for PM to reason about
+                error_step=0,  # Error before any steps executed (or during validation)
+                rollback_performed=False,
+                execution_time_ms=0,
+                steps_completed=0,
+                steps_total=0,
+            )
+            return error_result.model_dump()
 
         except Exception as e:
             # Catch unexpected errors that occur before execute_plan (schema loading, etc.)
