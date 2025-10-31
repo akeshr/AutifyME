@@ -552,9 +552,34 @@ class SupabaseStorageClient(StorageInterface):
             select_clause = ",".join(columns) if columns else "*"
             query = client.table(table).select(select_clause)
 
-            # Apply filters
+            # Apply filters (support both simple and operator-based)
             for key, value in filters.items():
-                query = query.eq(key, value)
+                if isinstance(value, dict):
+                    # Advanced filter with operator: {"in": [...], "gt": ..., etc.}
+                    for operator, operand in value.items():
+                        if operator == "in":
+                            query = query.in_(key, operand)
+                        elif operator == "eq":
+                            query = query.eq(key, operand)
+                        elif operator == "neq":
+                            query = query.neq(key, operand)
+                        elif operator == "gt":
+                            query = query.gt(key, operand)
+                        elif operator == "gte":
+                            query = query.gte(key, operand)
+                        elif operator == "lt":
+                            query = query.lt(key, operand)
+                        elif operator == "lte":
+                            query = query.lte(key, operand)
+                        elif operator == "like":
+                            query = query.like(key, operand)
+                        elif operator == "ilike":
+                            query = query.ilike(key, operand)
+                        else:
+                            raise ValueError(f"Unsupported filter operator: {operator}")
+                else:
+                    # Simple equality filter
+                    query = query.eq(key, value)
 
             response = await query.execute()
             return response.data if response.data else []
