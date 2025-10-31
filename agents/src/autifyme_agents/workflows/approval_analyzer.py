@@ -28,6 +28,7 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.schemas.approval import BatchApprovalResponse
 from autifyme_agents.schemas.interrupt import InterruptInfo
+from autifyme_agents.workflows.message_utils import extract_text_content
 
 logger = logging.getLogger(__name__)
 
@@ -129,10 +130,13 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
                 if msg_type is None:
                     msg_type = 'unknown'
 
-                content = getattr(msg, 'content', str(msg))
-                if isinstance(content, str) and len(content) > 0:
+                # Extract text content (handles both OpenAI string and Gemini list formats)
+                raw_content = getattr(msg, 'content', None)
+                text_content = extract_text_content(raw_content) if raw_content else None
+
+                if text_content and len(text_content) > 0:
                     # Truncate long messages
-                    preview = content[:200] + "..." if len(content) > 200 else content
+                    preview = text_content[:200] + "..." if len(text_content) > 200 else text_content
                     history_lines.append(f"[{msg_type.upper()}]: {preview}")
 
         formatted = {

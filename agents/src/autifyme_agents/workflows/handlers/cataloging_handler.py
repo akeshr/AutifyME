@@ -7,6 +7,7 @@ from typing import Any
 
 from autifyme_agents.schemas.models import CatalogingResult, Product
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
+from autifyme_agents.workflows.message_utils import extract_text_content
 from autifyme_agents.workflows.orchestration.message_formatter import (
     format_batch_approval_message,
     format_operation_intent_approval_message,
@@ -119,31 +120,14 @@ class CatalogingWorkflowHandler:
                 }
             )
 
-            # Handle string content (OpenAI format)
-            if isinstance(content, str) and content.strip():
+            # Extract text from content (handles both OpenAI string and Gemini list formats)
+            text = extract_text_content(content)
+            if text:
                 logger.info(
-                    f"extract_summary: extracted summary from string",
-                    extra={"summary_length": len(content)}
+                    f"extract_summary: extracted summary",
+                    extra={"summary_length": len(text), "content_format": type(content).__name__}
                 )
-                return content
-
-            # Handle list content (Gemini multimodal format)
-            # Gemini returns: [{"type": "text", "text": "actual message"}]
-            if isinstance(content, list):
-                for block in content:
-                    if isinstance(block, dict) and block.get("type") == "text":
-                        text = block.get("text", "")
-                        if text.strip():
-                            logger.info(
-                                f"extract_summary: extracted summary from list content",
-                                extra={"summary_length": len(text)}
-                            )
-                            return text
-
-                logger.warning(
-                    f"extract_summary: AI message has list content but no text blocks",
-                    extra={"content": content}
-                )
+                return text
 
         logger.warning("extract_summary: no AI message with string content found")
         return None

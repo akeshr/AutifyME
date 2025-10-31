@@ -52,7 +52,8 @@
       "SlashCommand(/test-intelligent)",
       "Bash(supabase --version:*)",
       "Bash(git checkout:*)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []
