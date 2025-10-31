@@ -16,7 +16,6 @@ if sys.platform == 'win32':
 
 from tests.tools.intelligent_execution import intelligent_execute_scenario
 
-
 # Test scenario definition
 UPDATE_WITH_IMAGE_SCENARIO = """
 **Scenario:** UPDATE variant capacity from 500ml to 1L with product image
@@ -112,7 +111,7 @@ async def run_update_with_image_test():
         safe_print(f"Trace URL: {result.trace_url}")
 
     if not result.success:
-        safe_print(f"\nFailure Reason:")
+        safe_print("\nFailure Reason:")
         for error in result.errors:
             safe_print(f"  - {error}")
 

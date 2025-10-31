@@ -12,8 +12,6 @@ works correctly across all scenarios before removing BusinessRuleHandlers.
 """
 
 import uuid
-from datetime import UTC, datetime
-from typing import Any
 
 import pytest
 from hypothesis import given, settings
@@ -23,18 +21,12 @@ from hypothesis import strategies as st
 pytestmark = pytest.mark.asyncio
 
 from autifyme_agents.schemas.registry import (
-    BusinessRule,
-    BusinessRuleTrigger,
     ColumnSchema,
     ColumnType,
-    Relationship,
-    RelationshipType,
     SchemaRegistry,
     TableSchema,
-    ValidationResult,
 )
 from tests.fixtures.fake_storage import FakeStorage
-
 
 # =============================================================================
 # Fixtures

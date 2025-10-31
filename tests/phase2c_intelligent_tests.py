@@ -25,8 +25,7 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from tests.tools.intelligent_execution import intelligent_execute_scenario
-from tests.tools.trace_analysis import get_trace_overview, get_llm_trace_tree
-
+from tests.tools.trace_analysis import get_llm_trace_tree, get_trace_overview
 
 # =============================================================================
 # Test Scenario Definitions
@@ -276,22 +275,22 @@ async def run_scenario_test(scenario_name: str, scenario_desc: str):
         safe_print(f"[Trace]: {result.trace_url}")
 
     if not result.success:
-        safe_print(f"\n[Warning]:  FAILURE REASON:")
+        safe_print("\n[Warning]:  FAILURE REASON:")
         safe_print(f"   {result.errors}")
 
         if result.trace_id and result.trace_id != "unknown":
-            safe_print(f"\n[Analyzing]: trace...")
+            safe_print("\n[Analyzing]: trace...")
             try:
                 # Get trace overview
                 overview = get_trace_overview(result.trace_id)
-                safe_print(f"\n   Trace Overview:")
+                safe_print("\n   Trace Overview:")
                 safe_print(f"   - Total runs: {overview.get('total_runs', 'N/A')}")
                 safe_print(f"   - Errors: {overview.get('error_count', 0)}")
 
                 # Get LLM call tree
                 tree = get_llm_trace_tree(result.trace_id)
                 if tree:
-                    safe_print(f"\n   LLM Call Tree:")
+                    safe_print("\n   LLM Call Tree:")
                     for call in tree[:5]:  # Show first 5 calls
                         safe_print(f"   - {call.get('name', 'Unknown')}: {call.get('status', 'N/A')}")
 

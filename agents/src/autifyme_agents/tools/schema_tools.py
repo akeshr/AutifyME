@@ -107,12 +107,12 @@ def get_product_schema(
 
         # Optionally filter out business rules
         if not include_business_rules:
-            for table_name, table_data in schema_dict["tables"].items():
+            for _table_name, table_data in schema_dict["tables"].items():
                 if "business_rules" in table_data:
                     table_data["business_rules"] = []
 
         logger.info(
-            f"Schema loaded successfully",
+            "Schema loaded successfully",
             extra={
                 "version": schema.version,
                 "tables_count": len(schema.tables)

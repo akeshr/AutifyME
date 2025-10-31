@@ -22,12 +22,12 @@ Model: gemini-2.5-computer-use-preview-10-2025
 Benchmarks: 70% accuracy on Online-Mind2Web
 """
 
-import asyncio
 import base64
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Literal
+from typing import Any
 
 try:
     from google import genai

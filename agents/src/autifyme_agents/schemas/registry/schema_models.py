@@ -279,7 +279,7 @@ class TableSchema(BaseModel):
                 columns=["id"]
             )
             exclude_ids = [str(rec["id"]) for rec in target_records if "id" in rec]
-        except Exception as e:
+        except Exception:
             logger.warning(
                 f"Could not query target record IDs for {self.name}",
                 exc_info=True,

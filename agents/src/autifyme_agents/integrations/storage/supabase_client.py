@@ -50,7 +50,7 @@ class SupabaseStorageClient(StorageInterface):
         self._service_key = derived_key
         self._client: Client | None = client
         self._async_client: AsyncClient | None = None  # Async client for non-blocking ops
-        self._current_transaction: "SupabaseTransaction | None" = None  # Track active transaction
+        self._current_transaction: SupabaseTransaction | None = None  # Track active transaction
 
     def __enter__(self) -> SupabaseStorageClient:
         """Enter context manager - ensures client is initialized.
@@ -1084,7 +1084,7 @@ class SupabaseTransaction:
     3. Application-level saga pattern with compensation
     """
 
-    def __init__(self, storage: "SupabaseStorageClient"):
+    def __init__(self, storage: SupabaseStorageClient):
         """Initialize transaction with storage reference."""
         self.storage = storage
         self.operations: list[dict[str, Any]] = []

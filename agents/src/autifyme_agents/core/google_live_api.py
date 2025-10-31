@@ -24,7 +24,7 @@ For full implementation, use Google's official Live API client library.
 """
 
 import os
-from typing import AsyncIterator, Callable, Literal
+from collections.abc import Callable
 
 try:
     import google.genai as genai
@@ -33,7 +33,7 @@ except ImportError:
     raise ImportError(
         "google-generativeai package with Live API support required. "
         "Install with: uv pip install google-generativeai[live]"
-    )
+    ) from None
 
 
 class GeminiLiveSession:

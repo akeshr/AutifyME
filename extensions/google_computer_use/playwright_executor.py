@@ -28,10 +28,9 @@ Usage:
 """
 
 import asyncio
-from typing import Any
 
 try:
-    from playwright.async_api import async_playwright, Browser, Page, Playwright
+    from playwright.async_api import Browser, Page, Playwright, async_playwright
 except ImportError:
     raise ImportError(
         "Playwright required for PlaywrightExecutor. "

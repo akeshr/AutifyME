@@ -23,7 +23,6 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
@@ -328,7 +327,7 @@ async def intelligent_execute_scenario(
         last_message_count = 0
         interrupt_occurred = False
 
-        for turn in range(max_turns):
+        for _turn in range(max_turns):
             time.sleep(1.0)  # Give PM time to respond
 
             # Check for new PM messages
@@ -368,15 +367,15 @@ async def intelligent_execute_scenario(
                 if msg.get("type") == "text":
                     safe_print(f"\n[PM -> USER] {msg['message'][:200]}...")
                 elif msg.get("type") == "approval_request":
-                    safe_print(f"\n[PM -> USER] [HITL APPROVAL REQUEST]")
+                    safe_print("\n[PM -> USER] [HITL APPROVAL REQUEST]")
                     interrupt_occurred = True
                 elif msg.get("type") == "completion":
-                    safe_print(f"\n[PM -> USER] [COMPLETION]")
+                    safe_print("\n[PM -> USER] [COMPLETION]")
                 elif msg.get("type") == "error":
                     safe_print(f"\n[PM -> USER] [ERROR: {msg['error_type']}]")
 
             # Ask AI how to respond
-            safe_print(f"\n[AI] Analyzing PM's messages...")
+            safe_print("\n[AI] Analyzing PM's messages...")
             decision = _ask_ai_how_to_respond(
                 pm_messages=new_messages,
                 scenario_context=full_scenario,
@@ -392,7 +391,7 @@ async def intelligent_execute_scenario(
                 safe_print("DEBUG MODE ACTIVATED")
                 safe_print(f"{'='*80}")
                 safe_print(f"Reason: {decision['debug_reason']}")
-                safe_print(f"\nStopping test for manual debugging...")
+                safe_print("\nStopping test for manual debugging...")
                 errors.append(f"Debug triggered: {decision['debug_reason']}")
                 break
 
@@ -462,7 +461,7 @@ async def intelligent_execute_scenario(
     safe_print(f"HITL: {'Yes' if interrupt_occurred else 'No'}")
     safe_print(f"Trace: {trace_url or 'Not available'}")
     if errors:
-        safe_print(f"\nErrors/Debug:")
+        safe_print("\nErrors/Debug:")
         for err in errors:
             safe_print(f"  - {err}")
     safe_print(f"{'='*80}\n")

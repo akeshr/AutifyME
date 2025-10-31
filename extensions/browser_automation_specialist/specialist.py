@@ -7,7 +7,6 @@ Intelligence-First Design:
 - Transparent about capabilities and limitations
 """
 
-import os
 from pathlib import Path
 from typing import Any
 

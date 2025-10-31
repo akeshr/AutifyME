@@ -29,7 +29,7 @@ except ImportError:
     raise ImportError(
         "google-generativeai package required for Veo 3.1. "
         "Install with: uv pip install google-generativeai"
-    )
+    ) from None
 
 
 class VeoVideoGenerator:

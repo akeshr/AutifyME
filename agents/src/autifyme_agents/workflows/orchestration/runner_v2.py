@@ -60,7 +60,6 @@ from langgraph.errors import GraphInterrupt, GraphRecursionError
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
 from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.handlers.approval_coordinator import ApprovalCoordinator
@@ -577,7 +576,9 @@ class WorkflowRunner:
         """Get async checkpointer instance."""
         if self._checkpointer:
             return self._checkpointer
-        from autifyme_agents.integrations.storage.postgres_saver_factory import get_async_checkpointer
+        from autifyme_agents.integrations.storage.postgres_saver_factory import (
+            get_async_checkpointer,
+        )
         return await get_async_checkpointer()
 
     async def _create_project_manager(self) -> Any:

@@ -31,12 +31,12 @@ def _load_prompt(
     channel: MessagingChannel | None = None,
 ) -> str:
     prompt_template = load_prompt("basic_project_manager.prompt")
-    
+
     # Extract platform name from channel (same logic as platform_tools.py)
     platform_name = "unknown"
     if channel is not None:
         platform_name = channel.__class__.__name__.replace("Channel", "").lower()
-    
+
     return prompt_template.format(
         company_name=company_profile.name,
         brand_voice=company_profile.brand_voice,

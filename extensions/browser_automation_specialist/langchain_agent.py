@@ -4,7 +4,6 @@ Demonstrates how to create a LangChain agent that uses Google Computer Use
 for autonomous browser automation.
 """
 
-import os
 from typing import Any
 
 from langchain.agents import create_agent

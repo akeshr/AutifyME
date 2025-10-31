@@ -29,13 +29,12 @@ Architecture Pattern:
 
 from typing import Any
 
-from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
+from autifyme_agents.core.prompt_loader import load_prompt
 
 # Import generic operation intent (replaces all hard-coded draft types)
 from autifyme_agents.schemas.operation_intent import OperationIntent
-
+from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 # =============================================================================
 # Specialist Factory

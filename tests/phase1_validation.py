@@ -16,9 +16,7 @@ Scenarios from context feeding matrix:
 """
 
 import asyncio
-import json
 import time
-from datetime import UTC, datetime
 
 import tiktoken
 
@@ -228,7 +226,7 @@ async def test_performance_summary():
     token_count = len(enc.encode(context_json))
 
     checkpointer = get_checkpointer()
-    pm = await create_project_manager(
+    await create_project_manager(
         company_profile=company_profile, checkpointer=checkpointer, storage=storage
     )
 
