@@ -21,7 +21,7 @@ Does NOT:
 - Classify into taxonomy (Taxonomy Specialist handles this)
 
 Architecture Pattern:
-- SubAgent dict format with OperationIntent response
+- CompiledSubAgent pattern with OperationIntent response
 - Schema-driven planning (no hard-coded operation types)
 - Single generic model (replaces 7 hard-coded draft types)
 - Dynamic execution plan generation
@@ -29,6 +29,10 @@ Architecture Pattern:
 
 from typing import Any
 
+from langchain.agents import create_agent
+from langchain.chat_models import BaseChatModel
+
+from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 
@@ -43,6 +47,7 @@ from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 def create_product_architecture_specialist(
     storage: StorageInterface | None = None,
+    model: BaseChatModel | None = None,
 ) -> dict[str, Any]:
     """
     Create Product Architecture Specialist with schema-driven CRUD.
@@ -55,21 +60,20 @@ def create_product_architecture_specialist(
     - Calculate impact analysis from schema + data
 
     Architecture:
-    - SubAgent dict format (DeepAgents pattern)
+    - CompiledSubAgent pattern (manually compiled agent with response_format)
     - OperationIntent response (single generic model)
     - Schema-driven planning (no hard-coded operation types)
     - Dynamic execution plan generation
 
     Args:
         storage: Storage interface for catalog search + schema query
+        model: LLM for specialist (defaults to gemini-2.5-flash-lite)
 
     Returns:
-        SubAgent spec with:
+        CompiledSubAgent spec with:
         - name: specialist identifier
         - description: delegation criteria
-        - tools: analysis, search, and schema query tools
-        - system_prompt: schema-driven planning instructions
-        - response_format: OperationIntent (single model)
+        - runnable: Pre-compiled agent with response_format configured
     """
     system_prompt = load_prompt("specialists/product_architecture_specialist.prompt")
 
@@ -104,10 +108,24 @@ def create_product_architecture_specialist(
         tools.append(create_search_product_families_tool(storage))
         tools.append(create_query_database_tool(storage))
 
+    # Resolve model (default to gemini-2.5-flash-lite for specialist work)
+    if model is None:
+        model = get_llm(provider="google", model="gemini-2.5-flash-lite", temperature=0.1)
+
+    # [CRITICAL] Manually compile agent with response_format
+    # DeepAgents SubAgent dict does NOT support response_format field
+    # Must use create_agent directly to configure structured output
+    runnable = create_agent(
+        model=model,
+        system_prompt=system_prompt,
+        tools=tools,
+        response_format=OperationIntent,  # Configures with_structured_output()
+        checkpointer=False,  # Specialists are stateless
+    )
+
+    # Return CompiledSubAgent format (uses runnable instead of individual fields)
     return {
         "name": "product_architecture_specialist",
         "description": description,
-        "tools": tools,
-        "system_prompt": system_prompt,
-        "response_format": OperationIntent,  # Single generic model
+        "runnable": runnable,
     }
