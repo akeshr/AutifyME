@@ -37,6 +37,83 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# Validation Helpers
+# =============================================================================
+
+
+def _validate_operation_completeness(
+    operations: list,
+    impact_analysis: dict[str, Any],
+) -> None:
+    """
+    Validate that operations contain complete data matching impact analysis.
+
+    Checks that entity counts in operations match the counts claimed in impact_analysis.
+    Prevents partial data from reaching database (e.g., 18 entities when impact says 36).
+
+    Args:
+        operations: List of Operation objects
+        impact_analysis: ImpactAnalysis dict with entity counts
+
+    Raises:
+        ToolException: If operation data is incomplete or mismatched with impact
+    """
+    new_entities_count = impact_analysis.get("new_entities_count", {})
+    updated_entities_count = impact_analysis.get("updated_entities_count", {})
+    deleted_entities_count = impact_analysis.get("deleted_entities_count", {})
+
+    for idx, operation in enumerate(operations):
+        op_type = operation.op_type
+        table = operation.table
+
+        # Validate INSERT operations
+        if op_type == "insert" and hasattr(operation, "new_entities") and operation.new_entities:
+            actual_count = len(operation.new_entities)
+            expected_count = new_entities_count.get(table, 0)
+
+            if expected_count > 0 and actual_count != expected_count:
+                raise ToolException(
+                    f"Operation {idx} incomplete: {table} insert has {actual_count} entities "
+                    f"but impact_analysis claims {expected_count}. "
+                    f"Specialist must provide ALL entities - partial lists are FORBIDDEN. "
+                    f"Expected all {expected_count} entities in new_entities array."
+                )
+
+        # Validate UPDATE operations (check field_updates with dict values)
+        if op_type == "update" and hasattr(operation, "field_updates") and operation.field_updates:
+            expected_count = updated_entities_count.get(table, 0)
+
+            # Check if any field_update value is a dict mapping UUID -> value
+            for field_name, field_value in operation.field_updates.items():
+                if isinstance(field_value, dict):
+                    actual_count = len(field_value)
+
+                    if expected_count > 0 and actual_count != expected_count:
+                        raise ToolException(
+                            f"Operation {idx} incomplete: {table} update field '{field_name}' "
+                            f"has {actual_count} entity-specific values but impact_analysis claims {expected_count}. "
+                            f"All {expected_count} entities must have values specified."
+                        )
+
+        # Validate DELETE operations (check delete_filter with ID lists)
+        if op_type == "delete" and hasattr(operation, "delete_filter") and operation.delete_filter:
+            expected_count = deleted_entities_count.get(table, 0)
+
+            # Check if delete_filter has a list of IDs
+            if "id" in operation.delete_filter:
+                filter_value = operation.delete_filter["id"]
+                if isinstance(filter_value, list):
+                    actual_count = len(filter_value)
+
+                    if expected_count > 0 and actual_count != expected_count:
+                        raise ToolException(
+                            f"Operation {idx} incomplete: {table} delete targets {actual_count} entities "
+                            f"but impact_analysis claims {expected_count}. "
+                            f"Delete filter must include all {expected_count} entity IDs."
+                        )
+
+
+# =============================================================================
 # Operation Executor - Core Execution Engine
 # =============================================================================
 
@@ -1029,6 +1106,12 @@ def create_execute_database_operation_tool(storage: StorageInterface):
                     raise ToolException(
                         f"Schema validation failed: {validation.errors}"
                     )
+
+            # Validate completeness (operations match impact_analysis counts)
+            _validate_operation_completeness(
+                operations=operation_intent.change_spec.operations,
+                impact_analysis=operation_intent.impact_analysis.model_dump()
+            )
 
             # Execute plan
             executor = OperationExecutor(storage, schema)

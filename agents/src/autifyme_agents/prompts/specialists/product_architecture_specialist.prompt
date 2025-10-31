@@ -427,6 +427,60 @@ Before returning OperationIntent:
 - Does naming pattern make sense for context (B2B vs B2C)?
 - Are dependencies correctly calculated?
 
+**[CRITICAL] Validate Completeness:**
+
+When operations affect N entities, you MUST include ALL N entities - partial lists are FORBIDDEN.
+
+**Self-Check Process:**
+1. Count entities in each operation (new_entities, field_updates keys, delete_filter IDs)
+2. Compare counts with impact_analysis numbers
+3. Verify: Are ALL affected entities included?
+4. If mismatch: FIX the operation before returning
+
+**Example Self-Check:**
+```
+Operation: insert 36 product_variant_values
+Impact Analysis: new_entities_count["product_variant_values"] = 36
+Generated: new_entities array has 18 items
+Result: MISMATCH ❌ - Generate remaining 18 links NOW
+```
+
+**Common Completeness Errors:**
+
+❌ WRONG - Partial list (only 2 of 8):
+```python
+new_entities=[
+    {"product_id": "uuid-1", "variant_value_id": "uuid-a"},
+    {"product_id": "uuid-2", "variant_value_id": "uuid-b"}
+    # Missing 6 products
+]
+# Impact says 8 but only generated 2 - INCOMPLETE
+```
+
+✓ CORRECT - Complete list (all 8):
+```python
+new_entities=[
+    {"product_id": "uuid-1", "variant_value_id": "uuid-a"},
+    {"product_id": "uuid-2", "variant_value_id": "uuid-b"},
+    {"product_id": "uuid-3", "variant_value_id": "uuid-c"},
+    {"product_id": "uuid-4", "variant_value_id": "uuid-d"},
+    {"product_id": "uuid-5", "variant_value_id": "uuid-e"},
+    {"product_id": "uuid-6", "variant_value_id": "uuid-f"},
+    {"product_id": "uuid-7", "variant_value_id": "uuid-g"},
+    {"product_id": "uuid-8", "variant_value_id": "uuid-h"}
+]
+# All 8 products included - impact_analysis matches ✓
+```
+
+**If You Cannot Include All Entities:**
+- State in reasoning: "Operation requires 500+ entities, exceeds context limit"
+- Suggest breaking into multiple operations
+- Add warning: "Operation incomplete - requires manual completion"
+- DO NOT submit partial lists silently
+
+**Document Self-Check in Reasoning:**
+Add verification note: "Self-check: Generated 36 product_variant_values links, matches impact_analysis ✓"
+
 **Handle uncertainty:**
 - Document assumptions and uncertainty in `reasoning` field
 - Use `warnings` array for significant risks or ambiguity
@@ -496,7 +550,28 @@ Return complete OperationIntent with:
 
 <examples>
 
-**IMPORTANT:** Return structured OperationIntent matching this exact format:
+## Output Format
+
+**CRITICAL:** You return structured JSON data matching the OperationIntent schema, NOT Python code.
+
+The examples below use Python syntax for READABILITY - they clearly show the structure and field names.
+But your ACTUAL output is JSON that matches the OperationIntent Pydantic model.
+
+**Do NOT:**
+- Use Python constructor syntax in your output: `OperationIntent(...)`
+- Wrap your output in ```python code blocks
+- Include Python type hints or comments
+
+**DO:**
+- Return the data structure directly (framework converts to JSON automatically)
+- Focus on completeness and accuracy of the data
+- Match the OperationIntent schema structure
+
+The examples show STRUCTURE. Your output is automatically serialized as JSON by response_format.
+
+---
+
+**Example Structure (Python notation for clarity):**
 
 ```python
 OperationIntent(
