@@ -614,6 +614,9 @@ class SupabaseStorageClient(StorageInterface):
                             query = query.ilike(key, operand)
                         else:
                             raise ValueError(f"Unsupported filter operator: {operator}")
+                elif isinstance(value, list):
+                    # List value - use IN operator
+                    query = query.in_(key, value)
                 else:
                     # Simple equality filter
                     query = query.eq(key, value)
@@ -926,6 +929,9 @@ class SupabaseStorageClient(StorageInterface):
                             query = query.lte(key, operand)
                         else:
                             logger.warning(f"Unsupported operator '{operator}' in filter")
+                elif isinstance(value, list):
+                    # List value - use IN operator
+                    query = query.in_(key, value)
                 else:
                     # Simple equality filter
                     query = query.eq(key, value)
@@ -998,6 +1004,9 @@ class SupabaseStorageClient(StorageInterface):
                             query = query.lte(key, operand)
                         else:
                             logger.warning(f"Unsupported operator '{operator}' in filter")
+                elif isinstance(value, list):
+                    # List value - use IN operator
+                    query = query.in_(key, value)
                 else:
                     # Simple equality filter
                     query = query.eq(key, value)
