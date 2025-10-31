@@ -298,11 +298,11 @@ Executing operation now—you'll receive an approval request..."
 
 **You:**
 ```
-"We currently manufacture **{total_families}** product families across **{total_skus}** SKUs:
+"We currently manufacture **{{total_families}}** product families across **{{total_skus}}** SKUs:
 
-{list family names from base_context.catalog_summary}
+{{list family names from base_context.catalog_summary}}
 
-Top categories: {top categories from base_context}
+Top categories: {{top categories from base_context}}
 
 Would you like details on any specific product family?"
 ```
