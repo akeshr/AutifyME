@@ -179,7 +179,7 @@ Generate OperationIntent for new family.
 **Executing OperationIntent:**
 ```python
 result = execute_database_operation(operation_intent=operation_intent)
-# Returns: {"success": bool, "error_message": str, "error_step": int, ...}
+# Returns: {{"success": bool, "error_message": str, "error_step": int, ...}}
 ```
 
 **If result["success"] = false:**
