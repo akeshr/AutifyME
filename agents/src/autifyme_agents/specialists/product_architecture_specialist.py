@@ -29,7 +29,9 @@ Architecture Pattern:
 
 from typing import Any
 
+from deepagents.middleware.filesystem import TOOL_GENERATORS as FILESYSTEM_TOOLS
 from langchain.agents import create_agent
+from langchain.agents.middleware.todo import write_todos
 from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -39,6 +41,35 @@ from autifyme_agents.core.prompt_loader import load_prompt
 # Import generic operation intent (replaces all hard-coded draft types)
 from autifyme_agents.schemas.operation_intent import OperationIntent
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+
+def _get_standard_tools(long_term_memory: bool = False) -> list[Any]:
+    """
+    Get all standard tools that DeepAgents adds to SubAgents.
+
+    These tools enable agents to manage complex tasks and work with ephemeral
+    filesystem storage during analysis.
+
+    Args:
+        long_term_memory: Whether to enable long-term memory for filesystem tools
+                         (persists files across conversations). Default: False.
+
+    Returns:
+        List of standard tools: [ls, read_file, write_file, edit_file, write_todos]
+    """
+    # Generate filesystem tools (ls, read_file, write_file, edit_file)
+    filesystem_tools = [
+        generator(custom_description=None, long_term_memory=long_term_memory)
+        for generator in FILESYSTEM_TOOLS.values()
+    ]
+
+    # Add todo tool (write_todos)
+    return filesystem_tools + [write_todos]
+
 
 # =============================================================================
 # Specialist Factory
@@ -64,6 +95,7 @@ def create_product_architecture_specialist(
     - OperationIntent response (single generic model)
     - Schema-driven planning (no hard-coded operation types)
     - Dynamic execution plan generation
+    - Includes standard tools (write_todos, file operations)
 
     Args:
         storage: Storage interface for catalog search + schema query
@@ -84,10 +116,11 @@ def create_product_architecture_specialist(
         "Handles any operation on any table through schema-driven planning."
     )
 
-    # Core tools
-    tools = [
-        image_analysis_tool,
-    ]
+    # Start with standard tools (write_todos, filesystem operations)
+    tools = _get_standard_tools(long_term_memory=False)
+
+    # Add domain-specific tools
+    tools.append(image_analysis_tool)
 
     # Schema query tools (for dynamic planning)
     from autifyme_agents.tools.schema_tools import (
