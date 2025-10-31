@@ -54,6 +54,11 @@ You are autonomous and intelligent. PM provides context and goals—you decide y
   - Column selection: `columns=["id", "name", "sku"]`
 - Returns: `{"success": True, "rows": [...], "count": N}` or `{"count": N}` if count_only
 - **CRITICAL:** Use this tool to fetch actual data BEFORE generating operations for update/delete/merge
+- **CRITICAL POSTGREST SYNTAX RULES:**
+  - Table names in relations are PLURAL: `variant_values` NOT `variant_value`
+  - Don't derive table names from foreign key columns (`variant_value_id` -> table is `variant_values`)
+  - Common mistake: Using `variant_value(...)` when it should be `variant_values(...)`
+  - Always use actual table names from schema: `product_families`, `products`, `variant_axes`, `variant_values`, `product_variant_values`
 
 **search_product_families:**
 - Purpose: Search catalog for existing product families
@@ -301,6 +306,22 @@ For operations involving existing entities (update, delete, migrate, merge), you
 3. **Generate concrete operations** with actual UUIDs and values
 4. **Calculate actual counts** for impact analysis
 
+**COMMON QUERY_DATABASE MISTAKES - AVOID THESE:**
+
+❌ WRONG - Using singular table name (derived from foreign key column):
+```python
+relations=["product_variant_values(variant_value_id, variant_value(axis_id, value))"]
+#                                                     ^^^^^^^^^^^^^^ ERROR: No table named "variant_value"
+```
+
+✓ CORRECT - Using plural table name (actual table from schema):
+```python
+relations=["product_variant_values(variant_values(*))"]
+#                                   ^^^^^^^^^^^^^^ Correct: Table is "variant_values" (PLURAL)
+```
+
+Remember: Foreign key column `variant_value_id` points to table `variant_values` (plural).
+
 **Example - Fetching Data for Merge:**
 
 ```python
@@ -308,7 +329,7 @@ For operations involving existing entities (update, delete, migrate, merge), you
 family_b_products = query_database(
     table="products",
     filters={"product_family_id": "uuid-family-b"},
-    relations=["product_variant_values(variant_values(*))"]
+    relations=["product_variant_values(variant_values(*))"]  # Note: variant_values (PLURAL) not variant_value
 )
 # Returns: {"rows": [{"id": "uuid-p1", "sku": "PET-BTL-250ML-CLR", ...}, ...], "count": 3}
 
@@ -316,7 +337,7 @@ family_b_products = query_database(
 family_a_variants = query_database(
     table="variant_axes",
     filters={"product_family_id": "uuid-family-a"},
-    relations=["variant_values(*)"]
+    relations=["variant_values(*)"]  # Table name: variant_values (PLURAL)
 )
 # Returns: {"rows": [{"name": "capacity", "variant_values": [{"id": "uuid-v1", "value": "250ml", ...}]}]}
 

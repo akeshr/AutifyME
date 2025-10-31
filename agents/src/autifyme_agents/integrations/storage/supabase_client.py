@@ -970,7 +970,7 @@ class SupabaseStorageClient(StorageInterface):
     # Transaction Support (Phase 3)
     # ========================================================================
 
-    def transaction(self):
+    def transaction(self) -> "SupabaseTransaction":
         """
         Create a transaction context manager for atomic operations.
 
@@ -1090,7 +1090,7 @@ class SupabaseTransaction:
         self.operations: list[dict[str, Any]] = []
         self.in_transaction = False
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "SupabaseTransaction":
         """Start transaction - begin tracking operations."""
         self.in_transaction = True
         self.operations = []
@@ -1098,7 +1098,7 @@ class SupabaseTransaction:
         logger.debug("Starting Supabase transaction (best-effort rollback)")
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
         """End transaction - rollback on exception, commit on success."""
         try:
             if exc_type is not None:
@@ -1119,7 +1119,7 @@ class SupabaseTransaction:
             self.in_transaction = False
             self.storage._current_transaction = None
 
-    async def _rollback(self):
+    async def _rollback(self) -> None:
         """Attempt best-effort rollback of tracked operations.
 
         Rolls back in reverse order (LIFO). Not guaranteed to succeed

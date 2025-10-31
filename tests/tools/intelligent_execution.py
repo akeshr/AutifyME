@@ -1,6 +1,6 @@
 """Intelligent execution where AI acts as test user.
 
-Instead of pattern matching, AI (OpenAI) reads PM messages and responds intelligently,
+Instead of pattern matching, AI (Google Gemini) reads PM messages and responds intelligently,
 detecting issues and debugging in real-time.
 """
 import asyncio
@@ -13,7 +13,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from langsmith import Client
-from openai import OpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 # Ensure .env is loaded
 load_dotenv()
@@ -92,7 +92,7 @@ def _ask_ai_how_to_respond(
     scenario_context: str,
     conversation_history: list[dict],
 ) -> dict:
-    """Ask AI (OpenAI gpt-4.1-mini) how to respond to PM's messages.
+    """Ask AI (Google Gemini 2.5 Flash) how to respond to PM's messages.
 
     Returns:
         {
@@ -102,7 +102,6 @@ def _ask_ai_how_to_respond(
             "debug_reason": str | None,  # Why we need to debug (if action=debug)
         }
     """
-    client = OpenAI()
 
     # Build context for AI
     messages_text = "\n\n".join([
@@ -178,19 +177,22 @@ CRITICAL: Stay consistent with your initial request "{initial_request}". Never c
 """
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4.1-mini",  # Better reasoning than nano
-            max_tokens=500,
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
             temperature=0,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": "You are a test orchestration AI simulating a business user. Maintain character consistency. Return valid JSON only."},
-                {"role": "user", "content": prompt}
-            ]
+            max_output_tokens=500,
+            response_mime_type="application/json"
         )
 
-        # Parse AI response
-        response_text = response.choices[0].message.content
+        messages = [
+            {"role": "system", "content": "You are a test orchestration AI simulating a business user. Maintain character consistency. Return valid JSON only."},
+            {"role": "user", "content": prompt}
+        ]
+
+        response = llm.invoke(messages)
+
+        # Parse AI response (LangChain format)
+        response_text = response.content
         decision = json.loads(response_text)
 
     except json.JSONDecodeError as e:
@@ -207,7 +209,7 @@ CRITICAL: Stay consistent with your initial request "{initial_request}". Never c
             "action": "debug",
             "response_text": "",
             "reasoning": "AI call failed",
-            "debug_reason": f"Error calling OpenAI: {str(e)}"
+            "debug_reason": f"Error calling AI model: {str(e)}"
         }
 
     return decision
@@ -253,7 +255,7 @@ async def intelligent_execute_scenario(
 ) -> ExecutionResult:
     """Execute test scenario with AI as intelligent test user.
 
-    AI (OpenAI gpt-4.1-mini) reads PM's messages, responds naturally, and detects issues in real-time.
+    AI (Google Gemini 2.5 Flash) reads PM's messages, responds naturally, and detects issues in real-time.
 
     Args:
         scenario_id: Scenario identifier or custom prompt text
@@ -303,7 +305,7 @@ async def intelligent_execute_scenario(
 
     try:
         safe_print(f"\n{'='*80}")
-        safe_print("INTELLIGENT TESTING MODE - AI as Test User (OpenAI gpt-4.1-mini)")
+        safe_print("INTELLIGENT TESTING MODE - AI as Test User (Google Gemini 2.5 Flash)")
         safe_print(f"{'='*80}")
         safe_print(f"Scenario: {scenario_id[:80]}...")  # Show abbreviated scenario name
         safe_print(f"Thread: {thread_id}")

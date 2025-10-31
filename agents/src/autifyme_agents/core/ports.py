@@ -419,7 +419,7 @@ class StorageInterface(ABC):
     # ========================================================================
 
     @abstractmethod
-    def transaction(self):
+    def transaction(self) -> Any:
         """
         Create a transaction context manager for atomic operations.
 

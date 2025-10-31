@@ -8,9 +8,12 @@ import logging
 from typing import Any
 
 from langchain.tools import tool
-from langchain_core.tools import ToolException
 
 from autifyme_agents.schemas.registry import SchemaRegistry
+from autifyme_agents.core.tool_error_handler import (
+    build_agent_error_response,
+    build_success_response,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +46,9 @@ def get_product_schema(
         include_business_rules: Include business rule metadata (default: False)
 
     Returns:
-        Schema dictionary with:
-        - version: Schema version identifier
-        - domain: Domain name (e.g., 'product_catalog')
-        - tables: Map of table_name -> table_schema
-        - Each table includes: columns, relationships, indexes
+        Dict with schema or error:
+        - On success: {"success": True, "version": str, "domain": str, "tables": {...}}
+        - On error: {"success": False, "error": str, "error_type": str}
 
     Examples:
         # Get latest schema
@@ -119,7 +120,7 @@ def get_product_schema(
             }
         )
 
-        return schema_dict
+        return build_success_response(schema_dict)
 
     except FileNotFoundError as e:
         logger.error(
@@ -127,9 +128,15 @@ def get_product_schema(
             exc_info=True,
             extra={"version": version}
         )
-        raise ToolException(
-            f"Schema version '{version}' not found. Available versions: v1"
-        ) from e
+        return build_agent_error_response(
+            exception=e,
+            context={},
+            fallback_type="SCHEMA_ERROR",
+            fallback_action=(
+                f"Schema version '{version}' does not exist. "
+                f"Use version='latest' or 'v1'. If persistent, contact system administrator."
+            ),
+        )
 
     except Exception as e:
         logger.error(
@@ -137,7 +144,15 @@ def get_product_schema(
             exc_info=True,
             extra={"error_type": type(e).__name__, "error_msg": str(e)}
         )
-        raise ToolException(f"Failed to load schema: {str(e)}") from e
+        return build_agent_error_response(
+            exception=e,
+            context={},
+            fallback_type="SCHEMA_ERROR",
+            fallback_action=(
+                "Schema registry issue. Try version='latest'. "
+                "If persistent, contact system administrator."
+            ),
+        )
 
 
 @tool("get_table_schema")
@@ -156,10 +171,9 @@ def get_table_schema(
         version: Schema version (default: 'latest')
 
     Returns:
-        Table schema dictionary with columns, relationships, and indexes
-
-    Raises:
-        ToolException: If table not found in schema
+        Dict with table schema or error:
+        - On success: {"success": True, "name": str, "columns": {...}, "relationships": [...], ...}
+        - On error: {"success": False, "error": str, "error_type": str, "table_name": str}
 
     Examples:
         # Get product_families table schema
@@ -191,7 +205,7 @@ def get_table_schema(
             }
         )
 
-        return table_schema.model_dump()
+        return build_success_response(table_schema.model_dump())
 
     except ValueError as e:
         logger.error(
@@ -199,10 +213,15 @@ def get_table_schema(
             exc_info=True,
             extra={"table": table_name, "version": version}
         )
-        raise ToolException(
-            f"Table '{table_name}' not found in schema. "
-            f"Available tables: {', '.join(SchemaRegistry.get_version(version).get_table_names())}"
-        ) from e
+        return build_agent_error_response(
+            exception=e,
+            context={"table_name": table_name},
+            fallback_type="SCHEMA_ERROR",
+            fallback_action=(
+                f"Table '{table_name}' does not exist in schema. "
+                f"Use list_available_tables to see all tables. Check table name spelling and try again."
+            ),
+        )
 
     except Exception as e:
         logger.error(
@@ -210,7 +229,15 @@ def get_table_schema(
             exc_info=True,
             extra={"error_type": type(e).__name__, "error_msg": str(e)}
         )
-        raise ToolException(f"Failed to load table schema: {str(e)}") from e
+        return build_agent_error_response(
+            exception=e,
+            context={"table_name": table_name},
+            fallback_type="SCHEMA_ERROR",
+            fallback_action=(
+                f"Schema registry issue. Try get_product_schema instead "
+                f"to get all tables, or contact system administrator."
+            ),
+        )
 
 
 @tool("list_available_tables")
@@ -224,11 +251,9 @@ def list_available_tables(version: str = "latest") -> dict[str, Any]:
         version: Schema version (default: 'latest')
 
     Returns:
-        Dictionary with:
-        - version: Schema version
-        - domain: Domain name
-        - tables: List of table names
-        - count: Number of tables
+        Dict with table list or error:
+        - On success: {"success": True, "version": str, "domain": str, "tables": [...], "count": int}
+        - On error: {"success": False, "error": str, "error_type": str}
 
     Example Response:
         {
@@ -270,7 +295,7 @@ def list_available_tables(version: str = "latest") -> dict[str, Any]:
             extra={"version": version, "count": len(table_names)}
         )
 
-        return result
+        return build_success_response(result)
 
     except Exception as e:
         logger.error(
@@ -278,4 +303,12 @@ def list_available_tables(version: str = "latest") -> dict[str, Any]:
             exc_info=True,
             extra={"error_type": type(e).__name__, "error_msg": str(e)}
         )
-        raise ToolException(f"Failed to list tables: {str(e)}") from e
+        return build_agent_error_response(
+            exception=e,
+            context={},
+            fallback_type="SCHEMA_ERROR",
+            fallback_action=(
+                "Schema registry issue. Try get_product_schema to access tables directly. "
+                "If persistent, contact system administrator."
+            ),
+        )

@@ -8,8 +8,8 @@ from langchain_openai import ChatOpenAI
 
 
 def get_llm(
-    provider: str = "openai",
-    model: str = "gpt-4.1-mini",
+    provider: str = "google",
+    model: str = "gemini-2.5-flash",
     temperature: float = 0.0,
     tags: list[str] | None = None,
     reasoning_effort: str = "low",

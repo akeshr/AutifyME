@@ -160,7 +160,7 @@ def create_marketing_content_specialist() -> dict[str, Any]:
     )
 
     # No tools needed - specialist uses LLM for creative content generation
-    tools = []
+    tools: list[Any] = []
 
     return {
         "name": "marketing_content_specialist",

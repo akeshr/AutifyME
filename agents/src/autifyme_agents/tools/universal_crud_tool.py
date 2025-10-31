@@ -21,7 +21,7 @@ from datetime import UTC
 from typing import Any
 
 from langchain.tools import tool
-from langchain_core.tools import ToolException
+from langchain_core.tools import BaseTool, ToolException
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.operation_intent import (
@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 
 def _validate_operation_completeness(
-    operations: list,
+    operations: list[Operation],
     impact_analysis: dict[str, Any],
 ) -> None:
     """
@@ -1011,7 +1011,7 @@ class OperationExecutor:
 # =============================================================================
 
 
-def create_execute_database_operation_tool(storage: StorageInterface):
+def create_execute_database_operation_tool(storage: StorageInterface) -> BaseTool:
     """
     Create universal database operation tool.
 

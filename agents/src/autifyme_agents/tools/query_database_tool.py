@@ -8,14 +8,18 @@ import logging
 from typing import Any
 
 from langchain.tools import tool
-from langchain_core.tools import ToolException
+from langchain_core.tools import BaseTool
 
 from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.core.tool_error_handler import (
+    build_agent_error_response,
+    build_success_response,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def create_query_database_tool(storage: StorageInterface):
+def create_query_database_tool(storage: StorageInterface) -> BaseTool:
     """
     Create query database tool for specialist data retrieval.
 
@@ -67,9 +71,7 @@ def create_query_database_tool(storage: StorageInterface):
             Dict with query results:
             - If count_only=False: {"success": True, "rows": [...], "count": N}
             - If count_only=True: {"success": True, "count": N}
-
-        Raises:
-            ToolException: On query failure or invalid parameters
+            - On error: {"success": False, "error": "...", "error_type": "..."}
 
         Examples:
             # Find all active product families with their categories
@@ -126,16 +128,12 @@ def create_query_database_tool(storage: StorageInterface):
 
             # Format response
             if count_only:
-                return {
-                    "success": True,
-                    "count": result,
-                }
+                return build_success_response({"count": result})
             else:
-                return {
-                    "success": True,
+                return build_success_response({
                     "rows": result,
                     "count": len(result),
-                }
+                })
 
         except Exception as e:
             logger.error(
@@ -147,8 +145,15 @@ def create_query_database_tool(storage: StorageInterface):
                     "search_patterns": search_patterns,
                 }
             )
-            raise ToolException(
-                f"Database query failed for {table}: {str(e)}"
-            ) from e
+            return build_agent_error_response(
+                exception=e,
+                context={
+                    "table": table,
+                    "filters": filters,
+                    "search_patterns": search_patterns,
+                },
+                fallback_type="QUERY_ERROR",
+                fallback_action="Review query parameters. Simplify query by removing relations/filters. Check if table has data matching filters.",
+            )
 
     return query_database

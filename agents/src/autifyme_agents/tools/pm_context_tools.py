@@ -15,11 +15,17 @@ Design:
 import logging
 from uuid import UUID
 
+from typing import Any
+
 from langchain.tools import tool
-from langchain_core.tools import ToolException
+from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.core.tool_error_handler import (
+    build_agent_error_response,
+    build_success_response,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +77,7 @@ class CategoryInfo(BaseModel):
 # =============================================================================
 
 
-def create_search_catalog_summary_tool(storage: StorageInterface):
+def create_search_catalog_summary_tool(storage: StorageInterface) -> BaseTool:
     """Factory for search_catalog_summary tool (PM-level summary query).
 
     Searches product families by name (case-insensitive substring match).
@@ -85,7 +91,7 @@ def create_search_catalog_summary_tool(storage: StorageInterface):
     """
 
     @tool
-    async def search_catalog_summary(query: str) -> CatalogSearchSummary:
+    async def search_catalog_summary(query: str) -> dict[str, Any]:
         """Search catalog for product families matching query.
 
         Summary-level search (family names and counts only). Use this to:
@@ -97,14 +103,16 @@ def create_search_catalog_summary_tool(storage: StorageInterface):
             query: Search term (e.g., "PET jar", "bottles", "containers")
 
         Returns:
-            CatalogSearchSummary with matching families (max 10 results)
+            Dict with search results:
+            - On success: {"success": True, "query": str, "matches": [...], "total_matches": int, "has_more": bool}
+            - On error: {"success": False, "error": str, "error_type": str, "query": str}
 
         Example:
             query: "PET jar"
-            → matches: [{"name": "PET Jars", "variant_count": 12, ...}]
+            → {"success": True, "matches": [{"name": "PET Jars", "variant_count": 12, ...}]}
 
             query: "bottles"
-            → matches: [{"name": "PET Bottles", "variant_count": 48}, {"name": "Glass Bottles", "variant_count": 24}]
+            → {"success": True, "matches": [{"name": "PET Bottles", "variant_count": 48}, {"name": "Glass Bottles", "variant_count": 24}]}
         """
         try:
             # Case-insensitive substring search on product family names
@@ -119,12 +127,12 @@ def create_search_catalog_summary_tool(storage: StorageInterface):
             )
 
             if not families:
-                return CatalogSearchSummary(
-                    query=query,
-                    matches=[],
-                    total_matches=0,
-                    has_more=False,
-                )
+                return build_success_response({
+                    "query": query,
+                    "matches": [],
+                    "total_matches": 0,
+                    "has_more": False,
+                })
 
             has_more = len(families) > 10
             families = families[:10]  # Limit to 10 for response
@@ -168,12 +176,12 @@ def create_search_catalog_summary_tool(storage: StorageInterface):
                 extra={"query": query, "matches_count": len(matches), "has_more": has_more}
             )
 
-            return CatalogSearchSummary(
-                query=query,
-                matches=matches,
-                total_matches=len(matches),
-                has_more=has_more,
-            )
+            return build_success_response({
+                "query": query,
+                "matches": [match.model_dump() for match in matches],
+                "total_matches": len(matches),
+                "has_more": has_more,
+            })
 
         except Exception as e:
             logger.error(
@@ -181,14 +189,20 @@ def create_search_catalog_summary_tool(storage: StorageInterface):
                 exc_info=True,
                 extra={"query": query, "error_type": type(e).__name__, "error_msg": str(e)}
             )
-            raise ToolException(
-                f"Failed to search catalog for '{query}': {str(e)}"
-            ) from e
+            return build_agent_error_response(
+                exception=e,
+                context={"query": query},
+                fallback_type="QUERY_ERROR",
+                fallback_action=(
+                    f"Unable to search catalog for '{query}'. "
+                    f"Proceed with workflow and delegate to specialist for verification."
+                ),
+            )
 
     return search_catalog_summary
 
 
-def create_get_category_info_tool(storage: StorageInterface):
+def create_get_category_info_tool(storage: StorageInterface) -> BaseTool:
     """Factory for get_category_info tool (PM-level taxonomy query).
 
     Gets category details and product counts (NOT full product lists).
@@ -202,7 +216,7 @@ def create_get_category_info_tool(storage: StorageInterface):
     """
 
     @tool
-    async def get_category_info(category_name: str) -> CategoryInfo:
+    async def get_category_info(category_name: str) -> dict[str, Any]:
         """Get category details and product counts.
 
         Summary-level taxonomy query. Use this to:
@@ -214,11 +228,13 @@ def create_get_category_info_tool(storage: StorageInterface):
             category_name: Category name (e.g., "Food & Beverage", "PET Packaging")
 
         Returns:
-            CategoryInfo with metadata and counts (NOT product lists)
+            Dict with category details:
+            - On success: {"success": True, "id": str, "name": str, "parent_id": str|None, "parent_name": str|None, "subcategory_count": int, "product_family_count": int}
+            - On error: {"success": False, "error": str, "error_type": str, "category_name": str}
 
         Example:
             category_name: "Food & Beverage"
-            → {id: "...", name: "Food & Beverage", subcategory_count: 3, product_family_count: 15}
+            → {"success": True, "id": "...", "name": "Food & Beverage", "subcategory_count": 3, "product_family_count": 15}
         """
         try:
             # Case-insensitive exact match on category name
@@ -230,10 +246,16 @@ def create_get_category_info_tool(storage: StorageInterface):
             )
 
             if not categories:
-                raise ToolException(
-                    f"Category '{category_name}' not found in taxonomy. "
-                    "Check base_context.taxonomy_tree for available categories."
-                )
+                return {
+                    "success": False,
+                    "error": (
+                        f"CATEGORY_NOT_FOUND: Category '{category_name}' does not exist in taxonomy.\n\n"
+                        f"Agent Action: Check base_context.taxonomy_tree for available categories. "
+                        f"Use exact category name or search with similar terms."
+                    ),
+                    "error_type": "CATEGORY_NOT_FOUND",
+                    "category_name": category_name,
+                }
 
             category = categories[0]
             category_id = UUID(category["id"])
@@ -274,18 +296,15 @@ def create_get_category_info_tool(storage: StorageInterface):
                 }
             )
 
-            return CategoryInfo(
-                id=str(category_id),
-                name=category["name"],
-                parent_id=str(category["parent_id"]) if category.get("parent_id") else None,
-                parent_name=parent_name,
-                subcategory_count=subcategory_count,
-                product_family_count=product_family_count,
-            )
+            return build_success_response({
+                "id": str(category_id),
+                "name": category["name"],
+                "parent_id": str(category["parent_id"]) if category.get("parent_id") else None,
+                "parent_name": parent_name,
+                "subcategory_count": subcategory_count,
+                "product_family_count": product_family_count,
+            })
 
-        except ToolException:
-            # Re-raise ToolException as-is
-            raise
         except Exception as e:
             logger.error(
                 "Category info query failed",
@@ -296,8 +315,14 @@ def create_get_category_info_tool(storage: StorageInterface):
                     "error_msg": str(e)
                 }
             )
-            raise ToolException(
-                f"Failed to get category info for '{category_name}': {str(e)}"
-            ) from e
+            return build_agent_error_response(
+                exception=e,
+                context={"category_name": category_name},
+                fallback_type="CATEGORY_ERROR",
+                fallback_action=(
+                    f"Unable to get category info for '{category_name}'. "
+                    f"Use base_context.taxonomy_tree for category structure. Proceed with cached data."
+                ),
+            )
 
     return get_category_info

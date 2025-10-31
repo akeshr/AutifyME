@@ -79,7 +79,7 @@ async def run_update_with_image_test():
     safe_print("\n" + "="*80)
     safe_print("INTELLIGENT TEST: Update 500ml to 1L with Image")
     safe_print("="*80)
-    safe_print("\nAI (gpt-4.1-mini) acts as real user with image attachment.\n")
+    safe_print("\nAI (Gemini 2.5 Flash) acts as real user with image attachment.\n")
 
     # Get image path
     fixture_image = Path(__file__).parent / "fixtures" / "images" / "PET_CAN_JAR_500ml.jpeg"
