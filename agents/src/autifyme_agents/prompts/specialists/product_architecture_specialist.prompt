@@ -145,14 +145,14 @@ The PM's execution tool has zero intelligence. It cannot:
 - Interpret placeholder strings as instructions
 
 **FORBIDDEN - Never use placeholders:**
-- ❌ `field_updates={"sku": "REGENERATE_BASED_ON_VARIANTS"}`
+- ❌ `field_updates={{"sku": "REGENERATE_BASED_ON_VARIANTS"}}`
 - ❌ `new_entities="COMPUTE_LINKS_FROM_PRODUCTS"`
-- ❌ `updated_entities_count={"products": "count of Family B products"}`
+- ❌ `updated_entities_count={{"products": "count of Family B products"}}`
 
 **REQUIRED - Use concrete data:**
-- ✅ `field_updates={"sku": "PAV-BTL-500ML-CLR"}`
-- ✅ `new_entities=[{"product_id": "uuid1", "variant_value_id": "uuid2"}]`
-- ✅ `updated_entities_count={"products": 12}`
+- ✅ `field_updates={{"sku": "PAV-BTL-500ML-CLR"}}`
+- ✅ `new_entities=[{{"product_id": "uuid1", "variant_value_id": "uuid2"}}]`
+- ✅ `updated_entities_count={{"products": 12}}`
 
 **For update/delete operations:**
 1. Fetch actual data first using query_database
@@ -205,75 +205,75 @@ My search: product_families "PET jar" → 0 matches found
 
 **You return:**
 ```
-{
+{{
   "intent_type": "create",
   "user_request_summary": "Create new PET Jars product family with 500ml capacity",
   "reasoning": "No existing PET jar families found. Creating new family with capacity as single variant axis. Material: PET, application: food packaging, price: Rs 30.",
-  "change_spec": {
+  "change_spec": {{
     "domain": "product_catalog",
     "operations": [
-      {
+      {{
         "op_type": "insert",
         "table": "product_families",
-        "new_entities": [{"name": "PET Jars", "brand": "Pavisha", "base_price": 30.0, "material": "PET"}],
-        "entity_refs": {"jar_family": 0},
+        "new_entities": [{{"name": "PET Jars", "brand": "Pavisha", "base_price": 30.0, "material": "PET"}}],
+        "entity_refs": {{"jar_family": 0}},
         "description": "Create product family"
-      },
-      {
+      }},
+      {{
         "op_type": "insert",
         "table": "variant_axes",
-        "new_entities": [{"name": "capacity", "display_label": "Capacity", "family_id": "$ref:jar_family"}],
-        "entity_refs": {"capacity_axis": 0},
+        "new_entities": [{{"name": "capacity", "display_label": "Capacity", "family_id": "$ref:jar_family"}}],
+        "entity_refs": {{"capacity_axis": 0}},
         "depends_on": [0],
         "description": "Create capacity variant axis"
-      },
-      {
+      }},
+      {{
         "op_type": "insert",
         "table": "variant_values",
-        "new_entities": [{"axis_id": "$ref:capacity_axis", "value": "500ml", "sku_code": "500ML"}],
-        "entity_refs": {"val_500ml": 0},
+        "new_entities": [{{"axis_id": "$ref:capacity_axis", "value": "500ml", "sku_code": "500ML"}}],
+        "entity_refs": {{"val_500ml": 0}},
         "depends_on": [1],
         "description": "Create capacity value"
-      },
-      {
+      }},
+      {{
         "op_type": "insert",
         "table": "products",
-        "new_entities": [{"family_id": "$ref:jar_family", "sku": "PAV-JAR-500ML", "name": "PET Jar 500ml"}],
-        "entity_refs": {"prod_500ml": 0},
+        "new_entities": [{{"family_id": "$ref:jar_family", "sku": "PAV-JAR-500ML", "name": "PET Jar 500ml"}}],
+        "entity_refs": {{"prod_500ml": 0}},
         "depends_on": [0],
         "description": "Create product SKU"
-      },
-      {
+      }},
+      {{
         "op_type": "insert",
         "table": "product_variant_values",
-        "new_entities": [{"product_id": "$ref:prod_500ml", "variant_value_id": "$ref:val_500ml"}],
+        "new_entities": [{{"product_id": "$ref:prod_500ml", "variant_value_id": "$ref:val_500ml"}}],
         "depends_on": [2, 3],
         "description": "Link product to variant value"
-      }
+      }}
     ]
-  },
-  "impact_analysis": {
-    "new_entities_count": {"product_families": 1, "variant_axes": 1, "variant_values": 1, "products": 1, "product_variant_values": 1},
+  }},
+  "impact_analysis": {{
+    "new_entities_count": {{"product_families": 1, "variant_axes": 1, "variant_values": 1, "products": 1, "product_variant_values": 1}},
     "business_impact_summary": "Will create 1 new product family with 1 initial SKU (500ml)",
     "examples": ["PAV-JAR-500ML"],
     "warnings": [],
     "is_destructive": false,
     "requires_approval": true
-  },
-  "execution_plan": {
+  }},
+  "execution_plan": {{
     "steps": [
-      {"step_number": 1, "description": "Create product family", "operation_index": 0, "rollback_on_failure": true},
-      {"step_number": 2, "description": "Create capacity axis", "operation_index": 1, "rollback_on_failure": true},
-      {"step_number": 3, "description": "Create capacity values", "operation_index": 2, "rollback_on_failure": true},
-      {"step_number": 4, "description": "Create product SKUs", "operation_index": 3, "rollback_on_failure": true},
-      {"step_number": 5, "description": "Link products to variants", "operation_index": 4, "rollback_on_failure": true}
+      {{"step_number": 1, "description": "Create product family", "operation_index": 0, "rollback_on_failure": true}},
+      {{"step_number": 2, "description": "Create capacity axis", "operation_index": 1, "rollback_on_failure": true}},
+      {{"step_number": 3, "description": "Create capacity values", "operation_index": 2, "rollback_on_failure": true}},
+      {{"step_number": 4, "description": "Create product SKUs", "operation_index": 3, "rollback_on_failure": true}},
+      {{"step_number": 5, "description": "Link products to variants", "operation_index": 4, "rollback_on_failure": true}}
     ],
     "estimated_duration_ms": 150,
     "requires_approval": true
-  },
+  }},
   "specialist_name": "product_architecture_specialist",
   "schema_version": "v1"
-}
+}}
 ```
 
 ---
