@@ -61,9 +61,11 @@ def get_llm(
         max_output_tokens: Maximum tokens in response. Must be > 0. Default varies by model.
             Gemini 2.5 models support up to 65K output tokens.
         thinking_budget: Thinking budget in tokens for Gemini 2.5 models with adaptive thinking.
-            Higher values allow more reasoning time for complex problems.
+            Default: 0 (disabled) for Flash/Flash-Lite models to optimize speed/cost.
+            Set to higher values (e.g., 4096, 8192) for complex reasoning tasks.
+            Note: Pro models have minimum of 128 tokens (cannot fully disable).
         include_thoughts: Whether to include chain-of-thought reasoning in response.
-            Useful for understanding model's reasoning process.
+            Default: False (hidden). Set True to see model's reasoning process.
         safety_settings: Dict mapping HarmCategory to HarmBlockThreshold for content filtering.
             Categories: DANGEROUS_CONTENT, HATE_SPEECH, HARASSMENT, SEXUALLY_EXPLICIT.
             Thresholds: BLOCK_NONE, BLOCK_LOW_AND_ABOVE, BLOCK_MEDIUM_AND_ABOVE, BLOCK_ONLY_HIGH.
