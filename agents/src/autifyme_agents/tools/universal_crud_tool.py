@@ -547,12 +547,12 @@ class OperationExecutor:
         Resolve foreign key references from execution context.
 
         Supports two reference formats:
-        1. Step field reference: "$step_1.family_id" → context[1]["family_id"]
-        2. Named reference: "$ref:prod_500ml_clear" → context[N]["_refs"]["prod_500ml_clear"]["id"]
+        1. Step field reference: "$step_1.family_id" ? context[1]["family_id"]
+        2. Named reference: "$ref:prod_500ml_clear" ? context[N]["_refs"]["prod_500ml_clear"]["id"]
 
         Args:
             data: Dict potentially containing references
-            context: Map of step_number → {field: value} or {_refs: {name: entity}}
+            context: Map of step_number ? {field: value} or {_refs: {name: entity}}
 
         Returns:
             Data with references resolved to actual values
@@ -703,7 +703,7 @@ class OperationExecutor:
             operations: Operations list for resolving step.operation_index
 
         Returns:
-            Map of table_name → affected_count
+            Map of table_name ? affected_count
         """
         affected = defaultdict(int)
 
@@ -1062,9 +1062,19 @@ def create_execute_database_operation_tool(storage: StorageInterface):
 
             return result.model_dump()
 
+        except ToolException as e:
+            # ToolException should propagate to LangChain framework for proper handling
+            logger.error(
+                "execute_database_operation failed with ToolException",
+                exc_info=True,
+                extra={"error_type": "ToolException", "error_msg": str(e)}
+            )
+            # Re-raise ToolException so LangChain can handle it properly
+            raise
+
         except Exception as e:
-            # Catch errors that occur before execute_plan (schema validation, etc.)
-            # Return ExecutionResult instead of re-raising to allow PM to handle gracefully
+            # Catch unexpected errors that occur before execute_plan (schema loading, etc.)
+            # Return ExecutionResult for these to allow PM to handle gracefully
             logger.error(
                 "execute_database_operation failed before execution",
                 exc_info=True,
