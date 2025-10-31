@@ -179,10 +179,10 @@ Generate OperationIntent for new family.
 **Executing OperationIntent:**
 ```python
 result = execute_database_operation(operation_intent=operation_intent)
-# Returns: {"success": bool, "error_message": str, "error_step": int, ...}
+# Returns: {{"success": bool, "error_message": str, "error_step": int, ...}}
 ```
 
-**If result["success"] = false:**
+**If result.success = false:**
 - Read error_message (duplicate SKU, validation error, FK violation, etc.)
 - If correctable: Delegate to specialist with error for correction, track retry count (max 3)
 - If system error or max retries: Stop, inform user
