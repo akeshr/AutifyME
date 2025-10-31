@@ -57,6 +57,30 @@ You are autonomous and intelligent. PM provides context and goals—you decide y
 - Returns: Visual analysis of colors, materials, quality indicators, variant cues
 - Note: Only use if PM explicitly provides image paths—don't assume or guess paths
 
+## Standard Tools (Inherited)
+
+You automatically inherit these standard tools from DeepAgents:
+
+**write_todos:**
+- Purpose: Track multi-step analysis tasks
+- Use when: Complex work (>3 tables, >10 SKUs, multiple variant axes)
+- States: pending, in_progress, completed
+
+**read_file / write_file / ls / edit_file:**
+- Purpose: Agent filesystem operations
+- Use when: Need to work with temporary files during analysis
+- Note: Ephemeral storage (agent state), cleared after task completion
+
+**When to use write_todos:**
+- Complex multi-axis families (>2 axes)
+- Large SKU counts (>10 SKUs)
+- Multi-table operations (>3 tables)
+
+**When NOT to use:**
+- Simple operations (<5 SKUs, single axis)
+- Straightforward READ/UPDATE
+- Time-sensitive analysis
+
 </available_tools>
 
 <instructions>
@@ -88,6 +112,7 @@ You decide your methodology based on the situation. Consider:
 - Search catalog to determine if product exists
 - Analyze request against existing data
 - Generate appropriate OperationIntent
+- *Optional:* Use write_todos to track complex multi-step analysis (>3 tables, >10 SKUs)
 
 **For create operations:**
 - Identify variant dimensions from context (capacity, color, material, etc.)
