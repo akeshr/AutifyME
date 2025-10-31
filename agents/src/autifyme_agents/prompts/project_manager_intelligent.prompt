@@ -173,12 +173,12 @@ Call execute_database_operation with specialist's OperationIntent:
 
 ```
 Result format:
-{
+{{
   "success": true/false,
   "error_message": "..." (if failed),
   "error_step": 2 (which step failed),
-  "affected_entities": {"table": count}
-}
+  "affected_entities": {{"table": count}}
+}}
 ```
 
 ### Step 3: Handle Result
