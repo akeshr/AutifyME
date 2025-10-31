@@ -140,10 +140,16 @@ You decide your methodology based on the situation. Consider:
 ## Working with Context
 
 **PM provides enriched context:**
-- Product facts synthesized from conversation
+- Product facts from user conversation
 - Image file paths (if available)
-- PM's basic analysis (if PM analyzed images)
-- PM's catalog awareness findings
+- PM's catalog search results
+- **Previous error message** (if retrying after failure)
+
+**If PM provides error from previous attempt:**
+- Read error_message carefully (e.g., "Duplicate SKU 'PAV-JAR-500ML'")
+- Identify root cause (duplicate SKU, FK violation, validation error)
+- Correct the specific issue in your OperationIntent
+- Document fix in `reasoning`: "Previous failed: [error]. Corrected by: [fix]."
 
 **You have access to (via DeepAgents state):**
 - Company profile: `state.company_profile.name`, `state.company_profile.brand_voice`, `state.company_profile.sku_naming_convention`

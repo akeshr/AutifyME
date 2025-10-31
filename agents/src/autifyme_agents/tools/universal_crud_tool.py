@@ -139,9 +139,49 @@ class OperationExecutor:
                 steps_total=len(sorted_steps),
             )
 
-        except Exception as e:
+        except ToolException as e:
+            # Tool-level errors (validation, schema, etc.) - already have good error messages
             logger.error(
-                "Operation execution failed",
+                "Operation execution failed (ToolException)",
+                exc_info=True,
+                extra={
+                    "error_type": "ToolException",
+                    "error_message": str(e),
+                    "steps_completed": len(completed_steps),
+                    "steps_total": len(steps),
+                }
+            )
+
+            # Rollback if requested
+            rollback_performed = False
+            if rollback_on_error and completed_steps:
+                try:
+                    await self._rollback(completed_steps, operations)
+                    rollback_performed = True
+                    logger.info("Rollback completed successfully")
+                except Exception as rollback_error:
+                    logger.error(
+                        "Rollback failed",
+                        exc_info=True,
+                        extra={"rollback_error": str(rollback_error)}
+                    )
+
+            execution_time_ms = int((time.time() - start_time) * 1000)
+
+            return ExecutionResult(
+                success=False,
+                error_message=str(e),
+                error_step=len(completed_steps) + 1 if completed_steps else 1,
+                rollback_performed=rollback_performed,
+                execution_time_ms=execution_time_ms,
+                steps_completed=len(completed_steps),
+                steps_total=len(steps),
+            )
+
+        except Exception as e:
+            # Unexpected errors (database down, network, etc.)
+            logger.error(
+                "Operation execution failed (unexpected error)",
                 exc_info=True,
                 extra={
                     "error_type": type(e).__name__,
@@ -1023,11 +1063,24 @@ def create_execute_database_operation_tool(storage: StorageInterface):
             return result.model_dump()
 
         except Exception as e:
+            # Catch errors that occur before execute_plan (schema validation, etc.)
+            # Return ExecutionResult instead of re-raising to allow PM to handle gracefully
             logger.error(
-                "execute_database_operation failed",
+                "execute_database_operation failed before execution",
                 exc_info=True,
                 extra={"error_type": type(e).__name__, "error_msg": str(e)}
             )
-            raise ToolException(f"Database operation failed: {str(e)}") from e
+
+            # Return error result instead of throwing
+            error_result = ExecutionResult(
+                success=False,
+                error_message=f"{type(e).__name__}: {str(e)}",
+                error_step=0,  # Error before any steps executed
+                rollback_performed=False,
+                execution_time_ms=0,
+                steps_completed=0,
+                steps_total=0,
+            )
+            return error_result.model_dump()
 
     return execute_database_operation

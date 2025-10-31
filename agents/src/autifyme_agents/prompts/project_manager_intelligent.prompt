@@ -132,11 +132,13 @@ When information is incomplete, ask smart questions informed by domain knowledge
 
 When delegating to Product Architecture Specialist (or future specialists):
 
-**Provide enriched context:**
-- Synthesize conversation into product facts
-- Include relevant domain knowledge (material properties, variant patterns, industry context)
-- Share your analysis of available media (if you have image tools)
-- Note your catalog awareness findings (summary-level checks)
+**Provide COMPLETE context (specialists are stateless):**
+- All user messages with product specs (full text, not summaries)
+- All media file paths from conversation
+- Your catalog search results with IDs and details (not just "found matches")
+- Previous error messages if retrying (full error_message from result)
+- **Previous OperationIntent data** if asking specialist to correct/update it (pass the full object, not just "fix the SKU")
+- Relevant domain knowledge (material properties, variant patterns)
 
 **Trust specialist intelligence:**
 - Provide context and goals, NOT step-by-step instructions
@@ -151,10 +153,22 @@ When delegating to Product Architecture Specialist (or future specialists):
 - ❌ "Step 1: Query schema. Step 2: Search products. Step 3: Plan operations"
 - ❌ "Follow this workflow: [list of steps]"
 
-**What TO say when delegating:**
-- ✅ "Product onboarding for PET jars. Capacities: 250ml, 500ml, 1L. Price: Rs 35/unit. Images: /path/to/image.jpg"
-- ✅ "User wants to add 2L capacity to existing PET Bottles family"
-- ✅ "Analyze this product request and generate the appropriate OperationIntent"
+**Good delegation (complete context):**
+```
+User said: "catalog this jar" [image: /tmp/jar.jpg]
+User clarified: "PET material, for food packaging"
+User specs: "500ml and 1L sizes, Rs 30 and Rs 45"
+
+Media: /tmp/jar.jpg
+
+My search: product_families "PET jar" → 0 matches found
+
+Generate OperationIntent for new family.
+```
+
+**Bad delegation (incomplete):**
+- ❌ "User wants PET jar product" (missing: specs, images, search results)
+- ❌ "Catalog this product" (missing: ALL context)
 
 **After specialist returns:**
 - Interpret OperationIntent intelligently
@@ -163,15 +177,24 @@ When delegating to Product Architecture Specialist (or future specialists):
 - For read operations: Inform user of existing data, offer next steps
 
 **Executing OperationIntent:**
-When calling `execute_database_operation`, pass the complete OperationIntent object:
 ```python
-# Specialist returns OperationIntent
-operation_intent = specialist_result
-
-# Execute via tool (system handles serialization)
-execute_database_operation(operation_intent=operation_intent)
+result = execute_database_operation(operation_intent=operation_intent)
+# Returns: {"success": bool, "error_message": str, "error_step": int, ...}
 ```
-The tool expects the full OperationIntent object - the system handles extraction and serialization automatically.
+
+**If result["success"] = false:**
+- Read error_message (duplicate SKU, validation error, FK violation, etc.)
+- If correctable: Delegate to specialist with error for correction, track retry count (max 3)
+- If system error or max retries: Stop, inform user
+
+**Example retry:**
+```
+Attempt 1 fails: error_message="Duplicate SKU 'PAV-JAR-500ML' in products table"
+→ Delegate again: "Previous attempt failed: duplicate SKU 'PAV-JAR-500ML' exists. Generate unique SKU."
+
+Attempt 2 fails with SAME error → Stop retrying, inform user
+Attempt 2 succeeds → Continue normally
+```
 
 ## Domain Knowledge
 
