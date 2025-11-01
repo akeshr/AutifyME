@@ -93,6 +93,7 @@ async def create_project_manager(
     *,
     model: BaseChatModel | None = None,
     checkpointer: Any,
+    specialist_checkpointer: Any,
     storage: StorageInterface,
     channel: MessagingChannel | None = None,
 ) -> Any:
@@ -103,17 +104,29 @@ async def create_project_manager(
 
     Args:
         company_profile: Company context for brand voice and positioning
-        model: LLM for orchestration (defaults to gpt-4.1-mini)
-        checkpointer: LangGraph checkpointer for state persistence
+        model: LLM for orchestration (defaults to gemini-2.5-flash-lite)
+        checkpointer: LangGraph checkpointer for PM state persistence
+        specialist_checkpointer: Separate checkpointer for specialist state (context isolation)
         storage: Storage adapter for database operations
         channel: Messaging channel for platform-specific operations
 
     Returns:
         Compiled DeepAgent
+
+    Notes:
+        - PM and specialists use SEPARATE checkpointers for context isolation
+        - PM sees: User messages + PM's own messages + specialist results
+        - Specialist sees: Only its own work history (delegation prompts + outputs)
+        - This prevents PM conversation leakage into specialist context
     """
     if checkpointer is None:
         raise ValueError(
             "checkpointer is required for Project Manager (DeepAgents requirement)"
+        )
+
+    if specialist_checkpointer is None:
+        raise ValueError(
+            "specialist_checkpointer is required for context isolation (specialists must not see PM conversation)"
         )
 
     if storage is None:
@@ -162,12 +175,28 @@ async def create_project_manager(
     # Campaign persistence tool (HITL-enabled for marketing campaigns)
     pm_tools.append(create_save_campaign_tool(storage))
 
-    # Product Architecture Specialist (structure, variants, SKUs)
-    product_architecture_specialist = create_product_architecture_specialist(storage)
+    # Product Architecture Specialist (DeepAgent as subagent - Pattern 3 with separate checkpointer)
+    # Returns CompiledStateGraph from create_deep_agent
+    # Uses SEPARATE checkpointer for context isolation (specialist only sees its own work)
+    product_architecture_specialist = create_product_architecture_specialist(
+        storage=storage,
+        checkpointer=specialist_checkpointer,  # Separate checkpointer (NOT shared with PM)
+    )
 
-    # Specialists (SubAgent pattern)
+    # Wrap specialist as CompiledSubAgent (Pattern 3)
+    # PM sees specialist as a runnable tool for delegation
     subagents: list[Any] = [
-        product_architecture_specialist,
+        {
+            "name": "product_architecture_specialist",
+            "description": (
+                "Product architecture specialist with schema-driven CRUD. "
+                "Analyzes product structure, queries schemas dynamically, "
+                "searches catalog for existing products, and generates "
+                "OperationIntent with execution plan and impact analysis. "
+                "Handles any CRUD operation on any table through schema-driven planning."
+            ),
+            "runnable": product_architecture_specialist,
+        }
     ]
 
     # HITL configuration
