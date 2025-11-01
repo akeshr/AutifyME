@@ -253,14 +253,14 @@ Specialist returns OperationIntent with:
   - impact_analysis.examples = []
   - impact_analysis says "Will create 12 SKUs"
   - operations[3].new_entities has only 3 items (not 12!)
-  - SKUs contain placeholder: "PAV-JAR-{SIZE}-{COLOR}"
+  - SKUs contain placeholder: "PAV-JAR-{{SIZE}}-{{COLOR}}"
 
 VALIDATION FAILS: Count mismatch (3 != 12) + placeholder SKUs
 
 → Re-delegate to specialist:
 "Your OperationIntent is incomplete:
 - impact_analysis claims 12 SKUs but operations only have 3 entities
-- SKUs contain placeholders: 'PAV-JAR-{SIZE}-{COLOR}'
+- SKUs contain placeholders: 'PAV-JAR-{{SIZE}}-{{COLOR}}'
 - impact_analysis.examples is empty
 
 I need:
