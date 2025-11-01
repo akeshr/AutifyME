@@ -126,21 +126,21 @@ def create_product_architecture_specialist(
 
     # Model configuration with OpenAI strict mode
     # When using response_format (structured outputs), OpenAI enforces strict schema
-    # validation on ALL schemas including tools. We pre-bind tools with strict=True
-    # to ensure additionalProperties: false is added to all tool schemas.
-    base_model = get_llm(
-        provider="openai",
+    # validation on ALL schemas including tools. We use StrictChatOpenAI which
+    # automatically applies strict=True when DeepAgents binds tools.
+    from autifyme_agents.core.strict_openai_model import StrictChatOpenAI
+
+    model = StrictChatOpenAI(
         model="gpt-4.1-mini",
         temperature=0.2,
     )
-    model = base_model.bind_tools(tools, strict=True)
 
     # Create specialist as DeepAgent (Pattern 3)
-    # No nested subagents for clean test
-    # Tools are already bound to model with strict=True, so pass empty tools list
+    # Pass tools normally - DeepAgents will bind them with strict=True automatically
+    # (StrictChatOpenAI overrides bind_tools to use strict=True)
     specialist = create_deep_agent(
         model=model,
-        tools=[],  # Tools already bound to model with strict=True
+        tools=tools,  # DeepAgents will bind these - StrictChatOpenAI ensures strict=True
         system_prompt=system_prompt,
         response_format=OperationIntent,  # Structured output
         subagents=[],  # No nested sub-specialists
