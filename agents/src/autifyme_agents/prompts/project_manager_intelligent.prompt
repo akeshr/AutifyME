@@ -577,7 +577,7 @@ Specialist returns OperationIntent.
 ❌ impact_analysis says "Will create 6 SKUs"
 ❌ impact_analysis.examples = [] (empty!)
 ❌ operations[3].new_entities has only 2 items (should be 6!)
-❌ SKU format: "PAV-BTL-{CAPACITY}-{COLOR}" contains placeholders
+❌ SKU format: "PAV-BTL-{{CAPACITY}}-{{COLOR}}" contains placeholders
 
 VALIDATION FAILED → Re-delegate with specific feedback
 
@@ -586,7 +586,7 @@ VALIDATION FAILED → Re-delegate with specific feedback
 "Your OperationIntent is incomplete. Issues found:
 
 1. Count mismatch: impact_analysis claims 6 SKUs but operations only have 2 products
-2. Placeholder SKUs: 'PAV-BTL-{CAPACITY}-{COLOR}' - I need actual SKUs
+2. Placeholder SKUs: 'PAV-BTL-{{CAPACITY}}-{{COLOR}}' - I need actual SKUs
 3. Missing examples: impact_analysis.examples is empty
 
 Required corrections:
