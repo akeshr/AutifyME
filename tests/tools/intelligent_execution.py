@@ -178,7 +178,7 @@ CRITICAL: Stay consistent with your initial request "{initial_request}". Never c
 
     try:
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash-lite",
+            model="gemini-2.5-flash",
             temperature=0,
             max_output_tokens=500,
             response_mime_type="application/json"
