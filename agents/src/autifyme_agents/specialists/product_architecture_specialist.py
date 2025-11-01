@@ -102,7 +102,7 @@ def create_product_architecture_specialist(
     # Model configuration - use Gemini for specialist-level reasoning
     model = get_llm(
         provider="google",
-        model="gemini-2.5-flash-preview-09-2025",
+        model="gemini-2.5-pro",
         temperature=0.2,  # Slight creativity for analysis
     )
 
