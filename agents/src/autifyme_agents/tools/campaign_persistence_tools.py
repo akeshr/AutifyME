@@ -34,8 +34,7 @@ HITL Strategy:
 import logging
 from typing import Any
 
-from langchain.tools import tool
-from langchain_core.tools import ToolException
+from langchain_core.tools import StructuredTool, ToolException
 from pydantic import BaseModel, Field
 
 from autifyme_agents.core.exceptions import ExternalAPIError, classify_api_error
@@ -131,6 +130,8 @@ class MarketingContentInput(BaseModel):
 class CampaignInput(BaseModel):
     """Complete campaign input for atomic persistence."""
 
+    model_config = {"extra": "forbid"}  # Generates additionalProperties: false
+
     # Core campaign metadata
     campaign_id: str = Field(..., description="Business-friendly campaign ID")
     name: str
@@ -192,8 +193,7 @@ def create_save_campaign_tool(storage: Any) -> Any:
         Configured tool for PM to use
     """
 
-    @tool
-    def save_campaign(campaign_input: CampaignInput) -> dict[str, Any]:
+    def _save_campaign_impl(campaign_input: CampaignInput) -> dict[str, Any]:
         """
         Atomically persist complete marketing campaign across 5+ tables.
 
@@ -409,4 +409,14 @@ def create_save_campaign_tool(storage: Any) -> Any:
 
             raise ToolException(error_message) from e
 
-    return save_campaign
+    return StructuredTool.from_function(
+        func=_save_campaign_impl,
+        name="save_campaign",
+        description=(
+            "Atomically persist complete marketing campaign across 5+ tables. "
+            "Performs all-or-nothing transaction across campaigns, campaign_products, "
+            "campaign_assets, campaign_channels, customer_segments, and marketing_content. "
+            "Rollback on any failure."
+        ),
+        args_schema=CampaignInput,
+    )
