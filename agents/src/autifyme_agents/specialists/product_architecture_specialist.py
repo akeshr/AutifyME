@@ -99,13 +99,6 @@ def create_product_architecture_specialist(
     # Load specialist prompt
     system_prompt = load_prompt("specialists/product_architecture_specialist.prompt")
 
-    # Model configuration - use Gemini for specialist-level reasoning
-    model = get_llm(
-        provider="google",
-        model="gemini-2.5-flash",
-        temperature=0.2,  # Slight creativity for analysis
-    )
-
     # Core tools
     tools: list[Any] = [
         image_analysis_tool,
@@ -131,11 +124,23 @@ def create_product_architecture_specialist(
     tools.append(create_search_product_families_tool(storage))
     tools.append(create_query_database_tool(storage))
 
+    # Model configuration with OpenAI strict mode
+    # When using response_format (structured outputs), OpenAI enforces strict schema
+    # validation on ALL schemas including tools. We pre-bind tools with strict=True
+    # to ensure additionalProperties: false is added to all tool schemas.
+    base_model = get_llm(
+        provider="openai",
+        model="gpt-4.1-mini",
+        temperature=0.2,
+    )
+    model = base_model.bind_tools(tools, strict=True)
+
     # Create specialist as DeepAgent (Pattern 3)
     # No nested subagents for clean test
+    # Tools are already bound to model with strict=True, so pass empty tools list
     specialist = create_deep_agent(
         model=model,
-        tools=tools,
+        tools=[],  # Tools already bound to model with strict=True
         system_prompt=system_prompt,
         response_format=OperationIntent,  # Structured output
         subagents=[],  # No nested sub-specialists
