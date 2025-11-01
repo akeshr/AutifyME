@@ -7,8 +7,8 @@ pattern matching, and counting capabilities.
 import logging
 from typing import Any
 
-from langchain.tools import tool
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, StructuredTool
+from pydantic import BaseModel, Field
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.tool_error_handler import (
@@ -17,6 +17,46 @@ from autifyme_agents.core.tool_error_handler import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Pydantic Model (OpenAI requires additionalProperties: false)
+# =============================================================================
+
+
+class QueryDatabaseInput(BaseModel):
+    """Input schema for query_database tool."""
+
+    model_config = {"extra": "forbid"}  # Generates additionalProperties: false
+
+    table: str = Field(
+        ...,
+        description="Table name to query (e.g., 'product_families', 'products')"
+    )
+    filters: dict[str, Any] | None = Field(
+        default=None,
+        description="Exact match conditions (e.g., {'is_active': True, 'category_id': 'uuid'})"
+    )
+    columns: list[str] | None = Field(
+        default=None,
+        description="Specific columns to return (e.g., ['id', 'name', 'sku_prefix']). If None, returns all columns"
+    )
+    relations: list[str] | None = Field(
+        default=None,
+        description="Related tables to include using PostgREST syntax (e.g., ['categories(*)', 'variant_axes(variant_values(*))'). Enables joining related data in single query"
+    )
+    search_patterns: dict[str, str] | None = Field(
+        default=None,
+        description="Case-insensitive pattern matching (e.g., {'name': '%bottle%', 'brand': '%acme%'}). Use % as wildcards for LIKE queries"
+    )
+    count_only: bool = Field(
+        default=False,
+        description="If True, return count of matching rows instead of data"
+    )
+    limit: int | None = Field(
+        default=None,
+        description="Maximum number of rows to return"
+    )
 
 
 def create_query_database_tool(storage: StorageInterface) -> BaseTool:
@@ -37,8 +77,7 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
         LangChain tool that executes advanced queries
     """
 
-    @tool("query_database")
-    async def query_database(
+    async def _query_database_impl(
         table: str,
         filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
@@ -162,4 +201,15 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
                 fallback_action="Review query parameters. Simplify query by removing relations/filters. Check if table has data matching filters.",
             )
 
-    return query_database
+    return StructuredTool.from_function(
+        coroutine=_query_database_impl,
+        name="query_database",
+        description=(
+            "Query database with advanced filtering and relation support. "
+            "Flexible data retrieval tool for specialists. Supports exact filters, "
+            "pattern matching, relation includes, counting, and column projection. "
+            "EFFICIENCY: Count first with count_only=True, always set limit, "
+            "project columns for specific fields, filter precisely."
+        ),
+        args_schema=QueryDatabaseInput,
+    )

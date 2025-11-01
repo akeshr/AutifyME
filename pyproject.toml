@@ -31,7 +31,7 @@ dependencies = [
     "langgraph-checkpoint-postgres>=3.0.0",
     "langsmith",
     # Advanced Agent Implementation
-    "deepagents>=0.2.0",  # Latest stable release (Oct 28, 2025) - OpenAI schema fixes
+    "deepagents>=0.2.4",  # Latest stable release (Oct 28, 2025) - OpenAI schema fixes
     # LLM Providers (v1 stable)
     "langchain-openai>=1.0.0",
     "langchain-anthropic>=1.0.0",

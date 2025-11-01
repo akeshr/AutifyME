@@ -15,7 +15,7 @@ Design Philosophy:
 import logging
 from typing import Any
 
-from langchain.tools import tool
+from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 from autifyme_agents.core.exceptions import classify_api_error
@@ -108,6 +108,33 @@ class ProductFamilySearchResult(BaseModel):
     )
     confidence: float = Field(
         ..., ge=0.0, le=1.0, description="Confidence in recommendation"
+    )
+
+
+class SearchProductFamiliesInput(BaseModel):
+    """Input schema for search_product_families tool (OpenAI-compatible)."""
+
+    model_config = {"extra": "forbid"}  # Generates additionalProperties: false
+
+    product_group_id: str | None = Field(
+        default=None,
+        description="Business identifier to search for (e.g., 'PACK-PET-JAR')"
+    )
+    name: str | None = Field(
+        default=None,
+        description="Product family name to match against"
+    )
+    brand: str | None = Field(
+        default=None,
+        description="Brand name to filter by"
+    )
+    material: str | None = Field(
+        default=None,
+        description="Material to match (e.g., 'PET', 'Glass')"
+    )
+    limit: int = Field(
+        default=5,
+        description="Max number of results to return (default 5)"
     )
 
 
@@ -255,8 +282,7 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
         LangChain tool for product family search
     """
 
-    @tool("search_product_families")
-    def search_product_families(
+    def _search_product_families_impl(
         product_group_id: str | None = None,
         name: str | None = None,
         brand: str | None = None,
@@ -414,4 +440,15 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
             )
             raise classify_api_error(e, "search_product_families", "Supabase") from e
 
-    return search_product_families
+    return StructuredTool.from_function(
+        func=_search_product_families_impl,
+        name="search_product_families",
+        description=(
+            "Search for existing product families in catalog using fuzzy matching. "
+            "Use this BEFORE creating a new product family to check if it already exists "
+            "or if the incoming product is a new variant of an existing family. "
+            "Matching logic: Exact business_id match (highest), name similarity + brand (variant), "
+            "moderate similarity (ask user), low/no matches (create new)."
+        ),
+        args_schema=SearchProductFamiliesInput,
+    )
