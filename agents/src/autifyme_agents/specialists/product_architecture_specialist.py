@@ -101,8 +101,8 @@ def create_product_architecture_specialist(
 
     # Model configuration - use Gemini for specialist-level reasoning
     model = get_llm(
-        provider="openai",
-        model="gpt-4.1-mini",
+        provider="google",
+        model="gemini-2.5-flash",
         temperature=0.5,  # Slight creativity for analysis
     )
 
