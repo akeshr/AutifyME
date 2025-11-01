@@ -143,7 +143,7 @@ def create_product_architecture_specialist(
 
     # Resolve model (default to gemini-2.5-flash-lite for specialist work)
     if model is None:
-        model = get_llm(provider="google", model="gemini-2.5-flash", temperature=0.1)
+        model = get_llm(provider="google", model="gemini-2.5-flash", temperature=0.3)
 
     # [CRITICAL] Manually compile agent with response_format
     # DeepAgents SubAgent dict does NOT support response_format field
