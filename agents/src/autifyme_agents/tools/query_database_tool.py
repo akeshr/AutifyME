@@ -53,6 +53,12 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
         Flexible data retrieval tool for specialists. Supports exact filters,
         pattern matching, relation includes, counting, and column projection.
 
+        EFFICIENCY BEST PRACTICES:
+        - Count first: Use count_only=True before fetching rows
+        - Limit always: Set limit parameter (default to 10 unless specific need)
+        - Project columns: Specify columns for specific fields only
+        - Filter precisely: Use filters for exact match, search_patterns for LIKE
+
         Args:
             table: Table name to query (e.g., "product_families", "products")
             filters: Exact match conditions (e.g., {"is_active": True, "category_id": "uuid"})
