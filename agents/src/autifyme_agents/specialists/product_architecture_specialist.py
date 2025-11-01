@@ -103,7 +103,7 @@ def create_product_architecture_specialist(
     model = get_llm(
         provider="google",
         model="gemini-2.5-pro",
-        temperature=0.2,  # Slight creativity for analysis
+        temperature=0.7,  # Slight creativity for analysis
     )
 
     # Core tools
