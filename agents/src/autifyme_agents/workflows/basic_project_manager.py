@@ -110,7 +110,6 @@ def create_project_manager(
         interrupt_on=interrupt_configs,
         checkpointer=checkpointer,
         store=store,
-        use_longterm_memory=True,
         context_schema=CompanyContext,
     )
 
