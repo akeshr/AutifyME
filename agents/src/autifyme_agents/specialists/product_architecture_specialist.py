@@ -49,6 +49,9 @@ from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 def create_product_architecture_specialist(
     storage: StorageInterface,
     checkpointer: Any,
+    provider: str = "google",
+    model_name: str = "gemini-2.5-flash",
+    temperature: float = 0.2,
 ) -> CompiledStateGraph:
     """
     Create Product Architecture Specialist with schema-driven CRUD.
@@ -74,6 +77,9 @@ def create_product_architecture_specialist(
     Args:
         storage: Storage interface for catalog search + schema query (REQUIRED)
         checkpointer: Checkpointer instance from PM (REQUIRED for state persistence)
+        provider: LLM provider ("openai", "anthropic", "google") - default: "openai"
+        model_name: Model identifier - default: "gpt-4.1-mini"
+        temperature: Sampling temperature (0.0-1.0) - default: 0.2
 
     Returns:
         CompiledStateGraph: Stateful specialist agent that can be nested as subagent in PM
@@ -82,6 +88,8 @@ def create_product_architecture_specialist(
         - Pattern 3 test: Stateful specialist with shared checkpointer
         - Specialist maintains domain knowledge across delegations
         - LangGraph handles thread_id namespacing automatically
+        - OpenAI requires StrictChatOpenAI wrapper when using response_format
+        - Other providers work with their native chat model classes
         - Single checkpointer simplifies state management
         - Includes default file tools + todo tool (DeepAgent behavior)
         - SubAgentMiddleware excluded (cannot spawn dynamic subagents)
@@ -124,27 +132,37 @@ def create_product_architecture_specialist(
     tools.append(create_search_product_families_tool(storage))
     tools.append(create_query_database_tool(storage))
 
-    # Model configuration with OpenAI strict mode
-    # When using response_format (structured outputs), OpenAI enforces strict schema
-    # validation on ALL schemas including tools. We use StrictChatOpenAI which
-    # automatically applies strict=True when DeepAgents binds tools.
-    from autifyme_agents.core.strict_openai_model import StrictChatOpenAI
+    # Model configuration - provider-agnostic with OpenAI special handling
+    # OpenAI requires StrictChatOpenAI wrapper when using response_format (structured outputs)
+    # because it enforces strict schema validation globally and requires additionalProperties: false
+    # Other providers (Anthropic, Google) work natively with structured outputs
+    from autifyme_agents.core.llm_factory import get_llm
 
-    model = StrictChatOpenAI(
-        model="gpt-4.1-mini",
-        temperature=0.2,
-    )
+    if provider == "openai":
+        # OpenAI with response_format requires strict mode + additionalProperties injection
+        from autifyme_agents.core.strict_openai_model import StrictChatOpenAI
+        model = StrictChatOpenAI(
+            model=model_name,
+            temperature=temperature,
+        )
+    else:
+        # Other providers work natively
+        model = get_llm(
+            provider=provider,
+            model=model_name,
+            temperature=temperature,
+        )
 
     # Create specialist as DeepAgent (Pattern 3)
-    # Pass tools normally - DeepAgents will bind them with strict=True automatically
-    # (StrictChatOpenAI overrides bind_tools to use strict=True)
+    # - OpenAI: StrictChatOpenAI wrapper ensures tools have correct strict schemas
+    # - Other providers: Native tool use with structured outputs
     specialist = create_deep_agent(
         model=model,
-        tools=tools,  # DeepAgents will bind these - StrictChatOpenAI ensures strict=True
+        tools=tools,
         system_prompt=system_prompt,
-        response_format=OperationIntent,  # Structured output
+        response_format=OperationIntent,  # Structured output (Pydantic model)
         subagents=[],  # No nested sub-specialists
-        checkpointer=checkpointer,  # Optional state persistence
+        checkpointer=checkpointer,  # State persistence
         interrupt_on={},  # No HITL for specialist (PM handles approvals)
     )
 
