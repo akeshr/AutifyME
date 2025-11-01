@@ -15,6 +15,9 @@ from langchain.chat_models import BaseChatModel
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.core.structured_subagent_middleware import (
+    StructuredSubAgentMiddleware,
+)
 from autifyme_agents.integrations.storage import get_store
 from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
@@ -101,15 +104,41 @@ async def create_project_manager(
     PM orchestrates domain specialists for business workflows. Uses SubAgent pattern
     for specialist delegation and HITL-enabled persistence tools.
 
+    Multi-Model Architecture:
+        PM and specialists can use different models optimized for their tasks:
+        - PM: Orchestration, routing, context management (default: gemini-2.5-flash)
+        - Product Specialist: Structured output, data analysis (default: gpt-4.1-mini)
+        - Marketing Specialist: Creative content generation (could use: claude-3-5-sonnet)
+
+    To configure specialist models, pass model parameter in specialist factories.
+    Each specialist independently selects its default if not provided.
+
     Args:
         company_profile: Company context for brand voice and positioning
-        model: LLM for orchestration (defaults to gpt-4.1-mini)
+        model: LLM for PM orchestration (defaults to gemini-2.5-flash)
         checkpointer: LangGraph checkpointer for state persistence
         storage: Storage adapter for database operations
         channel: Messaging channel for platform-specific operations
 
     Returns:
         Compiled DeepAgent
+
+    Example - Custom specialist models:
+        ```python
+        # PM uses Gemini for orchestration
+        pm = await create_project_manager(
+            company_profile=profile,
+            model=get_llm(provider="google", model="gemini-2.5-flash"),
+            checkpointer=checkpointer,
+            storage=storage,
+        )
+
+        # To customize specialist models, modify this file's specialist factory calls:
+        # product_specialist = create_product_architecture_specialist(
+        #     storage=storage,
+        #     model=get_llm(provider="anthropic", model="claude-3-5-sonnet"),
+        # )
+        ```
     """
     if checkpointer is None:
         raise ValueError(
@@ -163,9 +192,13 @@ async def create_project_manager(
     pm_tools.append(create_save_campaign_tool(storage))
 
     # Product Architecture Specialist (structure, variants, SKUs)
-    product_architecture_specialist = create_product_architecture_specialist(storage)
+    # Each specialist can use its own model (configured in specialist factory)
+    product_architecture_specialist = create_product_architecture_specialist(
+        storage=storage,
+        # model=None allows specialist to use its own default model
+    )
 
-    # Specialists (SubAgent pattern)
+    # Specialists (StructuredSubAgent pattern with response_format support)
     subagents: list[Any] = [
         product_architecture_specialist,
     ]
@@ -176,15 +209,43 @@ async def create_project_manager(
         "save_campaign": True,
     }
 
-    # Note: create_deep_agent adds SummarizationMiddleware by default
-    # No need to pass custom middleware - use default configuration
-    # Default: triggers at ~170K tokens, keeps last 6 messages
+    # Create StructuredSubAgentMiddleware for structured output support
+    # This replaces DeepAgents' default SubAgentMiddleware which doesn't support response_format
+    from deepagents.middleware.filesystem import FilesystemMiddleware
+    from langchain.agents.middleware import TodoListMiddleware
+    from langchain.agents.middleware.summarization import SummarizationMiddleware
+    from langchain_anthropic.middleware import AnthropicPromptCachingMiddleware
+    from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
+
+    structured_subagent_middleware = StructuredSubAgentMiddleware(
+        default_model=llm,
+        default_tools=pm_tools,
+        subagents=subagents,
+        default_middleware=[
+            TodoListMiddleware(),
+            FilesystemMiddleware(long_term_memory=True),
+            SummarizationMiddleware(
+                model=llm,
+                max_tokens_before_summary=170000,
+                messages_to_keep=6,
+            ),
+            AnthropicPromptCachingMiddleware(unsupported_model_behavior="ignore"),
+            PatchToolCallsMiddleware(),
+        ],
+        default_interrupt_on=interrupt_configs,
+        general_purpose_agent=True,
+    )
+
+    # Note: We pass subagents=None to prevent create_deep_agent from creating
+    # its own SubAgentMiddleware. Instead, we provide our StructuredSubAgentMiddleware
+    # via the middleware parameter.
 
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
-        subagents=subagents,
+        middleware=[structured_subagent_middleware],  # Custom middleware with response_format support
+        subagents=None,  # Don't let create_deep_agent create standard SubAgentMiddleware
         interrupt_on=interrupt_configs,
         checkpointer=checkpointer,
         store=store,

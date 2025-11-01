@@ -91,21 +91,55 @@ def create_product_architecture_specialist(
     - Calculate impact analysis from schema + data
 
     Architecture:
-    - CompiledSubAgent pattern (manually compiled agent with response_format)
+    - StructuredSubAgent pattern (DeepAgents SubAgent + response_format)
     - OperationIntent response (single generic model)
     - Schema-driven planning (no hard-coded operation types)
     - Dynamic execution plan generation
     - Includes standard tools (write_todos, file operations)
 
+    Provider Compatibility:
+        Works across all LLM providers (OpenAI, Gemini, Claude) via LangChain's
+        create_agent response_format parameter:
+        - OpenAI: Uses native json_schema mode (strict=True)
+        - Anthropic: Uses function calling / tool-based approach
+        - Google Gemini: Uses function calling or responseSchema
+
     Args:
         storage: Storage interface for catalog search + schema query
-        model: LLM for specialist (defaults to gemini-2.5-flash-lite)
+        model: LLM for specialist. If None, defaults to gpt-4.1-mini (fast, cost-effective
+            for structured output tasks). Override to use different model per specialist.
+
+    Model Selection Guide:
+        - gpt-4.1-mini: Fast, cheap, excellent for structured output (DEFAULT)
+        - gemini-2.5-flash: Fast, good reasoning, works well with tools
+        - claude-3-5-sonnet: Best reasoning, highest quality, more expensive
+        - gpt-4o: Strong reasoning, reliable tool calling
+
+    Example - Using different models for different specialists:
+        ```python
+        # PM uses Gemini for orchestration
+        pm_model = get_llm(provider="google", model="gemini-2.5-flash")
+
+        # Product Specialist uses GPT-4.1-mini for structured output
+        product_spec = create_product_architecture_specialist(
+            storage=storage,
+            model=None,  # Uses default: gpt-4.1-mini
+        )
+
+        # Marketing Specialist could use Claude for creative work
+        marketing_spec = create_marketing_specialist(
+            storage=storage,
+            model=get_llm(provider="anthropic", model="claude-3-5-sonnet"),
+        )
+        ```
 
     Returns:
-        CompiledSubAgent spec with:
+        StructuredSubAgent spec with:
         - name: specialist identifier
         - description: delegation criteria
-        - runnable: Pre-compiled agent with response_format configured
+        - system_prompt: loaded from prompts/specialists/
+        - tools: schema tools + storage tools + standard tools
+        - response_format: OperationIntent Pydantic model
     """
     system_prompt = load_prompt("specialists/product_architecture_specialist.prompt")
 
@@ -141,24 +175,13 @@ def create_product_architecture_specialist(
         tools.append(create_search_product_families_tool(storage))
         tools.append(create_query_database_tool(storage))
 
-    # Resolve model (default to gemini-2.5-flash-lite for specialist work)
-    if model is None:
-        model = get_llm(provider="openai", model="gpt-4.1-mini", temperature=0.3)
-
-    # [CRITICAL] Manually compile agent with response_format
-    # DeepAgents SubAgent dict does NOT support response_format field
-    # Must use create_agent directly to configure structured output
-    runnable = create_agent(
-        model=model,
-        system_prompt=system_prompt,
-        tools=tools,
-        response_format=OperationIntent,  # Configures with_structured_output()
-        checkpointer=False,  # Specialists are stateless
-    )
-
-    # Return CompiledSubAgent format (uses runnable instead of individual fields)
+    # Return StructuredSubAgent specification (used by StructuredSubAgentMiddleware)
+    # The middleware will create the agent with response_format support
     return {
         "name": "product_architecture_specialist",
         "description": description,
-        "runnable": runnable,
+        "system_prompt": system_prompt,
+        "tools": tools,
+        "model": model,  # Pass model through (middleware uses it)
+        "response_format": OperationIntent,  # Pydantic model for structured output
     }
