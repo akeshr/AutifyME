@@ -122,7 +122,7 @@ def image_analysis_tool(
     """
     try:
         # Get vision-capable LLM
-        llm = get_llm(provider="google", model="gemini-2.5-flash")
+        llm = get_llm(provider="google", model="gemini-2.5-flash-preview-09-2025")
 
         # Convert image to base64 data URI
         image_uri = _encode_image_to_base64_uri(image_path)
