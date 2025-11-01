@@ -175,17 +175,16 @@ def create_product_architecture_specialist(
         tools.append(create_search_product_families_tool(storage))
         tools.append(create_query_database_tool(storage))
 
-    # Resolve model (default to gpt-4.1-mini for specialist work)
+    # Resolve model default
     if model is None:
         model = get_llm(provider="openai", model="gpt-4.1-mini", temperature=0.3)
 
-    # Return StructuredSubAgent specification (used by StructuredSubAgentMiddleware)
-    # The middleware will create the agent with response_format support
+    # Return StructuredSubAgent specification
     return {
         "name": "product_architecture_specialist",
         "description": description,
         "system_prompt": system_prompt,
         "tools": tools,
-        "model": model,  # Resolved model (never None)
-        "response_format": OperationIntent,  # Pydantic model for structured output
+        "model": model,
+        "response_format": OperationIntent,
     }
