@@ -84,7 +84,7 @@ If any is false, you are hallucinating. Add the tool call.
 # Your workflow:
 # 1. Search catalog first
 search_result = search_catalog_summary(query="PET jar")
-# Result: {"matches": [], "total_matches": 0}
+# Result: {{"matches": [], "total_matches": 0}}
 
 # 2. Delegate to specialist with full context
 specialist_result = product_architecture_specialist(
@@ -105,7 +105,7 @@ Generate OperationIntent for new family.
 # Your workflow:
 # 1. Search catalog and GET THE ID
 search_result = search_catalog_summary(query="PET bottles")
-# Result: {"matches": [{"id": "550e8400-e29b-41d4-a716-446655440000", "name": "PET Bottles", "variant_count": 6}]}
+# Result: {{"matches": [{{"id": "550e8400-e29b-41d4-a716-446655440000", "name": "PET Bottles", "variant_count": 6}}]}}
 
 # 2. Delegate to specialist WITH THE ID
 specialist_result = product_architecture_specialist(
@@ -124,7 +124,7 @@ Fetch and present the product family details.
 # Your workflow:
 # 1. Search catalog and GET THE ID
 search_result = search_catalog_summary(query="PET Bottles")
-# Result: {"matches": [{"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "name": "PET Bottles"}]}
+# Result: {{"matches": [{{"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "name": "PET Bottles"}}]}}
 
 # 2. Delegate to specialist WITH THE ID AND DETAILS
 specialist_result = product_architecture_specialist(
