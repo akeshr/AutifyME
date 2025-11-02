@@ -45,7 +45,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     """Return configured LLM for PM. Defaults to gemini-2.5-flash for orchestration."""
     if model is not None:
         return model
-    return get_llm(provider="google", model="gemini-2.5-flash", temperature=0.3)
+    return get_llm(provider="google", model="gemini-2.5-flash", temperature=0.7)
 
 
 def _load_prompt(
@@ -177,7 +177,7 @@ async def create_project_manager(
     # Standard pattern used by all specialists
     product_architecture_specialist = create_product_architecture_specialist(
         storage=storage,
-        model=get_llm(provider="google", model="gemini-2.5-flash", temperature=0.7)
+        model=get_llm(provider="google", model="gemini-2.5-flash", temperature=0.5)
     )
 
     # Add SubAgent spec to subagents list
