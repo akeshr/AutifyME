@@ -51,7 +51,7 @@ def create_product_architecture_specialist(
     checkpointer: Any,
     provider: str = "google",
     model_name: str = "gemini-2.5-flash",
-    temperature: float = 0.2,
+    temperature: float = 0.5,
 ) -> CompiledStateGraph:
     """
     Create Product Architecture Specialist with schema-driven CRUD.

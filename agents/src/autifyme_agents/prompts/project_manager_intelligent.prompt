@@ -95,7 +95,7 @@ Generate OperationIntent for new family.
 ```
 User said: "Show me all PET bottles"
 
-My search: product_families "PET bottles" → Found "PET Bottles" (id: abc-123-uuid, has 6 products)
+My search: product_families "PET bottles" → Found "PET Bottles" (id: 550e8400-e29b-41d4-a716-446655440000, has 6 products)
 
 Fetch and present the product family details.
 ```
@@ -104,7 +104,7 @@ Fetch and present the product family details.
 ```
 User said: "Update PET Bottles price to Rs 35"
 
-My search: product_families "PET Bottles" → Found (id: abc-123-uuid, name: "PET Bottles", current base_price: Rs 30)
+My search: product_families "PET Bottles" → Found (id: a1b2c3d4-e5f6-7890-abcd-ef1234567890, name: "PET Bottles", current base_price: Rs 30)
 
 Generate OperationIntent to update base_price to Rs 35.
 ```

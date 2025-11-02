@@ -36,8 +36,10 @@ class QueryDatabaseInput(BaseModel):
     filters: dict[str, Any] | None = Field(
         default=None,
         description=(
-            "Exact match conditions for any field (e.g., {'id': 'uuid-123'}, "
-            "{'is_active': True}, {'brand': 'Acme'}, {'family_id': 'uuid-456'}). "
+            "Exact match conditions for any field. "
+            "Examples: {'id': '550e8400-e29b-41d4-a716-446655440000'}, "
+            "{'is_active': True}, {'brand': 'Acme'}, "
+            "{'family_id': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'}. "
             "CRITICAL: Use filters when you have specific criteria. "
             "Empty filters {} returns ALL rows - only appropriate for 'list all' queries. "
             "For partial matches, use search_patterns instead."
@@ -98,11 +100,18 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
         Flexible data retrieval tool for specialists. Supports exact filters,
         pattern matching, relation includes, counting, and column projection.
 
+        CRITICAL FILTER USAGE:
+        - SPECIFIC LOOKUPS: Use filters with entity IDs (UUIDs) or exact values
+          (e.g., filters={'id': '550e8400-e29b-41d4-a716-446655440000'}, filters={'brand': 'Acme'})
+        - BROAD SEARCHES: Use search_patterns for partial matches (search_patterns={'name': '%bottle%'})
+        - LIST ALL: Only use empty filters={} for "list all" queries - otherwise fetches ALL rows (inefficient)
+        - UUID FORMAT: Standard 8-4-4-4-12 hex format (e.g., 'a1b2c3d4-e5f6-7890-abcd-ef1234567890')
+        - When PM provides entity IDs in delegation → ALWAYS use them in filters
+
         EFFICIENCY BEST PRACTICES:
         - Count first: Use count_only=True before fetching rows
         - Limit always: Set limit parameter (default to 10 unless specific need)
         - Project columns: Specify columns for specific fields only
-        - Filter precisely: Use filters for exact match, search_patterns for LIKE
 
         Args:
             table: Table name to query (e.g., "product_families", "products")
@@ -140,10 +149,10 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
                 columns=["id", "name", "sku_code"]
             )
 
-            # Count products in a family
+            # Count products in a family (using UUID from PM delegation)
             query_database(
                 table="products",
-                filters={"product_family_id": "uuid-123"},
+                filters={"product_family_id": "550e8400-e29b-41d4-a716-446655440000"},
                 count_only=True
             )
 
@@ -153,6 +162,19 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
                 filters={"name": "Size"},
                 relations=["variant_values(*)"]
             )
+
+            # Get specific product family when PM provides ID (UUID format: 8-4-4-4-12)
+            query_database(
+                table="product_families",
+                filters={"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"},  # Actual UUID from PM
+                relations=["variant_axes(variant_values(*))", "products(*)"]
+            )
+
+            # BAD - Empty filters when you have specific criteria
+            # ❌ query_database(table="product_families", filters={}, relations=["variant_axes(*)"])
+            # This returns ALL families - use filters with UUID or search_patterns instead
+            # ✓ filters={"id": "550e8400-e29b-41d4-a716-446655440000"}
+            # ✓ search_patterns={"name": "%bottle%"}
         """
         try:
             logger.info(
@@ -211,11 +233,15 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
         coroutine=_query_database_impl,
         name="query_database",
         description=(
-            "Query database with advanced filtering and relation support. "
-            "Flexible data retrieval tool for specialists. Supports exact filters, "
-            "pattern matching, relation includes, counting, and column projection. "
-            "EFFICIENCY: Count first with count_only=True, always set limit, "
-            "project columns for specific fields, filter precisely."
+            "Query database with filters, search patterns, and relations. "
+            "CRITICAL USAGE: "
+            "1. SPECIFIC LOOKUPS: Use filters for exact matches with UUIDs or exact values "
+            "(e.g., filters={'id': '550e8400-e29b-41d4-a716-446655440000'}, filters={'is_active': True, 'brand': 'Acme'}). "
+            "2. BROAD SEARCHES: Use search_patterns for partial matches (e.g., search_patterns={'name': '%bottle%'}). "
+            "3. LIST ALL: Only use empty filters={} for 'list all' queries - otherwise you'll fetch ALL rows (inefficient). "
+            "EFFICIENCY: Count first (count_only=True), always set limit, use relations for joins. "
+            "UUID Format: UUIDs are 8-4-4-4-12 hex digits (e.g., '550e8400-e29b-41d4-a716-446655440000'). "
+            "When PM provides entity IDs in delegation, ALWAYS use them in filters."
         ),
         args_schema=QueryDatabaseInput,
     )
