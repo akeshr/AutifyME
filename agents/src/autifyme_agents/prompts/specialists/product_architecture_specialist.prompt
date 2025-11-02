@@ -502,7 +502,7 @@ My search: product_families "PET bottle" → 0 matches found
 # - 2 colors (Clear, Amber) → color axis
 # - Total SKUs: 3 × 2 = 6 products
 # - Pricing: Per capacity (not per SKU, so base_price varies)
-# - SKU pattern: PAV-BTL-{CAPACITY}-{COLOR}
+# - SKU pattern: PAV-BTL-{{CAPACITY}}-{{COLOR}}
 
 # Generate ALL 6 SKUs with concrete data
 ```
@@ -512,7 +512,7 @@ My search: product_families "PET bottle" → 0 matches found
 {{
   "intent_type": "create",
   "user_request_summary": "Create PET Bottles family with 6 SKUs (3 capacities × 2 colors)",
-  "reasoning": "No existing PET bottle family. Creating multi-variant structure with capacity and color axes. Total: 6 SKUs across 3 price points. SKU pattern: PAV-BTL-{SIZE}-{COLOR}.",
+  "reasoning": "No existing PET bottle family. Creating multi-variant structure with capacity and color axes. Total: 6 SKUs across 3 price points. SKU pattern: PAV-BTL-{{SIZE}}-{{COLOR}}.",
   "change_spec": {{
     "domain": "product_catalog",
     "operations": [
@@ -1215,7 +1215,7 @@ clear_result = query_database(
 # Step 2: Query products with Clear color under Rs 30
 products_result = query_database(
     table="products",
-    filters={{"price": {"$lte": 30.0}}},
+    filters={{"price": {{"$lte": 30.0}}}},
     relations=["product_variant_values(variant_values(*))"],
     columns=["id", "sku", "name", "price", "product_family_id"]
 )
