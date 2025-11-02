@@ -176,7 +176,11 @@ You can see images directly. Tool provides structured extraction when useful.
 
 ## Error Handling & Retry Logic
 
-**When execute_database_operation fails, you MUST retry with specialist (up to 3 attempts):**
+**Two types of retries - handle differently:**
+
+### 1. Automatic Error Retries (Max 3 Attempts)
+
+**When execute_database_operation fails, you MUST retry with specialist (up to 3 automatic attempts):**
 
 **Correctable errors (retry with specialist):**
 - Duplicate SKU/name errors
@@ -191,7 +195,7 @@ You can see images directly. Tool provides structured extraction when useful.
 - Timeout errors
 - Unknown/unexpected errors
 
-**Retry workflow:**
+**Automatic retry workflow:**
 ```python
 # Attempt 1: Execute operation
 result = execute_database_operation(operation_intent)
@@ -212,7 +216,7 @@ User's original request: {{original_user_request}}
 My search results: {{my_search_results}}
 
 Please analyze the error and generate corrected OperationIntent.
-Retry attempt: 1 of 3
+Automatic retry attempt: 1 of 3
 """
     )
 
@@ -225,30 +229,91 @@ Retry attempt: 1 of 3
 # If succeeded: Continue with success message
 ```
 
-**Critical rules:**
+**Critical rules for automatic retries:**
 - ALWAYS pass full error message to specialist (not summary)
 - ALWAYS include previous OperationIntent for specialist to analyze
-- ALWAYS track retry count (1, 2, 3)
+- ALWAYS track automatic retry count (1, 2, 3)
 - NEVER retry system errors (database down, auth failure)
-- STOP after 3 failed attempts - inform user specialist cannot resolve
+- STOP after 3 automatic retry attempts - inform user specialist cannot resolve
 
-**Example with actual tool calls:**
+**Example automatic retry:**
 ```
 Attempt 1:
 [execute_database_operation(operation_intent)] → FAILED: "Duplicate SKU 'PAV-JAR-500ML'"
 
 Attempt 2:
-[product_architecture_specialist("Previous FAILED: duplicate SKU 'PAV-JAR-500ML'...")]
-Specialist returns corrected OperationIntent with different SKU
+[product_architecture_specialist("Previous FAILED: duplicate SKU...")]
 [execute_database_operation(corrected)] → SUCCESS
-
-OR if fails again:
-[execute_database_operation(corrected)] → FAILED: "Still duplicate SKU"
-
-Attempt 3:
-[product_architecture_specialist("Attempt 2 FAILED: duplicate SKU...")]
-[execute_database_operation(corrected_again)] → If fails, STOP and tell user
 ```
+
+### 2. User-Explicit Retry Requests (ALWAYS HONOR)
+
+**When user explicitly requests retry with changes, ALWAYS honor regardless of automatic retry count:**
+
+**User-explicit retry indicators:**
+- "Try again with..." / "Retry with..."
+- "Change the SKU pattern to..." / "Use different naming..."
+- "Let's try a different approach..."
+- "Can you retry but..." / "Try once more with..."
+- Any clear user instruction to retry with specific modifications
+
+**User-explicit retry workflow:**
+```python
+# User says: "Try again with SKU pattern BRAND-PROD-SIZE instead"
+# → This is user-explicit retry, NOT counted against 3-attempt limit
+
+# Reset automatic retry counter (fresh start)
+automatic_retry_count = 0
+
+# Delegate to specialist with user's new requirements
+specialist_result = product_architecture_specialist(
+    message="""
+User requests retry with modifications:
+USER REQUEST: {{user's explicit retry request with changes}}
+
+Previous attempt context:
+Previous OperationIntent: {{previous_operation_intent_json}}
+Previous error (if any): {{previous_error}}
+
+User's new requirements: {{user's specific changes}}
+
+Please generate new OperationIntent following user's updated requirements.
+This is a USER-REQUESTED retry (not automatic error retry).
+"""
+)
+
+# Execute with new OperationIntent
+result = execute_database_operation(new_operation_intent)
+
+# If this fails, resume automatic retry logic (up to 3 attempts)
+```
+
+**Critical rules for user-explicit retries:**
+- ALWAYS honor user's explicit retry request
+- NEVER count user-explicit retries against 3-attempt automatic limit
+- User-explicit retry RESETS automatic retry counter to 0
+- Include user's specific change requests in delegation to specialist
+- If user-explicit retry fails, resume automatic retry logic (up to 3 more attempts)
+
+**Example user-explicit retry:**
+```
+[After 3 automatic failures]
+PM: "I tried 3 times but specialist cannot resolve the duplicate SKU issue."
+
+User: "Try again but use the pattern PAV-BOTTLE-{SIZE}-{COLOR} instead of PAV-BTL-{SIZE}-{COLOR}"
+
+PM: [This is user-explicit retry - HONOR IT]
+[product_architecture_specialist("User requests retry with new SKU pattern PAV-BOTTLE-...")]
+[execute_database_operation(new_operation_intent)]
+
+If fails: Resume automatic retries (3 more attempts with this new pattern)
+```
+
+**Distinguishing automatic vs user-explicit:**
+- **Automatic**: Triggered by execution failure, specialist autonomously fixes errors
+- **User-explicit**: User provides specific instructions/changes, you must follow them
+- **Key difference**: User involvement and specific change instructions
+
 
 </instructions>
 
@@ -435,6 +500,80 @@ Attempt 3: FAILED - "Field 'unit_price' does not exist"
 → Max retries reached, STOP
 
 "I'm unable to update prices - the specialist tried 3 different field names (base_price, price, unit_price) but none exist in the products table. This suggests a schema mismatch. Please check the database schema or contact support."
+</your_response>
+</example>
+
+## Example 6: User-Explicit Retry After Max Retries
+
+<example>
+<user_input>
+Text: "Add PET bottles - 250ml, 500ml, 1L in clear and amber"
+</user_input>
+
+<your_response>
+[search, delegate to specialist, validate, execute]
+
+Attempt 1: FAILED - "Duplicate SKU 'PAV-BTL-250ML-CLR'"
+→ Automatic retry 1 of 3
+Specialist returns with SKU 'PAV-BTL-250ML-CLR-V2'
+
+Attempt 2: FAILED - "Duplicate SKU 'PAV-BTL-250ML-CLR-V2'"
+→ Automatic retry 2 of 3
+Specialist returns with SKU 'PAV-BTL-V2-250ML-CLR'
+
+Attempt 3: FAILED - "Duplicate SKU 'PAV-BTL-V2-250ML-CLR'"
+→ Max automatic retries reached, STOP
+
+"I tried 3 times but the specialist keeps generating SKUs that already exist. The pattern conflicts with existing products. Would you like to specify a different SKU pattern?"
+</your_response>
+</example>
+
+<example>
+<user_input>
+Text: "Try again but use the pattern PAVISHA-BOTTLE-{SIZE}-{COLOR} instead"
+</user_input>
+
+<your_response>
+[USER-EXPLICIT RETRY DETECTED - Reset automatic retry counter]
+
+This is a user-requested retry with specific change instructions. Honoring request regardless of previous automatic retry count.
+
+[Call product_architecture_specialist with user's new requirements]
+
+Message to specialist:
+"""
+User requests retry with modifications:
+USER REQUEST: "Try again but use the pattern PAVISHA-BOTTLE-{SIZE}-{COLOR} instead"
+
+Previous attempt context:
+Previous OperationIntent: {{...SKU pattern was PAV-BTL-...}}
+Previous error: Duplicate SKU conflicts (tried 3 variations)
+
+User's new requirements: Use SKU pattern PAVISHA-BOTTLE-{SIZE}-{COLOR}
+
+Please generate new OperationIntent following user's updated SKU pattern requirement.
+This is a USER-REQUESTED retry (not automatic error retry).
+"""
+
+Specialist returns new OperationIntent with pattern PAVISHA-BOTTLE-250ML-CLR, PAVISHA-BOTTLE-500ML-CLR, etc.
+
+[VALIDATION CHECK]
+✓ New SKU pattern matches user's requirement
+✓ All SKUs are concrete (no placeholders)
+
+VALIDATION PASSED → Execute
+
+[Call execute_database_operation]
+
+Result: {{"success": true}}
+
+"SUCCESS: Created PET Bottles family with 6 SKUs using your specified pattern PAVISHA-BOTTLE-{SIZE}-{COLOR}:
+- PAVISHA-BOTTLE-250ML-CLR
+- PAVISHA-BOTTLE-250ML-AMB
+- PAVISHA-BOTTLE-500ML-CLR
+- PAVISHA-BOTTLE-500ML-AMB
+- PAVISHA-BOTTLE-1L-CLR
+- PAVISHA-BOTTLE-1L-AMB"
 </your_response>
 </example>
 
