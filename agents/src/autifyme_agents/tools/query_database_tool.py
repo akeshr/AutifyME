@@ -34,14 +34,13 @@ class QueryDatabaseInput(BaseModel):
         description="Table name to query (e.g., 'product_families', 'products')"
     )
     filters: dict[str, Any] | None = Field(
-        default=None,
         description=(
             "Exact match conditions for any field. "
             "Examples: {'id': '550e8400-e29b-41d4-a716-446655440000'}, "
             "{'is_active': True}, {'brand': 'Acme'}, "
             "{'family_id': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'}. "
             "CRITICAL: Use filters when you have specific criteria. "
-            "Empty filters {} returns ALL rows - only appropriate for 'list all' queries. "
+            "Pass None (or {{}}) for 'list all' queries - both treated as no filtering. "
             "For partial matches, use search_patterns instead."
         )
     )
@@ -54,7 +53,6 @@ class QueryDatabaseInput(BaseModel):
         description="Related tables to include using PostgREST syntax (e.g., ['categories(*)', 'variant_axes(variant_values(*))'). Enables joining related data in single query"
     )
     search_patterns: dict[str, str] | None = Field(
-        default=None,
         description=(
             "Case-insensitive partial text matching using SQL ILIKE with % wildcards. "
             "WHEN TO USE: When you need fuzzy/partial matches (user says 'bottles', 'jars', 'pet products'). "
@@ -65,7 +63,7 @@ class QueryDatabaseInput(BaseModel):
             "'%bottle' = ends with 'bottle' (PET Bottle, Glass Bottle). "
             "Examples: {'name': '%jar%'} finds 'PET Jars', 'Glass Jar', 'Mason Jars' | "
             "{'brand': '%acme%', 'material': '%pet%'} finds brands/materials containing those terms. "
-            "CRITICAL: Use search_patterns for discovery/browsing, filters for specific entity retrieval."
+            "CRITICAL: Pass None (or {{}}) when not searching - both treated as no pattern matching."
         )
     )
     count_only: bool = Field(
@@ -232,6 +230,13 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
             # UUIDs are exact - use filters={"id": "..."} instead
         """
         try:
+            # Normalize empty dicts to None to remove ambiguity
+            # LLMs sometimes pass {} explicitly instead of omitting parameter
+            if filters is not None and not filters:
+                filters = None
+            if search_patterns is not None and not search_patterns:
+                search_patterns = None
+
             logger.info(
                 f"Querying {table}",
                 extra={
