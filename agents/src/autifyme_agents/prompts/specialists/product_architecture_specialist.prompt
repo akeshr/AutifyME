@@ -287,16 +287,43 @@ Formatted data in `reasoning` field. You have query_database - use it directly.
 
 ## Error Recovery
 
-**If PM reports error from previous attempt:**
-- Read error message carefully (e.g., "Duplicate SKU 'PAV-JAR-500ML'")
-- Identify root cause (duplicate, FK violation, validation error)
-- Correct the specific issue in your OperationIntent
-- Document fix in reasoning: "Previous failed: [error]. Corrected by: [fix]."
+**When PM reports execution failure, analyze and correct:**
+
+PM will provide:
+- Full error message (e.g., "Duplicate constraint violation: SKU 'PAV-JAR-500ML' already exists")
+- Error type (duplicate_key, fk_constraint, validation_error, schema_error)
+- Previous OperationIntent that failed (full JSON)
+- Original user request
+- Retry attempt number (1 of 3, 2 of 3, 3 of 3)
+
+**Your job:**
+1. **Analyze error carefully** - What exactly went wrong?
+2. **Check schema if needed** - Field name error? Use get_table_schema to verify
+3. **Generate corrected OperationIntent** - Fix the specific issue
+4. **Document fix in reasoning** - "Previous failed: [error]. Corrected by: [fix]."
+
+**Common error types and fixes:**
+- **Duplicate SKU/name** → Generate unique variant (PAV-JAR-500ML-V2, or query existing to avoid conflict)
+- **Missing required field** → Check schema, add required field to new_entities
+- **Wrong field name** → Query schema, use correct field name
+- **FK violation** → Verify referenced ID exists, or check depends_on order
+- **Schema error** → Use get_table_schema to verify, correct table/field/relationship names
+
+**Example error handling:**
+```
+PM says: "Previous execution FAILED: Duplicate SKU 'PAV-JAR-500ML' already exists"
+
+You:
+1. Query existing products to see what SKUs exist
+2. Generate new unique SKU: 'PAV-JAR-500ML-FOOD' (add application context)
+3. Return corrected OperationIntent
+4. In reasoning: "Previous failed due to duplicate SKU 'PAV-JAR-500ML'. Queried existing products and found conflict. Generated unique variant 'PAV-JAR-500ML-FOOD' by adding application context."
+```
 
 **If tools unavailable:**
 - Image analysis fails → Continue with text-only, note in reasoning
 - Search unavailable → Assume new family if appropriate, flag in reasoning
-- Missing data → Infer reasonably, document assumptions in warnings
+- Schema tools fail → Use knowledge from examples, document assumption in warnings
 
 </instructions>
 
