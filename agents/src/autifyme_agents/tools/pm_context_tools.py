@@ -228,10 +228,10 @@ def create_search_catalog_summary_tool(storage: StorageInterface) -> BaseTool:
         coroutine=_search_catalog_summary_impl,
         name="search_catalog_summary",
         description=(
-            "Search catalog for product families matching query. "
-            "Summary-level search (family names and counts only). "
-            "Use to check if products exist, find similar families, "
-            "or validate user requests before delegating to specialists."
+            "Search catalog for product families (PM-level summary: names, counts, IDs only - NOT full data). "
+            "WHEN TO USE: PM uses this BEFORE delegating to check if products exist and to gather entity IDs for delegation messages. "
+            "NOT FOR SPECIALISTS: Specialists should use search_product_families (fuzzy matching with confidence scores) or query_database (complete data with filters). "
+            "CRITICAL: Include search results with IDs in your delegation message to specialist (e.g., 'Found PET Bottles (id: abc-123)')."
         ),
         args_schema=SearchCatalogSummaryInput,
     )
@@ -363,9 +363,9 @@ def create_get_category_info_tool(storage: StorageInterface) -> BaseTool:
         coroutine=_get_category_info_impl,
         name="get_category_info",
         description=(
-            "Get category details and product counts. Summary-level taxonomy query. "
-            "Use to understand category structure, get product counts, "
-            "or validate taxonomy before delegating to specialists."
+            "Get category details and product counts (PM-level taxonomy summary - NOT full product lists). "
+            "WHEN TO USE: PM uses this for taxonomy discussions, checking category structure, or understanding product distribution across categories. "
+            "Returns: Category metadata (ID, parent, subcategory count, product family count) - use for context in responses to user."
         ),
         args_schema=GetCategoryInfoInput,
     )

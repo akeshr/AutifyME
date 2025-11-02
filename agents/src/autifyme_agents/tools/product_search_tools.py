@@ -118,23 +118,37 @@ class SearchProductFamiliesInput(BaseModel):
 
     product_group_id: str | None = Field(
         default=None,
-        description="Business identifier to search for (e.g., 'PACK-PET-JAR')"
+        description=(
+            "Business identifier for exact match (e.g., 'PACK-PET-JAR'). "
+            "Strongest signal - if provided, prioritizes exact business ID matches. "
+            "Use when you have structured business identifier from user or PM."
+        )
     )
     name: str | None = Field(
         default=None,
-        description="Product family name to match against"
+        description=(
+            "Product family name to fuzzy match (e.g., 'PET Bottles', 'Glass Jars'). "
+            "REQUIRED for meaningful search - uses token-based similarity scoring. "
+            "Provide descriptive product name from user request."
+        )
     )
     brand: str | None = Field(
         default=None,
-        description="Brand name to filter by"
+        description=(
+            "Brand name for filtering and similarity scoring (e.g., 'Acme', 'PavCorp'). "
+            "Boosts match confidence when brand matches. Filters results if no business_id provided."
+        )
     )
     material: str | None = Field(
         default=None,
-        description="Material to match (e.g., 'PET', 'Glass')"
+        description=(
+            "Material for additional match scoring (e.g., 'PET', 'Glass', 'Aluminum'). "
+            "Contributes to overall match confidence. Use when material is known from request."
+        )
     )
     limit: int = Field(
         default=5,
-        description="Max number of results to return (default 5)"
+        description="Max results to return (default: 5, max: 10). Increase if expecting multiple similar families."
     )
 
 
@@ -444,11 +458,11 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
         func=_search_product_families_impl,
         name="search_product_families",
         description=(
-            "Search for existing product families in catalog using fuzzy matching. "
-            "Use this BEFORE creating a new product family to check if it already exists "
-            "or if the incoming product is a new variant of an existing family. "
-            "Matching logic: Exact business_id match (highest), name similarity + brand (variant), "
-            "moderate similarity (ask user), low/no matches (create new)."
+            "Search for existing product families using intelligent fuzzy matching. "
+            "WHEN TO USE: BEFORE creating new product families - checks if product already exists or is variant of existing family. "
+            "Returns confidence scores (exact/variant_candidate/similar/weak) and recommendations (create_new/update_existing/add_variant/ask_user). "
+            "Includes full variant configuration (axes, values, SKU codes) for extending existing patterns. "
+            "CRITICAL: Use this for finding matches before CREATE operations. For READ operations on known entities, use query_database with filters instead."
         ),
         args_schema=SearchProductFamiliesInput,
     )

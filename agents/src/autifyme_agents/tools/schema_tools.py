@@ -366,12 +366,11 @@ get_product_schema = StructuredTool.from_function(
     func=_get_product_schema_impl,
     name="get_product_schema",
     description=(
-        "Retrieve product catalog schema for dynamic operation planning. "
-        "Use this tool to understand available tables, columns, data types, "
-        "constraints, relationships (foreign keys, cascades), and optionally "
-        "business rules. This enables schema-driven operation planning where "
-        "you generate operations based on actual database structure rather "
-        "than hard-coded knowledge."
+        "Retrieve complete product catalog database schema (structure, not data). "
+        "WHEN TO USE: Before complex CREATE/UPDATE/DELETE operations when you need to verify table structure, relationships, or constraints. "
+        "NOT NEEDED: For routine operations - most standard tables are known (product_families, products, variant_axes, variant_values). "
+        "Returns: Tables with columns (types, nullability), foreign key relationships, cascade delete rules, indexes. "
+        "CRITICAL: This returns SCHEMA (database structure), NOT actual product data. Use query_database to fetch product data."
     ),
     args_schema=GetProductSchemaInput,
 )
@@ -380,8 +379,10 @@ get_table_schema = StructuredTool.from_function(
     func=_get_table_schema_impl,
     name="get_table_schema",
     description=(
-        "Retrieve schema for a specific table. Use this for focused queries "
-        "when you need details about a single table rather than the entire schema."
+        "Retrieve schema for a specific table (focused query for single table structure). "
+        "WHEN TO USE: When you need column details, types, or relationships for ONE table without loading entire schema. "
+        "More efficient than get_product_schema when you know which table you need. "
+        "CRITICAL: Returns table STRUCTURE only - use query_database for actual data from that table."
     ),
     args_schema=GetTableSchemaInput,
 )
@@ -390,8 +391,9 @@ list_available_tables = StructuredTool.from_function(
     func=_list_available_tables_impl,
     name="list_available_tables",
     description=(
-        "List all available tables in the product catalog schema. "
-        "Quick way to see what tables exist without retrieving full schema."
+        "List all table names in product catalog schema (lightweight discovery). "
+        "WHEN TO USE: When you need to see what tables exist without loading full schema or specific table details. "
+        "Returns: Just table names - use get_table_schema or get_product_schema for structure details."
     ),
     args_schema=ListAvailableTablesInput,
 )

@@ -97,28 +97,27 @@ def _encode_image_to_base64_uri(image_path: str) -> str:
 def image_analysis_tool(
     image_path: Annotated[
         str,
-        Field(description="File path to product image (e.g., '/tmp/media_downloads/product.jpg')")
+        Field(description=(
+            "Absolute file path to product image on local filesystem (e.g., '/tmp/media_downloads/product.jpg'). "
+            "CRITICAL: Use the path returned from download_<platform>_media tool, NOT the media_id from raw message. "
+            "Path must point to locally downloaded file before calling this tool."
+        ))
     ],
 ) -> dict[str, Any]:
-    """Analyze product image to extract visual attributes using Vision API.
+    """Analyze product image to extract visual attributes using Vision API (Google Gemini multimodal).
 
-    Extracts colors, materials, style tags, dimensions, and generates detailed
-    visual description. Uses OpenAI Vision model for multimodal analysis.
+    WHEN TO USE: After downloading media via download_<platform>_media, use this to extract visual features for product cataloging or analysis.
+    Extracts: colors, materials, style tags, visual description, dimensions/size indicators, condition, brand elements.
+    Returns: Structured ImageAnalysisResult with all visual attributes for use in product operations.
+    ERROR HANDLING: If image not found, verify download_<platform>_media was called first. If analysis fails, workflow can continue without visual data (inform user).
 
     Args:
-        image_path: Path to image file on local filesystem
+        image_path: Absolute path to downloaded image file (from download_<platform>_media result)
 
     Returns:
         Dict with analysis results or error:
-        - On success: {"success": True, "visual_description": str, "identified_colors": [...], "identified_materials": [...], ...}
-        - On error: {"success": False, "error": str, "error_type": str, "image_path": str}
-
-    Example:
-        >>> result = image_analysis_tool("/tmp/product.jpg")
-        >>> print(result["visual_description"])
-        "Blue leather sneakers with white sole..."
-        >>> print(result["identified_colors"])
-        ["blue", "white"]
+        - On success: {"success": True, "visual_description": str, "identified_colors": [...], "identified_materials": [...], "style_tags": [...], ...}
+        - On error: {"success": False, "error": str, "error_type": str, "image_path": str, "agent_action": str}
     """
     try:
         # Get vision-capable LLM
