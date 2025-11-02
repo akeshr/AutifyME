@@ -21,16 +21,16 @@ Does NOT:
 - Classify into taxonomy (Taxonomy Specialist handles this)
 
 Architecture Pattern:
-- Pattern 3: DeepAgent as subagent (testing nested DeepAgent behavior)
-- Returns CompiledStateGraph from create_deep_agent
+- CompiledSubAgent: Specialist compiled with create_agent()
+- Returns CompiledStateGraph from create_agent
 - Structured output via response_format=OperationIntent
 - Schema-driven planning (no hard-coded operation types)
-- No nested sub-specialists (clean test of DeepAgent capabilities)
+- Domain specialist pattern (no orchestration capabilities)
 """
 
 from typing import Any
 
-from deepagents import create_deep_agent
+from langchain.agents import create_agent
 from langgraph.graph.state import CompiledStateGraph
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -56,7 +56,7 @@ def create_product_architecture_specialist(
     """
     Create Product Architecture Specialist with schema-driven CRUD.
 
-    Pattern 3: DeepAgent as subagent with shared checkpointer for state persistence.
+    CompiledSubAgent Pattern: Domain specialist compiled with create_agent().
 
     Specialist Responsibilities:
     - Query product catalog schema dynamically
@@ -67,32 +67,31 @@ def create_product_architecture_specialist(
     - Maintain conversation history across PM delegations
 
     Architecture:
-    - DeepAgent (create_deep_agent) with structured output
+    - Specialist Agent (create_agent) with structured output
     - response_format: OperationIntent (Pydantic model)
-    - Shared checkpointer: Uses PM's checkpointer for state persistence
+    - Checkpointer: Uses separate specialist checkpointer for context isolation
     - Thread isolation: LangGraph automatically namespaces thread_id for nested agent
     - Schema-driven planning (no hard-coded operation types)
-    - No nested sub-specialists (clean Pattern 3 test)
+    - Domain specialist (no orchestration features like subagents, file tools)
 
     Args:
         storage: Storage interface for catalog search + schema query (REQUIRED)
-        checkpointer: Checkpointer instance from PM (REQUIRED for state persistence)
-        provider: LLM provider ("openai", "anthropic", "google") - default: "openai"
-        model_name: Model identifier - default: "gpt-4.1-mini"
-        temperature: Sampling temperature (0.0-1.0) - default: 0.2
+        checkpointer: Checkpointer instance for specialist state persistence (REQUIRED)
+        provider: LLM provider ("openai", "anthropic", "google") - default: "google"
+        model_name: Model identifier - default: "gemini-2.5-pro"
+        temperature: Sampling temperature (0.0-1.0) - default: 0.3
 
     Returns:
-        CompiledStateGraph: Stateful specialist agent that can be nested as subagent in PM
+        CompiledStateGraph: Stateful specialist agent wrapped as CompiledSubAgent in PM
 
     Notes:
-        - Pattern 3 test: Stateful specialist with shared checkpointer
+        - Follows CLAUDE.md: "Use create_agent for specialists" (line 68)
         - Specialist maintains domain knowledge across delegations
         - LangGraph handles thread_id namespacing automatically
         - OpenAI requires StrictChatOpenAI wrapper when using response_format
         - Other providers work with their native chat model classes
-        - Single checkpointer simplifies state management
-        - Includes default file tools + todo tool (DeepAgent behavior)
-        - SubAgentMiddleware excluded (cannot spawn dynamic subagents)
+        - Separate checkpointer provides context isolation from PM
+        - No orchestration overhead (no subagents, file tools, todo tools)
     """
     if storage is None:
         raise ValueError(
@@ -153,17 +152,18 @@ def create_product_architecture_specialist(
             temperature=temperature,
         )
 
-    # Create specialist as DeepAgent (Pattern 3)
+    # Create specialist as Agent (CompiledSubAgent pattern)
+    # - Uses create_agent (not create_deep_agent) per CLAUDE.md architecture
+    # - Domain specialist without orchestration capabilities
     # - OpenAI: StrictChatOpenAI wrapper ensures tools have correct strict schemas
     # - Other providers: Native tool use with structured outputs
-    specialist = create_deep_agent(
+    specialist = create_agent(
         model=model,
         tools=tools,
         system_prompt=system_prompt,
         response_format=OperationIntent,  # Structured output (Pydantic model)
-        subagents=[],  # No nested sub-specialists
         checkpointer=checkpointer,  # State persistence
-        interrupt_on={},  # No HITL for specialist (PM handles approvals)
+        # No interrupt_before/after - PM handles approvals via HITL tools
     )
 
     return specialist

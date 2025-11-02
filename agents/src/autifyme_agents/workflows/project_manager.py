@@ -175,15 +175,15 @@ async def create_project_manager(
     # Campaign persistence tool (HITL-enabled for marketing campaigns)
     pm_tools.append(create_save_campaign_tool(storage))
 
-    # Product Architecture Specialist (DeepAgent as subagent - Pattern 3 with separate checkpointer)
-    # Returns CompiledStateGraph from create_deep_agent
+    # Product Architecture Specialist (CompiledSubAgent pattern with separate checkpointer)
+    # Returns CompiledStateGraph from create_agent (domain specialist)
     # Uses SEPARATE checkpointer for context isolation (specialist only sees its own work)
     product_architecture_specialist = create_product_architecture_specialist(
         storage=storage,
         checkpointer=specialist_checkpointer,  # Separate checkpointer (NOT shared with PM)
     )
 
-    # Wrap specialist as CompiledSubAgent (Pattern 3)
+    # Wrap specialist as CompiledSubAgent
     # PM sees specialist as a runnable tool for delegation
     subagents: list[Any] = [
         {
