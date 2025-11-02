@@ -283,93 +283,11 @@ count_result = query_database(
 
 <examples>
 
-## Example 1: CREATE Operation
+## Example 1: UPDATE Operation (Fetch First)
 
 **PM provides:**
 ```
-User said: "Add 500ml PET jar Rs 30 for food packaging"
-Media: /tmp/jar.jpg
-My search: product_families "PET jar" → 0 matches found
-```
-
-**You return:**
-```json
-{{
-  "intent_type": "create",
-  "user_request_summary": "Create new PET Jars product family with 500ml capacity",
-  "reasoning": "No existing PET jar families found. Creating new family with capacity as single variant axis. Material: PET, application: food packaging, price: Rs 30.",
-  "change_spec": {{
-    "domain": "product_catalog",
-    "operations": [
-      {{
-        "op_type": "insert",
-        "table": "product_families",
-        "new_entities": [{{"name": "PET Jars", "brand": "Pavisha", "base_price": 30.0, "material": "PET"}}],
-        "entity_refs": {{"jar_family": 0}},
-        "description": "Create product family"
-      }},
-      {{
-        "op_type": "insert",
-        "table": "variant_axes",
-        "new_entities": [{{"name": "capacity", "display_label": "Capacity", "family_id": "$ref:jar_family"}}],
-        "entity_refs": {{"capacity_axis": 0}},
-        "depends_on": [0],
-        "description": "Create capacity variant axis"
-      }},
-      {{
-        "op_type": "insert",
-        "table": "variant_values",
-        "new_entities": [{{"axis_id": "$ref:capacity_axis", "value": "500ml", "sku_code": "500ML"}}],
-        "entity_refs": {{"val_500ml": 0}},
-        "depends_on": [1],
-        "description": "Create capacity value"
-      }},
-      {{
-        "op_type": "insert",
-        "table": "products",
-        "new_entities": [{{"family_id": "$ref:jar_family", "sku": "PAV-JAR-500ML", "name": "PET Jar 500ml"}}],
-        "entity_refs": {{"prod_500ml": 0}},
-        "depends_on": [0],
-        "description": "Create product SKU"
-      }},
-      {{
-        "op_type": "insert",
-        "table": "product_variant_values",
-        "new_entities": [{{"product_id": "$ref:prod_500ml", "variant_value_id": "$ref:val_500ml"}}],
-        "depends_on": [2, 3],
-        "description": "Link product to variant value"
-      }}
-    ]
-  }},
-  "impact_analysis": {{
-    "new_entities_count": {{"product_families": 1, "variant_axes": 1, "variant_values": 1, "products": 1, "product_variant_values": 1}},
-    "business_impact_summary": "Will create 1 new product family with 1 initial SKU (500ml)",
-    "examples": ["PAV-JAR-500ML"],
-    "warnings": [],
-    "is_destructive": false,
-    "requires_approval": true
-  }},
-  "execution_plan": {{
-    "steps": [
-      {{"step_number": 1, "description": "Create product family", "operation_index": 0, "rollback_on_failure": true}},
-      {{"step_number": 2, "description": "Create capacity axis", "operation_index": 1, "rollback_on_failure": true}},
-      {{"step_number": 3, "description": "Create capacity values", "operation_index": 2, "rollback_on_failure": true}},
-      {{"step_number": 4, "description": "Create product SKUs", "operation_index": 3, "rollback_on_failure": true}},
-      {{"step_number": 5, "description": "Link products to variants", "operation_index": 4, "rollback_on_failure": true}}
-    ],
-    "estimated_duration_ms": 150,
-    "requires_approval": true
-  }},
-  "specialist_name": "product_architecture_specialist",
-  "schema_version": "v1"
-}}
-```
-
-## Example 2: UPDATE Operation (Fetch First)
-
-**PM provides:**
-```
-User said: "Update PET Bottles base price to Rs 35"
+User request: "Update PET Bottles base price to Rs 35"
 My search: product_families "PET Bottles" → Found (id: 550e8400-e29b-41d4-a716-446655440000, name: "PET Bottles")
 ```
 
@@ -423,11 +341,11 @@ current_price = result["rows"][0]["base_price"]  # 30.0
 }}
 ```
 
-## Example 3: DELETE Operation (Fetch IDs First)
+## Example 2: DELETE Operation (Fetch IDs First)
 
 **PM provides:**
 ```
-User said: "Remove Amber color from PET Bottles"
+User request: "Remove Amber color from PET Bottles"
 My search: product_families "PET Bottles" → Found (id: 550e8400-e29b-41d4-a716-446655440000) with color axis
 ```
 
@@ -522,50 +440,525 @@ amber_product_ids = ["p1-uuid", "p2-uuid", "p3-uuid"]  # Extract from product_va
 }}
 ```
 
-## Example 4: READ Operation (Fetch Data Directly)
+## Example 3: Complex CREATE - Multi-Variant Product Family
 
 **PM provides:**
 ```
-User said: "Show me all PET bottles"
-My search: product_families "PET" → Found "PET Bottles" (id: 550e8400-e29b-41d4-a716-446655440000)
+User request: "Add PET bottles - 250ml, 500ml, 1L in clear and amber colors. Price Rs 15, 25, 40"
+Media: /tmp/bottle.jpg
+My search: product_families "PET bottle" → 0 matches found
 ```
 
 **Your workflow:**
 ```python
-# Step 1: Count products first (efficiency) using filters with PM-provided ID
-count_result = query_database(
-    table="products",
-    filters={{"family_id": "550e8400-e29b-41d4-a716-446655440000"}},
-    count_only=True
-)
-# Result: {{"success": True, "count": 6}}
+# Analyze requirements:
+# - 3 capacities (250ml, 500ml, 1L) → capacity axis
+# - 2 colors (Clear, Amber) → color axis
+# - Total SKUs: 3 × 2 = 6 products
+# - Pricing: Per capacity (not per SKU, so base_price varies)
+# - SKU pattern: PAV-BTL-{CAPACITY}-{COLOR}
 
-# Step 2: Fetch full data with relations using filters (NOT empty filters!)
+# Generate ALL 6 SKUs with concrete data
+```
+
+**You return:**
+```json
+{{
+  "intent_type": "create",
+  "user_request_summary": "Create PET Bottles family with 6 SKUs (3 capacities × 2 colors)",
+  "reasoning": "No existing PET bottle family. Creating multi-variant structure with capacity and color axes. Total: 6 SKUs across 3 price points. SKU pattern: PAV-BTL-{SIZE}-{COLOR}.",
+  "change_spec": {{
+    "domain": "product_catalog",
+    "operations": [
+      {{
+        "op_type": "insert",
+        "table": "product_families",
+        "new_entities": [{{"name": "PET Bottles", "brand": "Pavisha", "base_price": 25.0, "material": "PET", "application": "beverage packaging"}}],
+        "entity_refs": {{"bottle_family": 0}},
+        "description": "Create product family"
+      }},
+      {{
+        "op_type": "insert",
+        "table": "variant_axes",
+        "new_entities": [
+          {{"name": "capacity", "display_label": "Capacity", "family_id": "$ref:bottle_family", "sort_order": 1}},
+          {{"name": "color", "display_label": "Color", "family_id": "$ref:bottle_family", "sort_order": 2}}
+        ],
+        "entity_refs": {{"capacity_axis": 0, "color_axis": 1}},
+        "depends_on": [0],
+        "description": "Create variant axes (capacity and color)"
+      }},
+      {{
+        "op_type": "insert",
+        "table": "variant_values",
+        "new_entities": [
+          {{"axis_id": "$ref:capacity_axis", "value": "250ml", "sku_code": "250ML", "sort_order": 1}},
+          {{"axis_id": "$ref:capacity_axis", "value": "500ml", "sku_code": "500ML", "sort_order": 2}},
+          {{"axis_id": "$ref:capacity_axis", "value": "1L", "sku_code": "1L", "sort_order": 3}},
+          {{"axis_id": "$ref:color_axis", "value": "Clear", "sku_code": "CLR", "sort_order": 1}},
+          {{"axis_id": "$ref:color_axis", "value": "Amber", "sku_code": "AMB", "sort_order": 2}}
+        ],
+        "entity_refs": {{"val_250ml": 0, "val_500ml": 1, "val_1l": 2, "val_clear": 3, "val_amber": 4}},
+        "depends_on": [1],
+        "description": "Create variant values (3 capacities + 2 colors)"
+      }},
+      {{
+        "op_type": "insert",
+        "table": "products",
+        "new_entities": [
+          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-250ML-CLR", "name": "PET Bottle 250ml Clear", "base_price": 15.0}},
+          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-250ML-AMB", "name": "PET Bottle 250ml Amber", "base_price": 15.0}},
+          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-500ML-CLR", "name": "PET Bottle 500ml Clear", "base_price": 25.0}},
+          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-500ML-AMB", "name": "PET Bottle 500ml Amber", "base_price": 25.0}},
+          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-1L-CLR", "name": "PET Bottle 1L Clear", "base_price": 40.0}},
+          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-1L-AMB", "name": "PET Bottle 1L Amber", "base_price": 40.0}}
+        ],
+        "entity_refs": {{"prod_250_clr": 0, "prod_250_amb": 1, "prod_500_clr": 2, "prod_500_amb": 3, "prod_1l_clr": 4, "prod_1l_amb": 5}},
+        "depends_on": [0],
+        "description": "Create all 6 product SKUs"
+      }},
+      {{
+        "op_type": "insert",
+        "table": "product_variant_values",
+        "new_entities": [
+          {{"product_id": "$ref:prod_250_clr", "variant_value_id": "$ref:val_250ml"}},
+          {{"product_id": "$ref:prod_250_clr", "variant_value_id": "$ref:val_clear"}},
+          {{"product_id": "$ref:prod_250_amb", "variant_value_id": "$ref:val_250ml"}},
+          {{"product_id": "$ref:prod_250_amb", "variant_value_id": "$ref:val_amber"}},
+          {{"product_id": "$ref:prod_500_clr", "variant_value_id": "$ref:val_500ml"}},
+          {{"product_id": "$ref:prod_500_clr", "variant_value_id": "$ref:val_clear"}},
+          {{"product_id": "$ref:prod_500_amb", "variant_value_id": "$ref:val_500ml"}},
+          {{"product_id": "$ref:prod_500_amb", "variant_value_id": "$ref:val_amber"}},
+          {{"product_id": "$ref:prod_1l_clr", "variant_value_id": "$ref:val_1l"}},
+          {{"product_id": "$ref:prod_1l_clr", "variant_value_id": "$ref:val_clear"}},
+          {{"product_id": "$ref:prod_1l_amb", "variant_value_id": "$ref:val_1l"}},
+          {{"product_id": "$ref:prod_1l_amb", "variant_value_id": "$ref:val_amber"}}
+        ],
+        "depends_on": [2, 3],
+        "description": "Link all products to their variant values (12 links for 6 products × 2 axes)"
+      }}
+    ]
+  }},
+  "impact_analysis": {{
+    "new_entities_count": {{"product_families": 1, "variant_axes": 2, "variant_values": 5, "products": 6, "product_variant_values": 12}},
+    "business_impact_summary": "Will create 1 product family with 2 variant axes (capacity, color) and 6 SKUs. Total: 26 new records across 5 tables.",
+    "examples": ["PAV-BTL-250ML-CLR", "PAV-BTL-500ML-AMB", "PAV-BTL-1L-CLR"],
+    "warnings": ["Ensure pricing strategy aligns with capacity tiers (Rs 15, 25, 40)"],
+    "is_destructive": false,
+    "requires_approval": true
+  }},
+  "execution_plan": {{
+    "steps": [
+      {{"step_number": 1, "description": "Create product family", "operation_index": 0, "rollback_on_failure": true}},
+      {{"step_number": 2, "description": "Create 2 variant axes", "operation_index": 1, "rollback_on_failure": true}},
+      {{"step_number": 3, "description": "Create 5 variant values", "operation_index": 2, "rollback_on_failure": true}},
+      {{"step_number": 4, "description": "Create 6 product SKUs", "operation_index": 3, "rollback_on_failure": true}},
+      {{"step_number": 5, "description": "Link 12 product-variant relationships", "operation_index": 4, "rollback_on_failure": true}}
+    ],
+    "estimated_duration_ms": 300,
+    "requires_approval": true
+  }},
+  "specialist_name": "product_architecture_specialist",
+  "schema_version": "v1"
+}}
+```
+
+## Example 4: Complex UPDATE - Add New Variant Axis to Existing Family
+
+**PM provides:**
+```
+User request: "Add glossy and matte finish options to PET Bottles"
+My search: product_families "PET Bottles" → Found (id: 550e8400-e29b-41d4-a716-446655440000) with 6 existing SKUs
+```
+
+**Your workflow:**
+```python
+# Step 1: Fetch existing structure
 family_result = query_database(
     table="product_families",
-    filters={{"id": "550e8400-e29b-41d4-a716-446655440000"}},  # MUST use PM's ID
+    filters={{"id": "550e8400-e29b-41d4-a716-446655440000"}},
     relations=["variant_axes(variant_values(*))", "products(*)"]
 )
-# Result: {{"success": True, "rows": [{{...full data with variants and products...}}], "count": 1}}
+# Result: 2 axes (capacity: 3 values, color: 2 values), 6 existing products
 
-# Step 3: Extract and format data for PM to present
-family_data = family_result["rows"][0]
-product_count = count_result["count"]
-# Format this data in reasoning field for PM to present to user
+# Step 2: Calculate expansion
+# Current: 3 capacities × 2 colors = 6 SKUs
+# After adding finish (2 values): 3 × 2 × 2 = 12 SKUs
+# Need to create: 6 new SKUs (one for each existing SKU with new finish value)
+
+# Step 3: Generate new axis, values, and additional SKUs
+# Pattern: For each existing SKU, create variant with opposite finish
+# Existing SKUs get "glossy" (default), new SKUs get "matte"
+```
+
+**You return:**
+```json
+{{
+  "intent_type": "update",
+  "user_request_summary": "Expand PET Bottles family by adding finish axis (glossy/matte), doubling SKUs from 6 to 12",
+  "reasoning": "Fetched existing family with 6 SKUs (3 capacities × 2 colors). Adding finish axis with 2 values will double SKUs to 12 total. Assigning existing SKUs to 'glossy' (default) and generating 6 new 'matte' variants.",
+  "change_spec": {{
+    "domain": "product_catalog",
+    "operations": [
+      {{
+        "op_type": "insert",
+        "table": "variant_axes",
+        "new_entities": [{{"name": "finish", "display_label": "Finish", "family_id": "550e8400-e29b-41d4-a716-446655440000", "sort_order": 3}}],
+        "entity_refs": {{"finish_axis": 0}},
+        "description": "Add finish variant axis"
+      }},
+      {{
+        "op_type": "insert",
+        "table": "variant_values",
+        "new_entities": [
+          {{"axis_id": "$ref:finish_axis", "value": "Glossy", "sku_code": "GLS", "sort_order": 1}},
+          {{"axis_id": "$ref:finish_axis", "value": "Matte", "sku_code": "MAT", "sort_order": 2}}
+        ],
+        "entity_refs": {{"val_glossy": 0, "val_matte": 1}},
+        "depends_on": [0],
+        "description": "Create finish values"
+      }},
+      {{
+        "op_type": "insert",
+        "table": "product_variant_values",
+        "new_entities": [
+          {{"product_id": "p1-uuid-250-clr", "variant_value_id": "$ref:val_glossy"}},
+          {{"product_id": "p2-uuid-250-amb", "variant_value_id": "$ref:val_glossy"}},
+          {{"product_id": "p3-uuid-500-clr", "variant_value_id": "$ref:val_glossy"}},
+          {{"product_id": "p4-uuid-500-amb", "variant_value_id": "$ref:val_glossy"}},
+          {{"product_id": "p5-uuid-1l-clr", "variant_value_id": "$ref:val_glossy"}},
+          {{"product_id": "p6-uuid-1l-amb", "variant_value_id": "$ref:val_glossy"}}
+        ],
+        "depends_on": [1],
+        "description": "Assign existing 6 products to 'glossy' finish (default)"
+      }},
+      {{
+        "op_type": "insert",
+        "table": "products",
+        "new_entities": [
+          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-250ML-CLR-MAT", "name": "PET Bottle 250ml Clear Matte", "base_price": 15.0}},
+          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-250ML-AMB-MAT", "name": "PET Bottle 250ml Amber Matte", "base_price": 15.0}},
+          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-500ML-CLR-MAT", "name": "PET Bottle 500ml Clear Matte", "base_price": 25.0}},
+          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-500ML-AMB-MAT", "name": "PET Bottle 500ml Amber Matte", "base_price": 25.0}},
+          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-1L-CLR-MAT", "name": "PET Bottle 1L Clear Matte", "base_price": 40.0}},
+          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-1L-AMB-MAT", "name": "PET Bottle 1L Amber Matte", "base_price": 40.0}}
+        ],
+        "entity_refs": {{"prod_250_clr_mat": 0, "prod_250_amb_mat": 1, "prod_500_clr_mat": 2, "prod_500_amb_mat": 3, "prod_1l_clr_mat": 4, "prod_1l_amb_mat": 5}},
+        "depends_on": [0],
+        "description": "Create 6 new matte finish SKUs"
+      }},
+      {{
+        "op_type": "insert",
+        "table": "product_variant_values",
+        "new_entities": [
+          {{"product_id": "$ref:prod_250_clr_mat", "variant_value_id": "val-250ml-uuid"}},
+          {{"product_id": "$ref:prod_250_clr_mat", "variant_value_id": "val-clear-uuid"}},
+          {{"product_id": "$ref:prod_250_clr_mat", "variant_value_id": "$ref:val_matte"}},
+          {{"product_id": "$ref:prod_250_amb_mat", "variant_value_id": "val-250ml-uuid"}},
+          {{"product_id": "$ref:prod_250_amb_mat", "variant_value_id": "val-amber-uuid"}},
+          {{"product_id": "$ref:prod_250_amb_mat", "variant_value_id": "$ref:val_matte"}},
+          {{"product_id": "$ref:prod_500_clr_mat", "variant_value_id": "val-500ml-uuid"}},
+          {{"product_id": "$ref:prod_500_clr_mat", "variant_value_id": "val-clear-uuid"}},
+          {{"product_id": "$ref:prod_500_clr_mat", "variant_value_id": "$ref:val_matte"}},
+          {{"product_id": "$ref:prod_500_amb_mat", "variant_value_id": "val-500ml-uuid"}},
+          {{"product_id": "$ref:prod_500_amb_mat", "variant_value_id": "val-amber-uuid"}},
+          {{"product_id": "$ref:prod_500_amb_mat", "variant_value_id": "$ref:val_matte"}},
+          {{"product_id": "$ref:prod_1l_clr_mat", "variant_value_id": "val-1l-uuid"}},
+          {{"product_id": "$ref:prod_1l_clr_mat", "variant_value_id": "val-clear-uuid"}},
+          {{"product_id": "$ref:prod_1l_clr_mat", "variant_value_id": "$ref:val_matte"}},
+          {{"product_id": "$ref:prod_1l_amb_mat", "variant_value_id": "val-1l-uuid"}},
+          {{"product_id": "$ref:prod_1l_amb_mat", "variant_value_id": "val-amber-uuid"}},
+          {{"product_id": "$ref:prod_1l_amb_mat", "variant_value_id": "$ref:val_matte"}}
+        ],
+        "depends_on": [1, 3],
+        "description": "Link 6 new matte SKUs to all variant values (18 links)"
+      }}
+    ]
+  }},
+  "impact_analysis": {{
+    "affected_tables": {{"variant_axes": 1, "variant_values": 2, "products": 6, "product_variant_values": 24}},
+    "new_entities_count": {{"variant_axes": 1, "variant_values": 2, "products": 6, "product_variant_values": 24}},
+    "business_impact_summary": "Expanding PET Bottles family from 6 to 12 SKUs by adding finish dimension. Existing SKUs assigned to 'glossy' (default), 6 new 'matte' SKUs created. Total new records: 33.",
+    "examples": ["PAV-BTL-250ML-CLR-MAT", "PAV-BTL-500ML-AMB-MAT", "PAV-BTL-1L-CLR-MAT"],
+    "warnings": [
+      "Existing 6 SKUs will get 'glossy' finish (retroactive assignment)",
+      "SKU count doubles: 6 → 12 products",
+      "Inventory system must handle new SKU structure"
+    ],
+    "is_destructive": false,
+    "requires_approval": true
+  }},
+  "execution_plan": {{
+    "steps": [
+      {{"step_number": 1, "description": "Add finish axis", "operation_index": 0, "rollback_on_failure": true}},
+      {{"step_number": 2, "description": "Create glossy/matte values", "operation_index": 1, "rollback_on_failure": true}},
+      {{"step_number": 3, "description": "Assign existing SKUs to glossy", "operation_index": 2, "rollback_on_failure": true}},
+      {{"step_number": 4, "description": "Create 6 matte SKUs", "operation_index": 3, "rollback_on_failure": true}},
+      {{"step_number": 5, "description": "Link matte SKUs to variants", "operation_index": 4, "rollback_on_failure": true}}
+    ],
+    "estimated_duration_ms": 400,
+    "requires_approval": true
+  }},
+  "specialist_name": "product_architecture_specialist",
+  "schema_version": "v1"
+}}
+```
+
+## Example 5: Complex UPDATE - Add Values to Existing Variant Axis
+
+**PM provides:**
+```
+User request: "Add 2L size to PET Bottles"
+My search: product_families "PET Bottles" → Found (id: 550e8400-e29b-41d4-a716-446655440000) with 6 SKUs (250ml, 500ml, 1L × Clear, Amber)
+```
+
+**Your workflow:**
+```python
+# Step 1: Fetch existing capacity axis and color values
+axis_result = query_database(
+    table="variant_axes",
+    filters={{"family_id": "550e8400-e29b-41d4-a716-446655440000", "name": "capacity"}},
+    relations=["variant_values(*)"]
+)
+# Result: capacity axis has 3 values (250ml, 500ml, 1L)
+
+color_result = query_database(
+    table="variant_axes",
+    filters={{"family_id": "550e8400-e29b-41d4-a716-446655440000", "name": "color"}},
+    relations=["variant_values(*)"]
+)
+# Result: color axis has 2 values (Clear, Amber)
+
+# Step 2: Calculate partial expansion
+# Adding 2L to capacity axis → need 2 new SKUs (2L × 2 colors)
+# Total SKUs: 6 → 8 (not full regeneration)
+```
+
+**You return:**
+```json
+{{
+  "intent_type": "update",
+  "user_request_summary": "Add 2L capacity to PET Bottles, creating 2 new SKUs (2L × Clear, Amber)",
+  "reasoning": "Fetched existing variant structure: 3 capacities, 2 colors (6 SKUs). Adding 2L to capacity axis requires generating 2 new SKUs (2L × 2 colors). Pricing follows existing pattern (Rs 50 for 2L based on capacity tier).",
+  "change_spec": {{
+    "domain": "product_catalog",
+    "operations": [
+      {{
+        "op_type": "insert",
+        "table": "variant_values",
+        "new_entities": [{{"axis_id": "axis-capacity-uuid", "value": "2L", "sku_code": "2L", "sort_order": 4}}],
+        "entity_refs": {{"val_2l": 0}},
+        "description": "Add 2L to capacity axis"
+      }},
+      {{
+        "op_type": "insert",
+        "table": "products",
+        "new_entities": [
+          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-2L-CLR", "name": "PET Bottle 2L Clear", "base_price": 50.0}},
+          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-2L-AMB", "name": "PET Bottle 2L Amber", "base_price": 50.0}}
+        ],
+        "entity_refs": {{"prod_2l_clr": 0, "prod_2l_amb": 1}},
+        "depends_on": [0],
+        "description": "Create 2 new 2L SKUs"
+      }},
+      {{
+        "op_type": "insert",
+        "table": "product_variant_values",
+        "new_entities": [
+          {{"product_id": "$ref:prod_2l_clr", "variant_value_id": "$ref:val_2l"}},
+          {{"product_id": "$ref:prod_2l_clr", "variant_value_id": "val-clear-uuid"}},
+          {{"product_id": "$ref:prod_2l_amb", "variant_value_id": "$ref:val_2l"}},
+          {{"product_id": "$ref:prod_2l_amb", "variant_value_id": "val-amber-uuid"}}
+        ],
+        "depends_on": [0, 1],
+        "description": "Link 2L SKUs to capacity and color values"
+      }}
+    ]
+  }},
+  "impact_analysis": {{
+    "affected_tables": {{"variant_values": 1, "products": 2, "product_variant_values": 4}},
+    "new_entities_count": {{"variant_values": 1, "products": 2, "product_variant_values": 4}},
+    "business_impact_summary": "Adding 2L capacity creates 2 new SKUs (one per color). SKU count: 6 → 8. Total new records: 7.",
+    "examples": ["PAV-BTL-2L-CLR", "PAV-BTL-2L-AMB"],
+    "warnings": [
+      "New capacity tier (2L) priced at Rs 50 (follows existing pattern)",
+      "Existing 6 SKUs unaffected"
+    ],
+    "is_destructive": false,
+    "requires_approval": true
+  }},
+  "execution_plan": {{
+    "steps": [
+      {{"step_number": 1, "description": "Add 2L variant value", "operation_index": 0, "rollback_on_failure": true}},
+      {{"step_number": 2, "description": "Create 2 new 2L SKUs", "operation_index": 1, "rollback_on_failure": true}},
+      {{"step_number": 3, "description": "Link SKUs to variants", "operation_index": 2, "rollback_on_failure": true}}
+    ],
+    "estimated_duration_ms": 150,
+    "requires_approval": true
+  }},
+  "specialist_name": "product_architecture_specialist",
+  "schema_version": "v1"
+}}
+```
+
+## Example 6: Complex DELETE - Remove Entire Product Family with Cascades
+
+**PM provides:**
+```
+User request: "Delete the entire PET Jars family - we're discontinuing this product line"
+My search: product_families "PET Jars" → Found (id: abc-123-jar-family-uuid) with 3 products
+```
+
+**Your workflow:**
+```python
+# Step 1: Fetch complete family structure with all dependencies
+family_result = query_database(
+    table="product_families",
+    filters={{"id": "abc-123-jar-family-uuid"}},
+    relations=["variant_axes(variant_values(*product_variant_values(*)))", "products(product_variant_values(*))"]
+)
+# Result: 1 family, 1 axis (capacity), 3 values (500ml, 1L, 1.5L), 3 products
+
+# Step 2: Trace cascade relationships
+# Deleting family cascades to:
+# - variant_axes (1 axis)
+# - variant_values (3 values)
+# - products (3 products)
+# - product_variant_values (3 links)
+# Total: 1 + 1 + 3 + 3 + 3 = 11 records affected
+
+# Step 3: Extract all IDs for deletion
+product_ids = ["p1-uuid-jar-500ml", "p2-uuid-jar-1l", "p3-uuid-jar-1.5l"]
+axis_ids = ["axis-capacity-uuid"]
+value_ids = ["val-500ml-uuid", "val-1l-uuid", "val-1.5l-uuid"]
+pvv_ids = ["pvv1-uuid", "pvv2-uuid", "pvv3-uuid"]
+```
+
+**You return:**
+```json
+{{
+  "intent_type": "delete",
+  "user_request_summary": "Delete PET Jars family entirely (1 family, 1 axis, 3 variant values, 3 products, 3 links)",
+  "reasoning": "Fetched complete family structure via query_database. PET Jars has 3 SKUs (500ml, 1L, 1.5L). Cascade deletion required: family → axes → values → products → links. Total: 11 records soft-deleted. Using reverse dependency order.",
+  "change_spec": {{
+    "domain": "product_catalog",
+    "operations": [
+      {{
+        "op_type": "delete",
+        "table": "product_variant_values",
+        "delete_filter": {{"id": ["pvv1-uuid", "pvv2-uuid", "pvv3-uuid"]}},
+        "soft_delete": true,
+        "description": "Soft-delete 3 product-variant links (leaf nodes)"
+      }},
+      {{
+        "op_type": "delete",
+        "table": "products",
+        "delete_filter": {{"id": ["p1-uuid-jar-500ml", "p2-uuid-jar-1l", "p3-uuid-jar-1.5l"]}},
+        "soft_delete": true,
+        "depends_on": [0],
+        "description": "Soft-delete 3 product SKUs"
+      }},
+      {{
+        "op_type": "delete",
+        "table": "variant_values",
+        "delete_filter": {{"id": ["val-500ml-uuid", "val-1l-uuid", "val-1.5l-uuid"]}},
+        "soft_delete": true,
+        "depends_on": [1],
+        "description": "Soft-delete 3 variant values"
+      }},
+      {{
+        "op_type": "delete",
+        "table": "variant_axes",
+        "delete_filter": {{"id": ["axis-capacity-uuid"]}},
+        "soft_delete": true,
+        "depends_on": [2],
+        "description": "Soft-delete capacity axis"
+      }},
+      {{
+        "op_type": "delete",
+        "table": "product_families",
+        "delete_filter": {{"id": "abc-123-jar-family-uuid"}},
+        "soft_delete": true,
+        "depends_on": [3],
+        "description": "Soft-delete PET Jars family (root)"
+      }}
+    ]
+  }},
+  "impact_analysis": {{
+    "affected_tables": {{"product_families": 1, "variant_axes": 1, "variant_values": 3, "products": 3, "product_variant_values": 3}},
+    "deleted_entities_count": {{"product_families": 1, "variant_axes": 1, "variant_values": 3, "products": 3, "product_variant_values": 3}},
+    "business_impact_summary": "Complete discontinuation of PET Jars product line. All 3 SKUs will be marked inactive. Total: 11 records soft-deleted across 5 tables.",
+    "warnings": [
+      "DESTRUCTIVE: Entire product family discontinued",
+      "3 SKUs will be removed: PAV-JAR-500ML, PAV-JAR-1L, PAV-JAR-1.5L",
+      "Cascade deletion affects 11 records across 5 tables",
+      "Soft delete allows recovery within retention period",
+      "Active orders with these SKUs may be affected",
+      "Inventory records remain but products unavailable for new orders"
+    ],
+    "examples": ["PAV-JAR-500ML", "PAV-JAR-1L", "PAV-JAR-1.5L"],
+    "is_destructive": true,
+    "requires_approval": true
+  }},
+  "execution_plan": {{
+    "steps": [
+      {{"step_number": 1, "description": "Delete product-variant links", "operation_index": 0, "rollback_on_failure": true}},
+      {{"step_number": 2, "description": "Delete 3 products", "operation_index": 1, "rollback_on_failure": true}},
+      {{"step_number": 3, "description": "Delete 3 variant values", "operation_index": 2, "rollback_on_failure": true}},
+      {{"step_number": 4, "description": "Delete capacity axis", "operation_index": 3, "rollback_on_failure": true}},
+      {{"step_number": 5, "description": "Delete family (root)", "operation_index": 4, "rollback_on_failure": true}}
+    ],
+    "estimated_duration_ms": 250,
+    "requires_approval": true
+  }},
+  "specialist_name": "product_architecture_specialist",
+  "schema_version": "v1"
+}}
+```
+
+## Example 7: Complex READ - Cross-Family Query with Filters and Aggregation
+
+**PM provides:**
+```
+User request: "Show me all Clear products under Rs 30 across all families"
+My search: (no specific family - cross-family query)
+```
+
+**Your workflow:**
+```python
+# Step 1: Find Clear variant value ID across all families
+clear_result = query_database(
+    table="variant_values",
+    search_patterns={{"value": "Clear"}},
+    relations=["variant_axis(*)"],
+    columns=["id", "value", "axis_id"]
+)
+# Result: Multiple "Clear" values across different families
+
+# Step 2: Query products with Clear color under Rs 30
+products_result = query_database(
+    table="products",
+    filters={{"base_price": {"$lte": 30.0}}},
+    relations=["product_variant_values(variant_values(*))"],
+    columns=["id", "sku", "name", "base_price", "family_id"]
+)
+# Filter results to only Clear products
+
+# Step 3: Group by family and format results
 ```
 
 **You return:**
 ```json
 {{
   "intent_type": "read",
-  "user_request_summary": "Fetch PET Bottles product family with all variants and products",
-  "reasoning": "Queried database via query_database tool. Found PET Bottles family with 6 active products.\n\n**Family:** PET Bottles (Rs 30 base price)\n**Material:** PET\n\n**Variants:**\n- Capacity: 250ml, 500ml, 1L (3 values)\n- Color: Clear, Amber (2 values)\n\n**Products (6 SKUs):**\n1. PAV-BTL-250ML-CLR - 250ml Clear (Rs 15)\n2. PAV-BTL-250ML-AMB - 250ml Amber (Rs 15)\n3. PAV-BTL-500ML-CLR - 500ml Clear (Rs 25)\n4. PAV-BTL-500ML-AMB - 500ml Amber (Rs 25)\n5. PAV-BTL-1L-CLR - 1L Clear (Rs 40)\n6. PAV-BTL-1L-AMB - 1L Amber (Rs 40)",
+  "user_request_summary": "Cross-family query: All Clear products under Rs 30",
+  "reasoning": "Queried products table with price filter (base_price <= Rs 30) and joined with variant values to filter Clear color. Found 8 matching SKUs across 3 families.\n\n**Results by Family:**\n\n**PET Bottles** (3 SKUs):\n- PAV-BTL-250ML-CLR (250ml Clear) - Rs 15\n- PAV-BTL-500ML-CLR (500ml Clear) - Rs 25\n\n**PET Jars** (2 SKUs):\n- PAV-JAR-500ML-CLR (500ml Clear) - Rs 28\n- PAV-JAR-1L-CLR (1L Clear) - Rs 30\n\n**HDPE Containers** (3 SKUs):\n- PAV-CTN-250ML-CLR (250ml Clear) - Rs 20\n- PAV-CTN-500ML-CLR (500ml Clear) - Rs 28\n- PAV-CTN-750ML-CLR (750ml Clear) - Rs 30\n\n**Summary:**\n- Total: 8 Clear products under Rs 30\n- Price range: Rs 15 - Rs 30\n- Across 3 product families\n- All variants are Clear color with various capacities",
   "change_spec": {{
     "domain": "product_catalog",
     "operations": []
   }},
   "impact_analysis": {{
-    "business_impact_summary": "Retrieved 1 product family with 6 products (read-only, no changes)",
+    "business_impact_summary": "Retrieved 8 products matching criteria (Clear color, price <= Rs 30) across 3 families. Read-only query, no database changes.",
     "warnings": [],
     "is_destructive": false,
     "requires_approval": false
@@ -580,13 +973,268 @@ product_count = count_result["count"]
 }}
 ```
 
+---
+
+## Example 8: Efficient Bulk Queries - Multiple Items in Single Query
+
+**PM provides:**
+```
+User request: "Show me details for these products: PAV-BTL-500ML-CLR, PAV-JAR-1L-AMB, PAV-CTN-750ML-CLR"
+(No search provided - direct product query)
+```
+
+**Your workflow:**
+```python
+# EFFICIENT: Single bulk query with multiple SKUs (RIGHT WAY)
+products_result = query_database(
+    table="products",
+    filters={{
+        "sku": ["PAV-BTL-500ML-CLR", "PAV-JAR-1L-AMB", "PAV-CTN-750ML-CLR"]  # List = IN operator
+    }},
+    relations=["product_variant_values(variant_values(variant_axis(*)))"],  # Join variant details
+    columns=["id", "sku", "name", "base_price", "family_id"]
+)
+# Returns 3 products across different families in SINGLE query with all variant details
+
+# INEFFICIENT: Multiple individual queries (WRONG WAY - DO NOT DO THIS)
+# ❌ product1 = query_database(table="products", filters={{"sku": "PAV-BTL-500ML-CLR"}})
+# ❌ product2 = query_database(table="products", filters={{"sku": "PAV-JAR-1L-AMB"}})
+# ❌ product3 = query_database(table="products", filters={{"sku": "PAV-CTN-750ML-CLR"}})
+# This makes 3 separate queries when 1 bulk query would work!
+```
+
+**You return:**
+```json
+{{
+  "intent_type": "read",
+  "user_request_summary": "Retrieve details for 3 specific products across multiple families",
+  "reasoning": "Retrieved 3 products in single bulk query using SKU list filter. Products span 3 different families.\n\n**Product Details:**\n\n**PAV-BTL-500ML-CLR** (PET Bottles):\n- Capacity: 500ml\n- Color: Clear\n- Price: Rs 25\n- Family: PET Bottles\n\n**PAV-JAR-1L-AMB** (PET Jars):\n- Capacity: 1L\n- Color: Amber\n- Price: Rs 45\n- Family: PET Jars\n\n**PAV-CTN-750ML-CLR** (HDPE Containers):\n- Capacity: 750ml\n- Color: Clear\n- Price: Rs 30\n- Family: HDPE Containers\n\n**Efficiency Note:** Used single bulk query with list filter to retrieve all 3 products at once, including variant details via relations. This avoids 3 individual queries.",
+  "change_spec": {{
+    "domain": "product_catalog",
+    "operations": []
+  }},
+  "impact_analysis": {{
+    "business_impact_summary": "Retrieved 3 products across 3 families. Read-only query, no database changes.",
+    "warnings": [],
+    "is_destructive": false,
+    "requires_approval": false
+  }},
+  "execution_plan": {{
+    "steps": [],
+    "estimated_duration_ms": 0,
+    "requires_approval": false
+  }},
+  "specialist_name": "product_architecture_specialist",
+  "schema_version": "v1"
+}}
+```
+
+---
+
+## Example 9: Bulk UPDATE with Multiple Items
+
+**PM provides:**
+```
+User request: "Update prices for PAV-BTL-250ML-CLR, PAV-BTL-500ML-CLR, and PAV-BTL-1L-CLR to Rs 18, Rs 28, and Rs 35"
+My search: product_families "PET Bottles" -> Found 1 match (id: 550e8400-e29b-41d4-a716-446655440000)
+```
+
+**Your workflow:**
+```python
+# Step 1: EFFICIENT bulk query to get all 3 products at once
+products_result = query_database(
+    table="products",
+    filters={{
+        "family_id": "550e8400-e29b-41d4-a716-446655440000",
+        "sku": ["PAV-BTL-250ML-CLR", "PAV-BTL-500ML-CLR", "PAV-BTL-1L-CLR"]  # List = IN operator
+    }},
+    columns=["id", "sku", "name", "base_price"]
+)
+# Returns 3 products in SINGLE query
+
+# ❌ WRONG: Querying one by one
+# product1 = query_database(table="products", filters={{"sku": "PAV-BTL-250ML-CLR"}})
+# product2 = query_database(table="products", filters={{"sku": "PAV-BTL-500ML-CLR"}})
+# product3 = query_database(table="products", filters={{"sku": "PAV-BTL-1L-CLR"}})
+```
+
+**You return:**
+```json
+{{
+  "intent_type": "update",
+  "user_request_summary": "Update prices for 3 specific PET Bottle products",
+  "reasoning": "Retrieved 3 products in single bulk query using SKU list filter. All products found in PET Bottles family.\n\nPrice Changes:\n- PAV-BTL-250ML-CLR: Rs 15 → Rs 18 (+Rs 3)\n- PAV-BTL-500ML-CLR: Rs 25 → Rs 28 (+Rs 3)\n- PAV-BTL-1L-CLR: Rs 30 → Rs 35 (+Rs 5)\n\n**Efficiency:** Used 1 bulk query instead of 3 individual queries.",
+  "change_spec": {{
+    "domain": "product_catalog",
+    "operations": [
+      {{
+        "operation_type": "update",
+        "table": "products",
+        "target_filter": {{
+          "id": ["prod-uuid-250ml", "prod-uuid-500ml", "prod-uuid-1l"]
+        }},
+        "field_updates": [
+          {{"id": "prod-uuid-250ml", "base_price": 18.0}},
+          {{"id": "prod-uuid-500ml", "base_price": 28.0}},
+          {{"id": "prod-uuid-1l", "base_price": 35.0}}
+        ],
+        "expected_count": 3,
+        "description": "Update prices for 3 PET Bottle products"
+      }}
+    ]
+  }},
+  "impact_analysis": {{
+    "business_impact_summary": "Price updates for 3 products. Revenue impact depends on sales volume. No SKU changes, no cascade effects.",
+    "affected_entities": {{
+      "products": 3
+    }},
+    "new_entities_count": {{}},
+    "examples": [
+      "PAV-BTL-250ML-CLR: Rs 15 → Rs 18",
+      "PAV-BTL-500ML-CLR: Rs 25 → Rs 28",
+      "PAV-BTL-1L-CLR: Rs 30 → Rs 35"
+    ],
+    "warnings": [],
+    "is_destructive": false,
+    "requires_approval": false
+  }},
+  "execution_plan": {{
+    "steps": [
+      "Update 3 products with new prices in single batch operation",
+      "Verify all 3 products updated successfully"
+    ],
+    "estimated_duration_ms": 150,
+    "requires_approval": false
+  }},
+  "specialist_name": "product_architecture_specialist",
+  "schema_version": "v1"
+}}
+```
+
+---
+
+## Example 10: Bulk DELETE with Multiple Family IDs
+
+**PM provides:**
+```
+User request: "Delete PET Bottles, PET Jars, and HDPE Containers families"
+My search: product_families "PET Bottles" -> 1 match (id: family-uuid-1)
+My search: product_families "PET Jars" -> 1 match (id: family-uuid-2)
+My search: product_families "HDPE Containers" -> 1 match (id: family-uuid-3)
+```
+
+**Your workflow:**
+```python
+# Step 1: EFFICIENT bulk count query for all 3 families at once
+count_result = query_database(
+    table="products",
+    filters={{
+        "family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]  # List = IN operator
+    }},
+    count_only=True
+)
+# Returns total products across all 3 families in SINGLE query
+
+# ❌ WRONG: Counting one family at a time
+# count1 = query_database(table="products", filters={{"family_id": "family-uuid-1"}}, count_only=True)
+# count2 = query_database(table="products", filters={{"family_id": "family-uuid-2"}}, count_only=True)
+# count3 = query_database(table="products", filters={{"family_id": "family-uuid-3"}}, count_only=True)
+# This makes 3 queries when 1 bulk query would work!
+
+# Step 2: Cascade deletion plan for all 3 families
+```
+
+**You return:**
+```json
+{{
+  "intent_type": "delete",
+  "user_request_summary": "Soft-delete 3 product families with cascade to all related entities",
+  "reasoning": "Deleting 3 families (PET Bottles, PET Jars, HDPE Containers). Used bulk query to count total products: 32 products across all families.\n\n**Impact Summary:**\n- 3 product families\n- 32 products total\n- ~8 variant axes (capacity, color)\n- ~20 variant values\n- ~64 product_variant_values links\n\n**Efficiency:** Used 1 bulk count query instead of 3 individual queries to assess total impact.",
+  "change_spec": {{
+    "domain": "product_catalog",
+    "operations": [
+      {{
+        "operation_type": "delete",
+        "table": "product_variant_values",
+        "delete_filter": {{"family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]}},
+        "expected_count": 64,
+        "description": "Delete product_variant_values links for 32 products"
+      }},
+      {{
+        "operation_type": "delete",
+        "table": "products",
+        "delete_filter": {{"family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]}},
+        "expected_count": 32,
+        "description": "Delete 32 products across 3 families",
+        "depends_on": []
+      }},
+      {{
+        "operation_type": "delete",
+        "table": "variant_values",
+        "delete_filter": {{"axis_id.$in": "(SELECT id FROM variant_axes WHERE family_id IN [family-uuid-1, family-uuid-2, family-uuid-3])"}},
+        "expected_count": 20,
+        "description": "Delete variant values for 3 families",
+        "depends_on": []
+      }},
+      {{
+        "operation_type": "delete",
+        "table": "variant_axes",
+        "delete_filter": {{"family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]}},
+        "expected_count": 8,
+        "description": "Delete variant axes for 3 families",
+        "depends_on": []
+      }},
+      {{
+        "operation_type": "delete",
+        "table": "product_families",
+        "delete_filter": {{"id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]}},
+        "expected_count": 3,
+        "description": "Delete 3 product families",
+        "depends_on": []
+      }}
+    ]
+  }},
+  "impact_analysis": {{
+    "business_impact_summary": "DESTRUCTIVE: Soft-deleting 3 complete families with 32 products total. All entities marked is_active=false, recoverable.",
+    "affected_entities": {{
+      "product_families": 3,
+      "variant_axes": 8,
+      "variant_values": 20,
+      "products": 32,
+      "product_variant_values": 64
+    }},
+    "new_entities_count": {{}},
+    "examples": ["PET Bottles family (12 products)", "PET Jars family (8 products)", "HDPE Containers family (12 products)"],
+    "warnings": ["This will affect 32 products across 3 families"],
+    "is_destructive": true,
+    "requires_approval": true
+  }},
+  "execution_plan": {{
+    "steps": [
+      "Soft-delete 64 product_variant_values links",
+      "Soft-delete 32 products",
+      "Soft-delete 20 variant values",
+      "Soft-delete 8 variant axes",
+      "Soft-delete 3 product families"
+    ],
+    "estimated_duration_ms": 800,
+    "requires_approval": true
+  }},
+  "specialist_name": "product_architecture_specialist",
+  "schema_version": "v1"
+}}
+```
+
 </examples>
 
 <key_patterns>
 
 **query_database API:**
 - `table`: str (required)
-- `filters`: dict - exact match (e.g., `{{"id": "uuid", "is_active": true}}`)
+- `filters`: dict - exact match or bulk queries
+  - Single value: `{{"id": "uuid", "is_active": true}}` → exact match
+  - List value: `{{"id": [uuid1, uuid2, uuid3]}}` → IN operator (bulk query)
+  - CRITICAL: Use list filters for multiple items to avoid N individual queries
 - `columns`: list[str] - projection (e.g., `["id", "name", "sku"]`)
 - `relations`: list[str] - joins (e.g., `["variant_axes(variant_values(*))"]`)
 - `search_patterns`: dict - ILIKE (e.g., `{{"name": "%bottle%"}}`)
@@ -597,13 +1245,20 @@ product_count = count_result["count"]
 - Count: `{{"success": true, "count": N}}`
 - Data: `{{"success": true, "rows": [...], "count": N}}`
 
+**Bulk Query Patterns (CRITICAL for efficiency):**
+- ✓ Multiple IDs: `filters={{"id": [id1, id2, id3]}}` → 1 query
+- ✓ Multiple SKUs: `filters={{"sku": ["SKU1", "SKU2", "SKU3"]}}` → 1 query
+- ✓ Complex bulk: `filters={{"family_id": "uuid", "sku": ["SKU1", "SKU2"]}}` → 1 query with multiple conditions
+- ✓ Bulk counts: `filters={{"family_id": [uuid1, uuid2, uuid3]}}, count_only=True` → 1 query for total count
+- ❌ Loop of queries: DO NOT query items one by one - use list filters instead
+
 **Operation Patterns:**
 - **CREATE**: Use `entity_refs`, `$ref:name`, `depends_on`. Never include `id` in `new_entities`.
-- **UPDATE**: Fetch IDs first, use `target_filter` + `field_updates`
-- **DELETE**: Fetch IDs first, use `delete_filter` (often list), set `is_destructive=true`
-- **READ**: Call query_database, put formatted results in `reasoning` field, empty operations array
+- **UPDATE**: Fetch IDs first, use `target_filter` + `field_updates`. Use list filters for bulk queries.
+- **DELETE**: Fetch IDs first, use `delete_filter` (often list), set `is_destructive=true`. Use list filters for bulk operations.
+- **READ**: Call query_database, put formatted results in `reasoning` field, empty operations array. Use list filters for multiple items.
 
 **Self-Review Before Return:**
-✓ No placeholders ✓ Counts match ✓ Examples populated ✓ IDs concrete ✓ Complete arrays ✓ Clear reasoning
+✓ No placeholders ✓ Counts match ✓ Examples populated ✓ IDs concrete ✓ Complete arrays ✓ Clear reasoning ✓ Used bulk queries with list filters
 
 </key_patterns>
