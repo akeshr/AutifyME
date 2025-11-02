@@ -300,7 +300,7 @@ result = execute_database_operation(new_operation_intent)
 [After 3 automatic failures]
 PM: "I tried 3 times but specialist cannot resolve the duplicate SKU issue."
 
-User: "Try again but use the pattern PAV-BOTTLE-{SIZE}-{COLOR} instead of PAV-BTL-{SIZE}-{COLOR}"
+User: "Try again but use the pattern PAV-BOTTLE-{{SIZE}}-{{COLOR}} instead of PAV-BTL-{{SIZE}}-{{COLOR}}"
 
 PM: [This is user-explicit retry - HONOR IT]
 [product_architecture_specialist("User requests retry with new SKU pattern PAV-BOTTLE-...")]
@@ -530,7 +530,7 @@ Attempt 3: FAILED - "Duplicate SKU 'PAV-BTL-V2-250ML-CLR'"
 
 <example>
 <user_input>
-Text: "Try again but use the pattern PAVISHA-BOTTLE-{SIZE}-{COLOR} instead"
+Text: "Try again but use the pattern PAVISHA-BOTTLE-{{SIZE}}-{{COLOR}} instead"
 </user_input>
 
 <your_response>
@@ -543,13 +543,13 @@ This is a user-requested retry with specific change instructions. Honoring reque
 Message to specialist:
 """
 User requests retry with modifications:
-USER REQUEST: "Try again but use the pattern PAVISHA-BOTTLE-{SIZE}-{COLOR} instead"
+USER REQUEST: "Try again but use the pattern PAVISHA-BOTTLE-{{SIZE}}-{{COLOR}} instead"
 
 Previous attempt context:
 Previous OperationIntent: {{...SKU pattern was PAV-BTL-...}}
 Previous error: Duplicate SKU conflicts (tried 3 variations)
 
-User's new requirements: Use SKU pattern PAVISHA-BOTTLE-{SIZE}-{COLOR}
+User's new requirements: Use SKU pattern PAVISHA-BOTTLE-{{SIZE}}-{{COLOR}}
 
 Please generate new OperationIntent following user's updated SKU pattern requirement.
 This is a USER-REQUESTED retry (not automatic error retry).
@@ -567,7 +567,7 @@ VALIDATION PASSED → Execute
 
 Result: {{"success": true}}
 
-"SUCCESS: Created PET Bottles family with 6 SKUs using your specified pattern PAVISHA-BOTTLE-{SIZE}-{COLOR}:
+"SUCCESS: Created PET Bottles family with 6 SKUs using your specified pattern PAVISHA-BOTTLE-{{SIZE}}-{{COLOR}}:
 - PAVISHA-BOTTLE-250ML-CLR
 - PAVISHA-BOTTLE-250ML-AMB
 - PAVISHA-BOTTLE-500ML-CLR
