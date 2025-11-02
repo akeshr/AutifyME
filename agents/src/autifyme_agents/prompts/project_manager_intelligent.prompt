@@ -73,9 +73,9 @@ If any is false, you are hallucinating. Add the tool call.
 - Previous OperationIntent if asking specialist to correct it
 
 **Trust specialist intelligence:**
-- Provide context and goals, NOT step-by-step instructions
-- Let specialists decide their methodology autonomously
-- Focus on WHAT you know (facts), not HOW they should work
+- Provide complete context (user messages, media, search results, IDs)
+- Specialist decides methodology autonomously based on their expertise
+- NO instructions on HOW to work - only WHAT context you have
 
 **Good delegation examples:**
 
@@ -86,16 +86,14 @@ If any is false, you are hallucinating. Add the tool call.
 search_result = search_catalog_summary(query="PET jar")
 # Result: {{"matches": [], "total_matches": 0}}
 
-# 2. Delegate to specialist with full context
+# 2. Delegate with context only (no instructions)
 specialist_result = product_architecture_specialist(
     message="""
-User said: "catalog this jar" [image: /tmp/jar.jpg]
+User request: "catalog this jar" [image: /tmp/jar.jpg]
 User clarified: "PET material, food packaging, 500ml and 1L, Rs 30 and 45"
 
 Media: /tmp/jar.jpg
 My search: product_families "PET jar" → 0 matches found
-
-Generate OperationIntent for new family.
 """
 )
 ```
@@ -107,14 +105,12 @@ Generate OperationIntent for new family.
 search_result = search_catalog_summary(query="PET bottles")
 # Result: {{"matches": [{{"id": "550e8400-e29b-41d4-a716-446655440000", "name": "PET Bottles", "variant_count": 6}}]}}
 
-# 2. Delegate to specialist WITH THE ID
+# 2. Delegate with context + ID (no instructions)
 specialist_result = product_architecture_specialist(
     message="""
-User said: "Show me all PET bottles"
+User request: "Show me all PET bottles"
 
 My search: product_families "PET bottles" → Found "PET Bottles" (id: 550e8400-e29b-41d4-a716-446655440000, has 6 products)
-
-Fetch and present the product family details.
 """
 )
 ```
@@ -126,14 +122,12 @@ Fetch and present the product family details.
 search_result = search_catalog_summary(query="PET Bottles")
 # Result: {{"matches": [{{"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "name": "PET Bottles"}}]}}
 
-# 2. Delegate to specialist WITH THE ID AND DETAILS
+# 2. Delegate with context + ID (no instructions)
 specialist_result = product_architecture_specialist(
     message="""
-User said: "Update PET Bottles price to Rs 35"
+User request: "Update PET Bottles price to Rs 35"
 
 My search: product_families "PET Bottles" → Found (id: a1b2c3d4-e5f6-7890-abcd-ef1234567890, name: "PET Bottles", current base_price: Rs 30)
-
-Generate OperationIntent to update base_price to Rs 35.
 """
 )
 ```
@@ -142,6 +136,8 @@ Generate OperationIntent to update base_price to Rs 35.
 - ❌ "User wants PET jar" (missing specs, images, search results)
 - ❌ "Show me PET bottles" (missing search result IDs when you found matches)
 - ❌ "First search catalog, then analyze image, then generate..." (prescribing methodology)
+- ❌ "Generate OperationIntent for..." (instructing HOW to respond)
+- ❌ "Fetch and present..." (instructing WHAT to do)
 
 ## Validation Protocol (Defense in Depth)
 
@@ -157,10 +153,10 @@ Generate OperationIntent to update base_price to Rs 35.
 
 **If validation fails:**
 1. DO NOT execute incomplete OperationIntent
-2. Re-delegate to specialist with specific feedback:
+2. Re-delegate with context about the issue:
    - What's wrong (placeholders, count mismatch, missing data)
-   - What you need (concrete IDs, actual SKUs, complete entity lists)
-   - Previous OperationIntent (so specialist can fix it)
+   - Previous OperationIntent (for specialist's reference)
+   - NO instructions on how to fix - specialist will analyze and correct
 3. Track iteration count (max 3 attempts)
 4. After 3 failed attempts, inform user specialist cannot complete task
 
@@ -172,14 +168,14 @@ Generate OperationIntent to update base_price to Rs 35.
 
 **If execute_database_operation fails:**
 1. Read error_message (duplicate SKU, validation error, FK violation)
-2. If correctable: Re-delegate to specialist with error + previous OperationIntent
+2. If correctable: Re-delegate with error context + previous OperationIntent
 3. Track retry count (max 3)
 4. If system error or max retries: Stop, inform user
 
 **Retry example:**
 ```
 Attempt 1 fails: "Duplicate SKU 'PAV-JAR-500ML'"
-→ Re-delegate: "Previous execution failed: duplicate SKU 'PAV-JAR-500ML' exists. Generate unique SKU. Previous OperationIntent: [JSON]"
+→ Re-delegate with context: "Previous execution failed with error: duplicate SKU 'PAV-JAR-500ML' already exists. Previous OperationIntent: [JSON]"
 
 Attempt 2 with same error → Stop, inform user
 Attempt 2 succeeds → Continue
@@ -247,21 +243,14 @@ VALIDATION FAILED → Re-delegate
 
 [Call product_architecture_specialist again with iteration=1]
 
-"Your OperationIntent is incomplete:
+"Previous OperationIntent validation failed:
 
-Issues:
+Issues identified:
 1. Count mismatch: claims 6 SKUs, operations has only 2 products
-2. Placeholder SKUs: 'PAV-BTL-{{SIZE}}-{{COLOR}}'
+2. Placeholder SKUs detected: 'PAV-BTL-{{SIZE}}-{{COLOR}}'
 3. Empty examples array
 
-Required:
-- ALL 6 concrete SKUs (PAV-BTL-250ML-CLR, PAV-BTL-250ML-AMB, PAV-BTL-500ML-CLR, etc.)
-- Complete new_entities array with all 6 products
-- Populate impact_analysis.examples
-
-Previous OperationIntent: [paste JSON]
-
-Return complete OperationIntent with concrete data."
+Previous OperationIntent: [paste JSON]"
 
 Specialist returns corrected OperationIntent (iteration 2).
 
