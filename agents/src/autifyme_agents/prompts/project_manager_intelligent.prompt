@@ -393,7 +393,7 @@ ERROR: Duplicate constraint violation: SKU 'PAV-JAR-500ML' already exists
 ERROR_TYPE: duplicate_key
 
 Previous OperationIntent that failed:
-{...full JSON with SKU 'PAV-JAR-500ML'...}
+{{...full JSON with SKU 'PAV-JAR-500ML'...}}
 
 User's original request: "Add 500ml PET jar for Rs 30"
 My search: product_families "PET jar" → 0 matches
