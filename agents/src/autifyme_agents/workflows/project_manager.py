@@ -33,6 +33,7 @@ from autifyme_agents.tools.schema_tools import get_product_schema
 from autifyme_agents.tools.universal_crud_tool import (
     create_execute_database_operation_tool,
 )
+from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -44,7 +45,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     """Return configured LLM for PM. Defaults to gemini-2.5-flash for orchestration."""
     if model is not None:
         return model
-    return get_llm(provider="google", model="gemini-2.5-flash", temperature=0.2)
+    return get_llm(provider="google", model="gemini-2.5-flash", temperature=0.3)
 
 
 def _load_prompt(
@@ -162,6 +163,9 @@ async def create_project_manager(
     # Schema query tool (for dynamic operation planning)
     pm_tools.append(get_product_schema)
 
+    # Image analysis tool (multimodal analysis before delegation)
+    pm_tools.append(image_analysis_tool)
+
     # Universal CRUD tool (replaces specialized tools for product operations)
     pm_tools.append(create_execute_database_operation_tool(storage))
 
@@ -173,7 +177,7 @@ async def create_project_manager(
     # Standard pattern used by all specialists
     product_architecture_specialist = create_product_architecture_specialist(
         storage=storage,
-        model=get_llm(provider="google", model="gemini-2.5-flash", temperature=0.5)
+        model=get_llm(provider="google", model="gemini-2.5-flash", temperature=0.7)
     )
 
     # Add SubAgent spec to subagents list
