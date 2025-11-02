@@ -201,14 +201,14 @@ if result["success"] == False and error_is_correctable:
     specialist_result = product_architecture_specialist(
         message="""
 Previous execution FAILED with error:
-ERROR: {result["error_message"]}
-ERROR_TYPE: {result["error_type"]}
+ERROR: {{result["error_message"]}}
+ERROR_TYPE: {{result["error_type"]}}
 
 Previous OperationIntent that failed:
-{previous_operation_intent_json}
+{{previous_operation_intent_json}}
 
-User's original request: {original_user_request}
-My search results: {my_search_results}
+User's original request: {{original_user_request}}
+My search results: {{my_search_results}}
 
 Please analyze the error and generate corrected OperationIntent.
 Retry attempt: 1 of 3
