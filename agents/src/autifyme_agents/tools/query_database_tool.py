@@ -118,6 +118,9 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
         - When PM provides entity IDs in delegation → ALWAYS use them in filters
 
         EFFICIENCY BEST PRACTICES:
+        - Always use filters when you have specific criteria
+        - Always use UUIDs for filters when PM provides entity IDs in delegation
+        - Always use search_patterns for partial matches
         - Count first: Use count_only=True before fetching rows
         - Limit always: Set limit parameter (default to 10 unless specific need)
         - Project columns: Specify columns for specific fields only
