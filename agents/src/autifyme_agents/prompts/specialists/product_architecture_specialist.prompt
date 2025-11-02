@@ -104,6 +104,10 @@ PM will validate your output. Incomplete OperationIntent wastes iterations.
 **[CRITICAL]** You have query_database tool - USE IT directly!
 
 1. **Call query_database** with appropriate filters and relations
+   - **If you have specific criteria** → Use filters (e.g., `filters={"id": "uuid-123"}`, `{"is_active": True}`, `{"brand": "Acme"}`)
+   - **If PM provides context** (entity IDs, names, attributes) → Extract and use in filters
+   - **Empty filters `{}`** returns ALL rows → Only use for "list all" queries, not specific lookups
+   - **For partial matches** → Use search_patterns with wildcards (e.g., `search_patterns={"name": "%bottle%"}`)
 2. Get the actual data from tool response
 3. Format the data clearly
 4. Return OperationIntent with:
@@ -124,7 +128,7 @@ PM will validate your output. Incomplete OperationIntent wastes iterations.
 - ✅ Real values: `"capacity": "500ml"`, `"color": "Clear"`
 - ✅ Complete lists: All 12 SKUs if user requested 12
 
-- ❌ Placeholders: `"PAV-{{SIZE}}-{{COLOR}}"`, `"uuid-placeholder"`
+- ❌ Placeholders: `"PAV-{SIZE}-{COLOR}"`, `"uuid-placeholder"`
 - ❌ Partial lists: 3 SKUs when 12 requested
 - ❌ Generic IDs: `"uuid1"`, `"product-id"`
 

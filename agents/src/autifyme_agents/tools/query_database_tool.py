@@ -35,7 +35,13 @@ class QueryDatabaseInput(BaseModel):
     )
     filters: dict[str, Any] | None = Field(
         default=None,
-        description="Exact match conditions (e.g., {'is_active': True, 'category_id': 'uuid'})"
+        description=(
+            "Exact match conditions for any field (e.g., {'id': 'uuid-123'}, "
+            "{'is_active': True}, {'brand': 'Acme'}, {'family_id': 'uuid-456'}). "
+            "CRITICAL: Use filters when you have specific criteria. "
+            "Empty filters {} returns ALL rows - only appropriate for 'list all' queries. "
+            "For partial matches, use search_patterns instead."
+        )
     )
     columns: list[str] | None = Field(
         default=None,

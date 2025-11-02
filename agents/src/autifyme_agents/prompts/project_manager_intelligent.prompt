@@ -77,7 +77,9 @@ If any is false, you are hallucinating. Add the tool call.
 - Let specialists decide their methodology autonomously
 - Focus on WHAT you know (facts), not HOW they should work
 
-**Good delegation:**
+**Good delegation examples:**
+
+*Example 1 - CREATE (no match found):*
 ```
 User said: "catalog this jar" [image: /tmp/jar.jpg]
 User clarified: "PET material, food packaging, 500ml and 1L, Rs 30 and 45"
@@ -89,8 +91,27 @@ My search: product_families "PET jar" → 0 matches found
 Generate OperationIntent for new family.
 ```
 
+*Example 2 - READ (match found with ID):*
+```
+User said: "Show me all PET bottles"
+
+My search: product_families "PET bottles" → Found "PET Bottles" (id: abc-123-uuid, has 6 products)
+
+Fetch and present the product family details.
+```
+
+*Example 3 - UPDATE (match found with ID):*
+```
+User said: "Update PET Bottles price to Rs 35"
+
+My search: product_families "PET Bottles" → Found (id: abc-123-uuid, name: "PET Bottles", current base_price: Rs 30)
+
+Generate OperationIntent to update base_price to Rs 35.
+```
+
 **Bad delegation:**
 - ❌ "User wants PET jar" (missing specs, images, search results)
+- ❌ "Show me PET bottles" (missing search result IDs when you found matches)
 - ❌ "First search catalog, then analyze image, then generate..." (prescribing methodology)
 
 ## Validation Protocol (Defense in Depth)
