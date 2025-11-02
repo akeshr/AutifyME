@@ -51,7 +51,7 @@ def create_product_architecture_specialist(
     checkpointer: Any,
     provider: str = "openai",
     model_name: str = "gpt-4.1-mini",
-    temperature: float = 0.5,
+    temperature: float = 0.1,
 ) -> CompiledStateGraph:
     """
     Create Product Architecture Specialist with schema-driven CRUD.
