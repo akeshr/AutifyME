@@ -49,9 +49,9 @@ from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 def create_product_architecture_specialist(
     storage: StorageInterface,
     checkpointer: Any,
-    provider: str = "openai",
-    model_name: str = "gpt-4.1-mini",
-    temperature: float = 0.1,
+    provider: str = "google",
+    model_name: str = "gemini-2.5-pro",
+    temperature: float = 0.3,
 ) -> CompiledStateGraph:
     """
     Create Product Architecture Specialist with schema-driven CRUD.

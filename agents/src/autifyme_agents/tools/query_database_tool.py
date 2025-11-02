@@ -33,7 +33,8 @@ class QueryDatabaseInput(BaseModel):
         ...,
         description="Table name to query (e.g., 'product_families', 'products')"
     )
-    filters: dict[str, Any] | None = Field(
+    filters: dict[str, Any] = Field(
+        default={},
         description=(
             "Exact match conditions for any field. "
             "Examples: {'id': '550e8400-e29b-41d4-a716-446655440000'}, "
@@ -52,7 +53,8 @@ class QueryDatabaseInput(BaseModel):
         default=None,
         description="Related tables to include using PostgREST syntax (e.g., ['categories(*)', 'variant_axes(variant_values(*))'). Enables joining related data in single query"
     )
-    search_patterns: dict[str, str] | None = Field(
+    search_patterns: dict[str, str] = Field(
+        default={},
         description=(
             "Case-insensitive partial text matching using SQL ILIKE with % wildcards. "
             "WHEN TO USE: When you need fuzzy/partial matches (user says 'bottles', 'jars', 'pet products'). "
@@ -109,7 +111,7 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
         Flexible data retrieval tool for specialists. Supports exact filters,
         pattern matching, relation includes, counting, and column projection.
 
-        CRITICAL FILTER USAGE:
+        FILTER USAGE:
         - SPECIFIC LOOKUPS: Use filters with entity IDs (UUIDs) or exact values
           (e.g., filters={'id': '550e8400-e29b-41d4-a716-446655440000'}, filters={'brand': 'Acme'})
         - BROAD SEARCHES: Use search_patterns for partial matches (search_patterns={'name': '%bottle%'})
@@ -190,7 +192,7 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
             # Count products in a family (using UUID from PM delegation)
             query_database(
                 table="products",
-                filters={"product_family_id": "550e8400-e29b-41d4-a716-446655440000"},
+                filters={"id": "550e8400-e29b-41d4-a716-446655440000"},
                 count_only=True
             )
 
