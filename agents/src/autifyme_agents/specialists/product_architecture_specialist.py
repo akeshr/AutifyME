@@ -38,7 +38,10 @@ from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 # =============================================================================
 
 
-def create_product_architecture_specialist(storage: StorageInterface) -> dict[str, Any]:
+def create_product_architecture_specialist(
+    storage: StorageInterface,
+    model: str | None = None,
+) -> dict[str, Any]:
     """
     Create Product Architecture Specialist SubAgent spec.
 
@@ -53,20 +56,22 @@ def create_product_architecture_specialist(storage: StorageInterface) -> dict[st
     - Maintain conversation history across PM delegations
 
     Architecture:
-    - SubAgent dict: {name, description, tools, system_prompt}
-    - DeepAgents compiles specialist with default_model from PM
+    - SubAgent dict: {name, description, tools, system_prompt, model (optional)}
+    - DeepAgents compiles specialist with specified model or default_model from PM
     - Schema-driven planning (no hard-coded operation types)
     - PM handles persistence via execute_database_operation tool
 
     Args:
         storage: Storage interface for catalog search + schema query (REQUIRED)
+        model: Optional model string (e.g., "google:gemini-2.5-pro", "openai:gpt-4o")
+               If None, uses PM's default_model from SubAgentMiddleware
 
     Returns:
         SubAgent spec dict for PM's subagents list
 
     Notes:
         - Standard SubAgent pattern (like cataloging_specialist)
-        - DeepAgents handles model, checkpointer, middleware
+        - DeepAgents handles model compilation, checkpointer, middleware
         - Specialist focused on analysis and planning only
         - PM delegates execution and approval
     """
@@ -114,11 +119,16 @@ def create_product_architecture_specialist(storage: StorageInterface) -> dict[st
     )
 
     # Return SubAgent spec
-    return {
+    spec = {
         "name": "product_architecture_specialist",
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
         # No interrupt_on - specialist has no HITL tools
-        # DeepAgents handles model and checkpointer configuration
     }
+
+    # Add model if specified (otherwise uses PM's default_model)
+    if model is not None:
+        spec["model"] = model
+
+    return spec
