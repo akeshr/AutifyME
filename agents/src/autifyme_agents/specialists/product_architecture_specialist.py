@@ -12,7 +12,7 @@ Responsibilities:
 - Query product catalog schema dynamically
 - Search catalog for existing product families
 - Classify user intent into CRUD operations
-- Generate OperationIntent with execution plan
+- Generate operation specifications with execution plans
 - Calculate impact analysis from schema + current data
 
 Does NOT:
@@ -21,19 +21,16 @@ Does NOT:
 - Classify into taxonomy (Taxonomy Specialist handles this)
 
 Architecture Pattern:
-- SubAgent dict format with OperationIntent response
+- SubAgent spec: Standard dict format for PM delegation
+- Returns dict with {name, description, tools, system_prompt}
+- DeepAgents compiles specialist automatically in PM
 - Schema-driven planning (no hard-coded operation types)
-- Single generic model (replaces 7 hard-coded draft types)
-- Dynamic execution plan generation
 """
 
 from typing import Any
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
-
-# Import generic operation intent (replaces all hard-coded draft types)
-from autifyme_agents.schemas.operation_intent import OperationIntent
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 # =============================================================================
@@ -42,46 +39,52 @@ from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 
 def create_product_architecture_specialist(
-    storage: StorageInterface | None = None,
+    storage: StorageInterface,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """
-    Create Product Architecture Specialist with schema-driven CRUD.
+    Create Product Architecture Specialist SubAgent spec.
+
+    Standard SubAgent Pattern: Returns dict for PM's subagents list.
 
     Specialist Responsibilities:
     - Query product catalog schema dynamically
     - Search catalog for existing product families
     - Classify user intent (create/read/update/delete)
-    - Generate OperationIntent with execution plan
+    - Generate operation specifications with execution plans
     - Calculate impact analysis from schema + data
+    - Maintain conversation history across PM delegations
 
     Architecture:
-    - SubAgent dict format (DeepAgents pattern)
-    - OperationIntent response (single generic model)
+    - SubAgent dict: {name, description, tools, system_prompt, model (optional)}
+    - DeepAgents compiles specialist with specified model or default_model from PM
     - Schema-driven planning (no hard-coded operation types)
-    - Dynamic execution plan generation
+    - PM handles persistence via execute_database_operation tool
 
     Args:
-        storage: Storage interface for catalog search + schema query
+        storage: Storage interface for catalog search + schema query (REQUIRED)
+        model: Optional model string (e.g., "google:gemini-2.5-pro", "openai:gpt-4o")
+               If None, uses PM's default_model from SubAgentMiddleware
 
     Returns:
-        SubAgent spec with:
-        - name: specialist identifier
-        - description: delegation criteria
-        - tools: analysis, search, and schema query tools
-        - system_prompt: schema-driven planning instructions
-        - response_format: OperationIntent (single model)
+        SubAgent spec dict for PM's subagents list
+
+    Notes:
+        - Standard SubAgent pattern (like cataloging_specialist)
+        - DeepAgents handles model compilation, checkpointer, middleware
+        - Specialist focused on analysis and planning only
+        - PM delegates execution and approval
     """
+    if storage is None:
+        raise ValueError(
+            "storage is required for Product Architecture Specialist (tools dependency)"
+        )
+
+    # Load specialist prompt
     system_prompt = load_prompt("specialists/product_architecture_specialist.prompt")
 
-    description = (
-        "Product architecture specialist with schema-driven CRUD. "
-        "Queries schema dynamically, searches catalog, classifies intent, "
-        "and generates OperationIntent with execution plan. "
-        "Handles any operation on any table through schema-driven planning."
-    )
-
     # Core tools
-    tools = [
+    tools: list[Any] = [
         image_analysis_tool,
     ]
 
@@ -91,23 +94,41 @@ def create_product_architecture_specialist(
         get_table_schema,
         list_available_tables,
     )
+
     tools.extend([get_product_schema, get_table_schema, list_available_tables])
 
     # Storage-dependent tools
-    if storage:
-        from autifyme_agents.tools.product_search_tools import (
-            create_search_product_families_tool,
-        )
-        from autifyme_agents.tools.query_database_tool import (
-            create_query_database_tool,
-        )
-        tools.append(create_search_product_families_tool(storage))
-        tools.append(create_query_database_tool(storage))
+    from autifyme_agents.tools.product_search_tools import (
+        create_search_product_families_tool,
+    )
+    from autifyme_agents.tools.query_database_tool import (
+        create_query_database_tool,
+    )
 
-    return {
+    tools.append(create_search_product_families_tool(storage))
+    tools.append(create_query_database_tool(storage))
+
+    # Description for PM delegation
+    description = (
+        "Product architecture specialist with schema-driven CRUD capabilities. "
+        "Analyzes product structure, queries schemas dynamically, "
+        "searches catalog for existing products, and generates "
+        "operation specifications with execution plans and impact analysis. "
+        "Handles any CRUD operation on any table through schema-driven planning. "
+        "Returns detailed operation plans for PM to execute via execute_database_operation tool."
+    )
+
+    # Return SubAgent spec
+    spec = {
         "name": "product_architecture_specialist",
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
-        "response_format": OperationIntent,  # Single generic model
+        # No interrupt_on - specialist has no HITL tools
     }
+
+    # Add model if specified (otherwise uses PM's default_model)
+    if model is not None:
+        spec["model"] = model
+
+    return spec

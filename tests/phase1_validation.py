@@ -149,11 +149,15 @@ async def test_pm_initialization():
 
     storage = get_storage()
     company_profile = storage.get_company_profile()
-    checkpointer = get_checkpointer()
+    pm_checkpointer = get_checkpointer()
+    specialist_checkpointer = get_checkpointer()
 
     start_time = time.time()
     pm = await create_project_manager(
-        company_profile=company_profile, checkpointer=checkpointer, storage=storage
+        company_profile=company_profile,
+        checkpointer=pm_checkpointer,
+        specialist_checkpointer=specialist_checkpointer,
+        storage=storage,
     )
     init_time = (time.time() - start_time) * 1000
 
@@ -225,9 +229,13 @@ async def test_performance_summary():
     enc = tiktoken.get_encoding("cl100k_base")
     token_count = len(enc.encode(context_json))
 
-    checkpointer = get_checkpointer()
+    pm_checkpointer = get_checkpointer()
+    specialist_checkpointer = get_checkpointer()
     await create_project_manager(
-        company_profile=company_profile, checkpointer=checkpointer, storage=storage
+        company_profile=company_profile,
+        checkpointer=pm_checkpointer,
+        specialist_checkpointer=specialist_checkpointer,
+        storage=storage
     )
 
     total_time = (time.time() - start_time) * 1000

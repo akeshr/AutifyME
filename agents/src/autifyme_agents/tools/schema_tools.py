@@ -7,7 +7,8 @@ operation planning and validation.
 import logging
 from typing import Any
 
-from langchain.tools import tool
+from langchain_core.tools import StructuredTool
+from pydantic import BaseModel, Field
 
 from autifyme_agents.schemas.registry import SchemaRegistry
 from autifyme_agents.core.tool_error_handler import (
@@ -19,12 +20,57 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Schema Query Tool
+# Pydantic Models (OpenAI requires additionalProperties: false)
 # =============================================================================
 
 
-@tool("get_product_schema")
-def get_product_schema(
+class GetProductSchemaInput(BaseModel):
+    """Input schema for get_product_schema tool."""
+
+    model_config = {"extra": "forbid"}  # Generates additionalProperties: false
+
+    version: str = Field(
+        default="latest",
+        description="Schema version to retrieve ('latest', 'v1', 'v2', etc.)"
+    )
+    include_business_rules: bool = Field(
+        default=False,
+        description="Include business rule metadata (default: False)"
+    )
+
+
+class GetTableSchemaInput(BaseModel):
+    """Input schema for get_table_schema tool."""
+
+    model_config = {"extra": "forbid"}
+
+    table_name: str = Field(
+        ...,
+        description="Name of the table to query"
+    )
+    version: str = Field(
+        default="latest",
+        description="Schema version (default: 'latest')"
+    )
+
+
+class ListAvailableTablesInput(BaseModel):
+    """Input schema for list_available_tables tool."""
+
+    model_config = {"extra": "forbid"}
+
+    version: str = Field(
+        default="latest",
+        description="Schema version (default: 'latest')"
+    )
+
+
+# =============================================================================
+# Tool Implementation Functions
+# =============================================================================
+
+
+def _get_product_schema_impl(
     version: str = "latest",
     include_business_rules: bool = False,
 ) -> dict[str, Any]:
@@ -155,8 +201,7 @@ def get_product_schema(
         )
 
 
-@tool("get_table_schema")
-def get_table_schema(
+def _get_table_schema_impl(
     table_name: str,
     version: str = "latest",
 ) -> dict[str, Any]:
@@ -240,8 +285,7 @@ def get_table_schema(
         )
 
 
-@tool("list_available_tables")
-def list_available_tables(version: str = "latest") -> dict[str, Any]:
+def _list_available_tables_impl(version: str = "latest") -> dict[str, Any]:
     """
     List all available tables in the product catalog schema.
 
@@ -312,3 +356,44 @@ def list_available_tables(version: str = "latest") -> dict[str, Any]:
                 "If persistent, contact system administrator."
             ),
         )
+
+
+# =============================================================================
+# Tool Instances (OpenAI-compatible with additionalProperties: false)
+# =============================================================================
+
+get_product_schema = StructuredTool.from_function(
+    func=_get_product_schema_impl,
+    name="get_product_schema",
+    description=(
+        "Retrieve complete product catalog database schema (structure, not data). "
+        "WHEN TO USE: Before complex CREATE/UPDATE/DELETE operations when you need to verify table structure, relationships, or constraints. "
+        "NOT NEEDED: For routine operations - most standard tables are known (product_families, products, variant_axes, variant_values). "
+        "Returns: Tables with columns (types, nullability), foreign key relationships, cascade delete rules, indexes. "
+        "CRITICAL: This returns SCHEMA (database structure), NOT actual product data. Use query_database to fetch product data."
+    ),
+    args_schema=GetProductSchemaInput,
+)
+
+get_table_schema = StructuredTool.from_function(
+    func=_get_table_schema_impl,
+    name="get_table_schema",
+    description=(
+        "Retrieve schema for a specific table (focused query for single table structure). "
+        "WHEN TO USE: When you need column details, types, or relationships for ONE table without loading entire schema. "
+        "More efficient than get_product_schema when you know which table you need. "
+        "CRITICAL: Returns table STRUCTURE only - use query_database for actual data from that table."
+    ),
+    args_schema=GetTableSchemaInput,
+)
+
+list_available_tables = StructuredTool.from_function(
+    func=_list_available_tables_impl,
+    name="list_available_tables",
+    description=(
+        "List all table names in product catalog schema (lightweight discovery). "
+        "WHEN TO USE: When you need to see what tables exist without loading full schema or specific table details. "
+        "Returns: Just table names - use get_table_schema or get_product_schema for structure details."
+    ),
+    args_schema=ListAvailableTablesInput,
+)

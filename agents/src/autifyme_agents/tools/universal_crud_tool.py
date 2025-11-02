@@ -20,8 +20,8 @@ from collections import defaultdict
 from datetime import UTC
 from typing import Any
 
-from langchain.tools import tool
-from langchain_core.tools import BaseTool, ToolException
+from langchain_core.tools import BaseTool, StructuredTool, ToolException
+from pydantic import BaseModel, Field
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.operation_intent import (
@@ -1011,6 +1011,45 @@ class OperationExecutor:
 # =============================================================================
 
 
+class ExecuteDatabaseOperationInput(BaseModel):
+    """Input schema for execute_database_operation tool (OpenAI-compatible)."""
+
+    model_config = {"extra": "forbid"}  # Generates additionalProperties: false
+
+    intent_type: str = Field(
+        ...,
+        description="High-level intent classification (create/read/update/delete)"
+    )
+    change_spec: dict[str, Any] = Field(
+        ...,
+        description="Specification of table operations"
+    )
+    user_request_summary: str = Field(
+        ...,
+        description="Summary of user's original request"
+    )
+    reasoning: str = Field(
+        ...,
+        description="Why specialist classified this way (for transparency)"
+    )
+    impact_analysis: dict[str, Any] = Field(
+        ...,
+        description="Impact assessment for HITL"
+    )
+    execution_plan: dict[str, Any] = Field(
+        ...,
+        description="Multi-step execution plan with dependencies"
+    )
+    specialist_name: str | None = Field(
+        default=None,
+        description="Which specialist generated this intent (optional)"
+    )
+    schema_version: str = Field(
+        default="v1",
+        description="Schema version to validate against (default: v1)"
+    )
+
+
 def create_execute_database_operation_tool(storage: StorageInterface) -> BaseTool:
     """
     Create universal database operation tool.
@@ -1030,8 +1069,7 @@ def create_execute_database_operation_tool(storage: StorageInterface) -> BaseToo
         LangChain tool that executes OperationIntent
     """
 
-    @tool("execute_database_operation")
-    async def execute_database_operation(
+    async def _execute_database_operation_impl(
         intent_type: str,
         change_spec: dict[str, Any],
         user_request_summary: str,
@@ -1198,4 +1236,13 @@ def create_execute_database_operation_tool(storage: StorageInterface) -> BaseToo
             )
             return error_result.model_dump()
 
-    return execute_database_operation
+    return StructuredTool.from_function(
+        coroutine=_execute_database_operation_impl,
+        name="execute_database_operation",
+        description=(
+            "Universal database operation executor. Executes ANY operation on ANY table "
+            "through schema-driven planning. Works with current 9 tables and future tables "
+            "without code changes. Replaces all specialized persistence tools."
+        ),
+        args_schema=ExecuteDatabaseOperationInput,
+    )

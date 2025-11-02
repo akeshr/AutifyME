@@ -15,7 +15,7 @@ Design Philosophy:
 import logging
 from typing import Any
 
-from langchain.tools import tool
+from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 from autifyme_agents.core.exceptions import classify_api_error
@@ -108,6 +108,47 @@ class ProductFamilySearchResult(BaseModel):
     )
     confidence: float = Field(
         ..., ge=0.0, le=1.0, description="Confidence in recommendation"
+    )
+
+
+class SearchProductFamiliesInput(BaseModel):
+    """Input schema for search_product_families tool (OpenAI-compatible)."""
+
+    model_config = {"extra": "forbid"}  # Generates additionalProperties: false
+
+    product_group_id: str | None = Field(
+        default=None,
+        description=(
+            "Business identifier for exact match (e.g., 'PACK-PET-JAR'). "
+            "Strongest signal - if provided, prioritizes exact business ID matches. "
+            "Use when you have structured business identifier from user or PM."
+        )
+    )
+    name: str | None = Field(
+        default=None,
+        description=(
+            "Product family name to fuzzy match (e.g., 'PET Bottles', 'Glass Jars'). "
+            "REQUIRED for meaningful search - uses token-based similarity scoring. "
+            "Provide descriptive product name from user request."
+        )
+    )
+    brand: str | None = Field(
+        default=None,
+        description=(
+            "Brand name for filtering and similarity scoring (e.g., 'Acme', 'PavCorp'). "
+            "Boosts match confidence when brand matches. Filters results if no business_id provided."
+        )
+    )
+    material: str | None = Field(
+        default=None,
+        description=(
+            "Material for additional match scoring (e.g., 'PET', 'Glass', 'Aluminum'). "
+            "Contributes to overall match confidence. Use when material is known from request."
+        )
+    )
+    limit: int = Field(
+        default=5,
+        description="Max results to return (default: 5, max: 10). Increase if expecting multiple similar families."
     )
 
 
@@ -255,8 +296,7 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
         LangChain tool for product family search
     """
 
-    @tool("search_product_families")
-    def search_product_families(
+    def _search_product_families_impl(
         product_group_id: str | None = None,
         name: str | None = None,
         brand: str | None = None,
@@ -414,4 +454,15 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
             )
             raise classify_api_error(e, "search_product_families", "Supabase") from e
 
-    return search_product_families
+    return StructuredTool.from_function(
+        func=_search_product_families_impl,
+        name="search_product_families",
+        description=(
+            "Search for existing product families using intelligent fuzzy matching. "
+            "WHEN TO USE: BEFORE creating new product families - checks if product already exists or is variant of existing family. "
+            "Returns confidence scores (exact/variant_candidate/similar/weak) and recommendations (create_new/update_existing/add_variant/ask_user). "
+            "Includes full variant configuration (axes, values, SKU codes) for extending existing patterns. "
+            "CRITICAL: Use this for finding matches before CREATE operations. For READ operations on known entities, use query_database with filters instead."
+        ),
+        args_schema=SearchProductFamiliesInput,
+    )

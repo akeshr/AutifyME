@@ -33,6 +33,7 @@ from autifyme_agents.tools.schema_tools import get_product_schema
 from autifyme_agents.tools.universal_crud_tool import (
     create_execute_database_operation_tool,
 )
+from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -44,7 +45,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     """Return configured LLM for PM. Defaults to gemini-2.5-flash for orchestration."""
     if model is not None:
         return model
-    return get_llm(provider="google", model="gemini-2.5-flash-lite", temperature=0.2)
+    return get_llm(provider="google", model="gemini-2.5-flash", temperature=0.3)
 
 
 def _load_prompt(
@@ -103,13 +104,19 @@ async def create_project_manager(
 
     Args:
         company_profile: Company context for brand voice and positioning
-        model: LLM for orchestration (defaults to gpt-4.1-mini)
-        checkpointer: LangGraph checkpointer for state persistence
+        model: LLM for orchestration (defaults to gemini-2.5-flash-lite)
+        checkpointer: LangGraph checkpointer for PM state persistence
         storage: Storage adapter for database operations
         channel: Messaging channel for platform-specific operations
 
     Returns:
         Compiled DeepAgent
+
+    Notes:
+        - DeepAgents SubAgentMiddleware handles specialist compilation
+        - Specialists use default_model and default_middleware from SubAgentMiddleware
+        - PM's checkpointer is passed to create_deep_agent
+        - Specialist state managed by DeepAgents internally
     """
     if checkpointer is None:
         raise ValueError(
@@ -156,18 +163,27 @@ async def create_project_manager(
     # Schema query tool (for dynamic operation planning)
     pm_tools.append(get_product_schema)
 
+    # Image analysis tool (multimodal analysis before delegation)
+    pm_tools.append(image_analysis_tool)
+
     # Universal CRUD tool (replaces specialized tools for product operations)
     pm_tools.append(create_execute_database_operation_tool(storage))
 
     # Campaign persistence tool (HITL-enabled for marketing campaigns)
     pm_tools.append(create_save_campaign_tool(storage))
 
-    # Product Architecture Specialist (structure, variants, SKUs)
-    product_architecture_specialist = create_product_architecture_specialist(storage)
+    # Product Architecture Specialist (SubAgent spec pattern)
+    # Returns dict spec that DeepAgents compiles automatically
+    # Standard pattern used by all specialists
+    product_architecture_specialist = create_product_architecture_specialist(
+        storage=storage,
+        model=get_llm(provider="google", model="gemini-2.5-flash", temperature=0.7)
+    )
 
-    # Specialists (SubAgent pattern)
+    # Add SubAgent spec to subagents list
+    # DeepAgents SubAgentMiddleware compiles specialist with default_model
     subagents: list[Any] = [
-        product_architecture_specialist,
+        product_architecture_specialist,  # SubAgent dict spec
     ]
 
     # HITL configuration
@@ -188,7 +204,6 @@ async def create_project_manager(
         interrupt_on=interrupt_configs,
         checkpointer=checkpointer,
         store=store,
-        use_longterm_memory=True,
         context_schema=CompanyContext,
     )
 

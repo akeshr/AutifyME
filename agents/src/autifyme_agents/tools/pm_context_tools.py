@@ -17,8 +17,7 @@ from uuid import UUID
 
 from typing import Any
 
-from langchain.tools import tool
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel, Field
 
 from autifyme_agents.core.ports import StorageInterface
@@ -73,6 +72,33 @@ class CategoryInfo(BaseModel):
 
 
 # =============================================================================
+# Tool Input Models (OpenAI-compatible)
+# =============================================================================
+
+
+class SearchCatalogSummaryInput(BaseModel):
+    """Input schema for search_catalog_summary tool."""
+
+    model_config = {"extra": "forbid"}
+
+    query: str = Field(
+        ...,
+        description="Search query (case-insensitive substring match on product family names)"
+    )
+
+
+class GetCategoryInfoInput(BaseModel):
+    """Input schema for get_category_info tool."""
+
+    model_config = {"extra": "forbid"}
+
+    category_name: str = Field(
+        ...,
+        description="Category name to retrieve information for (case-insensitive match)"
+    )
+
+
+# =============================================================================
 # PM Query Tools
 # =============================================================================
 
@@ -90,8 +116,7 @@ def create_search_catalog_summary_tool(storage: StorageInterface) -> BaseTool:
         LangChain tool for PM catalog search
     """
 
-    @tool
-    async def search_catalog_summary(query: str) -> dict[str, Any]:
+    async def _search_catalog_summary_impl(query: str) -> dict[str, Any]:
         """Search catalog for product families matching query.
 
         Summary-level search (family names and counts only). Use this to:
@@ -199,7 +224,17 @@ def create_search_catalog_summary_tool(storage: StorageInterface) -> BaseTool:
                 ),
             )
 
-    return search_catalog_summary
+    return StructuredTool.from_function(
+        coroutine=_search_catalog_summary_impl,
+        name="search_catalog_summary",
+        description=(
+            "Search catalog for product families (PM-level summary: names, counts, IDs only - NOT full data). "
+            "WHEN TO USE: PM uses this BEFORE delegating to check if products exist and to gather entity IDs for delegation messages. "
+            "NOT FOR SPECIALISTS: Specialists should use search_product_families (fuzzy matching with confidence scores) or query_database (complete data with filters). "
+            "CRITICAL: Include search results with IDs in your delegation message to specialist (e.g., 'Found PET Bottles (id: abc-123)')."
+        ),
+        args_schema=SearchCatalogSummaryInput,
+    )
 
 
 def create_get_category_info_tool(storage: StorageInterface) -> BaseTool:
@@ -215,8 +250,7 @@ def create_get_category_info_tool(storage: StorageInterface) -> BaseTool:
         LangChain tool for PM category info query
     """
 
-    @tool
-    async def get_category_info(category_name: str) -> dict[str, Any]:
+    async def _get_category_info_impl(category_name: str) -> dict[str, Any]:
         """Get category details and product counts.
 
         Summary-level taxonomy query. Use this to:
@@ -325,4 +359,13 @@ def create_get_category_info_tool(storage: StorageInterface) -> BaseTool:
                 ),
             )
 
-    return get_category_info
+    return StructuredTool.from_function(
+        coroutine=_get_category_info_impl,
+        name="get_category_info",
+        description=(
+            "Get category details and product counts (PM-level taxonomy summary - NOT full product lists). "
+            "WHEN TO USE: PM uses this for taxonomy discussions, checking category structure, or understanding product distribution across categories. "
+            "Returns: Category metadata (ID, parent, subcategory count, product family count) - use for context in responses to user."
+        ),
+        args_schema=GetCategoryInfoInput,
+    )

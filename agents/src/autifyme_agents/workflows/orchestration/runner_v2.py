@@ -603,10 +603,17 @@ class WorkflowRunner:
         return await get_async_checkpointer()
 
     async def _create_project_manager(self) -> Any:
-        """Create PM instance with company context and channel."""
+        """Create PM instance with company context and channel.
+
+        PM checkpointer stores PM conversation state.
+        DeepAgents SubAgentMiddleware handles specialist state internally.
+        """
+        # Get PM checkpointer (stores PM conversation state)
+        pm_checkpointer = await self._get_async_checkpointer()
+
         return await create_project_manager(
             company_profile=self.company_profile,
-            checkpointer=await self._get_async_checkpointer(),
+            checkpointer=pm_checkpointer,
             storage=self.storage,
             channel=self.channel,
         )
