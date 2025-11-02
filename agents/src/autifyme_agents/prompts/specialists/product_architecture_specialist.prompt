@@ -131,14 +131,14 @@ result = query_database(
 # Foreign key lookup
 result = query_database(
     table="products",
-    filters={{"family_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}},
+    filters={{"product_family_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}},
     columns=["id", "name", "sku", "base_price"]
 )
 
 # Count with filter
 count_result = query_database(
     table="products",
-    filters={{"family_id": "550e8400-e29b-41d4-a716-446655440000"}},
+    filters={{"product_family_id": "550e8400-e29b-41d4-a716-446655440000"}},
     count_only=True
 )
 
@@ -188,7 +188,7 @@ result = query_database(
 # Get products with their variant value links
 result = query_database(
     table="products",
-    filters={{"family_id": "550e8400-e29b-41d4-a716-446655440000"}},
+    filters={{"product_family_id": "550e8400-e29b-41d4-a716-446655440000"}},
     relations=["product_variant_values(variant_values(*))"],
     columns=["id", "sku"]
 )
@@ -400,7 +400,7 @@ My search: product_families "PET Bottles" → Found (id: 550e8400-e29b-41d4-a716
 # Step 1: Fetch variant axis data with filters (PM provided family_id and axis name)
 axis_result = query_database(
     table="variant_axes",
-    filters={{"family_id": "550e8400-e29b-41d4-a716-446655440000", "name": "color"}},
+    filters={{"product_family_id": "550e8400-e29b-41d4-a716-446655440000", "name": "color"}},
     relations=["variant_values(*)"]
 )
 # Result: {{"success": True, "rows": [{{"id": "axis-color-uuid", "variant_values": [
@@ -418,7 +418,7 @@ for val in axis_result["rows"][0]["variant_values"]:
 # Step 2: Find products with Amber variant using filters
 products_result = query_database(
     table="products",
-    filters={{"family_id": "550e8400-e29b-41d4-a716-446655440000"}},
+    filters={{"product_family_id": "550e8400-e29b-41d4-a716-446655440000"}},
     relations=["product_variant_values(variant_values(*))"],
     columns=["id", "sku"]
 )
@@ -519,7 +519,22 @@ My search: product_families "PET bottle" → 0 matches found
       {{
         "op_type": "insert",
         "table": "product_families",
-        "new_entities": [{{"name": "PET Bottles", "brand": "Pavisha", "base_price": 25.0, "material": "PET", "application": "beverage packaging"}}],
+        "new_entities": [{{
+          "name": "PET Bottles",
+          "description": "Premium food-grade PET bottles for beverage packaging. Available in multiple sizes and colors.",
+          "brand": "Pavisha",
+          "sku_prefix": "PAV-BTL",
+          "product_group_id": "PAV-BTL-GRP",
+          "base_price": 25.0,
+          "price_currency": "INR",
+          "material": "Virgin PET Resin",
+          "condition": "new",
+          "lifecycle_stage": "regular",
+          "tags": ["food-grade", "BPA-free", "recyclable", "beverage"],
+          "google_product_category": "499676",
+          "is_active": true,
+          "custom_attributes": {{"certifications": ["IS:12252", "FSSAI"], "weight_range_g": "15-35", "neck_type": "PCO"}}
+        }}],
         "entity_refs": {{"bottle_family": 0}},
         "description": "Create product family"
       }},
@@ -527,8 +542,20 @@ My search: product_families "PET bottle" → 0 matches found
         "op_type": "insert",
         "table": "variant_axes",
         "new_entities": [
-          {{"name": "capacity", "display_label": "Capacity", "family_id": "$ref:bottle_family", "sort_order": 1}},
-          {{"name": "color", "display_label": "Color", "family_id": "$ref:bottle_family", "sort_order": 2}}
+          {{
+            "name": "capacity",
+            "display_label": "Capacity",
+            "product_family_id": "$ref:bottle_family",
+            "sort_order": 1,
+            "schema_property": "https://schema.org/volumeCapacity"
+          }},
+          {{
+            "name": "color",
+            "display_label": "Color",
+            "product_family_id": "$ref:bottle_family",
+            "sort_order": 2,
+            "schema_property": "https://schema.org/color"
+          }}
         ],
         "entity_refs": {{"capacity_axis": 0, "color_axis": 1}},
         "depends_on": [0],
@@ -538,11 +565,48 @@ My search: product_families "PET bottle" → 0 matches found
         "op_type": "insert",
         "table": "variant_values",
         "new_entities": [
-          {{"axis_id": "$ref:capacity_axis", "value": "250ml", "sku_code": "250ML", "sort_order": 1}},
-          {{"axis_id": "$ref:capacity_axis", "value": "500ml", "sku_code": "500ML", "sort_order": 2}},
-          {{"axis_id": "$ref:capacity_axis", "value": "1L", "sku_code": "1L", "sort_order": 3}},
-          {{"axis_id": "$ref:color_axis", "value": "Clear", "sku_code": "CLR", "sort_order": 1}},
-          {{"axis_id": "$ref:color_axis", "value": "Amber", "sku_code": "AMB", "sort_order": 2}}
+          {{
+            "variant_axis_id": "$ref:capacity_axis",
+            "value": "250ml",
+            "display_label": "250 ml",
+            "sku_code": "250ML",
+            "sort_order": 1,
+            "is_active": true
+          }},
+          {{
+            "variant_axis_id": "$ref:capacity_axis",
+            "value": "500ml",
+            "display_label": "500 ml",
+            "sku_code": "500ML",
+            "sort_order": 2,
+            "is_active": true
+          }},
+          {{
+            "variant_axis_id": "$ref:capacity_axis",
+            "value": "1L",
+            "display_label": "1 Liter",
+            "sku_code": "1L",
+            "sort_order": 3,
+            "is_active": true
+          }},
+          {{
+            "variant_axis_id": "$ref:color_axis",
+            "value": "Clear",
+            "display_label": "Clear",
+            "sku_code": "CLR",
+            "color_hex": "#FFFFFF",
+            "sort_order": 1,
+            "is_active": true
+          }},
+          {{
+            "variant_axis_id": "$ref:color_axis",
+            "value": "Amber",
+            "display_label": "Amber",
+            "sku_code": "AMB",
+            "color_hex": "#FFBF00",
+            "sort_order": 2,
+            "is_active": true
+          }}
         ],
         "entity_refs": {{"val_250ml": 0, "val_500ml": 1, "val_1l": 2, "val_clear": 3, "val_amber": 4}},
         "depends_on": [1],
@@ -552,12 +616,72 @@ My search: product_families "PET bottle" → 0 matches found
         "op_type": "insert",
         "table": "products",
         "new_entities": [
-          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-250ML-CLR", "name": "PET Bottle 250ml Clear", "base_price": 15.0}},
-          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-250ML-AMB", "name": "PET Bottle 250ml Amber", "base_price": 15.0}},
-          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-500ML-CLR", "name": "PET Bottle 500ml Clear", "base_price": 25.0}},
-          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-500ML-AMB", "name": "PET Bottle 500ml Amber", "base_price": 25.0}},
-          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-1L-CLR", "name": "PET Bottle 1L Clear", "base_price": 40.0}},
-          {{"family_id": "$ref:bottle_family", "sku": "PAV-BTL-1L-AMB", "name": "PET Bottle 1L Amber", "base_price": 40.0}}
+          {{
+            "product_family_id": "$ref:bottle_family",
+            "sku": "PAV-BTL-250ML-CLR",
+            "name": "PET Bottle 250ml Clear",
+            "price": 15.0,
+            "availability": "in_stock",
+            "stock_quantity": 5000,
+            "low_stock_threshold": 500,
+            "is_primary_variant": true,
+            "is_active": true
+          }},
+          {{
+            "product_family_id": "$ref:bottle_family",
+            "sku": "PAV-BTL-250ML-AMB",
+            "name": "PET Bottle 250ml Amber",
+            "price": 15.0,
+            "availability": "in_stock",
+            "stock_quantity": 3000,
+            "low_stock_threshold": 500,
+            "is_primary_variant": false,
+            "is_active": true
+          }},
+          {{
+            "product_family_id": "$ref:bottle_family",
+            "sku": "PAV-BTL-500ML-CLR",
+            "name": "PET Bottle 500ml Clear",
+            "price": 25.0,
+            "availability": "in_stock",
+            "stock_quantity": 4500,
+            "low_stock_threshold": 400,
+            "is_primary_variant": false,
+            "is_active": true
+          }},
+          {{
+            "product_family_id": "$ref:bottle_family",
+            "sku": "PAV-BTL-500ML-AMB",
+            "name": "PET Bottle 500ml Amber",
+            "price": 25.0,
+            "availability": "in_stock",
+            "stock_quantity": 2500,
+            "low_stock_threshold": 400,
+            "is_primary_variant": false,
+            "is_active": true
+          }},
+          {{
+            "product_family_id": "$ref:bottle_family",
+            "sku": "PAV-BTL-1L-CLR",
+            "name": "PET Bottle 1L Clear",
+            "price": 40.0,
+            "availability": "in_stock",
+            "stock_quantity": 3500,
+            "low_stock_threshold": 300,
+            "is_primary_variant": false,
+            "is_active": true
+          }},
+          {{
+            "product_family_id": "$ref:bottle_family",
+            "sku": "PAV-BTL-1L-AMB",
+            "name": "PET Bottle 1L Amber",
+            "price": 40.0,
+            "availability": "in_stock",
+            "stock_quantity": 2000,
+            "low_stock_threshold": 300,
+            "is_primary_variant": false,
+            "is_active": true
+          }}
         ],
         "entity_refs": {{"prod_250_clr": 0, "prod_250_amb": 1, "prod_500_clr": 2, "prod_500_amb": 3, "prod_1l_clr": 4, "prod_1l_amb": 5}},
         "depends_on": [0],
@@ -649,7 +773,13 @@ family_result = query_database(
       {{
         "op_type": "insert",
         "table": "variant_axes",
-        "new_entities": [{{"name": "finish", "display_label": "Finish", "family_id": "550e8400-e29b-41d4-a716-446655440000", "sort_order": 3}}],
+        "new_entities": [{{
+          "name": "finish",
+          "display_label": "Finish",
+          "product_family_id": "550e8400-e29b-41d4-a716-446655440000",
+          "sort_order": 3,
+          "schema_property": "https://schema.org/surface"
+        }}],
         "entity_refs": {{"finish_axis": 0}},
         "description": "Add finish variant axis"
       }},
@@ -657,8 +787,22 @@ family_result = query_database(
         "op_type": "insert",
         "table": "variant_values",
         "new_entities": [
-          {{"axis_id": "$ref:finish_axis", "value": "Glossy", "sku_code": "GLS", "sort_order": 1}},
-          {{"axis_id": "$ref:finish_axis", "value": "Matte", "sku_code": "MAT", "sort_order": 2}}
+          {{
+            "variant_axis_id": "$ref:finish_axis",
+            "value": "Glossy",
+            "display_label": "Glossy Finish",
+            "sku_code": "GLS",
+            "sort_order": 1,
+            "is_active": true
+          }},
+          {{
+            "variant_axis_id": "$ref:finish_axis",
+            "value": "Matte",
+            "display_label": "Matte Finish",
+            "sku_code": "MAT",
+            "sort_order": 2,
+            "is_active": true
+          }}
         ],
         "entity_refs": {{"val_glossy": 0, "val_matte": 1}},
         "depends_on": [0],
@@ -682,12 +826,72 @@ family_result = query_database(
         "op_type": "insert",
         "table": "products",
         "new_entities": [
-          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-250ML-CLR-MAT", "name": "PET Bottle 250ml Clear Matte", "base_price": 15.0}},
-          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-250ML-AMB-MAT", "name": "PET Bottle 250ml Amber Matte", "base_price": 15.0}},
-          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-500ML-CLR-MAT", "name": "PET Bottle 500ml Clear Matte", "base_price": 25.0}},
-          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-500ML-AMB-MAT", "name": "PET Bottle 500ml Amber Matte", "base_price": 25.0}},
-          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-1L-CLR-MAT", "name": "PET Bottle 1L Clear Matte", "base_price": 40.0}},
-          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-1L-AMB-MAT", "name": "PET Bottle 1L Amber Matte", "base_price": 40.0}}
+          {{
+            "product_family_id": "550e8400-e29b-41d4-a716-446655440000",
+            "sku": "PAV-BTL-250ML-CLR-MAT",
+            "name": "PET Bottle 250ml Clear Matte",
+            "price": 15.0,
+            "availability": "in_stock",
+            "stock_quantity": 2500,
+            "low_stock_threshold": 500,
+            "is_primary_variant": false,
+            "is_active": true
+          }},
+          {{
+            "product_family_id": "550e8400-e29b-41d4-a716-446655440000",
+            "sku": "PAV-BTL-250ML-AMB-MAT",
+            "name": "PET Bottle 250ml Amber Matte",
+            "price": 15.0,
+            "availability": "in_stock",
+            "stock_quantity": 1500,
+            "low_stock_threshold": 500,
+            "is_primary_variant": false,
+            "is_active": true
+          }},
+          {{
+            "product_family_id": "550e8400-e29b-41d4-a716-446655440000",
+            "sku": "PAV-BTL-500ML-CLR-MAT",
+            "name": "PET Bottle 500ml Clear Matte",
+            "price": 25.0,
+            "availability": "in_stock",
+            "stock_quantity": 2200,
+            "low_stock_threshold": 400,
+            "is_primary_variant": false,
+            "is_active": true
+          }},
+          {{
+            "product_family_id": "550e8400-e29b-41d4-a716-446655440000",
+            "sku": "PAV-BTL-500ML-AMB-MAT",
+            "name": "PET Bottle 500ml Amber Matte",
+            "price": 25.0,
+            "availability": "in_stock",
+            "stock_quantity": 1200,
+            "low_stock_threshold": 400,
+            "is_primary_variant": false,
+            "is_active": true
+          }},
+          {{
+            "product_family_id": "550e8400-e29b-41d4-a716-446655440000",
+            "sku": "PAV-BTL-1L-CLR-MAT",
+            "name": "PET Bottle 1L Clear Matte",
+            "price": 40.0,
+            "availability": "in_stock",
+            "stock_quantity": 1800,
+            "low_stock_threshold": 300,
+            "is_primary_variant": false,
+            "is_active": true
+          }},
+          {{
+            "product_family_id": "550e8400-e29b-41d4-a716-446655440000",
+            "sku": "PAV-BTL-1L-AMB-MAT",
+            "name": "PET Bottle 1L Amber Matte",
+            "price": 40.0,
+            "availability": "in_stock",
+            "stock_quantity": 1000,
+            "low_stock_threshold": 300,
+            "is_primary_variant": false,
+            "is_active": true
+          }}
         ],
         "entity_refs": {{"prod_250_clr_mat": 0, "prod_250_amb_mat": 1, "prod_500_clr_mat": 2, "prod_500_amb_mat": 3, "prod_1l_clr_mat": 4, "prod_1l_amb_mat": 5}},
         "depends_on": [0],
@@ -763,14 +967,14 @@ My search: product_families "PET Bottles" → Found (id: 550e8400-e29b-41d4-a716
 # Step 1: Fetch existing capacity axis and color values
 axis_result = query_database(
     table="variant_axes",
-    filters={{"family_id": "550e8400-e29b-41d4-a716-446655440000", "name": "capacity"}},
+    filters={{"product_family_id": "550e8400-e29b-41d4-a716-446655440000", "name": "capacity"}},
     relations=["variant_values(*)"]
 )
 # Result: capacity axis has 3 values (250ml, 500ml, 1L)
 
 color_result = query_database(
     table="variant_axes",
-    filters={{"family_id": "550e8400-e29b-41d4-a716-446655440000", "name": "color"}},
+    filters={{"product_family_id": "550e8400-e29b-41d4-a716-446655440000", "name": "color"}},
     relations=["variant_values(*)"]
 )
 # Result: color axis has 2 values (Clear, Amber)
@@ -792,7 +996,14 @@ color_result = query_database(
       {{
         "op_type": "insert",
         "table": "variant_values",
-        "new_entities": [{{"axis_id": "axis-capacity-uuid", "value": "2L", "sku_code": "2L", "sort_order": 4}}],
+        "new_entities": [{{
+          "variant_axis_id": "axis-capacity-uuid",
+          "value": "2L",
+          "display_label": "2 Liters",
+          "sku_code": "2L",
+          "sort_order": 4,
+          "is_active": true
+        }}],
         "entity_refs": {{"val_2l": 0}},
         "description": "Add 2L to capacity axis"
       }},
@@ -800,8 +1011,28 @@ color_result = query_database(
         "op_type": "insert",
         "table": "products",
         "new_entities": [
-          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-2L-CLR", "name": "PET Bottle 2L Clear", "base_price": 50.0}},
-          {{"family_id": "550e8400-e29b-41d4-a716-446655440000", "sku": "PAV-BTL-2L-AMB", "name": "PET Bottle 2L Amber", "base_price": 50.0}}
+          {{
+            "product_family_id": "550e8400-e29b-41d4-a716-446655440000",
+            "sku": "PAV-BTL-2L-CLR",
+            "name": "PET Bottle 2L Clear",
+            "price": 50.0,
+            "availability": "in_stock",
+            "stock_quantity": 2000,
+            "low_stock_threshold": 200,
+            "is_primary_variant": false,
+            "is_active": true
+          }},
+          {{
+            "product_family_id": "550e8400-e29b-41d4-a716-446655440000",
+            "sku": "PAV-BTL-2L-AMB",
+            "name": "PET Bottle 2L Amber",
+            "price": 50.0,
+            "availability": "in_stock",
+            "stock_quantity": 1200,
+            "low_stock_threshold": 200,
+            "is_primary_variant": false,
+            "is_active": true
+          }}
         ],
         "entity_refs": {{"prod_2l_clr": 0, "prod_2l_amb": 1}},
         "depends_on": [0],
@@ -984,9 +1215,9 @@ clear_result = query_database(
 # Step 2: Query products with Clear color under Rs 30
 products_result = query_database(
     table="products",
-    filters={{"base_price": {"$lte": 30.0}}},
+    filters={{"price": {"$lte": 30.0}}},
     relations=["product_variant_values(variant_values(*))"],
-    columns=["id", "sku", "name", "base_price", "family_id"]
+    columns=["id", "sku", "name", "price", "product_family_id"]
 )
 # Filter results to only Clear products
 
@@ -1091,7 +1322,7 @@ My search: product_families "PET Bottles" -> Found 1 match (id: 550e8400-e29b-41
 products_result = query_database(
     table="products",
     filters={{
-        "family_id": "550e8400-e29b-41d4-a716-446655440000",
+        "product_family_id": "550e8400-e29b-41d4-a716-446655440000",
         "sku": ["PAV-BTL-250ML-CLR", "PAV-BTL-500ML-CLR", "PAV-BTL-1L-CLR"]  # List = IN operator
     }},
     columns=["id", "sku", "name", "base_price"]
@@ -1120,9 +1351,9 @@ products_result = query_database(
           "id": ["prod-uuid-250ml", "prod-uuid-500ml", "prod-uuid-1l"]
         }},
         "field_updates": [
-          {{"id": "prod-uuid-250ml", "base_price": 18.0}},
-          {{"id": "prod-uuid-500ml", "base_price": 28.0}},
-          {{"id": "prod-uuid-1l", "base_price": 35.0}}
+          {{"id": "prod-uuid-250ml", "price": 18.0}},
+          {{"id": "prod-uuid-500ml", "price": 28.0}},
+          {{"id": "prod-uuid-1l", "price": 35.0}}
         ],
         "expected_count": 3,
         "description": "Update prices for 3 PET Bottle products"
@@ -1175,16 +1406,16 @@ My search: product_families "HDPE Containers" -> 1 match (id: family-uuid-3)
 count_result = query_database(
     table="products",
     filters={{
-        "family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]  # List = IN operator
+        "product_family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]  # List = IN operator
     }},
     count_only=True
 )
 # Returns total products across all 3 families in SINGLE query
 
 # ❌ WRONG: Counting one family at a time
-# count1 = query_database(table="products", filters={{"family_id": "family-uuid-1"}}, count_only=True)
-# count2 = query_database(table="products", filters={{"family_id": "family-uuid-2"}}, count_only=True)
-# count3 = query_database(table="products", filters={{"family_id": "family-uuid-3"}}, count_only=True)
+# count1 = query_database(table="products", filters={{"product_family_id": "family-uuid-1"}}, count_only=True)
+# count2 = query_database(table="products", filters={{"product_family_id": "family-uuid-2"}}, count_only=True)
+# count3 = query_database(table="products", filters={{"product_family_id": "family-uuid-3"}}, count_only=True)
 # This makes 3 queries when 1 bulk query would work!
 
 # Step 2: Cascade deletion plan for all 3 families
@@ -1202,14 +1433,14 @@ count_result = query_database(
       {{
         "operation_type": "delete",
         "table": "product_variant_values",
-        "delete_filter": {{"family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]}},
+        "delete_filter": {{"product_family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]}},
         "expected_count": 64,
         "description": "Delete product_variant_values links for 32 products"
       }},
       {{
         "operation_type": "delete",
         "table": "products",
-        "delete_filter": {{"family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]}},
+        "delete_filter": {{"product_family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]}},
         "expected_count": 32,
         "description": "Delete 32 products across 3 families",
         "depends_on": []
@@ -1225,7 +1456,7 @@ count_result = query_database(
       {{
         "operation_type": "delete",
         "table": "variant_axes",
-        "delete_filter": {{"family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]}},
+        "delete_filter": {{"product_family_id": ["family-uuid-1", "family-uuid-2", "family-uuid-3"]}},
         "expected_count": 8,
         "description": "Delete variant axes for 3 families",
         "depends_on": []
@@ -1294,8 +1525,8 @@ count_result = query_database(
 **Bulk Query Patterns (CRITICAL for efficiency):**
 - ✓ Multiple IDs: `filters={{"id": [id1, id2, id3]}}` → 1 query
 - ✓ Multiple SKUs: `filters={{"sku": ["SKU1", "SKU2", "SKU3"]}}` → 1 query
-- ✓ Complex bulk: `filters={{"family_id": "uuid", "sku": ["SKU1", "SKU2"]}}` → 1 query with multiple conditions
-- ✓ Bulk counts: `filters={{"family_id": [uuid1, uuid2, uuid3]}}, count_only=True` → 1 query for total count
+- ✓ Complex bulk: `filters={{"product_family_id": "uuid", "sku": ["SKU1", "SKU2"]}}` → 1 query with multiple conditions
+- ✓ Bulk counts: `filters={{"product_family_id": [uuid1, uuid2, uuid3]}}, count_only=True` → 1 query for total count
 - ❌ Loop of queries: DO NOT query items one by one - use list filters instead
 
 **Schema Tools (use smartly):**
