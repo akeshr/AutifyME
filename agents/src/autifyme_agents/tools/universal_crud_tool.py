@@ -464,9 +464,6 @@ class OperationExecutor:
             # Auto-populate timestamp fields (created_at, updated_at) if table has them
             resolved_entity = self._populate_timestamps(table_schema, resolved_entity, is_update=False)
 
-            # Coerce float values to int for integer columns (fixes LLM JSON float notation issue)
-            resolved_entity = self._coerce_integer_types(table_schema, resolved_entity)
-
             # Validate against schema
             validation = self.validator.validate_entity(table_schema.name, resolved_entity)
             if not validation.valid:
@@ -512,9 +509,6 @@ class OperationExecutor:
 
             # Auto-populate timestamp fields
             resolved_entity = self._populate_timestamps(table_schema, resolved_entity, is_update=False)
-
-            # Coerce float values to int for integer columns (fixes LLM JSON float notation issue)
-            resolved_entity = self._coerce_integer_types(table_schema, resolved_entity)
 
             # Validate against schema
             validation = self.validator.validate_entity(table_schema.name, resolved_entity)
@@ -601,9 +595,6 @@ class OperationExecutor:
 
         # Auto-populate updated_at timestamp if table has it
         resolved_updates = self._populate_timestamps(table_schema, resolved_updates, is_update=True)
-
-        # Coerce float values to int for integer columns (fixes LLM JSON float notation issue)
-        resolved_updates = self._coerce_integer_types(table_schema, resolved_updates)
 
         # Schema-driven validation: Validate unique constraints on updates
         schema_validation = await table_schema.validate_before_update(
@@ -879,59 +870,6 @@ class OperationExecutor:
         # Auto-populate updated_at for both INSERTs and UPDATEs (if not already provided)
         if 'updated_at' in columns and 'updated_at' not in result:
             result['updated_at'] = datetime.now(UTC).isoformat()
-
-        return result
-
-    def _coerce_integer_types(
-        self, table_schema: Any, data: dict[str, Any]
-    ) -> dict[str, Any]:
-        """
-        Coerce float values to int for integer-typed columns.
-
-        When LLMs generate JSON with float notation (e.g., "sort_order": 1.0),
-        Python's JSON parser converts them to floats. PostgreSQL integer columns
-        reject float values, causing insertion failures.
-
-        This method identifies integer-typed columns from schema and converts
-        float values to int (if they represent whole numbers).
-
-        Args:
-            table_schema: Table schema metadata with column definitions
-            data: Entity data dict potentially containing float values for integer fields
-
-        Returns:
-            Data with float values converted to int for integer columns
-        """
-        result = data.copy()
-
-        # Get column definitions from schema
-        columns = table_schema.columns if hasattr(table_schema, 'columns') else {}
-
-        for column_name, column_schema in columns.items():
-            # Check if column is integer-typed and value exists in data
-            if column_name in result and hasattr(column_schema, 'type'):
-                # Handle both ColumnType enum and string values
-                if hasattr(column_schema.type, 'value'):
-                    column_type = str(column_schema.type.value).lower()
-                else:
-                    column_type = str(column_schema.type).lower()
-
-                # Coerce float to int for integer/bigint columns
-                if column_type in ('integer', 'bigint'):
-                    value = result[column_name]
-
-                    # Convert float to int if it's a whole number
-                    if isinstance(value, float):
-                        if value.is_integer():
-                            result[column_name] = int(value)
-                            logger.debug(
-                                f"Coerced float to int for {table_schema.name}.{column_name}: {value} → {int(value)}"
-                            )
-                        else:
-                            # Float with decimal part for integer column - this will fail validation
-                            logger.warning(
-                                f"Non-integer float value {value} for integer column {table_schema.name}.{column_name}"
-                            )
 
         return result
 
