@@ -55,7 +55,18 @@ class QueryDatabaseInput(BaseModel):
     )
     search_patterns: dict[str, str] | None = Field(
         default=None,
-        description="Case-insensitive pattern matching (e.g., {'name': '%bottle%', 'brand': '%acme%'}). Use % as wildcards for LIKE queries"
+        description=(
+            "Case-insensitive partial text matching using SQL ILIKE with % wildcards. "
+            "WHEN TO USE: When you need fuzzy/partial matches (user says 'bottles', 'jars', 'pet products'). "
+            "NOT FOR: Exact lookups with known IDs - use filters instead. "
+            "Wildcard patterns: "
+            "'%bottle%' = contains 'bottle' anywhere (PET Bottle, Bottle Cap, bottled water), "
+            "'bottle%' = starts with 'bottle' (Bottle Cap, Bottled Water), "
+            "'%bottle' = ends with 'bottle' (PET Bottle, Glass Bottle). "
+            "Examples: {'name': '%jar%'} finds 'PET Jars', 'Glass Jar', 'Mason Jars' | "
+            "{'brand': '%acme%', 'material': '%pet%'} finds brands/materials containing those terms. "
+            "CRITICAL: Use search_patterns for discovery/browsing, filters for specific entity retrieval."
+        )
     )
     count_only: bool = Field(
         default=False,
@@ -121,9 +132,11 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
             relations: Related tables to include using PostgREST syntax
                       (e.g., ["categories(*)", "variant_axes(variant_values(*))"])
                       Enables joining related data in single query
-            search_patterns: Case-insensitive pattern matching
-                            (e.g., {"name": "%bottle%", "brand": "%acme%"})
-                            Use % as wildcards for LIKE queries
+            search_patterns: Case-insensitive partial text matching with SQL ILIKE wildcards
+                            Use % for wildcards: '%bottle%' (contains), 'bottle%' (starts with), '%bottle' (ends with)
+                            Examples: {"name": "%jar%"} finds "PET Jars", "Glass Jar", "Mason Jars"
+                            Multi-field: {"name": "%bottle%", "material": "%pet%"} combines conditions with AND
+                            Use for discovery/browsing, NOT for exact ID lookups (use filters instead)
             count_only: If True, return count of matching rows instead of data
             limit: Maximum number of rows to return
 
@@ -142,11 +155,35 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
                 limit=10
             )
 
-            # Search for products by name pattern
+            # SEARCH PATTERNS - Partial text matching with wildcards
+
+            # Contains 'bottle' anywhere in name
             query_database(
                 table="products",
-                search_patterns={"name": "%bottle%"},
-                columns=["id", "name", "sku_code"]
+                search_patterns={"name": "%bottle%"},  # Finds: PET Bottle, Bottle Cap, bottled water
+                columns=["id", "name", "sku_code"],
+                limit=20
+            )
+
+            # Starts with 'PET'
+            query_database(
+                table="product_families",
+                search_patterns={"name": "PET%"},  # Finds: PET Bottles, PET Jars, PET Containers
+                limit=10
+            )
+
+            # Ends with 'Jar'
+            query_database(
+                table="product_families",
+                search_patterns={"name": "%Jar"},  # Finds: PET Jar, Glass Jar, Mason Jar
+                limit=10
+            )
+
+            # Multi-field search (combines with AND)
+            query_database(
+                table="products",
+                search_patterns={"name": "%bottle%", "material": "%pet%"},  # PET bottles only
+                columns=["id", "name", "material"]
             )
 
             # Count products in a family (using UUID from PM delegation)
@@ -170,11 +207,29 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
                 relations=["variant_axes(variant_values(*))", "products(*)"]
             )
 
-            # BAD - Empty filters when you have specific criteria
-            # ❌ query_database(table="product_families", filters={}, relations=["variant_axes(*)"])
-            # This returns ALL families - use filters with UUID or search_patterns instead
-            # ✓ filters={"id": "550e8400-e29b-41d4-a716-446655440000"}
-            # ✓ search_patterns={"name": "%bottle%"}
+            # FILTERS vs SEARCH_PATTERNS - When to use which
+
+            # ✓ CORRECT: Use filters when you have specific ID from PM
+            query_database(
+                table="product_families",
+                filters={"id": "550e8400-e29b-41d4-a716-446655440000"},
+                relations=["variant_axes(variant_values(*))"]
+            )
+
+            # ✓ CORRECT: Use search_patterns when user says "show me bottles"
+            query_database(
+                table="product_families",
+                search_patterns={"name": "%bottle%"},
+                limit=10
+            )
+
+            # ❌ BAD: Empty filters when you have specific criteria
+            # query_database(table="product_families", filters={}, relations=["variant_axes(*)"])
+            # This returns ALL families - inefficient!
+
+            # ❌ BAD: Using search_patterns when you have exact UUID
+            # query_database(table="product_families", search_patterns={"id": "%550e8400%"})
+            # UUIDs are exact - use filters={"id": "..."} instead
         """
         try:
             logger.info(

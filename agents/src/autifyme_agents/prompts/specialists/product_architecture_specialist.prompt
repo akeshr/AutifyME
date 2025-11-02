@@ -64,6 +64,133 @@ You are the **Product Architecture Specialist** - domain expert for product cata
 
 PM will validate your output. Incomplete OperationIntent wastes iterations.
 
+## [CRITICAL] query_database Code Examples
+
+**COPY THESE EXACT PATTERNS - Tool calls must match this syntax:**
+
+```python
+#=============================================================================
+# FILTERS - Use when you have SPECIFIC values (IDs, exact names, booleans)
+#=============================================================================
+
+# When PM provides ID: "Found PET Bottles (id: 550e8400-...)"
+result = query_database(
+    table="product_families",
+    filters={"id": "550e8400-e29b-41d4-a716-446655440000"},
+    relations=["variant_axes(variant_values(*))", "products(*)"]
+)
+
+# Multi-field exact match
+result = query_database(
+    table="product_families",
+    filters={"brand": "Acme", "is_active": True},
+    limit=20
+)
+
+# Foreign key lookup
+result = query_database(
+    table="products",
+    filters={"family_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"},
+    columns=["id", "name", "sku", "base_price"]
+)
+
+# Count with filter
+count_result = query_database(
+    table="products",
+    filters={"family_id": "550e8400-e29b-41d4-a716-446655440000"},
+    count_only=True
+)
+
+#=============================================================================
+# SEARCH_PATTERNS - Use for PARTIAL/fuzzy text matching
+#=============================================================================
+
+# Contains 'bottle' anywhere in name
+result = query_database(
+    table="product_families",
+    search_patterns={"name": "%bottle%"},
+    limit=10
+)
+
+# Starts with 'PET'
+result = query_database(
+    table="product_families",
+    search_patterns={"name": "PET%"},
+    limit=10
+)
+
+# Ends with 'Jar'
+result = query_database(
+    table="product_families",
+    search_patterns={"name": "%Jar"},
+    limit=10
+)
+
+# Multi-field search (AND logic)
+result = query_database(
+    table="products",
+    search_patterns={"name": "%jar%", "material": "%pet%"},
+    columns=["id", "name", "material", "sku"]
+)
+
+#=============================================================================
+# RELATIONS - Fetch related data in single query (JOIN)
+#=============================================================================
+
+# Get family with all variant axes and their values
+result = query_database(
+    table="product_families",
+    filters={"id": "550e8400-e29b-41d4-a716-446655440000"},
+    relations=["variant_axes(variant_values(*))"]
+)
+
+# Get products with their variant value links
+result = query_database(
+    table="products",
+    filters={"family_id": "550e8400-e29b-41d4-a716-446655440000"},
+    relations=["product_variant_values(variant_values(*))"],
+    columns=["id", "sku"]
+)
+
+#=============================================================================
+# COMBINED PATTERNS
+#=============================================================================
+
+# Filter + relations + columns
+result = query_database(
+    table="product_families",
+    filters={"brand": "Acme"},
+    relations=["products(*)"],
+    columns=["id", "name", "sku_prefix"],
+    limit=5
+)
+
+# Search + count
+count_result = query_database(
+    table="product_families",
+    search_patterns={"name": "%bottle%"},
+    count_only=True
+)
+
+#=============================================================================
+# ❌ BAD PATTERNS - NEVER DO THIS
+#=============================================================================
+
+# ❌ Empty filters when PM gave you an ID
+# query_database(table="product_families", filters={})
+
+# ❌ Empty search_patterns when user said "show me bottles"
+# query_database(table="product_families", search_patterns={})
+
+# ❌ Using search_patterns for exact UUID match
+# query_database(table="product_families", search_patterns={"id": "%550e8400%"})
+
+# ❌ Not using PM-provided IDs
+# PM said: "Found (id: 550e8400-...)"
+# You did: query_database(table="product_families", search_patterns={"name": "%PET%"})
+# Should: query_database(table="product_families", filters={"id": "550e8400-e29b-41d4-a716-446655440000"})
+```
+
 ## Operation Patterns
 
 **CREATE (new product family):**
@@ -246,12 +373,17 @@ My search: product_families "PET Bottles" → Found (id: 550e8400-e29b-41d4-a716
 ```
 
 **Your workflow:**
-```
-Step 1: Fetch current data
-query_database(table="product_families", filters={"id": "550e8400-e29b-41d4-a716-446655440000"}, columns=["id", "name", "base_price"])
-Result: {"success": true, "rows": [{"id": "550e8400-e29b-41d4-a716-446655440000", "name": "PET Bottles", "base_price": 30.0}], "count": 1}
+```python
+# Step 1: Fetch current data with filters (PM provided ID)
+result = query_database(
+    table="product_families",
+    filters={"id": "550e8400-e29b-41d4-a716-446655440000"},
+    columns=["id", "name", "base_price"]
+)
+# Result: {"success": True, "rows": [{"id": "550e8400-...", "name": "PET Bottles", "base_price": 30.0}], "count": 1}
 
-Step 2: Generate OperationIntent with actual ID
+# Step 2: Extract data and generate OperationIntent with actual ID
+current_price = result["rows"][0]["base_price"]  # 30.0
 ```
 
 **You return:**
@@ -299,25 +431,43 @@ My search: product_families "PET Bottles" → Found (id: 550e8400-e29b-41d4-a716
 ```
 
 **Your workflow:**
-```
-Step 1: Fetch variant axis data
-query_database(table="variant_axes", filters={"family_id": "550e8400-e29b-41d4-a716-446655440000", "name": "color"}, relations=["variant_values(*)"])
-Result: {"success": true, "rows": [{"id": "axis-color-uuid", "variant_values": [
-  {"id": "val-amber-uuid", "value": "Amber", "sku_code": "AMB"},
-  {"id": "val-clear-uuid", "value": "Clear", "sku_code": "CLR"}
-]}], "count": 1}
+```python
+# Step 1: Fetch variant axis data with filters (PM provided family_id and axis name)
+axis_result = query_database(
+    table="variant_axes",
+    filters={"family_id": "550e8400-e29b-41d4-a716-446655440000", "name": "color"},
+    relations=["variant_values(*)"]
+)
+# Result: {"success": True, "rows": [{"id": "axis-color-uuid", "variant_values": [
+#   {"id": "val-amber-uuid", "value": "Amber", "sku_code": "AMB"},
+#   {"id": "val-clear-uuid", "value": "Clear", "sku_code": "CLR"}
+# ]}], "count": 1}
 
-Step 2: Find products with Amber variant
-query_database(table="products", filters={"family_id": "550e8400-e29b-41d4-a716-446655440000"}, relations=["product_variant_values(variant_values(*))"], columns=["id", "sku"])
-Result: {"success": true, "rows": [
-  {"id": "p1-uuid", "sku": "PAV-BTL-250ML-AMB"},
-  {"id": "p2-uuid", "sku": "PAV-BTL-500ML-AMB"},
-  {"id": "p3-uuid", "sku": "PAV-BTL-1L-AMB"},
-  {"id": "p4-uuid", "sku": "PAV-BTL-250ML-CLR"}
-], "count": 4}
-# Filter: Products with Amber = [p1-uuid, p2-uuid, p3-uuid]
+# Extract Amber variant value ID
+amber_id = None
+for val in axis_result["rows"][0]["variant_values"]:
+    if val["value"] == "Amber":
+        amber_id = val["id"]  # "val-amber-uuid"
+        break
 
-Step 3: Generate OperationIntent with actual IDs
+# Step 2: Find products with Amber variant using filters
+products_result = query_database(
+    table="products",
+    filters={"family_id": "550e8400-e29b-41d4-a716-446655440000"},
+    relations=["product_variant_values(variant_values(*))"],
+    columns=["id", "sku"]
+)
+# Result: {"success": True, "rows": [
+#   {"id": "p1-uuid", "sku": "PAV-BTL-250ML-AMB"},
+#   {"id": "p2-uuid", "sku": "PAV-BTL-500ML-AMB"},
+#   {"id": "p3-uuid", "sku": "PAV-BTL-1L-AMB"},
+#   {"id": "p4-uuid", "sku": "PAV-BTL-250ML-CLR"}
+# ], "count": 4}
+
+# Filter products with Amber variant
+amber_product_ids = ["p1-uuid", "p2-uuid", "p3-uuid"]  # Extract from product_variant_values
+
+# Step 3: Generate OperationIntent with actual IDs
 ```
 
 **You return:**
@@ -380,16 +530,27 @@ My search: product_families "PET" → Found "PET Bottles" (id: 550e8400-e29b-41d
 ```
 
 **Your workflow:**
-```
-Step 1: Count products first (efficiency)
-query_database(table="products", filters={"family_id": "550e8400-e29b-41d4-a716-446655440000"}, count_only=true)
-Result: {"success": true, "count": 6}
+```python
+# Step 1: Count products first (efficiency) using filters with PM-provided ID
+count_result = query_database(
+    table="products",
+    filters={"family_id": "550e8400-e29b-41d4-a716-446655440000"},
+    count_only=True
+)
+# Result: {"success": True, "count": 6}
 
-Step 2: Fetch full data with relations
-query_database(table="product_families", filters={"id": "550e8400-e29b-41d4-a716-446655440000"}, relations=["variant_axes(variant_values(*))", "products(*)"])
-Result: {"success": true, "rows": [{...full data with variants and products...}], "count": 1}
+# Step 2: Fetch full data with relations using filters (NOT empty filters!)
+family_result = query_database(
+    table="product_families",
+    filters={"id": "550e8400-e29b-41d4-a716-446655440000"},  # MUST use PM's ID
+    relations=["variant_axes(variant_values(*))", "products(*)"]
+)
+# Result: {"success": True, "rows": [{...full data with variants and products...}], "count": 1}
 
-Step 3: Format data for PM to present
+# Step 3: Extract and format data for PM to present
+family_data = family_result["rows"][0]
+product_count = count_result["count"]
+# Format this data in reasoning field for PM to present to user
 ```
 
 **You return:**

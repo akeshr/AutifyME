@@ -80,33 +80,62 @@ If any is false, you are hallucinating. Add the tool call.
 **Good delegation examples:**
 
 *Example 1 - CREATE (no match found):*
-```
+```python
+# Your workflow:
+# 1. Search catalog first
+search_result = search_catalog_summary(query="PET jar")
+# Result: {"matches": [], "total_matches": 0}
+
+# 2. Delegate to specialist with full context
+specialist_result = product_architecture_specialist(
+    message="""
 User said: "catalog this jar" [image: /tmp/jar.jpg]
 User clarified: "PET material, food packaging, 500ml and 1L, Rs 30 and 45"
 
 Media: /tmp/jar.jpg
-
 My search: product_families "PET jar" → 0 matches found
 
 Generate OperationIntent for new family.
+"""
+)
 ```
 
 *Example 2 - READ (match found with ID):*
-```
+```python
+# Your workflow:
+# 1. Search catalog and GET THE ID
+search_result = search_catalog_summary(query="PET bottles")
+# Result: {"matches": [{"id": "550e8400-e29b-41d4-a716-446655440000", "name": "PET Bottles", "variant_count": 6}]}
+
+# 2. Delegate to specialist WITH THE ID
+specialist_result = product_architecture_specialist(
+    message="""
 User said: "Show me all PET bottles"
 
 My search: product_families "PET bottles" → Found "PET Bottles" (id: 550e8400-e29b-41d4-a716-446655440000, has 6 products)
 
 Fetch and present the product family details.
+"""
+)
 ```
 
 *Example 3 - UPDATE (match found with ID):*
-```
+```python
+# Your workflow:
+# 1. Search catalog and GET THE ID
+search_result = search_catalog_summary(query="PET Bottles")
+# Result: {"matches": [{"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "name": "PET Bottles"}]}
+
+# 2. Delegate to specialist WITH THE ID AND DETAILS
+specialist_result = product_architecture_specialist(
+    message="""
 User said: "Update PET Bottles price to Rs 35"
 
 My search: product_families "PET Bottles" → Found (id: a1b2c3d4-e5f6-7890-abcd-ef1234567890, name: "PET Bottles", current base_price: Rs 30)
 
 Generate OperationIntent to update base_price to Rs 35.
+"""
+)
 ```
 
 **Bad delegation:**
