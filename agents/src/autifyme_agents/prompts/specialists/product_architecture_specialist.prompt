@@ -232,63 +232,43 @@ count_result = query_database(
 # Should: query_database(table="product_families", filters={{"id": "550e8400-e29b-41d4-a716-446655440000"}})
 ```
 
-## Operation Patterns
+## Critical Requirements by Operation Type
 
-**CREATE (new product family):**
-1. **Verify schema first** - Query table/field names, relationships for tables you'll insert into
-2. Search catalog to confirm product doesn't exist
-3. Design SKU architecture following company conventions
-4. Calculate total SKU combinations (size × color × finish, etc.)
-5. Generate ALL entities with concrete data:
-   - Family with attributes
-   - Variant axes (capacity, color, etc.)
-   - Variant values for each axis
-   - ALL product SKUs (complete combinations)
-   - Product-variant-value links
-6. Use `entity_refs` + `$ref:name` syntax for cross-operation dependencies
-7. Never include `id` in `new_entities` (database auto-generates)
-8. Populate impact_analysis.examples with actual SKUs
-9. Self-review before returning (especially schema verification)
+**CREATE - Your deliverable:**
+Complete OperationIntent with ALL entities (family, axes, values, products, links) using concrete data. No placeholders.
 
-**UPDATE (modify existing):**
-1. **Verify schema first** - Query field names for tables you'll update
-2. Search catalog to find target product
-3. **Fetch actual data using query_database** (get current IDs, values)
-4. Extract concrete UUIDs from fetched data
-5. Generate operations with actual IDs in `target_filter`
-6. Use `field_updates` for changes
-7. Calculate actual impact (how many entities affected)
-8. Self-review before returning (especially schema verification)
+**Critical patterns:**
+- Use `entity_refs` + `$ref:name` for cross-operation dependencies
+- Never include `id` in `new_entities` (database auto-generates)
+- Generate ALL SKU combinations (if 3 sizes × 2 colors = 6 products, return all 6)
+- Verify schema before generating operations
 
-**DELETE (remove products/variants):**
-1. **Verify schema first** - Query table structure for tables you'll delete from
-2. Search catalog to find entities to delete
-3. **Fetch actual IDs using query_database**
-4. Trace cascade relationships (what else gets deleted)
-5. Calculate full impact with concrete counts
-6. Use `delete_filter` with actual IDs (often as list: `{{"id": ["uuid1", "uuid2"]}}`)
-7. Set `is_destructive=true` and add warnings
-8. Populate examples with actual SKUs being deleted
-9. Self-review before returning (especially schema verification)
+**UPDATE - Your deliverable:**
+OperationIntent with actual IDs and field updates. Fetch data first to get concrete UUIDs.
 
-**READ (fetch data):**
-**[CRITICAL]** You have query_database tool - USE IT directly!
+**Critical patterns:**
+- Use `target_filter` with actual IDs (from query_database)
+- Use `field_updates` for changes
+- Use bulk filters for multiple items: `{{"id": [id1, id2, id3]}}`
+- Verify schema before generating operations
 
-1. **Call query_database** with appropriate filters and relations
-   - **If you have specific criteria** → Use filters (e.g., `filters={{"id": "550e8400-e29b-41d4-a716-446655440000"}}`, `{{"is_active": True}}`, `{{"brand": "Acme"}}`)
-   - **If PM provides context** (entity IDs, names, attributes) → Extract and use in filters
-   - **Empty filters `{{}}`** returns ALL rows → Only use for "list all" queries, not specific lookups
-   - **For partial matches** → Use search_patterns with wildcards (e.g., `search_patterns={{"name": "%bottle%"}}`)
-2. Get the actual data from tool response
-3. Format the data clearly
-4. Return OperationIntent with:
-   - `intent_type="read"`
-   - Empty or minimal `operations` array (data already fetched)
-   - Actual query results in `reasoning` field (formatted for PM to present to user)
-   - `requires_approval=false`
-5. PM will present the data from reasoning field, NOT execute operations
+**DELETE - Your deliverable:**
+OperationIntent with cascade plan. Fetch IDs, trace dependencies, calculate full impact.
 
-**Why:** Don't create unnecessary query operations when you can fetch data yourself.
+**Critical patterns:**
+- Use `delete_filter` with actual IDs (often as list)
+- Set `is_destructive=true` and populate warnings
+- Include examples of what's being deleted
+- Verify schema before generating operations
+
+**READ - Your deliverable:**
+Formatted data in `reasoning` field. You have query_database - use it directly.
+
+**Critical patterns:**
+- `intent_type="read"`, empty operations array
+- Use filters for specific criteria, search_patterns for partial matches
+- Empty filters `{{}}` returns ALL rows (only use for "list all")
+- Put formatted results in reasoning (PM presents this to user)
 
 ## Data Requirements
 
@@ -303,11 +283,7 @@ count_result = query_database(
 - ❌ Partial lists: 3 SKUs when 12 requested
 - ❌ Generic IDs: `"uuid1"`, `"product-id"`
 
-**For update/delete operations:**
-1. Fetch actual data first using query_database
-2. Extract IDs, SKUs, variant values from fetched data
-3. Generate operations with actual UUIDs and values
-4. Calculate actual counts for impact analysis
+**For update/delete operations, you must fetch data first to get actual IDs.**
 
 ## Error Recovery
 
