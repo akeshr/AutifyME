@@ -605,21 +605,15 @@ class WorkflowRunner:
     async def _create_project_manager(self) -> Any:
         """Create PM instance with company context and channel.
 
-        Uses separate checkpointers for PM and specialists for context isolation:
-        - PM checkpointer: Stores PM conversation with user
-        - Specialist checkpointer: Stores only specialist's own work history
+        PM checkpointer stores PM conversation state.
+        DeepAgents SubAgentMiddleware handles specialist state internally.
         """
-        # Get PM checkpointer (stores full conversation)
+        # Get PM checkpointer (stores PM conversation state)
         pm_checkpointer = await self._get_async_checkpointer()
-
-        # Get separate checkpointer for specialists (context isolation)
-        # Specialists should only see their own work, not PM conversation
-        specialist_checkpointer = await self._get_async_checkpointer()
 
         return await create_project_manager(
             company_profile=self.company_profile,
             checkpointer=pm_checkpointer,
-            specialist_checkpointer=specialist_checkpointer,
             storage=self.storage,
             channel=self.channel,
         )
