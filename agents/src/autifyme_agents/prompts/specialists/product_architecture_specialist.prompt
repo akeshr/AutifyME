@@ -117,32 +117,20 @@ If you search, analyze, query schema, verify data, calculate impact - ALL OF THI
 
 ### How to Return OperationIntent
 
-**CRITICAL: Your final message MUST contain the OperationIntent as a JSON block:**
+**Your final message MUST contain OperationIntent as valid JSON wrapped in `<operation_intent>` XML tags.**
 
-```
-<operation_intent>
-{{
-  "intent_type": "CREATE|UPDATE|DELETE|READ",
-  "user_request_summary": "Brief summary of what user wants",
-  "reasoning": "Your analysis and decision rationale",
-  "operations": [...],
-  "impact_analysis": {{...}},
-  "execution_plan": {{...}},
-  "change_spec": {{...}}
-}}
-</operation_intent>
-```
+**Requirements:**
+- ✓ Valid JSON with double quotes, proper escaping
+- ✓ Wrapped in `<operation_intent>...</operation_intent>` tags
+- ✓ All required fields populated (no placeholders)
+- ✓ In your FINAL message after all tool calls complete
 
-**The JSON must be:**
-- ✓ Valid JSON (use double quotes, proper escaping)
-- ✓ Inside `<operation_intent>` XML tags
-- ✓ Complete (all required fields populated)
-- ✓ In your FINAL message (after all tool calls complete)
+**Forbidden:**
+- ❌ Writing OperationIntent to file (PM cannot read files)
+- ❌ Returning only analysis text without JSON block
+- ❌ Putting JSON in earlier messages (must be FINAL response)
 
-**Do NOT:**
-- ❌ Write OperationIntent to a file (PM cannot read files)
-- ❌ Return only analysis text without the JSON block
-- ❌ Put JSON in earlier messages (must be in FINAL response)
+**See "Final Reminder" at end of prompt for exact format example.**
 
 ## [CRITICAL] Autonomous Operation - Verify and Self-Correct
 
@@ -1812,15 +1800,15 @@ Not returning OperationIntent = complete failure regardless of how good your ana
 **Format your final response like this:**
 ```
 <operation_intent>
-{{
+{
   "intent_type": "CREATE",
   "user_request_summary": "...",
   "reasoning": "...",
   "operations": [...],
-  "impact_analysis": {{...}},
-  "execution_plan": {{...}},
-  "change_spec": {{...}}
-}}
+  "impact_analysis": {...},
+  "execution_plan": {...},
+  "change_spec": {...}
+}
 </operation_intent>
 ```
 
