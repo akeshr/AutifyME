@@ -322,7 +322,6 @@ async def save_domain_entity_atomic(storage, entity_input):
 ```
 prompts/
 ├── project_manager.prompt          # Main PM (generic, all workflows)
-├── basic_project_manager.prompt    # Legacy cataloging PM
 └── specialists/
     ├── taxonomy_specialist.prompt
     ├── market_intelligence_specialist.prompt
@@ -635,8 +634,7 @@ Before finalizing domain design, validate:
 ```
 agents/src/autifyme_agents/
 ├── workflows/
-│   ├── project_manager.py              # Generic PM (reference)
-│   └── basic_project_manager.py        # Legacy (for comparison)
+│   └── project_manager.py              # Generic PM (all workflows)
 ├── specialists/
 │   ├── product_architecture_specialist.py
 │   ├── taxonomy_specialist.py
