@@ -132,6 +132,20 @@
           "max_length": 255,
           "nullable": true,
           "description": "User/agent identifier"
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": true,
+          "description": "User/agent who last updated this record"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Soft delete flag - false means deactivated"
         }
       },
       "primary_key": "id",
@@ -191,6 +205,13 @@
           "nullable": false,
           "default": "now()",
           "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
         }
       },
       "primary_key": "id",
@@ -293,6 +314,20 @@
           "nullable": false,
           "default": "now()",
           "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Soft delete flag - false means deactivated"
         }
       },
       "primary_key": "id",
@@ -427,6 +462,13 @@
           "nullable": false,
           "default": "now()",
           "description": "Last update timestamp"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Soft delete flag - false means deactivated"
         }
       },
       "primary_key": "id",
@@ -475,6 +517,13 @@
           "nullable": false,
           "default": "now()",
           "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
         }
       },
       "primary_key": "id",
@@ -535,7 +584,8 @@
         "industry_benefits": {
           "name": "industry_benefits",
           "type": "array",
-          "nullable": true,
+          "nullable": false,
+          "default": "'{}'::text[]",
           "description": "Array of benefit strings"
         },
         "compliance_notes": {
@@ -547,7 +597,7 @@
         "is_primary_industry": {
           "name": "is_primary_industry",
           "type": "boolean",
-          "nullable": false,
+          "nullable": true,
           "default": "false",
           "description": "Main target industry. CONSTRAINT: Only one industry per family can have is_primary_industry=true (enforced by partial unique index)."
         },
@@ -557,6 +607,13 @@
           "nullable": false,
           "default": "now()",
           "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
         }
       },
       "primary_key": "id",
@@ -588,9 +645,9 @@
         "product_family_id": {
           "name": "product_family_id",
           "type": "uuid",
-          "nullable": false,
+          "nullable": true,
           "references": "product_families.id",
-          "description": "Product family reference"
+          "description": "Product family reference (null for campaign-level segments)"
         },
         "segment_type": {
           "name": "segment_type",
@@ -616,25 +673,29 @@
         "key_benefits": {
           "name": "key_benefits",
           "type": "array",
-          "nullable": true,
+          "nullable": false,
+          "default": "'{}'::text[]",
           "description": "Array of benefit strings"
         },
         "pain_points": {
           "name": "pain_points",
           "type": "array",
-          "nullable": true,
+          "nullable": false,
+          "default": "'{}'::text[]",
           "description": "Array of pain point strings"
         },
         "primary_channels": {
           "name": "primary_channels",
           "type": "array",
-          "nullable": true,
+          "nullable": false,
+          "default": "'{}'::text[]",
           "description": "Array of channel names"
         },
         "content_formats": {
           "name": "content_formats",
           "type": "array",
-          "nullable": true,
+          "nullable": false,
+          "default": "'{}'::text[]",
           "description": "Array of format strings"
         },
         "pricing_notes": {
@@ -649,6 +710,20 @@
           "nullable": false,
           "default": "now()",
           "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "campaigns.id",
+          "description": "Campaign reference for campaign-specific segments"
         }
       },
       "primary_key": "id",
@@ -680,9 +755,16 @@
         "product_family_id": {
           "name": "product_family_id",
           "type": "uuid",
-          "nullable": false,
+          "nullable": true,
           "references": "product_families.id",
-          "description": "Product family reference"
+          "description": "Product family reference (null for product-specific images)"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "products.id",
+          "description": "Product reference (null for family-level images)"
         },
         "url": {
           "name": "url",
@@ -727,7 +809,7 @@
         },
         "file_size_bytes": {
           "name": "file_size_bytes",
-          "type": "bigint",
+          "type": "integer",
           "nullable": true,
           "description": "File size in bytes"
         },
@@ -741,16 +823,9 @@
         "is_primary": {
           "name": "is_primary",
           "type": "boolean",
-          "nullable": false,
+          "nullable": true,
           "default": "false",
           "description": "Hero image"
-        },
-        "for_sku": {
-          "name": "for_sku",
-          "type": "varchar",
-          "max_length": 255,
-          "nullable": true,
-          "description": "SKU-specific image (null = family-level)"
         },
         "created_at": {
           "name": "created_at",
@@ -758,6 +833,13 @@
           "nullable": false,
           "default": "now()",
           "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
         }
       },
       "primary_key": "id",
@@ -769,11 +851,20 @@
           "target_column": "id",
           "cascade_delete": true,
           "cascade_update": false,
-          "description": "Images belong to product family"
+          "description": "Images can belong to product family (family-level images)"
+        },
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Images can belong to specific product (product-level images)"
         }
       ],
       "business_rules": [],
-      "indexes": ["product_family_id", "for_sku"]
+      "indexes": ["product_family_id", "product_id"]
     },
     "marketing_content": {
       "name": "marketing_content",
@@ -789,9 +880,30 @@
         "product_family_id": {
           "name": "product_family_id",
           "type": "uuid",
-          "nullable": false,
+          "nullable": true,
           "references": "product_families.id",
-          "description": "Product family reference"
+          "description": "Product family reference (null for campaign-level content)"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "products.id",
+          "description": "Product reference (null for family-level content)"
+        },
+        "customer_segment_id": {
+          "name": "customer_segment_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "customer_segments.id",
+          "description": "Customer segment reference (null for non-segmented content)"
+        },
+        "industry_naics_code": {
+          "name": "industry_naics_code",
+          "type": "varchar",
+          "max_length": 10,
+          "nullable": true,
+          "description": "Industry-specific content (NAICS code)"
         },
         "platform": {
           "name": "platform",
@@ -817,18 +929,21 @@
           "name": "content_metadata",
           "type": "jsonb",
           "nullable": true,
+          "default": "'{}'::jsonb",
           "description": "Platform-specific metadata"
         },
         "hashtags": {
           "name": "hashtags",
           "type": "array",
           "nullable": true,
+          "default": "'{}'::text[]",
           "description": "Array of hashtag strings"
         },
         "keywords": {
           "name": "keywords",
           "type": "array",
           "nullable": true,
+          "default": "'{}'::text[]",
           "description": "Array of keyword strings"
         },
         "meta_title": {
@@ -845,26 +960,54 @@
           "nullable": true,
           "description": "Meta description for SEO"
         },
-        "for_sku": {
-          "name": "for_sku",
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "default": "1",
+          "description": "Content version number for tracking revisions"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": true,
+          "default": "true",
+          "description": "Soft delete flag - false means deactivated"
+        },
+        "impressions": {
+          "name": "impressions",
+          "type": "integer",
+          "nullable": true,
+          "default": "0",
+          "description": "Number of times content was displayed"
+        },
+        "clicks": {
+          "name": "clicks",
+          "type": "integer",
+          "nullable": true,
+          "default": "0",
+          "description": "Number of clicks on content"
+        },
+        "conversions": {
+          "name": "conversions",
+          "type": "integer",
+          "nullable": true,
+          "default": "0",
+          "description": "Number of conversions attributed to content"
+        },
+        "generated_by": {
+          "name": "generated_by",
           "type": "varchar",
           "max_length": 255,
           "nullable": true,
-          "description": "SKU-specific content (null = family-level)"
+          "description": "AI agent or system that generated this content"
         },
-        "for_customer_segment": {
-          "name": "for_customer_segment",
+        "generation_prompt_version": {
+          "name": "generation_prompt_version",
           "type": "varchar",
-          "max_length": 50,
+          "max_length": 255,
           "nullable": true,
-          "description": "Segment-specific content"
-        },
-        "for_industry": {
-          "name": "for_industry",
-          "type": "varchar",
-          "max_length": 10,
-          "nullable": true,
-          "description": "Industry-specific content (NAICS code)"
+          "description": "Version of prompt template used for AI generation"
         },
         "created_at": {
           "name": "created_at",
@@ -872,6 +1015,33 @@
           "nullable": false,
           "default": "now()",
           "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "When content was published/activated"
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "campaigns.id",
+          "description": "Campaign reference for campaign-specific content"
+        },
+        "campaign_asset_id": {
+          "name": "campaign_asset_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "campaign_assets.id",
+          "description": "Campaign asset reference linking to specific assets"
         }
       },
       "primary_key": "id",
@@ -883,11 +1053,47 @@
           "target_column": "id",
           "cascade_delete": true,
           "cascade_update": false,
-          "description": "Content belongs to product family"
+          "description": "Content can belong to product family (family-level content)"
+        },
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Content can belong to specific product (product-level content)"
+        },
+        {
+          "type": "parent",
+          "target_table": "customer_segments",
+          "foreign_key": "customer_segment_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Content can target specific customer segment"
+        },
+        {
+          "type": "parent",
+          "target_table": "campaigns",
+          "foreign_key": "campaign_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Content can belong to marketing campaign"
+        },
+        {
+          "type": "parent",
+          "target_table": "campaign_assets",
+          "foreign_key": "campaign_asset_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Content can link to campaign asset"
         }
       ],
       "business_rules": [],
-      "indexes": ["product_family_id", "platform", "for_sku"]
+      "indexes": ["product_family_id", "product_id", "platform", "campaign_id"]
     }
   }
 }
