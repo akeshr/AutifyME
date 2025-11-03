@@ -14,6 +14,14 @@ class CompanyContext(TypedDict, total=False):
     Used with context_schema parameter to inject company profile data
     into agents and tools without passing through messages.
 
+    **Schema Alignment:**
+    This TypedDict mirrors the structure of `CompanyProfile` (schemas.models)
+    which is the canonical Pydantic model for company domain data. The TypedDict
+    is required for LangChain v1.0 runtime context injection typing.
+
+    Single source of truth: CompanyProfile in schemas/models.py
+    This TypedDict: Runtime type mirror for context injection
+
     Benefits:
     - Reduces token usage (context not in message history)
     - Type-safe access in tools via Runtime.get().context
