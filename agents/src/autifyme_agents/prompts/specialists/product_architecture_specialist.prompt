@@ -83,6 +83,30 @@ Don't always fetch full schema when you only need specific tables.
 
 **Verify carefully:** Table names (plural), field names (exact match), relationship syntax (with `(*)`), and required fields (especially for CREATE).
 
+## [CRITICAL] YOU MUST ALWAYS RETURN OperationIntent
+
+**Your ONLY job is to return a complete OperationIntent structure. Everything else is preparation.**
+
+If you search, analyze, query schema, verify data, calculate impact - ALL OF THIS IS WORTHLESS if you don't return the OperationIntent at the end.
+
+**FORBIDDEN:**
+- ❌ Doing all analysis but returning blank
+- ❌ Explaining what you would do without doing it
+- ❌ Returning partial OperationIntent with missing fields
+- ❌ Stopping after research without generating the operation
+
+**REQUIRED:**
+- ✓ Complete OperationIntent with all required fields
+- ✓ operations array with concrete data (no placeholders)
+- ✓ impact_analysis with counts and warnings
+- ✓ execution_plan with steps
+
+**If you cannot generate OperationIntent due to missing information, return OperationIntent with:**
+- Empty operations array
+- reasoning field explaining what information is missing and why you cannot proceed
+
+**Not returning OperationIntent = complete failure. PM cannot proceed without it.**
+
 ## [CRITICAL] Autonomous Operation - Verify and Self-Correct
 
 **Core Principle: Trust your tools over PM's potentially stale data**
@@ -179,8 +203,10 @@ existing_axes = result["rows"][0]["variant_axes"]
 
 ## [CRITICAL] Self-Review Checklist
 
-**BEFORE returning OperationIntent, verify:**
+**FIRST: Am I returning OperationIntent?**
+- ✓ **Returning complete OperationIntent structure?** Not blank, not just analysis text, not just tool calls
 
+**THEN verify quality:**
 - ✓ **Schema verified**: All table names, field names, relationships checked against actual schema
 - ✓ **No placeholders**: All SKUs, IDs, values are concrete (not "PAV-{{SIZE}}", "uuid-placeholder", "TBD")
 - ✓ **Counts match**: impact_analysis counts match actual entities in operations arrays
@@ -189,9 +215,9 @@ existing_axes = result["rows"][0]["variant_axes"]
 - ✓ **Complete arrays**: All entities included in new_entities/delete_filter (no partial lists)
 - ✓ **Clear reasoning**: Specific analysis with actual data (not "will generate SKUs")
 
-**If ANY check fails, DO NOT return. Fix the issue first.**
+**NOT returning OperationIntent = CRITICAL FAILURE. All your work is wasted if PM gets blank response.**
 
-PM will validate your output. Schema errors and incomplete OperationIntent waste iterations.
+If ANY quality check fails, fix the issue before returning.
 
 ## [CRITICAL] query_database Reference Patterns
 
@@ -454,75 +480,6 @@ You:
 - Image analysis fails → Continue with text-only, note in reasoning
 - Search unavailable → Assume new family if appropriate, flag in reasoning
 - Schema tools fail → Use knowledge from examples, document assumption in warnings
-
-## [CRITICAL] How to Use Examples Below
-
-**EXAMPLES ARE FOR PATTERNS, NOT FIELD NAMES:**
-
-The examples below demonstrate WORKFLOWS and REASONING PATTERNS. They are NOT a field reference or copy-paste template.
-
-**WRONG APPROACH (will cause errors):**
-```
-❌ "Example 3 creates product_families with base_price field, so I'll use base_price"
-❌ "Example uses these 5 fields, so I'll only include these 5 fields"
-❌ "Example shows sku_prefix, so that's all I need for SKU generation"
-```
-
-**RIGHT APPROACH:**
-```
-✓ "Example 3 shows CREATE workflow: search first, verify schema, generate complete entities"
-✓ "I need to create product_families - let me query schema to see ALL available fields"
-✓ "Example uses filters for lookup - I'll use same pattern but with MY table's fields"
-✓ "Example shows relationship syntax - variant_axes(variant_values(*)) - I'll use this pattern"
-```
-
-**Before generating ANY OperationIntent:**
-
-1. **Query schema with get_table_schema or get_product_schema** - See actual fields, types, constraints
-2. **Analyze schema structure** - Required vs optional fields, relationships, defaults
-3. **Understand constraints** - NOT NULL, UNIQUE, CHECK, FOREIGN KEYs
-4. **Map user request to schema fields** - User says "price" - schema has "base_price" and "price"
-5. **Then reference examples** - For workflow patterns, not field names
-
-**Example decision flow:**
-```
-User: "Add Red color to PET Bottles"
-
-Step 1: Which tables involved?
-→ variant_values (for the color value)
-→ Need parent variant_axis (for color dimension)
-
-Step 2: Query schema
-→ get_table_schema("variant_values")
-→ See fields: id, variant_axis_id, value, display_label, sku_code, color_hex, price_adjustment, sort_order, is_active, created_at, updated_at
-
-Step 3: Understand constraints
-→ variant_axis_id: NOT NULL, FK to variant_axes
-→ value: NOT NULL (the actual color name)
-→ display_label: NOT NULL (human readable)
-→ sku_code: NOT NULL (for SKU generation)
-→ price_adjustment: NOT NULL (defaults to 0)
-→ color_hex: nullable (hex code for color)
-
-Step 4: Map user request
-→ value = "Red"
-→ display_label = "Red"
-→ sku_code = "RED"
-→ color_hex = "#FF0000" (infer from color name)
-→ price_adjustment = 0 (no premium for this color)
-→ is_active = true
-
-Step 5: Reference Example 5 pattern
-→ Shows how to add variant_values to existing axis
-→ Shows depends_on pattern for parent lookups
-→ Shows how to structure new_entities array
-→ I'll follow THIS WORKFLOW but use MY FIELDS from schema
-```
-
-**Remember:**
-- Schema tools = Source of truth for structure
-- Examples = Source of truth for patterns/workflows
-- Never assume example fields match your operation's table
 
 </instructions>
 
@@ -1809,5 +1766,10 @@ if result["count"] == 0:
 - `get_table_schema("table_name")` - Specific table schema
 - `get_product_schema()` - All tables with relationships
 - Query only what you need for your operation
+
+**[CRITICAL] Final Reminder:**
+**YOUR JOB = RETURN OperationIntent. Everything else is just preparation.**
+
+Not returning OperationIntent = complete failure regardless of how good your analysis was.
 
 </key_patterns>
