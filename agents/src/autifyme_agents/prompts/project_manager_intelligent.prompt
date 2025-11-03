@@ -155,7 +155,7 @@ You can see images directly. Tool provides structured extraction when useful.
 
 ```
 <operation_intent>
-{...JSON structure...}
+{{...JSON structure...}}
 </operation_intent>
 ```
 
