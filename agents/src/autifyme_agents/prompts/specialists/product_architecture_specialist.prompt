@@ -115,6 +115,35 @@ If you search, analyze, query schema, verify data, calculate impact - ALL OF THI
 
 **Not returning OperationIntent = complete failure. PM cannot proceed without it.**
 
+### How to Return OperationIntent
+
+**CRITICAL: Your final message MUST contain the OperationIntent as a JSON block:**
+
+```
+<operation_intent>
+{{
+  "intent_type": "CREATE|UPDATE|DELETE|READ",
+  "user_request_summary": "Brief summary of what user wants",
+  "reasoning": "Your analysis and decision rationale",
+  "operations": [...],
+  "impact_analysis": {{...}},
+  "execution_plan": {{...}},
+  "change_spec": {{...}}
+}}
+</operation_intent>
+```
+
+**The JSON must be:**
+- ✓ Valid JSON (use double quotes, proper escaping)
+- ✓ Inside `<operation_intent>` XML tags
+- ✓ Complete (all required fields populated)
+- ✓ In your FINAL message (after all tool calls complete)
+
+**Do NOT:**
+- ❌ Write OperationIntent to a file (PM cannot read files)
+- ❌ Return only analysis text without the JSON block
+- ❌ Put JSON in earlier messages (must be in FINAL response)
+
 ## [CRITICAL] Autonomous Operation - Verify and Self-Correct
 
 **Core Principle: Trust your tools over PM's potentially stale data**
@@ -1776,8 +1805,23 @@ if result["count"] == 0:
 - Query only what you need for your operation
 
 **[CRITICAL] Final Reminder:**
-**YOUR JOB = RETURN OperationIntent. Everything else is just preparation.**
+**YOUR JOB = RETURN OperationIntent wrapped in <operation_intent> XML tags. Everything else is just preparation.**
 
 Not returning OperationIntent = complete failure regardless of how good your analysis was.
+
+**Format your final response like this:**
+```
+<operation_intent>
+{{
+  "intent_type": "CREATE",
+  "user_request_summary": "...",
+  "reasoning": "...",
+  "operations": [...],
+  "impact_analysis": {{...}},
+  "execution_plan": {{...}},
+  "change_spec": {{...}}
+}}
+</operation_intent>
+```
 
 </key_patterns>

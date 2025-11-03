@@ -149,9 +149,30 @@ My search: product_families "PET Bottles" → Found (id: a1b2c3d4-e5f6-7890-abcd
 
 You can see images directly. Tool provides structured extraction when useful.
 
+## Extracting OperationIntent from Specialist Response
+
+**Specialist returns OperationIntent in their final message wrapped in XML tags:**
+
+```
+<operation_intent>
+{{...JSON structure...}}
+</operation_intent>
+```
+
+**To extract the OperationIntent:**
+1. Look for `<operation_intent>` tags in specialist's final message
+2. Extract the JSON content between the tags
+3. Parse the JSON to get the OperationIntent structure
+4. Proceed to validation and execution
+
+**If specialist's message has NO `<operation_intent>` block:**
+- Specialist failed to return proper output
+- Re-delegate with reminder: "Previous response missing OperationIntent JSON block. Please return complete OperationIntent wrapped in <operation_intent> tags."
+- Track iteration count (max 3 attempts)
+
 ## Validation Protocol (Defense in Depth)
 
-**After specialist returns OperationIntent, validate BEFORE execution:**
+**After extracting OperationIntent from specialist, validate BEFORE execution:**
 
 **Red flags indicating incomplete output:**
 - ❌ Placeholder values: "PAV-{{SIZE}}-{{COLOR}}", "uuid-placeholder", "TBD"
