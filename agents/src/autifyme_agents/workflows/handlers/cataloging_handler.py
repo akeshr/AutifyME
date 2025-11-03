@@ -145,10 +145,26 @@ class CatalogingWorkflowHandler:
                 )
 
                 for idx, action_req in enumerate(action_requests):
-                    # DeepAgents format: {'name': 'save_product', 'args': {...}}
+                    # DeepAgents format: {'name': 'execute_database_operation', 'args': {...}}
                     tool_name = action_req.get("name", "unknown")
                     clean_value = action_req.get("args", {})
 
+                    # Check if this is OperationIntent (execute_database_operation)
+                    if tool_name == "execute_database_operation" and 'intent_type' in clean_value and 'change_spec' in clean_value:
+                        logger.debug(
+                            "Detected OperationIntent in action_requests",
+                            extra={
+                                "thread_id": thread_id,
+                                "intent_type": clean_value.get('intent_type'),
+                                "summary": clean_value.get('user_request_summary', '')[:50]
+                            }
+                        )
+                        # Format and send OperationIntent approval
+                        approval_message = format_operation_intent_approval_message(clean_value)
+                        self.channel.send_text(sender, approval_message)
+                        return  # OperationIntent handled, exit early
+
+                    # Legacy Product approval
                     logger.debug(
                         f"Processing action_request {idx + 1} of {len(action_requests)}",
                         extra={
@@ -195,6 +211,22 @@ class CatalogingWorkflowHandler:
                         clean_value = action_request.get("args", {})
                         tool_name = action_request.get("action", "unknown")
 
+                        # Check if this is OperationIntent
+                        if tool_name == "execute_database_operation" and 'intent_type' in clean_value and 'change_spec' in clean_value:
+                            logger.debug(
+                                "Detected OperationIntent in legacy format",
+                                extra={
+                                    "thread_id": thread_id,
+                                    "intent_type": clean_value.get('intent_type'),
+                                    "summary": clean_value.get('user_request_summary', '')[:50]
+                                }
+                            )
+                            # Format and send OperationIntent approval
+                            approval_message = format_operation_intent_approval_message(clean_value)
+                            self.channel.send_text(sender, approval_message)
+                            return  # OperationIntent handled, exit early
+
+                        # Legacy Product approval
                         logger.debug(
                             f"Unwrapping action {idx + 1} of {len(interrupt_value)}",
                             extra={

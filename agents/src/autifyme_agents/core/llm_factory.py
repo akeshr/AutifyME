@@ -9,8 +9,8 @@ from langchain_openai import ChatOpenAI
 
 def get_llm(
     provider: str = "google",
-    model: str = "gemini-2.5-flash-lite",
-    temperature: float = 0.0,
+    model: str = "gemini-2.5-flash",
+    temperature: float = 0.1,
     tags: list[str] | None = None,
     reasoning_effort: str = "low",
     verbosity: str = "low",
@@ -180,7 +180,7 @@ def get_llm(
         # Gemini 2.5 has adaptive thinking enabled by default which wastes time/money
         # Set thinking_budget=0 to disable (only works for Flash/Flash-Lite, not Pro)
         if thinking_budget is None and ("flash" in model.lower()):
-            thinking_budget = 0
+            thinking_budget = 512
 
         # Add optional parameters only if provided
         if timeout is not None:

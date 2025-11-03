@@ -19,6 +19,40 @@ from autifyme_agents.schemas.models import CompanyProfile, Product
 logger = logging.getLogger(__name__)
 
 
+def _normalize_numeric_types(data: dict[str, Any] | list[dict[str, Any]]) -> dict[str, Any] | list[dict[str, Any]]:
+    """
+    Normalize whole-number floats to integers for PostgreSQL compatibility.
+
+    When LLMs generate JSON with float notation (e.g., "sort_order": 1.0),
+    Python's JSON parser creates float types. PostgreSQL integer columns
+    reject float values, causing insertion failures.
+
+    This normalizes all whole-number floats (1.0 → 1) before database insertion.
+    Handles both single entities and batches.
+
+    Args:
+        data: Single entity dict or list of entity dicts
+
+    Returns:
+        Normalized data with whole-number floats converted to ints
+    """
+    def normalize_value(value: Any) -> Any:
+        """Recursively normalize a single value."""
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        elif isinstance(value, dict):
+            return {k: normalize_value(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [normalize_value(item) for item in value]
+        else:
+            return value
+
+    if isinstance(data, list):
+        return [normalize_value(item) for item in data]
+    else:
+        return normalize_value(data)
+
+
 class SupabaseStorageClient(StorageInterface):
     """Concrete adapter that persists and retrieves catalog data via Supabase.
 
@@ -801,7 +835,9 @@ class SupabaseStorageClient(StorageInterface):
         """
         try:
             client = await self._ensure_async_client()
-            response = await client.table(table).insert(data).execute()
+            # Normalize whole-number floats to ints for PostgreSQL compatibility
+            normalized_data = _normalize_numeric_types(data)
+            response = await client.table(table).insert(normalized_data).execute()
 
             if not response.data or len(response.data) == 0:
                 raise StorageError(
@@ -855,7 +891,9 @@ class SupabaseStorageClient(StorageInterface):
 
         try:
             client = await self._ensure_async_client()
-            response = await client.table(table).insert(data).execute()
+            # Normalize whole-number floats to ints for PostgreSQL compatibility
+            normalized_data = _normalize_numeric_types(data)
+            response = await client.table(table).insert(normalized_data).execute()
 
             if not response.data:
                 raise StorageError(
@@ -910,7 +948,9 @@ class SupabaseStorageClient(StorageInterface):
         """
         try:
             client = await self._ensure_async_client()
-            query = client.table(table).update(updates)
+            # Normalize whole-number floats to ints for PostgreSQL compatibility
+            normalized_updates = _normalize_numeric_types(updates)
+            query = client.table(table).update(normalized_updates)
 
             # Apply filters with operator support
             for key, value in filters.items():

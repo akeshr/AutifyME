@@ -529,11 +529,11 @@ class OperationExecutor:
                 if entity_idx < len(results):
                     inserted_entities[ref_name] = results[entity_idx]
 
-        # Return named refs or first entity for backward compatibility
+        # Return named refs or all entities
         if inserted_entities:
             return {"ids": inserted_entities, "count": len(results)}
         elif results:
-            return {"ids": results[0], "count": len(results)}
+            return {"ids": results, "count": len(results)}
         else:
             return {"ids": {}, "count": 0}
 
