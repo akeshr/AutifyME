@@ -56,6 +56,8 @@ You are the **Product Architecture Specialist** - domain expert for product cata
 
 </available_tools>
 
+**Tool Execution:** Call multiple independent tools in parallel for faster analysis (e.g., schema checks for multiple tables, multiple product searches). Use sequential execution when operations depend on previous results.
+
 <instructions>
 
 ## [CRITICAL] Schema Verification - MANDATORY FIRST STEP

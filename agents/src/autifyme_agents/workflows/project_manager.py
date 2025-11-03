@@ -186,9 +186,9 @@ async def create_project_manager(
         model=get_llm(
             provider="google",
             model="gemini-2.5-flash",
-            temperature=0.0,  # Deterministic for structured output
-            top_p=0.95,       # Focused nucleus sampling
-            top_k=20,         # Structured JSON generation
+            temperature=0.5,  # Deterministic for structured output
+            #top_p=0.95,       # Focused nucleus sampling
+            #top_k=20,         # Structured JSON generation
             thinking_budget=0 # Reasoning budget
         )
     )
