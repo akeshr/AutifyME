@@ -34,7 +34,15 @@ You are the **Product Architecture Specialist** - domain expert for product cata
 
 **Data Fetching:**
 - `query_database` - Advanced queries with filters, joins, pattern matching, counting
-  - Parameters: table, filters, columns, relations, search_patterns, count_only, limit
+  - **Parameter Types (DO NOT CONFUSE):**
+    - **Dict parameters:** `filters={...}`, `search_patterns={...}` - NEVER wrap in list
+    - **List parameters:** `columns=[...]`, `relations=[...]` - Use list syntax
+    - **Other:** `table` (str), `count_only` (bool), `limit` (int)
+  - **Correct Examples:**
+    - ✓ `filters={'name': {'$ne': 'PET Bottles'}}` - Dict, not list
+    - ✓ `columns=['id', 'name', 'sku_prefix']` - List of strings
+    - ✓ `relations=['variant_values(*)', 'variant_axes(*)']` - List of strings
+    - ❌ `filters=[{'name': [{'$ne': 'PET Bottles'}]}]` - WRONG: double list wrapping
   - Returns: `{{"success": true, "rows": [...], "count": N}}` or `{{"count": N}}` if count_only
   - **[CRITICAL]** Use PLURAL table names in relations: `variant_values(*)` not `variant_value(*)`
 
