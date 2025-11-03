@@ -189,6 +189,7 @@ async def create_project_manager(
             temperature=0.0,  # Deterministic for structured output
             top_p=0.95,       # Focused nucleus sampling
             top_k=20,         # Structured JSON generation
+            thinking_budget=512, # Reasoning budget
         )
     )
 
