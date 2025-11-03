@@ -177,7 +177,7 @@ async def create_project_manager(
     # Standard pattern used by all specialists
     product_architecture_specialist = create_product_architecture_specialist(
         storage=storage,
-        model=get_llm(provider="google", model="gemini-2.5-flash", temperature=0.5)
+        model=get_llm(provider="google", model="gemini-2.5-flash", temperature=0.7)
     )
 
     # Add SubAgent spec to subagents list
