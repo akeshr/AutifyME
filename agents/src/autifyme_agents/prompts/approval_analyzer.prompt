@@ -38,10 +38,10 @@ User approves the operation as-is.
 **When:** User approves ("approve", "yes", "ok", "looks good", "go ahead")
 **Structure:**
 ```json
-{
+{{
   "type": "accept",
   "user_message": null
-}
+}}
 ```
 
 ### 2. reject
@@ -54,10 +54,10 @@ User rejects OR wants changes.
 
 **Structure:**
 ```json
-{
+{{
   "type": "reject",
   "user_message": "exact user message explaining what they want"
-}
+}}
 ```
 
 **CRITICAL:** Pass user's EXACT message - PM will delegate back to specialist with this feedback.
