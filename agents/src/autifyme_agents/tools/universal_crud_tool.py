@@ -21,7 +21,7 @@ from datetime import UTC
 from typing import Any
 
 from langchain_core.tools import BaseTool, StructuredTool, ToolException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.operation_intent import (
@@ -1007,6 +1007,215 @@ class OperationExecutor:
 
 
 # =============================================================================
+# Dynamic Schema Generation for Access Control
+# =============================================================================
+
+
+def _create_operation_input_schema(
+    operations: list[str],
+) -> type[BaseModel]:
+    """
+    Generate Pydantic input schema for specific database operations.
+
+    Creates operation-scoped schemas with only relevant fields:
+    - Read-only: query_filter (no change_spec, no impact_analysis)
+    - Mutations: change_spec + impact_analysis (for HITL)
+
+    Args:
+        operations: Allowed operations (e.g., ["read"] or ["create", "update"])
+
+    Returns:
+        Dynamically generated Pydantic BaseModel class
+
+    Examples:
+        >>> ReadSchema = _create_operation_input_schema(["read"])
+        >>> ReadSchema.model_fields.keys()
+        dict_keys(['user_request_summary', 'reasoning', 'intent_type',
+                   'query_filter', 'execution_plan', 'specialist_name', 'schema_version'])
+
+        >>> CrudSchema = _create_operation_input_schema(["create", "read", "update", "delete"])
+        >>> "change_spec" in CrudSchema.model_fields
+        True
+    """
+    # Common fields for all operations
+    fields: dict[str, Any] = {
+        'user_request_summary': (
+            str,
+            Field(..., description='Summary of user original request')
+        ),
+        'reasoning': (
+            str,
+            Field(..., description='Why specialist classified this way (for transparency)')
+        ),
+    }
+
+    # intent_type with operation-specific description
+    allowed_ops = ', '.join(operations)
+    if len(operations) == 1:
+        intent_desc = f'Intent type. Must be "{operations[0]}". This tool handles {operations[0]} operations only.'
+    else:
+        intent_desc = f'Intent type. Allowed operations: {allowed_ops}'
+
+    fields['intent_type'] = (
+        str,
+        Field(..., description=intent_desc)
+    )
+
+    # Operation-specific fields
+    if operations == ["read"]:
+        # Read-only: simplified query structure (no mutations)
+        fields['query_filter'] = (
+            dict[str, Any],
+            Field(
+                default={},
+                description='Filter conditions for querying entities. '
+                'Examples: {"id": "uuid-123"}, {"category": "electronics"}, '
+                '{"is_active": true}. Used for WHERE clauses in SELECT operations.'
+            )
+        )
+        fields['execution_plan'] = (
+            dict[str, Any],
+            Field(
+                ...,
+                description='Query execution plan. Define steps to fetch data from tables. '
+                'READ-ONLY: no insert/update/delete operations allowed in this plan.'
+            )
+        )
+    else:
+        # Mutations need full spec
+        fields['change_spec'] = (
+            dict[str, Any],
+            Field(
+                ...,
+                description='Specification of table operations. '
+                'Contains operations array with insert/update/delete/query operation definitions.'
+            )
+        )
+        fields['impact_analysis'] = (
+            dict[str, Any],
+            Field(
+                ...,
+                description='REQUIRED for HITL approval. Specifies new/updated/deleted entity counts per table. '
+                'Example: {"new_entities_count": {"products": 5}, "updated_entities_count": {"products": 2}}'
+            )
+        )
+        fields['execution_plan'] = (
+            dict[str, Any],
+            Field(
+                ...,
+                description='Multi-step execution plan with dependencies. '
+                'Defines atomic steps with rollback support and dependency ordering.'
+            )
+        )
+
+    # Common optional fields
+    fields['specialist_name'] = (
+        str | None,
+        Field(default=None, description='Which specialist generated this intent (optional)')
+    )
+    fields['schema_version'] = (
+        str,
+        Field(default='v1', description='Schema version to validate against (default: v1)')
+    )
+
+    # Generate model name
+    if operations == ["read"]:
+        model_name = 'ReadOperationInput'
+    elif set(operations) == {"create", "read", "update", "delete"}:
+        model_name = 'FullCrudOperationInput'
+    else:
+        model_name = f"{''.join([op.title() for op in operations])}OperationInput"
+
+    # Create dynamic model with config
+    return create_model(
+        model_name,
+        __config__=ConfigDict(extra='forbid'),  # additionalProperties: false
+        **fields
+    )
+
+
+def _generate_tool_description(
+    operations: list[str],
+    tables: list[str] | None = None,
+) -> str:
+    """
+    Generate operation-specific tool description for LLM context.
+
+    Args:
+        operations: Allowed operations for this tool
+        tables: Optional whitelist of accessible tables
+
+    Returns:
+        Human-readable tool description
+
+    Examples:
+        >>> _generate_tool_description(["read"])
+        'Read-only database access. Query entities without modifications. ...'
+
+        >>> _generate_tool_description(["create", "read", "update", "delete"])
+        'Full CRUD database access. Create, read, update, and delete entities. ...'
+    """
+    # Operation description
+    if operations == ["read"]:
+        op_desc = "Read-only database access. Query entities without modifications."
+    elif set(operations) == {"create", "read", "update", "delete"}:
+        op_desc = "Full CRUD database access. Create, read, update, and delete entities."
+    elif set(operations) == {"read", "update"}:
+        op_desc = "Database query and update access. Read existing data and modify entities."
+    elif set(operations) == {"read", "create"}:
+        op_desc = "Database query and create access. Read existing data and insert new entities."
+    elif set(operations) == {"read", "create", "update"}:
+        op_desc = "Database read, create, and update access. Query and modify data (no delete)."
+    else:
+        op_list = ', '.join(operations)
+        op_desc = f"Database operations: {op_list}."
+
+    # Table scope
+    if tables:
+        if len(tables) <= 5:
+            table_list = ', '.join(tables)
+            scope_desc = f" Scoped to tables: {table_list}."
+        else:
+            scope_desc = f" Scoped to {len(tables)} specific tables."
+    else:
+        scope_desc = " Works across all schema tables."
+
+    # Core capabilities
+    capabilities = (
+        " Schema-driven execution with dependency resolution, "
+        "foreign key reference resolution, and atomic transactions with rollback."
+    )
+
+    return op_desc + scope_desc + capabilities
+
+
+def _generate_tool_name(suffix: str | None = None) -> str:
+    """
+    Generate tool name with optional suffix.
+
+    Args:
+        suffix: Optional suffix for tool name specialization
+
+    Returns:
+        Tool name string
+
+    Examples:
+        >>> _generate_tool_name()
+        'execute_database_operation'
+
+        >>> _generate_tool_name('read_only')
+        'execute_database_operation_read_only'
+
+        >>> _generate_tool_name('products')
+        'execute_database_operation_products'
+    """
+    base_name = "execute_database_operation"
+    if suffix:
+        return f"{base_name}_{suffix}"
+    return base_name
+
+
+# =============================================================================
 # Universal CRUD Tool
 # =============================================================================
 
@@ -1052,7 +1261,13 @@ class ExecuteDatabaseOperationInput(BaseModel):
 
 def create_execute_database_operation_tool(storage: StorageInterface) -> BaseTool:
     """
-    Create universal database operation tool.
+    Create universal database operation tool (backward compatibility wrapper).
+
+    DEPRECATED: Use create_database_tool() for new code with operation-specific schemas.
+
+    This function maintains backward compatibility with existing code that expects
+    the static ExecuteDatabaseOperationInput schema. New specialists should use
+    create_database_tool() for operation-scoped access control.
 
     This single tool replaces all specialized persistence tools:
     - save_product_family
@@ -1066,7 +1281,43 @@ def create_execute_database_operation_tool(storage: StorageInterface) -> BaseToo
         storage: Storage interface for database operations
 
     Returns:
-        LangChain tool that executes OperationIntent
+        LangChain tool that executes OperationIntent with full CRUD access
+
+    Related:
+        - create_database_tool(): New factory with operation-scoped schemas
+        - ExecuteDatabaseOperationInput: Static schema (8 fields, all operations)
+
+    Examples:
+        # Backward compatible (existing code)
+        >>> tool = create_execute_database_operation_tool(storage)
+        >>> # Same behavior as before - full CRUD access
+
+        # New pattern (recommended for new specialists)
+        >>> tool = create_database_tool(
+        ...     storage,
+        ...     operations=["create", "read", "update", "delete"]
+        ... )
+        >>> # Same functionality, but explicit about operations
+    """
+    # Delegate to new factory with full CRUD operations
+    # This preserves existing behavior while using new implementation
+    return create_database_tool(
+        storage=storage,
+        operations=["create", "read", "update", "delete"],
+        tables=None,  # All tables accessible
+        tool_name_suffix=None,  # Keep original name "execute_database_operation"
+    )
+
+
+def _create_execute_database_operation_tool_legacy(storage: StorageInterface) -> BaseTool:
+    """
+    Legacy implementation of execute_database_operation tool.
+
+    PRESERVED FOR REFERENCE ONLY - Not used in production.
+    The actual implementation now uses create_database_tool().
+
+    This code is kept to document the original static schema approach
+    before dynamic access control was implemented.
     """
 
     async def _execute_database_operation_impl(
@@ -1245,4 +1496,296 @@ def create_execute_database_operation_tool(storage: StorageInterface) -> BaseToo
             "without code changes. Replaces all specialized persistence tools."
         ),
         args_schema=ExecuteDatabaseOperationInput,
+    )
+
+
+# =============================================================================
+# Dynamic CRUD Tool Factory (Operation-Scoped Access Control)
+# =============================================================================
+
+
+def create_database_tool(
+    storage: StorageInterface,
+    operations: list[str],
+    tables: list[str] | None = None,
+    tool_name_suffix: str | None = None,
+) -> BaseTool:
+    """
+    Create operation-scoped database tool with dynamic schema and access control.
+
+    This factory creates database tools with specific operation permissions:
+    - Read-only tools: Only query operations, no mutations
+    - Full CRUD tools: All operations (create, read, update, delete)
+    - Mixed tools: Custom operation combinations (e.g., read + update)
+
+    The generated tool has:
+    - Dynamic Pydantic schema with only relevant fields
+    - Context-aware field descriptions per operation type
+    - Runtime validation of operations and table access
+    - Clean JSON Schema for LLM function calling
+
+    Args:
+        storage: Storage interface for database operations (REQUIRED)
+        operations: List of allowed operations. Valid values: "read", "create", "update", "delete"
+        tables: Optional whitelist of accessible tables. None = all tables allowed
+        tool_name_suffix: Optional suffix for tool name (e.g., "read_only", "products")
+
+    Returns:
+        StructuredTool configured for specified operations and tables
+
+    Raises:
+        ValueError: If operations list is empty or contains invalid operations
+
+    Examples:
+        # Read-only tool for market intelligence specialist
+        >>> read_tool = create_database_tool(
+        ...     storage=storage,
+        ...     operations=["read"]
+        ... )
+        >>> # Tool has 6-field schema (no change_spec, no impact_analysis)
+        >>> # Description: "Read-only database access..."
+
+        # Full CRUD tool for product architecture specialist
+        >>> crud_tool = create_database_tool(
+        ...     storage=storage,
+        ...     operations=["create", "read", "update", "delete"]
+        ... )
+        >>> # Tool has 8-field schema (full mutation support)
+        >>> # Description: "Full CRUD database access..."
+
+        # Domain-scoped tool for taxonomy specialist
+        >>> taxonomy_tool = create_database_tool(
+        ...     storage=storage,
+        ...     operations=["read", "create", "update"],
+        ...     tables=["categories", "category_product_mappings"],
+        ...     tool_name_suffix="taxonomy"
+        ... )
+        >>> # Tool name: "execute_database_operation_taxonomy"
+        >>> # Description: "...Scoped to tables: categories, category_product_mappings"
+
+        # Read + update tool for campaign optimization
+        >>> campaign_tool = create_database_tool(
+        ...     storage=storage,
+        ...     operations=["read", "update"],
+        ...     tables=["campaigns", "ad_copies"],
+        ...     tool_name_suffix="campaigns"
+        ... )
+        >>> # Tool has 8-field schema (mutations allowed, but not create/delete)
+
+    Architecture:
+        - Uses dynamic Pydantic schema generation (pydantic.create_model)
+        - Closure captures access control parameters (operations, tables)
+        - Runtime validation before execution
+        - Shared implementation with static tool (same executor logic)
+
+    Related:
+        - create_execute_database_operation_tool(): Backward-compatible static tool
+        - _create_operation_input_schema(): Dynamic schema generator
+        - _generate_tool_description(): Description generator
+    """
+    # Validate operations
+    valid_operations = {"read", "create", "update", "delete"}
+    if not operations:
+        raise ValueError("operations list cannot be empty")
+
+    invalid_ops = set(operations) - valid_operations
+    if invalid_ops:
+        raise ValueError(
+            f"Invalid operations: {invalid_ops}. "
+            f"Valid operations: {valid_operations}"
+        )
+
+    # Generate dynamic schema for specified operations
+    input_schema = _create_operation_input_schema(operations)
+
+    # Generate tool name and description
+    tool_name = _generate_tool_name(tool_name_suffix)
+    tool_description = _generate_tool_description(operations, tables)
+
+    # Create implementation with access control closure
+    async def _execute_database_operation_impl(
+        **kwargs: Any
+    ) -> dict[str, Any]:
+        """
+        Operation-scoped database executor with runtime validation.
+
+        Validates operations and table access before execution.
+        Shared implementation with static tool.
+        """
+        # Extract parameters (handles both read-only and mutation schemas)
+        intent_type = kwargs.get('intent_type')
+        user_request_summary = kwargs.get('user_request_summary')
+        reasoning = kwargs.get('reasoning')
+        specialist_name = kwargs.get('specialist_name')
+        schema_version = kwargs.get('schema_version', 'v1')
+
+        # Handle read-only vs mutation parameter differences
+        if 'query_filter' in kwargs:
+            # Read-only tool: convert query_filter to change_spec format
+            query_filter = kwargs.get('query_filter', {})
+            execution_plan = kwargs.get('execution_plan')
+
+            # Build minimal change_spec for read operations
+            change_spec = {
+                'domain': 'product_catalog',  # Default domain
+                'operations': [
+                    {
+                        'op_type': 'query',
+                        'table': 'products',  # Will be overridden by execution plan
+                        'query_filter': query_filter,
+                        'include_relations': [],
+                        'depends_on': []
+                    }
+                ]
+            }
+            # Minimal impact for read operations
+            impact_analysis = {
+                'affected_tables': {},
+                'new_entities_count': {},
+                'updated_entities_count': {},
+                'deleted_entities_count': {},
+                'business_impact_summary': 'Read-only query operation',
+                'warnings': [],
+                'examples': []
+            }
+        else:
+            # Mutation tool: use provided change_spec and impact_analysis
+            change_spec = kwargs.get('change_spec')
+            impact_analysis = kwargs.get('impact_analysis')
+            execution_plan = kwargs.get('execution_plan')
+
+        # Validate operation is allowed
+        if intent_type not in operations:
+            raise ToolException(
+                f"Operation '{intent_type}' not allowed for this tool. "
+                f"Allowed operations: {', '.join(operations)}. "
+                f"This tool is configured for: {', '.join(operations)} only."
+            )
+
+        # Validate table access if restricted
+        if tables is not None and change_spec:
+            ops_list = change_spec.get('operations', [])
+            for operation in ops_list:
+                table = operation.get('table')
+                if table and table not in tables:
+                    raise ToolException(
+                        f"Table '{table}' not accessible by this tool. "
+                        f"Allowed tables: {', '.join(tables)}. "
+                        f"This tool is scoped to specific tables only."
+                    )
+
+        # Execute using shared implementation logic
+        try:
+            # Load schema for validation
+            schema = SchemaRegistry.get_version(
+                version=schema_version,
+                domain=change_spec.get("domain", "product_catalog")
+            )
+
+            # Construct OperationIntent from parameters
+            operation_intent = OperationIntent(
+                intent_type=intent_type,
+                change_spec=change_spec,
+                user_request_summary=user_request_summary,
+                reasoning=reasoning,
+                impact_analysis=impact_analysis,
+                execution_plan=execution_plan,
+                specialist_name=specialist_name,
+                schema_version=schema_version,
+            )
+
+            logger.info(
+                f"Executing database operation: {operation_intent.intent_type}",
+                extra={
+                    "intent_type": operation_intent.intent_type,
+                    "operations_count": len(operation_intent.change_spec.operations),
+                    "schema_version": schema_version,
+                    "allowed_operations": operations,
+                    "allowed_tables": tables,
+                }
+            )
+
+            # Validate against schema
+            validator = SchemaValidator(schema)
+            for operation in operation_intent.change_spec.operations:
+                validation = validator.validate_operation(operation.model_dump())
+                if not validation.valid:
+                    raise ToolException(
+                        f"Schema validation failed: {validation.errors}"
+                    )
+
+            # Validate completeness (operations match impact_analysis counts)
+            _validate_operation_completeness(
+                operations=operation_intent.change_spec.operations,
+                impact_analysis=operation_intent.impact_analysis.model_dump()
+            )
+
+            # Execute plan
+            executor = OperationExecutor(storage, schema)
+            result = await executor.execute_plan(
+                steps=operation_intent.execution_plan.steps,
+                operations=operation_intent.change_spec.operations,
+            )
+
+            if result.success:
+                logger.info(
+                    "Operation executed successfully",
+                    extra={
+                        "affected_entities": result.affected_entities,
+                        "execution_time_ms": result.execution_time_ms,
+                    }
+                )
+            else:
+                logger.error(
+                    "Operation failed",
+                    extra={
+                        "error_message": result.error_message,
+                        "error_step": result.error_step,
+                        "rollback_performed": result.rollback_performed,
+                    }
+                )
+
+            return result.model_dump()
+
+        except Exception as e:
+            # Catch errors that occur before execute_plan (schema validation, etc.)
+            error_type = type(e).__name__
+            error_msg = str(e)
+
+            # Build actionable error message
+            if "schema validation" in error_msg.lower():
+                actionable_msg = f"SCHEMA_ERROR: {error_msg}\n\nAgent Action: Review change_spec structure. Ensure all required fields present and types correct."
+            elif "invalid table" in error_msg.lower():
+                actionable_msg = f"SCHEMA_ERROR: {error_msg}\n\nAgent Action: Use only valid table names from schema. Check available tables in schema registry."
+            elif "incomplete" in error_msg.lower():
+                actionable_msg = f"INCOMPLETE_DATA: {error_msg}\n\nAgent Action: Provide ALL entities claimed in impact_analysis. Partial data is forbidden."
+            elif "not allowed" in error_msg.lower() or "not accessible" in error_msg.lower():
+                actionable_msg = f"ACCESS_DENIED: {error_msg}\n\nAgent Action: This tool has restricted permissions. Use appropriate tool for this operation/table."
+            else:
+                actionable_msg = f"{error_type}: {error_msg}\n\nAgent Action: Review operation structure and fix validation errors before retrying."
+
+            logger.error(
+                "execute_database_operation failed before execution",
+                exc_info=True,
+                extra={"error_type": error_type, "error_msg": error_msg}
+            )
+
+            # Return error result instead of throwing
+            error_result = ExecutionResult(
+                success=False,
+                error_message=actionable_msg,
+                error_step=0,  # Error before any steps executed
+                rollback_performed=False,
+                execution_time_ms=0,
+                steps_completed=0,
+                steps_total=0,
+            )
+            return error_result.model_dump()
+
+    # Create and return StructuredTool with dynamic schema
+    return StructuredTool.from_function(
+        coroutine=_execute_database_operation_impl,
+        name=tool_name,
+        description=tool_description,
+        args_schema=input_schema,
     )
