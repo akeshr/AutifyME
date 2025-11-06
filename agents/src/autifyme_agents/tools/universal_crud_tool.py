@@ -201,6 +201,11 @@ class OperationExecutor:
             error_type = type(e).__name__
             error_msg = str(e)
 
+            # Extract step number from error message if available
+            import re
+            step_match = re.match(r"Step (\d+) failed", error_msg)
+            failed_step = int(step_match.group(1)) if step_match else None
+
             # Enhance error message with context
             if "unique constraint" in error_msg.lower() or "already exists" in error_msg.lower():
                 actionable_msg = f"CONSTRAINT_VIOLATION: {error_msg}\n\nAgent Action: Check for duplicate values in unique fields (sku, email, etc.). Query existing data first or use different values."
@@ -216,12 +221,13 @@ class OperationExecutor:
             logger.error(
                 "Execution failed - transaction rolled back",
                 exc_info=True,
-                extra={"error_type": error_type, "error": error_msg}
+                extra={"error_type": error_type, "error": error_msg, "failed_step": failed_step}
             )
 
             return ExecutionResult(
                 success=False,
                 error_message=actionable_msg,
+                error_step=failed_step,
                 rollback_performed=True,
                 execution_time_ms=execution_time_ms,
                 steps_completed=0,
@@ -275,37 +281,65 @@ class OperationExecutor:
         """Execute plan within transaction (all validation already done)."""
         completed_steps: list[tuple[ExecutionStep, dict[str, Any]]] = []
         created_ids: dict[int, dict[str, Any]] = {}
+        updated_entities: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        deleted_entities: dict[str, list[str]] = defaultdict(list)
 
         # Sort steps by dependencies (already validated in _validate_plan)
         sorted_steps = self._resolve_dependencies(steps, operations)
 
-        for step in sorted_steps:
-            operation = operations[step.operation_index]
+        current_step = None
+        try:
+            for step in sorted_steps:
+                current_step = step
+                operation = operations[step.operation_index]
 
-            logger.info(
-                f"Executing step {step.step_number}: {step.description}",
-                extra={"step": step.step_number, "operation": operation.op_type}
+                logger.info(
+                    f"Executing step {step.step_number}: {step.description}",
+                    extra={"step": step.step_number, "operation": operation.op_type}
+                )
+
+                # Execute operation
+                result = await self._execute_operation(operation, created_ids)
+                completed_steps.append((step, result))
+
+                # Store created IDs for dependent operations
+                if operation.op_type == "insert" and result.get("ids"):
+                    ids = result["ids"]
+                    # Check if this is named refs or single entity
+                    if isinstance(ids, dict) and "id" not in ids:
+                        # Named refs dict
+                        created_ids[step.step_number] = {"_refs": ids}
+                    else:
+                        # Single entity
+                        created_ids[step.step_number] = ids
+
+                # Track updated entities
+                if operation.op_type == "update" and result.get("updated_details"):
+                    table = operation.table
+                    updated_entities[table].extend(result["updated_details"])
+
+                # Track deleted entities
+                if operation.op_type == "delete" and result.get("deleted_ids"):
+                    table = operation.table
+                    deleted_entities[table].extend(result["deleted_ids"])
+
+                logger.info(
+                    f"Step {step.step_number} completed",
+                    extra={"affected_rows": result.get("count", 0)}
+                )
+
+        except Exception as e:
+            # Capture which step failed for detailed error reporting
+            execution_time_ms = int((time.time() - start_time) * 1000)
+
+            # Re-raise with step context attached
+            error_with_context = ToolException(
+                f"Step {current_step.step_number if current_step else 0} failed "
+                f"({current_step.description if current_step else 'unknown'}): {str(e)}"
             )
-
-            # Execute operation
-            result = await self._execute_operation(operation, created_ids)
-            completed_steps.append((step, result))
-
-            # Store created IDs for dependent operations
-            if operation.op_type == "insert" and result.get("ids"):
-                ids = result["ids"]
-                # Check if this is named refs or single entity
-                if isinstance(ids, dict) and "id" not in ids:
-                    # Named refs dict
-                    created_ids[step.step_number] = {"_refs": ids}
-                else:
-                    # Single entity
-                    created_ids[step.step_number] = ids
-
-            logger.info(
-                f"Step {step.step_number} completed",
-                extra={"affected_rows": result.get("count", 0)}
-            )
+            # Preserve original exception type info
+            error_with_context.__cause__ = e
+            raise error_with_context
 
         # Success - calculate execution time
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -314,6 +348,8 @@ class OperationExecutor:
             success=True,
             affected_entities=self._count_affected(completed_steps, operations),
             created_ids=created_ids,
+            updated_entities=dict(updated_entities),
+            deleted_entities=dict(deleted_entities),
             execution_time_ms=execution_time_ms,
             steps_completed=len(completed_steps),
             steps_total=len(sorted_steps),
@@ -638,7 +674,18 @@ class OperationExecutor:
             table_schema.name, resolved_filter, resolved_updates
         )
 
-        return {"count": count}
+        # Build updated entity details for result tracking
+        updated_details = []
+        if count > 0:
+            # Extract entity IDs from filter (if available)
+            entity_id = resolved_filter.get("id")
+            if entity_id:
+                updated_details.append({
+                    "id": entity_id,
+                    "updated_fields": list(resolved_updates.keys())
+                })
+
+        return {"count": count, "updated_details": updated_details}
 
     async def _execute_delete(
         self,
@@ -715,7 +762,18 @@ class OperationExecutor:
             # Hard delete
             count = await self._delete_entities(table_schema.name, resolved_filter)
 
-        return {"count": count, "soft_delete": operation.soft_delete}
+        # Extract deleted entity IDs for result tracking
+        deleted_ids = []
+        if count > 0:
+            # Extract entity ID(s) from filter
+            entity_id = resolved_filter.get("id")
+            if entity_id:
+                if isinstance(entity_id, list):
+                    deleted_ids = entity_id
+                else:
+                    deleted_ids = [entity_id]
+
+        return {"count": count, "soft_delete": operation.soft_delete, "deleted_ids": deleted_ids}
 
     async def _execute_query(
         self,

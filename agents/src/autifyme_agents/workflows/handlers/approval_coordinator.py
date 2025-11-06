@@ -218,11 +218,11 @@ class ApprovalCoordinator:
                     extra={"interrupt_id": interrupt_info.interrupt_id}
                 )
             elif response.type == "reject":
-                # User rejected or wants changes - pass exact user message to PM
-                # PM will delegate back to specialist with this feedback
+                # User rejected or wants changes - send user's actual response to PM
+                # Simple marker format so PM recognizes this as HITL feedback (not hallucination)
                 decision = {
                     "type": "reject",
-                    "message": response.user_message or "User rejected"
+                    "message": f"[HITL_FEEDBACK] {response.user_message or 'User rejected'}"
                 }
                 logger.debug(
                     f"Built reject decision for interrupt {idx}",
