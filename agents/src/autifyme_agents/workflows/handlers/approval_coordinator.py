@@ -218,31 +218,17 @@ class ApprovalCoordinator:
                     extra={"interrupt_id": interrupt_info.interrupt_id}
                 )
             elif response.type == "reject":
-                # User rejected or wants changes - pass FULL approval context to PM
-                # Include approval analyzer's reasoning + user message for proper context
-                # PM needs to understand this is approval feedback, not raw tool output
-
-                # Build structured rejection message with approval context
-                rejection_context = {
-                    "approval_analysis": {
-                        "type": "reject",
-                        "user_message": response.user_message or "User rejected",
-                        "analyzer_reasoning": approval_response.reasoning,
-                        "interrupt_id": interrupt_info.interrupt_id,
-                        "tool_name": interrupt_info.tool_name,
-                    }
-                }
-
+                # User rejected or wants changes - send user's actual response to PM
+                # Simple marker format so PM recognizes this as HITL feedback (not hallucination)
                 decision = {
                     "type": "reject",
-                    "message": f"HITL_REJECTION: {response.user_message or 'User rejected'}\n\nApproval Analysis Context:\n{approval_response.reasoning}"
+                    "message": f"[HITL_FEEDBACK] {response.user_message or 'User rejected'}"
                 }
                 logger.debug(
                     f"Built reject decision for interrupt {idx}",
                     extra={
                         "interrupt_id": interrupt_info.interrupt_id,
                         "user_feedback": response.user_message,
-                        "analyzer_reasoning": approval_response.reasoning,
                     }
                 )
 

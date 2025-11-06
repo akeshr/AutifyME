@@ -227,20 +227,16 @@ When you receive ToolMessage with status="error" from execute_database_operation
 
 **Message format:**
 ```
-HITL_REJECTION: [user's exact feedback]
-
-Approval Analysis Context:
-[Approval analyzer's reasoning about user intent]
+[HITL_FEEDBACK] [user's exact response]
 ```
 
 **Processing steps:**
 
-1. **Recognize rejection:** Message starts with "HITL_REJECTION:" - user reviewed the OperationIntent and wants changes
+1. **Recognize rejection:** Message starts with "[HITL_FEEDBACK]" - user reviewed the OperationIntent and wants changes
 
 2. **Extract feedback:**
-   - User's exact words appear after "HITL_REJECTION:" prefix
-   - Example: "HITL_REJECTION: make it cheaper" → feedback is "make it cheaper"
-   - Approval analyzer reasoning provides additional context about user intent
+   - User's exact words appear after "[HITL_FEEDBACK]" marker
+   - Example: "[HITL_FEEDBACK] make it cheaper" → feedback is "make it cheaper"
 
 3. **Reconstruct full context:** Look back through message history to build COMPLETE request context
    - User may have provided details across multiple messages ("Add jar" → "make it 500ml" → "for food storage")
@@ -269,10 +265,7 @@ Specialist generates: OperationIntent with capacity=500ml, application="food sto
 User rejects: "make it 50 rupees instead"
 
 PM receives ToolMessage:
-"HITL_REJECTION: make it 50 rupees instead
-
-Approval Analysis Context:
-User approved the product specifications but wants price adjustment from Rs 100 to Rs 50."
+"[HITL_FEEDBACK] make it 50 rupees instead"
 
 → Extract feedback: "make it 50 rupees instead"
 → Re-delegate: "User reviewed your operation but wants changes: make it 50 rupees instead.
