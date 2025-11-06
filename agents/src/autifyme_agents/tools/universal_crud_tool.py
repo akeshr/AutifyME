@@ -434,13 +434,13 @@ class OperationExecutor:
         can_batch = self._can_batch_insert(operation.new_entities)
 
         if can_batch and len(operation.new_entities) > 1:
-            # OPTIMIZED: Batch insert all entities in single DB call
+            # Batch insert: All entities in single DB call (optimization)
             logger.debug(f"Batch inserting {len(operation.new_entities)} independent entities")
             return await self._batch_insert_entities(
                 operation, table_schema, context
             )
         else:
-            # LEGACY: Sequential insert (has cross-references or single entity)
+            # Sequential insert: One at a time (required for cross-references or single entity)
             if not can_batch:
                 logger.debug("Using sequential insert (entities have cross-references)")
             return await self._sequential_insert_entities(
@@ -453,7 +453,7 @@ class OperationExecutor:
         table_schema: Any,
         context: dict[int, dict[str, Any]],
     ) -> dict[str, Any]:
-        """Sequential entity insertion (original behavior - for entities with cross-refs)."""
+        """Sequential entity insertion (required for entities with cross-references)."""
         inserted_entities = {}
         last_result = None
 
@@ -484,12 +484,12 @@ class OperationExecutor:
                         inserted_entities[ref_name] = result
                         break
 
-        # Return named refs or single entity for backward compatibility
+        # Return appropriate format based on entity refs
         if inserted_entities:
-            # Multiple entities with named refs
+            # Named entity references provided
             return {"ids": inserted_entities, "count": len(operation.new_entities)}
         elif last_result:
-            # Single entity (legacy pattern)
+            # No named refs, return last inserted ID
             return {"ids": last_result, "count": len(operation.new_entities)}
         else:
             return {"ids": {}, "count": 0}
