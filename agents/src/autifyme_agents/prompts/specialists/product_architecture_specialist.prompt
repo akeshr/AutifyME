@@ -235,6 +235,7 @@ existing_axes = result["rows"][0]["variant_axes"]
 - ✓ **Schema verified**: All table names, field names, relationships checked against actual schema
 - ✓ **No placeholders**: All SKUs, IDs, values are concrete (not "PAV-{{SIZE}}", "uuid-placeholder", "TBD")
 - ✓ **Counts match**: impact_analysis counts match actual entities in operations arrays
+- ✓ **INSERT vs UPDATE distinction**: When updating existing products AND creating new links to variant_values, the links are INSERTS (new records in product_variant_values), NOT updates. Count ALL product_variant_values operations as new_entities_count, even for existing products.
 - ✓ **Examples populated**: impact_analysis.examples has actual SKU samples (not empty)
 - ✓ **IDs are concrete**: UUIDs for update/delete operations (not generic "550e8400-e29b-41d4-a716-446655440000")
 - ✓ **Complete arrays**: All entities included in new_entities/delete_filter (no partial lists)
@@ -1128,6 +1129,63 @@ family_result = query_database(
   "schema_version": "v1"
 }
 ```
+
+### [CRITICAL] Common Mistake: Counting Links for Existing Products
+
+**Scenario:** Adding new variant axes to family with existing products
+
+**WRONG counting (causes validation error):**
+```json
+{
+  "operations": [
+    {"op_type": "insert", "table": "variant_axes", "new_entities": [...]},  // 4 axes
+    {"op_type": "insert", "table": "variant_values", "new_entities": [...]},  // 12 values
+    {"op_type": "update", "table": "products", "target_filter": {"id": "existing-product-uuid"}, "field_updates": {"sku": "NEW-SKU"}},  // Update 1 product
+    {"op_type": "insert", "table": "products", "new_entities": [...]},  // 8 new products
+    {"op_type": "insert", "table": "product_variant_values", "new_entities": [
+      // 4 links for existing product (linking to new variant axes)
+      {"product_id": "existing-product-uuid", "variant_value_id": "$ref:val_capacity"},
+      {"product_id": "existing-product-uuid", "variant_value_id": "$ref:val_color"},
+      {"product_id": "existing-product-uuid", "variant_value_id": "$ref:val_neck_type"},
+      {"product_id": "existing-product-uuid", "variant_value_id": "$ref:val_neck_size"},
+      // 32 links for 8 new products (8 products × 4 axes)
+      ...
+    ]}  // Total: 36 new records in product_variant_values
+  ],
+  "impact_analysis": {
+    "new_entities_count": {
+      "variant_axes": 4,
+      "variant_values": 12,
+      "products": 8,
+      "product_variant_values": 32  // ❌ WRONG! Should be 36
+    },
+    "updated_entities_count": {
+      "products": 1,
+      "product_variant_values": 4  // ❌ WRONG! These are INSERTS, not updates
+    }
+  }
+}
+```
+
+**CORRECT counting:**
+```json
+{
+  "impact_analysis": {
+    "new_entities_count": {
+      "variant_axes": 4,
+      "variant_values": 12,
+      "products": 8,
+      "product_variant_values": 36  // ✓ CORRECT: 4 (existing product) + 32 (new products)
+    },
+    "updated_entities_count": {
+      "products": 1  // ✓ Only the products table has updates
+      // NO product_variant_values here - all links are NEW records (inserts)
+    }
+  }
+}
+```
+
+**Key insight:** When you UPDATE a product (change name/SKU) and then CREATE new links in product_variant_values, those links are NEW records, NOT updates. The product_variant_values table only has INSERT operations in this scenario.
 
 ## Example 5: Complex UPDATE - Add Values to Existing Variant Axis
 
