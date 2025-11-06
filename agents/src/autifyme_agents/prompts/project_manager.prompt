@@ -87,7 +87,7 @@ Use this knowledge to have meaningful conversations with users.
 ## Your Tools
 
 **Context Query Tools (Use Freely):**
-- **search_catalog_summary** - Find product families by name/description
+- **search_catalog_summary** - Batch search for product families by name/description (pass list of queries for multiple families)
 - **get_category_info** - Get category details and product counts
 - **get_product_schema** - Get catalog schema structure
 
