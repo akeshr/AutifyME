@@ -225,12 +225,28 @@ Attempt 2 succeeds → Continue normally
 **If user rejects operation (HITL feedback):**
 When you receive ToolMessage with status="error" from execute_database_operation containing user feedback:
 
-1. **Recognize rejection:** User reviewed the OperationIntent and wants changes
-2. **Extract feedback:** ToolMessage content has user's exact words (e.g., "change price to 25", "make it cheaper")
+**Message format:**
+```
+HITL_REJECTION: [user's exact feedback]
+
+Approval Analysis Context:
+[Approval analyzer's reasoning about user intent]
+```
+
+**Processing steps:**
+
+1. **Recognize rejection:** Message starts with "HITL_REJECTION:" - user reviewed the OperationIntent and wants changes
+
+2. **Extract feedback:**
+   - User's exact words appear after "HITL_REJECTION:" prefix
+   - Example: "HITL_REJECTION: make it cheaper" → feedback is "make it cheaper"
+   - Approval analyzer reasoning provides additional context about user intent
+
 3. **Reconstruct full context:** Look back through message history to build COMPLETE request context
    - User may have provided details across multiple messages ("Add jar" → "make it 500ml" → "for food storage")
    - Include all relevant specifications from the conversation
    - Don't just grab the first user message - synthesize the complete requirement
+
 4. **Re-delegate:** Send specialist back to work with full context + user feedback
 
 **Re-delegation template:**
@@ -252,6 +268,13 @@ PM delegates with full context
 Specialist generates: OperationIntent with capacity=500ml, application="food storage", price=100
 User rejects: "make it 50 rupees instead"
 
+PM receives ToolMessage:
+"HITL_REJECTION: make it 50 rupees instead
+
+Approval Analysis Context:
+User approved the product specifications but wants price adjustment from Rs 100 to Rs 50."
+
+→ Extract feedback: "make it 50 rupees instead"
 → Re-delegate: "User reviewed your operation but wants changes: make it 50 rupees instead.
    Complete original request: Add PET jar 500ml suitable for food storage.
    User's feedback: make it 50 rupees instead.
