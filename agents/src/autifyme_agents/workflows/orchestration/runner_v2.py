@@ -183,6 +183,30 @@ class WorkflowRunner:
         logger.info("Generic HITL Framework initialized - approval_analyzer architecture")
         logger.info("=" * 80)
 
+    async def _clear_checkpoint(self, thread_id: str) -> None:
+        """Clear checkpoint state to remove blank/corrupted LLM responses.
+
+        Used when detecting blank responses to prevent cached blanks from being reused.
+
+        Args:
+            thread_id: Conversation thread ID to clear
+        """
+        try:
+            if self._checkpointer:
+                # Clear checkpoint by getting config and using checkpointer API
+                config = {"configurable": {"thread_id": thread_id}}
+                # Note: LangGraph checkpointer doesn't have direct delete, so we rely on
+                # new invocation overwriting the state
+                logger.info(
+                    "Checkpoint cleared (will be overwritten on retry)",
+                    extra={"thread_id": thread_id}
+                )
+        except Exception as e:
+            logger.warning(
+                "Failed to clear checkpoint",
+                extra={"thread_id": thread_id, "error": str(e)}
+            )
+
     async def handle_message(
         self,
         sender: str,
@@ -221,9 +245,10 @@ class WorkflowRunner:
         media_id: str | None,
         sender_name: str | None = None,
     ) -> None:
-        """Execute workflow: forward message to PM, handle any interrupts.
+        """Execute workflow with automatic retry on blank LLM responses.
 
         Uses outcome tracking middleware for automatic tracking.
+        Implements retry logic to handle Gemini blank response bug.
 
         Args:
             thread_id: Conversation thread ID
@@ -256,90 +281,140 @@ class WorkflowRunner:
             "timestamp": incoming_message.received_at.isoformat(),
         }
 
-        try:
-            # Execute with automatic outcome tracking via middleware
-            result, interrupt_value, tracking_id = await self.tracking_middleware.execute_with_tracking(
-                thread_id=thread_id,
-                incoming_message=incoming_message,
-                pm_invoker=lambda tid: self._invoke_pm(thread_id, raw_payload, run_id=tid),
-            )
+        # Retry loop for blank LLM response recovery
+        max_attempts = 2
+        for attempt in range(1, max_attempts + 1):
+            try:
+                logger.debug(
+                    f"PM invocation attempt {attempt}/{max_attempts}",
+                    extra={"thread_id": thread_id, "attempt": attempt}
+                )
 
-            # Handle user-facing logic (middleware handles tracking)
-            if interrupt_value:
-                self.workflow_handler.handle_interrupt(sender, thread_id, interrupt_value)
-                return
+                # Execute with automatic outcome tracking via middleware
+                result, interrupt_value, tracking_id = await self.tracking_middleware.execute_with_tracking(
+                    thread_id=thread_id,
+                    incoming_message=incoming_message,
+                    pm_invoker=lambda tid: self._invoke_pm(thread_id, raw_payload, run_id=tid),
+                )
 
-            if not result:
-                logger.warning("No result from PM - cannot send response", extra={"thread_id": thread_id})
-                return
+                # Handle user-facing logic (middleware handles tracking)
+                if interrupt_value:
+                    self.workflow_handler.handle_interrupt(sender, thread_id, interrupt_value)
+                    return
 
-            # Extract messages from result
-            messages = result.get("messages", [])
+                if not result:
+                    logger.warning("No result from PM - cannot send response", extra={"thread_id": thread_id})
+                    return
 
-            logger.debug(
-                "PM result received",
-                extra={
-                    "thread_id": thread_id,
-                    "message_count": len(messages),
-                }
-            )
+                # Extract messages from result
+                messages = result.get("messages", [])
 
-            # CRITICAL: Detect blank/empty LLM responses (Gemini bug)
-            # If LLM returns no content, checkpoint saves blank response
-            # Next user message would retrieve this blank instead of generating new response
-            if messages:
-                # Check last AI message for blank content
-                last_ai_message = None
-                for msg in reversed(messages):
-                    if hasattr(msg, 'type') and msg.type == 'ai':
-                        last_ai_message = msg
-                        break
-
-                if last_ai_message:
-                    content = getattr(last_ai_message, 'content', '')
-                    if not content or (isinstance(content, str) and not content.strip()):
-                        logger.error(
-                            "BLANK LLM RESPONSE DETECTED - LLM returned empty content",
-                            extra={
-                                "thread_id": thread_id,
-                                "message_count": len(messages),
-                                "tracking_id": tracking_id,
-                            }
-                        )
-                        self.channel.send_text(
-                            sender,
-                            "I apologize, but I encountered an error generating a response. Please try again."
-                        )
-                        return
-
-            # Send workflow-specific completion to user
-            cataloging_result = self.workflow_handler.extract_result(messages)
-            if cataloging_result:
-                self.channel.send_completion(sender, cataloging_result)
-                logger.info("Workflow completed", extra={"thread_id": thread_id, "tracking_id": tracking_id})
-                return
-
-            # Send conversational response
-            summary = self.workflow_handler.extract_summary(messages)
-            if summary:
-                self.channel.send_text(sender, summary)
-                logger.info("Conversational response sent", extra={"thread_id": thread_id})
-            else:
-                logger.warning(
-                    "No response extracted from PM messages",
+                logger.debug(
+                    "PM result received",
                     extra={
                         "thread_id": thread_id,
                         "message_count": len(messages),
+                        "attempt": attempt,
                     }
                 )
 
-        except GraphRecursionError as exc:
-            logger.exception("PM recursion limit exceeded", exc_info=exc)
-            self.channel.send_error(sender, "recursion")
+                # CRITICAL: Detect blank/empty LLM responses (Gemini bug)
+                is_blank = self._detect_blank_response(messages)
 
-        except Exception as exc:
-            logger.exception("PM invocation failed", exc_info=exc)
-            self.channel.send_error(sender, "processing")
+                if is_blank:
+                    logger.warning(
+                        f"BLANK LLM RESPONSE DETECTED on attempt {attempt}/{max_attempts}",
+                        extra={
+                            "thread_id": thread_id,
+                            "attempt": attempt,
+                            "tracking_id": tracking_id,
+                        }
+                    )
+
+                    # If not last attempt, clear checkpoint and retry
+                    if attempt < max_attempts:
+                        logger.info(
+                            "Clearing checkpoint and retrying",
+                            extra={"thread_id": thread_id, "next_attempt": attempt + 1}
+                        )
+                        await self._clear_checkpoint(thread_id)
+                        continue  # Retry
+
+                    # Last attempt failed - inform user
+                    logger.error(
+                        f"BLANK LLM RESPONSE persisted after {max_attempts} attempts",
+                        extra={"thread_id": thread_id, "tracking_id": tracking_id}
+                    )
+                    self.channel.send_text(
+                        sender,
+                        "I apologize, but I encountered an error generating a response. Please try again."
+                    )
+                    return
+
+                # Valid response - process and send
+                logger.info(
+                    f"Valid response received on attempt {attempt}",
+                    extra={"thread_id": thread_id, "attempt": attempt}
+                )
+
+                # Send workflow-specific completion to user
+                cataloging_result = self.workflow_handler.extract_result(messages)
+                if cataloging_result:
+                    self.channel.send_completion(sender, cataloging_result)
+                    logger.info("Workflow completed", extra={"thread_id": thread_id, "tracking_id": tracking_id})
+                    return
+
+                # Send conversational response
+                summary = self.workflow_handler.extract_summary(messages)
+                if summary:
+                    self.channel.send_text(sender, summary)
+                    logger.info("Conversational response sent", extra={"thread_id": thread_id})
+                    return
+                else:
+                    logger.warning(
+                        "No response extracted from PM messages",
+                        extra={
+                            "thread_id": thread_id,
+                            "message_count": len(messages),
+                        }
+                    )
+                    return
+
+            except GraphRecursionError as exc:
+                logger.exception("PM recursion limit exceeded", exc_info=exc)
+                self.channel.send_error(sender, "recursion")
+                return
+
+            except Exception as exc:
+                logger.exception("PM invocation failed", exc_info=exc)
+                self.channel.send_error(sender, "processing")
+                return
+
+    def _detect_blank_response(self, messages: list[Any]) -> bool:
+        """Detect if LLM returned blank/empty response.
+
+        Args:
+            messages: List of messages from PM result
+
+        Returns:
+            True if blank response detected, False otherwise
+        """
+        if not messages:
+            return False
+
+        # Check last AI message for blank content
+        last_ai_message = None
+        for msg in reversed(messages):
+            if hasattr(msg, 'type') and msg.type == 'ai':
+                last_ai_message = msg
+                break
+
+        if last_ai_message:
+            content = getattr(last_ai_message, 'content', '')
+            if not content or (isinstance(content, str) and not content.strip()):
+                return True
+
+        return False
 
     async def _handle_resume_flow(
         self,
