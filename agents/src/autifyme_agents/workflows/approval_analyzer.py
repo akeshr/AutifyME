@@ -5,14 +5,14 @@ responses and returns structured BatchApprovalResponse objects. It is NOT
 a full agent - just a prompt + LLM + structured output.
 
 Architecture:
-- Input: OperationIntent (extracted from pending_interrupts) + user_message (exact)
+- Input: pending_interrupts + user_message + conversation_history
 - Processing: LLM analyzes intent with structured output schema
 - Output: BatchApprovalResponse (Pydantic model)
 
 Key Design:
-- No conversation history - clean approval analysis based solely on intent + user response
-- Extracts only OperationIntent from tool_args (for execute_database_operation)
-- Passes user message exactly as provided
+- Uses conversation history to understand context and resolve ambiguous references
+- Full tool_args provided for complete context
+- LLM interprets approval intent based on full context
 
 This is separate from PM because:
 1. PM handles orchestration (task delegation)
@@ -33,6 +33,7 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.schemas.approval import BatchApprovalResponse
 from autifyme_agents.schemas.interrupt import InterruptInfo
+from autifyme_agents.workflows.message_utils import extract_text_content
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +42,11 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
     """Create approval analyzer chain with structured output.
 
     This creates a lightweight LLM chain (NOT a full agent) that:
-    1. Takes pending interrupts (OperationIntent only) + user message as input
-    2. Interprets user intent using LLM reasoning
+    1. Takes pending interrupts + user message + conversation history as input
+    2. Interprets user intent using LLM reasoning with full context
     3. Returns BatchApprovalResponse (structured Pydantic model)
 
-    No state, no tools, no delegation, no conversation history - pure analysis function.
-    Only receives the OperationIntent structure and exact user message.
+    No state, no tools, no delegation - pure analysis function with conversation context.
 
     Args:
         llm: Optional LLM override. If None, uses default gemini-2.5-flash-lite with low temperature
@@ -54,7 +54,7 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
 
     Returns:
         LangChain chain configured for structured output:
-        Input: {"pending_interrupts": list[dict], "user_message": str}
+        Input: {"pending_interrupts": list[dict], "user_message": str, "conversation_history": list}
         Output: BatchApprovalResponse
 
     Example:
@@ -63,7 +63,8 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
         ...     "pending_interrupts": [
         ...         {"interrupt_id": "1", "tool_name": "execute_database_operation", "tool_args": {...}},
         ...     ],
-        ...     "user_message": "approve"
+        ...     "user_message": "approve",
+        ...     "conversation_history": [...]
         ... })
         >>> assert isinstance(result, BatchApprovalResponse)
         >>> assert len(result.responses) == 1
@@ -84,55 +85,71 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
     prompt_text = load_prompt("approval_analyzer.prompt")
 
     # Build prompt template
-    # Input variables: pending_interrupts, user_message
+    # Input variables: pending_interrupts, user_message, conversation_history
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", prompt_text),
-        ("human", """**Pending Operations:**
-{pending_operations_formatted}
+        ("human", """**Conversation History:**
+{conversation_history_formatted}
 
-**User Message:**
+**Pending Interrupts:**
+{pending_interrupts_formatted}
+
+**Current User Message:**
 {user_message}
 
-Analyze the user's response and return BatchApprovalResponse with exactly {interrupt_count} responses (one per operation)."""),
+Use the conversation history to understand context and resolve references (e.g., "the cheaper one", "same description", "make it 25").
+Analyze the user's response and return BatchApprovalResponse with exactly {interrupt_count} responses (one per interrupt)."""),
     ])
 
     # Build chain with preprocessing
     def format_input(inputs: dict[str, Any]) -> dict[str, Any]:
-        """Format inputs for prompt template - extract OperationIntent only."""
+        """Format inputs for prompt template."""
         pending_interrupts = inputs["pending_interrupts"]
         user_message = inputs.get("user_message", "")
+        conversation_history = inputs.get("conversation_history", [])
 
-        # Format operations - extract only the OperationIntent from tool_args
-        # For execute_database_operation, tool_args contains the full OperationIntent
+        # Format interrupts for display
+        # CRITICAL: Use json.dumps to avoid curly brace template variable conflicts
+        # If we use str(dict), curly braces like {name} get interpreted as template vars
         import json
-        operation_lines = []
+        interrupt_lines = []
         for idx, interrupt in enumerate(pending_interrupts, 1):
-            tool_name = interrupt.get('tool_name', 'unknown')
             tool_args = interrupt.get('tool_args', {})
-
-            # Extract just the intent structure
-            # For execute_database_operation, this is the OperationIntent
-            # For other tools, just show the relevant args
-            if tool_name == "execute_database_operation":
-                # Extract the OperationIntent fields we care about
-                intent = {
-                    "intent_type": tool_args.get("intent_type"),
-                    "user_request_summary": tool_args.get("user_request_summary"),
-                    "change_spec": tool_args.get("change_spec"),
-                    "impact_analysis": tool_args.get("impact_analysis"),
-                }
-            else:
-                # For other tools, show all args
-                intent = tool_args
-
             # Use json.dumps for safe formatting (escapes braces)
-            intent_str = json.dumps(intent, ensure_ascii=False, indent=2)
-            operation_lines.append(
-                f"{idx}. {tool_name}:\n{intent_str}"
+            args_str = json.dumps(tool_args, ensure_ascii=False)
+            interrupt_lines.append(
+                f"{idx}. Tool: {interrupt.get('tool_name', 'unknown')}, "
+                f"Args: {args_str}"
             )
 
+        # Format conversation history for context
+        # LIMIT to recent messages to prevent context bleeding (applying old edits)
+        history_lines = []
+        if conversation_history:
+            for msg in conversation_history[-5:]:  # Last 5 messages for context
+                msg_type = getattr(msg, 'type', None)
+                if not msg_type and hasattr(msg, '__class__'):
+                    msg_type = msg.__class__.__name__.replace('Message', '').lower()
+
+                # Ensure msg_type is not None
+                if msg_type is None:
+                    msg_type = 'unknown'
+
+                # Extract text content (handles both OpenAI string and Gemini list formats)
+                raw_content = getattr(msg, 'content', None)
+                text_content = extract_text_content(raw_content) if raw_content else None
+
+                if text_content and len(text_content) > 0:
+                    # Truncate long messages
+                    preview = text_content[:200] + "..." if len(text_content) > 200 else text_content
+                    history_lines.append(f"[{msg_type.upper()}]: {preview}")
+
         formatted = {
-            "pending_operations_formatted": "\n\n".join(operation_lines),
+            "conversation_history_formatted": (
+                "\n".join(history_lines) if history_lines
+                else "(No prior conversation)"
+            ),
+            "pending_interrupts_formatted": "\n".join(interrupt_lines),
             "user_message": user_message,
             "interrupt_count": len(pending_interrupts),
         }
@@ -150,19 +167,16 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
 def analyze_approval(
     pending_interrupts: list[InterruptInfo],
     user_message: str,
-    conversation_history: list[Any] | None = None,  # Deprecated, kept for backwards compatibility
+    conversation_history: list[Any] | None = None,
     llm: BaseChatModel | None = None,
     run_id: str | None = None,
 ) -> BatchApprovalResponse:
     """Convenience function to analyze approval with validation.
 
-    Extracts only the OperationIntent from interrupts and passes user message exactly.
-    No conversation history used - clean approval analysis based solely on intent + user response.
-
     Args:
-        pending_interrupts: List of InterruptInfo objects (OperationIntent extracted from tool_args)
-        user_message: User's exact approval/rejection message
-        conversation_history: DEPRECATED - No longer used, kept for backwards compatibility
+        pending_interrupts: List of InterruptInfo objects
+        user_message: User's approval/rejection message
+        conversation_history: Full conversation history for context (helps resolve ambiguous references)
         llm: Optional LLM override
         run_id: Optional run_id to use as trace_id in LangSmith
 
@@ -183,12 +197,13 @@ def analyze_approval(
         from uuid import UUID
         config["run_id"] = UUID(run_id) if isinstance(run_id, str) else run_id
 
-    # Invoke analyzer with OperationIntent + user message only
+    # Invoke analyzer with conversation history for context
     try:
         result: BatchApprovalResponse = analyzer.invoke(
             {
                 "pending_interrupts": interrupts_as_dicts,
                 "user_message": user_message,
+                "conversation_history": conversation_history or [],
             },
             config=config if config else None,
         )
@@ -227,6 +242,7 @@ def analyze_approval(
         extra={
             "interrupt_count": len(pending_interrupts),
             "response_count": len(result.responses),
+            "has_conversation_history": len(conversation_history or []) > 0,
             "reasoning": result.reasoning,
         }
     )
