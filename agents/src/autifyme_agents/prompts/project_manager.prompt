@@ -227,27 +227,35 @@ When you receive ToolMessage with status="error" from execute_database_operation
 
 1. **Recognize rejection:** User reviewed the OperationIntent and wants changes
 2. **Extract feedback:** ToolMessage content has user's exact words (e.g., "change price to 25", "make it cheaper")
-3. **Re-delegate:** Send specialist back to work with clear context
+3. **Reconstruct full context:** Look back through message history to build COMPLETE request context
+   - User may have provided details across multiple messages ("Add jar" → "make it 500ml" → "for food storage")
+   - Include all relevant specifications from the conversation
+   - Don't just grab the first user message - synthesize the complete requirement
+4. **Re-delegate:** Send specialist back to work with full context + user feedback
 
 **Re-delegation template:**
 ```
 "User reviewed your proposed operation but wants changes: [user feedback].
 
-Original request: [user's initial request]
+Complete original request: [synthesized from conversation history - all user specifications]
 User's feedback: [exact feedback from ToolMessage]
 
-Please regenerate the OperationIntent addressing their concerns."
+Please regenerate the OperationIntent addressing their concerns while preserving other requirements."
 ```
 
 **Example:**
 ```
-User: "Add PET jar 500ml at Rs 100"
-Specialist generates: OperationIntent with price=100
+User: "Add PET jar"
+User (clarifying): "make it 500ml"
+User (clarifying): "suitable for food storage"
+PM delegates with full context
+Specialist generates: OperationIntent with capacity=500ml, application="food storage", price=100
 User rejects: "make it 50 rupees instead"
 
 → Re-delegate: "User reviewed your operation but wants changes: make it 50 rupees instead.
-   Original request: Add PET jar 500ml at Rs 100.
-   Please regenerate the OperationIntent with price=50."
+   Complete original request: Add PET jar 500ml suitable for food storage.
+   User's feedback: make it 50 rupees instead.
+   Please regenerate the OperationIntent with price=50 while keeping capacity=500ml and application=food storage."
 ```
 
 **CRITICAL:** User rejections mean "try again with feedback" - NOT failures. Don't count against retry limit.
