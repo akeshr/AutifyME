@@ -30,9 +30,7 @@ from autifyme_agents.tools.pm_context_tools import (
     create_search_catalog_summary_tool,
 )
 from autifyme_agents.tools.schema_tools import get_product_schema
-from autifyme_agents.tools.universal_crud_tool import (
-    create_execute_database_operation_tool,
-)
+from autifyme_agents.tools.universal_crud_tool import create_database_tool
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 if TYPE_CHECKING:
@@ -166,8 +164,13 @@ async def create_project_manager(
     # Image analysis tool (multimodal analysis before delegation)
     pm_tools.append(image_analysis_tool)
 
-    # Universal CRUD tool (replaces specialized tools for product operations)
-    pm_tools.append(create_execute_database_operation_tool(storage))
+    # Universal CRUD tool (schema-driven database operations with HITL)
+    pm_tools.append(
+        create_database_tool(
+            storage=storage,
+            operations=["create", "read", "update", "delete"],  # Full CRUD access
+        )
+    )
 
     # Campaign persistence tool (HITL-enabled for marketing campaigns)
     pm_tools.append(create_save_campaign_tool(storage))

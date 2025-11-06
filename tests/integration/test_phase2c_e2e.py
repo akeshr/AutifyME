@@ -35,7 +35,7 @@ from autifyme_agents.specialists.product_architecture_specialist import (
 )
 from autifyme_agents.tools.universal_crud_tool import (
     OperationExecutor,
-    create_execute_database_operation_tool,
+    create_database_tool,
 )
 
 # Import FakeStorage from fixtures
@@ -61,7 +61,10 @@ def test_storage():
 @pytest.fixture
 def universal_tool(test_storage):
     """Create universal CRUD tool with test storage."""
-    return create_execute_database_operation_tool(test_storage)
+    return create_database_tool(
+        storage=test_storage,
+        operations=["create", "read", "update", "delete"],
+    )
 
 
 @pytest.fixture
