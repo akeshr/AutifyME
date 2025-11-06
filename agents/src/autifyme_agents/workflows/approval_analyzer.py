@@ -5,9 +5,14 @@ responses and returns structured BatchApprovalResponse objects. It is NOT
 a full agent - just a prompt + LLM + structured output.
 
 Architecture:
-- Input: pending_interrupts + user_message
+- Input: pending_interrupts + user_message + conversation_history
 - Processing: LLM analyzes intent with structured output schema
 - Output: BatchApprovalResponse (Pydantic model)
+
+Key Design:
+- Uses conversation history to understand context and resolve ambiguous references
+- Full tool_args provided for complete context
+- LLM interprets approval intent based on full context
 
 This is separate from PM because:
 1. PM handles orchestration (task delegation)
@@ -37,32 +42,32 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
     """Create approval analyzer chain with structured output.
 
     This creates a lightweight LLM chain (NOT a full agent) that:
-    1. Takes pending interrupts + user message as input
-    2. Interprets user intent using LLM reasoning
+    1. Takes pending interrupts + user message + conversation history as input
+    2. Interprets user intent using LLM reasoning with full context
     3. Returns BatchApprovalResponse (structured Pydantic model)
 
-    No state, no tools, no delegation - pure analysis function.
+    No state, no tools, no delegation - pure analysis function with conversation context.
 
     Args:
-        llm: Optional LLM override. If None, uses default gpt-4.1-mini with low temperature
+        llm: Optional LLM override. If None, uses default gemini-2.5-flash-lite with low temperature
              for deterministic approval interpretation.
 
     Returns:
         LangChain chain configured for structured output:
-        Input: {"pending_interrupts": list[InterruptContext], "user_message": str}
+        Input: {"pending_interrupts": list[dict], "user_message": str, "conversation_history": list}
         Output: BatchApprovalResponse
 
     Example:
         >>> analyzer = create_approval_analyzer()
         >>> result = analyzer.invoke({
         ...     "pending_interrupts": [
-        ...         {"interrupt_id": "1", "tool_name": "save_product", "tool_args": {...}},
-        ...         {"interrupt_id": "2", "tool_name": "save_product", "tool_args": {...}},
+        ...         {"interrupt_id": "1", "tool_name": "execute_database_operation", "tool_args": {...}},
         ...     ],
-        ...     "user_message": "approve both"
+        ...     "user_message": "approve",
+        ...     "conversation_history": [...]
         ... })
         >>> assert isinstance(result, BatchApprovalResponse)
-        >>> assert len(result.responses) == 2
+        >>> assert len(result.responses) == 1
     """
     if llm is None:
         # Use gemini-2.5-flash for fast, deterministic approval interpretation
@@ -118,10 +123,10 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
             )
 
         # Format conversation history for context
-        # LIMIT to 3 recent messages to prevent context bleeding (applying old edits)
+        # LIMIT to recent messages to prevent context bleeding (applying old edits)
         history_lines = []
         if conversation_history:
-            for msg in conversation_history[-5:]:  # Last 3 messages only (reduced from 10)
+            for msg in conversation_history[-5:]:  # Last 5 messages for context
                 msg_type = getattr(msg, 'type', None)
                 if not msg_type and hasattr(msg, '__class__'):
                     msg_type = msg.__class__.__name__.replace('Message', '').lower()
@@ -171,7 +176,7 @@ def analyze_approval(
     Args:
         pending_interrupts: List of InterruptInfo objects
         user_message: User's approval/rejection message
-        conversation_history: Full conversation history for context
+        conversation_history: Full conversation history for context (helps resolve ambiguous references)
         llm: Optional LLM override
         run_id: Optional run_id to use as trace_id in LangSmith
 
@@ -192,7 +197,7 @@ def analyze_approval(
         from uuid import UUID
         config["run_id"] = UUID(run_id) if isinstance(run_id, str) else run_id
 
-    # Invoke analyzer with conversation history
+    # Invoke analyzer with conversation history for context
     try:
         result: BatchApprovalResponse = analyzer.invoke(
             {

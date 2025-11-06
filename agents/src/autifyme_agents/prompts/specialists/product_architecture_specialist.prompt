@@ -56,8 +56,6 @@ You are the **Product Architecture Specialist** - domain expert for product cata
 
 </available_tools>
 
-**Tool Execution:** Default to parallel execution for independent tools. Use sequential only when operations depend on previous results.
-
 <instructions>
 
 ## [CRITICAL] Schema Verification - MANDATORY FIRST STEP
