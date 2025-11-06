@@ -275,6 +275,8 @@ class OperationExecutor:
         """Execute plan within transaction (all validation already done)."""
         completed_steps: list[tuple[ExecutionStep, dict[str, Any]]] = []
         created_ids: dict[int, dict[str, Any]] = {}
+        updated_entities: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        deleted_entities: dict[str, list[str]] = defaultdict(list)
 
         # Sort steps by dependencies (already validated in _validate_plan)
         sorted_steps = self._resolve_dependencies(steps, operations)
@@ -302,6 +304,16 @@ class OperationExecutor:
                     # Single entity
                     created_ids[step.step_number] = ids
 
+            # Track updated entities
+            if operation.op_type == "update" and result.get("updated_details"):
+                table = operation.table
+                updated_entities[table].extend(result["updated_details"])
+
+            # Track deleted entities
+            if operation.op_type == "delete" and result.get("deleted_ids"):
+                table = operation.table
+                deleted_entities[table].extend(result["deleted_ids"])
+
             logger.info(
                 f"Step {step.step_number} completed",
                 extra={"affected_rows": result.get("count", 0)}
@@ -314,6 +326,8 @@ class OperationExecutor:
             success=True,
             affected_entities=self._count_affected(completed_steps, operations),
             created_ids=created_ids,
+            updated_entities=dict(updated_entities),
+            deleted_entities=dict(deleted_entities),
             execution_time_ms=execution_time_ms,
             steps_completed=len(completed_steps),
             steps_total=len(sorted_steps),
@@ -638,7 +652,18 @@ class OperationExecutor:
             table_schema.name, resolved_filter, resolved_updates
         )
 
-        return {"count": count}
+        # Build updated entity details for result tracking
+        updated_details = []
+        if count > 0:
+            # Extract entity IDs from filter (if available)
+            entity_id = resolved_filter.get("id")
+            if entity_id:
+                updated_details.append({
+                    "id": entity_id,
+                    "updated_fields": list(resolved_updates.keys())
+                })
+
+        return {"count": count, "updated_details": updated_details}
 
     async def _execute_delete(
         self,
@@ -715,7 +740,18 @@ class OperationExecutor:
             # Hard delete
             count = await self._delete_entities(table_schema.name, resolved_filter)
 
-        return {"count": count, "soft_delete": operation.soft_delete}
+        # Extract deleted entity IDs for result tracking
+        deleted_ids = []
+        if count > 0:
+            # Extract entity ID(s) from filter
+            entity_id = resolved_filter.get("id")
+            if entity_id:
+                if isinstance(entity_id, list):
+                    deleted_ids = entity_id
+                else:
+                    deleted_ids = [entity_id]
+
+        return {"count": count, "soft_delete": operation.soft_delete, "deleted_ids": deleted_ids}
 
     async def _execute_query(
         self,

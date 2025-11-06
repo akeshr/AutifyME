@@ -241,7 +241,17 @@ class ExecutionResult(BaseModel):
     )
     created_ids: dict[int, dict[str, Any]] = Field(
         default_factory=dict,
-        description="Map of step_number -> {field_name: generated_id} (for foreign keys)"
+        description="Map of step_number -> {field_name: generated_id} or {_refs: {name: entity}} for named refs"
+    )
+    updated_entities: dict[str, list[dict[str, Any]]] = Field(
+        default_factory=dict,
+        description="Map of table_name -> list of updated entity IDs and fields. "
+                    "Example: {'products': [{'id': 'uuid', 'updated_fields': ['name', 'sku']}]}"
+    )
+    deleted_entities: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Map of table_name -> list of deleted entity IDs. "
+                    "Example: {'products': ['uuid-1', 'uuid-2']}"
     )
 
     # Execution metadata
