@@ -72,7 +72,7 @@ Library patterns, prompt engineering, and development practices.
 | --- | --- |
 | **[TECH_STACK.md](./tech/TECH_STACK.md)** | Technology choices organized by architecture layer |
 | **[EXECUTABLE_SCHEMA_COMPLETE.md](./tech/EXECUTABLE_SCHEMA_COMPLETE.md)** | ✅ **Phase 2D+2E Complete** - Executable schema + transaction support (76 tests, production-ready) |
-| **[DYNAMIC_CRUD_ACCESS_CONTROL.md](./tech/DYNAMIC_CRUD_ACCESS_CONTROL.md)** | 🔄 **Design** - Operation-scoped CRUD tools with dynamic Pydantic schemas for agent role-based access control |
+| **[DYNAMIC_CRUD_ACCESS_CONTROL.md](./tech/DYNAMIC_CRUD_ACCESS_CONTROL.md)** | ✅ **Implemented** - Operation-scoped CRUD tools with dynamic Pydantic schemas (39 tests) |
 | **[LANGCHAIN_V1_FEATURES.md](./tech/LANGCHAIN_V1_FEATURES.md)** | LangChain v1 native patterns (HITL, error handling, structured outputs) |
 | **[LANGGRAPH_V1_FEATURES.md](./tech/LANGGRAPH_V1_FEATURES.md)** | LangGraph orchestration patterns and gotchas |
 | **[LANGSMITH_FEATURES.md](./tech/LANGSMITH_FEATURES.md)** | LangSmith tracing and debugging |
