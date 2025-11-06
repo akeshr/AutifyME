@@ -284,6 +284,34 @@ class WorkflowRunner:
                 }
             )
 
+            # CRITICAL: Detect blank/empty LLM responses (Gemini bug)
+            # If LLM returns no content, checkpoint saves blank response
+            # Next user message would retrieve this blank instead of generating new response
+            if messages:
+                # Check last AI message for blank content
+                last_ai_message = None
+                for msg in reversed(messages):
+                    if hasattr(msg, 'type') and msg.type == 'ai':
+                        last_ai_message = msg
+                        break
+
+                if last_ai_message:
+                    content = getattr(last_ai_message, 'content', '')
+                    if not content or (isinstance(content, str) and not content.strip()):
+                        logger.error(
+                            "BLANK LLM RESPONSE DETECTED - LLM returned empty content",
+                            extra={
+                                "thread_id": thread_id,
+                                "message_count": len(messages),
+                                "tracking_id": tracking_id,
+                            }
+                        )
+                        self.channel.send_text(
+                            sender,
+                            "I apologize, but I encountered an error generating a response. Please try again."
+                        )
+                        return
+
             # Send workflow-specific completion to user
             cataloging_result = self.workflow_handler.extract_result(messages)
             if cataloging_result:
