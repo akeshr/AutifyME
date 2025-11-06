@@ -14,32 +14,33 @@ from pydantic import BaseModel, ConfigDict, Field
 class HumanInTheLoopResponse(BaseModel):
     """Single response for one HITL interrupt.
 
-    This schema matches langchain.agents.middleware.human_in_the_loop expectations
-    for resuming interrupted workflows.
+    Simplified to binary approval model - approval analyzer does NOT modify domain data.
 
     Attributes:
-        type: Response type - accept (approve as-is), edit (approve with changes),
-              or response (reject/clarify)
-        args: Additional data based on type:
-              - accept: None
-              - edit: dict with field → value mappings (e.g., {"price": 45.0})
-              - response: string message explaining rejection/clarification
+        type: Response type - accept (approve operation) or reject (user rejected or wants changes)
+        user_message: For reject, the exact user message explaining what they want changed.
+                     For accept, this is empty/None.
+
+    Design Philosophy:
+        - Approval analyzer: Simple binary decision (accept/reject)
+        - Specialist: Handles all domain work including regenerating operations based on feedback
+        - PM: Receives rejection with user message, delegates back to specialist
     """
 
-    type: Literal["accept", "edit", "response"] = Field(
-        description="Response type: accept, edit, or response"
+    type: Literal["accept", "reject"] = Field(
+        description="Response type: accept (approve) or reject (user wants changes or rejects)"
     )
-    args: dict[str, Any] | str | None = Field(
+    user_message: str | None = Field(
         default=None,
-        description="Arguments: None for accept, dict for edit, string for response",
+        description="For reject: exact user message explaining rejection/changes. For accept: None.",
     )
 
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
-                {"type": "accept", "args": None},
-                {"type": "edit", "args": {"price": 45.0, "name": "Updated Name"}},
-                {"type": "response", "args": "User rejected this item"},
+                {"type": "accept", "user_message": None},
+                {"type": "reject", "user_message": "change price to 25"},
+                {"type": "reject", "user_message": "no, I want it cheaper"},
             ]
         }
     )
@@ -109,24 +110,24 @@ class BatchApprovalResponse(BaseModel):
             "examples": [
                 {
                     "responses": [
-                        {"type": "accept", "args": None},
-                        {"type": "accept", "args": None},
+                        {"type": "accept", "user_message": None},
+                        {"type": "accept", "user_message": None},
                     ],
-                    "reasoning": "User approved both pending items",
+                    "reasoning": "User approved both pending operations",
                 },
                 {
                     "responses": [
-                        {"type": "accept", "args": None},
-                        {"type": "edit", "args": {"price": 45.0}},
+                        {"type": "accept", "user_message": None},
+                        {"type": "reject", "user_message": "make the price 45 instead"},
                     ],
-                    "reasoning": "User approved first item as-is, requested price edit for second",
+                    "reasoning": "User approved first operation, wants changes to second",
                 },
                 {
                     "responses": [
-                        {"type": "response", "args": "User rejected"},
-                        {"type": "response", "args": "User rejected"},
+                        {"type": "reject", "user_message": "no, I don't want this"},
+                        {"type": "reject", "user_message": "no, I don't want this"},
                     ],
-                    "reasoning": "User rejected all pending items",
+                    "reasoning": "User rejected all pending operations",
                 },
             ]
         }

@@ -108,19 +108,25 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
         user_message = inputs.get("user_message", "")
         conversation_history = inputs.get("conversation_history", [])
 
-        # Format interrupts for display
-        # CRITICAL: Use json.dumps to avoid curly brace template variable conflicts
-        # If we use str(dict), curly braces like {name} get interpreted as template vars
-        import json
+        # Format interrupts for display - show only high-level summary
+        # Approval analyzer should see what user saw, not backend OperationIntent details
         interrupt_lines = []
         for idx, interrupt in enumerate(pending_interrupts, 1):
+            tool_name = interrupt.get('tool_name', 'unknown')
             tool_args = interrupt.get('tool_args', {})
-            # Use json.dumps for safe formatting (escapes braces)
-            args_str = json.dumps(tool_args, ensure_ascii=False)
-            interrupt_lines.append(
-                f"{idx}. Tool: {interrupt.get('tool_name', 'unknown')}, "
-                f"Args: {args_str}"
-            )
+
+            # Extract human-readable summary (what user actually saw in approval message)
+            if tool_name == "execute_database_operation":
+                # Show operation type + summary (matches approval message format)
+                intent_type = tool_args.get("intent_type", "unknown").upper()
+                summary = tool_args.get("user_request_summary", "Database operation")
+                interrupt_lines.append(f"{idx}. {intent_type}: {summary}")
+            else:
+                # For other tools, show formatted tool name
+                formatted_name = tool_name.replace('_', ' ').title()
+                interrupt_lines.append(f"{idx}. {formatted_name}")
+
+        # Result: "1. CREATE: Add 500ml PET jar" instead of "1. Tool: execute_database_operation, Args: {change_spec: {...}, entity_references: {...}}"
 
         # Format conversation history for context
         # LIMIT to recent messages to prevent context bleeding (applying old edits)
@@ -140,8 +146,8 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
                 text_content = extract_text_content(raw_content) if raw_content else None
 
                 if text_content and len(text_content) > 0:
-                    # Truncate long messages
-                    preview = text_content[:200] + "..." if len(text_content) > 200 else text_content
+                    # Truncate long messages (500 chars to preserve context for references)
+                    preview = text_content[:500] + "..." if len(text_content) > 500 else text_content
                     history_lines.append(f"[{msg_type.upper()}]: {preview}")
 
         formatted = {

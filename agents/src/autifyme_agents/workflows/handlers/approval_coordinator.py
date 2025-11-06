@@ -207,37 +207,30 @@ class ApprovalCoordinator:
             )
 
             response = approval_response.responses[idx]
-            tool_name = interrupt_info.tool_name
-            tool_args = interrupt_info.tool_args
 
-            # Format response based on type for v1.0 HITL middleware compatibility
-            if response.type == "edit":
-                # v1.0 HITL middleware expects: {"type": "edit", "edited_action": {"name": "tool_name", "args": {...}}}
-                merged_args = {**tool_args, **response.args} if isinstance(response.args, dict) else tool_args
-                decision = {
-                    "type": "edit",
-                    "edited_action": {
-                        "name": tool_name,
-                        "args": merged_args
-                    }
-                }
-                logger.debug(
-                    f"Built edit decision for interrupt {idx}",
-                    extra={
-                        "tool_name": tool_name,
-                        "edited_fields": list(response.args.keys()) if isinstance(response.args, dict) else [],
-                    }
-                )
-            elif response.type == "accept":
-                # v1.0: "accept" → "approve"
+            # Binary approval model: accept or reject
+            # Approval analyzer does NOT modify domain data - specialist handles all domain work
+            if response.type == "accept":
+                # User approved operation
                 decision = {"type": "approve"}
-            elif response.type == "response":
-                # v1.0: "response" → "reject" with "message" field
-                message = response.args if isinstance(response.args, str) else str(response.args or "")
+                logger.debug(
+                    f"Built approve decision for interrupt {idx}",
+                    extra={"interrupt_id": interrupt_info.interrupt_id}
+                )
+            elif response.type == "reject":
+                # User rejected or wants changes - pass exact user message to PM
+                # PM will delegate back to specialist with this feedback
                 decision = {
                     "type": "reject",
-                    "message": message
+                    "message": response.user_message or "User rejected"
                 }
+                logger.debug(
+                    f"Built reject decision for interrupt {idx}",
+                    extra={
+                        "interrupt_id": interrupt_info.interrupt_id,
+                        "user_feedback": response.user_message,
+                    }
+                )
 
             all_decisions.append(decision)
 
@@ -246,7 +239,6 @@ class ApprovalCoordinator:
             extra={
                 "total_decisions": len(all_decisions),
                 "approve_count": sum(1 for d in all_decisions if d["type"] == "approve"),
-                "edit_count": sum(1 for d in all_decisions if d["type"] == "edit"),
                 "reject_count": sum(1 for d in all_decisions if d["type"] == "reject"),
             }
         )
