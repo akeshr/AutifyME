@@ -110,13 +110,14 @@ def test_query_tools():
     search_tool = create_search_catalog_summary_tool(storage)
 
     start_time = time.time()
-    result = search_tool.invoke({"query": "PET"})
+    result = search_tool.invoke({"queries": ["PET"]})
     query_time = (time.time() - start_time) * 1000
 
+    first_result = result["results"][0]
     print_result(
         "search_catalog_summary works",
-        result.total_matches > 0,
-        f"Found {result.total_matches} matches for 'PET'",
+        first_result["total_matches"] > 0,
+        f"Found {first_result['total_matches']} matches for 'PET'",
     )
 
     print_result(
@@ -182,19 +183,21 @@ def test_scenario_matrix():
     search_tool = create_search_catalog_summary_tool(storage)
 
     # Scenario 1: New product (no match)
-    result = search_tool.invoke({"query": "nonexistent product"})
+    result = search_tool.invoke({"queries": ["nonexistent product"]})
+    first_result = result["results"][0]
     print_result(
         "Scenario 1: New product (no match)",
-        result.total_matches == 0,
+        first_result["total_matches"] == 0,
         "Correctly returns no matches",
     )
 
     # Scenario 2: Existing product
-    result = search_tool.invoke({"query": "Bottles"})
+    result = search_tool.invoke({"queries": ["Bottles"]})
+    first_result = result["results"][0]
     print_result(
         "Scenario 2: Existing product",
-        result.total_matches > 0,
-        f"Found {result.total_matches} bottle families",
+        first_result["total_matches"] > 0,
+        f"Found {first_result['total_matches']} bottle families",
     )
 
     # Scenario 3: User question (would use base context)
@@ -204,11 +207,12 @@ def test_scenario_matrix():
     )
 
     # Scenario 4: Ambiguous match (multiple results)
-    result = search_tool.invoke({"query": "PET"})
+    result = search_tool.invoke({"queries": ["PET"]})
+    first_result = result["results"][0]
     print_result(
         "Scenario 4: Ambiguous match",
-        result.total_matches > 1,
-        f"Found {result.total_matches} matches (allows clarification)",
+        first_result["total_matches"] > 1,
+        f"Found {first_result['total_matches']} matches (allows clarification)",
     )
 
     # Don't cleanup - other tests need storage
