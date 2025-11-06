@@ -80,17 +80,24 @@ def _validate_operation_completeness(
         if op_type == "insert" and hasattr(operation, "new_entities") and operation.new_entities:
             actual_new_counts[table] += len(operation.new_entities)
 
-        # Count UPDATE operations (entity-specific field updates)
+        # Count UPDATE operations (both single-entity and bulk entity-specific updates)
         if op_type == "update" and hasattr(operation, "field_updates") and operation.field_updates:
-            # Check if any field_update value is a dict mapping UUID -> value
+            # Check if this is bulk entity-specific update (field values are dicts)
+            has_entity_specific_updates = False
             for field_value in operation.field_updates.values():
                 if isinstance(field_value, dict):
-                    # Found entity-specific updates
+                    # Bulk update: field maps UUID -> value
                     actual_updated_counts[table] = max(
                         actual_updated_counts[table],
                         len(field_value)
                     )
+                    has_entity_specific_updates = True
                     break  # Only need to count once per operation
+
+            # If no entity-specific dict found, this is a single-entity update with target_filter
+            if not has_entity_specific_updates and hasattr(operation, "target_filter") and operation.target_filter:
+                # Single-entity update: count as 1
+                actual_updated_counts[table] += 1
 
         # Count DELETE operations (ID list deletions)
         if op_type == "delete" and hasattr(operation, "delete_filter") and operation.delete_filter:
