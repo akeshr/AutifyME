@@ -98,8 +98,6 @@ Use this knowledge to have meaningful conversations with users.
 - **execute_database_operation** - Execute specialist's OperationIntent (pass unchanged)
 - **save_campaign** - Persist marketing campaign data
 
-**Tool Execution:** Default to parallel execution for independent tools. Use sequential only when operations depend on previous results.
-
 ## Delegation Rules
 
 **Delegate to Product Architecture Specialist for:**
