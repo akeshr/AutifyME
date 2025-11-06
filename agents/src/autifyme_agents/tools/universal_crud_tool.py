@@ -53,6 +53,9 @@ def _validate_operation_completeness(
     Checks that entity counts in operations match the counts claimed in impact_analysis.
     Prevents partial data from reaching database (e.g., 18 entities when impact says 36).
 
+    Aggregates counts across ALL operations for same table before comparing to impact_analysis.
+    Multiple operations can target the same table (e.g., operation 3 and 5 both insert into product_variant_values).
+
     Args:
         operations: List of Operation objects
         impact_analysis: ImpactAnalysis dict with entity counts
@@ -64,55 +67,66 @@ def _validate_operation_completeness(
     updated_entities_count = impact_analysis.get("updated_entities_count", {})
     deleted_entities_count = impact_analysis.get("deleted_entities_count", {})
 
-    for idx, operation in enumerate(operations):
+    # Aggregate actual counts across all operations per table
+    actual_new_counts = defaultdict(int)
+    actual_updated_counts = defaultdict(int)
+    actual_deleted_counts = defaultdict(int)
+
+    for operation in operations:
         op_type = operation.op_type
         table = operation.table
 
-        # Validate INSERT operations
+        # Count INSERT operations
         if op_type == "insert" and hasattr(operation, "new_entities") and operation.new_entities:
-            actual_count = len(operation.new_entities)
-            expected_count = new_entities_count.get(table, 0)
+            actual_new_counts[table] += len(operation.new_entities)
 
-            if expected_count > 0 and actual_count != expected_count:
-                raise ToolException(
-                    f"Operation {idx} incomplete: {table} insert has {actual_count} entities "
-                    f"but impact_analysis claims {expected_count}. "
-                    f"Specialist must provide ALL entities - partial lists are FORBIDDEN. "
-                    f"Expected all {expected_count} entities in new_entities array."
-                )
-
-        # Validate UPDATE operations (check field_updates with dict values)
+        # Count UPDATE operations (entity-specific field updates)
         if op_type == "update" and hasattr(operation, "field_updates") and operation.field_updates:
-            expected_count = updated_entities_count.get(table, 0)
-
             # Check if any field_update value is a dict mapping UUID -> value
-            for field_name, field_value in operation.field_updates.items():
+            for field_value in operation.field_updates.values():
                 if isinstance(field_value, dict):
-                    actual_count = len(field_value)
+                    # Found entity-specific updates
+                    actual_updated_counts[table] = max(
+                        actual_updated_counts[table],
+                        len(field_value)
+                    )
+                    break  # Only need to count once per operation
 
-                    if expected_count > 0 and actual_count != expected_count:
-                        raise ToolException(
-                            f"Operation {idx} incomplete: {table} update field '{field_name}' "
-                            f"has {actual_count} entity-specific values but impact_analysis claims {expected_count}. "
-                            f"All {expected_count} entities must have values specified."
-                        )
-
-        # Validate DELETE operations (check delete_filter with ID lists)
+        # Count DELETE operations (ID list deletions)
         if op_type == "delete" and hasattr(operation, "delete_filter") and operation.delete_filter:
-            expected_count = deleted_entities_count.get(table, 0)
-
-            # Check if delete_filter has a list of IDs
             if "id" in operation.delete_filter:
                 filter_value = operation.delete_filter["id"]
                 if isinstance(filter_value, list):
-                    actual_count = len(filter_value)
+                    actual_deleted_counts[table] += len(filter_value)
 
-                    if expected_count > 0 and actual_count != expected_count:
-                        raise ToolException(
-                            f"Operation {idx} incomplete: {table} delete targets {actual_count} entities "
-                            f"but impact_analysis claims {expected_count}. "
-                            f"Delete filter must include all {expected_count} entity IDs."
-                        )
+    # Validate aggregated counts against impact_analysis
+    for table, expected_count in new_entities_count.items():
+        actual_count = actual_new_counts.get(table, 0)
+        if expected_count > 0 and actual_count != expected_count:
+            raise ToolException(
+                f"INSERT count mismatch for {table}: operations provide {actual_count} entities "
+                f"but impact_analysis claims {expected_count}. "
+                f"Specialist must provide ALL entities - partial lists are FORBIDDEN. "
+                f"Expected {expected_count} total entities across all operations for {table}."
+            )
+
+    for table, expected_count in updated_entities_count.items():
+        actual_count = actual_updated_counts.get(table, 0)
+        if expected_count > 0 and actual_count != expected_count:
+            raise ToolException(
+                f"UPDATE count mismatch for {table}: operations provide {actual_count} entity-specific updates "
+                f"but impact_analysis claims {expected_count}. "
+                f"All {expected_count} entities must have values specified."
+            )
+
+    for table, expected_count in deleted_entities_count.items():
+        actual_count = actual_deleted_counts.get(table, 0)
+        if expected_count > 0 and actual_count != expected_count:
+            raise ToolException(
+                f"DELETE count mismatch for {table}: operations target {actual_count} entities "
+                f"but impact_analysis claims {expected_count}. "
+                f"Delete filter must include all {expected_count} entity IDs."
+            )
 
 
 # =============================================================================
