@@ -43,7 +43,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     """Return configured LLM for PM. Defaults to gemini-2.5-flash for orchestration."""
     if model is not None:
         return model
-    return get_llm(provider="google", model="gemini-2.5-flash", temperature=0.7)
+    return get_llm(provider="google", model="gemini-2.5-flash", temperature=0.5)
 
 
 def _load_prompt(
@@ -180,16 +180,16 @@ async def create_project_manager(
     # Standard pattern used by all specialists
     #
     # CRITICAL: Specialist needs deterministic model for structured OperationIntent
-    # - temperature=0: Maximum consistency for schema-driven operations
+    # - temperature=0.3: More deterministic for schema-driven operations
     # - top_p=0.95: Focused sampling (Google's recommendation for JSON)
     # - top_k=20: Structured output best practice
-    # PM uses temperature=0.7 for creative orchestration; specialist needs precision
+    # PM uses temperature=0.5 for orchestration; specialist needs more precision
     product_architecture_specialist = create_product_architecture_specialist(
         storage=storage,
         model=get_llm(
             provider="google",
             model="gemini-2.5-flash",
-            temperature=0.5,  # Deterministic for structured output
+            temperature=0.3,  # More deterministic for structured output
             #top_p=0.95,       # Focused nucleus sampling
             #top_k=20,         # Structured JSON generation
             thinking_budget=0 # Reasoning budget
