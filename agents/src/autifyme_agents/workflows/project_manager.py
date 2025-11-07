@@ -19,19 +19,20 @@ from autifyme_agents.integrations.storage import get_store
 from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
+from autifyme_agents.schemas.operation_intent import OperationIntent
 from autifyme_agents.specialists.product_architecture_specialist import (
     create_product_architecture_specialist,
 )
 from autifyme_agents.tools.campaign_persistence_tools import (
     create_save_campaign_tool,
 )
+from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 from autifyme_agents.tools.pm_context_tools import (
     create_get_category_info_tool,
     create_search_catalog_summary_tool,
 )
 from autifyme_agents.tools.schema_tools import get_product_schema
 from autifyme_agents.tools.universal_crud_tool import create_database_tool
-from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -192,7 +193,9 @@ async def create_project_manager(
             temperature=0.3,  # More deterministic for structured output
             #top_p=0.95,       # Focused nucleus sampling
             #top_k=20,         # Structured JSON generation
-            thinking_budget=0 # Reasoning budget
+            thinking_budget=0, # Reasoning budget
+            response_mime_type="application/json",
+            response_schema=OperationIntent.model_json_schema()
         )
     )
 
