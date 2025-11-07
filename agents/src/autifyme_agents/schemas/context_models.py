@@ -1,10 +1,11 @@
 """Context models for PM base context (catalog summary, taxonomy tree)."""
 
 from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from autifyme_agents.schemas.models import CompanyProfile
 
 
 class CategoryNode(BaseModel):
@@ -112,7 +113,7 @@ class PMBaseContext(BaseModel):
     - Taxonomy tree: ~500-1000 tokens
     """
 
-    company_profile: dict[str, Any] = Field(
+    company_profile: CompanyProfile = Field(
         ...,
         description="Company profile with brand voice, target audience, capabilities"
     )

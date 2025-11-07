@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Any
 
-from ..schemas.models import CompanyProfile, Product
+from ..schemas.models import CompanyProfile, WorkflowOutcome
 
 # Note for Abhi (from our discussion):
 # This is the equivalent of a Java or TypeScript `interface`. It defines a
@@ -30,20 +30,9 @@ class StorageInterface(ABC):
         """
         pass
 
-    @abstractmethod
-    def save_product(self, product: Product) -> Product:
-        """
-        Saves a product to the storage layer.
-
-        Args:
-            product: The Product object to save.
-
-        Returns:
-            The saved Product object, potentially updated with new data
-            from the database (like a creation timestamp).
-        """
-        pass
-
+    # NOTE: Legacy methods removed - use universal_crud_tool for all persistence
+    # Removed methods: save_product() - use execute_database_operation instead
+    #
     # NOTE: Pending approval methods removed - architecture uses LangGraph checkpoints
     # for HITL state persistence instead of database storage. If restart recovery
     # is needed for approvals, use LangGraph checkpoint restoration.
@@ -83,32 +72,12 @@ class StorageInterface(ABC):
     # ========================================================================
 
     @abstractmethod
-    def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
+    def save_workflow_outcome(self, outcome: WorkflowOutcome) -> str:
         """
         Persist workflow outcome for learning and analytics.
 
         Args:
-            outcome: Complete workflow record with:
-                - tracking_id: Unique identifier
-                - thread_id: LangGraph thread ID
-                - sender_id: User identifier
-                - message_text: User's message
-                - message_hash: Content hash for similarity
-                - media_id, media_type, platform: Optional media info
-                - received_at: When message was received
-                - intent, department: Routing decision
-                - routing_reasoning: PM's reasoning
-                - routing_confidence: Optional confidence score
-                - alternative_departments: Fallback options
-                - routed_at: When routing occurred
-                - success: Whether workflow succeeded
-                - error_type, error_message: If failed
-                - resolution_strategy: How error was handled
-                - result_data: Structured result if successful
-                - duration_seconds: Execution time
-                - started_at, ended_at: Timestamps
-                - learned_patterns, failure_warnings: Extracted learnings
-                - applied_strategies: Which strategies were used
+            outcome: WorkflowOutcome model with complete workflow execution data
 
         Returns:
             Outcome record ID (UUID)
@@ -124,7 +93,7 @@ class StorageInterface(ABC):
         department: str | None = None,
         success: bool | None = None,
         limit: int = 100,
-    ) -> list[dict[str, Any]]:
+    ) -> list[WorkflowOutcome]:
         """
         Retrieve workflow outcomes for analysis.
 
@@ -136,7 +105,7 @@ class StorageInterface(ABC):
             limit: Maximum records to return
 
         Returns:
-            List of outcome records ordered by created_at DESC
+            List of WorkflowOutcome models ordered by received_at DESC
         """
         pass
 
@@ -145,7 +114,7 @@ class StorageInterface(ABC):
         self,
         time_window: timedelta,
         limit: int = 10,
-    ) -> list[dict[str, Any]]:
+    ) -> list[WorkflowOutcome]:
         """
         Retrieve recent failures for regression test generation.
 
@@ -154,7 +123,7 @@ class StorageInterface(ABC):
             limit: Maximum failures to return
 
         Returns:
-            List of failure records ordered by recency
+            List of WorkflowOutcome models (failures only) ordered by received_at DESC
         """
         pass
 
