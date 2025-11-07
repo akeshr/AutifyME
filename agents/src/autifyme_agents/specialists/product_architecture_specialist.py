@@ -29,11 +29,8 @@ Architecture Pattern:
 
 from typing import Any
 
-from langchain.agents.structured_output import ProviderStrategy
-
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.schemas.operation_intent import OperationIntent
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 # =============================================================================
@@ -59,17 +56,12 @@ def create_product_architecture_specialist(
     - Maintain conversation history across PM delegations
 
     Architecture:
-    - SubAgent dict: {name, description, tools, system_prompt, response_format, model (optional)}
+    - SubAgent dict: {name, description, tools, system_prompt, model (optional)}
     - DeepAgents compiles specialist with specified model or default_model from PM
     - Schema-driven planning (no hard-coded operation types)
-    - Structured output via ProviderStrategy(OperationIntent) for native Gemini schema enforcement
+    - Returns OperationIntent as JSON wrapped in XML tags
+    - PM extracts and validates OperationIntent from specialist response
     - PM handles persistence via execute_database_operation tool
-
-    Structured Output:
-    - Uses Gemini's native JSON Schema support via response_format parameter
-    - Guarantees syntactically valid OperationIntent matching Pydantic schema
-    - Eliminates XML parsing and format errors
-    - PM receives validated object in structured_response state key
 
     Args:
         storage: Storage interface for catalog search + schema query (REQUIRED)
@@ -84,7 +76,6 @@ def create_product_architecture_specialist(
         - DeepAgents handles model compilation, checkpointer, middleware
         - Specialist focused on analysis and planning only
         - PM delegates execution and approval
-        - Response format enforced at LLM API level (not post-processing)
     """
     if storage is None:
         raise ValueError(
@@ -129,14 +120,12 @@ def create_product_architecture_specialist(
         "Returns detailed operation plans for PM to execute via execute_database_operation tool."
     )
 
-    # Return SubAgent spec with structured output enforcement
-    # ProviderStrategy uses Gemini's native JSON Schema support for guaranteed structure
+    # Return SubAgent spec
     spec = {
         "name": "product_architecture_specialist",
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
-        "response_format": ProviderStrategy(schema=OperationIntent),  # Native schema enforcement
         # No interrupt_on - specialist has no HITL tools
     }
 
