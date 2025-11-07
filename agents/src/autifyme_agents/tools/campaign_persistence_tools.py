@@ -193,7 +193,7 @@ def create_save_campaign_tool(storage: Any) -> Any:
         Configured tool for PM to use
     """
 
-    def _save_campaign_impl(campaign_input: CampaignInput) -> dict[str, Any]:
+    async def _save_campaign_impl(campaign_input: CampaignInput) -> dict[str, Any]:
         """
         Atomically persist complete marketing campaign across 5+ tables.
 
@@ -249,14 +249,11 @@ def create_save_campaign_tool(storage: Any) -> Any:
                 "specialist_versions": campaign_input.specialist_versions,
             }
 
-            campaign_result = storage.execute_sql(
-                "INSERT INTO campaigns ({}) VALUES ({}) RETURNING id".format(
-                    ", ".join(campaign_data.keys()),
-                    ", ".join([f"${i+1}" for i in range(len(campaign_data))])
-                ),
-                list(campaign_data.values())
+            campaign_result = await storage.insert_entity(
+                "campaigns",
+                campaign_data
             )
-            campaign_id = campaign_result[0]["id"]
+            campaign_id = campaign_result["id"]
             logger.info(f"Created campaign: {campaign_id}")
 
             # 2. Create campaign_products (M:N junctions)
@@ -271,14 +268,11 @@ def create_save_campaign_tool(storage: Any) -> Any:
                     "discount_percentage": product_input.discount_percentage,
                     "special_price": product_input.special_price,
                 }
-                result = storage.execute_sql(
-                    "INSERT INTO campaign_products ({}) VALUES ({}) RETURNING id".format(
-                        ", ".join(product_data.keys()),
-                        ", ".join([f"${i+1}" for i in range(len(product_data))])
-                    ),
-                    list(product_data.values())
+                result = await storage.insert_entity(
+                    "campaign_products",
+                    product_data
                 )
-                product_ids.append(result[0]["id"])
+                product_ids.append(result["id"])
 
             logger.info(f"Created {len(product_ids)} campaign products")
 
@@ -299,14 +293,11 @@ def create_save_campaign_tool(storage: Any) -> Any:
                     "platform_optimized_for": asset_input.platform_optimized_for,
                     "is_approved": asset_input.is_approved,
                 }
-                result = storage.execute_sql(
-                    "INSERT INTO campaign_assets ({}) VALUES ({}) RETURNING id".format(
-                        ", ".join(asset_data.keys()),
-                        ", ".join([f"${i+1}" for i in range(len(asset_data))])
-                    ),
-                    list(asset_data.values())
+                result = await storage.insert_entity(
+                    "campaign_assets",
+                    asset_data
                 )
-                asset_ids.append(result[0]["id"])
+                asset_ids.append(result["id"])
 
             logger.info(f"Created {len(asset_ids)} campaign assets")
 
@@ -319,14 +310,11 @@ def create_save_campaign_tool(storage: Any) -> Any:
                     "channel_config": channel_input.channel_config,
                     "status": channel_input.status,
                 }
-                result = storage.execute_sql(
-                    "INSERT INTO campaign_channels ({}) VALUES ({}) RETURNING id".format(
-                        ", ".join(channel_data.keys()),
-                        ", ".join([f"${i+1}" for i in range(len(channel_data))])
-                    ),
-                    list(channel_data.values())
+                result = await storage.insert_entity(
+                    "campaign_channels",
+                    channel_data
                 )
-                channel_ids.append(result[0]["id"])
+                channel_ids.append(result["id"])
 
             logger.info(f"Created {len(channel_ids)} campaign channels")
 
@@ -342,14 +330,11 @@ def create_save_campaign_tool(storage: Any) -> Any:
                     "primary_channels": segment_input.primary_channels,
                     "content_formats": segment_input.content_formats,
                 }
-                result = storage.execute_sql(
-                    "INSERT INTO customer_segments ({}) VALUES ({}) RETURNING id".format(
-                        ", ".join(segment_data.keys()),
-                        ", ".join([f"${i+1}" for i in range(len(segment_data))])
-                    ),
-                    list(segment_data.values())
+                result = await storage.insert_entity(
+                    "customer_segments",
+                    segment_data
                 )
-                segment_ids.append(result[0]["id"])
+                segment_ids.append(result["id"])
 
             logger.info(f"Created {len(segment_ids)} customer segments")
 
@@ -366,14 +351,11 @@ def create_save_campaign_tool(storage: Any) -> Any:
                     "campaign_asset_id": content_input.campaign_asset_id,
                     "generated_by": campaign_input.generated_by,
                 }
-                result = storage.execute_sql(
-                    "INSERT INTO marketing_content ({}) VALUES ({}) RETURNING id".format(
-                        ", ".join(content_data.keys()),
-                        ", ".join([f"${i+1}" for i in range(len(content_data))])
-                    ),
-                    list(content_data.values())
+                result = await storage.insert_entity(
+                    "marketing_content",
+                    content_data
                 )
-                content_ids.append(result[0]["id"])
+                content_ids.append(result["id"])
 
             logger.info(f"Created {len(content_ids)} marketing content items")
 
