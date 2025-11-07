@@ -114,7 +114,7 @@ def create_find_relevant_categories_tool(storage: StorageInterface) -> object:
     """Factory: Create tool that searches internal category hierarchy."""
 
     @tool
-    def find_relevant_categories(
+    async def find_relevant_categories(
         product_name: str, product_description: str
     ) -> list[dict[str, Any]]:
         """
@@ -128,8 +128,6 @@ def create_find_relevant_categories_tool(storage: StorageInterface) -> object:
             List of matching categories with confidence scores
         """
         try:
-            client = storage._ensure_client()
-
             # Search categories by name/description similarity
             # Simple keyword-based search for Phase 1
             # TODO Phase 2: Implement semantic search via embeddings
@@ -140,20 +138,19 @@ def create_find_relevant_categories_tool(storage: StorageInterface) -> object:
             if not search_terms:
                 return []
 
-            # Query categories table
-            response = (
-                client.table("categories")
-                .select("id, name, slug, description, parent_id")
-                .eq("is_active", True)
-                .execute()
+            # Query categories table using port method
+            categories = await storage.query_entities(
+                table="categories",
+                filters={"is_active": True},
+                columns=["id", "name", "slug", "description", "parent_id"]
             )
 
-            if not response.data:
+            if not categories:
                 return []
 
             # Simple keyword matching
             matches = []
-            for category in response.data:
+            for category in categories:
                 cat_text = f"{category['name']} {category.get('description', '')}".lower()
                 match_count = sum(1 for term in search_terms if term in cat_text)
 
@@ -265,7 +262,7 @@ def create_classify_into_industries_tool(storage: StorageInterface) -> object:
     """Factory: Create tool that classifies into NAICS industries."""
 
     @tool
-    def classify_into_industries(
+    async def classify_into_industries(
         product_type: str,
         business_model: str,
         product_description: str,
@@ -287,17 +284,14 @@ def create_classify_into_industries_tool(storage: StorageInterface) -> object:
             List of relevant NAICS industries with use cases
         """
         try:
-            client = storage._ensure_client()
-
-            # Query NAICS industries table
-            response = (
-                client.table("industries")
-                .select("naics_code, label, description, level")
-                .eq("is_active", True)
-                .execute()
+            # Query NAICS industries table using port method
+            industries = await storage.query_entities(
+                table="industries",
+                filters={"is_active": True},
+                columns=["naics_code", "label", "description", "level"]
             )
 
-            if not response.data:
+            if not industries:
                 return []
 
             # Simple keyword-based matching for Phase 1
@@ -307,7 +301,7 @@ def create_classify_into_industries_tool(storage: StorageInterface) -> object:
             search_terms = [term for term in search_terms if len(term) > 3][:10]
 
             matches = []
-            for industry in response.data:
+            for industry in industries:
                 industry_text = (
                     f"{industry['label']} {industry.get('description', '')}"
                 ).lower()
