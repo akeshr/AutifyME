@@ -24,6 +24,7 @@ def get_llm(
     safety_settings: dict[HarmCategory, HarmBlockThreshold] | None = None,
     response_modalities: list[Literal["TEXT", "IMAGE", "AUDIO"]] | None = None,
     response_mime_type: str | None = None,
+    response_schema: dict | None = None,
 ) -> BaseChatModel:
     """
     Factory function to instantiate and return a language model client.
@@ -76,6 +77,9 @@ def get_llm(
             Default: ["TEXT"] for text-only generation.
         response_mime_type: MIME type for structured outputs (e.g., "application/json").
             Used to enforce specific output formats.
+        response_schema: JSON Schema dict for structured output validation.
+            Used with response_mime_type="application/json" to enforce schema.
+            Pass Pydantic model's model_json_schema() output.
 
     Returns:
         An instance of a BaseChatModel.
@@ -208,6 +212,8 @@ def get_llm(
             gemini_kwargs["response_modalities"] = converted_modalities
         if response_mime_type is not None:
             gemini_kwargs["response_mime_type"] = response_mime_type
+        if response_schema is not None:
+            gemini_kwargs["response_schema"] = response_schema
 
         llm = ChatGoogleGenerativeAI(**gemini_kwargs)
     else:
