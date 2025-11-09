@@ -349,7 +349,7 @@ class TableSchema(BaseModel):
 
             try:
                 # Query existing axes for this product family
-                existing_axes = await storage.query(
+                existing_axes = await storage.query_entities(
                     table="variant_axes",
                     filters={"product_family_id": family_id}
                 )
