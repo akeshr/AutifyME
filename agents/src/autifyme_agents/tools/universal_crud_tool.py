@@ -1431,7 +1431,7 @@ def create_database_tool(
 
     # Create simple input schema: single operation_intent parameter
     from pydantic import create_model
-    SimpleInputSchema = create_model(
+    SimpleInputSchema = create_model(  # noqa: N806 (dynamic Pydantic model class)
         'OperationIntentInput',
         operation_intent=(
             dict[str, Any],
@@ -1471,17 +1471,17 @@ def create_database_tool(
             ) from e
 
         # Extract validated fields (using getattr for dynamic model)
-        intent_type = str(getattr(validated, 'intent_type'))
-        user_request_summary = str(getattr(validated, 'user_request_summary'))
-        reasoning = str(getattr(validated, 'reasoning'))
+        intent_type = str(validated.intent_type)
+        user_request_summary = str(validated.user_request_summary)
+        reasoning = str(validated.reasoning)
         specialist_name = getattr(validated, 'specialist_name', None)
         schema_version = str(getattr(validated, 'schema_version', 'v1'))
 
         # Handle read-only vs mutation parameter differences
         if hasattr(validated, 'query_filter'):
             # Read-only operation
-            query_filter = getattr(validated, 'query_filter')
-            execution_plan = getattr(validated, 'execution_plan')
+            query_filter = validated.query_filter
+            execution_plan = validated.execution_plan
 
             # Build minimal change_spec for read operations
             change_spec: dict[str, Any] = {
@@ -1508,9 +1508,9 @@ def create_database_tool(
             }
         else:
             # Mutation operation
-            change_spec = getattr(validated, 'change_spec')
-            impact_analysis = getattr(validated, 'impact_analysis')
-            execution_plan = getattr(validated, 'execution_plan')
+            change_spec = validated.change_spec
+            impact_analysis = validated.impact_analysis
+            execution_plan = validated.execution_plan
 
         # Validate operation is allowed
         if intent_type not in allowed_operations:

@@ -8,7 +8,6 @@ This wrapper ensures bind_tools always uses strict=True and injects additionalPr
 from collections.abc import Callable, Sequence
 from typing import Any, cast
 
-from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.prompt_values import PromptValue
 from langchain_core.runnables.base import Runnable, RunnableBinding

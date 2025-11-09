@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
-from typing import Any, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from autifyme_agents.workflows.handlers.protocol import WorkflowHandler
 from autifyme_agents.workflows.outcome_tracker import IncomingMessage, OutcomeTracker

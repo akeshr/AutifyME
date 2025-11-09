@@ -366,7 +366,7 @@ class TableSchema(BaseModel):
                             f"Use the existing axis or choose a different name."
                         )
                         logger.warning(
-                            f"Case-insensitive name conflict for variant_axes",
+                            "Case-insensitive name conflict for variant_axes",
                             extra={
                                 "attempted_name": name,
                                 "existing_name": existing_name,
@@ -389,7 +389,7 @@ class TableSchema(BaseModel):
                     f"Could not verify case-insensitive uniqueness for axis '{name}': {str(e)}"
                 )
                 logger.error(
-                    f"Case-insensitive uniqueness check failed for variant_axes",
+                    "Case-insensitive uniqueness check failed for variant_axes",
                     exc_info=True,
                     extra={"name": name, "family_id": family_id}
                 )
