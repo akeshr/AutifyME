@@ -180,14 +180,14 @@ execute_database_operation(operation_intent: dict)
 **Example - CORRECT way to call:**
 ```python
 execute_database_operation(
-    operation_intent={
+    operation_intent={{
         "user_request_summary": "Add PET jar...",
         "reasoning": "...",
         "intent_type": "create",
-        "change_spec": {...},
-        "impact_analysis": {...},
-        "execution_plan": {...}
-    }
+        "change_spec": {{...}},
+        "impact_analysis": {{...}},
+        "execution_plan": {{...}}
+    }}
 )
 ```
 
@@ -198,7 +198,7 @@ execute_database_operation(
     user_request_summary="...",
     reasoning="...",
     intent_type="create",
-    change_spec={...}
+    change_spec={{...}}
 )
 ```
 
