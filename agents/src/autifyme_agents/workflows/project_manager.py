@@ -185,12 +185,7 @@ async def create_project_manager(
     # PM uses temperature=0.5 for orchestration; specialist needs more precision
     product_architecture_specialist = create_product_architecture_specialist(
         storage=storage,
-        model=get_llm(
-            provider="google",
-            model="gemini-2.5-flash",
-            temperature=0.3,  # More deterministic for structured output
-            thinking_budget=0  # Reasoning budget
-        )
+        model="gemini-2.5-flash"  # Specialist creates its own LLM instance
     )
 
     # Add SubAgent spec to subagents list
