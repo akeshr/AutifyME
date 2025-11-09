@@ -1472,6 +1472,48 @@ def create_database_tool(
             impact_analysis = kwargs.get('impact_analysis')
             execution_plan = kwargs.get('execution_plan')
 
+            # Auto-generate missing fields if not provided
+            if impact_analysis is None and change_spec:
+                # Generate basic impact analysis from change_spec operations
+                operations_list = change_spec.get('operations', [])
+                impact_analysis = {
+                    'affected_tables': [],
+                    'new_entities_count': {},
+                    'updated_entities_count': {},
+                    'deleted_entities_count': {},
+                    'business_impact_summary': f'Will execute {len(operations_list)} operations',
+                    'warnings': [],
+                    'examples': []
+                }
+                # Count entities per operation type
+                for op in operations_list:
+                    table = op.get('table')
+                    op_type = op.get('op_type')
+                    if op_type == 'insert' and 'new_entities' in op:
+                        count = len(op['new_entities']) if isinstance(op['new_entities'], list) else 1
+                        impact_analysis['new_entities_count'][table] = impact_analysis['new_entities_count'].get(table, 0) + count
+                    elif op_type == 'update':
+                        impact_analysis['updated_entities_count'][table] = impact_analysis['updated_entities_count'].get(table, 0) + 1
+                    elif op_type == 'delete':
+                        impact_analysis['deleted_entities_count'][table] = impact_analysis['deleted_entities_count'].get(table, 0) + 1
+
+            if execution_plan is None and change_spec:
+                # Generate basic execution plan from change_spec operations
+                operations_list = change_spec.get('operations', [])
+                execution_plan = {
+                    'steps': [
+                        {
+                            'step_number': i + 1,
+                            'description': op.get('description', f"{op.get('op_type', 'operation')} on {op.get('table', 'table')}"),
+                            'operation_index': i,
+                            'rollback_on_failure': True
+                        }
+                        for i, op in enumerate(operations_list)
+                    ],
+                    'estimated_duration_ms': len(operations_list) * 100,  # 100ms per operation estimate
+                    'requires_approval': True  # Mutations require approval by default
+                }
+
         # Validate operation is allowed
         if intent_type not in operations:
             raise ToolException(
