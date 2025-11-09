@@ -296,7 +296,7 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
         LangChain tool for product family search
     """
 
-    def _search_product_families_impl(
+    async def _search_product_families_impl(
         product_group_id: str | None = None,
         name: str | None = None,
         brand: str | None = None,
@@ -327,23 +327,23 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
         try:
             # Build query - join with variant axes and values for complete SKU config
             # Nested select: product_families → variant_axes → variant_values
-            query = storage._ensure_client().table("product_families").select(
-                "*,variant_axes(id,name,display_label,sort_order,variant_values(id,value,display_label,sku_code,sort_order))"
-            )
-            query = query.eq("is_active", True)
-
-            # Apply filters
+            filters = {"is_active": True}
             if product_group_id:
                 # Exact match on business ID
-                query = query.eq("product_group_id", product_group_id.upper())
+                filters["product_group_id"] = product_group_id.upper()
             elif brand:
                 # If no business_id, filter by brand at minimum
-                query = query.eq("brand", brand)
+                filters["brand"] = brand
 
-            # Execute query
-            response = query.limit(50).execute()  # Get more for fuzzy matching
+            # Execute query using port method
+            response_data = await storage.query_advanced(
+                table="product_families",
+                filters=filters,
+                relations=["variant_axes(id,name,display_label,sort_order,variant_values(id,value,display_label,sku_code,sort_order))"],
+                limit=50  # Get more for fuzzy matching
+            )
 
-            if not response.data:
+            if not response_data:
                 return ProductFamilySearchResult(
                     query_summary=f"Searched for: business_id={product_group_id}, name={name}, brand={brand}",
                     matches=[],
@@ -355,7 +355,7 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
             # Calculate match scores for all results
             all_matches = []
 
-            for family in response.data:
+            for family in response_data:
                 score, factors, match_type = _calculate_match_score(
                     query_business_id=product_group_id,
                     query_name=name or "",

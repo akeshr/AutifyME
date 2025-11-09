@@ -224,7 +224,7 @@ async def load_base_context(
         )
 
         return PMBaseContext(
-            company_profile=company_profile.model_dump(),
+            company_profile=company_profile,
             catalog_summary=catalog_summary,
             taxonomy_tree=taxonomy_tree,
             recent_activity=[],  # FUTURE: Load from activity log
@@ -245,7 +245,7 @@ async def load_base_context(
         # Graceful degradation: Return empty summaries instead of crashing
         # PM can still operate with limited context
         return PMBaseContext(
-            company_profile=company_profile.model_dump(),
+            company_profile=company_profile,
             catalog_summary=CatalogSummary(
                 total_families=0,
                 total_skus=0,
