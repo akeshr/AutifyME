@@ -7,7 +7,7 @@ Loaded once at PM startup, refreshed periodically (15 min TTL recommended).
 import logging
 from collections import defaultdict
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from autifyme_agents.core.ports import StorageInterface
@@ -42,18 +42,22 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
     """
     try:
         # Query 1: Total families (include category_id for top categories)
-        families = await storage.query_advanced(
+        families_result = await storage.query_advanced(
             table="product_families",
             columns=["id", "name", "category_id"]
         )
+        # Type narrowing: count_only defaults to False, so result is list
+        families = cast(list[dict[str, Any]], families_result)
         total_families = len(families)
         family_names = [f["name"] for f in families]
 
         # Query 2: Total SKUs (count only)
-        total_skus = await storage.query_advanced(
+        total_skus_result = await storage.query_advanced(
             table="products",
             count_only=True
         )
+        # Type narrowing: count_only=True returns int
+        total_skus = cast(int, total_skus_result)
 
         # Query 3: Top categories (from product families)
         # Get category_id from families, then lookup category names
@@ -122,10 +126,12 @@ async def load_taxonomy_tree(storage: StorageInterface) -> TaxonomyTree:
     """
     try:
         # Query all categories with parent_id
-        categories_data = await storage.query_advanced(
+        categories_data_result = await storage.query_advanced(
             table="categories",
             columns=["id", "name", "parent_id"]
         )
+        # Type narrowing: count_only defaults to False, so result is list
+        categories_data = cast(list[dict[str, Any]], categories_data_result)
 
         if not categories_data:
             logger.warning("No categories found in database - empty taxonomy tree")

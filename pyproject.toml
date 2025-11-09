@@ -186,8 +186,8 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = [
     # High priority
-    # "autifyme_agents.tools.universal_crud_tool",  # FIXING NOW
-    "autifyme_agents.middleware.context_middleware",
+    # "autifyme_agents.tools.universal_crud_tool",  # FIXED - Type narrowing + dynamic models
+    # "autifyme_agents.middleware.context_middleware",  # FIXING NOW
     "autifyme_agents.integrations.storage.supabase_client",
     # "autifyme_agents.schemas.operation_intent",  # FIXED - Pydantic plugin + op_type mapping
     "autifyme_agents.tools.campaign_persistence_tools",
