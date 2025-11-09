@@ -1,6 +1,7 @@
 """Factory for creating and configuring the LangGraph PostgresSaver."""
 
 import logging
+from typing import Any
 
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -9,10 +10,10 @@ from autifyme_agents.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_checkpointer_instance = None
-_checkpointer_cm = None
-_async_checkpointer_instance = None
-_async_checkpointer_cm = None
+_checkpointer_instance: PostgresSaver | None = None
+_checkpointer_cm: Any = None
+_async_checkpointer_instance: AsyncPostgresSaver | None = None
+_async_checkpointer_cm: Any = None
 
 
 def get_checkpointer(setup: bool = False) -> PostgresSaver:
@@ -75,14 +76,12 @@ async def get_async_checkpointer(setup: bool = False, force_reconnect: bool = Fa
     global _async_checkpointer_instance, _async_checkpointer_cm
 
     # Check if we need to recreate the checkpointer
-    if _async_checkpointer_instance is None:
-        should_recreate = True
-    elif force_reconnect:
-        should_recreate = True
-    elif not await _is_connection_healthy(_async_checkpointer_instance):
-        should_recreate = True
-    else:
-        should_recreate = False
+    should_recreate = _async_checkpointer_instance is None or force_reconnect
+
+    # If instance exists and reconnect not forced, check connection health
+    if not should_recreate and _async_checkpointer_instance is not None:
+        is_healthy = await _is_connection_healthy(_async_checkpointer_instance)
+        should_recreate = not is_healthy
 
     if should_recreate:
         logger.info("Creating new AsyncPostgresSaver instance")

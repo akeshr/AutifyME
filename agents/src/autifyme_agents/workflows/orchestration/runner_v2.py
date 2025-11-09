@@ -60,6 +60,7 @@ from langgraph.errors import GraphInterrupt, GraphRecursionError
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.schemas.interrupt import InterruptInfo
 from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.handlers.approval_coordinator import ApprovalCoordinator
@@ -420,7 +421,7 @@ class WorkflowRunner:
         config: dict[str, Any],
         thread_id: str,
         raw_payload: dict[str, Any],
-        pending_interrupts_list: list[dict[str, Any]],
+        pending_interrupts_list: list[InterruptInfo],
     ) -> tuple[dict[str, Any] | None, Any | None]:
         """Handle resume flow when interrupts exist.
 

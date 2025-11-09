@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Coroutine
 
 from autifyme_agents.workflows.handlers.protocol import WorkflowHandler
 from autifyme_agents.workflows.outcome_tracker import IncomingMessage, OutcomeTracker
@@ -37,7 +37,7 @@ class OutcomeTrackingMiddleware:
         self,
         thread_id: str,
         incoming_message: IncomingMessage,
-        pm_invoker: Callable[[str], tuple[dict[str, Any] | None, Any | None]],
+        pm_invoker: Callable[[str], Coroutine[Any, Any, tuple[dict[str, Any] | None, Any | None]]],
     ) -> tuple[dict[str, Any] | None, Any | None, str]:
         """Execute PM invocation with automatic outcome tracking.
 

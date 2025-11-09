@@ -14,7 +14,7 @@ from supabase.lib.client_options import AsyncClientOptions, SyncClientOptions
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.exceptions import ConfigurationError, StorageError
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.schemas.models import CompanyProfile, Product
+from autifyme_agents.schemas.models import CompanyProfile, Product, WorkflowOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +48,11 @@ def _normalize_numeric_types(data: dict[str, Any] | list[dict[str, Any]]) -> dic
             return value
 
     if isinstance(data, list):
-        return [normalize_value(item) for item in data]
+        normalized_list: list[dict[str, Any]] = [normalize_value(item) for item in data]
+        return normalized_list
     else:
-        return normalize_value(data)
+        normalized_dict: dict[str, Any] = normalize_value(data)
+        return normalized_dict
 
 
 class SupabaseStorageClient(StorageInterface):
@@ -313,6 +315,8 @@ class SupabaseStorageClient(StorageInterface):
                     config_key="SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY"
                 ) from e
 
+        # Type guaranteed: if client was None, we initialized it above or raised exception
+        assert self._async_client is not None, "Async client should be initialized"
         return self._async_client
 
     def get_company_profile(self) -> CompanyProfile:
@@ -438,14 +442,11 @@ class SupabaseStorageClient(StorageInterface):
     # Phase 1.2: Workflow Outcome Tracking (Agentic Evolution)
     # ========================================================================
 
-    def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
+    def save_workflow_outcome(self, outcome: WorkflowOutcome) -> str:
         """Persist workflow outcome for learning and analytics.
 
         Args:
-            outcome: Workflow outcome payload with required fields:
-                - tracking_id, thread_id, sender_id (required)
-                - message_hash, success, started_at (required)
-                - trace_id, intent, department (optional)
+            outcome: WorkflowOutcome model with tracking data
 
         Returns:
             Outcome ID from database
@@ -456,9 +457,12 @@ class SupabaseStorageClient(StorageInterface):
         """
         client = self._ensure_client()
 
+        # Convert Pydantic model to dict for database insertion
+        outcome_dict = outcome.model_dump(mode="json")
+
         # Validate required fields before attempting insert
         required_fields = ["tracking_id", "thread_id", "sender_id", "message_hash", "success", "started_at"]
-        missing_fields = [field for field in required_fields if field not in outcome or outcome[field] is None]
+        missing_fields = [field for field in required_fields if field not in outcome_dict or outcome_dict[field] is None]
 
         if missing_fields:
             error_msg = f"Cannot persist workflow outcome - missing required fields: {missing_fields}"
@@ -466,14 +470,14 @@ class SupabaseStorageClient(StorageInterface):
                 error_msg,
                 extra={
                     "missing_fields": missing_fields,
-                    "tracking_id": outcome.get("tracking_id"),
-                    "thread_id": outcome.get("thread_id"),
+                    "tracking_id": outcome_dict.get("tracking_id"),
+                    "thread_id": outcome_dict.get("thread_id"),
                 }
             )
             raise ValueError(error_msg)
 
         # Ensure timestamps are ISO strings for Supabase
-        payload = outcome.copy()
+        payload = outcome_dict.copy()
         for ts_field in ["received_at", "routed_at", "started_at", "ended_at"]:
             if ts_field in payload and isinstance(payload[ts_field], datetime):
                 payload[ts_field] = payload[ts_field].isoformat()
@@ -490,10 +494,10 @@ class SupabaseStorageClient(StorageInterface):
             logger.info(
                 "Persisted workflow outcome",
                 extra={
-                    "tracking_id": outcome.get("tracking_id"),
-                    "success": outcome.get("success"),
-                    "intent": outcome.get("intent"),
-                    "department": outcome.get("department"),
+                    "tracking_id": outcome_dict.get("tracking_id"),
+                    "success": outcome_dict.get("success"),
+                    "intent": outcome_dict.get("intent"),
+                    "department": outcome_dict.get("department"),
                 },
             )
 
@@ -504,8 +508,8 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 "Failed to persist workflow outcome to database",
                 extra={
-                    "tracking_id": outcome.get("tracking_id"),
-                    "thread_id": outcome.get("thread_id"),
+                    "tracking_id": outcome_dict.get("tracking_id"),
+                    "thread_id": outcome_dict.get("thread_id"),
                     "error_type": type(e).__name__,
                     "error_msg": str(e),
                     "payload_keys": list(payload.keys()),
@@ -522,7 +526,7 @@ class SupabaseStorageClient(StorageInterface):
         department: str | None = None,
         success: bool | None = None,
         limit: int = 100,
-    ) -> list[dict[str, Any]]:
+    ) -> list[WorkflowOutcome]:
         """Retrieve workflow outcomes for analysis."""
         client = self._ensure_client()
 
@@ -546,13 +550,16 @@ class SupabaseStorageClient(StorageInterface):
         query = query.order("created_at", desc=True).limit(limit)
 
         response = query.execute()
-        return response.data if response.data else []
+        # Convert dicts to WorkflowOutcome models
+        if response.data:
+            return [WorkflowOutcome.model_validate(row) for row in response.data]
+        return []
 
     def get_recent_failures(
         self,
         time_window: timedelta,
         limit: int = 10,
-    ) -> list[dict[str, Any]]:
+    ) -> list[WorkflowOutcome]:
         """Retrieve recent failures for regression test generation."""
         client = self._ensure_client()
 
@@ -560,8 +567,7 @@ class SupabaseStorageClient(StorageInterface):
 
         response = (
             client.table("workflow_outcomes")
-            .select("tracking_id, thread_id, message_text, media_id, media_type, "
-                    "error_type, error_message, resolution_strategy, duration_seconds, created_at")
+            .select("*")  # Select all columns to build full WorkflowOutcome model
             .eq("success", False)
             .gte("created_at", cutoff)
             .order("created_at", desc=True)
@@ -569,7 +575,10 @@ class SupabaseStorageClient(StorageInterface):
             .execute()
         )
 
-        return response.data if response.data else []
+        # Convert dicts to WorkflowOutcome models
+        if response.data:
+            return [WorkflowOutcome.model_validate(row) for row in response.data]
+        return []
 
     def get_success_rates(
         self,
@@ -891,7 +900,7 @@ class SupabaseStorageClient(StorageInterface):
                     operation="insert_entity",
                 )
 
-            inserted = response.data[0]
+            inserted: dict[str, Any] = response.data[0]
 
             # Track operation for transaction rollback
             if self._current_transaction is not None:
@@ -947,7 +956,7 @@ class SupabaseStorageClient(StorageInterface):
                     operation="insert_entities",
                 )
 
-            inserted = response.data
+            inserted: list[dict[str, Any]] = response.data
 
             # Track operation for transaction rollback
             if self._current_transaction is not None:
