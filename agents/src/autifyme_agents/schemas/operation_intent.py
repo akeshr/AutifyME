@@ -9,6 +9,63 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 # =============================================================================
+# Helper Models for Type Safety
+# =============================================================================
+
+
+class FieldValue(BaseModel):
+    """Strongly-typed field-value pair for database operations.
+
+    Provides type safety while supporting all database field types.
+    """
+
+    field: str = Field(..., description="Field/column name")
+    value: str | int | float | bool | None = Field(..., description="Field value (NULL supported)")
+
+
+class EntityRef(BaseModel):
+    """Named entity reference for cross-operation dependencies.
+
+    Enables semantic references like $ref:prod_500ml_clear instead of $step_0.
+    """
+
+    name: str = Field(..., description="Semantic reference name (e.g., 'prod_500ml_clear')")
+    entity_index: int = Field(..., description="Index in new_entities array (0-based)")
+
+
+class TableCount(BaseModel):
+    """Table with row count for impact tracking."""
+
+    table: str = Field(..., description="Table name")
+    count: int = Field(..., description="Row count")
+
+
+class CreatedEntity(BaseModel):
+    """Track created entity with generated ID and semantic name."""
+
+    entity_id: str = Field(..., description="Generated entity ID (UUID)")
+    entity_name: str | None = Field(None, description="Semantic name if using entity_refs")
+    table: str = Field(..., description="Table name where entity was created")
+    step_number: int = Field(..., description="Execution step that created this entity")
+
+
+class UpdatedEntity(BaseModel):
+    """Track updated entity with modified fields."""
+
+    entity_id: str = Field(..., description="Entity ID that was updated")
+    table: str = Field(..., description="Table name")
+    updated_fields: list[str] = Field(..., description="List of field names that were updated")
+
+
+class DeletedEntity(BaseModel):
+    """Track deleted entity."""
+
+    entity_id: str = Field(..., description="Entity ID that was deleted")
+    table: str = Field(..., description="Table name")
+    soft_delete: bool = Field(..., description="Whether it was soft-deleted (inactive) or hard-deleted")
+
+
+# =============================================================================
 # Operation Models
 # =============================================================================
 
@@ -89,22 +146,22 @@ class ChangeSpecification(BaseModel):
 class ImpactAnalysis(BaseModel):
     """Dynamic impact calculation from schema + current data."""
 
-    # Quantitative impact
-    affected_tables: dict[str, int] = Field(
-        default_factory=dict,
-        description="Map of table_name -> affected_row_count"
+    # Quantitative impact (strongly typed for better validation)
+    affected_tables: list[TableCount] = Field(
+        default_factory=list,
+        description="Tables affected with row counts"
     )
-    new_entities_count: dict[str, int] = Field(
-        default_factory=dict,
-        description="Map of table_name -> new_row_count (for INSERTs)"
+    new_entities_count: list[TableCount] = Field(
+        default_factory=list,
+        description="New rows to be inserted per table (for INSERTs)"
     )
-    updated_entities_count: dict[str, int] = Field(
-        default_factory=dict,
-        description="Map of table_name -> updated_row_count (for UPDATEs)"
+    updated_entities_count: list[TableCount] = Field(
+        default_factory=list,
+        description="Rows to be updated per table (for UPDATEs)"
     )
-    deleted_entities_count: dict[str, int] = Field(
-        default_factory=dict,
-        description="Map of table_name -> deleted_row_count (for DELETEs)"
+    deleted_entities_count: list[TableCount] = Field(
+        default_factory=list,
+        description="Rows to be deleted per table (for DELETEs)"
     )
 
     # Business-level impact (for HITL presentation)
@@ -230,28 +287,26 @@ class OperationIntent(BaseModel):
 
 
 class ExecutionResult(BaseModel):
-    """Result of executing an OperationIntent."""
+    """Result of executing an OperationIntent (strongly typed for validation)."""
 
     success: bool = Field(..., description="Execution succeeded")
 
-    # Entity tracking
-    affected_entities: dict[str, int] = Field(
-        default_factory=dict,
-        description="Map of table_name -> affected_row_count"
+    # Entity tracking (strongly typed models)
+    affected_entities: list[TableCount] = Field(
+        default_factory=list,
+        description="Tables affected with row counts"
     )
-    created_ids: dict[int, dict[str, Any]] = Field(
-        default_factory=dict,
-        description="Map of step_number -> {field_name: generated_id} or {_refs: {name: entity}} for named refs"
+    created_ids: list[CreatedEntity] = Field(
+        default_factory=list,
+        description="List of created entities with IDs and semantic names"
     )
-    updated_entities: dict[str, list[dict[str, Any]]] = Field(
-        default_factory=dict,
-        description="Map of table_name -> list of updated entity IDs and fields. "
-                    "Example: {'products': [{'id': 'uuid', 'updated_fields': ['name', 'sku']}]}"
+    updated_entities: list[UpdatedEntity] = Field(
+        default_factory=list,
+        description="List of updated entities with modified fields"
     )
-    deleted_entities: dict[str, list[str]] = Field(
-        default_factory=dict,
-        description="Map of table_name -> list of deleted entity IDs. "
-                    "Example: {'products': ['uuid-1', 'uuid-2']}"
+    deleted_entities: list[DeletedEntity] = Field(
+        default_factory=list,
+        description="List of deleted entities"
     )
 
     # Execution metadata
