@@ -163,21 +163,44 @@ My search: product_families "PET Bottles" → Found (id: a1b2c3d4-e5f6-7890-abcd
 
 You can see images directly. Tool provides structured extraction when useful.
 
-## Extracting OperationIntent from Specialist Response
+## Calling execute_database_operation Tool
 
-**Specialist returns OperationIntent in their final message wrapped in XML tags:**
+**CRITICAL - Tool accepts single parameter:**
 
+The tool signature is:
+```python
+execute_database_operation(operation_intent: dict)
 ```
-<operation_intent>
-{{...JSON structure...}}
-</operation_intent>
+
+**How to call the tool:**
+1. Look for `<operation_intent>` tags in specialist's message
+2. Extract the complete JSON object between the tags
+3. Call the tool with that ENTIRE object as the `operation_intent` parameter
+
+**Example - CORRECT way to call:**
+```python
+execute_database_operation(
+    operation_intent={
+        "user_request_summary": "Add PET jar...",
+        "reasoning": "...",
+        "intent_type": "create",
+        "change_spec": {...},
+        "impact_analysis": {...},
+        "execution_plan": {...}
+    }
+)
 ```
 
-**To extract the OperationIntent:**
-1. Look for `<operation_intent>` tags in specialist's final message
-2. Extract the JSON content between the tags
-3. Parse the JSON to get the OperationIntent structure
-4. Proceed to validation and execution
+**FORBIDDEN - DO NOT extract individual fields:**
+```python
+# ❌ WRONG - Do not pass individual fields
+execute_database_operation(
+    user_request_summary="...",
+    reasoning="...",
+    intent_type="create",
+    change_spec={...}
+)
+```
 
 **If specialist's message has NO `<operation_intent>` block (blank/invalid response):**
 - SILENTLY retry - DO NOT tell user "specialist failed" or "will inform you later"

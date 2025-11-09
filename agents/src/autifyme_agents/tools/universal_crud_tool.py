@@ -1140,26 +1140,24 @@ def _create_operation_input_schema(
     fields: dict[str, Any] = {
         'user_request_summary': (
             str,
-            Field(default="Database operation", description='Summary of user original request')
+            Field(..., description='Summary of user original request')
         ),
         'reasoning': (
             str,
-            Field(default="Executing database operation", description='Why specialist classified this way (for transparency)')
+            Field(..., description='Why specialist classified this way (for transparency)')
         ),
     }
 
     # intent_type with operation-specific description
     allowed_ops = ', '.join(operations)
     if len(operations) == 1:
-        intent_desc = f'Intent type. Defaults to "{operations[0]}". This tool handles {operations[0]} operations only.'
-        default_intent = operations[0]
+        intent_desc = f'Intent type. Must be "{operations[0]}". This tool handles {operations[0]} operations only.'
     else:
         intent_desc = f'Intent type. Allowed operations: {allowed_ops}'
-        default_intent = operations[0]  # Default to first operation
 
     fields['intent_type'] = (
         str,
-        Field(default=default_intent, description=intent_desc)
+        Field(..., description=intent_desc)
     )
 
     # Operation-specific fields
@@ -1193,21 +1191,19 @@ def _create_operation_input_schema(
             )
         )
         fields['impact_analysis'] = (
-            dict[str, Any] | None,
+            dict[str, Any],
             Field(
-                default=None,
-                description='Optional: Impact analysis for HITL approval. Specifies new/updated/deleted entity counts per table. '
-                'Example: {"new_entities_count": {"products": 5}, "updated_entities_count": {"products": 2}}. '
-                'If not provided, will be auto-generated from change_spec.'
+                ...,
+                description='REQUIRED for HITL approval. Specifies new/updated/deleted entity counts per table. '
+                'Example: {"new_entities_count": {"products": 5}, "updated_entities_count": {"products": 2}}'
             )
         )
         fields['execution_plan'] = (
-            dict[str, Any] | None,
+            dict[str, Any],
             Field(
-                default=None,
-                description='Optional: Multi-step execution plan with dependencies. '
-                'Defines atomic steps with rollback support and dependency ordering. '
-                'If not provided, will be auto-generated from change_spec operations.'
+                ...,
+                description='Multi-step execution plan with dependencies. '
+                'Defines atomic steps with rollback support and dependency ordering.'
             )
         )
 
@@ -1414,34 +1410,66 @@ def create_database_tool(
             f"Valid operations: {valid_operations}"
         )
 
-    # Generate dynamic schema for specified operations
-    input_schema = _create_operation_input_schema(operations)
+    # Generate dynamic schema for validation (kept for internal validation)
+    expected_schema = _create_operation_input_schema(operations)
 
     # Generate tool name and description
     tool_name = _generate_tool_name(tool_name_suffix)
     tool_description = _generate_tool_description(operations, tables)
 
+    # Create simple input schema: single operation_intent parameter
+    from pydantic import create_model
+    SimpleInputSchema = create_model(
+        'OperationIntentInput',
+        operation_intent=(
+            dict[str, Any],
+            Field(
+                ...,
+                description=(
+                    'Complete OperationIntent from specialist. '
+                    'Extract the full JSON object from specialist\'s <operation_intent> tags and pass it here. '
+                    'Required fields: user_request_summary, reasoning, intent_type, change_spec (or query_filter for reads), '
+                    'impact_analysis, execution_plan. '
+                    'DO NOT extract individual fields - pass the entire OperationIntent object.'
+                )
+            )
+        )
+    )
+
     # Create implementation with access control closure
     async def _execute_database_operation_impl(
-        **kwargs: Any
+        operation_intent: dict[str, Any]
     ) -> dict[str, Any]:
         """
         Operation-scoped database executor with runtime validation.
 
         Validates operations and table access before execution.
+
+        Args:
+            operation_intent: Complete OperationIntent dict from specialist
         """
-        # Extract parameters (handles both read-only and mutation schemas)
-        intent_type = kwargs.get('intent_type')
-        user_request_summary = kwargs.get('user_request_summary')
-        reasoning = kwargs.get('reasoning')
-        specialist_name = kwargs.get('specialist_name')
-        schema_version = kwargs.get('schema_version', 'v1')
+        # Validate operation_intent against expected schema
+        try:
+            validated = expected_schema.model_validate(operation_intent)
+        except Exception as e:
+            raise ToolException(
+                f"Invalid OperationIntent structure: {str(e)}\n\n"
+                f"Expected fields for {operations} operations: {list(expected_schema.model_fields.keys())}\n"
+                f"Received: {list(operation_intent.keys())}"
+            ) from e
+
+        # Extract validated fields
+        intent_type = validated.intent_type
+        user_request_summary = validated.user_request_summary
+        reasoning = validated.reasoning
+        specialist_name = validated.specialist_name
+        schema_version = validated.schema_version
 
         # Handle read-only vs mutation parameter differences
-        if 'query_filter' in kwargs:
-            # Read-only tool: convert query_filter to change_spec format
-            query_filter = kwargs.get('query_filter', {})
-            execution_plan = kwargs.get('execution_plan')
+        if hasattr(validated, 'query_filter'):
+            # Read-only operation
+            query_filter = validated.query_filter
+            execution_plan = validated.execution_plan
 
             # Build minimal change_spec for read operations
             change_spec = {
@@ -1467,52 +1495,10 @@ def create_database_tool(
                 'examples': []
             }
         else:
-            # Mutation tool: use provided change_spec and impact_analysis
-            change_spec = kwargs.get('change_spec')
-            impact_analysis = kwargs.get('impact_analysis')
-            execution_plan = kwargs.get('execution_plan')
-
-            # Auto-generate missing fields if not provided
-            if impact_analysis is None and change_spec:
-                # Generate basic impact analysis from change_spec operations
-                operations_list = change_spec.get('operations', [])
-                impact_analysis = {
-                    'affected_tables': [],
-                    'new_entities_count': {},
-                    'updated_entities_count': {},
-                    'deleted_entities_count': {},
-                    'business_impact_summary': f'Will execute {len(operations_list)} operations',
-                    'warnings': [],
-                    'examples': []
-                }
-                # Count entities per operation type
-                for op in operations_list:
-                    table = op.get('table')
-                    op_type = op.get('op_type')
-                    if op_type == 'insert' and 'new_entities' in op:
-                        count = len(op['new_entities']) if isinstance(op['new_entities'], list) else 1
-                        impact_analysis['new_entities_count'][table] = impact_analysis['new_entities_count'].get(table, 0) + count
-                    elif op_type == 'update':
-                        impact_analysis['updated_entities_count'][table] = impact_analysis['updated_entities_count'].get(table, 0) + 1
-                    elif op_type == 'delete':
-                        impact_analysis['deleted_entities_count'][table] = impact_analysis['deleted_entities_count'].get(table, 0) + 1
-
-            if execution_plan is None and change_spec:
-                # Generate basic execution plan from change_spec operations
-                operations_list = change_spec.get('operations', [])
-                execution_plan = {
-                    'steps': [
-                        {
-                            'step_number': i + 1,
-                            'description': op.get('description', f"{op.get('op_type', 'operation')} on {op.get('table', 'table')}"),
-                            'operation_index': i,
-                            'rollback_on_failure': True
-                        }
-                        for i, op in enumerate(operations_list)
-                    ],
-                    'estimated_duration_ms': len(operations_list) * 100,  # 100ms per operation estimate
-                    'requires_approval': True  # Mutations require approval by default
-                }
+            # Mutation operation
+            change_spec = validated.change_spec
+            impact_analysis = validated.impact_analysis
+            execution_plan = validated.execution_plan
 
         # Validate operation is allowed
         if intent_type not in operations:
@@ -1642,10 +1628,10 @@ def create_database_tool(
             )
             return error_result.model_dump()
 
-    # Create and return StructuredTool with dynamic schema
+    # Create and return StructuredTool with simple single-parameter schema
     return StructuredTool.from_function(
         coroutine=_execute_database_operation_impl,
         name=tool_name,
         description=tool_description,
-        args_schema=input_schema,
+        args_schema=SimpleInputSchema,
     )

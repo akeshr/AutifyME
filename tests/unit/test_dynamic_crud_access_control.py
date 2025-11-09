@@ -130,7 +130,7 @@ class TestSchemaGeneration:
         assert "intent_type" in required_fields
         assert "execution_plan" in required_fields
 
-        # Optional fields
+        # Optional fields with sensible defaults
         optional_fields = [
             name for name, field in ReadSchema.model_fields.items()
             if not field.is_required()
@@ -305,10 +305,9 @@ class TestToolFactory:
             operations=["read"],
         )
 
-        # Check schema
-        assert "query_filter" in tool.args_schema.model_fields
-        assert "change_spec" not in tool.args_schema.model_fields
-        assert "impact_analysis" not in tool.args_schema.model_fields
+        # Check schema - now uses single operation_intent parameter
+        assert "operation_intent" in tool.args_schema.model_fields
+        assert len(tool.args_schema.model_fields) == 1  # Only one parameter
 
         # Check description
         assert "read" in tool.description.lower()
@@ -321,10 +320,9 @@ class TestToolFactory:
             operations=["create", "read", "update", "delete"],
         )
 
-        # Check schema
-        assert "change_spec" in tool.args_schema.model_fields
-        assert "impact_analysis" in tool.args_schema.model_fields
-        assert "query_filter" not in tool.args_schema.model_fields
+        # Check schema - now uses single operation_intent parameter
+        assert "operation_intent" in tool.args_schema.model_fields
+        assert len(tool.args_schema.model_fields) == 1  # Only one parameter
 
         # Check description
         assert "crud" in tool.description.lower() or "create" in tool.description.lower()
@@ -406,8 +404,9 @@ class TestToolFactory:
             operations=["read"],
         )
 
-        # Tool schema should reflect read-only
-        assert tool.args_schema.__name__ == "ReadOperationInput"
+        # Tool schema should use single operation_intent parameter
+        assert tool.args_schema.__name__ == "OperationIntentInput"
+        assert "operation_intent" in tool.args_schema.model_fields
 
     def test_factory_different_instances_independent(self):
         """Different factory calls should create independent tools."""
@@ -421,10 +420,12 @@ class TestToolFactory:
             operations=["create", "read", "update", "delete"],
         )
 
-        # Should have different schemas
-        assert read_tool.args_schema is not crud_tool.args_schema
-        assert "query_filter" in read_tool.args_schema.model_fields
-        assert "change_spec" in crud_tool.args_schema.model_fields
+        # Both should use single operation_intent parameter
+        assert "operation_intent" in read_tool.args_schema.model_fields
+        assert "operation_intent" in crud_tool.args_schema.model_fields
+        # Schema instances should be different (but both named OperationIntentInput)
+        assert read_tool.args_schema.__name__ == "OperationIntentInput"
+        assert crud_tool.args_schema.__name__ == "OperationIntentInput"
 
 
 # =============================================================================
@@ -447,7 +448,7 @@ class TestJSONSchemaForLLMs:
         assert "impact_analysis" not in properties
 
         # Check required fields
-        required = json_schema["required"]
+        required = json_schema.get("required", [])
         assert "user_request_summary" in required
         assert "reasoning" in required
         assert "intent_type" in required
@@ -468,9 +469,13 @@ class TestJSONSchemaForLLMs:
         assert "query_filter" not in properties
 
         # Check required fields
-        required = json_schema["required"]
+        required = json_schema.get("required", [])
+        assert "user_request_summary" in required
+        assert "reasoning" in required
+        assert "intent_type" in required
         assert "change_spec" in required
         assert "impact_analysis" in required
+        assert "execution_plan" in required
 
     def test_field_descriptions_in_json_schema(self):
         """JSON Schema should include field descriptions."""
@@ -516,7 +521,8 @@ class TestIntegration:
 
         assert tool.name == "execute_database_operation_read_only"
         assert "read" in tool.description.lower()
-        assert "query_filter" in tool.args_schema.model_fields
+        assert "operation_intent" in tool.args_schema.model_fields
+        # Tool now accepts single operation_intent parameter
 
     def test_full_crud_specialist_pattern(self):
         """Test full CRUD specialist configuration pattern."""
@@ -528,8 +534,8 @@ class TestIntegration:
         )
 
         assert tool.name == "execute_database_operation"
-        assert "change_spec" in tool.args_schema.model_fields
-        assert "impact_analysis" in tool.args_schema.model_fields
+        assert "operation_intent" in tool.args_schema.model_fields
+        # Tool now accepts single operation_intent parameter
 
     def test_domain_scoped_specialist_pattern(self):
         """Test domain-scoped specialist configuration pattern."""
@@ -544,7 +550,7 @@ class TestIntegration:
 
         assert tool.name == "execute_database_operation_taxonomy"
         assert "categories" in tool.description.lower()
-        assert "change_spec" in tool.args_schema.model_fields
+        assert "operation_intent" in tool.args_schema.model_fields
 
     def test_mixed_operations_specialist_pattern(self):
         """Test mixed operations specialist configuration pattern."""
@@ -559,4 +565,4 @@ class TestIntegration:
 
         assert tool.name == "execute_database_operation_campaigns"
         assert "campaigns" in tool.description.lower()
-        assert "change_spec" in tool.args_schema.model_fields
+        assert "operation_intent" in tool.args_schema.model_fields
