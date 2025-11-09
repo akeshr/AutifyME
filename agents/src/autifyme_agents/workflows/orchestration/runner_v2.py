@@ -193,8 +193,6 @@ class WorkflowRunner:
         """
         try:
             if self._checkpointer:
-                # Clear checkpoint by getting config and using checkpointer API
-                config = {"configurable": {"thread_id": thread_id}}
                 # Note: LangGraph checkpointer doesn't have direct delete, so we rely on
                 # new invocation overwriting the state
                 logger.info(

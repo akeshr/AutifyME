@@ -25,10 +25,14 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.operation_intent import (
+    CreatedEntity,
+    DeletedEntity,
     ExecutionResult,
     ExecutionStep,
     Operation,
     OperationIntent,
+    TableCount,
+    UpdatedEntity,
 )
 from autifyme_agents.schemas.registry import (
     SchemaRegistry,
@@ -100,11 +104,10 @@ def _validate_operation_completeness(
                 actual_updated_counts[table] += 1
 
         # Count DELETE operations (ID list deletions)
-        if op_type == "delete" and hasattr(operation, "delete_filter") and operation.delete_filter:
-            if "id" in operation.delete_filter:
-                filter_value = operation.delete_filter["id"]
-                if isinstance(filter_value, list):
-                    actual_deleted_counts[table] += len(filter_value)
+        if op_type == "delete" and hasattr(operation, "delete_filter") and operation.delete_filter and "id" in operation.delete_filter:
+            filter_value = operation.delete_filter["id"]
+            if isinstance(filter_value, list):
+                actual_deleted_counts[table] += len(filter_value)
 
     # Validate aggregated counts against impact_analysis
     for table, expected_count in new_entities_count.items():
@@ -182,8 +185,6 @@ class OperationExecutor:
         Raises:
             ToolException: On validation or execution failure (DB auto-rolls back)
         """
-        import time
-
         start_time = time.time()
 
         # Validate entire plan upfront (before transaction)
@@ -202,7 +203,6 @@ class OperationExecutor:
             error_msg = str(e)
 
             # Extract step number from error message if available
-            import re
             step_match = re.match(r"Step (\d+) failed", error_msg)
             failed_step = int(step_match.group(1)) if step_match else None
 
@@ -280,9 +280,12 @@ class OperationExecutor:
     ) -> ExecutionResult:
         """Execute plan within transaction (all validation already done)."""
         completed_steps: list[tuple[ExecutionStep, dict[str, Any]]] = []
+        # Strongly typed entity tracking
+        created_entities: list[CreatedEntity] = []
+        updated_entities_list: list[UpdatedEntity] = []
+        deleted_entities_list: list[DeletedEntity] = []
+        # Keep created_ids dict for backward compatibility with $step_N.field references
         created_ids: dict[int, dict[str, Any]] = {}
-        updated_entities: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        deleted_entities: dict[str, list[str]] = defaultdict(list)
 
         # Sort steps by dependencies (already validated in _validate_plan)
         sorted_steps = self._resolve_dependencies(steps, operations)
@@ -302,26 +305,47 @@ class OperationExecutor:
                 result = await self._execute_operation(operation, created_ids)
                 completed_steps.append((step, result))
 
-                # Store created IDs for dependent operations
+                # Store created IDs for dependent operations + structured tracking
                 if operation.op_type == "insert" and result.get("ids"):
                     ids = result["ids"]
                     # Check if this is named refs or single entity
                     if isinstance(ids, dict) and "id" not in ids:
-                        # Named refs dict
+                        # Named refs dict - track each named entity
                         created_ids[step.step_number] = {"_refs": ids}
+                        for ref_name, entity_id in ids.items():
+                            created_entities.append(CreatedEntity(
+                                entity_id=str(entity_id),
+                                entity_name=ref_name,
+                                table=operation.table,
+                                step_number=step.step_number
+                            ))
                     else:
                         # Single entity
                         created_ids[step.step_number] = ids
+                        created_entities.append(CreatedEntity(
+                            entity_id=str(ids.get("id", ids)),
+                            entity_name=None,
+                            table=operation.table,
+                            step_number=step.step_number
+                        ))
 
-                # Track updated entities
+                # Track updated entities (structured)
                 if operation.op_type == "update" and result.get("updated_details"):
-                    table = operation.table
-                    updated_entities[table].extend(result["updated_details"])
+                    for detail in result["updated_details"]:
+                        updated_entities_list.append(UpdatedEntity(
+                            entity_id=str(detail.get("id", "")),
+                            table=operation.table,
+                            updated_fields=detail.get("updated_fields", [])
+                        ))
 
-                # Track deleted entities
+                # Track deleted entities (structured)
                 if operation.op_type == "delete" and result.get("deleted_ids"):
-                    table = operation.table
-                    deleted_entities[table].extend(result["deleted_ids"])
+                    for entity_id in result["deleted_ids"]:
+                        deleted_entities_list.append(DeletedEntity(
+                            entity_id=str(entity_id),
+                            table=operation.table,
+                            soft_delete=operation.soft_delete
+                        ))
 
                 logger.info(
                     f"Step {step.step_number} completed",
@@ -338,8 +362,7 @@ class OperationExecutor:
                 f"({current_step.description if current_step else 'unknown'}): {str(e)}"
             )
             # Preserve original exception type info
-            error_with_context.__cause__ = e
-            raise error_with_context
+            raise error_with_context from e
 
         # Success - calculate execution time
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -347,9 +370,9 @@ class OperationExecutor:
         return ExecutionResult(
             success=True,
             affected_entities=self._count_affected(completed_steps, operations),
-            created_ids=created_ids,
-            updated_entities=dict(updated_entities),
-            deleted_entities=dict(deleted_entities),
+            created_ids=created_entities,
+            updated_entities=updated_entities_list,
+            deleted_entities=deleted_entities_list,
             execution_time_ms=execution_time_ms,
             steps_completed=len(completed_steps),
             steps_total=len(sorted_steps),
@@ -768,10 +791,7 @@ class OperationExecutor:
             # Extract entity ID(s) from filter
             entity_id = resolved_filter.get("id")
             if entity_id:
-                if isinstance(entity_id, list):
-                    deleted_ids = entity_id
-                else:
-                    deleted_ids = [entity_id]
+                deleted_ids = entity_id if isinstance(entity_id, list) else [entity_id]
 
         return {"count": count, "soft_delete": operation.soft_delete, "deleted_ids": deleted_ids}
 
@@ -956,7 +976,7 @@ class OperationExecutor:
         self,
         completed_steps: list[tuple[ExecutionStep, dict[str, Any]]],
         operations: list[Operation]
-    ) -> dict[str, int]:
+    ) -> list[TableCount]:
         """
         Count affected entities by table.
 
@@ -965,7 +985,7 @@ class OperationExecutor:
             operations: Operations list for resolving step.operation_index
 
         Returns:
-            Map of table_name → affected_count
+            List of TableCount objects with table names and counts
         """
         affected = defaultdict(int)
 
@@ -975,7 +995,7 @@ class OperationExecutor:
             count = result.get("count", 0)
             affected[table] += count
 
-        return dict(affected)
+        return [TableCount(table=table, count=count) for table, count in affected.items()]
 
     # =========================================================================
     # Storage Adapter Methods

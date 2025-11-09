@@ -25,12 +25,16 @@ Architecture Pattern:
 - PM orchestrates and approves
 """
 
+import logging
 from typing import Any
 
 from langchain.tools import tool
 from pydantic import BaseModel, Field
 
+from autifyme_agents.core.config import settings
 from autifyme_agents.core.prompt_loader import load_prompt
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Data Models - Market Intelligence Specialist Outputs
@@ -149,8 +153,16 @@ def analyze_price_positioning(
     Returns:
         Price positioning analysis with recommendations
     """
-    # Rule-based positioning logic for Phase 1
-    # TODO Phase 2: Integrate competitive pricing data APIs
+    # Check feature flag for competitive pricing API
+    if settings.ENABLE_COMPETITIVE_PRICING_API:
+        # TODO: Implement competitive pricing API integration when enabled
+        raise NotImplementedError("Competitive pricing API not yet implemented")
+
+    # Fallback: Rule-based positioning logic
+    logger.warning(
+        "Using rule-based price positioning fallback. "
+        "Enable ENABLE_COMPETITIVE_PRICING_API for real-time competitive data."
+    )
 
     positioning_map = {
         "leather": "premium",
@@ -390,9 +402,16 @@ def develop_industry_use_cases(
     Returns:
         Industry-specific use cases with benefits and compliance notes
     """
-    # Industry-specific use case templates
-    # This is simplified for Phase 1
-    # TODO Phase 2: Use LLM to generate custom use cases per industry
+    # Check feature flag for LLM-generated use cases
+    if settings.ENABLE_LLM_USE_CASE_GENERATION:
+        # TODO: Implement LLM-based use case generation when enabled
+        raise NotImplementedError("LLM-based use case generation not yet implemented")
+
+    # Fallback: Industry-specific use case templates
+    logger.warning(
+        "Using template-based industry use cases fallback. "
+        "Enable ENABLE_LLM_USE_CASE_GENERATION for custom LLM-generated use cases."
+    )
 
     use_case_templates = {
         "packaging": {

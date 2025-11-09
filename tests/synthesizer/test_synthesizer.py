@@ -53,7 +53,7 @@ class UsagePattern(BaseModel):
     )
 
 
-class TestScenario(BaseModel):
+class ScenarioDefinition(BaseModel):
     """Test scenario ready for simulate.py."""
 
     name: str = Field(description="Descriptive scenario name")
@@ -81,7 +81,7 @@ class FailureCase(BaseModel):
     )
 
 
-class TestSynthesizer:
+class ScenarioSynthesizer:
     """Generates test scenarios from production usage patterns.
 
     **Design Principles**:
@@ -91,7 +91,7 @@ class TestSynthesizer:
     - Actionable: Generates executable test code
 
     **Usage**:
-        synthesizer = TestSynthesizer(storage)
+        synthesizer = ScenarioSynthesizer(storage)
 
         # Daily: Extract new patterns from production
         patterns = synthesizer.analyze_production_logs(timedelta(days=7))
@@ -156,7 +156,7 @@ class TestSynthesizer:
         # Phase 2: Real clustering and analysis with vector embeddings
         return []
 
-    def synthesize_test_scenario(self, pattern: UsagePattern) -> TestScenario:
+    def synthesize_test_scenario(self, pattern: UsagePattern) -> ScenarioDefinition:
         """Create test scenario from usage pattern.
 
         Args:
@@ -172,7 +172,7 @@ class TestSynthesizer:
             f"({pattern.occurrence_count}x)"
         )
 
-        scenario = TestScenario(
+        scenario = ScenarioDefinition(
             name=name,
             text=pattern.message_text,
             media_path=None,  # TODO: Map media_type to test files

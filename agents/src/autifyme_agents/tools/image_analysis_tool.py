@@ -16,11 +16,11 @@ from PIL import Image
 from pydantic import Field
 
 from autifyme_agents.core.llm_factory import get_llm
-from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 from autifyme_agents.core.tool_error_handler import (
     build_agent_error_response,
     build_success_response,
 )
+from autifyme_agents.schemas.agent_outputs import ImageAnalysisResult
 
 # Vision model optimal dimensions (OpenAI recommends max 2048px)
 MAX_DIMENSION = 2048

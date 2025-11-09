@@ -67,3 +67,4 @@ Thumbs.db
 # Node.js
 node_modules/
 
+coverage.xml

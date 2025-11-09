@@ -12,7 +12,6 @@ Design Philosophy:
 
 from typing import Any
 
-
 # Error type classification rules
 ERROR_PATTERNS = {
     # Database/Storage errors

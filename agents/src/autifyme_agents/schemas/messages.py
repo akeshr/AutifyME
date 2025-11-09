@@ -147,4 +147,5 @@ class IncomingMessage(BaseModel):
 
         return "\n".join(parts)
 
-    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+    # Pydantic V2 handles datetime serialization automatically
+    model_config = ConfigDict()

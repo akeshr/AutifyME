@@ -285,7 +285,7 @@ class WorkflowStory(BaseModel):
 # Test History Models
 # ============================================================================
 
-class TestExecution(BaseModel):
+class ExecutionRecord(BaseModel):
     """Single test execution record."""
 
     timestamp: datetime
@@ -313,10 +313,10 @@ class TestExecution(BaseModel):
     """Brief error summary if failed."""
 
 
-class TestHistory(BaseModel):
+class ExecutionHistory(BaseModel):
     """History of test executions."""
 
-    tests: list[TestExecution]
+    tests: list[ExecutionRecord]
     """List of test executions, newest first."""
 
 
