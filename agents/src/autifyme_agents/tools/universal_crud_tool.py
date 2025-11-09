@@ -67,9 +67,15 @@ def _validate_operation_completeness(
     Raises:
         ToolException: If operation data is incomplete or mismatched with impact
     """
-    new_entities_count = impact_analysis.get("new_entities_count", {})
-    updated_entities_count = impact_analysis.get("updated_entities_count", {})
-    deleted_entities_count = impact_analysis.get("deleted_entities_count", {})
+    # Convert list[TableCount] format to dict for validation
+    new_entities_count_list = impact_analysis.get("new_entities_count", [])
+    new_entities_count = {item["table"]: item["count"] for item in new_entities_count_list} if isinstance(new_entities_count_list, list) else new_entities_count_list
+
+    updated_entities_count_list = impact_analysis.get("updated_entities_count", [])
+    updated_entities_count = {item["table"]: item["count"] for item in updated_entities_count_list} if isinstance(updated_entities_count_list, list) else updated_entities_count_list
+
+    deleted_entities_count_list = impact_analysis.get("deleted_entities_count", [])
+    deleted_entities_count = {item["table"]: item["count"] for item in deleted_entities_count_list} if isinstance(deleted_entities_count_list, list) else deleted_entities_count_list
 
     # Aggregate actual counts across all operations per table
     actual_new_counts = defaultdict(int)
