@@ -1106,14 +1106,12 @@ class OperationExecutor:
             if include_relations:
                 formatted_relations = [f"{rel}(*)" for rel in include_relations]
 
-            # Use port method with relation support (count_only=False, returns list)
-            result = await self.storage.query_advanced(
+            # Use type-safe query_entities port method
+            return await self.storage.query_entities(
                 table=table,
                 filters=filter,
                 relations=formatted_relations
             )
-            # Type narrowing: count_only defaults to False, so result is always list
-            return cast(list[dict[str, Any]], result)
         except Exception as e:
             logger.error(f"Failed to query {table}", exc_info=True)
             raise ToolException(f"Query failed for {table}: {str(e)}") from e

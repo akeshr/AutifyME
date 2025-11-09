@@ -619,75 +619,73 @@ class SupabaseStorageClient(StorageInterface):
     async def query_entities(
         self,
         table: str,
-        filters: dict[str, Any],
+        filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Query entities with filters using async client.
+        """
+        Query entities - always returns list of rows.
+
+        Type-safe wrapper over query_advanced with count_only=False.
 
         Args:
             table: Table name
             filters: WHERE conditions as dict
             columns: Columns to select (default: all)
+            relations: Related tables to include
+            search_patterns: Case-insensitive LIKE patterns
+            limit: Maximum rows to return
 
         Returns:
-            List of matching rows
+            List of matching rows (guaranteed list, never int)
 
         Raises:
             StorageError: On query failure
         """
-        try:
-            client = await self._ensure_async_client()
+        result = await self.query_advanced(
+            table=table,
+            filters=filters,
+            columns=columns,
+            relations=relations,
+            search_patterns=search_patterns,
+            count_only=False,  # Always return rows
+            limit=limit
+        )
+        # Type guaranteed: count_only=False means result is list
+        return result  # type: ignore[return-value]
 
-            # Build select clause
-            select_clause = ",".join(columns) if columns else "*"
-            query = client.table(table).select(select_clause)
+    async def count_entities(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+    ) -> int:
+        """
+        Count entities - always returns int count.
 
-            # Apply filters (support both simple and operator-based)
-            for key, value in filters.items():
-                if isinstance(value, dict):
-                    # Advanced filter with operator: {"in": [...], "gt": ..., etc.}
-                    for operator, operand in value.items():
-                        if operator == "in":
-                            query = query.in_(key, operand)
-                        elif operator == "eq":
-                            query = query.eq(key, operand)
-                        elif operator == "neq":
-                            query = query.neq(key, operand)
-                        elif operator == "gt":
-                            query = query.gt(key, operand)
-                        elif operator == "gte":
-                            query = query.gte(key, operand)
-                        elif operator == "lt":
-                            query = query.lt(key, operand)
-                        elif operator == "lte":
-                            query = query.lte(key, operand)
-                        elif operator == "like":
-                            query = query.like(key, operand)
-                        elif operator == "ilike":
-                            query = query.ilike(key, operand)
-                        else:
-                            raise ValueError(f"Unsupported filter operator: {operator}")
-                elif isinstance(value, list):
-                    # List value - use IN operator
-                    query = query.in_(key, value)
-                else:
-                    # Simple equality filter
-                    query = query.eq(key, value)
+        Type-safe wrapper over query_advanced with count_only=True.
 
-            response = await query.execute()
-            return response.data if response.data else []
+        Args:
+            table: Table name
+            filters: WHERE conditions as dict
+            search_patterns: Case-insensitive LIKE patterns
 
-        except Exception as e:
-            logger.error(
-                f"Failed to query {table}",
-                exc_info=True,
-                extra={"table": table, "filters": filters}
-            )
-            raise StorageError(
-                message=f"Query failed for {table}: {str(e)}",
-                operation="query_entities",
-                original_error=e,
-            ) from e
+        Returns:
+            Count of matching rows (guaranteed int, never list)
+
+        Raises:
+            StorageError: On query failure
+        """
+        result = await self.query_advanced(
+            table=table,
+            filters=filters,
+            search_patterns=search_patterns,
+            count_only=True,  # Always return count
+        )
+        # Type guaranteed: count_only=True means result is int
+        return result  # type: ignore[return-value]
 
     async def check_existing_values(
         self,
