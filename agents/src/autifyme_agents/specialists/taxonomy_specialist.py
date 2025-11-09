@@ -24,13 +24,17 @@ Architecture Pattern:
 - PM orchestrates and approves
 """
 
+import logging
 from typing import Any
 
 from langchain.tools import tool
 from pydantic import BaseModel, Field
 
+from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Data Models - Taxonomy Specialist Outputs
@@ -129,8 +133,15 @@ def create_find_relevant_categories_tool(storage: StorageInterface) -> object:
         """
         try:
             # Search categories by name/description similarity
-            # Simple keyword-based search for Phase 1
-            # TODO Phase 2: Implement semantic search via embeddings
+            if settings.ENABLE_SEMANTIC_SEARCH:
+                # TODO: Implement semantic search via embeddings when enabled
+                raise NotImplementedError("Semantic search not yet implemented")
+
+            # Fallback: Simple keyword-based search
+            logger.warning(
+                "Using keyword-based category search fallback. "
+                "Enable ENABLE_SEMANTIC_SEARCH for improved accuracy via embeddings."
+            )
 
             search_terms = (product_name + " " + product_description).lower().split()
             search_terms = [term for term in search_terms if len(term) > 3][:5]  # Top 5 keywords
@@ -172,8 +183,15 @@ def create_find_relevant_categories_tool(storage: StorageInterface) -> object:
 
             return matches[:5]  # Top 5 matches
 
-        except Exception:
-            # Return empty list on error - specialist will note manual classification needed
+        except Exception as e:
+            logger.error(
+                "Failed to find relevant categories for product '%s': %s",
+                product_name,
+                e,
+                exc_info=True
+            )
+            # Return empty list - specialist will note manual classification needed
+            # This is acceptable degradation (manual fallback exists)
             return []
 
     return find_relevant_categories
@@ -200,8 +218,16 @@ def find_google_product_category(
 
     Note: Phase 1 uses rule-based mapping. Phase 2 will add Google Taxonomy API integration.
     """
-    # Simplified category mapping for Phase 1
-    # TODO Phase 2: Integrate Google Product Taxonomy API
+    # Check feature flag for Google Taxonomy API
+    if settings.ENABLE_GOOGLE_TAXONOMY_API:
+        # TODO: Implement Google Product Taxonomy API integration when enabled
+        raise NotImplementedError("Google Product Taxonomy API not yet implemented")
+
+    # Fallback: Simplified category mapping
+    logger.warning(
+        "Using rule-based Google category mapping fallback. "
+        "Enable ENABLE_GOOGLE_TAXONOMY_API for official Google Taxonomy API integration."
+    )
 
     category_map = {
         # Apparel
@@ -294,8 +320,16 @@ def create_classify_into_industries_tool(storage: StorageInterface) -> object:
             if not industries:
                 return []
 
-            # Simple keyword-based matching for Phase 1
-            # TODO Phase 2: Implement LLM-based industry classification
+            # Check feature flag for LLM-based classification
+            if settings.ENABLE_LLM_INDUSTRY_CLASSIFICATION:
+                # TODO: Implement LLM-based industry classification when enabled
+                raise NotImplementedError("LLM-based industry classification not yet implemented")
+
+            # Fallback: Simple keyword-based matching
+            logger.warning(
+                "Using keyword-based NAICS industry matching fallback. "
+                "Enable ENABLE_LLM_INDUSTRY_CLASSIFICATION for LLM-powered precision."
+            )
 
             search_terms = (product_type + " " + product_description).lower().split()
             search_terms = [term for term in search_terms if len(term) > 3][:10]
@@ -331,7 +365,15 @@ def create_classify_into_industries_tool(storage: StorageInterface) -> object:
             # Return top 5 matches
             return matches[:5]
 
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "Failed to classify product '%s' into industries: %s",
+                product_type,
+                e,
+                exc_info=True
+            )
+            # Return empty list - specialist will note manual classification needed
+            # This is acceptable degradation (manual fallback exists)
             return []
 
     return classify_into_industries

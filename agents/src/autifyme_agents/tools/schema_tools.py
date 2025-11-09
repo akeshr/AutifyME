@@ -10,11 +10,11 @@ from typing import Any
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from autifyme_agents.schemas.registry import SchemaRegistry
 from autifyme_agents.core.tool_error_handler import (
     build_agent_error_response,
     build_success_response,
 )
+from autifyme_agents.schemas.registry import SchemaRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -279,8 +279,8 @@ def _get_table_schema_impl(
             context={"table_name": table_name},
             fallback_type="SCHEMA_ERROR",
             fallback_action=(
-                f"Schema registry issue. Try get_product_schema instead "
-                f"to get all tables, or contact system administrator."
+                "Schema registry issue. Try get_product_schema instead "
+                "to get all tables, or contact system administrator."
             ),
         )
 

@@ -182,8 +182,6 @@ class OperationExecutor:
         Raises:
             ToolException: On validation or execution failure (DB auto-rolls back)
         """
-        import time
-
         start_time = time.time()
 
         # Validate entire plan upfront (before transaction)
@@ -202,7 +200,6 @@ class OperationExecutor:
             error_msg = str(e)
 
             # Extract step number from error message if available
-            import re
             step_match = re.match(r"Step (\d+) failed", error_msg)
             failed_step = int(step_match.group(1)) if step_match else None
 

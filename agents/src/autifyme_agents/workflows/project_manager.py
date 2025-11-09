@@ -25,13 +25,13 @@ from autifyme_agents.specialists.product_architecture_specialist import (
 from autifyme_agents.tools.campaign_persistence_tools import (
     create_save_campaign_tool,
 )
+from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 from autifyme_agents.tools.pm_context_tools import (
     create_get_category_info_tool,
     create_search_catalog_summary_tool,
 )
 from autifyme_agents.tools.schema_tools import get_product_schema
 from autifyme_agents.tools.universal_crud_tool import create_database_tool
-from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -181,8 +181,7 @@ async def create_project_manager(
     #
     # CRITICAL: Specialist needs deterministic model for structured OperationIntent
     # - temperature=0.3: More deterministic for schema-driven operations
-    # - top_p=0.95: Focused sampling (Google's recommendation for JSON)
-    # - top_k=20: Structured output best practice
+    # - thinking_budget=0: No extended reasoning needed for structured outputs
     # PM uses temperature=0.5 for orchestration; specialist needs more precision
     product_architecture_specialist = create_product_architecture_specialist(
         storage=storage,
@@ -190,9 +189,7 @@ async def create_project_manager(
             provider="google",
             model="gemini-2.5-flash",
             temperature=0.3,  # More deterministic for structured output
-            #top_p=0.95,       # Focused nucleus sampling
-            #top_k=20,         # Structured JSON generation
-            thinking_budget=0 # Reasoning budget
+            thinking_budget=0  # Reasoning budget
         )
     )
 

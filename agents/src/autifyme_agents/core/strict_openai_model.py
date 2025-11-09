@@ -5,7 +5,8 @@ have strict validation enabled AND additionalProperties: false in parameters.
 This wrapper ensures bind_tools always uses strict=True and injects additionalProperties.
 """
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI

@@ -7,21 +7,31 @@ messaging platforms without hardcoding platform logic in the Runner.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import Any, Protocol
 
 from langchain.tools import tool
-
-if TYPE_CHECKING:
-    from autifyme_agents.workflows.channels.protocol import MessagingChannel
 
 logger = logging.getLogger(__name__)
 
 
-def create_platform_media_tools(channel: MessagingChannel) -> list[Any]:
+class MediaDownloader(Protocol):
+    """Minimal interface for media download capability.
+
+    Tools layer depends only on this protocol, not on full MessagingChannel.
+    This preserves hexagonal architecture (core doesn't depend on adapters).
+    """
+
+    def download_media(self, media_id: str) -> Path | None:
+        """Download media and return local path."""
+        ...
+
+
+def create_platform_media_tools(channel: MediaDownloader) -> list[Any]:
     """Create platform-specific media download tools.
 
     Args:
-        channel: The messaging channel adapter (WhatsApp, Telegram, etc.)
+        channel: Object implementing MediaDownloader protocol (e.g., WhatsAppChannel)
 
     Returns:
         List of platform-specific tools for media operations

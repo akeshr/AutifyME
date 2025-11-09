@@ -1085,7 +1085,7 @@ class SupabaseStorageClient(StorageInterface):
     # Transaction Support (Phase 3)
     # ========================================================================
 
-    def transaction(self) -> "SupabaseTransaction":
+    def transaction(self) -> SupabaseTransaction:
         """
         Create a transaction context manager for atomic operations.
 
@@ -1206,7 +1206,7 @@ class SupabaseTransaction:
         self.operations: list[dict[str, Any]] = []
         self.in_transaction = False
 
-    async def __aenter__(self) -> "SupabaseTransaction":
+    async def __aenter__(self) -> SupabaseTransaction:
         """Start transaction - begin tracking operations."""
         self.in_transaction = True
         self.operations = []

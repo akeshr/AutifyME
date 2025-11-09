@@ -13,9 +13,8 @@ Design:
 """
 
 import logging
-from uuid import UUID
-
 from typing import Any
+from uuid import UUID
 
 from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel, Field

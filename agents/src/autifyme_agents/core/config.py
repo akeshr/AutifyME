@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: str | None = None
     AGENT_RECURSION_LIMIT: int = 50
 
+    # Phase 2 Feature Flags (Enable advanced capabilities when ready)
+    ENABLE_SEMANTIC_SEARCH: bool = False  # Taxonomy: Embeddings-based category search
+    ENABLE_GOOGLE_TAXONOMY_API: bool = False  # Taxonomy: Google Product Taxonomy integration
+    ENABLE_LLM_INDUSTRY_CLASSIFICATION: bool = False  # Taxonomy: LLM-based NAICS classification
+    ENABLE_COMPETITIVE_PRICING_API: bool = False  # Market Intelligence: Competitive pricing data
+    ENABLE_LLM_USE_CASE_GENERATION: bool = False  # Market Intelligence: Custom use cases per industry
+    ENABLE_LLM_BULLET_GENERATION: bool = False  # Content SEO: Brand-aligned bullet points
+
 
 # Create a single, globally accessible instance of the settings.
 # Other parts of our application will import this `settings` object.

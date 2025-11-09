@@ -343,9 +343,14 @@ class CatalogingWorkflowHandler:
                     try:
                         result = CatalogingResult.model_validate(args)
                         return result
-                    except Exception:
+                    except Exception as e:
                         # Validation failed, continue to next tool call
-                        pass
+                        logger.debug(
+                            "Tool call %s validation failed, checking next: %s",
+                            tc_id,
+                            e
+                        )
+                        continue
 
         return None
 
