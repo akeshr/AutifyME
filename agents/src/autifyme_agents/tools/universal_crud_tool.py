@@ -18,7 +18,7 @@ import re
 import time
 from collections import defaultdict
 from datetime import UTC
-from typing import Any
+from typing import Any, cast
 
 from langchain_core.tools import BaseTool, StructuredTool, ToolException
 from pydantic import BaseModel, ConfigDict, Field, create_model
@@ -768,7 +768,7 @@ class OperationExecutor:
         if operation.soft_delete:
             # Soft delete - mark as inactive (schema-aware)
             # Only set columns that exist in the table schema
-            updates = {}
+            updates: dict[str, Any] = {}
 
             # Check if table has is_active column
             if "is_active" in table_schema.columns:
@@ -851,7 +851,7 @@ class OperationExecutor:
         Returns:
             Data with references resolved to actual values
         """
-        resolved = {}
+        resolved: dict[str, Any] = {}
 
         for key, value in data.items():
             if isinstance(value, str):
@@ -931,7 +931,7 @@ class OperationExecutor:
                 if ref_name in refs:
                     entity = refs[ref_name]
                     if "id" in entity:
-                        return entity["id"]
+                        return str(entity["id"])  # Explicit cast to str for type safety
                     else:
                         raise ToolException(
                             f"Named reference '{ref_name}' found but entity has no 'id' field"
@@ -1106,12 +1106,14 @@ class OperationExecutor:
             if include_relations:
                 formatted_relations = [f"{rel}(*)" for rel in include_relations]
 
-            # Use port method with relation support
-            return await self.storage.query_advanced(
+            # Use port method with relation support (count_only=False, returns list)
+            result = await self.storage.query_advanced(
                 table=table,
                 filters=filter,
                 relations=formatted_relations
             )
+            # Type narrowing: count_only defaults to False, so result is always list
+            return cast(list[dict[str, Any]], result)
         except Exception as e:
             logger.error(f"Failed to query {table}", exc_info=True)
             raise ToolException(f"Query failed for {table}: {str(e)}") from e
@@ -1470,18 +1472,18 @@ def create_database_tool(
                 f"Received: {list(operation_intent.keys())}"
             ) from e
 
-        # Extract validated fields
-        intent_type = validated.intent_type
-        user_request_summary = validated.user_request_summary
-        reasoning = validated.reasoning
-        specialist_name = validated.specialist_name
-        schema_version = validated.schema_version
+        # Extract validated fields (using getattr for dynamic model)
+        intent_type = str(getattr(validated, 'intent_type'))
+        user_request_summary = str(getattr(validated, 'user_request_summary'))
+        reasoning = str(getattr(validated, 'reasoning'))
+        specialist_name = getattr(validated, 'specialist_name', None)
+        schema_version = str(getattr(validated, 'schema_version', 'v1'))
 
         # Handle read-only vs mutation parameter differences
         if hasattr(validated, 'query_filter'):
             # Read-only operation
-            query_filter = validated.query_filter
-            execution_plan = validated.execution_plan
+            query_filter = getattr(validated, 'query_filter')
+            execution_plan = getattr(validated, 'execution_plan')
 
             # Build minimal change_spec for read operations
             change_spec = {
@@ -1508,9 +1510,9 @@ def create_database_tool(
             }
         else:
             # Mutation operation
-            change_spec = validated.change_spec
-            impact_analysis = validated.impact_analysis
-            execution_plan = validated.execution_plan
+            change_spec = getattr(validated, 'change_spec')
+            impact_analysis = getattr(validated, 'impact_analysis')
+            execution_plan = getattr(validated, 'execution_plan')
 
         # Validate operation is allowed
         if intent_type not in operations:
@@ -1520,11 +1522,11 @@ def create_database_tool(
                 f"This tool is configured for: {', '.join(operations)} only."
             )
 
-        # Validate table access if restricted
-        if tables is not None and change_spec:
+        # Validate table access if restricted (change_spec is dict at this point)
+        if tables is not None and change_spec and isinstance(change_spec, dict):
             ops_list = change_spec.get('operations', [])
             for operation in ops_list:
-                table = operation.get('table')
+                table = operation.get('table') if isinstance(operation, dict) else None
                 if table and table not in tables:
                     raise ToolException(
                         f"Table '{table}' not accessible by this tool. "
@@ -1534,29 +1536,34 @@ def create_database_tool(
 
         # Execute using shared implementation logic
         try:
+            # Get domain from change_spec dict for schema loading
+            domain_raw = change_spec.get("domain", "product_catalog") if isinstance(change_spec, dict) else "product_catalog"
+            domain = cast(str, domain_raw)  # Type narrowing for mypy
+
             # Load schema for validation
             schema = SchemaRegistry.get_version(
                 version=schema_version,
-                domain=change_spec.get("domain", "product_catalog")
+                domain=domain
             )
 
-            # Construct OperationIntent from parameters
-            operation_intent = OperationIntent(
-                intent_type=intent_type,
-                change_spec=change_spec,
-                user_request_summary=user_request_summary,
-                reasoning=reasoning,
-                impact_analysis=impact_analysis,
-                execution_plan=execution_plan,
-                specialist_name=specialist_name,
-                schema_version=schema_version,
-            )
+            # Construct OperationIntent from parameters using model_validate (handles nested models)
+            # model_validate converts dict representations to proper Pydantic models
+            operation_intent_final: OperationIntent = OperationIntent.model_validate({
+                "intent_type": intent_type,
+                "change_spec": change_spec,
+                "user_request_summary": user_request_summary,
+                "reasoning": reasoning,
+                "impact_analysis": impact_analysis,
+                "execution_plan": execution_plan,
+                "specialist_name": specialist_name,
+                "schema_version": schema_version,
+            })
 
             logger.info(
-                f"Executing database operation: {operation_intent.intent_type}",
+                f"Executing database operation: {operation_intent_final.intent_type}",
                 extra={
-                    "intent_type": operation_intent.intent_type,
-                    "operations_count": len(operation_intent.change_spec.operations),
+                    "intent_type": operation_intent_final.intent_type,
+                    "operations_count": len(operation_intent_final.change_spec.operations),
                     "schema_version": schema_version,
                     "allowed_operations": operations,
                     "allowed_tables": tables,
@@ -1565,8 +1572,10 @@ def create_database_tool(
 
             # Validate against schema
             validator = SchemaValidator(schema)
-            for operation in operation_intent.change_spec.operations:
-                validation = validator.validate_operation(operation.model_dump())
+            # Type narrowing: operations is list[Operation] from ChangeSpecification
+            # Mypy confused by closure variable 'operations: list[str]', suppress false positives
+            for operation in operation_intent_final.change_spec.operations:  # type: ignore[assignment]
+                validation = validator.validate_operation(operation.model_dump())  # type: ignore[attr-defined]
                 if not validation.valid:
                     raise ToolException(
                         f"Schema validation failed: {validation.errors}"
@@ -1574,15 +1583,15 @@ def create_database_tool(
 
             # Validate completeness (operations match impact_analysis counts)
             _validate_operation_completeness(
-                operations=operation_intent.change_spec.operations,
-                impact_analysis=operation_intent.impact_analysis.model_dump()
+                operations=operation_intent_final.change_spec.operations,
+                impact_analysis=operation_intent_final.impact_analysis.model_dump()
             )
 
             # Execute plan
             executor = OperationExecutor(storage, schema)
             result = await executor.execute_plan(
-                steps=operation_intent.execution_plan.steps,
-                operations=operation_intent.change_spec.operations,
+                steps=operation_intent_final.execution_plan.steps,
+                operations=operation_intent_final.change_spec.operations,
             )
 
             if result.success:
