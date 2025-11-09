@@ -552,8 +552,8 @@ current_price = result["rows"][0]["base_price"]  # 30.0
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"product_families": 1},
-    "updated_entities_count": {"product_families": 1},
+    "affected_tables": [{"table": "product_families", "count": 1}],
+    "updated_entities_count": [{"table": "product_families", "count": 1}],
     "business_impact_summary": "Base price updated from Rs 30 to Rs 35 (affects all SKU pricing)",
     "warnings": ["Price increase may affect existing orders"],
     "is_destructive": false,
@@ -644,8 +644,14 @@ amber_product_ids = ["p1-uuid", "p2-uuid", "p3-uuid"]  # Extract from product_va
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"variant_values": 1, "products": 3},
-    "deleted_entities_count": {"variant_values": 1, "products": 3},
+    "affected_tables": [
+      {"table": "variant_values", "count": 1},
+      {"table": "products", "count": 3}
+    ],
+    "deleted_entities_count": [
+      {"table": "variant_values", "count": 1},
+      {"table": "products", "count": 3}
+    ],
     "business_impact_summary": "Will discontinue Amber color variant (3 SKUs affected)",
     "warnings": [
       "3 SKUs will be discontinued: PAV-BTL-250ML-AMB, PAV-BTL-500ML-AMB, PAV-BTL-1L-AMB",
@@ -892,7 +898,20 @@ My search: product_families "PET bottle" → 0 matches found
     ]
   },
   "impact_analysis": {
-    "new_entities_count": {"product_families": 1, "variant_axes": 2, "variant_values": 5, "products": 6, "product_variant_values": 12},
+    "affected_tables": [
+      {"table": "product_families", "count": 1},
+      {"table": "variant_axes", "count": 2},
+      {"table": "variant_values", "count": 5},
+      {"table": "products", "count": 6},
+      {"table": "product_variant_values", "count": 12}
+    ],
+    "new_entities_count": [
+      {"table": "product_families", "count": 1},
+      {"table": "variant_axes", "count": 2},
+      {"table": "variant_values", "count": 5},
+      {"table": "products", "count": 6},
+      {"table": "product_variant_values", "count": 12}
+    ],
     "business_impact_summary": "Will create 1 product family with 2 variant axes (capacity, color) and 6 SKUs. Total: 26 new records across 5 tables.",
     "examples": ["PAV-BTL-250ML-CLR", "PAV-BTL-500ML-AMB", "PAV-BTL-1L-CLR"],
     "warnings": ["Ensure pricing strategy aligns with capacity tiers (Rs 15, 25, 40)"],
@@ -1102,8 +1121,18 @@ family_result = query_database(
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"variant_axes": 1, "variant_values": 2, "products": 6, "product_variant_values": 24},
-    "new_entities_count": {"variant_axes": 1, "variant_values": 2, "products": 6, "product_variant_values": 24},
+    "affected_tables": [
+      {"table": "variant_axes", "count": 1},
+      {"table": "variant_values", "count": 2},
+      {"table": "products", "count": 6},
+      {"table": "product_variant_values", "count": 24}
+    ],
+    "new_entities_count": [
+      {"table": "variant_axes", "count": 1},
+      {"table": "variant_values", "count": 2},
+      {"table": "products", "count": 6},
+      {"table": "product_variant_values", "count": 24}
+    ],
     "business_impact_summary": "Expanding PET Bottles family from 6 to 12 SKUs by adding finish dimension. Existing SKUs assigned to 'glossy' (default), 6 new 'matte' SKUs created. Total new records: 33.",
     "examples": ["PAV-BTL-250ML-CLR-MAT", "PAV-BTL-500ML-AMB-MAT", "PAV-BTL-1L-CLR-MAT"],
     "warnings": [
@@ -1153,16 +1182,16 @@ family_result = query_database(
     ]}  // Total: 36 new records in product_variant_values
   ],
   "impact_analysis": {
-    "new_entities_count": {
-      "variant_axes": 4,
-      "variant_values": 12,
-      "products": 8,
-      "product_variant_values": 32  // ❌ WRONG! Should be 36
-    },
-    "updated_entities_count": {
-      "products": 1,
-      "product_variant_values": 4  // ❌ WRONG! These are INSERTS, not updates
-    }
+    "new_entities_count": [
+      {"table": "variant_axes", "count": 4},
+      {"table": "variant_values", "count": 12},
+      {"table": "products", "count": 8},
+      {"table": "product_variant_values", "count": 32}
+    ],
+    "updated_entities_count": [
+      {"table": "products", "count": 1},
+      {"table": "product_variant_values", "count": 4}
+    ]
   }
 }
 ```
@@ -1171,16 +1200,15 @@ family_result = query_database(
 ```json
 {
   "impact_analysis": {
-    "new_entities_count": {
-      "variant_axes": 4,
-      "variant_values": 12,
-      "products": 8,
-      "product_variant_values": 36  // ✓ CORRECT: 4 (existing product) + 32 (new products)
-    },
-    "updated_entities_count": {
-      "products": 1  // ✓ Only the products table has updates
-      // NO product_variant_values here - all links are NEW records (inserts)
-    }
+    "new_entities_count": [
+      {"table": "variant_axes", "count": 4},
+      {"table": "variant_values", "count": 12},
+      {"table": "products", "count": 8},
+      {"table": "product_variant_values", "count": 36}
+    ],
+    "updated_entities_count": [
+      {"table": "products", "count": 1}
+    ]
   }
 }
 ```
@@ -1284,8 +1312,16 @@ color_result = query_database(
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"variant_values": 1, "products": 2, "product_variant_values": 4},
-    "new_entities_count": {"variant_values": 1, "products": 2, "product_variant_values": 4},
+    "affected_tables": [
+      {"table": "variant_values", "count": 1},
+      {"table": "products", "count": 2},
+      {"table": "product_variant_values", "count": 4}
+    ],
+    "new_entities_count": [
+      {"table": "variant_values", "count": 1},
+      {"table": "products", "count": 2},
+      {"table": "product_variant_values", "count": 4}
+    ],
     "business_impact_summary": "Adding 2L capacity creates 2 new SKUs (one per color). SKU count: 6 → 8. Total new records: 7.",
     "examples": ["PAV-BTL-2L-CLR", "PAV-BTL-2L-AMB"],
     "warnings": [
@@ -1393,8 +1429,20 @@ pvv_ids = ["pvv1-uuid", "pvv2-uuid", "pvv3-uuid"]
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"product_families": 1, "variant_axes": 1, "variant_values": 3, "products": 3, "product_variant_values": 3},
-    "deleted_entities_count": {"product_families": 1, "variant_axes": 1, "variant_values": 3, "products": 3, "product_variant_values": 3},
+    "affected_tables": [
+      {"table": "product_families", "count": 1},
+      {"table": "variant_axes", "count": 1},
+      {"table": "variant_values", "count": 3},
+      {"table": "products", "count": 3},
+      {"table": "product_variant_values", "count": 3}
+    ],
+    "deleted_entities_count": [
+      {"table": "product_families", "count": 1},
+      {"table": "variant_axes", "count": 1},
+      {"table": "variant_values", "count": 3},
+      {"table": "products", "count": 3},
+      {"table": "product_variant_values", "count": 3}
+    ],
     "business_impact_summary": "Complete discontinuation of PET Jars product line. All 3 SKUs will be marked inactive. Total: 11 records soft-deleted across 5 tables.",
     "warnings": [
       "DESTRUCTIVE: Entire product family discontinued",
@@ -1596,7 +1644,7 @@ products_result = query_database(
     "affected_entities": {
       "products": 3
     },
-    "new_entities_count": {},
+    "new_entities_count": [],
     "examples": [
       "PAV-BTL-250ML-CLR: Rs 15 → Rs 18",
       "PAV-BTL-500ML-CLR: Rs 25 → Rs 28",
@@ -1711,7 +1759,7 @@ count_result = query_database(
       "products": 32,
       "product_variant_values": 64
     },
-    "new_entities_count": {},
+    "new_entities_count": [],
     "examples": ["PET Bottles family (12 products)", "PET Jars family (8 products)", "HDPE Containers family (12 products)"],
     "warnings": ["This will affect 32 products across 3 families"],
     "is_destructive": true,
@@ -1790,8 +1838,12 @@ if result["count"] == 0:
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"product_families": 1},
-    "updated_entities_count": {"product_families": 1},
+    "affected_tables": [
+      {"table": "product_families", "count": 1}
+    ],
+    "updated_entities_count": [
+      {"table": "product_families", "count": 1}
+    ],
     "business_impact_summary": "Base price updated from Rs 25 to Rs 32 for PET Bottles family",
     "warnings": ["Price increase of Rs 7 (28%) may affect margins"],
     "is_destructive": false,
