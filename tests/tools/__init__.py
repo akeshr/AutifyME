@@ -21,6 +21,8 @@ from .intelligent_execution import intelligent_execute_scenario
 
 # Models (for type hints and return types)
 from .models import (
+    ExecutionHistory,
+    ExecutionRecord,
     ExecutionResult,
     HITLDecision,
     LLMCallNode,
@@ -30,8 +32,6 @@ from .models import (
     RunMessages,
     RunMetadata,
     RunNode,
-    TestExecution,
-    TestHistory,
     ToolCall,
     ToolResult,
     TraceOverview,
@@ -79,6 +79,6 @@ __all__ = [
     "list_recent_tests",
     "record_test_execution",
     "clear_test_history",
-    "TestHistory",
-    "TestExecution",
+    "ExecutionHistory",
+    "ExecutionRecord",
 ]
