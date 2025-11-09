@@ -107,6 +107,25 @@ class SupabaseStorageClient(StorageInterface):
         """
         self.cleanup()
 
+    @staticmethod
+    def _is_uuid(value: str) -> bool:
+        """
+        Check if a string is a valid UUID format.
+
+        UUIDs should use exact case-sensitive matching (not case-insensitive).
+        This prevents converting UUID filters to ILIKE which would be incorrect.
+
+        Args:
+            value: String to check
+
+        Returns:
+            True if value matches UUID format (8-4-4-4-12 hex pattern)
+        """
+        import re
+        # UUID pattern: 8-4-4-4-12 hex digits
+        uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        return bool(re.match(uuid_pattern, value.lower()))
+
     def _ensure_client(self) -> Client:
         """Create and validate the Supabase client lazily.
 
@@ -774,13 +793,18 @@ class SupabaseStorageClient(StorageInterface):
                 count="exact" if count_only else None
             )
 
-            # Apply exact match filters
+            # Apply filters with case-insensitive matching for text fields
             if filters:
                 for key, value in filters.items():
                     if isinstance(value, list):
                         # List value - use IN operator
                         query = query.in_(key, value)
+                    elif isinstance(value, str) and not self._is_uuid(value):
+                        # String value (non-UUID) - use case-insensitive match
+                        # This prevents "neck type" vs "Neck Type" mismatches
+                        query = query.ilike(key, value)
                     else:
+                        # UUID, number, boolean - use exact match
                         query = query.eq(key, value)
 
             # Apply ILIKE search patterns
