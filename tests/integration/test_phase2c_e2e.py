@@ -28,6 +28,7 @@ from autifyme_agents.schemas.operation_intent import (
     ImpactAnalysis,
     Operation,
     OperationIntent,
+    TableCount,
 )
 from autifyme_agents.schemas.registry import SchemaRegistry
 from autifyme_agents.specialists.product_architecture_specialist import (
@@ -40,6 +41,18 @@ from autifyme_agents.tools.universal_crud_tool import (
 
 # Import FakeStorage from fixtures
 from tests.fixtures.fake_storage import FakeStorage
+
+
+# =============================================================================
+# Test Helpers
+# =============================================================================
+
+def get_table_count(table_counts: list[TableCount], table_name: str) -> int:
+    """Helper to get count for a table from list[TableCount]."""
+    for tc in table_counts:
+        if tc.table == table_name:
+            return tc.count
+    return 0
 
 # =============================================================================
 # Fixtures - Test Database Setup
@@ -134,12 +147,12 @@ class TestCreateOperations:
             user_request_summary="Create Test Water Bottles family with capacity variants",
             reasoning="New family requires product_families + variant_axes + variant_values + products",
             impact_analysis=ImpactAnalysis(
-                new_entities_count={
-                    "product_families": 1,
-                    "variant_axes": 1,
-                    "variant_values": 3,
-                    "products": 3,
-                },
+                new_entities_count=[
+                    TableCount(table="product_families", count=1),
+                    TableCount(table="variant_axes", count=1),
+                    TableCount(table="variant_values", count=3),
+                    TableCount(table="products", count=3),
+                ],
                 business_impact_summary="Will create 3 new SKUs",
                 examples=["TEST-BTL-250ML", "TEST-BTL-500ML", "TEST-BTL-1L"],
             ),
@@ -158,7 +171,7 @@ class TestCreateOperations:
         assert intent.intent_type == "create"
         assert len(intent.change_spec.operations) == 2
         assert intent.change_spec.operations[1].depends_on == [1]
-        assert intent.impact_analysis.new_entities_count["product_families"] == 1
+        assert get_table_count(intent.impact_analysis.new_entities_count, "product_families") == 1
         assert len(intent.impact_analysis.examples) == 3
 
     def test_operation_intent_serialization(self):
@@ -475,9 +488,10 @@ class TestSpecialistIntegration:
     def test_specialist_structure(self, product_specialist):
         """Test specialist is configured correctly."""
         assert product_specialist["name"] == "product_architecture_specialist"
-        assert product_specialist["response_format"] == OperationIntent
+        assert "description" in product_specialist
         assert "tools" in product_specialist
         assert len(product_specialist["tools"]) > 0
+        assert "system_prompt" in product_specialist
 
     def test_specialist_has_schema_tools(self, product_specialist):
         """Test specialist has access to schema query tools."""
@@ -543,9 +557,10 @@ class TestFullE2EExecution:
 
         # Verify success
         assert result.success is True
-        assert result.affected_entities["product_families"] == 1
+        assert get_table_count(result.affected_entities, "product_families") == 1
         assert result.steps_completed == 1
-        assert result.created_ids[1]["id"] == family_id  # Verify ID matches
+        assert len(result.created_ids) == 1
+        assert result.created_ids[0].entity_id == family_id  # Verify ID matches
 
         # Verify database state
         assert len(test_storage.tables["product_families"]) == 1
@@ -610,11 +625,12 @@ class TestFullE2EExecution:
         # Verify success
         assert result.success is True
         assert result.steps_completed == 2
-        assert result.affected_entities["product_families"] == 1
-        assert result.affected_entities["variant_axes"] == 1
+        assert get_table_count(result.affected_entities, "product_families") == 1
+        assert get_table_count(result.affected_entities, "variant_axes") == 1
 
         # Verify dependencies resolved correctly
-        family_id = result.created_ids[1]["id"]  # Extract ID from full entity
+        # Family is first created entity (step 1)
+        family_id = result.created_ids[0].entity_id
         axis_record = test_storage.tables["variant_axes"][0]
         assert axis_record["product_family_id"] == family_id
 
@@ -655,7 +671,7 @@ class TestFullE2EExecution:
 
         # Verify
         assert result.success is True
-        assert result.affected_entities["product_families"] == 1
+        assert get_table_count(result.affected_entities, "product_families") == 1
 
         # Check database
         updated_family = test_storage.tables["product_families"][0]
@@ -700,7 +716,7 @@ class TestFullE2EExecution:
 
         # Verify
         assert result.success is True
-        assert result.affected_entities["variant_values"] == 1
+        assert get_table_count(result.affected_entities, "variant_values") == 1
 
         # Check database - should be empty
         assert len(test_storage.tables["variant_values"]) == 0
@@ -816,9 +832,9 @@ class TestFullE2EExecution:
         # Verify complete success
         assert result.success is True
         assert result.steps_completed == 5
-        assert result.affected_entities["product_families"] == 1
-        assert result.affected_entities["variant_axes"] == 2
-        assert result.affected_entities["variant_values"] == 2
+        assert get_table_count(result.affected_entities, "product_families") == 1
+        assert get_table_count(result.affected_entities, "variant_axes") == 2
+        assert get_table_count(result.affected_entities, "variant_values") == 2
 
         # Verify all records created
         assert len(test_storage.tables["product_families"]) == 1
@@ -826,7 +842,8 @@ class TestFullE2EExecution:
         assert len(test_storage.tables["variant_values"]) == 2
 
         # Verify foreign key relationships
-        family_id = result.created_ids[1]["id"]  # Extract ID from full entity
+        # Family is first created entity (step 1)
+        family_id = result.created_ids[0].entity_id
         axis1 = test_storage.tables["variant_axes"][0]
         axis2 = test_storage.tables["variant_axes"][1]
         assert axis1["product_family_id"] == family_id
