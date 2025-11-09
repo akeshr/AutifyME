@@ -18,7 +18,7 @@ import re
 import time
 from collections import defaultdict
 from datetime import UTC
-from typing import Any, cast
+from typing import Any
 
 from langchain_core.tools import BaseTool, StructuredTool, ToolException
 from pydantic import BaseModel, ConfigDict, Field, create_model
@@ -1333,7 +1333,7 @@ def _generate_tool_name(suffix: str | None = None) -> str:
 
 def create_database_tool(
     storage: StorageInterface,
-    operations: list[str],
+    allowed_operations: list[str],
     tables: list[str] | None = None,
     tool_name_suffix: str | None = None,
 ) -> BaseTool:
@@ -1353,7 +1353,7 @@ def create_database_tool(
 
     Args:
         storage: Storage interface for database operations (REQUIRED)
-        operations: List of allowed operations. Valid values: "read", "create", "update", "delete"
+        allowed_operations: List of allowed operations. Valid values: "read", "create", "update", "delete"
         tables: Optional whitelist of accessible tables. None = all tables allowed
         tool_name_suffix: Optional suffix for tool name (e.g., "read_only", "products")
 
@@ -1367,7 +1367,7 @@ def create_database_tool(
         # Read-only tool for market intelligence specialist
         >>> read_tool = create_database_tool(
         ...     storage=storage,
-        ...     operations=["read"]
+        ...     allowed_operations=["read"]
         ... )
         >>> # Tool has 6-field schema (no change_spec, no impact_analysis)
         >>> # Description: "Read-only database access..."
@@ -1375,7 +1375,7 @@ def create_database_tool(
         # Full CRUD tool for product architecture specialist
         >>> crud_tool = create_database_tool(
         ...     storage=storage,
-        ...     operations=["create", "read", "update", "delete"]
+        ...     allowed_operations=["create", "read", "update", "delete"]
         ... )
         >>> # Tool has 8-field schema (full mutation support)
         >>> # Description: "Full CRUD database access..."
@@ -1383,7 +1383,7 @@ def create_database_tool(
         # Domain-scoped tool for taxonomy specialist
         >>> taxonomy_tool = create_database_tool(
         ...     storage=storage,
-        ...     operations=["read", "create", "update"],
+        ...     allowed_operations=["read", "create", "update"],
         ...     tables=["categories", "category_product_mappings"],
         ...     tool_name_suffix="taxonomy"
         ... )
@@ -1393,7 +1393,7 @@ def create_database_tool(
         # Read + update tool for campaign optimization
         >>> campaign_tool = create_database_tool(
         ...     storage=storage,
-        ...     operations=["read", "update"],
+        ...     allowed_operations=["read", "update"],
         ...     tables=["campaigns", "ad_copies"],
         ...     tool_name_suffix="campaigns"
         ... )
@@ -1401,7 +1401,7 @@ def create_database_tool(
 
     Architecture:
         - Uses dynamic Pydantic schema generation (pydantic.create_model)
-        - Closure captures access control parameters (operations, tables)
+        - Closure captures access control parameters (allowed_operations, tables)
         - Runtime validation before execution
         - Single implementation for all operation combinations
 
@@ -1410,12 +1410,12 @@ def create_database_tool(
         - _generate_tool_description(): Description generator
         - _generate_tool_name(): Tool naming with optional suffixes
     """
-    # Validate operations
+    # Validate allowed operations
     valid_operations = {"read", "create", "update", "delete"}
-    if not operations:
-        raise ValueError("operations list cannot be empty")
+    if not allowed_operations:
+        raise ValueError("allowed_operations list cannot be empty")
 
-    invalid_ops = set(operations) - valid_operations
+    invalid_ops = set(allowed_operations) - valid_operations
     if invalid_ops:
         raise ValueError(
             f"Invalid operations: {invalid_ops}. "
@@ -1423,11 +1423,11 @@ def create_database_tool(
         )
 
     # Generate dynamic schema for validation (kept for internal validation)
-    expected_schema = _create_operation_input_schema(operations)
+    expected_schema = _create_operation_input_schema(allowed_operations)
 
     # Generate tool name and description
     tool_name = _generate_tool_name(tool_name_suffix)
-    tool_description = _generate_tool_description(operations, tables)
+    tool_description = _generate_tool_description(allowed_operations, tables)
 
     # Create simple input schema: single operation_intent parameter
     from pydantic import create_model
@@ -1466,7 +1466,7 @@ def create_database_tool(
         except Exception as e:
             raise ToolException(
                 f"Invalid OperationIntent structure: {str(e)}\n\n"
-                f"Expected fields for {operations} operations: {list(expected_schema.model_fields.keys())}\n"
+                f"Expected fields for {allowed_operations} operations: {list(expected_schema.model_fields.keys())}\n"
                 f"Received: {list(operation_intent.keys())}"
             ) from e
 
@@ -1484,7 +1484,7 @@ def create_database_tool(
             execution_plan = getattr(validated, 'execution_plan')
 
             # Build minimal change_spec for read operations
-            change_spec = {
+            change_spec: dict[str, Any] = {
                 'domain': 'product_catalog',  # Default domain
                 'operations': [
                     {
@@ -1513,18 +1513,18 @@ def create_database_tool(
             execution_plan = getattr(validated, 'execution_plan')
 
         # Validate operation is allowed
-        if intent_type not in operations:
+        if intent_type not in allowed_operations:
             raise ToolException(
                 f"Operation '{intent_type}' not allowed for this tool. "
-                f"Allowed operations: {', '.join(operations)}. "
-                f"This tool is configured for: {', '.join(operations)} only."
+                f"Allowed operations: {', '.join(allowed_operations)}. "
+                f"This tool is configured for: {', '.join(allowed_operations)} only."
             )
 
         # Validate table access if restricted (change_spec is dict at this point)
         if tables is not None and change_spec and isinstance(change_spec, dict):
             ops_list = change_spec.get('operations', [])
-            for operation in ops_list:
-                table = operation.get('table') if isinstance(operation, dict) else None
+            for op_dict in ops_list:
+                table = op_dict.get('table') if isinstance(op_dict, dict) else None
                 if table and table not in tables:
                     raise ToolException(
                         f"Table '{table}' not accessible by this tool. "
@@ -1535,13 +1535,15 @@ def create_database_tool(
         # Execute using shared implementation logic
         try:
             # Get domain from change_spec dict for schema loading
-            domain_raw = change_spec.get("domain", "product_catalog") if isinstance(change_spec, dict) else "product_catalog"
-            domain = cast(str, domain_raw)  # Type narrowing for mypy
+            # Default to product_catalog if not specified or if change_spec is not a dict
+            domain_value = "product_catalog"
+            if isinstance(change_spec, dict):
+                domain_value = change_spec.get("domain", "product_catalog")
 
             # Load schema for validation
             schema = SchemaRegistry.get_version(
                 version=schema_version,
-                domain=domain
+                domain=domain_value
             )
 
             # Construct OperationIntent from parameters using model_validate (handles nested models)
@@ -1563,17 +1565,16 @@ def create_database_tool(
                     "intent_type": operation_intent_final.intent_type,
                     "operations_count": len(operation_intent_final.change_spec.operations),
                     "schema_version": schema_version,
-                    "allowed_operations": operations,
+                    "allowed_operations": allowed_operations,
                     "allowed_tables": tables,
                 }
             )
 
             # Validate against schema
             validator = SchemaValidator(schema)
-            # Type narrowing: operations is list[Operation] from ChangeSpecification
-            # Mypy confused by closure variable 'operations: list[str]', suppress false positives
-            for operation in operation_intent_final.change_spec.operations:  # type: ignore[assignment]
-                validation = validator.validate_operation(operation.model_dump())  # type: ignore[attr-defined]
+            # Type guaranteed: change_spec.operations is list[Operation] from ChangeSpecification
+            for operation in operation_intent_final.change_spec.operations:
+                validation = validator.validate_operation(operation.model_dump())
                 if not validation.valid:
                     raise ToolException(
                         f"Schema validation failed: {validation.errors}"

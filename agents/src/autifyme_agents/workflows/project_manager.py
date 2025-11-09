@@ -168,7 +168,7 @@ async def create_project_manager(
     pm_tools.append(
         create_database_tool(
             storage=storage,
-            operations=["create", "read", "update", "delete"],  # Full CRUD access
+            allowed_operations=["create", "read", "update", "delete"],  # Full CRUD access
         )
     )
 

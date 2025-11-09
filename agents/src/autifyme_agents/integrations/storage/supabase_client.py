@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal, overload
 
 import httpx
 from supabase import AsyncClient, Client, create_async_client, create_client
@@ -653,8 +653,8 @@ class SupabaseStorageClient(StorageInterface):
             count_only=False,  # Always return rows
             limit=limit
         )
-        # Type guaranteed: count_only=False means result is list
-        return result  # type: ignore[return-value]
+        # Type guaranteed by @overload: count_only=False → list
+        return result
 
     async def count_entities(
         self,
@@ -684,8 +684,8 @@ class SupabaseStorageClient(StorageInterface):
             search_patterns=search_patterns,
             count_only=True,  # Always return count
         )
-        # Type guaranteed: count_only=True means result is int
-        return result  # type: ignore[return-value]
+        # Type guaranteed by @overload: count_only=True → int
+        return result
 
     async def check_existing_values(
         self,
@@ -742,6 +742,30 @@ class SupabaseStorageClient(StorageInterface):
                 operation="check_existing_values",
                 original_error=e,
             ) from e
+
+    @overload
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: Literal[True] = ...,
+        limit: int | None = None,
+    ) -> int: ...
+
+    @overload
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: Literal[False] = ...,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]: ...
 
     async def query_advanced(
         self,
