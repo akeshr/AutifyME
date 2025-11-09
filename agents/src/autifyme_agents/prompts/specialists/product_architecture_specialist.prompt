@@ -323,6 +323,74 @@ result = query_database(
 # Finds variant values matching both patterns
 
 #=============================================================================
+# INTELLIGENT QUERYING - Handle Real-World Name Variations (CRITICAL)
+#=============================================================================
+
+# **PROBLEM:** PM/user often use informal names that don't exactly match database.
+# Examples: "neck type" (input) vs "Neck Type" (database), "pet bottles" vs "PET Bottles"
+#
+# **SOLUTION:** Don't blindly trust empty results. Search intelligently before concluding absence.
+
+# ✓ PATTERN: Try exact match first, then fuzzy if empty (when you expect to find it)
+# Scenario: PM says "PET Jar family has neck_type axis", but query returns empty
+
+# Step 1: Try exact match from PM context
+result = query_database(
+    table="variant_axes",
+    filters={"name": "neck type", "product_family_id": "8fda52e0-..."}
+)
+
+# Step 2: If empty BUT context suggests it should exist, try fuzzy search
+if result['count'] == 0:
+    # Try wildcard search to find case/format variations
+    result = query_database(
+        table="variant_axes",
+        filters={"product_family_id": "8fda52e0-..."},
+        search_patterns={"name": "%neck%type%"}  # Finds: "Neck Type", "neck_type", "NECK TYPE"
+    )
+
+    # If found matches, inspect and use existing axis (don't create duplicate!)
+    if result['count'] > 0:
+        # Found "Neck Type" - use this existing axis instead of creating "neck_type"
+        existing_axis_id = result['rows'][0]['id']
+
+# ✓ PATTERN: Common variations to try
+variations = [
+    "%{keyword}%",           # Contains anywhere
+    "{keyword}%",            # Starts with
+    "%{keyword}",            # Ends with
+    "%{word1}%{word2}%"     # Multiple words in any format
+]
+
+# ✓ EXAMPLE: Finding product family when user says "pet jars"
+# Try 1: Exact
+result = query_database(table="product_families", filters={"name": "pet jars"})
+
+# Try 2: If empty, fuzzy
+if result['count'] == 0:
+    result = query_database(
+        table="product_families",
+        search_patterns={"name": "%pet%jar%"}  # Finds: "PET Jars", "PET Jar", "Pet Jar"
+    )
+
+# ✓ CRITICAL RULE: Only conclude "doesn't exist" after exhaustive search
+# DON'T: Query once → empty → create duplicate
+# DO: Query exact → empty → query fuzzy → still empty → THEN conclude doesn't exist
+
+# ❌ BAD: Blindly trust first empty result
+result = query_database(table="variant_axes", filters={"name": "neck type"})
+if result['count'] == 0:
+    # WRONG: Create new axis (might create duplicate of "Neck Type")
+
+# ✓ GOOD: Intelligent search before concluding
+result = query_database(table="variant_axes", filters={"name": "neck type"})
+if result['count'] == 0:
+    # Try fuzzy before giving up
+    result = query_database(table="variant_axes", search_patterns={"name": "%neck%type%"})
+    if result['count'] == 0:
+        # NOW it's safe to create new axis
+
+#=============================================================================
 # RELATIONS - Fetch related data (avoid multiple round-trips)
 #=============================================================================
 
@@ -552,8 +620,8 @@ current_price = result["rows"][0]["base_price"]  # 30.0
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"product_families": 1},
-    "updated_entities_count": {"product_families": 1},
+    "affected_tables": [{"table": "product_families", "count": 1}],
+    "updated_entities_count": [{"table": "product_families", "count": 1}],
     "business_impact_summary": "Base price updated from Rs 30 to Rs 35 (affects all SKU pricing)",
     "warnings": ["Price increase may affect existing orders"],
     "is_destructive": false,
@@ -644,8 +712,14 @@ amber_product_ids = ["p1-uuid", "p2-uuid", "p3-uuid"]  # Extract from product_va
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"variant_values": 1, "products": 3},
-    "deleted_entities_count": {"variant_values": 1, "products": 3},
+    "affected_tables": [
+      {"table": "variant_values", "count": 1},
+      {"table": "products", "count": 3}
+    ],
+    "deleted_entities_count": [
+      {"table": "variant_values", "count": 1},
+      {"table": "products", "count": 3}
+    ],
     "business_impact_summary": "Will discontinue Amber color variant (3 SKUs affected)",
     "warnings": [
       "3 SKUs will be discontinued: PAV-BTL-250ML-AMB, PAV-BTL-500ML-AMB, PAV-BTL-1L-AMB",
@@ -892,7 +966,20 @@ My search: product_families "PET bottle" → 0 matches found
     ]
   },
   "impact_analysis": {
-    "new_entities_count": {"product_families": 1, "variant_axes": 2, "variant_values": 5, "products": 6, "product_variant_values": 12},
+    "affected_tables": [
+      {"table": "product_families", "count": 1},
+      {"table": "variant_axes", "count": 2},
+      {"table": "variant_values", "count": 5},
+      {"table": "products", "count": 6},
+      {"table": "product_variant_values", "count": 12}
+    ],
+    "new_entities_count": [
+      {"table": "product_families", "count": 1},
+      {"table": "variant_axes", "count": 2},
+      {"table": "variant_values", "count": 5},
+      {"table": "products", "count": 6},
+      {"table": "product_variant_values", "count": 12}
+    ],
     "business_impact_summary": "Will create 1 product family with 2 variant axes (capacity, color) and 6 SKUs. Total: 26 new records across 5 tables.",
     "examples": ["PAV-BTL-250ML-CLR", "PAV-BTL-500ML-AMB", "PAV-BTL-1L-CLR"],
     "warnings": ["Ensure pricing strategy aligns with capacity tiers (Rs 15, 25, 40)"],
@@ -1102,8 +1189,18 @@ family_result = query_database(
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"variant_axes": 1, "variant_values": 2, "products": 6, "product_variant_values": 24},
-    "new_entities_count": {"variant_axes": 1, "variant_values": 2, "products": 6, "product_variant_values": 24},
+    "affected_tables": [
+      {"table": "variant_axes", "count": 1},
+      {"table": "variant_values", "count": 2},
+      {"table": "products", "count": 6},
+      {"table": "product_variant_values", "count": 24}
+    ],
+    "new_entities_count": [
+      {"table": "variant_axes", "count": 1},
+      {"table": "variant_values", "count": 2},
+      {"table": "products", "count": 6},
+      {"table": "product_variant_values", "count": 24}
+    ],
     "business_impact_summary": "Expanding PET Bottles family from 6 to 12 SKUs by adding finish dimension. Existing SKUs assigned to 'glossy' (default), 6 new 'matte' SKUs created. Total new records: 33.",
     "examples": ["PAV-BTL-250ML-CLR-MAT", "PAV-BTL-500ML-AMB-MAT", "PAV-BTL-1L-CLR-MAT"],
     "warnings": [
@@ -1153,16 +1250,16 @@ family_result = query_database(
     ]}  // Total: 36 new records in product_variant_values
   ],
   "impact_analysis": {
-    "new_entities_count": {
-      "variant_axes": 4,
-      "variant_values": 12,
-      "products": 8,
-      "product_variant_values": 32  // ❌ WRONG! Should be 36
-    },
-    "updated_entities_count": {
-      "products": 1,
-      "product_variant_values": 4  // ❌ WRONG! These are INSERTS, not updates
-    }
+    "new_entities_count": [
+      {"table": "variant_axes", "count": 4},
+      {"table": "variant_values", "count": 12},
+      {"table": "products", "count": 8},
+      {"table": "product_variant_values", "count": 32}
+    ],
+    "updated_entities_count": [
+      {"table": "products", "count": 1},
+      {"table": "product_variant_values", "count": 4}
+    ]
   }
 }
 ```
@@ -1171,16 +1268,15 @@ family_result = query_database(
 ```json
 {
   "impact_analysis": {
-    "new_entities_count": {
-      "variant_axes": 4,
-      "variant_values": 12,
-      "products": 8,
-      "product_variant_values": 36  // ✓ CORRECT: 4 (existing product) + 32 (new products)
-    },
-    "updated_entities_count": {
-      "products": 1  // ✓ Only the products table has updates
-      // NO product_variant_values here - all links are NEW records (inserts)
-    }
+    "new_entities_count": [
+      {"table": "variant_axes", "count": 4},
+      {"table": "variant_values", "count": 12},
+      {"table": "products", "count": 8},
+      {"table": "product_variant_values", "count": 36}
+    ],
+    "updated_entities_count": [
+      {"table": "products", "count": 1}
+    ]
   }
 }
 ```
@@ -1284,8 +1380,16 @@ color_result = query_database(
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"variant_values": 1, "products": 2, "product_variant_values": 4},
-    "new_entities_count": {"variant_values": 1, "products": 2, "product_variant_values": 4},
+    "affected_tables": [
+      {"table": "variant_values", "count": 1},
+      {"table": "products", "count": 2},
+      {"table": "product_variant_values", "count": 4}
+    ],
+    "new_entities_count": [
+      {"table": "variant_values", "count": 1},
+      {"table": "products", "count": 2},
+      {"table": "product_variant_values", "count": 4}
+    ],
     "business_impact_summary": "Adding 2L capacity creates 2 new SKUs (one per color). SKU count: 6 → 8. Total new records: 7.",
     "examples": ["PAV-BTL-2L-CLR", "PAV-BTL-2L-AMB"],
     "warnings": [
@@ -1393,8 +1497,20 @@ pvv_ids = ["pvv1-uuid", "pvv2-uuid", "pvv3-uuid"]
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"product_families": 1, "variant_axes": 1, "variant_values": 3, "products": 3, "product_variant_values": 3},
-    "deleted_entities_count": {"product_families": 1, "variant_axes": 1, "variant_values": 3, "products": 3, "product_variant_values": 3},
+    "affected_tables": [
+      {"table": "product_families", "count": 1},
+      {"table": "variant_axes", "count": 1},
+      {"table": "variant_values", "count": 3},
+      {"table": "products", "count": 3},
+      {"table": "product_variant_values", "count": 3}
+    ],
+    "deleted_entities_count": [
+      {"table": "product_families", "count": 1},
+      {"table": "variant_axes", "count": 1},
+      {"table": "variant_values", "count": 3},
+      {"table": "products", "count": 3},
+      {"table": "product_variant_values", "count": 3}
+    ],
     "business_impact_summary": "Complete discontinuation of PET Jars product line. All 3 SKUs will be marked inactive. Total: 11 records soft-deleted across 5 tables.",
     "warnings": [
       "DESTRUCTIVE: Entire product family discontinued",
@@ -1596,7 +1712,7 @@ products_result = query_database(
     "affected_entities": {
       "products": 3
     },
-    "new_entities_count": {},
+    "new_entities_count": [],
     "examples": [
       "PAV-BTL-250ML-CLR: Rs 15 → Rs 18",
       "PAV-BTL-500ML-CLR: Rs 25 → Rs 28",
@@ -1711,7 +1827,7 @@ count_result = query_database(
       "products": 32,
       "product_variant_values": 64
     },
-    "new_entities_count": {},
+    "new_entities_count": [],
     "examples": ["PET Bottles family (12 products)", "PET Jars family (8 products)", "HDPE Containers family (12 products)"],
     "warnings": ["This will affect 32 products across 3 families"],
     "is_destructive": true,
@@ -1790,8 +1906,12 @@ if result["count"] == 0:
     ]
   },
   "impact_analysis": {
-    "affected_tables": {"product_families": 1},
-    "updated_entities_count": {"product_families": 1},
+    "affected_tables": [
+      {"table": "product_families", "count": 1}
+    ],
+    "updated_entities_count": [
+      {"table": "product_families", "count": 1}
+    ],
     "business_impact_summary": "Base price updated from Rs 25 to Rs 32 for PET Bottles family",
     "warnings": ["Price increase of Rs 7 (28%) may affect margins"],
     "is_destructive": false,

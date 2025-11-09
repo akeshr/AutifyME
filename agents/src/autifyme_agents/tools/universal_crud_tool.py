@@ -67,9 +67,10 @@ def _validate_operation_completeness(
     Raises:
         ToolException: If operation data is incomplete or mismatched with impact
     """
-    new_entities_count = impact_analysis.get("new_entities_count", {})
-    updated_entities_count = impact_analysis.get("updated_entities_count", {})
-    deleted_entities_count = impact_analysis.get("deleted_entities_count", {})
+    # Get impact counts in list[TableCount] format (per schema)
+    new_entities_count = impact_analysis.get("new_entities_count", [])
+    updated_entities_count = impact_analysis.get("updated_entities_count", [])
+    deleted_entities_count = impact_analysis.get("deleted_entities_count", [])
 
     # Aggregate actual counts across all operations per table
     actual_new_counts = defaultdict(int)
@@ -109,8 +110,10 @@ def _validate_operation_completeness(
             if isinstance(filter_value, list):
                 actual_deleted_counts[table] += len(filter_value)
 
-    # Validate aggregated counts against impact_analysis
-    for table, expected_count in new_entities_count.items():
+    # Validate aggregated counts against impact_analysis (list[TableCount] format)
+    for table_count in new_entities_count:
+        table = table_count["table"]
+        expected_count = table_count["count"]
         actual_count = actual_new_counts.get(table, 0)
         if expected_count > 0 and actual_count != expected_count:
             raise ToolException(
@@ -120,7 +123,9 @@ def _validate_operation_completeness(
                 f"Expected {expected_count} total entities across all operations for {table}."
             )
 
-    for table, expected_count in updated_entities_count.items():
+    for table_count in updated_entities_count:
+        table = table_count["table"]
+        expected_count = table_count["count"]
         actual_count = actual_updated_counts.get(table, 0)
         if expected_count > 0 and actual_count != expected_count:
             raise ToolException(
@@ -129,7 +134,9 @@ def _validate_operation_completeness(
                 f"All {expected_count} entities must have values specified."
             )
 
-    for table, expected_count in deleted_entities_count.items():
+    for table_count in deleted_entities_count:
+        table = table_count["table"]
+        expected_count = table_count["count"]
         actual_count = actual_deleted_counts.get(table, 0)
         if expected_count > 0 and actual_count != expected_count:
             raise ToolException(
@@ -1410,34 +1417,66 @@ def create_database_tool(
             f"Valid operations: {valid_operations}"
         )
 
-    # Generate dynamic schema for specified operations
-    input_schema = _create_operation_input_schema(operations)
+    # Generate dynamic schema for validation (kept for internal validation)
+    expected_schema = _create_operation_input_schema(operations)
 
     # Generate tool name and description
     tool_name = _generate_tool_name(tool_name_suffix)
     tool_description = _generate_tool_description(operations, tables)
 
+    # Create simple input schema: single operation_intent parameter
+    from pydantic import create_model
+    SimpleInputSchema = create_model(
+        'OperationIntentInput',
+        operation_intent=(
+            dict[str, Any],
+            Field(
+                ...,
+                description=(
+                    'Complete OperationIntent from specialist. '
+                    'Extract the full JSON object from specialist\'s <operation_intent> tags and pass it here. '
+                    'Required fields: user_request_summary, reasoning, intent_type, change_spec (or query_filter for reads), '
+                    'impact_analysis, execution_plan. '
+                    'DO NOT extract individual fields - pass the entire OperationIntent object.'
+                )
+            )
+        )
+    )
+
     # Create implementation with access control closure
     async def _execute_database_operation_impl(
-        **kwargs: Any
+        operation_intent: dict[str, Any]
     ) -> dict[str, Any]:
         """
         Operation-scoped database executor with runtime validation.
 
         Validates operations and table access before execution.
+
+        Args:
+            operation_intent: Complete OperationIntent dict from specialist
         """
-        # Extract parameters (handles both read-only and mutation schemas)
-        intent_type = kwargs.get('intent_type')
-        user_request_summary = kwargs.get('user_request_summary')
-        reasoning = kwargs.get('reasoning')
-        specialist_name = kwargs.get('specialist_name')
-        schema_version = kwargs.get('schema_version', 'v1')
+        # Validate operation_intent against expected schema
+        try:
+            validated = expected_schema.model_validate(operation_intent)
+        except Exception as e:
+            raise ToolException(
+                f"Invalid OperationIntent structure: {str(e)}\n\n"
+                f"Expected fields for {operations} operations: {list(expected_schema.model_fields.keys())}\n"
+                f"Received: {list(operation_intent.keys())}"
+            ) from e
+
+        # Extract validated fields
+        intent_type = validated.intent_type
+        user_request_summary = validated.user_request_summary
+        reasoning = validated.reasoning
+        specialist_name = validated.specialist_name
+        schema_version = validated.schema_version
 
         # Handle read-only vs mutation parameter differences
-        if 'query_filter' in kwargs:
-            # Read-only tool: convert query_filter to change_spec format
-            query_filter = kwargs.get('query_filter', {})
-            execution_plan = kwargs.get('execution_plan')
+        if hasattr(validated, 'query_filter'):
+            # Read-only operation
+            query_filter = validated.query_filter
+            execution_plan = validated.execution_plan
 
             # Build minimal change_spec for read operations
             change_spec = {
@@ -1463,10 +1502,10 @@ def create_database_tool(
                 'examples': []
             }
         else:
-            # Mutation tool: use provided change_spec and impact_analysis
-            change_spec = kwargs.get('change_spec')
-            impact_analysis = kwargs.get('impact_analysis')
-            execution_plan = kwargs.get('execution_plan')
+            # Mutation operation
+            change_spec = validated.change_spec
+            impact_analysis = validated.impact_analysis
+            execution_plan = validated.execution_plan
 
         # Validate operation is allowed
         if intent_type not in operations:
@@ -1596,10 +1635,10 @@ def create_database_tool(
             )
             return error_result.model_dump()
 
-    # Create and return StructuredTool with dynamic schema
+    # Create and return StructuredTool with simple single-parameter schema
     return StructuredTool.from_function(
         coroutine=_execute_database_operation_impl,
         name=tool_name,
         description=tool_description,
-        args_schema=input_schema,
+        args_schema=SimpleInputSchema,
     )
