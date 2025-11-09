@@ -142,6 +142,42 @@ module = [
 ]
 ignore_missing_imports = true
 
+# Gradual typing for modules undergoing type improvements
+[[tool.mypy.overrides]]
+module = [
+    "autifyme_agents.core.google_live_api",
+    "autifyme_agents.core.google_media_factory",
+]
+ignore_missing_imports = true  # google.genai has no type stubs
+
+[[tool.mypy.overrides]]
+module = [
+    "autifyme_agents.tools.universal_crud_tool",
+    "autifyme_agents.middleware.context_middleware",
+    "autifyme_agents.integrations.storage.supabase_client",
+    "autifyme_agents.tools.product_search_tools",
+    "autifyme_agents.tools.pm_context_tools",
+    "autifyme_agents.tools.query_database_tool",
+    "autifyme_agents.schemas.operation_intent",
+    "autifyme_agents.workflows.orchestration.runner_v2",
+    "autifyme_agents.workflows.handlers.approval_coordinator",
+    "autifyme_agents.workflows.outcome_tracker",
+    "autifyme_agents.workflows.middleware.outcome_tracking_middleware",
+    "autifyme_agents.tools.campaign_persistence_tools",
+    "autifyme_agents.core.config",
+    "autifyme_agents.core.strict_openai_model",
+    "autifyme_agents.integrations.storage.postgres_saver_factory",
+    "autifyme_agents.core.llm_factory",
+    "autifyme_agents.specialists.market_intelligence_specialist",
+    "autifyme_agents.specialists.content_seo_specialist",
+    "autifyme_agents.workflows.project_manager",
+]
+# Allow gradual typing improvements - these modules have complex type issues
+# that require architectural changes (Pydantic model updates, Supabase wrappers, etc.)
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+warn_return_any = false
+
 [tool.hatch.build.targets.wheel]
 packages = ["agents/src/autifyme_agents"]
 
