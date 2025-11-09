@@ -67,7 +67,7 @@ class VeoVideoGenerator:
             )
 
         # Configure client
-        genai.configure(api_key=self.api_key)  # type: ignore[attr-defined]
+        genai.configure(api_key=self.api_key)
         self.client = genai.Client()
 
     async def generate_video(
@@ -113,7 +113,7 @@ class VeoVideoGenerator:
             request_params["reference_images"] = reference_images  # type: ignore[assignment]
 
         # Start video generation (async operation)
-        operation = await self.client.models.generate_video(  # type: ignore[attr-defined]
+        operation = await self.client.models.generate_video(
             model=self.model, **request_params
         )
 
@@ -172,7 +172,7 @@ class VeoVideoGenerator:
             request_params["prompt"] = extension_prompt  # type: ignore[assignment]
 
         # Start video extension (async operation)
-        operation = await self.client.models.extend_video(  # type: ignore[attr-defined]
+        operation = await self.client.models.extend_video(
             model=self.model, **request_params
         )
 
