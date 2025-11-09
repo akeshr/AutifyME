@@ -178,7 +178,9 @@ Format your response as JSON:
 
         # Parse JSON response
         import json
-        cleaned = content.strip().removeprefix("```json").removeprefix("```").removesuffix("```")
+        # Handle content as string (LangChain returns str or list)
+        content_str = content if isinstance(content, str) else str(content)
+        cleaned = content_str.strip().removeprefix("```json").removeprefix("```").removesuffix("```")
         data = json.loads(cleaned)
 
         return {

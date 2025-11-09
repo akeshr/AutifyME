@@ -217,13 +217,16 @@ def analyze_price_positioning(
     min_mult, max_mult = price_multipliers[suggested_positioning]
 
     if base_price:
-        price_range = {
+        price_range: dict[str, Any] = {
             "min": round(base_price * min_mult, 2),
             "max": round(base_price * max_mult, 2),
             "recommended": round(base_price * ((min_mult + max_mult) / 2), 2),
         }
     else:
         price_range = {
+            "min": 0.0,
+            "max": 0.0,
+            "recommended": 0.0,
             "multiplier_range": f"{min_mult}x - {max_mult}x base cost",
             "note": "Set base price for specific recommendations",
         }
@@ -460,7 +463,7 @@ def develop_industry_use_cases(
         },
     }
 
-    use_cases = []
+    use_cases: list[dict[str, Any]] = []
 
     for naics in naics_codes[:3]:  # Top 3 industries
         # Match product type and NAICS prefix
