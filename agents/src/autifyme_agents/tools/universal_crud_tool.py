@@ -67,15 +67,10 @@ def _validate_operation_completeness(
     Raises:
         ToolException: If operation data is incomplete or mismatched with impact
     """
-    # Convert list[TableCount] format to dict for validation
-    new_entities_count_list = impact_analysis.get("new_entities_count", [])
-    new_entities_count = {item["table"]: item["count"] for item in new_entities_count_list} if isinstance(new_entities_count_list, list) else new_entities_count_list
-
-    updated_entities_count_list = impact_analysis.get("updated_entities_count", [])
-    updated_entities_count = {item["table"]: item["count"] for item in updated_entities_count_list} if isinstance(updated_entities_count_list, list) else updated_entities_count_list
-
-    deleted_entities_count_list = impact_analysis.get("deleted_entities_count", [])
-    deleted_entities_count = {item["table"]: item["count"] for item in deleted_entities_count_list} if isinstance(deleted_entities_count_list, list) else deleted_entities_count_list
+    # Get impact counts in list[TableCount] format (per schema)
+    new_entities_count = impact_analysis.get("new_entities_count", [])
+    updated_entities_count = impact_analysis.get("updated_entities_count", [])
+    deleted_entities_count = impact_analysis.get("deleted_entities_count", [])
 
     # Aggregate actual counts across all operations per table
     actual_new_counts = defaultdict(int)
@@ -115,8 +110,10 @@ def _validate_operation_completeness(
             if isinstance(filter_value, list):
                 actual_deleted_counts[table] += len(filter_value)
 
-    # Validate aggregated counts against impact_analysis
-    for table, expected_count in new_entities_count.items():
+    # Validate aggregated counts against impact_analysis (list[TableCount] format)
+    for table_count in new_entities_count:
+        table = table_count["table"]
+        expected_count = table_count["count"]
         actual_count = actual_new_counts.get(table, 0)
         if expected_count > 0 and actual_count != expected_count:
             raise ToolException(
@@ -126,7 +123,9 @@ def _validate_operation_completeness(
                 f"Expected {expected_count} total entities across all operations for {table}."
             )
 
-    for table, expected_count in updated_entities_count.items():
+    for table_count in updated_entities_count:
+        table = table_count["table"]
+        expected_count = table_count["count"]
         actual_count = actual_updated_counts.get(table, 0)
         if expected_count > 0 and actual_count != expected_count:
             raise ToolException(
@@ -135,7 +134,9 @@ def _validate_operation_completeness(
                 f"All {expected_count} entities must have values specified."
             )
 
-    for table, expected_count in deleted_entities_count.items():
+    for table_count in deleted_entities_count:
+        table = table_count["table"]
+        expected_count = table_count["count"]
         actual_count = actual_deleted_counts.get(table, 0)
         if expected_count > 0 and actual_count != expected_count:
             raise ToolException(
