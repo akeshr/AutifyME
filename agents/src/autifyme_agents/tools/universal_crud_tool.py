@@ -1470,10 +1470,10 @@ def create_database_tool(
                 f"Received: {list(operation_intent.keys())}"
             ) from e
 
-        # Extract validated fields (using getattr for dynamic model)
-        intent_type = str(validated.intent_type)
-        user_request_summary = str(validated.user_request_summary)
-        reasoning = str(validated.reasoning)
+        # Extract validated fields (dynamic model - mypy can't infer fields)
+        intent_type = str(validated.intent_type)  # type: ignore[attr-defined]
+        user_request_summary = str(validated.user_request_summary)  # type: ignore[attr-defined]
+        reasoning = str(validated.reasoning)  # type: ignore[attr-defined]
         specialist_name = getattr(validated, 'specialist_name', None)
         schema_version = str(getattr(validated, 'schema_version', 'v1'))
 
@@ -1481,7 +1481,7 @@ def create_database_tool(
         if hasattr(validated, 'query_filter'):
             # Read-only operation
             query_filter = validated.query_filter
-            execution_plan = validated.execution_plan
+            execution_plan = validated.execution_plan  # type: ignore[attr-defined]
 
             # Build minimal change_spec for read operations
             change_spec: dict[str, Any] = {
@@ -1508,9 +1508,9 @@ def create_database_tool(
             }
         else:
             # Mutation operation
-            change_spec = validated.change_spec
-            impact_analysis = validated.impact_analysis
-            execution_plan = validated.execution_plan
+            change_spec = validated.change_spec  # type: ignore[attr-defined]
+            impact_analysis = validated.impact_analysis  # type: ignore[attr-defined]
+            execution_plan = validated.execution_plan  # type: ignore[attr-defined]
 
         # Validate operation is allowed
         if intent_type not in allowed_operations:
