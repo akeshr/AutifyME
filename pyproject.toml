@@ -131,6 +131,12 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 show_error_codes = true
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 [[tool.mypy.overrides]]
 module = [
@@ -180,10 +186,10 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = [
     # High priority
-    "autifyme_agents.tools.universal_crud_tool",
+    # "autifyme_agents.tools.universal_crud_tool",  # FIXING NOW
     "autifyme_agents.middleware.context_middleware",
     "autifyme_agents.integrations.storage.supabase_client",
-    "autifyme_agents.schemas.operation_intent",
+    # "autifyme_agents.schemas.operation_intent",  # FIXED - Pydantic plugin + op_type mapping
     "autifyme_agents.tools.campaign_persistence_tools",
     "autifyme_agents.core.strict_openai_model",
     # Medium priority

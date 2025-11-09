@@ -73,9 +73,9 @@ def _validate_operation_completeness(
     deleted_entities_count = impact_analysis.get("deleted_entities_count", [])
 
     # Aggregate actual counts across all operations per table
-    actual_new_counts = defaultdict(int)
-    actual_updated_counts = defaultdict(int)
-    actual_deleted_counts = defaultdict(int)
+    actual_new_counts: dict[str, int] = defaultdict(int)
+    actual_updated_counts: dict[str, int] = defaultdict(int)
+    actual_deleted_counts: dict[str, int] = defaultdict(int)
 
     for operation in operations:
         op_type = operation.op_type
@@ -501,10 +501,13 @@ class OperationExecutor:
         if not operation.new_entities:
             return {"ids": {}, "count": 0}
 
+        # Type narrowing: mypy now knows new_entities is not None
+        entities = operation.new_entities
+
         # Schema-driven validation: Auto-validate unique constraints from metadata
-        logger.debug(f"Validating {len(operation.new_entities)} entities for {table_schema.name}")
+        logger.debug(f"Validating {len(entities)} entities for {table_schema.name}")
         schema_validation = await table_schema.validate_before_insert(
-            operation.new_entities,
+            entities,
             self.storage
         )
         if not schema_validation.valid:
@@ -518,20 +521,20 @@ class OperationExecutor:
             )
 
         # Check if entities can be batch inserted (no cross-references)
-        can_batch = self._can_batch_insert(operation.new_entities)
+        can_batch = self._can_batch_insert(entities)
 
-        if can_batch and len(operation.new_entities) > 1:
+        if can_batch and len(entities) > 1:
             # Batch insert: All entities in single DB call (optimization)
-            logger.debug(f"Batch inserting {len(operation.new_entities)} independent entities")
+            logger.debug(f"Batch inserting {len(entities)} independent entities")
             return await self._batch_insert_entities(
-                operation, table_schema, context
+                operation, table_schema, context, entities
             )
         else:
             # Sequential insert: One at a time (required for cross-references or single entity)
             if not can_batch:
                 logger.debug("Using sequential insert (entities have cross-references)")
             return await self._sequential_insert_entities(
-                operation, table_schema, context
+                operation, table_schema, context, entities
             )
 
     async def _sequential_insert_entities(
@@ -539,12 +542,13 @@ class OperationExecutor:
         operation: Operation,
         table_schema: Any,
         context: dict[int, dict[str, Any]],
+        entities: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Sequential entity insertion (required for entities with cross-references)."""
         inserted_entities = {}
         last_result = None
 
-        for idx, entity in enumerate(operation.new_entities):
+        for idx, entity in enumerate(entities):
             # Resolve foreign key references from context
             resolved_entity = self._resolve_references(entity, context)
 
@@ -574,10 +578,10 @@ class OperationExecutor:
         # Return appropriate format based on entity refs
         if inserted_entities:
             # Named entity references provided
-            return {"ids": inserted_entities, "count": len(operation.new_entities)}
+            return {"ids": inserted_entities, "count": len(entities)}
         elif last_result:
             # No named refs, return last inserted ID
-            return {"ids": last_result, "count": len(operation.new_entities)}
+            return {"ids": last_result, "count": len(entities)}
         else:
             return {"ids": {}, "count": 0}
 
@@ -586,11 +590,12 @@ class OperationExecutor:
         operation: Operation,
         table_schema: Any,
         context: dict[int, dict[str, Any]],
+        entities: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Batch entity insertion (OPTIMIZED - for independent entities)."""
         # Prepare all entities
         resolved_entities = []
-        for entity in operation.new_entities:
+        for entity in entities:
             # Resolve foreign key references from context
             resolved_entity = self._resolve_references(entity, context)
 
@@ -994,7 +999,7 @@ class OperationExecutor:
         Returns:
             List of TableCount objects with table names and counts
         """
-        affected = defaultdict(int)
+        affected: dict[str, int] = defaultdict(int)
 
         for step, result in completed_steps:
             operation = operations[step.operation_index]

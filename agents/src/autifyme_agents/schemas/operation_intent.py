@@ -1177,8 +1177,10 @@ def create_simple_intent(
         For complex multi-table operations with dependencies, construct OperationIntent manually
         instead of using this helper. This function is optimized for simple single-table use cases.
     """
+    # Map intent_type to op_type (create→insert, read→query, update→update, delete→delete)
+    op_type_map = {"create": "insert", "read": "query", "update": "update", "delete": "delete"}
     operation = Operation(
-        op_type="insert" if intent_type == "create" else intent_type,
+        op_type=op_type_map.get(intent_type, intent_type),  # type: ignore[arg-type]
         table=table,
         new_entities=entities if intent_type == "create" else None,
         description=f"{intent_type.upper()} on {table}",
