@@ -142,39 +142,32 @@ module = [
 ]
 ignore_missing_imports = true
 
-# Gradual typing for modules undergoing type improvements
+# External libraries without type stubs
 [[tool.mypy.overrides]]
 module = [
-    "autifyme_agents.core.google_live_api",
-    "autifyme_agents.core.google_media_factory",
+    "google.genai",
+    "google.genai.live",
+    "google",
 ]
-ignore_missing_imports = true  # google.genai has no type stubs
+ignore_missing_imports = true
 
+# TODO: Fix these files - they have complex type issues requiring architectural changes
+# Files with 5+ errors that need Supabase wrappers, Pydantic model updates, or API changes:
+# - universal_crud_tool.py: 26 errors (Supabase return types, Pydantic models)
+# - context_middleware.py: 7 errors (Supabase list|int returns)
+# - supabase_client.py: 7 errors (StorageInterface compatibility)
+# - operation_intent.py: 7 errors (Pydantic construction)
+# - campaign_persistence_tools.py: 6 errors (Pydantic default_factory, API errors)
+# - strict_openai_model.py: 5 errors (LangChain override signatures)
 [[tool.mypy.overrides]]
 module = [
     "autifyme_agents.tools.universal_crud_tool",
     "autifyme_agents.middleware.context_middleware",
     "autifyme_agents.integrations.storage.supabase_client",
-    "autifyme_agents.tools.product_search_tools",
-    "autifyme_agents.tools.pm_context_tools",
-    "autifyme_agents.tools.query_database_tool",
     "autifyme_agents.schemas.operation_intent",
-    "autifyme_agents.workflows.orchestration.runner_v2",
-    "autifyme_agents.workflows.handlers.approval_coordinator",
-    "autifyme_agents.workflows.outcome_tracker",
-    "autifyme_agents.workflows.middleware.outcome_tracking_middleware",
     "autifyme_agents.tools.campaign_persistence_tools",
-    "autifyme_agents.core.config",
     "autifyme_agents.core.strict_openai_model",
-    "autifyme_agents.integrations.storage.postgres_saver_factory",
-    "autifyme_agents.core.llm_factory",
-    "autifyme_agents.specialists.market_intelligence_specialist",
-    "autifyme_agents.specialists.content_seo_specialist",
-    "autifyme_agents.workflows.project_manager",
 ]
-# Gradual typing: Suppress errors for legacy modules undergoing incremental type improvements
-# These require architectural changes: Pydantic model updates, Supabase wrappers, etc.
-# TODO: Remove ignore_errors as modules are properly typed
 ignore_errors = true
 
 [tool.hatch.build.targets.wheel]
