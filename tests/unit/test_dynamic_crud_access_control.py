@@ -289,7 +289,7 @@ class TestToolFactory:
         mock_storage = Mock()
         tool = create_database_tool(
             storage=mock_storage,
-            operations=["read"],
+            allowed_operations=["read"],
         )
 
         assert tool is not None
@@ -302,7 +302,7 @@ class TestToolFactory:
         mock_storage = Mock()
         tool = create_database_tool(
             storage=mock_storage,
-            operations=["read"],
+            allowed_operations=["read"],
         )
 
         # Check schema - now uses single operation_intent parameter
@@ -317,7 +317,7 @@ class TestToolFactory:
         mock_storage = Mock()
         tool = create_database_tool(
             storage=mock_storage,
-            operations=["create", "read", "update", "delete"],
+            allowed_operations=["create", "read", "update", "delete"],
         )
 
         # Check schema - now uses single operation_intent parameter
@@ -332,7 +332,7 @@ class TestToolFactory:
         mock_storage = Mock()
         tool = create_database_tool(
             storage=mock_storage,
-            operations=["read"],
+            allowed_operations=["read"],
             tool_name_suffix="products",
         )
 
@@ -343,7 +343,7 @@ class TestToolFactory:
         mock_storage = Mock()
         tool = create_database_tool(
             storage=mock_storage,
-            operations=["read"],
+            allowed_operations=["read"],
             tables=["categories", "products"],
         )
 
@@ -356,7 +356,7 @@ class TestToolFactory:
         with pytest.raises(ValueError) as exc_info:
             create_database_tool(
                 storage=mock_storage,
-                operations=[],
+                allowed_operations=[],
             )
 
         assert "cannot be empty" in str(exc_info.value)
@@ -367,7 +367,7 @@ class TestToolFactory:
         with pytest.raises(ValueError) as exc_info:
             create_database_tool(
                 storage=mock_storage,
-                operations=["read", "invalid_op"],
+                allowed_operations=["read", "invalid_op"],
             )
 
         assert "invalid" in str(exc_info.value).lower()
@@ -392,7 +392,7 @@ class TestToolFactory:
         for ops in valid_combinations:
             tool = create_database_tool(
                 storage=mock_storage,
-                operations=ops,
+                allowed_operations=ops,
             )
             assert tool is not None
 
@@ -401,7 +401,7 @@ class TestToolFactory:
         mock_storage = Mock()
         tool = create_database_tool(
             storage=mock_storage,
-            operations=["read"],
+            allowed_operations=["read"],
         )
 
         # Tool schema should use single operation_intent parameter
@@ -413,11 +413,11 @@ class TestToolFactory:
         mock_storage = Mock()
         read_tool = create_database_tool(
             storage=mock_storage,
-            operations=["read"],
+            allowed_operations=["read"],
         )
         crud_tool = create_database_tool(
             storage=mock_storage,
-            operations=["create", "read", "update", "delete"],
+            allowed_operations=["create", "read", "update", "delete"],
         )
 
         # Both should use single operation_intent parameter
@@ -515,7 +515,7 @@ class TestIntegration:
         # Market Intelligence specialist pattern
         tool = create_database_tool(
             storage=mock_storage,
-            operations=["read"],
+            allowed_operations=["read"],
             tool_name_suffix="read_only",
         )
 
@@ -530,7 +530,7 @@ class TestIntegration:
         # Product Architecture specialist pattern
         tool = create_database_tool(
             storage=mock_storage,
-            operations=["create", "read", "update", "delete"],
+            allowed_operations=["create", "read", "update", "delete"],
         )
 
         assert tool.name == "execute_database_operation"
@@ -543,7 +543,7 @@ class TestIntegration:
         # Taxonomy specialist pattern
         tool = create_database_tool(
             storage=mock_storage,
-            operations=["read", "create", "update"],
+            allowed_operations=["read", "create", "update"],
             tables=["categories", "category_product_mappings"],
             tool_name_suffix="taxonomy",
         )
@@ -558,7 +558,7 @@ class TestIntegration:
         # Campaign Optimization specialist pattern
         tool = create_database_tool(
             storage=mock_storage,
-            operations=["read", "update"],
+            allowed_operations=["read", "update"],
             tables=["campaigns", "ad_copies"],
             tool_name_suffix="campaigns",
         )

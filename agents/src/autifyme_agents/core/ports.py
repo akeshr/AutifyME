@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal, overload
 
 from ..schemas.models import CompanyProfile, WorkflowOutcome
 
@@ -179,25 +179,72 @@ class StorageInterface(ABC):
     async def query_entities(
         self,
         table: str,
-        filters: dict[str, Any],
+        filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        limit: int | None = None,
     ) -> list[dict[str, Any]]:
         """
-        Query entities with filters.
+        Query entities with optional filters, relations, and search.
 
         Args:
             table: Table name
             filters: WHERE conditions as dict (e.g., {"is_active": True})
             columns: Columns to select (default: all columns)
+            relations: Related tables to include (e.g., ["categories(*)", "variant_axes(*)"])
+            search_patterns: Case-insensitive LIKE patterns (e.g., {"name": "%bottle%"})
+            limit: Maximum rows to return
 
         Returns:
-            List of matching rows as dicts
+            List of matching rows as dicts (always a list, never int)
 
         Example:
+            # Simple query
             rows = await storage.query_entities(
                 "products",
                 {"product_family_id": family_id, "is_active": True},
                 ["id", "sku_code", "name"]
+            )
+
+            # With relations
+            families = await storage.query_entities(
+                "product_families",
+                {"is_active": True},
+                relations=["categories(*)", "variant_axes(*)"]
+            )
+        """
+        pass
+
+    @abstractmethod
+    async def count_entities(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+    ) -> int:
+        """
+        Count entities matching filters.
+
+        Args:
+            table: Table name
+            filters: WHERE conditions as dict (e.g., {"is_active": True})
+            search_patterns: Case-insensitive LIKE patterns (e.g., {"name": "%bottle%"})
+
+        Returns:
+            Count of matching rows (always an int, never a list)
+
+        Example:
+            # Count all active products
+            total = await storage.count_entities(
+                "products",
+                {"is_active": True}
+            )
+
+            # Count with search
+            matching = await storage.count_entities(
+                "products",
+                search_patterns={"name": "%bottle%"}
             )
         """
         pass
@@ -240,6 +287,30 @@ class StorageInterface(ABC):
             # Returns [] if SKU-001 only exists on record uuid-123
         """
         pass
+
+    @overload
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: Literal[True] = ...,
+        limit: int | None = None,
+    ) -> int: ...
+
+    @overload
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: Literal[False] = ...,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]: ...
 
     @abstractmethod
     async def query_advanced(

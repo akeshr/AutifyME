@@ -29,6 +29,8 @@ Architecture Pattern:
 
 from typing import Any
 
+from langchain.chat_models import BaseChatModel
+
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
@@ -40,7 +42,7 @@ from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 def create_product_architecture_specialist(
     storage: StorageInterface,
-    model: str | None = None,
+    model: str | BaseChatModel | None = None,
 ) -> dict[str, Any]:
     """
     Create Product Architecture Specialist SubAgent spec.
@@ -63,8 +65,10 @@ def create_product_architecture_specialist(
 
     Args:
         storage: Storage interface for catalog search + schema query (REQUIRED)
-        model: Optional model string (e.g., "google:gemini-2.5-pro", "openai:gpt-4o")
-               If None, uses PM's default_model from SubAgentMiddleware
+        model: Optional model (string or LLM instance).
+               - String: "google:gemini-2.5-pro", "openai:gpt-4o"
+               - LLM instance: Pre-configured BaseChatModel with custom temperature/thinking_budget
+               - None: Uses PM's default_model from SubAgentMiddleware
 
     Returns:
         SubAgent spec dict for PM's subagents list
@@ -119,7 +123,7 @@ def create_product_architecture_specialist(
     )
 
     # Return SubAgent spec
-    spec = {
+    spec: dict[str, Any] = {
         "name": "product_architecture_specialist",
         "description": description,
         "tools": tools,

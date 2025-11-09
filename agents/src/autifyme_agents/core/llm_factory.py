@@ -140,7 +140,7 @@ def get_llm(
         if supports_reasoning_params:
             # GPT-5/o1/o3 models with reasoning parameters
             # Prompt caching is AUTOMATIC for 1024+ token prompts (no config needed)
-            llm = ChatOpenAI(
+            llm = ChatOpenAI(  # type: ignore[call-arg]
                 model=model,
                 temperature=temperature,
                 reasoning_effort=reasoning_effort,
@@ -151,7 +151,7 @@ def get_llm(
             # GPT-4.1 and other models (standard configuration)
             # Prompt caching is AUTOMATIC for 1024+ token prompts (no config needed)
             # GPT-4.1 has BEST caching: 75% discount vs 50% for GPT-5
-            llm = ChatOpenAI(
+            llm = ChatOpenAI(  # type: ignore[call-arg]
                 model=model,
                 temperature=temperature,
                 timeout=timeout,
@@ -161,7 +161,7 @@ def get_llm(
         llm = ChatAnthropic(
             model=model,
             temperature=temperature,
-            timeout=timeout,
+            timeout=timeout,  # type: ignore[call-arg]
             model_kwargs={
                 "extra_headers": {"anthropic-beta": "prompt-caching-2024-07-31"}
             },

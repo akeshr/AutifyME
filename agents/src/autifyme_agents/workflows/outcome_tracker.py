@@ -28,6 +28,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.schemas.models import WorkflowOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -361,7 +362,9 @@ class OutcomeTracker:
         }
 
         try:
-            outcome_id = self.storage.save_workflow_outcome(outcome_payload)
+            # Convert dict to WorkflowOutcome model
+            outcome_model = WorkflowOutcome.model_validate(outcome_payload)
+            outcome_id = self.storage.save_workflow_outcome(outcome_model)
             status = outcome_payload.get("result_data", {}).get("status") if isinstance(outcome_payload.get("result_data"), dict) else "completed"
             logger.info(
                 "Workflow outcome persisted",

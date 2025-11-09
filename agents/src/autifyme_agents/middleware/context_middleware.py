@@ -42,7 +42,7 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
     """
     try:
         # Query 1: Total families (include category_id for top categories)
-        families = await storage.query_advanced(
+        families = await storage.query_entities(
             table="product_families",
             columns=["id", "name", "category_id"]
         )
@@ -50,10 +50,7 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
         family_names = [f["name"] for f in families]
 
         # Query 2: Total SKUs (count only)
-        total_skus = await storage.query_advanced(
-            table="products",
-            count_only=True
-        )
+        total_skus = await storage.count_entities(table="products")
 
         # Query 3: Top categories (from product families)
         # Get category_id from families, then lookup category names
@@ -122,7 +119,7 @@ async def load_taxonomy_tree(storage: StorageInterface) -> TaxonomyTree:
     """
     try:
         # Query all categories with parent_id
-        categories_data = await storage.query_advanced(
+        categories_data = await storage.query_entities(
             table="categories",
             columns=["id", "name", "parent_id"]
         )

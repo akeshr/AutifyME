@@ -248,6 +248,6 @@ class ApprovalCoordinator:
         hitl_response = {"decisions": all_decisions}
 
         # Return Command with HITLResponse as direct resume value
-        command_to_return = Command(resume=hitl_response)
+        command_to_return: Command = Command(resume=hitl_response)  # type: ignore[type-arg]
 
         return command_to_return

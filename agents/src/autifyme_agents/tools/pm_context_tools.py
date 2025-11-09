@@ -361,8 +361,8 @@ def create_search_catalog_summary_tool(storage: StorageInterface) -> BaseTool:
                 # Case-insensitive substring search on product family names
                 search_pattern = f"%{query}%"
 
-                # Query product families with search pattern
-                families = await storage.query_advanced(
+                # Query product families with search pattern (type-safe)
+                families = await storage.query_entities(
                     table="product_families",
                     columns=["id", "name", "category_id"],
                     search_patterns={"name": search_pattern},
@@ -386,11 +386,10 @@ def create_search_catalog_summary_tool(storage: StorageInterface) -> BaseTool:
                 for family in families:
                     family_id = family["id"]
 
-                    # Count variants for this family
-                    variant_count = await storage.query_advanced(
+                    # Count variants for this family (type-safe)
+                    variant_count = await storage.count_entities(
                         table="products",
                         filters={"product_family_id": family_id},
-                        count_only=True
                     )
 
                     # Get category name if category_id exists
@@ -495,8 +494,8 @@ def create_get_category_info_tool(storage: StorageInterface) -> BaseTool:
             → {"success": True, "id": "...", "name": "Food & Beverage", "subcategory_count": 3, "product_family_count": 15}
         """
         try:
-            # Case-insensitive exact match on category name
-            categories = await storage.query_advanced(
+            # Case-insensitive exact match on category name (type-safe)
+            categories = await storage.query_entities(
                 table="categories",
                 columns=["id", "name", "parent_id"],
                 search_patterns={"name": category_name},
@@ -531,18 +530,16 @@ def create_get_category_info_tool(storage: StorageInterface) -> BaseTool:
                 except Exception as e:
                     logger.warning(f"Failed to fetch parent category name: {e}")
 
-            # Count subcategories
-            subcategory_count = await storage.query_advanced(
+            # Count subcategories (type-safe)
+            subcategory_count = await storage.count_entities(
                 table="categories",
                 filters={"parent_id": str(category_id)},
-                count_only=True
             )
 
-            # Count product families in this category
-            product_family_count = await storage.query_advanced(
+            # Count product families in this category (type-safe)
+            product_family_count = await storage.count_entities(
                 table="product_families",
                 filters={"category_id": str(category_id)},
-                count_only=True
             )
 
             logger.info(

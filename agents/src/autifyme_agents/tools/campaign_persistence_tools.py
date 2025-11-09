@@ -1048,12 +1048,16 @@ def create_save_campaign_tool(storage: Any) -> Any:
         except Exception as e:
             logger.error(f"Campaign persistence failed: {str(e)}", exc_info=True)
 
-            error_class = classify_api_error(e)
+            error_instance = classify_api_error(
+                error=e,
+                tool_name="save_campaign",
+                api_name="supabase"
+            )
             error_message = (
                 f"Failed to save campaign '{campaign_input.campaign_id}': {str(e)}"
             )
 
-            if error_class == ExternalAPIError:
+            if isinstance(error_instance, ExternalAPIError):
                 error_message += "\n\nDatabase connection issue. Campaign NOT saved. Please retry."
             else:
                 error_message += "\n\nValidation or constraint error. Check campaign data."

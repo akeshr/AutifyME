@@ -735,7 +735,7 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
         try:
             # Build query - join with variant axes and values for complete SKU config
             # Nested select: product_families → variant_axes → variant_values
-            filters = {"is_active": True}
+            filters: dict[str, Any] = {"is_active": True}
             if product_group_id:
                 # Exact match on business ID
                 filters["product_group_id"] = product_group_id.upper()
@@ -743,8 +743,8 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
                 # If no business_id, filter by brand at minimum
                 filters["brand"] = brand
 
-            # Execute query using port method
-            response_data = await storage.query_advanced(
+            # Execute query using port method (type-safe)
+            response_data = await storage.query_entities(
                 table="product_families",
                 filters=filters,
                 relations=["variant_axes(id,name,display_label,sort_order,variant_values(id,value,display_label,sku_code,sort_order))"],
