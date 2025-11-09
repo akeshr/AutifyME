@@ -104,11 +104,10 @@ def _validate_operation_completeness(
                 actual_updated_counts[table] += 1
 
         # Count DELETE operations (ID list deletions)
-        if op_type == "delete" and hasattr(operation, "delete_filter") and operation.delete_filter:
-            if "id" in operation.delete_filter:
-                filter_value = operation.delete_filter["id"]
-                if isinstance(filter_value, list):
-                    actual_deleted_counts[table] += len(filter_value)
+        if op_type == "delete" and hasattr(operation, "delete_filter") and operation.delete_filter and "id" in operation.delete_filter:
+            filter_value = operation.delete_filter["id"]
+            if isinstance(filter_value, list):
+                actual_deleted_counts[table] += len(filter_value)
 
     # Validate aggregated counts against impact_analysis
     for table, expected_count in new_entities_count.items():
@@ -363,8 +362,7 @@ class OperationExecutor:
                 f"({current_step.description if current_step else 'unknown'}): {str(e)}"
             )
             # Preserve original exception type info
-            error_with_context.__cause__ = e
-            raise error_with_context
+            raise error_with_context from e
 
         # Success - calculate execution time
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -793,10 +791,7 @@ class OperationExecutor:
             # Extract entity ID(s) from filter
             entity_id = resolved_filter.get("id")
             if entity_id:
-                if isinstance(entity_id, list):
-                    deleted_ids = entity_id
-                else:
-                    deleted_ids = [entity_id]
+                deleted_ids = entity_id if isinstance(entity_id, list) else [entity_id]
 
         return {"count": count, "soft_delete": operation.soft_delete, "deleted_ids": deleted_ids}
 
