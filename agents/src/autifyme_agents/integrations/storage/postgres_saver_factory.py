@@ -75,11 +75,14 @@ async def get_async_checkpointer(setup: bool = False, force_reconnect: bool = Fa
     global _async_checkpointer_instance, _async_checkpointer_cm
 
     # Check if we need to recreate the checkpointer
-    should_recreate = (
-        _async_checkpointer_instance is None  # Never created
-        or force_reconnect  # Forced recreation
-        or not await _is_connection_healthy(_async_checkpointer_instance)  # Connection dead
-    )
+    if _async_checkpointer_instance is None:
+        should_recreate = True
+    elif force_reconnect:
+        should_recreate = True
+    elif not await _is_connection_healthy(_async_checkpointer_instance):
+        should_recreate = True
+    else:
+        should_recreate = False
 
     if should_recreate:
         logger.info("Creating new AsyncPostgresSaver instance")
@@ -101,4 +104,6 @@ async def get_async_checkpointer(setup: bool = False, force_reconnect: bool = Fa
 
         logger.info("AsyncPostgresSaver instance created successfully")
 
+    # Type guaranteed: if instance was None, should_recreate=True created it
+    assert _async_checkpointer_instance is not None, "Checkpointer should be initialized"
     return _async_checkpointer_instance

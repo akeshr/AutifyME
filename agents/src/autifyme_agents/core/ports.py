@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal, overload
 
 from ..schemas.models import CompanyProfile, WorkflowOutcome
 
@@ -287,6 +287,30 @@ class StorageInterface(ABC):
             # Returns [] if SKU-001 only exists on record uuid-123
         """
         pass
+
+    @overload
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: Literal[True] = ...,
+        limit: int | None = None,
+    ) -> int: ...
+
+    @overload
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: Literal[False] = ...,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]: ...
 
     @abstractmethod
     async def query_advanced(
