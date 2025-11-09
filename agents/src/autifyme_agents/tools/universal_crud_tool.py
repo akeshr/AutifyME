@@ -1140,24 +1140,26 @@ def _create_operation_input_schema(
     fields: dict[str, Any] = {
         'user_request_summary': (
             str,
-            Field(..., description='Summary of user original request')
+            Field(default="Database operation", description='Summary of user original request')
         ),
         'reasoning': (
             str,
-            Field(..., description='Why specialist classified this way (for transparency)')
+            Field(default="Executing database operation", description='Why specialist classified this way (for transparency)')
         ),
     }
 
     # intent_type with operation-specific description
     allowed_ops = ', '.join(operations)
     if len(operations) == 1:
-        intent_desc = f'Intent type. Must be "{operations[0]}". This tool handles {operations[0]} operations only.'
+        intent_desc = f'Intent type. Defaults to "{operations[0]}". This tool handles {operations[0]} operations only.'
+        default_intent = operations[0]
     else:
         intent_desc = f'Intent type. Allowed operations: {allowed_ops}'
+        default_intent = operations[0]  # Default to first operation
 
     fields['intent_type'] = (
         str,
-        Field(..., description=intent_desc)
+        Field(default=default_intent, description=intent_desc)
     )
 
     # Operation-specific fields
@@ -1191,19 +1193,21 @@ def _create_operation_input_schema(
             )
         )
         fields['impact_analysis'] = (
-            dict[str, Any],
+            dict[str, Any] | None,
             Field(
-                ...,
-                description='REQUIRED for HITL approval. Specifies new/updated/deleted entity counts per table. '
-                'Example: {"new_entities_count": {"products": 5}, "updated_entities_count": {"products": 2}}'
+                default=None,
+                description='Optional: Impact analysis for HITL approval. Specifies new/updated/deleted entity counts per table. '
+                'Example: {"new_entities_count": {"products": 5}, "updated_entities_count": {"products": 2}}. '
+                'If not provided, will be auto-generated from change_spec.'
             )
         )
         fields['execution_plan'] = (
-            dict[str, Any],
+            dict[str, Any] | None,
             Field(
-                ...,
-                description='Multi-step execution plan with dependencies. '
-                'Defines atomic steps with rollback support and dependency ordering.'
+                default=None,
+                description='Optional: Multi-step execution plan with dependencies. '
+                'Defines atomic steps with rollback support and dependency ordering. '
+                'If not provided, will be auto-generated from change_spec operations.'
             )
         )
 
