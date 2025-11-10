@@ -381,6 +381,7 @@ def create_research_product_tool(settings: Settings) -> StructuredTool:
             "Graceful: Continues workflow if research fails (don't block operations)."
         ),
         args_schema=ResearchProductInput,
+        coroutine=True,  # CRITICAL: Function is async, must specify coroutine=True
     )
 
 
@@ -583,6 +584,7 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
             "Graceful: Returns error if extraction fails (try alternative sources)."
         ),
         args_schema=ExtractWebContentInput,
+        coroutine=True,  # CRITICAL: Function is async, must specify coroutine=True
     )
 
 
