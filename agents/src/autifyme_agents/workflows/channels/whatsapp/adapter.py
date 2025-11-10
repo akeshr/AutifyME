@@ -73,33 +73,33 @@ class WhatsAppChannel:
 
             # WhatsApp free-form message limit: 1,600 chars (4,096 absolute max)
             # PM should keep responses under 1,500 chars - this is fallback validation
-            MAX_LENGTH = 1600
-            TARGET_LENGTH = 1500
+            max_length = 1600
+            target_length = 1500
 
-            if len(message) > MAX_LENGTH:
+            if len(message) > max_length:
                 # CRITICAL: PM exceeded hard limit - this indicates prompt failure
                 logger.error(
                     "PM exceeded WhatsApp hard limit - prompt constraint violated",
                     extra={
                         "recipient": recipient,
                         "message_length": len(message),
-                        "max_allowed": MAX_LENGTH,
-                        "target_length": TARGET_LENGTH,
-                        "overflow": len(message) - MAX_LENGTH,
+                        "max_allowed": max_length,
+                        "target_length": target_length,
+                        "overflow": len(message) - max_length,
                         "message_preview": message[:200],
                     },
                 )
                 # Fallback: truncate to prevent delivery failure
-                message = message[: MAX_LENGTH - 3] + "..."
-            elif len(message) > TARGET_LENGTH:
+                message = message[: max_length - 3] + "..."
+            elif len(message) > target_length:
                 # WARNING: PM exceeded target but within hard limit
                 logger.warning(
                     "PM response exceeds target length - consider prompt tuning",
                     extra={
                         "recipient": recipient,
                         "message_length": len(message),
-                        "target_length": TARGET_LENGTH,
-                        "overflow": len(message) - TARGET_LENGTH,
+                        "target_length": target_length,
+                        "overflow": len(message) - target_length,
                     },
                 )
 
