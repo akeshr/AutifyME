@@ -1,9 +1,9 @@
 # Specialist Build-Up Integration Plan
 
 **Date:** October 28, 2025
-**Last Updated:** January 6, 2025
-**Status:** ✅ Phase 1 Complete | ✅ Phase 2 Complete | ✅ Phase 2B Complete | ✅ Phase 2C Complete | ✅ Phase 2D Complete | ✅ Phase 2E Complete | ✅ Phase 2F Complete
-**Current Phase:** Phase 2F Complete (Dynamic CRUD Access Control) - Ready for Phase 3 (Taxonomy Specialist)
+**Last Updated:** January 10, 2025
+**Status:** ✅ Phase 1 Complete | ✅ Phase 2 Complete | ✅ Phase 2B Complete | ✅ Phase 2C Complete | ✅ Phase 2D Complete | ✅ Phase 2E Complete | ✅ Phase 2F Complete | 🔄 Phase 2G Planned
+**Current Phase:** Phase 2G Planned (Product Research Capability) - Tool enhancement for Product Specialist
 **Strategy:** Incremental build-up - unplug all specialists, perfect PM core, add specialists one by one
 
 ---
@@ -3185,6 +3185,258 @@ create_database_tool(
     operations=["create", "read", "update", "delete"]
 )
 ```
+
+---
+
+## Phase 2G: Product Research Capability 🔄 PLANNED (6-9 hours)
+
+**Date Added:** January 10, 2025
+**Status:** 🔄 Planning
+**Architecture Doc:** `PRODUCT_RESEARCH_CAPABILITY.md`
+**Pattern:** Tool-Based Enhancement (Intelligence-First)
+
+### Goal
+Enhance Product Architecture Specialist with web research tools (Tavily) to enrich product data beyond user-provided information.
+
+### Problem Statement
+Product Specialist creates catalog entries from user-provided data only. No external research to:
+- Validate specifications (materials, dimensions, certifications)
+- Discover competitive pricing and market positioning
+- Enrich brand/manufacturer information
+- Find technical documentation (safety data sheets, compliance)
+
+### Solution
+Add two research tools to Product Architecture Specialist:
+1. **research_product_tool** - Broad web search (Tavily Search API)
+2. **extract_web_content_tool** - Deep content extraction (Tavily Extract API)
+
+**Why Tools (Not Specialist):**
+- Maintains 2-level architecture (PM → Specialists → Tools)
+- Product research requires product domain expertise (query formulation, relevance assessment)
+- Specialist intelligence guides research strategy (intelligence-first principle)
+- Cross-cutting capability (future: Customer Specialist, Inventory Specialist use same tools)
+
+### Task 2G.1: Tool Selection - Tavily vs Alternatives ✅ DECIDED
+
+**Options Analyzed:**
+- **Tavily:** $0.008/credit (1000 free/mo), AI-native, LLM-optimized summaries ✅ CHOSEN
+- **SerpAPI:** $50/mo (100 free), raw SERP JSON, 10x more expensive ❌
+- **Google Custom Search:** $5/1000 (100/day free), raw HTML, quota limits ❌
+- **Raw Scraping:** Free but fragile, violates ToS, maintenance nightmare ❌
+
+**Decision Rationale:**
+1. **Cost-Effective:** 6-10x cheaper than SerpAPI, better free tier than Google
+2. **AI-Native:** Returns LLM-optimized content (not token-heavy raw HTML)
+3. **Production-Ready:** 93.3% accuracy benchmark, built for agents
+4. **Feature-Rich:** Search + Extract + Crawl (future extensibility)
+5. **LangChain Native:** First-class integration, follows existing tool patterns
+
+### Task 2G.2: Implement Research Tools (2-3 hours)
+
+**Files to Create/Modify:**
+- [ ] `agents/src/autifyme_agents/tools/research_tools.py` (new)
+- [ ] `agents/src/autifyme_agents/schemas/agent_outputs.py` (add ProductResearchResult, WebContentAnalysis)
+- [ ] `pyproject.toml` (add langchain-tavily>=0.2.13)
+
+**Tool 1: research_product_tool**
+```python
+@tool
+def research_product_tool(
+    query: str,  # "PET jar specifications 500ml food grade India"
+    max_results: int = 5,
+    include_answer: bool = True,
+) -> dict[str, Any]:
+    """Research product info using Tavily web search.
+
+    Returns ProductResearchResult:
+    - AI-generated answer summary
+    - Source citations with URLs
+    - Key findings (bullet points)
+    - Confidence score
+    """
+```
+
+**Tool 2: extract_web_content_tool**
+```python
+@tool
+def extract_web_content_tool(
+    url: str,
+    format: Literal["markdown", "text"] = "markdown",
+) -> dict[str, Any]:
+    """Extract web page content for LLM analysis.
+
+    Returns WebContentAnalysis:
+    - Extracted content (markdown/text)
+    - Metadata (title, description, publish date)
+    - Structured data (JSON-LD, microdata)
+    """
+```
+
+**Pattern:** Follow `image_analysis_tool.py` (deterministic API wrapper, structured outputs)
+
+### Task 2G.3: Add Tools to Product Specialist (1 hour)
+
+**File:** `agents/src/autifyme_agents/specialists/product_architecture_specialist.py`
+
+```python
+from autifyme_agents.tools.research_tools import (
+    research_product_tool,
+    extract_web_content_tool,
+)
+
+tools = [
+    search_product_families_tool,
+    universal_crud_tool,
+    research_product_tool,        # NEW
+    extract_web_content_tool,     # NEW
+]
+```
+
+### Task 2G.4: Update Specialist Prompt (1 hour)
+
+**File:** `agents/src/autifyme_agents/prompts/specialists/product_architecture_specialist.prompt`
+
+**Add Research Guidance:**
+```xml
+<research_capability>
+You have web research tools to enrich product data beyond user-provided information.
+
+WHEN TO RESEARCH:
+- User provides minimal data (just name/image)
+- Validating specifications (materials, certifications)
+- Competitive analysis (pricing, alternatives)
+- Brand/manufacturer verification
+- Technical documentation needed
+
+RESEARCH STRATEGY:
+1. Formulate targeted queries (use domain knowledge)
+2. Assess source quality (manufacturer sites, industry databases)
+3. Synthesize findings with user data
+4. Flag confidence gaps (inform user if inconclusive)
+
+COST AWARENESS:
+- Research efficiently (targeted, not exploratory)
+- Don't over-research obvious cases
+</research_capability>
+```
+
+### Task 2G.5: Environment Setup (30 mins)
+
+**Get Tavily API Key:**
+1. Sign up: https://app.tavily.com/sign-up (free tier: 1000 credits/month)
+2. Copy API key from dashboard
+
+**Add to .env:**
+```bash
+# In /home/user/AutifyME/.env
+TAVILY_API_KEY=tvly-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+**Update Settings:**
+```python
+# agents/src/autifyme_agents/core/config.py
+class Settings(BaseSettings):
+    TAVILY_API_KEY: str = Field(
+        ...,
+        description="Tavily API key for web research"
+    )
+```
+
+**Verify:**
+```bash
+uv run python -c "
+from dotenv import load_dotenv
+load_dotenv('.env')
+import os
+print('Tavily:', os.getenv('TAVILY_API_KEY')[:10] + '...')
+"
+```
+
+### Task 2G.6: Cost Optimization (1 hour)
+
+**1. Result Caching (PostgreSQL):**
+```sql
+CREATE TABLE research_cache (
+    query_hash TEXT PRIMARY KEY,
+    query TEXT NOT NULL,
+    results JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '24 hours'
+);
+```
+
+**2. LangSmith Monitoring:**
+- Track cost per product workflow
+- Monitor Tavily API usage
+- Alert at 80% free tier (800/1000 credits)
+
+**Expected Usage:**
+- 2-3 searches per product
+- ~50 products/month
+- ~150 searches/month
+- **Well within free tier (1000/month)**
+
+### Task 2G.7: Testing (2-3 hours)
+
+**Unit Tests:**
+```python
+# tests/unit/tools/test_research_tools.py
+
+def test_research_product_tool_success():
+    result = research_product_tool(
+        query="PET jar 500ml food grade India",
+        max_results=5,
+    )
+    assert result["success"] is True
+    assert "answer" in result
+    assert len(result["sources"]) <= 5
+
+def test_research_tool_api_failure():
+    # Test graceful failure handling
+    pass
+```
+
+**Integration Tests (Intelligent Framework):**
+```python
+# tests/cli/test_product_research_workflow.py
+
+async def test_product_onboarding_with_research():
+    scenario = {
+        "user_message": "Catalog: PET jar, 500ml",
+        "expected_research": True,
+    }
+    result = await intelligent_test(scenario)
+    assert "research_product_tool" in result.tools_used
+    assert result.product_draft.specifications  # Enriched
+```
+
+### Task 2G.8: Commit
+
+```bash
+git add .
+git commit -m "Phase 2G: Add Product Research Capability (Tavily)
+
+- Add research_product_tool (Tavily Search)
+- Add extract_web_content_tool (Tavily Extract)
+- Integrate with Product Architecture Specialist
+- Research caching (PostgreSQL 24hr TTL)
+- Unit + integration tests
+- Cost monitoring (LangSmith)
+
+Enhancement: Product Specialist can now research specifications,
+pricing, and competitive intelligence to enrich catalog entries.
+
+Cost: ~150 searches/month (well within 1000 free tier)
+Pattern: Tool-based (intelligence-first, 2-level architecture)
+"
+```
+
+---
+
+**Related Documentation:**
+- Detailed design: `docs/architecture/workflows/PRODUCT_RESEARCH_CAPABILITY.md`
+- Tavily docs: https://docs.tavily.com
+- LangChain integration: https://python.langchain.com/docs/integrations/tools/tavily_search/
 
 ---
 
