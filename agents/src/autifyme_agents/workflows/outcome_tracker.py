@@ -344,12 +344,13 @@ class OutcomeTracker:
             "trace_id": workflow.trace_id,  # LangSmith trace ID for observability correlation
             # Business context
             "sender_id": workflow.message.sender_id,
+            "message_text": workflow.message.text or "",  # Required field
             "platform": workflow.message.platform,
             "message_hash": workflow.message_hash,  # For similarity matching
             "received_at": workflow.message.received_at,  # Message timestamp
-            # Routing decision (business logic)
-            "intent": workflow.routing.intent if workflow.routing else None,
-            "department": workflow.routing.department if workflow.routing else None,
+            # Routing decision (business logic) - use defaults for direct responses
+            "intent": workflow.routing.intent if workflow.routing else "conversational",
+            "department": workflow.routing.department if workflow.routing else "direct_response",
             # Outcome (business success/failure)
             "success": workflow.result.success if workflow.result else False,
             "result_data": result_data,  # Cataloging result with product details

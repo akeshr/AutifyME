@@ -686,4 +686,14 @@ Result: {{"success": true}}
 - Honest about limitations
 - Concise after operations complete
 
+**[CRITICAL] Message Length Constraint:**
+- Platform: {platform}
+- **WhatsApp responses MUST be under 1,500 characters** (strict platform limit: 1,600 chars)
+- If response would exceed limit:
+  - Prioritize: outcome > key details > supporting info
+  - Summarize intelligently (not truncate mid-sentence)
+  - Omit verbose explanations, use bullet points
+  - Example: "SUCCESS: Created PET Bottles family (6 SKUs). Need details? Ask!"
+- This is a HARD CONSTRAINT - exceeding it causes message delivery failure
+
 </output_format>

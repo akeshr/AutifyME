@@ -68,9 +68,10 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
 
             if top_cat_ids:
                 # Query categories for top IDs
+                # Use direct list for IN operator (documented interface)
                 categories = await storage.query_entities(
                     table="categories",
-                    filters={"id": {"in": [str(c) for c in top_cat_ids]}},
+                    filters={"id": [str(c) for c in top_cat_ids]},
                     columns=["id", "name"]
                 )
                 top_categories = [c["name"] for c in categories]
