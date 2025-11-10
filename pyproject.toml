@@ -36,6 +36,8 @@ dependencies = [
     "langchain-openai>=1.0.0",
     "langchain-anthropic>=1.0.0",
     "langchain-google-genai",
+    # Research & Web Tools
+    "langchain-tavily>=0.2.0",  # Web search & content extraction (Tavily API)
     # Database & Storage
     "supabase",
     "psycopg[binary]>=3.2.10",  # Required for LangGraph PostgreSQL checkpointer
