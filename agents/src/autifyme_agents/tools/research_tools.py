@@ -129,12 +129,8 @@ def _calculate_research_confidence(sources: list[dict[str, Any]]) -> float:
 
     # Source count factor (diminishing returns)
     n = len(sources)
-    if n == 1:
-        # Single source = moderate confidence (not zero)
-        source_factor = 0.3
-    else:
-        # Multi-source: sqrt provides diminishing returns
-        source_factor = 1 - (1 / math.sqrt(n))
+    # Single source = moderate confidence (not zero); multi-source uses sqrt for diminishing returns
+    source_factor = 0.3 if n == 1 else 1 - (1 / math.sqrt(n))
 
     return min(avg_relevance * source_factor, 1.0)
 
@@ -592,7 +588,7 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
 
 # These are created with default settings for direct import compatibility
 # Specialists should prefer factory functions for proper dependency injection
-from autifyme_agents.core.config import settings as default_settings
+from autifyme_agents.core.config import settings as default_settings  # noqa: E402
 
 research_product_tool = create_research_product_tool(default_settings)
 extract_web_content_tool = create_extract_web_content_tool(default_settings)
