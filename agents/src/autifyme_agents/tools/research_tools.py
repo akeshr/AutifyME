@@ -449,8 +449,10 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
                     fallback_action="URL must start with http:// or https://. Inform user, request valid URL.",
                 )
 
-            # Initialize Tavily extract with injected API key
-            tavily = TavilyExtract(api_key=settings.TAVILY_API_KEY)
+            # Initialize Tavily extract with injected API key and format
+            # IMPORTANT: format MUST be in constructor, not invoke dict
+            # Passing format in invoke causes "multiple values for keyword argument 'format'" error
+            tavily = TavilyExtract(api_key=settings.TAVILY_API_KEY, format=format)
 
             logger.info(
                 "Extracting web content",
@@ -460,33 +462,33 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
                 }
             )
 
-            # Execute extraction
-            raw_result = tavily.invoke({"urls": [url], "format": format})
+            # Execute extraction (only urls in invoke dict)
+            raw_result = tavily.invoke({"urls": [url]})
 
-            # Handle API returning error
-            if isinstance(raw_result, dict) and "error" in raw_result:
+            # Handle API response format
+            # Success: dict with {results: [{url, title, raw_content, images}], failed_results: [], ...}
+            # Failure: string with error message
+            if isinstance(raw_result, str):
+                # API returns string on extraction failure
                 logger.error(
-                    "Tavily Extract API returned error",
+                    "Tavily Extract API returned error string",
                     extra={
                         "url": url,
-                        "error": raw_result.get("error"),
+                        "error": raw_result,
                     }
                 )
                 return build_agent_error_response(
-                    exception=ValueError(f"Tavily Extract error: {raw_result['error']}"),
+                    exception=ValueError(f"Tavily Extract error: {raw_result}"),
                     context={"url": url},
                     fallback_type="API_ERROR",
                     fallback_action=(
-                        "Content extraction failed. Try alternative URL or use summary from research instead."
+                        "Content extraction failed. Possible causes: paywall, JavaScript-required, inaccessible. "
+                        "Try alternative URL or use summary from research instead."
                     ),
                 )
 
-            # Parse extraction (Tavily Extract returns list of results)
-            if isinstance(raw_result, list) and raw_result:
-                extraction = raw_result[0]  # Single URL = single result
-            elif isinstance(raw_result, dict):
-                extraction = raw_result
-            else:
+            # Parse successful extraction (dict with results array)
+            if not isinstance(raw_result, dict):
                 logger.error(
                     "Unexpected Tavily Extract response format",
                     extra={
@@ -495,22 +497,50 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
                     }
                 )
                 return build_agent_error_response(
-                    exception=ValueError(f"Unexpected Tavily Extract response: {type(raw_result)}"),
+                    exception=ValueError(f"Unexpected Tavily Extract response type: {type(raw_result)}"),
                     context={"url": url},
                     fallback_type="API_ERROR",
                     fallback_action="Content extraction returned unexpected format. Try alternative source.",
                 )
 
-            # Extract fields
-            content = extraction.get("content", "")
-            if not content:
+            # Extract results from nested structure
+            results = raw_result.get("results", [])
+            failed_results = raw_result.get("failed_results", [])
+
+            if not results or len(results) == 0:
+                # Check failed_results for reason
+                failure_reason = failed_results[0] if failed_results else "Unknown reason"
+                logger.error(
+                    "Tavily Extract returned no results",
+                    extra={
+                        "url": url,
+                        "failed_results": failed_results,
+                    }
+                )
                 return build_agent_error_response(
-                    exception=ValueError("No content extracted from URL"),
+                    exception=ValueError(f"No content extracted from URL: {failure_reason}"),
                     context={"url": url},
                     fallback_type="EXTRACTION_ERROR",
                     fallback_action=(
-                        "URL returned empty content. Possible causes: paywall, JavaScript-required, inaccessible. "
-                        "Try alternative source or use summary from research instead."
+                        "URL returned no extractable content. Possible causes: paywall, JavaScript-required, "
+                        "inaccessible, or content not text-based. Try alternative source or use summary from research."
+                    ),
+                )
+
+            # Extract first result (single URL request = single result)
+            extraction = results[0]
+
+            # Map API fields to expected schema
+            # API returns: url, title, raw_content, images
+            # Schema expects: url, title, content, description, structured_data, publish_date, author, word_count
+            content = extraction.get("raw_content", "")
+            if not content:
+                return build_agent_error_response(
+                    exception=ValueError("Extracted result has empty raw_content"),
+                    context={"url": url},
+                    fallback_type="EXTRACTION_ERROR",
+                    fallback_action=(
+                        "URL extraction succeeded but content is empty. Try alternative source or use summary."
                     ),
                 )
 
@@ -518,14 +548,14 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
             word_count = len(content.split()) if content else 0
 
             result = WebContentAnalysis(
-                url=url,
+                url=extraction.get("url", url),  # Use extracted URL (may differ due to redirects)
                 title=extraction.get("title"),
-                description=extraction.get("description"),
+                description=None,  # Tavily Extract API doesn't return description
                 content=content,
                 content_format=format,
-                structured_data=extraction.get("metadata"),
-                publish_date=extraction.get("published_date"),
-                author=extraction.get("author"),
+                structured_data=None,  # Tavily Extract API doesn't return structured metadata
+                publish_date=None,  # Tavily Extract API doesn't return publish date
+                author=None,  # Tavily Extract API doesn't return author
                 word_count=word_count,
             )
 
