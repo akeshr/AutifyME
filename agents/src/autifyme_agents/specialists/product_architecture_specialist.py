@@ -1,5 +1,5 @@
 """
-Product Architecture Specialist - Dynamic schema-driven CRUD operations.
+Product Architecture Specialist - Schema-driven CRUD with autonomous research.
 
 Domain Expertise:
 - Product structure analysis (family vs variants)
@@ -7,6 +7,9 @@ Domain Expertise:
 - SKU architecture design (naming conventions, combinations)
 - Intelligent catalog matching for autonomous create vs update decisions
 - Schema-driven operation planning (queries schema, generates execution plans)
+- Web research for product enrichment (specs, pricing, competitive analysis)
+- Visual attribute extraction from product images
+- Autonomous data enrichment (handles minimal user input intelligently)
 
 Responsibilities:
 - Query product catalog schema dynamically
@@ -14,6 +17,10 @@ Responsibilities:
 - Classify user intent into CRUD operations
 - Generate operation specifications with execution plans
 - Calculate impact analysis from schema + current data
+- Research product information via web search (Tavily API)
+- Extract content from specific URLs (manufacturer sites, spec sheets)
+- Analyze product images for visual attributes (materials, colors, dimensions)
+- Enrich minimal user data autonomously (no hand-holding needed)
 
 Does NOT:
 - Persist to database (PM handles persistence via universal tool)
@@ -25,6 +32,7 @@ Architecture Pattern:
 - Returns dict with {name, description, tools, system_prompt}
 - DeepAgents compiles specialist automatically in PM
 - Schema-driven planning (no hard-coded operation types)
+- Intelligence-first: trusts specialist to research and enrich autonomously
 """
 
 from typing import Any
@@ -59,12 +67,17 @@ def create_product_architecture_specialist(
     - Classify user intent (create/read/update/delete)
     - Generate operation specifications with execution plans
     - Calculate impact analysis from schema + data
+    - Research product information via web (Tavily API)
+    - Extract content from URLs (manufacturer sites, spec sheets)
+    - Analyze product images for visual attributes
+    - Enrich minimal user data autonomously
     - Maintain conversation history across PM delegations
 
     Architecture:
     - SubAgent dict: {name, description, tools, system_prompt, model (optional)}
     - DeepAgents compiles specialist with specified model or default_model from PM
     - Schema-driven planning (no hard-coded operation types)
+    - Intelligence-first: autonomous research and enrichment
     - PM handles persistence via execute_database_operation tool
 
     Args:
@@ -80,7 +93,7 @@ def create_product_architecture_specialist(
     Notes:
         - Standard SubAgent pattern (like cataloging_specialist)
         - DeepAgents handles model compilation, checkpointer, middleware
-        - Specialist focused on analysis and planning only
+        - Specialist focused on analysis, research, and planning
         - PM delegates execution and approval
     """
     if storage is None:
@@ -118,13 +131,16 @@ def create_product_architecture_specialist(
     tools.append(create_search_product_families_tool(storage))
     tools.append(create_query_database_tool(storage))
 
-    # Description for PM delegation
+    # Description for PM delegation (routing decisions)
     description = (
-        "Product architecture specialist with schema-driven CRUD capabilities. "
-        "Analyzes product structure, queries schemas dynamically, "
-        "searches catalog for existing products, and generates "
-        "operation specifications with execution plans and impact analysis. "
-        "Handles any CRUD operation on any table through schema-driven planning. "
+        "Product architecture specialist with schema-driven CRUD and autonomous research. "
+        "Core capabilities: analyzes product structure, queries schemas dynamically, "
+        "searches catalog for existing products, generates operation specifications with execution plans. "
+        "Research capabilities: web search for product specs/pricing/competitive analysis (Tavily), "
+        "extracts content from URLs (manufacturer sites, spec sheets), "
+        "analyzes product images for visual attributes (materials, colors, dimensions, condition). "
+        "Intelligence: handles minimal user data autonomously (researches to fill gaps), "
+        "enriches product information without hand-holding. "
         "Returns detailed operation plans for PM to execute via execute_database_operation tool."
     )
 
