@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: str | None = None
     AGENT_RECURSION_LIMIT: int = 50
 
+    # Research & Web Tools
+    TAVILY_API_KEY: str | None = None  # Web search & content extraction (Phase 2G)
+
     # Phase 2 Feature Flags (Enable advanced capabilities when ready)
     ENABLE_SEMANTIC_SEARCH: bool = False  # Taxonomy: Embeddings-based category search
     ENABLE_GOOGLE_TAXONOMY_API: bool = False  # Taxonomy: Google Product Taxonomy integration
