@@ -124,8 +124,8 @@ def _calculate_research_confidence(sources: list[dict[str, Any]]) -> float:
         return 0.0
 
     # Average relevance
-    scores = [s.get("score", 0.5) for s in sources]
-    avg_relevance = sum(scores) / len(scores)
+    scores: list[float] = [float(s.get("score", 0.5)) for s in sources]
+    avg_relevance: float = sum(scores) / len(scores)
 
     # Source count factor (diminishing returns)
     n = len(sources)
