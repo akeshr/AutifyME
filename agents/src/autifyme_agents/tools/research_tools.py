@@ -238,6 +238,7 @@ def create_research_product_tool(settings: Settings) -> StructuredTool:
             tavily = TavilySearch(
                 api_key=settings.TAVILY_API_KEY,
                 max_results=max_results,
+                include_answer=include_answer,  # Constructor parameter, not invoke parameter
             )
 
             logger.info(
@@ -249,8 +250,8 @@ def create_research_product_tool(settings: Settings) -> StructuredTool:
                 }
             )
 
-            # Execute search
-            raw_results = tavily.invoke({"query": query, "include_answer": include_answer})
+            # Execute search (only query in invoke dict)
+            raw_results = tavily.invoke({"query": query})
 
             # Handle API returning dict with error
             if isinstance(raw_results, dict) and "error" in raw_results:
