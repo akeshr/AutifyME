@@ -863,7 +863,7 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
             raise classify_api_error(e, "search_product_families", "Supabase") from e
 
     return StructuredTool.from_function(
-        func=_search_product_families_impl,
+        coroutine=_search_product_families_impl,  # Async function - use coroutine parameter
         name="search_product_families",
         description=(
             "Search for existing product families using intelligent fuzzy matching. "
