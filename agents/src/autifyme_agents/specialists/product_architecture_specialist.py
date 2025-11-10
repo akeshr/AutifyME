@@ -34,6 +34,10 @@ from langchain.chat_models import BaseChatModel
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
+from autifyme_agents.tools.research_tools import (
+    extract_web_content_tool,
+    research_product_tool,
+)
 
 # =============================================================================
 # Specialist Factory
@@ -90,6 +94,8 @@ def create_product_architecture_specialist(
     # Core tools
     tools: list[Any] = [
         image_analysis_tool,
+        research_product_tool,       # Web research for product enrichment
+        extract_web_content_tool,    # Deep content extraction from URLs
     ]
 
     # Schema query tools (for dynamic planning)

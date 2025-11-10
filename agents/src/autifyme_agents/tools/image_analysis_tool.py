@@ -126,19 +126,47 @@ def image_analysis_tool(
         # Convert image to base64 data URI
         image_uri = _encode_image_to_base64_uri(image_path)
 
-        # Vision API prompt
-        content = """Analyze this product image and extract all visual attributes.
+        # Vision API prompt (aligned with ImageAnalysisResult schema)
+        content = """Analyze this product image and extract ALL visual attributes.
 
-Focus on:
-- Visual description (detailed, specific)
-- Colors (all visible colors)
-- Materials (fabric, leather, metal, etc.)
-- Style tags (modern, vintage, casual, formal, etc.)
-- Estimated dimensions or size indicators
-- Condition and quality indicators
-- Any visible brand elements or logos
+Extract for EACH field:
 
-Be specific and objective. Describe what you actually see."""
+1. VISUAL_DESCRIPTION (required):
+   - Detailed, objective description suitable for e-commerce
+   - Describe shape, design, packaging, features visible
+   - Be specific and factual (what you see, not assumptions)
+
+2. IDENTIFIED_COLORS (list):
+   - All dominant colors visible in product
+   - Examples: Clear, Amber, Blue, White, Transparent, etc.
+   - List multiple if product has color variations
+
+3. IDENTIFIED_MATERIALS (list):
+   - Materials identified from visual inspection
+   - Examples: PET, Glass, Aluminum, Cardboard, Plastic, Metal, Wood, etc.
+   - Be specific if possible (e.g., "PET plastic" not just "plastic")
+
+4. STYLE_TAGS (list):
+   - Style/aesthetic keywords
+   - Examples: modern, industrial, vintage, minimalist, decorative, functional
+   - Describe design language you observe
+
+5. DIMENSIONS_INDICATORS (optional string):
+   - Size/dimension indicators visible (labels, markings, context clues)
+   - Examples: "500ml capacity marked on label", "appears ~20cm height based on proportions"
+   - Leave null if no size indicators visible
+
+6. CONDITION_ASSESSMENT (optional string):
+   - Product condition/quality indicators
+   - Examples: "new/unused condition", "minor wear on edges", "excellent condition"
+   - Leave null if condition unclear from image
+
+7. BRAND_ELEMENTS (list):
+   - Visible brands, logos, manufacturer markings, certifications
+   - Examples: "Pavisha logo on cap", "FDA marking on bottom", "CE certification visible"
+   - List all visible text/markings
+
+IMPORTANT: Be thorough - extract ALL visible information for each field."""
 
         # Build vision message
         messages = [
