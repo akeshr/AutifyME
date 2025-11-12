@@ -15,6 +15,7 @@ Timeless design blueprints and implementation ground truth.
 | **[ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./core/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md)** | ✅ **Ground truth** - as-built implementation verified from code |
 | **[PROJECT_MANAGER_DESIGN.md](./core/PROJECT_MANAGER_DESIGN.md)** | PM agent role, intent classification, delegation patterns |
 | **[DYNAMIC_SCHEMA_DRIVEN_ARCHITECTURE.md](./core/DYNAMIC_SCHEMA_DRIVEN_ARCHITECTURE.md)** | 🔄 **Dynamic CRUD** - Schema-driven architecture for future-proof database operations (replaces static patterns) |
+| **[PRODUCT_HIERARCHY_RELATIONSHIPS_DESIGN.md](./core/PRODUCT_HIERARCHY_RELATIONSHIPS_DESIGN.md)** | 🔄 **In Design** - Product relationships, BOM, UOM conversions, packaging hierarchy for autonomous agent decisions |
 | **[WORKFLOW_DESIGN_STRATEGY.md](./core/WORKFLOW_DESIGN_STRATEGY.md)** | Workflow orchestration patterns and sequencing strategies |
 | **[ARCHITECTURE_IMPROVEMENTS.md](./core/ARCHITECTURE_IMPROVEMENTS.md)** | Evolution and design decision history |
 
