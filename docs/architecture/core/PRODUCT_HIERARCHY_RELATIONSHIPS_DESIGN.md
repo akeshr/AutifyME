@@ -8,35 +8,400 @@
 
 ## Executive Summary
 
-Comprehensive data model for product composition, unit of measure (UOM) conversions, and packaging hierarchies to support autonomous agent decision-making across manufacturing, procurement, inventory, and sales workflows.
+**Core Principle: Everything Is A Product SKU**
 
-**Key Architectural Decisions:**
-- **Unified relationship model:** Single `product_relationships` table handles manufacturing BOM, packaging hierarchy, and commercial relationships
-- **Multi-UOM support:** Products tracked in multiple units with conversion factors (MT → KG → Pieces)
-- **Three-system architecture:** Manufacturing BOM (how products are made) + UOM conversions (cross-unit tracking) + Packaging hierarchy (how products are sold)
-- **Agent-optimized:** Supports dynamic planning, procurement optimization, inventory reservation, configuration validation
+Unified data model where raw materials, components, assemblies, packaging units, and finished goods are ALL products with SKUs. Relationships define how they connect. No special tables for "configured products" or "composite images" - everything flows through the same six tables.
+
+**Architectural Foundation:**
+- **Single product model:** One `products` table for materials, components, assemblies, packages
+- **Unified relationships:** One `product_relationships` table for BOM, packaging, substitutes, accessories
+- **Multi-UOM support:** Products tracked in multiple units (MT, KG, pieces) with conversion factors
+- **Image composition:** AI-generated assembly images stored alongside photographed component images
+- **Agent-optimized:** Supports procurement planning, inventory management, visual configuration, cost rollup
+
+**Six Core Tables:**
+1. `products` - Everything is a product (raw materials → finished goods → packaging)
+2. `product_images` - All images (photographed, AI-generated, marketing)
+3. `product_relationships` - All connections (manufacturing, packaging, commercial)
+4. `uom_categories` - Unit families (Weight, Volume, Count)
+5. `units_of_measure` - MT, KG, PC, L, etc.
+6. `product_uoms` - Product-specific UOM mappings + conversions
 
 **Scope:**
-- ✅ Manufacturing BOM (multi-level, phantom assemblies, effectivity dates)
-- ✅ UOM conversions (fixed, batch-specific, catch weight)
-- ✅ Packaging hierarchy (inner packs, master cases, pallets)
+- ✅ Manufacturing BOM (resin → preform → bottle → assembly)
+- ✅ UOM conversions (metric tons → kilograms → pieces)
+- ✅ Packaging hierarchy (bottle → 6-pack → dozen → carton)
+- ✅ Visual configuration (blue cap + transparent jar → AI-generated composite)
 - ✅ Commercial relationships (bundles, accessories, substitutes, upgrades)
-- ✅ Configurable products (modular BOM, 150% BOM pattern)
+- ✅ Effectivity, phantom assemblies, batch-specific conversions
 
 ---
 
 ## Table of Contents
 
-1. [Business Context](#business-context)
-2. [Research Findings](#research-findings)
-3. [Complete Relationship Taxonomy](#complete-relationship-taxonomy)
-4. [Unit of Measure Architecture](#unit-of-measure-architecture)
-5. [Unified Data Model](#unified-data-model)
-6. [Real-World Scenario: Pet Jar Manufacturing](#real-world-scenario-pet-jar-manufacturing)
-7. [Agent Decision Scenarios](#agent-decision-scenarios)
-8. [Query Patterns](#query-patterns)
-9. [Implementation Roadmap](#implementation-roadmap)
-10. [Open Questions & Design Decisions](#open-questions--design-decisions)
+1. [Core Architectural Principle](#core-architectural-principle)
+2. [Business Context](#business-context)
+3. [Research Findings](#research-findings)
+4. [Six-Table Architecture](#six-table-architecture)
+5. [Complete Relationship Taxonomy](#complete-relationship-taxonomy)
+6. [Unit of Measure Architecture](#unit-of-measure-architecture)
+7. [Real-World Scenario: Pet Jar Manufacturing](#real-world-scenario-pet-jar-manufacturing)
+8. [Visual Configuration: AI-Generated Images](#visual-configuration-ai-generated-images)
+9. [Agent Decision Scenarios](#agent-decision-scenarios)
+10. [Query Patterns](#query-patterns)
+11. [Implementation Roadmap](#implementation-roadmap)
+12. [Open Questions & Design Decisions](#open-questions--design-decisions)
+
+---
+
+## Core Architectural Principle
+
+### Everything Is A Product SKU
+
+**Fundamental Design Rule:** Every physical or conceptual item in the business is a row in the `products` table with a unique SKU.
+
+**What This Means:**
+
+| Item Type | Example | SKU | product_type | In products Table? |
+|-----------|---------|-----|--------------|-------------------|
+| Raw Material | PET Resin Pellets | RAW-PET-001 | raw_material | ✅ Yes |
+| Component | Preform 500ml | COMP-PREFORM-500 | component | ✅ Yes |
+| Component | Blue Cap 83mm | COMP-CAP-BLUE-83 | component | ✅ Yes |
+| Component | Transparent Jar 500ml | COMP-JAR-TRANS-500 | component | ✅ Yes |
+| Finished Good | Assembled Bottle | ASSY-BTL-500-BLUE | finished_good | ✅ Yes |
+| Packaging Unit | 6-Pack | 6PK-BTL-500-BLUE | bundle | ✅ Yes |
+| Packaging Unit | Dozen Pack (7×6) | DZ-BTL-500-BLUE | bundle | ✅ Yes |
+| Packaging Unit | Master Carton | CTN-BTL-500-BLUE | bundle | ✅ Yes |
+
+**Implications:**
+
+1. **Single Source of Truth**
+   - All items tracked in one table
+   - Consistent querying: `SELECT * FROM products WHERE sku = ?`
+   - No special tables for "assemblies" vs "packages" vs "components"
+
+2. **Inventory Tracking**
+   - Every SKU can have `stock_quantity`
+   - Track raw materials: 5 MT resin in stock
+   - Track components: 300 KG preforms in stock
+   - Track finished goods: 10,000 bottles in stock
+   - Track packages: 500 six-packs in stock
+
+3. **Pricing**
+   - Every SKU has a `price`
+   - Sell components individually: $0.50/cap
+   - Sell assemblies: $5.00/bottle
+   - Sell packages: $28.00/6-pack
+   - Pricing logic: assembly price vs sum(component prices)
+
+4. **Images**
+   - Every SKU can have images in `product_images`
+   - Component images: Photographed (cap-blue-83mm.png)
+   - Assembly images: AI-generated from component images
+   - Package images: Marketing photography (6-pack lifestyle shot)
+   - **No special cache tables** - image existence = cached
+
+5. **Relationships**
+   - All connections in `product_relationships`
+   - Manufacturing: Bottle → Cap + Jar (type='component')
+   - Packaging: 6-Pack → 6 × Bottle (type='inner_pack')
+   - Commercial: Bottle → Spare Cap (type='accessory')
+
+### Why This Works
+
+**Unified Query Patterns:**
+```sql
+-- Get product (works for EVERYTHING)
+SELECT * FROM products WHERE sku = 'ANY-SKU';
+
+-- Get product image (works for EVERYTHING)
+SELECT url FROM product_images WHERE product_id = 'ANY-PRODUCT-ID' AND is_primary = true;
+
+-- Get product relationships (works for EVERYTHING)
+SELECT * FROM product_relationships WHERE source_product_id = 'ANY-PRODUCT-ID';
+
+-- Get product inventory (works for EVERYTHING)
+SELECT stock_quantity, availability FROM products WHERE sku = 'ANY-SKU';
+```
+
+**No Special Cases:**
+- ❌ No separate "configured_products" table
+- ❌ No separate "packaging_units" table
+- ❌ No separate "image_compositions" cache
+- ❌ No separate "assembly_bom" table
+- ✅ Everything through `products` + `product_relationships` + `product_images`
+
+**Agent Simplicity:**
+```python
+# Agent needs assembly image
+image = get_product_image(product_id)
+
+if not image:
+    # Not cached - generate from components
+    components = get_relationships(product_id, type='component')
+    component_images = [get_product_image(c.id) for c in components]
+    generated_image = ai_generate_composite(component_images)
+    save_product_image(product_id, generated_image)  # Cache it
+    return generated_image
+else:
+    return image  # Already cached
+```
+
+### What Changes From Current Schema
+
+**Existing Tables (Keep):**
+- ✅ `products` - ADD `product_type` column
+- ✅ `product_images` - No changes (already perfect)
+
+**New Tables (Add):**
+- ➕ `product_relationships` - Unified relationship model
+- ➕ `uom_categories` - Weight, Volume, Count
+- ➕ `units_of_measure` - MT, KG, PC, L, etc.
+- ➕ `product_uoms` - Product-specific UOM mappings
+
+**Tables NOT Needed:**
+- ❌ `product_compositions` - Redundant with product_relationships
+- ❌ `product_image_compositions` - Redundant with product_images
+- ❌ `packaging_units` - Redundant with products (type='bundle')
+- ❌ `configured_products` - Redundant with products + relationships
+
+---
+
+## Six-Table Architecture
+
+### Complete Schema Overview
+
+**1. products (Existing - Extend)**
+```sql
+ALTER TABLE products ADD COLUMN product_type VARCHAR(20) DEFAULT 'finished_good';
+ALTER TABLE products ADD CONSTRAINT check_product_type
+  CHECK (product_type IN ('raw_material', 'component', 'phantom', 'finished_good', 'bundle', 'service'));
+```
+
+**Purpose:** Everything is a product
+- Raw materials (resin, pellets)
+- Components (caps, jars, preforms)
+- Phantom assemblies (not stocked)
+- Finished goods (bottles, assemblies)
+- Bundles (6-packs, dozens, cartons)
+- Services (non-physical products)
+
+**Existing Columns Used:**
+- `id`, `sku`, `name`, `description`
+- `price`, `stock_quantity`, `availability`
+- `product_family_id` (for variants)
+- All existing relationships preserved
+
+---
+
+**2. product_images (Existing - No Changes)**
+```sql
+-- Already perfect - no schema changes
+product_images (
+  id, product_family_id, product_id,
+  url, alt_text, image_type,
+  is_primary, display_order
+)
+```
+
+**Purpose:** All images for all products
+- Component images (photographed)
+- Assembly images (AI-generated)
+- Package images (marketing shots)
+- Family images (shared across variants)
+
+**No New Columns Needed:**
+- Existing schema supports everything
+- `product_id` = cache key for generated images
+- Image existence = already generated
+
+---
+
+**3. product_relationships (New)**
+```sql
+CREATE TABLE product_relationships (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Core relationship
+  source_product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  target_product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  relationship_type VARCHAR(50) NOT NULL,
+
+  -- Quantity/specifications
+  quantity DECIMAL(10,4),
+  source_uom_id UUID REFERENCES units_of_measure(id),
+  target_uom_id UUID REFERENCES units_of_measure(id),
+  sort_order INTEGER,
+  is_optional BOOLEAN DEFAULT false,
+  is_phantom BOOLEAN DEFAULT false,
+
+  -- Effectivity (validity conditions)
+  effective_from DATE,
+  effective_to DATE,
+  serial_number_from VARCHAR(50),
+  serial_number_to VARCHAR(50),
+  configuration_context JSONB,
+
+  -- Substitution handling
+  substitution_priority INTEGER,
+  substitution_reason VARCHAR(100),
+
+  -- Commercial attributes
+  price_adjustment DECIMAL(10,2),
+  lead_time_days INTEGER,
+
+  -- Metadata
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  CONSTRAINT unique_relationship UNIQUE (source_product_id, target_product_id, relationship_type, effective_from),
+  CONSTRAINT no_self_reference CHECK (source_product_id != target_product_id)
+);
+
+CREATE INDEX idx_relationships_source ON product_relationships(source_product_id, relationship_type);
+CREATE INDEX idx_relationships_target ON product_relationships(target_product_id, relationship_type);
+```
+
+**Purpose:** ALL relationships between products
+- Manufacturing BOM: Bottle → Cap + Jar
+- Packaging: 6-Pack → 6 Bottles
+- Substitutes: Cap-Blue ↔ Cap-Red
+- Accessories: Bottle → Spare-Cap
+- Bundles: Kit → Multiple products
+- Effectivity: Time/serial-based component selection
+
+**Relationship Types:** See [Complete Relationship Taxonomy](#complete-relationship-taxonomy)
+
+---
+
+**4. uom_categories (New)**
+```sql
+CREATE TABLE uom_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(50) UNIQUE NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+INSERT INTO uom_categories (name, description) VALUES
+  ('Weight', 'Mass and weight measurements'),
+  ('Volume', 'Volume and capacity measurements'),
+  ('Count', 'Discrete countable units'),
+  ('Length', 'Linear distance measurements'),
+  ('Area', 'Surface area measurements');
+```
+
+**Purpose:** Group units by dimensional family
+- Conversions only valid within same category
+- Weight: MT, KG, G, LB
+- Volume: L, ML, GAL
+- Count: PC, DZ, GR
+
+---
+
+**5. units_of_measure (New)**
+```sql
+CREATE TABLE units_of_measure (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  category_id UUID NOT NULL REFERENCES uom_categories(id),
+
+  code VARCHAR(20) UNIQUE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  symbol VARCHAR(10),
+
+  is_base_unit BOOLEAN DEFAULT false,
+  conversion_factor DECIMAL(20,10),
+  rounding_precision INTEGER DEFAULT 2,
+
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+INSERT INTO units_of_measure (category_id, code, name, symbol, is_base_unit, conversion_factor) VALUES
+  -- Weight (base: KG)
+  ((SELECT id FROM uom_categories WHERE name='Weight'), 'KG', 'Kilogram', 'kg', true, 1.0),
+  ((SELECT id FROM uom_categories WHERE name='Weight'), 'MT', 'Metric Ton', 't', false, 1000.0),
+  ((SELECT id FROM uom_categories WHERE name='Weight'), 'G', 'Gram', 'g', false, 0.001),
+
+  -- Count (base: PC)
+  ((SELECT id FROM uom_categories WHERE name='Count'), 'PC', 'Piece', 'pc', true, 1.0),
+  ((SELECT id FROM uom_categories WHERE name='Count'), 'DZ', 'Dozen', 'dz', false, 12.0);
+```
+
+**Purpose:** Define all units of measure
+- Standard UOMs (KG, MT, PC, L, etc.)
+- Conversion factors to base unit
+- Rounding rules per UOM
+
+---
+
+**6. product_uoms (New)**
+```sql
+CREATE TABLE product_uoms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  uom_id UUID NOT NULL REFERENCES units_of_measure(id),
+
+  -- Role in product lifecycle
+  is_base_uom BOOLEAN DEFAULT false,
+  is_purchase_uom BOOLEAN DEFAULT false,
+  is_stock_uom BOOLEAN DEFAULT false,
+  is_sales_uom BOOLEAN DEFAULT false,
+  is_production_uom BOOLEAN DEFAULT false,
+
+  -- Product-specific conversion
+  conversion_factor DECIMAL(20,10),
+  conversion_type VARCHAR(20) DEFAULT 'fixed',
+
+  -- Batch-specific tracking
+  batch_id UUID,
+
+  -- Metadata
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+
+  CONSTRAINT unique_product_uom UNIQUE (product_id, uom_id),
+  CONSTRAINT one_base_per_product UNIQUE (product_id, is_base_uom) WHERE is_base_uom = true
+);
+```
+
+**Purpose:** Product-specific UOM mappings
+- Each product defines which UOMs it uses
+- Conversion factors (can override standard)
+- Role flags (purchase vs stock vs sales UOM)
+- Batch-specific conversions (catch weight)
+
+**Example:**
+- PET Resin: base_uom=MT, purchase_uom=MT, alternate=KG
+- Preform: base_uom=KG, stock_uom=KG, alternate=PC (1 KG = 40 pieces)
+- Bottle: base_uom=PC, sales_uom=PC
+
+---
+
+### Data Flow Across Six Tables
+
+**Scenario: User orders 50 cartons**
+
+```
+1. Query products: "50 × CTN-BTL-500-BLUE"
+2. Query product_relationships: Carton contains what?
+   → 10 Dozen Packs (type='pallet_load')
+3. Query products: "500 × DZ-BTL-500-BLUE"
+4. Query product_relationships: Dozen contains what?
+   → 7 Six-Packs (type='master_case')
+5. Query products: "3500 × 6PK-BTL-500-BLUE"
+6. Query product_relationships: 6-Pack contains what?
+   → 6 Bottles (type='inner_pack')
+7. Query products: "21,000 × ASSY-BTL-500-BLUE"
+8. Query product_relationships: Bottle made from what?
+   → Cap + Jar (type='component')
+9. Query product_uoms: Convert component quantities
+   → Cap: 21,000 PC
+   → Jar: 21,000 PC (check stock)
+10. Query product_images: Show product images
+    → If assembly image missing, generate from components
+```
+
+**All through six tables. No special cases.**
 
 ---
 
@@ -665,6 +1030,241 @@ Carton (1 CTN = 420 bottles)
 
 ---
 
+## Visual Configuration: AI-Generated Images
+
+### Principle: Every SKU Can Have Images
+
+**Scenario:** User wants to see bottle with blue cap 83mm + transparent jar 500ml
+
+### Product Setup
+
+**All items are products with SKUs:**
+
+```sql
+-- Components (photographed)
+INSERT INTO products (id, sku, name, product_type, price) VALUES
+  ('comp-cap-blue-83', 'COMP-CAP-BLUE-83MM', 'Blue Cap 83mm', 'component', 0.50),
+  ('comp-jar-trans-500', 'COMP-JAR-TRANS-500ML', 'Transparent Jar 500ml', 'component', 2.00);
+
+-- Component images (photographed in studio)
+INSERT INTO product_images (product_id, url, is_primary) VALUES
+  ('comp-cap-blue-83', 'https://storage.../cap-blue-83mm.png', true),
+  ('comp-jar-trans-500', 'https://storage.../jar-transparent-500ml.png', true);
+
+-- Assembly product (configured SKU)
+INSERT INTO products (id, sku, name, product_type, price) VALUES
+  ('assy-btl-500-blue-83', 'ASSY-BTL-500-BLUE-83MM', 'Bottle 500ml Blue Cap', 'finished_good', 5.00);
+
+-- Assembly relationships
+INSERT INTO product_relationships (source_product_id, target_product_id, relationship_type, quantity) VALUES
+  ('assy-btl-500-blue-83', 'comp-cap-blue-83', 'component', 1),
+  ('assy-btl-500-blue-83', 'comp-jar-trans-500', 'component', 1);
+
+-- Assembly image: GENERATED ON-DEMAND (initially doesn't exist)
+```
+
+### Agent Workflow: Get or Generate Image
+
+```python
+def get_product_image(product_id: str) -> str:
+    """Get product image, generating if needed from components."""
+
+    # 1. Check if image already exists (cache check)
+    existing = db.query("""
+        SELECT url FROM product_images
+        WHERE product_id = %s AND is_primary = true
+    """, (product_id,))
+
+    if existing:
+        return existing[0].url  # Already cached
+
+    # 2. Image doesn't exist - check if this product has components
+    components = db.query("""
+        SELECT
+            p.id, p.name,
+            pi.url as image_url
+        FROM product_relationships pr
+        JOIN products p ON p.id = pr.target_product_id
+        JOIN product_images pi ON pi.product_id = p.id AND pi.is_primary = true
+        WHERE pr.source_product_id = %s
+          AND pr.relationship_type = 'component'
+        ORDER BY pr.sort_order
+    """, (product_id,))
+
+    if not components:
+        raise ValueError(f"No image found for {product_id} and not an assembly")
+
+    # 3. Download component images
+    component_image_data = [
+        {
+            "name": comp.name,
+            "data": download_image(comp.image_url)
+        }
+        for comp in components
+    ]
+
+    # 4. Generate composite using Gemini + Imagen
+    composite_url = generate_composite_image(component_image_data)
+
+    # 5. Store generated image (cache it)
+    db.execute("""
+        INSERT INTO product_images (product_id, url, is_primary, image_type)
+        VALUES (%s, %s, true, 'primary')
+    """, (product_id, composite_url))
+
+    return composite_url
+
+
+def generate_composite_image(component_images: List[Dict]) -> str:
+    """Generate composite image using Gemini analysis + Imagen generation."""
+
+    # Send component images to Gemini for analysis
+    analysis = gemini_client.generate_content([
+        "Analyze these product component images and describe how they assemble:",
+        *[{"mime_type": "image/png", "data": img["data"]} for img in component_images],
+        """
+        Provide detailed assembly description:
+        - Spatial relationship (cap screws onto jar opening)
+        - Proportions (cap diameter, jar height)
+        - Lighting and perspective
+        - Material properties (transparency, color)
+
+        Format as prompt for photorealistic product image generation.
+        """
+    ])
+
+    # Generate composite using Imagen
+    generated_image = imagen_client.generate_image(
+        prompt=f"""
+        Professional product photography:
+        {analysis.text}
+
+        Style:
+        - White background
+        - Studio lighting (45° angle)
+        - High resolution (2000px min)
+        - Photorealistic
+        """
+    )
+
+    # Upload to storage
+    return upload_to_storage(generated_image)
+```
+
+### Caching Strategy
+
+**Natural caching through product_images:**
+
+| Request | Action | Query |
+|---------|--------|-------|
+| **First request** | Image doesn't exist | Generate → Store in product_images |
+| **Second request** | Image exists | Return from product_images (cached) |
+| **Nth request** | Image exists | Return from product_images (cached) |
+
+**No separate cache table needed:**
+- `product_images.product_id` = cache key
+- Image existence = already generated
+- Same table for photographed and AI-generated images
+
+### Configuration Variations
+
+**Q: What if customer wants red cap instead of blue?**
+
+**A: Create another assembly SKU:**
+
+```sql
+-- Different configuration = different SKU
+INSERT INTO products (id, sku, name, product_type) VALUES
+  ('assy-btl-500-red-83', 'ASSY-BTL-500-RED-83MM', 'Bottle 500ml Red Cap', 'finished_good');
+
+-- Different relationships
+INSERT INTO product_relationships VALUES
+  ('assy-btl-500-red-83', 'comp-cap-red-83', 'component', 1),
+  ('assy-btl-500-red-83', 'comp-jar-trans-500', 'component', 1);
+
+-- Different generated image (will be created on first request)
+```
+
+**Result:**
+- Blue cap bottle: SKU `ASSY-BTL-500-BLUE-83MM` with own image
+- Red cap bottle: SKU `ASSY-BTL-500-RED-83MM` with own image
+- Both cached in same `product_images` table
+
+### Dynamic Configuration (On-Demand SKU Creation)
+
+**For highly configurable products, generate SKU on demand:**
+
+```python
+def get_or_create_configured_product(base_sku: str, component_ids: List[str]) -> str:
+    """Get existing configured SKU or create new one on-demand."""
+
+    # Generate deterministic SKU from configuration
+    config_hash = hashlib.md5(''.join(sorted(component_ids)).encode()).hexdigest()[:8]
+    sku = f"CFG-{base_sku}-{config_hash}"
+
+    # Check if configuration already exists
+    existing = db.query("SELECT id FROM products WHERE sku = %s", (sku,))
+    if existing:
+        return existing[0].id
+
+    # Create new product for this configuration
+    product_id = db.execute("""
+        INSERT INTO products (sku, name, product_type, price)
+        VALUES (%s, %s, 'finished_good', %s)
+        RETURNING id
+    """, (sku, f"Configured Bottle {config_hash}", calculate_price(component_ids)))
+
+    # Create relationships
+    for comp_id in component_ids:
+        db.execute("""
+            INSERT INTO product_relationships (source_product_id, target_product_id, relationship_type)
+            VALUES (%s, %s, 'component')
+        """, (product_id, comp_id))
+
+    return product_id
+
+# Usage
+product_id = get_or_create_configured_product(
+    'BTL-500',
+    ['comp-cap-blue-83', 'comp-jar-trans-500']
+)
+
+# Now get image (will generate if doesn't exist)
+image_url = get_product_image(product_id)
+```
+
+**Benefits:**
+- SKU created once, reused forever
+- Image generated once, cached forever
+- Inventory tracked per configuration
+- Pricing per configuration
+
+### Why This Works
+
+**1. Consistent with "Everything Is A SKU" principle**
+- Assembly is a product
+- Has own SKU, price, inventory
+- Image stored like any other product image
+
+**2. Natural caching**
+- No special cache tables
+- `product_images` table IS the cache
+- Image existence check = cache hit/miss
+
+**3. Simple agent logic**
+- Check if image exists
+- If not, check if assembly
+- Generate from component images
+- Store and return
+
+**4. Scales to all scenarios**
+- Works for 2-component assemblies
+- Works for N-component assemblies
+- Works for nested assemblies
+- Works for configurable products
+
+---
+
 ## Agent Decision Scenarios
 
 ### Scenario 1: Procurement Planning
@@ -1167,6 +1767,71 @@ ORDER BY level DESC, sku;
 - Agents convert quantities across UOMs during planning/procurement
 
 **Implementation:** See [Real-World Scenario: Pet Jar Manufacturing](#real-world-scenario-pet-jar-manufacturing)
+
+---
+
+#### Q2: Visual Configuration - AI-Generated Assembly Images (2025-11-12)
+
+**Question:** "If blue cap 83mm has its own image and transparent jar 500ml has its own image, can agents generate composite image of assembled product? Will this work for all configuration scenarios?"
+
+**Answer:** Yes, using existing schema without special tables.
+
+**Design Decision:**
+- **Assembly is a product SKU** (not a special case)
+- Component images stored in `product_images` (photographed)
+- Assembly image stored in `product_images` (AI-generated)
+- **No separate cache table** - image existence in `product_images` = cached
+- Agent workflow:
+  1. Check if assembly image exists (cache hit)
+  2. If not, get component images via `product_relationships`
+  3. Generate composite using Gemini (analysis) + Imagen (generation)
+  4. Store in `product_images` (cache for future requests)
+
+**Why This Works:**
+- Consistent with "everything is a SKU" principle
+- `product_images` handles both photographed and AI-generated images
+- Natural caching through existing table
+- Works for all scenarios: 2-component, N-component, nested assemblies, configurable products
+
+**Implementation:** See [Visual Configuration: AI-Generated Images](#visual-configuration-ai-generated-images)
+
+---
+
+#### Q3: Architecture Simplification - Everything Is A SKU (2025-11-12)
+
+**Question:** "Why do we need separate composition/cache tables? Can't everything be in the products table with all items as SKUs having their own relationships?"
+
+**Answer:** You're absolutely correct. Simpler architecture using existing schema.
+
+**Key Insight:**
+- Raw materials = products (type='raw_material')
+- Components = products (type='component')
+- Assemblies = products (type='finished_good')
+- Packages = products (type='bundle')
+- **ALL** in same `products` table with same query patterns
+
+**What This Eliminates:**
+- ❌ No `product_compositions` table (redundant with `product_relationships`)
+- ❌ No `product_image_compositions` cache table (redundant with `product_images`)
+- ❌ No `packaging_units` table (redundant with `products` type='bundle')
+- ❌ No `configured_products` table (redundant with `products` + relationships)
+
+**What We Keep:**
+- ✅ `products` (add `product_type` column)
+- ✅ `product_images` (already perfect, no changes)
+- ✅ `product_relationships` (unified relationship model)
+- ✅ `uom_categories`, `units_of_measure`, `product_uoms` (UOM support)
+
+**Benefits:**
+- Single source of truth
+- Consistent query patterns
+- Natural caching
+- Simpler agent logic
+- No special cases
+
+**Architectural Principle:** "Everything Is A Product SKU" - every physical/conceptual item is a row in `products` with a unique SKU. Relationships define connections. Images stored uniformly. Inventory tracked consistently.
+
+**Implementation:** See [Core Architectural Principle](#core-architectural-principle) and [Six-Table Architecture](#six-table-architecture)
 
 ---
 
