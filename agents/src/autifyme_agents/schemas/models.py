@@ -56,6 +56,84 @@ class Product(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SKUNamingConvention(BaseModel):
+    """
+    Company-specific SKU naming rules for autonomous pattern generation.
+
+    Used by Product Architecture Specialist to generate consistent SKUs
+    that match company branding and naming patterns.
+    """
+    prefix_format: str = Field(
+        ...,
+        description="Format for SKU prefix (e.g., 'BRAND-CATEGORY', 'CATEGORY-PRODUCT')"
+    )
+    separator: str = Field(
+        default="-",
+        description="Character used to separate SKU components"
+    )
+    variant_code_length: str = Field(
+        ...,
+        description="Length range for variant codes (e.g., '3-5', '4', '2-6')"
+    )
+    uppercase: bool = Field(
+        default=True,
+        description="Whether SKUs should be uppercase"
+    )
+    examples: list[str] = Field(
+        ...,
+        description="Example SKUs following this convention (e.g., ['PAV-BTL-500ML-CLR', 'PAV-JAR-1L-AMB'])"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WorkflowOutcome(BaseModel):
+    """
+    Represents the outcome of a completed workflow for analytics and learning.
+
+    Used by outcome tracking middleware to record workflow execution results
+    for Phase 2 agentic evolution and similarity matching.
+    """
+    tracking_id: str = Field(..., description="Unique identifier for this outcome")
+    thread_id: str = Field(..., description="LangGraph thread ID")
+    sender_id: str = Field(..., description="User identifier (phone number, email, etc.)")
+    message_text: str = Field(..., description="User's original message")
+    message_hash: str = Field(..., description="Content hash for similarity matching")
+
+    # Media info (optional)
+    media_id: str | None = Field(None, description="Media identifier if present")
+    media_type: str | None = Field(None, description="Media type (image, video, document)")
+    platform: str | None = Field(None, description="Originating platform (whatsapp, web, etc.)")
+
+    # Timing
+    received_at: datetime = Field(..., description="When message was received")
+    completed_at: datetime | None = Field(None, description="When workflow completed")
+    duration_seconds: float | None = Field(None, description="Total execution time")
+
+    # Routing decision
+    intent: str = Field(..., description="Detected user intent")
+    department: str = Field(..., description="Routed to department/workflow")
+    routing_reasoning: str | None = Field(None, description="PM's routing reasoning")
+
+    # Execution outcome
+    success: bool = Field(..., description="Whether workflow completed successfully")
+    result_summary: str | None = Field(None, description="Human-readable outcome summary")
+    error_message: str | None = Field(None, description="Error message if failed")
+
+    # Specialist involvement
+    specialists_invoked: list[str] = Field(
+        default_factory=list,
+        description="List of specialists that were invoked"
+    )
+    tool_calls_count: int = Field(default=0, description="Total tool calls made")
+
+    # HITL
+    required_approval: bool = Field(default=False, description="Whether HITL approval was required")
+    approval_status: str | None = Field(None, description="approved, rejected, timeout")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CompanyProfile(BaseModel):
     """
     Represents a company's profile and brand guidelines.
@@ -71,14 +149,9 @@ class CompanyProfile(BaseModel):
     industry: str | None = Field(None, description="Company's industry vertical.")
 
     # SKU Naming Conventions (for Product Architecture Specialist)
-    sku_naming_convention: dict[str, Any] | None = Field(
+    sku_naming_convention: SKUNamingConvention | None = Field(
         None,
-        description=(
-            "Company-specific SKU naming rules for autonomous pattern generation. "
-            "Example: {'prefix_format': 'BRAND-CATEGORY', 'separator': '-', "
-            "'variant_code_length': '3-5', 'uppercase': True, "
-            "'examples': ['PAV-BTL-500ML-CLR', 'PAV-JAR-1L-AMB']}"
-        )
+        description="Company-specific SKU naming rules for autonomous pattern generation"
     )
 
     model_config = ConfigDict(from_attributes=True)

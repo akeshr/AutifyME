@@ -239,6 +239,16 @@ class TableSchema(BaseModel):
                     exc_info=True
                 )
 
+        # Special validation for variant_axes: case-insensitive name uniqueness within family
+        if self.name == "variant_axes":
+            case_insensitive_result = await self._validate_variant_axis_case_insensitive(
+                entities, storage
+            )
+            if not case_insensitive_result.valid:
+                result.errors.extend(case_insensitive_result.errors)
+                result.warnings.extend(case_insensitive_result.warnings)
+                result.valid = False
+
         return result
 
     async def validate_before_update(
@@ -307,6 +317,82 @@ class TableSchema(BaseModel):
                     result.add_warning(
                         f"Could not verify uniqueness for column '{col}': {str(e)}"
                     )
+
+        return result
+
+    async def _validate_variant_axis_case_insensitive(
+        self,
+        entities: list[dict[str, Any]],
+        storage: "StorageInterface",
+    ) -> "ValidationResult":
+        """
+        Validate variant_axes for case-insensitive name uniqueness within product family.
+
+        Prevents creating duplicate axes like "neck_type" when "Neck Type" already exists.
+        This catches issues that standard unique constraint validation misses due to case sensitivity.
+
+        Args:
+            entities: List of variant_axes entities to insert
+            storage: Storage interface for database queries
+
+        Returns:
+            ValidationResult with any case-insensitive conflicts detected
+        """
+        result = ValidationResult(valid=True)
+
+        for entity in entities:
+            name = entity.get("name")
+            family_id = entity.get("product_family_id")
+
+            if not name or not family_id:
+                continue  # Skip if missing - other validation will catch this
+
+            try:
+                # Query existing axes for this product family
+                existing_axes = await storage.query_entities(
+                    table="variant_axes",
+                    filters={"product_family_id": family_id}
+                )
+
+                # Check for case-insensitive name collision
+                for existing in existing_axes:
+                    existing_name = existing.get("name", "")
+                    # Case-insensitive match but different actual case
+                    if existing_name.lower() == name.lower() and existing_name != name:
+                        result.add_error(
+                            f"Variant axis '{name}' conflicts with existing '{existing_name}' "
+                            f"(ID: {existing['id']}) in product family {family_id}. "
+                            f"Axis names must be case-insensitively unique. "
+                            f"Use the existing axis or choose a different name."
+                        )
+                        logger.warning(
+                            "Case-insensitive name conflict for variant_axes",
+                            extra={
+                                "attempted_name": name,
+                                "existing_name": existing_name,
+                                "family_id": family_id
+                            }
+                        )
+
+                # Check within the batch being inserted (prevent duplicates in same operation)
+                batch_names = [e.get("name", "").lower() for e in entities
+                              if e.get("product_family_id") == family_id and e.get("name")]
+                if batch_names.count(name.lower()) > 1:
+                    result.add_error(
+                        f"Duplicate variant axis name '{name}' found in operation. "
+                        f"Each axis name must be unique (case-insensitive) within product family."
+                    )
+
+            except Exception as e:
+                # Don't fail validation if check fails (graceful degradation)
+                result.add_warning(
+                    f"Could not verify case-insensitive uniqueness for axis '{name}': {str(e)}"
+                )
+                logger.error(
+                    "Case-insensitive uniqueness check failed for variant_axes",
+                    exc_info=True,
+                    extra={"name": name, "family_id": family_id}
+                )
 
         return result
 

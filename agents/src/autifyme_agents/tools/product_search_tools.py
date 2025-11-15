@@ -34,11 +34,57 @@ class VariantAxisInfo(BaseModel):
 
     Represents a dimension along which variants differ (e.g., capacity, color, neck_finish).
     Used when adding variants to existing families to maintain SKU pattern consistency.
+
+    Examples:
+        Capacity axis:
+            VariantAxisInfo(
+                axis_id="660e8400-e29b-41d4-a716-446655440000",
+                name="capacity",
+                display_label="Capacity",
+                sort_order=1
+            )
+
+        Color axis:
+            VariantAxisInfo(
+                axis_id="660e8401-e29b-41d4-a716-446655440000",
+                name="color",
+                display_label="Color",
+                sort_order=2
+            )
     """
-    axis_id: str = Field(..., description="UUID of variant axis")
-    name: str = Field(..., description="Internal axis name (e.g., 'capacity', 'color')")
-    display_label: str = Field(..., description="Human-readable label (e.g., 'Capacity', 'Color')")
-    sort_order: int = Field(..., description="Display order in UI")
+    axis_id: str = Field(
+        ...,
+        description=(
+            "UUID of variant axis in database. "
+            "Used to create new variant_values referencing this axis. "
+            "Example: '660e8400-e29b-41d4-a716-446655440000'."
+        )
+    )
+    name: str = Field(
+        ...,
+        description=(
+            "Internal axis name (lowercase, underscored). "
+            "Examples: 'capacity', 'color', 'neck_finish', 'material', 'closure_type'. "
+            "Used in backend logic and SKU pattern generation."
+        )
+    )
+    display_label: str = Field(
+        ...,
+        description=(
+            "Human-readable label for UI display (title case). "
+            "Examples: 'Capacity', 'Color', 'Neck Finish', 'Closure Type'. "
+            "Shown to users in product catalogs and variant selectors."
+        )
+    )
+    sort_order: int = Field(
+        ...,
+        description=(
+            "Display order in UI and SKU pattern (1-indexed). "
+            "Lower numbers appear first. "
+            "Example: Capacity (sort_order=1) appears before Color (sort_order=2) in SKU: BOTTLE-PET-500ML-CLEAR. "
+            "Determines variant value sequence in generated SKUs."
+        )
+    )
 
 
 class VariantValueInfo(BaseModel):
@@ -46,68 +92,430 @@ class VariantValueInfo(BaseModel):
 
     Represents a specific value for a variant axis (e.g., '500ml' for capacity, 'Clear' for color).
     Includes SKU code used in pattern generation.
+
+    Examples:
+        500ml capacity value:
+            VariantValueInfo(
+                value_id="770e8400-e29b-41d4-a716-446655440000",
+                axis_id="660e8400-e29b-41d4-a716-446655440000",
+                axis_name="capacity",
+                value="500ml",
+                display_label="500ml",
+                sku_code="500ML",
+                sort_order=1
+            )
+
+        Clear color value:
+            VariantValueInfo(
+                value_id="770e8401-e29b-41d4-a716-446655440000",
+                axis_id="660e8401-e29b-41d4-a716-446655440000",
+                axis_name="color",
+                value="Clear",
+                display_label="Clear",
+                sku_code="CLR",
+                sort_order=1
+            )
+
+        Amber color value:
+            VariantValueInfo(
+                value_id="770e8402-e29b-41d4-a716-446655440000",
+                axis_id="660e8401-e29b-41d4-a716-446655440000",
+                axis_name="color",
+                value="Amber",
+                display_label="Amber",
+                sku_code="AMB",
+                sort_order=2
+            )
     """
-    value_id: str = Field(..., description="UUID of variant value")
-    axis_id: str = Field(..., description="Parent variant axis UUID")
-    axis_name: str = Field(..., description="Parent axis name for grouping")
-    value: str = Field(..., description="Internal value (e.g., '500ml', 'Clear')")
-    display_label: str | None = Field(None, description="Optional UI label")
-    sku_code: str = Field(..., description="SKU code (e.g., '500ML', 'CLR')")
-    sort_order: int = Field(..., description="Display order within axis")
+    value_id: str = Field(
+        ...,
+        description=(
+            "UUID of variant value in database. "
+            "Referenced in product_variant_values join table for SKU composition. "
+            "Example: '770e8400-e29b-41d4-a716-446655440000'."
+        )
+    )
+    axis_id: str = Field(
+        ...,
+        description=(
+            "Parent variant axis UUID this value belongs to. "
+            "Groups values under axis (e.g., all capacity values share same axis_id). "
+            "Example: '660e8400-e29b-41d4-a716-446655440000' for capacity axis."
+        )
+    )
+    axis_name: str = Field(
+        ...,
+        description=(
+            "Parent axis name for display grouping (lowercase, underscored). "
+            "Examples: 'capacity', 'color', 'neck_finish'. "
+            "Use to group variant values by axis in UI (Capacity: 500ml, 1L, 2L | Color: Clear, Amber)."
+        )
+    )
+    value: str = Field(
+        ...,
+        description=(
+            "Internal value identifier (mixed case, human-readable). "
+            "Examples: '500ml', '1L', 'Clear', 'Amber', '28mm', '38mm Screw Cap'. "
+            "Exact string stored in database and shown in catalogs."
+        )
+    )
+    display_label: str | None = Field(
+        None,
+        description=(
+            "Optional UI label (overrides value for display if provided). "
+            "Use when value differs from display (e.g., value='PET', display_label='Polyethylene Terephthalate'). "
+            "None means use value field for display. "
+            "Examples: '500 milliliters', 'Crystal Clear', 'Amber Tint'."
+        )
+    )
+    sku_code: str = Field(
+        ...,
+        description=(
+            "SKU code segment for pattern generation (uppercase, concise). "
+            "Examples: '500ML', '1L', '2L', 'CLR', 'AMB', '28MM', '38SC'. "
+            "Combined with family sku_prefix and other axis codes to form complete SKU. "
+            "Pattern: {family_prefix}-{axis1_code}-{axis2_code}-... → BOTTLE-PET-500ML-CLR."
+        )
+    )
+    sort_order: int = Field(
+        ...,
+        description=(
+            "Display order within parent axis (1-indexed). "
+            "Lower numbers appear first in UI dropdowns and SKU listings. "
+            "Example: 500ml (sort_order=1), 1L (sort_order=2), 2L (sort_order=3) shown in ascending capacity order."
+        )
+    )
 
 
 class ProductFamilyMatch(BaseModel):
-    """A single product family match result."""
+    """A single product family match result with confidence scoring.
 
-    family_id: str = Field(..., description="UUID of matched product family")
-    product_group_id: str = Field(..., description="Business identifier (e.g., 'PACK-PET-JAR')")
-    name: str = Field(..., description="Product family name")
-    brand: str = Field(..., description="Brand name")
-    material: str | None = Field(None, description="Primary material")
-    sku_prefix: str = Field(..., description="SKU prefix")
-    base_price: float = Field(..., description="Base price")
+    Returned by search_product_families tool for intelligent decision-making.
+    Includes variant configuration to enable adding new variants to existing families.
+
+    Examples:
+        Exact match (business_id + high name similarity):
+            ProductFamilyMatch(
+                family_id="550e8400-e29b-41d4-a716-446655440000",
+                product_group_id="PACK-PET-JAR",
+                name="PET Jars",
+                brand="Pavisha",
+                material="PET",
+                sku_prefix="JAR-PET",
+                base_price=22.50,
+                variant_axes=[
+                    VariantAxisInfo(axis_id="...", name="capacity", display_label="Capacity", sort_order=1),
+                    VariantAxisInfo(axis_id="...", name="color", display_label="Color", sort_order=2)
+                ],
+                variant_values=[
+                    VariantValueInfo(value_id="...", axis_name="capacity", value="500ml", sku_code="500ML", ...),
+                    VariantValueInfo(value_id="...", axis_name="capacity", value="1L", sku_code="1L", ...),
+                    VariantValueInfo(value_id="...", axis_name="color", value="Clear", sku_code="CLR", ...)
+                ],
+                match_score=0.95,
+                match_type="exact",
+                match_factors={
+                    "business_id_match": True,
+                    "name_similarity": 0.85,
+                    "brand_match": True,
+                    "material_match": True
+                },
+                reasoning="Exact (95% confidence): Exact business ID match, High name similarity (85%), Same brand, Same material"
+            )
+
+        Variant candidate (high name similarity, same brand, no business_id):
+            ProductFamilyMatch(
+                family_id="550e8401-e29b-41d4-a716-446655440000",
+                product_group_id="PACK-PET-BOTTLE",
+                name="PET Bottles",
+                brand="Pavisha",
+                material="PET",
+                sku_prefix="BOTTLE-PET",
+                base_price=25.00,
+                variant_axes=[VariantAxisInfo(...)],  # Full variant config included
+                variant_values=[VariantValueInfo(...)],
+                match_score=0.75,
+                match_type="variant_candidate",
+                match_factors={
+                    "business_id_match": False,
+                    "name_similarity": 0.80,
+                    "brand_match": True,
+                    "material_match": True
+                },
+                reasoning="Variant Candidate (75% confidence): High name similarity (80%), Same brand, Same material"
+            )
+
+        Similar (moderate name similarity, different brand):
+            ProductFamilyMatch(
+                family_id="550e8402-e29b-41d4-a716-446655440000",
+                product_group_id="PACK-HDPE-BOTTLE",
+                name="HDPE Bottles",
+                brand="Generic",
+                material="HDPE",
+                sku_prefix="BOTTLE-HDPE",
+                base_price=30.00,
+                variant_axes=None,
+                variant_values=None,
+                match_score=0.50,
+                match_type="similar",
+                match_factors={
+                    "business_id_match": False,
+                    "name_similarity": 0.65,
+                    "brand_match": False,
+                    "material_match": False
+                },
+                reasoning="Similar (50% confidence): Moderate name similarity (65%)"
+            )
+    """
+
+    family_id: str = Field(
+        ...,
+        description=(
+            "UUID of matched product family in database. "
+            "Use to reference this family in update/add_variant operations. "
+            "Example: '550e8400-e29b-41d4-a716-446655440000'."
+        )
+    )
+    product_group_id: str = Field(
+        ...,
+        description=(
+            "Business identifier for this product family (unique, uppercase). "
+            "Examples: 'PACK-PET-JAR', 'PACK-HDPE-BOTTLE', 'PACK-GLASS-JAR'. "
+            "Strongest matching signal - exact business_id match indicates same product family."
+        )
+    )
+    name: str = Field(
+        ...,
+        description=(
+            "Product family name (human-readable). "
+            "Examples: 'PET Jars', 'HDPE Bottles', 'Glass Jars 200ml-5L'. "
+            "Used for fuzzy name matching and user presentation."
+        )
+    )
+    brand: str = Field(
+        ...,
+        description=(
+            "Brand name for this product family. "
+            "Examples: 'Pavisha', 'Acme', 'Generic'. "
+            "Brand match boosts confidence score - same brand suggests related products."
+        )
+    )
+    material: str | None = Field(
+        None,
+        description=(
+            "Primary material (uppercase). "
+            "Examples: 'PET', 'HDPE', 'Glass', 'Aluminum'. "
+            "None if material not specified in catalog. "
+            "Material match contributes to overall confidence."
+        )
+    )
+    sku_prefix: str = Field(
+        ...,
+        description=(
+            "SKU prefix for all products in this family (uppercase with hyphens). "
+            "Examples: 'JAR-PET', 'BOTTLE-HDPE', 'CONT-GLASS'. "
+            "Combined with variant codes to form complete SKUs: JAR-PET-500ML-CLR."
+        )
+    )
+    base_price: float = Field(
+        ...,
+        description=(
+            "Base price for this family (currency units, typically INR). "
+            "Example: 22.50 (₹22.50). "
+            "Individual variants may adjust from base using price modifiers."
+        )
+    )
 
     # Variant configuration (for add_variant scenarios)
     variant_axes: list[VariantAxisInfo] | None = Field(
         None,
-        description="Variant axes configured for this family (enables extending existing SKU patterns)"
+        description=(
+            "Variant axes configured for this family (enables extending existing SKU patterns). "
+            "None if no axes configured (simple product family). "
+            "Present for variant_candidate and exact matches to support add_variant workflow. "
+            "Example: [VariantAxisInfo(name='capacity', ...), VariantAxisInfo(name='color', ...)]."
+        )
     )
     variant_values: list[VariantValueInfo] | None = Field(
         None,
-        description="Existing variant values per axis (for SKU pattern consistency)"
+        description=(
+            "Existing variant values per axis (for SKU pattern consistency). "
+            "None if no values exist or no axes configured. "
+            "Use to understand current variant coverage and maintain naming consistency. "
+            "Example: [VariantValueInfo(axis_name='capacity', value='500ml', sku_code='500ML', ...), ...]."
+        )
     )
 
     # Match analysis
     match_score: float = Field(
-        ..., ge=0.0, le=1.0, description="Overall confidence score"
+        ...,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Overall confidence score (0.0-1.0). "
+            "Calculated from: business_id_match (0.5 weight), name_similarity (0.3), brand_match (0.15), material_match (0.05). "
+            "Thresholds: >=0.9 exact, >=0.7 variant_candidate, >=0.4 similar, <0.4 weak. "
+            "Example: 0.95 (95% confidence) indicates very strong match."
+        )
     )
     match_type: str = Field(
         ...,
-        description="Type of match: 'exact', 'variant_candidate', 'similar', 'weak'"
+        description=(
+            "Type of match classification. Options: "
+            "'exact' (>=0.9 score, likely same family - update/query), "
+            "'variant_candidate' (>=0.7 score, likely new variant of existing family - add_variant), "
+            "'similar' (>=0.4 score, related but distinct - show user for confirmation), "
+            "'weak' (<0.4 score, low confidence - probably different family)."
+        )
     )
     match_factors: dict[str, Any] = Field(
         ...,
-        description="Breakdown of what matched: business_id, name, brand, material"
+        description=(
+            "Breakdown of matching factors for transparency. "
+            "Structure: {"
+            "  'business_id_match': bool (True if exact business_id match), "
+            "  'name_similarity': float (0.0-1.0 token-based Jaccard similarity), "
+            "  'brand_match': bool (True if exact brand match), "
+            "  'material_match': bool (True if exact material match)"
+            "}. "
+            "Example: {'business_id_match': True, 'name_similarity': 0.85, 'brand_match': True, 'material_match': False}."
+        )
     )
     reasoning: str = Field(
-        ..., description="Human-readable explanation of why this matched"
+        ...,
+        description=(
+            "Human-readable explanation of why this matched (for user transparency). "
+            "Format: '{match_type} ({score}% confidence): {reasons}'. "
+            "Examples: "
+            "'Exact (95% confidence): Exact business ID match, High name similarity (85%), Same brand', "
+            "'Variant Candidate (75% confidence): High name similarity (80%), Same brand, Same material', "
+            "'Similar (50% confidence): Moderate name similarity (65%)', "
+            "'Weak (25% confidence): Low similarity across all factors'."
+        )
     )
 
 
 class ProductFamilySearchResult(BaseModel):
-    """Results from product family search."""
+    """Results from product family search with autonomous recommendation.
 
-    query_summary: str = Field(..., description="Summary of search criteria")
-    matches: list[ProductFamilyMatch] = Field(
-        default_factory=list, description="Ranked matches (best first)"
+    Enables intelligent decision-making: create_new, update_existing, add_variant, or ask_user.
+    Specialists use this to determine workflow path without PM intervention for high-confidence matches.
+
+    Examples:
+        No matches found → create_new:
+            ProductFamilySearchResult(
+                query_summary="Searched for: business_id=None, name=Glass Containers, brand=Pavisha, material=Glass",
+                matches=[],
+                total_found=0,
+                recommendation="create_new",
+                confidence=0.95
+            )
+
+        Exact match → update_existing:
+            ProductFamilySearchResult(
+                query_summary="Searched for: business_id=PACK-PET-JAR, name=PET Jars, brand=Pavisha, material=PET. Found 1 potential matches.",
+                matches=[
+                    ProductFamilyMatch(
+                        family_id="550e8400-...",
+                        name="PET Jars",
+                        match_score=0.95,
+                        match_type="exact",
+                        reasoning="Exact (95% confidence): Exact business ID match, High name similarity (85%), Same brand, Same material"
+                    )
+                ],
+                total_found=1,
+                recommendation="update_existing",
+                confidence=0.95
+            )
+
+        High similarity, same brand → add_variant:
+            ProductFamilySearchResult(
+                query_summary="Searched for: business_id=None, name=PET Bottles 500ml Clear, brand=Pavisha, material=PET. Found 1 potential matches.",
+                matches=[
+                    ProductFamilyMatch(
+                        family_id="550e8401-...",
+                        product_group_id="PACK-PET-BOTTLE",
+                        name="PET Bottles",
+                        brand="Pavisha",
+                        material="PET",
+                        variant_axes=[VariantAxisInfo(...)],  # Existing axes
+                        variant_values=[VariantValueInfo(...)],  # Current values
+                        match_score=0.75,
+                        match_type="variant_candidate",
+                        reasoning="Variant Candidate (75% confidence): High name similarity (80%), Same brand, Same material"
+                    )
+                ],
+                total_found=1,
+                recommendation="add_variant",
+                confidence=0.75
+            )
+
+        Multiple similar matches → ask_user:
+            ProductFamilySearchResult(
+                query_summary="Searched for: business_id=None, name=Bottles, brand=None, material=None. Found 3 potential matches.",
+                matches=[
+                    ProductFamilyMatch(name="PET Bottles", match_score=0.55, match_type="similar", ...),
+                    ProductFamilyMatch(name="HDPE Bottles", match_score=0.52, match_type="similar", ...),
+                    ProductFamilyMatch(name="Glass Bottles", match_score=0.50, match_type="similar", ...)
+                ],
+                total_found=3,
+                recommendation="ask_user",
+                confidence=0.40
+            )
+    """
+
+    query_summary: str = Field(
+        ...,
+        description=(
+            "Summary of search criteria and results count. "
+            "Format: 'Searched for: business_id={val}, name={val}, brand={val}, material={val}. Found {N} potential matches.' "
+            "Example: 'Searched for: business_id=PACK-PET-JAR, name=PET Jars, brand=Pavisha, material=PET. Found 1 potential matches.'. "
+            "Used for logging and specialist reasoning transparency."
+        )
     )
-    total_found: int = Field(..., description="Total families found in search")
+    matches: list[ProductFamilyMatch] = Field(
+        default_factory=list,
+        description=(
+            "Ranked matches sorted by match_score descending (best match first). "
+            "Empty list if no matches found (score <= 0.2 threshold). "
+            "Limited to top 5-10 matches to keep response concise. "
+            "Each match includes full family details and variant configuration for decision-making."
+        )
+    )
+    total_found: int = Field(
+        ...,
+        description=(
+            "Total number of families found matching search criteria (before score threshold filtering). "
+            "May be higher than len(matches) if weak matches were filtered out. "
+            "Example: total_found=15 but matches=[top 5] after filtering score < 0.2. "
+            "Used to inform user about breadth of search results."
+        )
+    )
     recommendation: str = Field(
         ...,
-        description="Suggested action: 'create_new', 'update_existing', 'add_variant', 'ask_user'"
+        description=(
+            "Suggested autonomous action based on match analysis. Options: "
+            "'create_new' (no matches or all weak, confidence ~0.80-0.95), "
+            "'update_existing' (exact match found, confidence ~0.90-0.95), "
+            "'add_variant' (variant_candidate match, confidence ~0.70-0.80), "
+            "'ask_user' (multiple similar matches or ambiguous, confidence ~0.40-0.60). "
+            "Specialist should execute recommendation if confidence >= 0.70, otherwise escalate to PM/user."
+        )
     )
     confidence: float = Field(
-        ..., ge=0.0, le=1.0, description="Confidence in recommendation"
+        ...,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Confidence in recommendation (0.0-1.0). "
+            "Derived from best match score and match count. "
+            "Thresholds: "
+            ">=0.90 (very high - auto-execute update_existing), "
+            ">=0.70 (high - auto-execute add_variant), "
+            ">=0.60 (moderate - show user for confirmation), "
+            "<0.60 (low - ask user to clarify or verify). "
+            "Example: 0.95 for exact business_id match, 0.40 for multiple ambiguous similar matches."
+        )
     )
 
 
@@ -296,7 +704,7 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
         LangChain tool for product family search
     """
 
-    def _search_product_families_impl(
+    async def _search_product_families_impl(
         product_group_id: str | None = None,
         name: str | None = None,
         brand: str | None = None,
@@ -327,23 +735,23 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
         try:
             # Build query - join with variant axes and values for complete SKU config
             # Nested select: product_families → variant_axes → variant_values
-            query = storage._ensure_client().table("product_families").select(
-                "*,variant_axes(id,name,display_label,sort_order,variant_values(id,value,display_label,sku_code,sort_order))"
-            )
-            query = query.eq("is_active", True)
-
-            # Apply filters
+            filters: dict[str, Any] = {"is_active": True}
             if product_group_id:
                 # Exact match on business ID
-                query = query.eq("product_group_id", product_group_id.upper())
+                filters["product_group_id"] = product_group_id.upper()
             elif brand:
                 # If no business_id, filter by brand at minimum
-                query = query.eq("brand", brand)
+                filters["brand"] = brand
 
-            # Execute query
-            response = query.limit(50).execute()  # Get more for fuzzy matching
+            # Execute query using port method (type-safe)
+            response_data = await storage.query_entities(
+                table="product_families",
+                filters=filters,
+                relations=["variant_axes(id,name,display_label,sort_order,variant_values(id,value,display_label,sku_code,sort_order))"],
+                limit=50  # Get more for fuzzy matching
+            )
 
-            if not response.data:
+            if not response_data:
                 return ProductFamilySearchResult(
                     query_summary=f"Searched for: business_id={product_group_id}, name={name}, brand={brand}",
                     matches=[],
@@ -355,7 +763,7 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
             # Calculate match scores for all results
             all_matches = []
 
-            for family in response.data:
+            for family in response_data:
                 score, factors, match_type = _calculate_match_score(
                     query_business_id=product_group_id,
                     query_name=name or "",
@@ -455,7 +863,7 @@ def create_search_product_families_tool(storage: StorageInterface) -> object:
             raise classify_api_error(e, "search_product_families", "Supabase") from e
 
     return StructuredTool.from_function(
-        func=_search_product_families_impl,
+        coroutine=_search_product_families_impl,  # Async function - use coroutine parameter
         name="search_product_families",
         description=(
             "Search for existing product families using intelligent fuzzy matching. "

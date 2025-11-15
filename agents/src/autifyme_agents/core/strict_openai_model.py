@@ -5,8 +5,12 @@ have strict validation enabled AND additionalProperties: false in parameters.
 This wrapper ensures bind_tools always uses strict=True and injects additionalProperties.
 """
 
-from typing import Any, Sequence
+from collections.abc import Callable, Sequence
+from typing import Any, cast
 
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.prompt_values import PromptValue
+from langchain_core.runnables.base import Runnable, RunnableBinding
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 
@@ -29,18 +33,20 @@ class StrictChatOpenAI(ChatOpenAI):
 
     def bind_tools(
         self,
-        tools: Sequence[BaseTool | dict[str, Any]],
+        tools: Sequence[dict[str, Any] | type | Callable[..., Any] | BaseTool],
         *,
-        tool_choice: Any | None = None,
+        tool_choice: dict[Any, Any] | str | bool | None = None,
         strict: bool | None = None,
+        parallel_tool_calls: bool | None = None,
         **kwargs: Any,
-    ) -> "StrictChatOpenAI":
+    ) -> Runnable[PromptValue | str | Sequence[BaseMessage | list[str] | tuple[str, str] | str | dict[str, Any]], AIMessage]:
         """Override bind_tools to enforce strict mode and inject additionalProperties.
 
         Args:
             tools: List of tools to bind
             tool_choice: Optional tool choice parameter
             strict: Strict mode (forced to True if None)
+            parallel_tool_calls: Whether to allow parallel tool calls
             **kwargs: Additional arguments
 
         Returns:
@@ -55,13 +61,17 @@ class StrictChatOpenAI(ChatOpenAI):
             tools,
             tool_choice=tool_choice,
             strict=strict,
+            parallel_tool_calls=parallel_tool_calls,
             **kwargs
         )
 
+        # Cast to RunnableBinding to access kwargs (mypy type stubs incomplete)
+        bound_binding = cast(RunnableBinding[Any, Any], bound_model)
+
         # Inject additionalProperties: false into all tool schemas
         # This is required by OpenAI when using response_format
-        if "tools" in bound_model.kwargs:
-            for tool_def in bound_model.kwargs["tools"]:
+        if "tools" in bound_binding.kwargs:
+            for tool_def in bound_binding.kwargs["tools"]:
                 if "function" in tool_def and "parameters" in tool_def["function"]:
                     params = tool_def["function"]["parameters"]
                     # Inject additionalProperties: false if not present

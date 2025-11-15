@@ -42,7 +42,7 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
     """
     try:
         # Query 1: Total families (include category_id for top categories)
-        families = await storage.query_advanced(
+        families = await storage.query_entities(
             table="product_families",
             columns=["id", "name", "category_id"]
         )
@@ -50,10 +50,7 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
         family_names = [f["name"] for f in families]
 
         # Query 2: Total SKUs (count only)
-        total_skus = await storage.query_advanced(
-            table="products",
-            count_only=True
-        )
+        total_skus = await storage.count_entities(table="products")
 
         # Query 3: Top categories (from product families)
         # Get category_id from families, then lookup category names
@@ -71,9 +68,10 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
 
             if top_cat_ids:
                 # Query categories for top IDs
+                # Use direct list for IN operator (documented interface)
                 categories = await storage.query_entities(
                     table="categories",
-                    filters={"id": {"in": [str(c) for c in top_cat_ids]}},
+                    filters={"id": [str(c) for c in top_cat_ids]},
                     columns=["id", "name"]
                 )
                 top_categories = [c["name"] for c in categories]
@@ -122,7 +120,7 @@ async def load_taxonomy_tree(storage: StorageInterface) -> TaxonomyTree:
     """
     try:
         # Query all categories with parent_id
-        categories_data = await storage.query_advanced(
+        categories_data = await storage.query_entities(
             table="categories",
             columns=["id", "name", "parent_id"]
         )
@@ -224,7 +222,7 @@ async def load_base_context(
         )
 
         return PMBaseContext(
-            company_profile=company_profile.model_dump(),
+            company_profile=company_profile,
             catalog_summary=catalog_summary,
             taxonomy_tree=taxonomy_tree,
             recent_activity=[],  # FUTURE: Load from activity log
@@ -245,7 +243,7 @@ async def load_base_context(
         # Graceful degradation: Return empty summaries instead of crashing
         # PM can still operate with limited context
         return PMBaseContext(
-            company_profile=company_profile.model_dump(),
+            company_profile=company_profile,
             catalog_summary=CatalogSummary(
                 total_families=0,
                 total_skus=0,

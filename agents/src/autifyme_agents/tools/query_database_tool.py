@@ -253,24 +253,28 @@ def create_query_database_tool(storage: StorageInterface) -> BaseTool:
                 }
             )
 
-            # Execute query through storage port
-            result = await storage.query_advanced(
-                table=table,
-                filters=filters,
-                columns=columns,
-                relations=relations,
-                search_patterns=search_patterns,
-                count_only=count_only,
-                limit=limit,
-            )
-
-            # Format response
+            # Execute query through storage port (type-safe methods)
             if count_only:
-                return build_success_response({"count": result})
+                # Use count_entities for count-only queries
+                count = await storage.count_entities(
+                    table=table,
+                    filters=filters,
+                    search_patterns=search_patterns,
+                )
+                return build_success_response({"count": count})
             else:
+                # Use query_entities for row retrieval
+                rows = await storage.query_entities(
+                    table=table,
+                    filters=filters,
+                    columns=columns,
+                    relations=relations,
+                    search_patterns=search_patterns,
+                    limit=limit,
+                )
                 return build_success_response({
-                    "rows": result,
-                    "count": len(result),
+                    "rows": rows,
+                    "count": len(rows),
                 })
 
         except Exception as e:

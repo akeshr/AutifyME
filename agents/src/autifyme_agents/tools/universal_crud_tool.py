@@ -25,10 +25,14 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.operation_intent import (
+    CreatedEntity,
+    DeletedEntity,
     ExecutionResult,
     ExecutionStep,
     Operation,
     OperationIntent,
+    TableCount,
+    UpdatedEntity,
 )
 from autifyme_agents.schemas.registry import (
     SchemaRegistry,
@@ -63,14 +67,15 @@ def _validate_operation_completeness(
     Raises:
         ToolException: If operation data is incomplete or mismatched with impact
     """
-    new_entities_count = impact_analysis.get("new_entities_count", {})
-    updated_entities_count = impact_analysis.get("updated_entities_count", {})
-    deleted_entities_count = impact_analysis.get("deleted_entities_count", {})
+    # Get impact counts in list[TableCount] format (per schema)
+    new_entities_count = impact_analysis.get("new_entities_count", [])
+    updated_entities_count = impact_analysis.get("updated_entities_count", [])
+    deleted_entities_count = impact_analysis.get("deleted_entities_count", [])
 
     # Aggregate actual counts across all operations per table
-    actual_new_counts = defaultdict(int)
-    actual_updated_counts = defaultdict(int)
-    actual_deleted_counts = defaultdict(int)
+    actual_new_counts: dict[str, int] = defaultdict(int)
+    actual_updated_counts: dict[str, int] = defaultdict(int)
+    actual_deleted_counts: dict[str, int] = defaultdict(int)
 
     for operation in operations:
         op_type = operation.op_type
@@ -100,14 +105,15 @@ def _validate_operation_completeness(
                 actual_updated_counts[table] += 1
 
         # Count DELETE operations (ID list deletions)
-        if op_type == "delete" and hasattr(operation, "delete_filter") and operation.delete_filter:
-            if "id" in operation.delete_filter:
-                filter_value = operation.delete_filter["id"]
-                if isinstance(filter_value, list):
-                    actual_deleted_counts[table] += len(filter_value)
+        if op_type == "delete" and hasattr(operation, "delete_filter") and operation.delete_filter and "id" in operation.delete_filter:
+            filter_value = operation.delete_filter["id"]
+            if isinstance(filter_value, list):
+                actual_deleted_counts[table] += len(filter_value)
 
-    # Validate aggregated counts against impact_analysis
-    for table, expected_count in new_entities_count.items():
+    # Validate aggregated counts against impact_analysis (list[TableCount] format)
+    for table_count in new_entities_count:
+        table = table_count["table"]
+        expected_count = table_count["count"]
         actual_count = actual_new_counts.get(table, 0)
         if expected_count > 0 and actual_count != expected_count:
             raise ToolException(
@@ -117,7 +123,9 @@ def _validate_operation_completeness(
                 f"Expected {expected_count} total entities across all operations for {table}."
             )
 
-    for table, expected_count in updated_entities_count.items():
+    for table_count in updated_entities_count:
+        table = table_count["table"]
+        expected_count = table_count["count"]
         actual_count = actual_updated_counts.get(table, 0)
         if expected_count > 0 and actual_count != expected_count:
             raise ToolException(
@@ -126,7 +134,9 @@ def _validate_operation_completeness(
                 f"All {expected_count} entities must have values specified."
             )
 
-    for table, expected_count in deleted_entities_count.items():
+    for table_count in deleted_entities_count:
+        table = table_count["table"]
+        expected_count = table_count["count"]
         actual_count = actual_deleted_counts.get(table, 0)
         if expected_count > 0 and actual_count != expected_count:
             raise ToolException(
@@ -182,8 +192,6 @@ class OperationExecutor:
         Raises:
             ToolException: On validation or execution failure (DB auto-rolls back)
         """
-        import time
-
         start_time = time.time()
 
         # Validate entire plan upfront (before transaction)
@@ -202,7 +210,6 @@ class OperationExecutor:
             error_msg = str(e)
 
             # Extract step number from error message if available
-            import re
             step_match = re.match(r"Step (\d+) failed", error_msg)
             failed_step = int(step_match.group(1)) if step_match else None
 
@@ -280,9 +287,12 @@ class OperationExecutor:
     ) -> ExecutionResult:
         """Execute plan within transaction (all validation already done)."""
         completed_steps: list[tuple[ExecutionStep, dict[str, Any]]] = []
+        # Strongly typed entity tracking
+        created_entities: list[CreatedEntity] = []
+        updated_entities_list: list[UpdatedEntity] = []
+        deleted_entities_list: list[DeletedEntity] = []
+        # Keep created_ids dict for backward compatibility with $step_N.field references
         created_ids: dict[int, dict[str, Any]] = {}
-        updated_entities: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        deleted_entities: dict[str, list[str]] = defaultdict(list)
 
         # Sort steps by dependencies (already validated in _validate_plan)
         sorted_steps = self._resolve_dependencies(steps, operations)
@@ -302,26 +312,47 @@ class OperationExecutor:
                 result = await self._execute_operation(operation, created_ids)
                 completed_steps.append((step, result))
 
-                # Store created IDs for dependent operations
+                # Store created IDs for dependent operations + structured tracking
                 if operation.op_type == "insert" and result.get("ids"):
                     ids = result["ids"]
                     # Check if this is named refs or single entity
                     if isinstance(ids, dict) and "id" not in ids:
-                        # Named refs dict
+                        # Named refs dict - track each named entity
                         created_ids[step.step_number] = {"_refs": ids}
+                        for ref_name, entity_id in ids.items():
+                            created_entities.append(CreatedEntity(
+                                entity_id=str(entity_id),
+                                entity_name=ref_name,
+                                table=operation.table,
+                                step_number=step.step_number
+                            ))
                     else:
                         # Single entity
                         created_ids[step.step_number] = ids
+                        created_entities.append(CreatedEntity(
+                            entity_id=str(ids.get("id", ids)),
+                            entity_name=None,
+                            table=operation.table,
+                            step_number=step.step_number
+                        ))
 
-                # Track updated entities
+                # Track updated entities (structured)
                 if operation.op_type == "update" and result.get("updated_details"):
-                    table = operation.table
-                    updated_entities[table].extend(result["updated_details"])
+                    for detail in result["updated_details"]:
+                        updated_entities_list.append(UpdatedEntity(
+                            entity_id=str(detail.get("id", "")),
+                            table=operation.table,
+                            updated_fields=detail.get("updated_fields", [])
+                        ))
 
-                # Track deleted entities
+                # Track deleted entities (structured)
                 if operation.op_type == "delete" and result.get("deleted_ids"):
-                    table = operation.table
-                    deleted_entities[table].extend(result["deleted_ids"])
+                    for entity_id in result["deleted_ids"]:
+                        deleted_entities_list.append(DeletedEntity(
+                            entity_id=str(entity_id),
+                            table=operation.table,
+                            soft_delete=operation.soft_delete
+                        ))
 
                 logger.info(
                     f"Step {step.step_number} completed",
@@ -338,8 +369,7 @@ class OperationExecutor:
                 f"({current_step.description if current_step else 'unknown'}): {str(e)}"
             )
             # Preserve original exception type info
-            error_with_context.__cause__ = e
-            raise error_with_context
+            raise error_with_context from e
 
         # Success - calculate execution time
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -347,9 +377,9 @@ class OperationExecutor:
         return ExecutionResult(
             success=True,
             affected_entities=self._count_affected(completed_steps, operations),
-            created_ids=created_ids,
-            updated_entities=dict(updated_entities),
-            deleted_entities=dict(deleted_entities),
+            created_ids=created_entities,
+            updated_entities=updated_entities_list,
+            deleted_entities=deleted_entities_list,
             execution_time_ms=execution_time_ms,
             steps_completed=len(completed_steps),
             steps_total=len(sorted_steps),
@@ -471,10 +501,13 @@ class OperationExecutor:
         if not operation.new_entities:
             return {"ids": {}, "count": 0}
 
+        # Type narrowing: mypy now knows new_entities is not None
+        entities = operation.new_entities
+
         # Schema-driven validation: Auto-validate unique constraints from metadata
-        logger.debug(f"Validating {len(operation.new_entities)} entities for {table_schema.name}")
+        logger.debug(f"Validating {len(entities)} entities for {table_schema.name}")
         schema_validation = await table_schema.validate_before_insert(
-            operation.new_entities,
+            entities,
             self.storage
         )
         if not schema_validation.valid:
@@ -488,20 +521,20 @@ class OperationExecutor:
             )
 
         # Check if entities can be batch inserted (no cross-references)
-        can_batch = self._can_batch_insert(operation.new_entities)
+        can_batch = self._can_batch_insert(entities)
 
-        if can_batch and len(operation.new_entities) > 1:
+        if can_batch and len(entities) > 1:
             # Batch insert: All entities in single DB call (optimization)
-            logger.debug(f"Batch inserting {len(operation.new_entities)} independent entities")
+            logger.debug(f"Batch inserting {len(entities)} independent entities")
             return await self._batch_insert_entities(
-                operation, table_schema, context
+                operation, table_schema, context, entities
             )
         else:
             # Sequential insert: One at a time (required for cross-references or single entity)
             if not can_batch:
                 logger.debug("Using sequential insert (entities have cross-references)")
             return await self._sequential_insert_entities(
-                operation, table_schema, context
+                operation, table_schema, context, entities
             )
 
     async def _sequential_insert_entities(
@@ -509,12 +542,13 @@ class OperationExecutor:
         operation: Operation,
         table_schema: Any,
         context: dict[int, dict[str, Any]],
+        entities: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Sequential entity insertion (required for entities with cross-references)."""
         inserted_entities = {}
         last_result = None
 
-        for idx, entity in enumerate(operation.new_entities):
+        for idx, entity in enumerate(entities):
             # Resolve foreign key references from context
             resolved_entity = self._resolve_references(entity, context)
 
@@ -544,10 +578,10 @@ class OperationExecutor:
         # Return appropriate format based on entity refs
         if inserted_entities:
             # Named entity references provided
-            return {"ids": inserted_entities, "count": len(operation.new_entities)}
+            return {"ids": inserted_entities, "count": len(entities)}
         elif last_result:
             # No named refs, return last inserted ID
-            return {"ids": last_result, "count": len(operation.new_entities)}
+            return {"ids": last_result, "count": len(entities)}
         else:
             return {"ids": {}, "count": 0}
 
@@ -556,11 +590,12 @@ class OperationExecutor:
         operation: Operation,
         table_schema: Any,
         context: dict[int, dict[str, Any]],
+        entities: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Batch entity insertion (OPTIMIZED - for independent entities)."""
         # Prepare all entities
         resolved_entities = []
-        for entity in operation.new_entities:
+        for entity in entities:
             # Resolve foreign key references from context
             resolved_entity = self._resolve_references(entity, context)
 
@@ -733,7 +768,7 @@ class OperationExecutor:
         if operation.soft_delete:
             # Soft delete - mark as inactive (schema-aware)
             # Only set columns that exist in the table schema
-            updates = {}
+            updates: dict[str, Any] = {}
 
             # Check if table has is_active column
             if "is_active" in table_schema.columns:
@@ -768,10 +803,7 @@ class OperationExecutor:
             # Extract entity ID(s) from filter
             entity_id = resolved_filter.get("id")
             if entity_id:
-                if isinstance(entity_id, list):
-                    deleted_ids = entity_id
-                else:
-                    deleted_ids = [entity_id]
+                deleted_ids = entity_id if isinstance(entity_id, list) else [entity_id]
 
         return {"count": count, "soft_delete": operation.soft_delete, "deleted_ids": deleted_ids}
 
@@ -819,7 +851,7 @@ class OperationExecutor:
         Returns:
             Data with references resolved to actual values
         """
-        resolved = {}
+        resolved: dict[str, Any] = {}
 
         for key, value in data.items():
             if isinstance(value, str):
@@ -899,7 +931,7 @@ class OperationExecutor:
                 if ref_name in refs:
                     entity = refs[ref_name]
                     if "id" in entity:
-                        return entity["id"]
+                        return str(entity["id"])  # Explicit cast to str for type safety
                     else:
                         raise ToolException(
                             f"Named reference '{ref_name}' found but entity has no 'id' field"
@@ -956,7 +988,7 @@ class OperationExecutor:
         self,
         completed_steps: list[tuple[ExecutionStep, dict[str, Any]]],
         operations: list[Operation]
-    ) -> dict[str, int]:
+    ) -> list[TableCount]:
         """
         Count affected entities by table.
 
@@ -965,9 +997,9 @@ class OperationExecutor:
             operations: Operations list for resolving step.operation_index
 
         Returns:
-            Map of table_name → affected_count
+            List of TableCount objects with table names and counts
         """
-        affected = defaultdict(int)
+        affected: dict[str, int] = defaultdict(int)
 
         for step, result in completed_steps:
             operation = operations[step.operation_index]
@@ -975,7 +1007,7 @@ class OperationExecutor:
             count = result.get("count", 0)
             affected[table] += count
 
-        return dict(affected)
+        return [TableCount(table=table, count=count) for table, count in affected.items()]
 
     # =========================================================================
     # Storage Adapter Methods
@@ -1074,8 +1106,8 @@ class OperationExecutor:
             if include_relations:
                 formatted_relations = [f"{rel}(*)" for rel in include_relations]
 
-            # Use port method with relation support
-            return await self.storage.query_advanced(
+            # Use type-safe query_entities port method
+            return await self.storage.query_entities(
                 table=table,
                 filters=filter,
                 relations=formatted_relations
@@ -1301,7 +1333,7 @@ def _generate_tool_name(suffix: str | None = None) -> str:
 
 def create_database_tool(
     storage: StorageInterface,
-    operations: list[str],
+    allowed_operations: list[str],
     tables: list[str] | None = None,
     tool_name_suffix: str | None = None,
 ) -> BaseTool:
@@ -1321,7 +1353,7 @@ def create_database_tool(
 
     Args:
         storage: Storage interface for database operations (REQUIRED)
-        operations: List of allowed operations. Valid values: "read", "create", "update", "delete"
+        allowed_operations: List of allowed operations. Valid values: "read", "create", "update", "delete"
         tables: Optional whitelist of accessible tables. None = all tables allowed
         tool_name_suffix: Optional suffix for tool name (e.g., "read_only", "products")
 
@@ -1335,7 +1367,7 @@ def create_database_tool(
         # Read-only tool for market intelligence specialist
         >>> read_tool = create_database_tool(
         ...     storage=storage,
-        ...     operations=["read"]
+        ...     allowed_operations=["read"]
         ... )
         >>> # Tool has 6-field schema (no change_spec, no impact_analysis)
         >>> # Description: "Read-only database access..."
@@ -1343,7 +1375,7 @@ def create_database_tool(
         # Full CRUD tool for product architecture specialist
         >>> crud_tool = create_database_tool(
         ...     storage=storage,
-        ...     operations=["create", "read", "update", "delete"]
+        ...     allowed_operations=["create", "read", "update", "delete"]
         ... )
         >>> # Tool has 8-field schema (full mutation support)
         >>> # Description: "Full CRUD database access..."
@@ -1351,7 +1383,7 @@ def create_database_tool(
         # Domain-scoped tool for taxonomy specialist
         >>> taxonomy_tool = create_database_tool(
         ...     storage=storage,
-        ...     operations=["read", "create", "update"],
+        ...     allowed_operations=["read", "create", "update"],
         ...     tables=["categories", "category_product_mappings"],
         ...     tool_name_suffix="taxonomy"
         ... )
@@ -1361,7 +1393,7 @@ def create_database_tool(
         # Read + update tool for campaign optimization
         >>> campaign_tool = create_database_tool(
         ...     storage=storage,
-        ...     operations=["read", "update"],
+        ...     allowed_operations=["read", "update"],
         ...     tables=["campaigns", "ad_copies"],
         ...     tool_name_suffix="campaigns"
         ... )
@@ -1369,7 +1401,7 @@ def create_database_tool(
 
     Architecture:
         - Uses dynamic Pydantic schema generation (pydantic.create_model)
-        - Closure captures access control parameters (operations, tables)
+        - Closure captures access control parameters (allowed_operations, tables)
         - Runtime validation before execution
         - Single implementation for all operation combinations
 
@@ -1378,49 +1410,81 @@ def create_database_tool(
         - _generate_tool_description(): Description generator
         - _generate_tool_name(): Tool naming with optional suffixes
     """
-    # Validate operations
+    # Validate allowed operations
     valid_operations = {"read", "create", "update", "delete"}
-    if not operations:
-        raise ValueError("operations list cannot be empty")
+    if not allowed_operations:
+        raise ValueError("allowed_operations list cannot be empty")
 
-    invalid_ops = set(operations) - valid_operations
+    invalid_ops = set(allowed_operations) - valid_operations
     if invalid_ops:
         raise ValueError(
             f"Invalid operations: {invalid_ops}. "
             f"Valid operations: {valid_operations}"
         )
 
-    # Generate dynamic schema for specified operations
-    input_schema = _create_operation_input_schema(operations)
+    # Generate dynamic schema for validation (kept for internal validation)
+    expected_schema = _create_operation_input_schema(allowed_operations)
 
     # Generate tool name and description
     tool_name = _generate_tool_name(tool_name_suffix)
-    tool_description = _generate_tool_description(operations, tables)
+    tool_description = _generate_tool_description(allowed_operations, tables)
+
+    # Create simple input schema: single operation_intent parameter
+    from pydantic import create_model
+    SimpleInputSchema = create_model(  # noqa: N806 (dynamic Pydantic model class)
+        'OperationIntentInput',
+        operation_intent=(
+            dict[str, Any],
+            Field(
+                ...,
+                description=(
+                    'Complete OperationIntent from specialist. '
+                    'Extract the full JSON object from specialist\'s <operation_intent> tags and pass it here. '
+                    'Required fields: user_request_summary, reasoning, intent_type, change_spec (or query_filter for reads), '
+                    'impact_analysis, execution_plan. '
+                    'DO NOT extract individual fields - pass the entire OperationIntent object.'
+                )
+            )
+        )
+    )
 
     # Create implementation with access control closure
     async def _execute_database_operation_impl(
-        **kwargs: Any
+        operation_intent: dict[str, Any]
     ) -> dict[str, Any]:
         """
         Operation-scoped database executor with runtime validation.
 
         Validates operations and table access before execution.
+
+        Args:
+            operation_intent: Complete OperationIntent dict from specialist
         """
-        # Extract parameters (handles both read-only and mutation schemas)
-        intent_type = kwargs.get('intent_type')
-        user_request_summary = kwargs.get('user_request_summary')
-        reasoning = kwargs.get('reasoning')
-        specialist_name = kwargs.get('specialist_name')
-        schema_version = kwargs.get('schema_version', 'v1')
+        # Validate operation_intent against expected schema
+        try:
+            validated = expected_schema.model_validate(operation_intent)
+        except Exception as e:
+            raise ToolException(
+                f"Invalid OperationIntent structure: {str(e)}\n\n"
+                f"Expected fields for {allowed_operations} operations: {list(expected_schema.model_fields.keys())}\n"
+                f"Received: {list(operation_intent.keys())}"
+            ) from e
+
+        # Extract validated fields (dynamic model - mypy can't infer fields)
+        intent_type = str(validated.intent_type)  # type: ignore[attr-defined]
+        user_request_summary = str(validated.user_request_summary)  # type: ignore[attr-defined]
+        reasoning = str(validated.reasoning)  # type: ignore[attr-defined]
+        specialist_name = getattr(validated, 'specialist_name', None)
+        schema_version = str(getattr(validated, 'schema_version', 'v1'))
 
         # Handle read-only vs mutation parameter differences
-        if 'query_filter' in kwargs:
-            # Read-only tool: convert query_filter to change_spec format
-            query_filter = kwargs.get('query_filter', {})
-            execution_plan = kwargs.get('execution_plan')
+        if hasattr(validated, 'query_filter'):
+            # Read-only operation
+            query_filter = validated.query_filter
+            execution_plan = validated.execution_plan  # type: ignore[attr-defined]
 
             # Build minimal change_spec for read operations
-            change_spec = {
+            change_spec: dict[str, Any] = {
                 'domain': 'product_catalog',  # Default domain
                 'operations': [
                     {
@@ -1443,24 +1507,24 @@ def create_database_tool(
                 'examples': []
             }
         else:
-            # Mutation tool: use provided change_spec and impact_analysis
-            change_spec = kwargs.get('change_spec')
-            impact_analysis = kwargs.get('impact_analysis')
-            execution_plan = kwargs.get('execution_plan')
+            # Mutation operation
+            change_spec = validated.change_spec  # type: ignore[attr-defined]
+            impact_analysis = validated.impact_analysis  # type: ignore[attr-defined]
+            execution_plan = validated.execution_plan  # type: ignore[attr-defined]
 
         # Validate operation is allowed
-        if intent_type not in operations:
+        if intent_type not in allowed_operations:
             raise ToolException(
                 f"Operation '{intent_type}' not allowed for this tool. "
-                f"Allowed operations: {', '.join(operations)}. "
-                f"This tool is configured for: {', '.join(operations)} only."
+                f"Allowed operations: {', '.join(allowed_operations)}. "
+                f"This tool is configured for: {', '.join(allowed_operations)} only."
             )
 
-        # Validate table access if restricted
-        if tables is not None and change_spec:
+        # Validate table access if restricted (change_spec is dict at this point)
+        if tables is not None and change_spec and isinstance(change_spec, dict):
             ops_list = change_spec.get('operations', [])
-            for operation in ops_list:
-                table = operation.get('table')
+            for op_dict in ops_list:
+                table = op_dict.get('table') if isinstance(op_dict, dict) else None
                 if table and table not in tables:
                     raise ToolException(
                         f"Table '{table}' not accessible by this tool. "
@@ -1470,38 +1534,46 @@ def create_database_tool(
 
         # Execute using shared implementation logic
         try:
+            # Get domain from change_spec dict for schema loading
+            # Default to product_catalog if not specified or if change_spec is not a dict
+            domain_value = "product_catalog"
+            if isinstance(change_spec, dict):
+                domain_value = change_spec.get("domain", "product_catalog")
+
             # Load schema for validation
             schema = SchemaRegistry.get_version(
                 version=schema_version,
-                domain=change_spec.get("domain", "product_catalog")
+                domain=domain_value
             )
 
-            # Construct OperationIntent from parameters
-            operation_intent = OperationIntent(
-                intent_type=intent_type,
-                change_spec=change_spec,
-                user_request_summary=user_request_summary,
-                reasoning=reasoning,
-                impact_analysis=impact_analysis,
-                execution_plan=execution_plan,
-                specialist_name=specialist_name,
-                schema_version=schema_version,
-            )
+            # Construct OperationIntent from parameters using model_validate (handles nested models)
+            # model_validate converts dict representations to proper Pydantic models
+            operation_intent_final: OperationIntent = OperationIntent.model_validate({
+                "intent_type": intent_type,
+                "change_spec": change_spec,
+                "user_request_summary": user_request_summary,
+                "reasoning": reasoning,
+                "impact_analysis": impact_analysis,
+                "execution_plan": execution_plan,
+                "specialist_name": specialist_name,
+                "schema_version": schema_version,
+            })
 
             logger.info(
-                f"Executing database operation: {operation_intent.intent_type}",
+                f"Executing database operation: {operation_intent_final.intent_type}",
                 extra={
-                    "intent_type": operation_intent.intent_type,
-                    "operations_count": len(operation_intent.change_spec.operations),
+                    "intent_type": operation_intent_final.intent_type,
+                    "operations_count": len(operation_intent_final.change_spec.operations),
                     "schema_version": schema_version,
-                    "allowed_operations": operations,
+                    "allowed_operations": allowed_operations,
                     "allowed_tables": tables,
                 }
             )
 
             # Validate against schema
             validator = SchemaValidator(schema)
-            for operation in operation_intent.change_spec.operations:
+            # Type guaranteed: change_spec.operations is list[Operation] from ChangeSpecification
+            for operation in operation_intent_final.change_spec.operations:
                 validation = validator.validate_operation(operation.model_dump())
                 if not validation.valid:
                     raise ToolException(
@@ -1510,15 +1582,15 @@ def create_database_tool(
 
             # Validate completeness (operations match impact_analysis counts)
             _validate_operation_completeness(
-                operations=operation_intent.change_spec.operations,
-                impact_analysis=operation_intent.impact_analysis.model_dump()
+                operations=operation_intent_final.change_spec.operations,
+                impact_analysis=operation_intent_final.impact_analysis.model_dump()
             )
 
             # Execute plan
             executor = OperationExecutor(storage, schema)
             result = await executor.execute_plan(
-                steps=operation_intent.execution_plan.steps,
-                operations=operation_intent.change_spec.operations,
+                steps=operation_intent_final.execution_plan.steps,
+                operations=operation_intent_final.change_spec.operations,
             )
 
             if result.success:
@@ -1576,10 +1648,10 @@ def create_database_tool(
             )
             return error_result.model_dump()
 
-    # Create and return StructuredTool with dynamic schema
+    # Create and return StructuredTool with simple single-parameter schema
     return StructuredTool.from_function(
         coroutine=_execute_database_operation_impl,
         name=tool_name,
         description=tool_description,
-        args_schema=input_schema,
+        args_schema=SimpleInputSchema,
     )

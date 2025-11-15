@@ -26,13 +26,17 @@ Architecture Pattern:
 - PM orchestrates and approves
 """
 
+import logging
 from typing import Any
 
 from langchain.tools import tool
 from pydantic import BaseModel, Field
 
+from autifyme_agents.core.config import settings
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Data Models - Content & SEO Specialist Outputs
@@ -174,7 +178,9 @@ Format your response as JSON:
 
         # Parse JSON response
         import json
-        cleaned = content.strip().removeprefix("```json").removeprefix("```").removesuffix("```")
+        # Handle content as string (LangChain returns str or list)
+        content_str = content if isinstance(content, str) else str(content)
+        cleaned = content_str.strip().removeprefix("```json").removeprefix("```").removesuffix("```")
         data = json.loads(cleaned)
 
         return {
@@ -211,8 +217,16 @@ def generate_feature_bullets(
     Returns:
         List of formatted feature bullets
     """
-    # Simple template-based for Phase 1
-    # TODO Phase 2: Use LLM for brand-aligned bullet generation
+    # Check feature flag for LLM-based bullet generation
+    if settings.ENABLE_LLM_BULLET_GENERATION:
+        # TODO: Implement LLM-based bullet generation when enabled
+        raise NotImplementedError("LLM-based bullet generation not yet implemented")
+
+    # Fallback: Simple template-based formatting
+    logger.warning(
+        "Using template-based feature bullet formatting fallback. "
+        "Enable ENABLE_LLM_BULLET_GENERATION for brand-aligned LLM generation."
+    )
 
     bullets = []
     for feature in key_features[:max_bullets]:

@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from .models import ExecutionResult, TestExecution, TestHistory
+from .models import ExecutionHistory, ExecutionRecord, ExecutionResult
 
 # History file location (in tests/tools directory)
 HISTORY_FILE = Path(__file__).parent / ".test_history.json"
@@ -72,7 +72,7 @@ def record_test_execution(result: ExecutionResult, scenario_id: str) -> None:
     _save_history(history)
 
 
-def list_recent_tests(limit: int = 10) -> TestHistory:
+def list_recent_tests(limit: int = 10) -> ExecutionHistory:
     """Get recent test execution history.
 
     Retrieves the N most recent test executions for progress tracking
@@ -83,7 +83,7 @@ def list_recent_tests(limit: int = 10) -> TestHistory:
         limit: Maximum number of test executions to return (default: 10)
 
     Returns:
-        TestHistory with list of recent test executions (newest first)
+        ExecutionHistory with list of recent test executions (newest first)
 
     Example:
         >>> history = list_recent_tests(limit=5)
@@ -100,7 +100,7 @@ def list_recent_tests(limit: int = 10) -> TestHistory:
     tests = []
     for data in history_data[:limit]:
         try:
-            execution = TestExecution(
+            execution = ExecutionRecord(
                 timestamp=datetime.fromisoformat(data["timestamp"]),
                 scenario_id=data["scenario_id"],
                 thread_id=data["thread_id"],
@@ -115,7 +115,7 @@ def list_recent_tests(limit: int = 10) -> TestHistory:
             # Skip malformed records
             continue
 
-    return TestHistory(tests=tests)
+    return ExecutionHistory(tests=tests)
 
 
 def clear_test_history() -> None:

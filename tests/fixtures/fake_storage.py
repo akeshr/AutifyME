@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.schemas.models import CompanyProfile, Product
+from autifyme_agents.schemas.models import CompanyProfile, Product, WorkflowOutcome
 
 
 class FakeStorage(StorageInterface):
@@ -94,10 +94,12 @@ class FakeStorage(StorageInterface):
         self.processed_messages.add(message_id)
         return False  # New message
 
-    def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
+    def save_workflow_outcome(self, outcome: WorkflowOutcome) -> str:
         """Save workflow outcome to in-memory list."""
         outcome_id = str(uuid.uuid4())
-        outcome_with_id = {**outcome, "id": outcome_id}
+        # Convert Pydantic model to dict for storage
+        outcome_dict = outcome.model_dump(mode="json")
+        outcome_with_id = {**outcome_dict, "id": outcome_id}
         self.workflow_outcomes.append(outcome_with_id)
         return outcome_id
 
@@ -109,7 +111,7 @@ class FakeStorage(StorageInterface):
         department: str | None = None,
         success: bool | None = None,
         limit: int = 100,
-    ) -> list[dict[str, Any]]:
+    ) -> list[WorkflowOutcome]:
         """Get workflow outcomes with filters."""
         results = self.workflow_outcomes[:]
 
@@ -121,16 +123,18 @@ class FakeStorage(StorageInterface):
         if success is not None:
             results = [r for r in results if r.get("success") == success]
 
-        return results[:limit]
+        # Convert dicts back to WorkflowOutcome models
+        return [WorkflowOutcome.model_validate(r) for r in results[:limit]]
 
     def get_recent_failures(
         self,
         time_window: timedelta,
         limit: int = 10,
-    ) -> list[dict[str, Any]]:
+    ) -> list[WorkflowOutcome]:
         """Get recent workflow failures."""
         failures = [o for o in self.workflow_outcomes if not o.get("success", True)]
-        return failures[:limit]
+        # Convert dicts back to WorkflowOutcome models
+        return [WorkflowOutcome.model_validate(f) for f in failures[:limit]]
 
     def get_success_rates(
         self,
@@ -157,24 +161,75 @@ class FakeStorage(StorageInterface):
     async def query_entities(
         self,
         table: str,
-        filters: dict[str, Any],
+        filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Query entities with filters."""
+        """Query entities with filters, relations, and search patterns."""
         table_data = self.tables.get(table, [])
 
-        # Apply filters
+        # Apply filters and search patterns
         results = []
         for row in table_data:
-            match = all(row.get(k) == v for k, v in filters.items())
-            if match:
-                if columns:
-                    filtered_row = {k: row.get(k) for k in columns}
-                    results.append(filtered_row)
-                else:
-                    results.append(row.copy())
+            # Exact match filters
+            if filters:
+                match = all(row.get(k) == v for k, v in filters.items())
+                if not match:
+                    continue
+
+            # ILIKE search patterns (simplified case-insensitive substring match)
+            if search_patterns:
+                pattern_match = all(
+                    pattern.strip("%").lower() in str(row.get(k, "")).lower()
+                    for k, pattern in search_patterns.items()
+                )
+                if not pattern_match:
+                    continue
+
+            # Column filtering
+            if columns:
+                filtered_row = {k: row.get(k) for k in columns}
+                results.append(filtered_row)
+            else:
+                results.append(row.copy())
+
+        # Apply limit
+        if limit:
+            results = results[:limit]
 
         return results
+
+    async def count_entities(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+    ) -> int:
+        """Count entities matching filters and search patterns."""
+        table_data = self.tables.get(table, [])
+        count = 0
+
+        for row in table_data:
+            # Exact match filters
+            if filters:
+                match = all(row.get(k) == v for k, v in filters.items())
+                if not match:
+                    continue
+
+            # ILIKE search patterns (simplified case-insensitive substring match)
+            if search_patterns:
+                pattern_match = all(
+                    pattern.strip("%").lower() in str(row.get(k, "")).lower()
+                    for k, pattern in search_patterns.items()
+                )
+                if not pattern_match:
+                    continue
+
+            count += 1
+
+        return count
 
     async def check_existing_values(
         self,

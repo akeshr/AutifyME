@@ -31,6 +31,7 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=your_webhook_verify_token
 WHATSAPP_API_VERSION=v20.0
 LANGCHAIN_API_KEY=your_langsmith_api_key
 OPENAI_API_KEY=your_openai_api_key
+TAVILY_API_KEY=your_tavily_api_key
 AGENT_RECURSION_LIMIT=15
 ```
 
@@ -50,6 +51,12 @@ AGENT_RECURSION_LIMIT=15
 
 **LangSmith & OpenAI:**
 - Copy from your existing `.env` file
+
+**Tavily (Web Research):**
+1. Go to [Tavily](https://tavily.com/)
+2. Sign up/login → Dashboard → API Keys
+3. Copy API key → `TAVILY_API_KEY`
+4. Free tier: 1000 searches/month (sufficient for ~150 products/month)
 
 ### 4. Set Up Custom Domain (Highly Recommended)
 

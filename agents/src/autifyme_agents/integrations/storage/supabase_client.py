@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal, overload
 
 import httpx
 from supabase import AsyncClient, Client, create_async_client, create_client
@@ -14,7 +14,7 @@ from supabase.lib.client_options import AsyncClientOptions, SyncClientOptions
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.exceptions import ConfigurationError, StorageError
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.schemas.models import CompanyProfile, Product
+from autifyme_agents.schemas.models import CompanyProfile, Product, WorkflowOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +48,11 @@ def _normalize_numeric_types(data: dict[str, Any] | list[dict[str, Any]]) -> dic
             return value
 
     if isinstance(data, list):
-        return [normalize_value(item) for item in data]
+        normalized_list: list[dict[str, Any]] = [normalize_value(item) for item in data]
+        return normalized_list
     else:
-        return normalize_value(data)
+        normalized_dict: dict[str, Any] = normalize_value(data)
+        return normalized_dict
 
 
 class SupabaseStorageClient(StorageInterface):
@@ -106,6 +108,25 @@ class SupabaseStorageClient(StorageInterface):
             exc_tb: Exception traceback if an error occurred
         """
         self.cleanup()
+
+    @staticmethod
+    def _is_uuid(value: str) -> bool:
+        """
+        Check if a string is a valid UUID format.
+
+        UUIDs should use exact case-sensitive matching (not case-insensitive).
+        This prevents converting UUID filters to ILIKE which would be incorrect.
+
+        Args:
+            value: String to check
+
+        Returns:
+            True if value matches UUID format (8-4-4-4-12 hex pattern)
+        """
+        import re
+        # UUID pattern: 8-4-4-4-12 hex digits
+        uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        return bool(re.match(uuid_pattern, value.lower()))
 
     def _ensure_client(self) -> Client:
         """Create and validate the Supabase client lazily.
@@ -294,6 +315,8 @@ class SupabaseStorageClient(StorageInterface):
                     config_key="SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY"
                 ) from e
 
+        # Type guaranteed: if client was None, we initialized it above or raised exception
+        assert self._async_client is not None, "Async client should be initialized"
         return self._async_client
 
     def get_company_profile(self) -> CompanyProfile:
@@ -419,14 +442,11 @@ class SupabaseStorageClient(StorageInterface):
     # Phase 1.2: Workflow Outcome Tracking (Agentic Evolution)
     # ========================================================================
 
-    def save_workflow_outcome(self, outcome: dict[str, Any]) -> str:
+    def save_workflow_outcome(self, outcome: WorkflowOutcome) -> str:
         """Persist workflow outcome for learning and analytics.
 
         Args:
-            outcome: Workflow outcome payload with required fields:
-                - tracking_id, thread_id, sender_id (required)
-                - message_hash, success, started_at (required)
-                - trace_id, intent, department (optional)
+            outcome: WorkflowOutcome model with tracking data
 
         Returns:
             Outcome ID from database
@@ -437,9 +457,12 @@ class SupabaseStorageClient(StorageInterface):
         """
         client = self._ensure_client()
 
+        # Convert Pydantic model to dict for database insertion
+        outcome_dict = outcome.model_dump(mode="json")
+
         # Validate required fields before attempting insert
         required_fields = ["tracking_id", "thread_id", "sender_id", "message_hash", "success", "started_at"]
-        missing_fields = [field for field in required_fields if field not in outcome or outcome[field] is None]
+        missing_fields = [field for field in required_fields if field not in outcome_dict or outcome_dict[field] is None]
 
         if missing_fields:
             error_msg = f"Cannot persist workflow outcome - missing required fields: {missing_fields}"
@@ -447,14 +470,14 @@ class SupabaseStorageClient(StorageInterface):
                 error_msg,
                 extra={
                     "missing_fields": missing_fields,
-                    "tracking_id": outcome.get("tracking_id"),
-                    "thread_id": outcome.get("thread_id"),
+                    "tracking_id": outcome_dict.get("tracking_id"),
+                    "thread_id": outcome_dict.get("thread_id"),
                 }
             )
             raise ValueError(error_msg)
 
         # Ensure timestamps are ISO strings for Supabase
-        payload = outcome.copy()
+        payload = outcome_dict.copy()
         for ts_field in ["received_at", "routed_at", "started_at", "ended_at"]:
             if ts_field in payload and isinstance(payload[ts_field], datetime):
                 payload[ts_field] = payload[ts_field].isoformat()
@@ -471,10 +494,10 @@ class SupabaseStorageClient(StorageInterface):
             logger.info(
                 "Persisted workflow outcome",
                 extra={
-                    "tracking_id": outcome.get("tracking_id"),
-                    "success": outcome.get("success"),
-                    "intent": outcome.get("intent"),
-                    "department": outcome.get("department"),
+                    "tracking_id": outcome_dict.get("tracking_id"),
+                    "success": outcome_dict.get("success"),
+                    "intent": outcome_dict.get("intent"),
+                    "department": outcome_dict.get("department"),
                 },
             )
 
@@ -485,8 +508,8 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 "Failed to persist workflow outcome to database",
                 extra={
-                    "tracking_id": outcome.get("tracking_id"),
-                    "thread_id": outcome.get("thread_id"),
+                    "tracking_id": outcome_dict.get("tracking_id"),
+                    "thread_id": outcome_dict.get("thread_id"),
                     "error_type": type(e).__name__,
                     "error_msg": str(e),
                     "payload_keys": list(payload.keys()),
@@ -503,7 +526,7 @@ class SupabaseStorageClient(StorageInterface):
         department: str | None = None,
         success: bool | None = None,
         limit: int = 100,
-    ) -> list[dict[str, Any]]:
+    ) -> list[WorkflowOutcome]:
         """Retrieve workflow outcomes for analysis."""
         client = self._ensure_client()
 
@@ -527,13 +550,16 @@ class SupabaseStorageClient(StorageInterface):
         query = query.order("created_at", desc=True).limit(limit)
 
         response = query.execute()
-        return response.data if response.data else []
+        # Convert dicts to WorkflowOutcome models
+        if response.data:
+            return [WorkflowOutcome.model_validate(row) for row in response.data]
+        return []
 
     def get_recent_failures(
         self,
         time_window: timedelta,
         limit: int = 10,
-    ) -> list[dict[str, Any]]:
+    ) -> list[WorkflowOutcome]:
         """Retrieve recent failures for regression test generation."""
         client = self._ensure_client()
 
@@ -541,8 +567,7 @@ class SupabaseStorageClient(StorageInterface):
 
         response = (
             client.table("workflow_outcomes")
-            .select("tracking_id, thread_id, message_text, media_id, media_type, "
-                    "error_type, error_message, resolution_strategy, duration_seconds, created_at")
+            .select("*")  # Select all columns to build full WorkflowOutcome model
             .eq("success", False)
             .gte("created_at", cutoff)
             .order("created_at", desc=True)
@@ -550,7 +575,10 @@ class SupabaseStorageClient(StorageInterface):
             .execute()
         )
 
-        return response.data if response.data else []
+        # Convert dicts to WorkflowOutcome models
+        if response.data:
+            return [WorkflowOutcome.model_validate(row) for row in response.data]
+        return []
 
     def get_success_rates(
         self,
@@ -600,75 +628,73 @@ class SupabaseStorageClient(StorageInterface):
     async def query_entities(
         self,
         table: str,
-        filters: dict[str, Any],
+        filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Query entities with filters using async client.
+        """
+        Query entities - always returns list of rows.
+
+        Type-safe wrapper over query_advanced with count_only=False.
 
         Args:
             table: Table name
             filters: WHERE conditions as dict
             columns: Columns to select (default: all)
+            relations: Related tables to include
+            search_patterns: Case-insensitive LIKE patterns
+            limit: Maximum rows to return
 
         Returns:
-            List of matching rows
+            List of matching rows (guaranteed list, never int)
 
         Raises:
             StorageError: On query failure
         """
-        try:
-            client = await self._ensure_async_client()
+        result = await self.query_advanced(
+            table=table,
+            filters=filters,
+            columns=columns,
+            relations=relations,
+            search_patterns=search_patterns,
+            count_only=False,  # Always return rows
+            limit=limit
+        )
+        # Type guaranteed by @overload: count_only=False → list
+        return result
 
-            # Build select clause
-            select_clause = ",".join(columns) if columns else "*"
-            query = client.table(table).select(select_clause)
+    async def count_entities(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+    ) -> int:
+        """
+        Count entities - always returns int count.
 
-            # Apply filters (support both simple and operator-based)
-            for key, value in filters.items():
-                if isinstance(value, dict):
-                    # Advanced filter with operator: {"in": [...], "gt": ..., etc.}
-                    for operator, operand in value.items():
-                        if operator == "in":
-                            query = query.in_(key, operand)
-                        elif operator == "eq":
-                            query = query.eq(key, operand)
-                        elif operator == "neq":
-                            query = query.neq(key, operand)
-                        elif operator == "gt":
-                            query = query.gt(key, operand)
-                        elif operator == "gte":
-                            query = query.gte(key, operand)
-                        elif operator == "lt":
-                            query = query.lt(key, operand)
-                        elif operator == "lte":
-                            query = query.lte(key, operand)
-                        elif operator == "like":
-                            query = query.like(key, operand)
-                        elif operator == "ilike":
-                            query = query.ilike(key, operand)
-                        else:
-                            raise ValueError(f"Unsupported filter operator: {operator}")
-                elif isinstance(value, list):
-                    # List value - use IN operator
-                    query = query.in_(key, value)
-                else:
-                    # Simple equality filter
-                    query = query.eq(key, value)
+        Type-safe wrapper over query_advanced with count_only=True.
 
-            response = await query.execute()
-            return response.data if response.data else []
+        Args:
+            table: Table name
+            filters: WHERE conditions as dict
+            search_patterns: Case-insensitive LIKE patterns
 
-        except Exception as e:
-            logger.error(
-                f"Failed to query {table}",
-                exc_info=True,
-                extra={"table": table, "filters": filters}
-            )
-            raise StorageError(
-                message=f"Query failed for {table}: {str(e)}",
-                operation="query_entities",
-                original_error=e,
-            ) from e
+        Returns:
+            Count of matching rows (guaranteed int, never list)
+
+        Raises:
+            StorageError: On query failure
+        """
+        result = await self.query_advanced(
+            table=table,
+            filters=filters,
+            search_patterns=search_patterns,
+            count_only=True,  # Always return count
+        )
+        # Type guaranteed by @overload: count_only=True → int
+        return result
 
     async def check_existing_values(
         self,
@@ -726,6 +752,30 @@ class SupabaseStorageClient(StorageInterface):
                 original_error=e,
             ) from e
 
+    @overload
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: Literal[True] = ...,
+        limit: int | None = None,
+    ) -> int: ...
+
+    @overload
+    async def query_advanced(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        count_only: Literal[False] = ...,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]: ...
+
     async def query_advanced(
         self,
         table: str,
@@ -774,13 +824,18 @@ class SupabaseStorageClient(StorageInterface):
                 count="exact" if count_only else None
             )
 
-            # Apply exact match filters
+            # Apply filters with case-insensitive matching for text fields
             if filters:
                 for key, value in filters.items():
                     if isinstance(value, list):
                         # List value - use IN operator
                         query = query.in_(key, value)
+                    elif isinstance(value, str) and not self._is_uuid(value):
+                        # String value (non-UUID) - use case-insensitive match
+                        # This prevents "neck type" vs "Neck Type" mismatches
+                        query = query.ilike(key, value)
                     else:
+                        # UUID, number, boolean - use exact match
                         query = query.eq(key, value)
 
             # Apply ILIKE search patterns
@@ -845,7 +900,7 @@ class SupabaseStorageClient(StorageInterface):
                     operation="insert_entity",
                 )
 
-            inserted = response.data[0]
+            inserted: dict[str, Any] = response.data[0]
 
             # Track operation for transaction rollback
             if self._current_transaction is not None:
@@ -901,7 +956,7 @@ class SupabaseStorageClient(StorageInterface):
                     operation="insert_entities",
                 )
 
-            inserted = response.data
+            inserted: list[dict[str, Any]] = response.data
 
             # Track operation for transaction rollback
             if self._current_transaction is not None:
@@ -1085,7 +1140,7 @@ class SupabaseStorageClient(StorageInterface):
     # Transaction Support (Phase 3)
     # ========================================================================
 
-    def transaction(self) -> "SupabaseTransaction":
+    def transaction(self) -> SupabaseTransaction:
         """
         Create a transaction context manager for atomic operations.
 
@@ -1206,7 +1261,7 @@ class SupabaseTransaction:
         self.operations: list[dict[str, Any]] = []
         self.in_transaction = False
 
-    async def __aenter__(self) -> "SupabaseTransaction":
+    async def __aenter__(self) -> SupabaseTransaction:
         """Start transaction - begin tracking operations."""
         self.in_transaction = True
         self.operations = []

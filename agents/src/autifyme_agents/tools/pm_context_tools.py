@@ -13,9 +13,8 @@ Design:
 """
 
 import logging
-from uuid import UUID
-
 from typing import Any
+from uuid import UUID
 
 from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel, Field
@@ -35,40 +34,251 @@ logger = logging.getLogger(__name__)
 
 
 class FamilyMatch(BaseModel):
-    """Single product family match from catalog search."""
+    """Single product family match from PM-level catalog search.
 
-    id: str = Field(..., description="Product family UUID")
-    name: str = Field(..., description="Product family name")
-    variant_count: int = Field(..., description="Number of SKU variants in this family")
-    category_name: str | None = Field(None, description="Category name if available")
+    Lightweight summary (names, counts, IDs only) for PM discussions.
+    NOT full product data - PM delegates to specialists for detailed operations.
+
+    Examples:
+        PET Jars family:
+            FamilyMatch(
+                id="550e8400-e29b-41d4-a716-446655440000",
+                name="PET Jars",
+                variant_count=24,
+                category_name="Food & Beverage Packaging"
+            )
+
+        Small family without category:
+            FamilyMatch(
+                id="550e8401-e29b-41d4-a716-446655440000",
+                name="Glass Bottles 200ml-500ml",
+                variant_count=8,
+                category_name=None
+            )
+    """
+
+    id: str = Field(
+        ...,
+        description=(
+            "Product family UUID in database. "
+            "PM includes this in delegation message to specialist for entity reference. "
+            "Example: '550e8400-e29b-41d4-a716-446655440000'. "
+            "Specialist uses this ID to query full family details or perform operations."
+        )
+    )
+    name: str = Field(
+        ...,
+        description=(
+            "Product family name (human-readable). "
+            "Examples: 'PET Jars', 'HDPE Bottles 500ml-5L', 'Glass Containers'. "
+            "PM uses this for user-facing responses and delegation context. "
+            "Shown to user: 'Found existing family: PET Jars (id: 550e8400-...)'"
+        )
+    )
+    variant_count: int = Field(
+        ...,
+        description=(
+            "Number of SKU variants in this family (product count). "
+            "Example: 24 (means 24 distinct SKUs like JAR-PET-500ML-CLR, JAR-PET-1L-CLR, etc.). "
+            "PM uses for context: 'PET Jars family has 24 existing variants'. "
+            "Helps PM assess if this is small starter family (1-5 SKUs) or mature family (50+ SKUs)."
+        )
+    )
+    category_name: str | None = Field(
+        None,
+        description=(
+            "Category name if family is categorized (None if uncategorized). "
+            "Examples: 'Food & Beverage Packaging', 'Industrial Containers', 'Cosmetic Packaging'. "
+            "PM uses for taxonomy discussions: 'This family is in Food & Beverage Packaging category'. "
+            "None indicates family not yet assigned to category taxonomy."
+        )
+    )
 
 
 class CatalogSearchSummary(BaseModel):
-    """Summary-level search results from catalog.
+    """Summary-level search results from PM catalog search.
 
     Returns matching family names and variant counts, NOT full product data.
     PM uses this to check if products exist before delegating to specialists.
+
+    Examples:
+        Single match found:
+            CatalogSearchSummary(
+                query="PET Jars",
+                matches=[
+                    FamilyMatch(
+                        id="550e8400-e29b-41d4-a716-446655440000",
+                        name="PET Jars",
+                        variant_count=24,
+                        category_name="Food & Beverage Packaging"
+                    )
+                ],
+                total_matches=1,
+                has_more=False
+            )
+
+        Multiple matches found (limited to 10):
+            CatalogSearchSummary(
+                query="Bottles",
+                matches=[
+                    FamilyMatch(id="...", name="PET Bottles", variant_count=48, category_name="..."),
+                    FamilyMatch(id="...", name="HDPE Bottles", variant_count=36, category_name="..."),
+                    FamilyMatch(id="...", name="Glass Bottles", variant_count=24, category_name="...")
+                ],
+                total_matches=3,
+                has_more=False
+            )
+
+        Many matches (truncated):
+            CatalogSearchSummary(
+                query="Containers",
+                matches=[
+                    # ... 10 FamilyMatch objects
+                ],
+                total_matches=10,
+                has_more=True  # More than 10 results exist
+            )
+
+        No matches:
+            CatalogSearchSummary(
+                query="Ceramic Vases",
+                matches=[],
+                total_matches=0,
+                has_more=False
+            )
     """
 
-    query: str = Field(..., description="Search query used")
-    matches: list[FamilyMatch] = Field(..., description="Matching product families (max 10)")
-    total_matches: int = Field(..., description="Total number of matches found")
-    has_more: bool = Field(..., description="True if more matches exist beyond limit")
+    query: str = Field(
+        ...,
+        description=(
+            "Search query used (as provided by PM). "
+            "Examples: 'PET Jars', 'Bottles', 'Containers', 'Glass'. "
+            "Used for logging and traceability. "
+            "PM can reference this in user response: 'I searched for \"{query}\" and found...'."
+        )
+    )
+    matches: list[FamilyMatch] = Field(
+        ...,
+        description=(
+            "Matching product families (max 10 for concise response). "
+            "Empty list if no matches found. "
+            "Sorted by relevance (exact name matches first, then substring matches). "
+            "Each match includes id, name, variant_count, category_name for PM context. "
+            "PM shows these to user or includes in delegation message to specialist."
+        )
+    )
+    total_matches: int = Field(
+        ...,
+        description=(
+            "Total number of matches found (before 10-match limit). "
+            "Examples: 1 (single exact match), 3 (few matches), 15 (many matches truncated to 10). "
+            "PM uses to inform user: '...and 5 more families' if total_matches=15 and len(matches)=10. "
+            "Same as len(matches) if has_more=False."
+        )
+    )
+    has_more: bool = Field(
+        ...,
+        description=(
+            "True if more matches exist beyond 10-match limit (total_matches > 10). "
+            "PM uses to inform user about truncated results. "
+            "Example user message: 'Found 10 matching families (and 5 more)' when has_more=True."
+        )
+    )
 
 
 class CategoryInfo(BaseModel):
-    """Category details for PM understanding.
+    """Category details for PM taxonomy understanding.
 
     Returns category metadata and product counts, NOT full product lists.
     PM uses this for taxonomy discussions and classification guidance.
+
+    Examples:
+        Top-level category with subcategories:
+            CategoryInfo(
+                id="660e8400-e29b-41d4-a716-446655440000",
+                name="Food & Beverage",
+                parent_id=None,
+                parent_name=None,
+                subcategory_count=5,
+                product_family_count=0
+            )
+
+        Subcategory with products:
+            CategoryInfo(
+                id="660e8401-e29b-41d4-a716-446655440000",
+                name="Beverage Packaging",
+                parent_id="660e8400-e29b-41d4-a716-446655440000",
+                parent_name="Food & Beverage",
+                subcategory_count=2,
+                product_family_count=15
+            )
+
+        Leaf category (no subcategories, only products):
+            CategoryInfo(
+                id="660e8402-e29b-41d4-a716-446655440000",
+                name="PET Bottle Packaging",
+                parent_id="660e8401-e29b-41d4-a716-446655440000",
+                parent_name="Beverage Packaging",
+                subcategory_count=0,
+                product_family_count=8
+            )
     """
 
-    id: str = Field(..., description="Category UUID")
-    name: str = Field(..., description="Category name")
-    parent_id: str | None = Field(None, description="Parent category UUID if subcategory")
-    parent_name: str | None = Field(None, description="Parent category name if available")
-    subcategory_count: int = Field(..., description="Number of direct subcategories")
-    product_family_count: int = Field(..., description="Number of product families in this category")
+    id: str = Field(
+        ...,
+        description=(
+            "Category UUID in database. "
+            "PM uses to reference category in delegation messages. "
+            "Example: '660e8400-e29b-41d4-a716-446655440000'. "
+            "Specialist uses this ID to assign families to categories."
+        )
+    )
+    name: str = Field(
+        ...,
+        description=(
+            "Category name (human-readable, hierarchical). "
+            "Examples: 'Food & Beverage', 'Beverage Packaging', 'PET Bottle Packaging'. "
+            "PM shows this to user for taxonomy discussions. "
+            "Exact match required for category assignment."
+        )
+    )
+    parent_id: str | None = Field(
+        None,
+        description=(
+            "Parent category UUID if this is a subcategory (None for top-level categories). "
+            "Example: '660e8400-...' (Food & Beverage parent of Beverage Packaging). "
+            "Used to understand taxonomy hierarchy. "
+            "None indicates this is a root category."
+        )
+    )
+    parent_name: str | None = Field(
+        None,
+        description=(
+            "Parent category name if available (None for top-level categories). "
+            "Examples: 'Food & Beverage', 'Beverage Packaging'. "
+            "PM uses for context: 'This is a subcategory of Food & Beverage'. "
+            "None if this is a root category or parent name unavailable."
+        )
+    )
+    subcategory_count: int = Field(
+        ...,
+        description=(
+            "Number of direct subcategories under this category. "
+            "Example: 5 (Food & Beverage has 5 subcategories like Beverage, Dairy, Snacks, etc.). "
+            "0 indicates leaf category (no further subdivision). "
+            "PM uses to navigate taxonomy: 'This category has 5 subcategories you can explore'."
+        )
+    )
+    product_family_count: int = Field(
+        ...,
+        description=(
+            "Number of product families assigned to this specific category (not including subcategories). "
+            "Example: 15 (15 families in Beverage Packaging category). "
+            "0 means no families assigned yet or category used only for organization. "
+            "PM uses for context: 'This category contains 15 product families'. "
+            "Helps PM understand category utilization and suggest appropriate categories."
+        )
+    )
 
 
 # =============================================================================
@@ -151,8 +361,8 @@ def create_search_catalog_summary_tool(storage: StorageInterface) -> BaseTool:
                 # Case-insensitive substring search on product family names
                 search_pattern = f"%{query}%"
 
-                # Query product families with search pattern
-                families = await storage.query_advanced(
+                # Query product families with search pattern (type-safe)
+                families = await storage.query_entities(
                     table="product_families",
                     columns=["id", "name", "category_id"],
                     search_patterns={"name": search_pattern},
@@ -176,11 +386,10 @@ def create_search_catalog_summary_tool(storage: StorageInterface) -> BaseTool:
                 for family in families:
                     family_id = family["id"]
 
-                    # Count variants for this family
-                    variant_count = await storage.query_advanced(
+                    # Count variants for this family (type-safe)
+                    variant_count = await storage.count_entities(
                         table="products",
                         filters={"product_family_id": family_id},
-                        count_only=True
                     )
 
                     # Get category name if category_id exists
@@ -285,8 +494,8 @@ def create_get_category_info_tool(storage: StorageInterface) -> BaseTool:
             → {"success": True, "id": "...", "name": "Food & Beverage", "subcategory_count": 3, "product_family_count": 15}
         """
         try:
-            # Case-insensitive exact match on category name
-            categories = await storage.query_advanced(
+            # Case-insensitive exact match on category name (type-safe)
+            categories = await storage.query_entities(
                 table="categories",
                 columns=["id", "name", "parent_id"],
                 search_patterns={"name": category_name},
@@ -321,18 +530,16 @@ def create_get_category_info_tool(storage: StorageInterface) -> BaseTool:
                 except Exception as e:
                     logger.warning(f"Failed to fetch parent category name: {e}")
 
-            # Count subcategories
-            subcategory_count = await storage.query_advanced(
+            # Count subcategories (type-safe)
+            subcategory_count = await storage.count_entities(
                 table="categories",
                 filters={"parent_id": str(category_id)},
-                count_only=True
             )
 
-            # Count product families in this category
-            product_family_count = await storage.query_advanced(
+            # Count product families in this category (type-safe)
+            product_family_count = await storage.count_entities(
                 table="product_families",
                 filters={"category_id": str(category_id)},
-                count_only=True
             )
 
             logger.info(
