@@ -873,6 +873,256 @@ class StorageInterface(ABC):
         pass
 
     # ========================================================================
+    # Dry-Run & Validation (Universal Data Engine - Phase 1.5)
+    # ========================================================================
+
+    @abstractmethod
+    async def validate_entity_data(
+        self,
+        table: str,
+        data: dict[str, Any] | list[dict[str, Any]],
+        operation: Literal["insert", "update", "upsert", "delete"],
+    ) -> dict[str, Any]:
+        """
+        Validate entity data against schema without executing operation.
+
+        Universal Data Engine - Phase 1.5: Pre-flight validation for safe writes.
+
+        Performs comprehensive validation checks:
+        - Schema conformance (field types, required fields)
+        - Data type validation (strings, numbers, booleans, dates)
+        - Field length constraints
+        - Enum value validation (if supported by schema)
+
+        Args:
+            table: Table name
+            data: Entity data (single dict or list of dicts)
+            operation: Operation type being validated
+
+        Returns:
+            Validation result dict:
+            {
+                "valid": bool,              # Overall validation status
+                "errors": [                 # Critical errors (must fix)
+                    {
+                        "field": "sku_code",
+                        "error": "Field is required but missing",
+                        "severity": "error"
+                    }
+                ],
+                "warnings": [               # Non-critical warnings
+                    {
+                        "field": "price",
+                        "warning": "Value seems unusually high",
+                        "severity": "warning"
+                    }
+                ],
+                "entity_count": 1,          # Number of entities validated
+            }
+
+        Examples:
+            # Validate single entity for insert
+            result = await storage.validate_entity_data(
+                "products",
+                {"sku_code": "SKU-001", "name": "Product A"},
+                operation="insert"
+            )
+            if not result["valid"]:
+                print(f"Validation errors: {result['errors']}")
+
+            # Validate batch for upsert
+            result = await storage.validate_entity_data(
+                "products",
+                [
+                    {"sku_code": "SKU-001", "name": "Product A"},
+                    {"sku_code": "SKU-002"},  # Missing name
+                ],
+                operation="upsert"
+            )
+
+        Notes:
+            - Does NOT check constraints (use check_constraint_violations)
+            - Does NOT execute any writes
+            - Schema validation only, not business logic
+            - Useful for pre-flight checks before bulk operations
+
+        Raises:
+            StorageError: On validation system failure (not data errors)
+            ValueError: If table doesn't exist
+        """
+        pass
+
+    @abstractmethod
+    async def check_constraint_violations(
+        self,
+        table: str,
+        data: dict[str, Any] | list[dict[str, Any]],
+        operation: Literal["insert", "update", "upsert"],
+        exclude_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Check for constraint violations before write operation.
+
+        Universal Data Engine - Phase 1.5: Detect conflicts before execution.
+
+        Validates against database constraints:
+        - Uniqueness constraints (duplicate detection)
+        - Foreign key constraints (referential integrity)
+        - Check constraints (value ranges, patterns)
+
+        Args:
+            table: Table name
+            data: Entity data (single dict or list of dicts)
+            operation: Operation type ("insert", "update", "upsert")
+            exclude_ids: IDs to exclude from uniqueness check (for updates)
+
+        Returns:
+            Constraint check result:
+            {
+                "safe_to_proceed": bool,    # Can operation proceed safely
+                "violations": [             # List of constraint violations
+                    {
+                        "type": "uniqueness",
+                        "field": "sku_code",
+                        "value": "SKU-001",
+                        "message": "SKU code already exists",
+                        "conflicting_id": "uuid-existing"
+                    },
+                    {
+                        "type": "foreign_key",
+                        "field": "category_id",
+                        "value": "cat-999",
+                        "message": "Referenced category does not exist"
+                    }
+                ],
+                "warnings": [               # Non-blocking issues
+                    {
+                        "type": "performance",
+                        "message": "Large batch may be slow"
+                    }
+                ],
+                "checked_constraints": [    # Constraints that were checked
+                    "sku_code_unique",
+                    "category_id_fkey"
+                ]
+            }
+
+        Examples:
+            # Check uniqueness before insert
+            result = await storage.check_constraint_violations(
+                "products",
+                {"sku_code": "SKU-001", "name": "Product A"},
+                operation="insert"
+            )
+            if not result["safe_to_proceed"]:
+                print(f"Violations: {result['violations']}")
+
+            # Check batch with ID exclusion for update
+            result = await storage.check_constraint_violations(
+                "products",
+                {"sku_code": "SKU-001"},  # Updating existing
+                operation="update",
+                exclude_ids=["uuid-123"]  # Exclude self from uniqueness check
+            )
+
+        Performance:
+            - Uses indexes for efficient constraint checking
+            - Batch operations checked in single query where possible
+            - Foreign key checks may query related tables
+
+        Notes:
+            - Does NOT validate schema (use validate_entity_data)
+            - Does NOT execute any writes
+            - safe_to_proceed=True means no violations detected
+            - Upsert operations typically skip uniqueness checks
+
+        Raises:
+            StorageError: On constraint check failure
+            ValueError: If table doesn't exist
+        """
+        pass
+
+    @abstractmethod
+    async def preview_write_impact(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        operation: Literal["update", "delete"] = "update",
+        sample_size: int = 5,
+    ) -> dict[str, Any]:
+        """
+        Preview impact of update/delete operation before execution.
+
+        Universal Data Engine - Phase 1.5: Dry-run impact analysis.
+
+        Calculates operation impact without executing:
+        - Number of entities affected
+        - Sample of entities that would change
+        - Estimated execution time
+        - Potential risks and warnings
+
+        Args:
+            table: Table name
+            filters: Filter conditions (same as update/delete filters)
+            operation: Operation type ("update" or "delete")
+            sample_size: Number of sample entities to return (default: 5)
+
+        Returns:
+            Impact preview:
+            {
+                "affected_count": 150,      # Entities that would be affected
+                "sample_entities": [        # Sample of affected entities
+                    {"id": "id1", "sku_code": "SKU-001", "name": "Product A"},
+                    {"id": "id2", "sku_code": "SKU-002", "name": "Product B"},
+                    ...
+                ],
+                "estimated_duration_ms": 250,  # Estimated operation time
+                "warnings": [               # Potential issues
+                    {
+                        "type": "large_batch",
+                        "message": "Operation affects 150+ entities"
+                    }
+                ],
+                "safe_to_proceed": True,    # Recommendation
+            }
+
+        Examples:
+            # Preview delete impact
+            result = await storage.preview_write_impact(
+                "products",
+                filters={"is_active": False},
+                operation="delete"
+            )
+            print(f"Would delete {result['affected_count']} entities")
+            print(f"Sample: {result['sample_entities']}")
+
+            # Preview update impact with no filters (dangerous!)
+            result = await storage.preview_write_impact(
+                "products",
+                filters=None,
+                operation="update"
+            )
+            if not result["safe_to_proceed"]:
+                print("WARNING: Would affect ALL entities")
+
+        Warnings Generated:
+            - large_batch: >100 entities affected
+            - no_filters: Operation affects all entities
+            - cascading_deletes: Delete would cascade to related records
+
+        Notes:
+            - Does NOT execute any writes
+            - Count and samples fetched in single query
+            - Duration estimate based on affected_count heuristics
+            - Insert operations don't need preview (no existing data affected)
+
+        Raises:
+            StorageError: On preview failure
+            ValueError: If table doesn't exist or operation not supported
+        """
+        pass
+
+    # ========================================================================
     # Schema Intelligence (Universal Data Engine - Phase 1.1)
     # ========================================================================
 
