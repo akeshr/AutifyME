@@ -871,6 +871,149 @@ class SupabaseStorageClient(StorageInterface):
                 original_error=e,
             ) from e
 
+    async def query_aggregate(
+        self,
+        table: str,
+        aggregates: dict[str, str],
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        group_by: list[str] | None = None,
+        having: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query with aggregations and GROUP BY using PostgREST.
+
+        Universal Data Engine - Phase 1.2: Aggregation support.
+
+        Args:
+            table: Table name
+            aggregates: Aggregation operations as {alias: "function(column)"}
+            filters: Exact match filters before aggregation
+            search_patterns: ILIKE patterns before aggregation
+            group_by: Columns to group by
+            having: Filters on aggregated results
+
+        Returns:
+            List of aggregated results
+
+        Raises:
+            StorageError: On query failure
+        """
+        try:
+            client = await self._ensure_async_client()
+
+            # Build SELECT clause with group_by columns and aggregates
+            select_parts = []
+
+            # Add group by columns
+            if group_by:
+                select_parts.extend(group_by)
+
+            # Add aggregate functions
+            # PostgREST syntax: column.function()::alias
+            for alias, aggregate_expr in aggregates.items():
+                # Parse aggregate expression like "count(*)", "sum(price)", "avg(rating)"
+                # PostgREST expects: "price.sum()::total_price" or "id.count()::total"
+
+                # Handle count(*) special case
+                if "count(*)" in aggregate_expr.lower():
+                    select_parts.append(f"id.count()::int::{alias}")
+                else:
+                    # Extract function and column: "sum(price)" -> function=sum, column=price
+                    import re
+                    match = re.match(r'(\w+)\(([^)]+)\)', aggregate_expr)
+                    if match:
+                        func, column = match.groups()
+                        # PostgREST syntax for aggregates
+                        if func.lower() in ('sum', 'avg', 'min', 'max'):
+                            select_parts.append(f"{column}.{func.lower()}()::numeric::{alias}")
+                        elif func.lower() == 'count':
+                            select_parts.append(f"{column}.count()::int::{alias}")
+                        else:
+                            logger.warning(f"Unknown aggregate function: {func}")
+                            select_parts.append(f"{column}.{func.lower()}()::{alias}")
+                    else:
+                        logger.error(f"Invalid aggregate syntax: {aggregate_expr}")
+                        raise ValueError(f"Invalid aggregate expression: {aggregate_expr}")
+
+            select_clause = ",".join(select_parts)
+
+            # Build query
+            query = client.table(table).select(select_clause)
+
+            # Apply filters
+            if filters:
+                for key, value in filters.items():
+                    if isinstance(value, list):
+                        query = query.in_(key, value)
+                    else:
+                        query = query.eq(key, value)
+
+            # Apply search patterns
+            if search_patterns:
+                for column, pattern in search_patterns.items():
+                    query = query.ilike(column, pattern)
+
+            # Note: PostgREST doesn't support HAVING clause directly
+            # We'll need to filter results in Python if having is specified
+            if having and not group_by:
+                logger.warning("HAVING clause without GROUP BY - will be ignored")
+
+            # Execute query
+            response = await query.execute()
+            results = response.data if response.data else []
+
+            # Apply HAVING filters in Python (PostgREST limitation)
+            if having and group_by and results:
+                filtered_results = []
+                for row in results:
+                    include = True
+                    for having_col, condition in having.items():
+                        if having_col not in row:
+                            continue
+
+                        value = row[having_col]
+                        if isinstance(condition, dict):
+                            # Handle operators: {"gt": 10}, {"lt": 100}, etc.
+                            for op, threshold in condition.items():
+                                if op == "gt" and not (value > threshold) or op == "gte" and not (value >= threshold) or op == "lt" and not (value < threshold) or op == "lte" and not (value <= threshold) or op == "eq" and value != threshold or op == "neq" and value == threshold:
+                                    include = False
+                        else:
+                            # Direct comparison
+                            if value != condition:
+                                include = False
+
+                    if include:
+                        filtered_results.append(row)
+
+                results = filtered_results
+
+            logger.debug(
+                f"Aggregate query returned {len(results)} results",
+                extra={
+                    "table": table,
+                    "aggregates": list(aggregates.keys()),
+                    "group_by": group_by,
+                }
+            )
+
+            return results
+
+        except Exception as e:
+            logger.error(
+                f"Aggregate query failed for {table}",
+                exc_info=True,
+                extra={
+                    "table": table,
+                    "aggregates": aggregates,
+                    "group_by": group_by,
+                }
+            )
+            raise StorageError(
+                message=f"Aggregate query failed for {table}: {str(e)}",
+                operation="query_aggregate",
+                original_error=e,
+            ) from e
+
     async def insert_entity(
         self,
         table: str,

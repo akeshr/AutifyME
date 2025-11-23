@@ -369,6 +369,75 @@ class StorageInterface(ABC):
         pass
 
     @abstractmethod
+    async def query_aggregate(
+        self,
+        table: str,
+        aggregates: dict[str, str],
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        group_by: list[str] | None = None,
+        having: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Query with aggregations (count, sum, avg, min, max) and GROUP BY.
+
+        Universal Data Engine - Phase 1.2: Aggregation support for analytics queries.
+
+        Enables agents to perform analytical queries like:
+        - Count products by category
+        - Sum sales by region
+        - Average price by brand
+        - Min/max values per group
+
+        Args:
+            table: Table name
+            aggregates: Aggregation operations as {alias: "function(column)"}
+                       Examples:
+                       - {"total": "count(*)"} - count all rows
+                       - {"total_price": "sum(price)"} - sum of prices
+                       - {"avg_rating": "avg(rating)"} - average rating
+                       - {"min_price": "min(price)", "max_price": "max(price)"}
+            filters: Exact match filters applied before aggregation
+            search_patterns: ILIKE patterns applied before aggregation
+            group_by: Columns to group by (e.g., ["category", "brand"])
+            having: Filters on aggregated results (e.g., {"total": {"gt": 100}})
+
+        Returns:
+            List of aggregated results, each row contains:
+            - All group_by columns
+            - All aggregate aliases with their computed values
+
+        Examples:
+            # Count products per category
+            results = await storage.query_aggregate(
+                "products",
+                aggregates={"count": "count(*)"},
+                group_by=["category_id"]
+            )
+            # Returns: [{"category_id": "cat1", "count": 15}, ...]
+
+            # Average price per brand, only brands with >10 products
+            results = await storage.query_aggregate(
+                "products",
+                aggregates={"avg_price": "avg(base_price)", "product_count": "count(*)"},
+                group_by=["brand"],
+                having={"product_count": {"gt": 10}}
+            )
+
+            # Total active products (no grouping)
+            results = await storage.query_aggregate(
+                "products",
+                aggregates={"total_active": "count(*)"},
+                filters={"is_active": True}
+            )
+            # Returns: [{"total_active": 42}]
+
+        Raises:
+            StorageError: On query failure or invalid aggregate syntax
+        """
+        pass
+
+    @abstractmethod
     async def insert_entity(
         self,
         table: str,
