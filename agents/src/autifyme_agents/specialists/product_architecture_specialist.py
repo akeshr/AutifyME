@@ -121,7 +121,7 @@ def create_product_architecture_specialist(
     tools.extend([get_product_schema, get_table_schema, list_available_tables])
 
     # Storage-dependent tools
-    from autifyme_agents.tools.data_engine_tools import (
+    from autifyme_agents.tools.data_engine import (
         create_inspect_schema_tool,
         create_read_data_tool,
     )
