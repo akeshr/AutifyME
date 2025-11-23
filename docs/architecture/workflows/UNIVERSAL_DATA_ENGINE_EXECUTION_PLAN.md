@@ -92,80 +92,83 @@ Phased implementation plan for transforming AutifyME's data layer into a Univers
 **Goal:** Enhance existing capabilities and build Schema Engine foundation
 
 **Duration:** 2-3 weeks
-**Status:** 🔲 Not Started
+**Status:** 🔄 In Progress (Phase 1.2 Complete)
 **Priority:** CRITICAL
 
 ### 1.1 Schema Engine - Core Features
 
-**Status:** 🔲 Not Started
+**Status:** ✅ Complete (2025-01-23)
 
 **Architecture Note:** Schema stored in single JSON file (`schemas/database_schema_v1.json`) containing ALL tables. SchemaRegistry loads once at startup (in-memory), filters to requested tables at runtime. Token-efficient: agents receive only requested subset.
 
 #### Tasks:
 
-- [ ] **Schema Tool Factory** (`tools/schema_tools.py`)
-  - [ ] Create `create_schema_tool()` factory with table restrictions
-  - [ ] Support capability filtering (introspect, relationships, stats)
-  - [ ] Integrate with existing SchemaRegistry (single-file, in-memory)
-  - [ ] Add access control enforcement (table-level filtering)
-  - [ ] **Tests:** 15+ tests (factory, access control, caching)
+- [x] **Schema Tool Factory** (`tools/data_engine_tools.py`)
+  - [x] Created `create_inspect_schema_tool()` factory with table restrictions
+  - [x] Support multi-detail inspection (structure, relationships, stats, samples)
+  - [x] Integrated with existing SchemaRegistry (single-file, in-memory)
+  - [x] Access control enforcement (table-level filtering)
+  - [x] **Tests:** 15 tests (factory, access control, configuration)
 
-- [ ] **Schema Discovery** (`tools/schema_tools.py`)
-  - [ ] `explore_schema(domain)` - List tables with metadata
-  - [ ] `get_schema(tables, depth)` - Fetch targeted schema
-  - [ ] Schema caching per session (avoid repeated fetches)
-  - [ ] Minimal response format (token-efficient)
-  - [ ] **Tests:** 10+ tests (depth levels, caching, performance)
+- [x] **Schema Discovery** (`tools/data_engine_tools.py`)
+  - [x] `inspect_schema(tables, details)` - Fetch targeted schema metadata
+  - [x] On-demand filtering (runtime, not prompt-time)
+  - [x] Graceful partial failures (per-table error isolation)
+  - [x] Token-efficient response format
+  - [x] **Tests:** 10 tests (multi-table, details filtering, edge cases)
 
-- [ ] **Table Statistics** (`integrations/storage/supabase_client.py`)
-  - [ ] `get_table_stats(table)` - Row counts, column stats
-  - [ ] Index information retrieval
-  - [ ] Last updated timestamp
-  - [ ] Add to StorageInterface port
-  - [ ] **Tests:** 8+ tests (all tables, empty tables, performance)
+- [x] **Table Statistics** (`integrations/storage/supabase_client.py`)
+  - [x] `get_table_stats(table)` - Row counts, indexes, primary key
+  - [x] Index information retrieval
+  - [x] Future-ready (estimated_size_bytes, last_updated placeholders)
+  - [x] Added to StorageInterface port
+  - [x] **Tests:** 8 tests (all tables, empty tables, errors)
 
-- [ ] **Data Sampling** (`integrations/storage/supabase_client.py`)
-  - [ ] `sample_data(table, filters, limit)` - Real examples
-  - [ ] Respect RLS policies (future-proof)
-  - [ ] Add to StorageInterface port
-  - [ ] **Tests:** 10+ tests (filters, limits, edge cases)
+- [x] **Data Sampling** (`integrations/storage/supabase_client.py`)
+  - [x] `sample_data(table, filters, limit)` - Real data examples
+  - [x] Safety limit (max 20 rows)
+  - [x] Filter support for targeted sampling
+  - [x] Added to StorageInterface port
+  - [x] **Tests:** 10 tests (filters, limits, validation, edge cases)
 
 **Deliverables:**
-- Schema tool factory with access control
-- Schema discovery APIs
-- Table statistics APIs
-- Data sampling APIs
-- 40+ tests (unit + integration)
-- Documentation updates
+- ✅ Schema tool factory with access control
+- ✅ inspect_schema tool with multi-detail support
+- ✅ Table statistics APIs (get_table_stats)
+- ✅ Data sampling APIs (sample_data)
+- ✅ 50 comprehensive tests (all passing)
+- ✅ Quality: Ruff + Mypy clean
+- ✅ Documentation: Inline docstrings + test coverage
 
 ---
 
 ### 1.2 Read Engine - Aggregations
 
-**Status:** 🔲 Not Started
+**Status:** ✅ Complete (2025-01-23)
 
 #### Tasks:
 
-- [ ] **Aggregation Support** (`integrations/storage/supabase_client.py`)
-  - [ ] Extend `query_advanced()` with aggregation support
-  - [ ] Support metrics: count, sum, avg, min, max
-  - [ ] GROUP BY support
-  - [ ] HAVING clause support (filter aggregated results)
-  - [ ] Add to StorageInterface port
-  - [ ] **Tests:** 20+ tests (all metrics, GROUP BY, HAVING)
+- [x] **Aggregation Support** (`integrations/storage/supabase_client.py`)
+  - [x] Added `query_aggregate()` port method to StorageInterface
+  - [x] Implemented in SupabaseClient with PostgREST syntax translation
+  - [x] Support metrics: count, sum, avg, min, max
+  - [x] GROUP BY support (single/multiple columns)
+  - [x] HAVING clause support (Python-side filtering, all operators: gt, gte, lt, lte, eq, neq)
+  - [x] **Tests:** 35 tests total (comprehensive coverage)
 
-- [ ] **Read Tool Enhancement** (`tools/query_database_tool.py`)
-  - [ ] Add `aggregate()` method to query_database tool
-  - [ ] Integrate with existing query capabilities
-  - [ ] Maintain backward compatibility
-  - [ ] Add examples to docstrings
-  - [ ] **Tests:** 15+ tests (specialist scenarios)
+- [x] **Aggregate Data Tool** (`tools/data_engine_tools.py`)
+  - [x] Created `create_aggregate_data_tool()` factory
+  - [x] Access control with table restrictions
+  - [x] Agent-centric naming: `aggregate_data`
+  - [x] Comprehensive docstrings with USE WHEN guidance
+  - [x] **Tests:** Included in 35-test suite
 
 **Deliverables:**
-- Aggregation support in storage layer
-- Enhanced query_database tool
-- 35+ tests
-- Updated documentation
+- ✅ Aggregation support in storage layer (query_aggregate method)
+- ✅ New aggregate_data tool with factory pattern
+- ✅ 35 comprehensive tests (all passing)
+- ✅ Quality: Ruff + Mypy clean
+- ✅ Documentation: Inline docstrings + test coverage
 
 ---
 
