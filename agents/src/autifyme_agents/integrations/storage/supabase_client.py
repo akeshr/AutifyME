@@ -1171,7 +1171,7 @@ class SupabaseStorageClient(StorageInterface):
             # - pg_stat_user_tables for last_updated
             # - pg_indexes for index list
 
-            stats = {
+            stats: dict[str, Any] = {
                 "row_count": row_count,
                 "estimated_size_bytes": None,  # Requires database function
                 "last_updated": None,  # Requires pg_stat_user_tables access
