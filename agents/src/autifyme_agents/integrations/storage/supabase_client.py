@@ -1742,6 +1742,299 @@ class SupabaseStorageClient(StorageInterface):
             ) from e
 
     # ========================================================================
+    # Dry-Run & Validation (Universal Data Engine - Phase 1.5)
+    # ========================================================================
+
+    async def validate_entity_data(
+        self,
+        table: str,
+        data: dict[str, Any] | list[dict[str, Any]],
+        operation: Literal["insert", "update", "upsert", "delete"],
+    ) -> dict[str, Any]:
+        """
+        Validate entity data against schema without executing operation.
+
+        Performs basic schema validation:
+        - Checks for required fields (basic validation)
+        - Type checking for common field types
+        - Returns errors/warnings without executing writes
+
+        Args:
+            table: Table name
+            data: Entity data (single dict or list of dicts)
+            operation: Operation type being validated
+
+        Returns:
+            Validation result with valid flag, errors, and warnings
+        """
+        try:
+            # Normalize to list for consistent processing
+            entities = data if isinstance(data, list) else [data]
+
+            errors: list[dict[str, Any]] = []
+            warnings: list[dict[str, Any]] = []
+
+            # Basic validation rules for common fields
+            # In production, these would come from schema registry
+            required_fields_by_table = {
+                "products": ["sku_code", "name"] if operation == "insert" else [],
+                "product_families": ["name", "sku_prefix"] if operation == "insert" else [],
+                "categories": ["name"] if operation == "insert" else [],
+            }
+
+            required_fields = required_fields_by_table.get(table, [])
+
+            # Validate each entity
+            for idx, entity in enumerate(entities):
+                # Check required fields
+                for field in required_fields:
+                    if field not in entity or entity[field] is None or entity[field] == "":
+                        errors.append({
+                            "entity_index": idx,
+                            "field": field,
+                            "error": f"Field '{field}' is required but missing or empty",
+                            "severity": "error"
+                        })
+
+                # Type validation for common fields
+                if "base_price" in entity and entity["base_price"] is not None:
+                    if not isinstance(entity["base_price"], (int, float)):
+                        errors.append({
+                            "entity_index": idx,
+                            "field": "base_price",
+                            "error": "Field 'base_price' must be a number",
+                            "severity": "error"
+                        })
+                    elif entity["base_price"] < 0:
+                        warnings.append({
+                            "entity_index": idx,
+                            "field": "base_price",
+                            "warning": "Negative price detected",
+                            "severity": "warning"
+                        })
+
+                # Check for unusually long strings (potential data issues)
+                for key, value in entity.items():
+                    if isinstance(value, str) and len(value) > 1000:
+                        warnings.append({
+                            "entity_index": idx,
+                            "field": key,
+                            "warning": f"String value exceeds 1000 characters ({len(value)} chars)",
+                            "severity": "warning"
+                        })
+
+            return {
+                "valid": len(errors) == 0,
+                "errors": errors,
+                "warnings": warnings,
+                "entity_count": len(entities),
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Validation failed for {table}",
+                exc_info=True,
+                extra={"table": table, "operation": operation}
+            )
+            raise StorageError(
+                message=f"Validation failed for {table}: {str(e)}",
+                operation="validate_entity_data",
+                original_error=e,
+            ) from e
+
+    async def check_constraint_violations(
+        self,
+        table: str,
+        data: dict[str, Any] | list[dict[str, Any]],
+        operation: Literal["insert", "update", "upsert"],
+        exclude_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Check for constraint violations before write operation.
+
+        Checks uniqueness constraints using existing storage methods.
+        Leverages check_existing_values for efficient batch checking.
+
+        Args:
+            table: Table name
+            data: Entity data (single dict or list of dicts)
+            operation: Operation type
+            exclude_ids: IDs to exclude from uniqueness check
+
+        Returns:
+            Constraint check result with safe_to_proceed flag and violations
+        """
+        try:
+            # Normalize to list
+            entities = data if isinstance(data, list) else [data]
+
+            violations: list[dict[str, Any]] = []
+            warnings: list[dict[str, Any]] = []
+            checked_constraints: list[str] = []
+
+            # Define unique fields per table
+            # In production, these would come from schema registry
+            unique_fields_by_table = {
+                "products": ["sku_code"],
+                "product_families": ["sku_prefix"],
+                "categories": ["slug"],
+                "variant_axes": ["axis_name"],
+            }
+
+            unique_fields = unique_fields_by_table.get(table, [])
+
+            # Check uniqueness constraints (skip for upsert as it handles conflicts)
+            if operation != "upsert":
+                for field in unique_fields:
+                    # Collect values to check
+                    values_to_check = [
+                        entity[field]
+                        for entity in entities
+                        if field in entity and entity[field] is not None
+                    ]
+
+                    if values_to_check:
+                        # Use existing check_existing_values method
+                        existing_values = await self.check_existing_values(
+                            table, field, values_to_check, exclude_ids
+                        )
+
+                        # Report violations for existing values
+                        for value in existing_values:
+                            violations.append({
+                                "type": "uniqueness",
+                                "field": field,
+                                "value": value,
+                                "message": f"{field} '{value}' already exists",
+                            })
+
+                        checked_constraints.append(f"{field}_unique")
+
+            # Check for large batches (performance warning)
+            if len(entities) > 100:
+                warnings.append({
+                    "type": "performance",
+                    "message": f"Large batch ({len(entities)} entities) may be slow"
+                })
+
+            # Check for duplicate values within the batch itself
+            for field in unique_fields:
+                field_values = [
+                    entity[field]
+                    for entity in entities
+                    if field in entity and entity[field] is not None
+                ]
+
+                duplicates = {v for v in field_values if field_values.count(v) > 1}
+
+                for dup_value in duplicates:
+                    violations.append({
+                        "type": "duplicate_in_batch",
+                        "field": field,
+                        "value": dup_value,
+                        "message": f"Duplicate {field} '{dup_value}' within batch"
+                    })
+
+            return {
+                "safe_to_proceed": len(violations) == 0,
+                "violations": violations,
+                "warnings": warnings,
+                "checked_constraints": checked_constraints,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Constraint check failed for {table}",
+                exc_info=True,
+                extra={"table": table, "operation": operation}
+            )
+            raise StorageError(
+                message=f"Constraint check failed for {table}: {str(e)}",
+                operation="check_constraint_violations",
+                original_error=e,
+            ) from e
+
+    async def preview_write_impact(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        operation: Literal["update", "delete"] = "update",
+        sample_size: int = 5,
+    ) -> dict[str, Any]:
+        """
+        Preview impact of update/delete operation before execution.
+
+        Uses existing count_entities and query_entities for efficient preview.
+
+        Args:
+            table: Table name
+            filters: Filter conditions
+            operation: Operation type ("update" or "delete")
+            sample_size: Number of sample entities to return
+
+        Returns:
+            Impact preview with affected_count, samples, and warnings
+        """
+        try:
+            # Get affected count
+            affected_count = await self.count_entities(table, filters=filters)
+
+            # Get sample entities
+            sample_entities: list[dict[str, Any]] = []
+            if affected_count > 0:
+                sample_entities = await self.query_entities(
+                    table,
+                    filters=filters,
+                    limit=sample_size
+                )
+
+            # Calculate estimated duration (heuristic: ~2ms per entity)
+            estimated_duration_ms = max(10, affected_count * 2)
+
+            # Generate warnings
+            warnings: list[dict[str, Any]] = []
+            safe_to_proceed = True
+
+            if filters is None or len(filters) == 0:
+                warnings.append({
+                    "type": "no_filters",
+                    "message": "Operation affects ALL entities in table"
+                })
+                safe_to_proceed = False  # Dangerous operation
+
+            if affected_count > 100:
+                warnings.append({
+                    "type": "large_batch",
+                    "message": f"Operation affects {affected_count} entities"
+                })
+
+            if affected_count == 0:
+                warnings.append({
+                    "type": "no_effect",
+                    "message": "No entities match the filter criteria"
+                })
+
+            return {
+                "affected_count": affected_count,
+                "sample_entities": sample_entities,
+                "estimated_duration_ms": estimated_duration_ms,
+                "warnings": warnings,
+                "safe_to_proceed": safe_to_proceed,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Preview failed for {table}",
+                exc_info=True,
+                extra={"table": table, "operation": operation, "filters": filters}
+            )
+            raise StorageError(
+                message=f"Preview failed for {table}: {str(e)}",
+                operation="preview_write_impact",
+                original_error=e,
+            ) from e
+
+    # ========================================================================
     # Schema Intelligence (Universal Data Engine - Phase 1.1)
     # ========================================================================
 
