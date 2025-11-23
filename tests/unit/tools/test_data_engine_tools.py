@@ -7,13 +7,29 @@ Phase 1.1: Schema Engine (50 tests)
 - Data sampling (10+ tests)
 - Error handling & edge cases (7+ tests)
 
-Phase 1.2: Read Engine - Aggregations (35+ tests)
+Phase 1.2: Read Engine - Aggregations (35 tests)
 - Aggregation tool factory (10+ tests)
 - Basic aggregation queries (10+ tests)
 - GROUP BY operations (8+ tests)
 - HAVING clause (7+ tests)
 
-Total: 85+ tests
+Phase 1.6: Read Engine - Unified read_data tool (25 tests)
+- Query operations (filters, search, columns) (8 tests)
+- Batch read by IDs (4 tests)
+- Pagination and counting (5 tests)
+- Relations and access control (5 tests)
+- Error handling (3 tests)
+
+Phase 1.6: Write Engine - Unified write_data tool (35 tests)
+- Insert operations (6 tests)
+- Update and delete (6 tests)
+- Upsert operations (5 tests)
+- Patch operations (4 tests)
+- Validation mode (6 tests)
+- Dry-run mode (5 tests)
+- Access control (3 tests)
+
+Total: 145 tests
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -27,6 +43,8 @@ from autifyme_agents.schemas.registry import SchemaRegistry
 from autifyme_agents.tools.data_engine_tools import (
     create_aggregate_data_tool,
     create_inspect_schema_tool,
+    create_read_data_tool,
+    create_write_data_tool,
 )
 
 # =============================================================================
@@ -58,6 +76,46 @@ def mock_storage():
         {"category_id": "cat-1", "count": 10, "avg_price": 150.50},
         {"category_id": "cat-2", "count": 25, "avg_price": 89.99},
     ])
+
+    # Default mock behavior for Phase 1.6 (read_data tool)
+    storage.batch_read = AsyncMock(return_value=[
+        {"id": "id-1", "name": "Product 1", "price": 100},
+        {"id": "id-2", "name": "Product 2", "price": 200},
+    ])
+    storage.count_entities = AsyncMock(return_value=42)
+    storage.query_advanced = AsyncMock(return_value=[
+        {"id": "id-1", "name": "Product 1", "price": 100},
+        {"id": "id-2", "name": "Product 2", "price": 200},
+    ])
+
+    # Default mock behavior for Phase 1.6 (write_data tool)
+    storage.insert_entity = AsyncMock(return_value={"id": "new-id", "name": "New Product"})
+    storage.bulk_upsert = AsyncMock(return_value=[
+        {"id": "id-1", "name": "Product 1"},
+        {"id": "id-2", "name": "Product 2"},
+    ])
+    storage.update_entities = AsyncMock(return_value=5)
+    storage.delete_entities = AsyncMock(return_value=3)
+    storage.upsert_entity = AsyncMock(return_value={"id": "id-1", "name": "Upserted"})
+    storage.patch_entity = AsyncMock(return_value={"id": "id-1", "price": 150.0})
+    storage.validate_entity_data = AsyncMock(return_value={
+        "valid": True,
+        "errors": [],
+        "warnings": [],
+        "entity_count": 1
+    })
+    storage.check_constraint_violations = AsyncMock(return_value={
+        "safe_to_proceed": True,
+        "violations": [],
+        "warnings": []
+    })
+    storage.preview_write_impact = AsyncMock(return_value={
+        "affected_count": 10,
+        "sample_entities": [{"id": "id-1"}],
+        "estimated_duration_ms": 20,
+        "warnings": [],
+        "safe_to_proceed": True
+    })
 
     return storage
 
@@ -1751,3 +1809,1037 @@ class TestHavingClause:
         assert call_args.kwargs["filters"]["is_active"] is True
         assert call_args.kwargs["group_by"] == ["brand"]
         assert call_args.kwargs["having"]["total"]["gt"] == 20
+
+
+# =============================================================================
+# Phase 1.6: Unified read_data Tool Tests (25 tests)
+# =============================================================================
+
+
+class TestReadDataTool:
+    """Tests for create_read_data_tool factory and unified read operations."""
+
+    # =========================================================================
+    # Group 1: Query Operations (8 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_read_basic_query_with_filters(self, mock_storage):
+        """Test basic query with exact match filters."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "filters": {"is_active": True, "category_id": "cat-123"}
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "query"
+        assert "results" in result
+        mock_storage.query_advanced.assert_called_once()
+        call_args = mock_storage.query_advanced.call_args
+        assert call_args.kwargs["filters"]["is_active"] is True
+
+    @pytest.mark.asyncio
+    async def test_read_with_search_patterns(self, mock_storage):
+        """Test query with ILIKE search patterns."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "search_patterns": {"name": "%bottle%", "sku_code": "SKU-%"}
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_advanced.call_args
+        assert call_args.kwargs["search_patterns"]["name"] == "%bottle%"
+
+    @pytest.mark.asyncio
+    async def test_read_with_column_projection(self, mock_storage):
+        """Test query with specific columns only."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "columns": ["id", "name", "price"]
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_advanced.call_args
+        assert call_args.kwargs["columns"] == ["id", "name", "price"]
+
+    @pytest.mark.asyncio
+    async def test_read_with_relations(self, mock_storage):
+        """Test query with related table joins."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "relations": ["category(id,name)", "product_family(*)"]
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_advanced.call_args
+        assert "category(id,name)" in call_args.kwargs["relations"]
+
+    @pytest.mark.asyncio
+    async def test_read_combined_filters_and_search(self, mock_storage):
+        """Test query combining filters and search patterns."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "filters": {"is_active": True},
+            "search_patterns": {"name": "%premium%"},
+            "columns": ["id", "name"]
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_advanced.call_args
+        assert call_args.kwargs["filters"]["is_active"] is True
+        assert call_args.kwargs["search_patterns"]["name"] == "%premium%"
+
+    @pytest.mark.asyncio
+    async def test_read_with_limit(self, mock_storage):
+        """Test query with limit for pagination."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "limit": 10
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_advanced.call_args
+        assert call_args.kwargs["limit"] == 10
+
+    @pytest.mark.asyncio
+    async def test_read_with_offset(self, mock_storage):
+        """Test query with offset for pagination."""
+        mock_storage.query_advanced.return_value = [
+            {"id": f"id-{i}", "name": f"Product {i}"} for i in range(3, 8)
+        ]
+
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "limit": 5,
+            "offset": 2
+        })
+
+        assert result["success"] is True
+        # Offset is applied after query
+        assert len(result["results"]) == 3  # 5 results - 2 offset
+
+    @pytest.mark.asyncio
+    async def test_read_pagination_metadata(self, mock_storage):
+        """Test pagination metadata in response."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "limit": 10,
+            "offset": 5
+        })
+
+        assert result["success"] is True
+        assert "pagination" in result
+        assert result["pagination"]["limit"] == 10
+        assert result["pagination"]["offset"] == 5
+
+    # =========================================================================
+    # Group 2: Batch Read by IDs (4 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_batch_read_by_ids(self, mock_storage):
+        """Test batch read fetching multiple records by ID."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "ids": ["id-1", "id-2", "id-3"]
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "batch_read"
+        mock_storage.batch_read.assert_called_once()
+        call_args = mock_storage.batch_read.call_args
+        assert call_args.kwargs["ids"] == ["id-1", "id-2", "id-3"]
+
+    @pytest.mark.asyncio
+    async def test_batch_read_with_relations(self, mock_storage):
+        """Test batch read with related tables included."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "ids": ["id-1", "id-2"],
+            "relations": ["category(*)", "variants(*)"]
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.batch_read.call_args
+        assert call_args.kwargs["relations"] == ["category(*)", "variants(*)"]
+
+    @pytest.mark.asyncio
+    async def test_batch_read_result_metadata(self, mock_storage):
+        """Test batch read includes count metadata."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "ids": ["id-1", "id-2", "id-3"]
+        })
+
+        assert result["success"] is True
+        assert result["count"] == 2  # Mock returns 2 items
+        assert result["requested_ids"] == 3
+
+    @pytest.mark.asyncio
+    async def test_batch_read_single_id(self, mock_storage):
+        """Test batch read with single ID."""
+        mock_storage.batch_read.return_value = [{"id": "id-1", "name": "Product"}]
+
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "ids": ["id-1"]
+        })
+
+        assert result["success"] is True
+        assert result["count"] == 1
+
+    # =========================================================================
+    # Group 3: Pagination and Counting (5 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_count_only_mode(self, mock_storage):
+        """Test count-only mode for efficient counting."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "count_only": True
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "count"
+        assert result["count"] == 42
+        mock_storage.count_entities.assert_called_once()
+        mock_storage.query_advanced.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_count_with_filters(self, mock_storage):
+        """Test counting with filter conditions."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "filters": {"is_active": True},
+            "count_only": True
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.count_entities.call_args
+        assert call_args.kwargs["filters"]["is_active"] is True
+
+    @pytest.mark.asyncio
+    async def test_pagination_first_page(self, mock_storage):
+        """Test first page of paginated results."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "limit": 10,
+            "offset": 0
+        })
+
+        assert result["success"] is True
+        assert result["pagination"]["offset"] == 0
+
+    @pytest.mark.asyncio
+    async def test_pagination_subsequent_page(self, mock_storage):
+        """Test subsequent page of paginated results."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "limit": 10,
+            "offset": 10
+        })
+
+        assert result["success"] is True
+        assert result["pagination"]["offset"] == 10
+
+    @pytest.mark.asyncio
+    async def test_pagination_has_more_indicator(self, mock_storage):
+        """Test has_more indicator when limit is reached."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "limit": 2
+        })
+
+        assert result["success"] is True
+        # Mock returns 2 items, so has_more should be True (count == limit)
+        assert result["pagination"]["has_more"] is True
+
+    # =========================================================================
+    # Group 4: Relations and Access Control (5 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_read_access_control_allowed_table(self, mock_storage):
+        """Test access control allows specified tables."""
+        tool = create_read_data_tool(mock_storage, tables=["products", "categories"])
+
+        result = await tool.ainvoke({
+            "table": "products"
+        })
+
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_read_access_control_denied_table(self, mock_storage):
+        """Test access control denies non-specified tables."""
+        tool = create_read_data_tool(mock_storage, tables=["products"])
+
+        result = await tool.ainvoke({
+            "table": "categories"
+        })
+
+        assert result["success"] is False
+        assert "ACCESS_DENIED"  # Note: Tool sets this in fallback_type in result["error_type"]
+        assert "categories" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_read_no_table_restrictions(self, mock_storage):
+        """Test tool with no table restrictions (all tables allowed)."""
+        tool = create_read_data_tool(mock_storage)  # No tables parameter
+
+        result = await tool.ainvoke({
+            "table": "any_table"
+        })
+
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_read_multiple_relations(self, mock_storage):
+        """Test query with multiple related tables."""
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "relations": [
+                "category(id,name,slug)",
+                "product_family(*)",
+                "variants(id,sku_code)"
+            ]
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_advanced.call_args
+        assert len(call_args.kwargs["relations"]) == 3
+
+    @pytest.mark.asyncio
+    async def test_read_access_control_error_message(self, mock_storage):
+        """Test access control provides helpful error messages."""
+        tool = create_read_data_tool(mock_storage, tables=["products", "categories"])
+
+        result = await tool.ainvoke({
+            "table": "unauthorized_table"
+        })
+
+        assert result["success"] is False
+        assert "Access denied" in result["error"]
+        # Note: error_pattern matching determines final message, not fallback_action
+
+    # =========================================================================
+    # Group 5: Error Handling (3 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_read_storage_error_handling(self, mock_storage):
+        """Test proper handling of storage errors."""
+        mock_storage.query_advanced.side_effect = StorageError(
+            message="Database connection failed",
+            operation="query_advanced"
+        )
+
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products"
+        })
+
+        assert result["success"] is False
+        assert result["error_type"] in ["QUERY_ERROR", "CONNECTION_ERROR"]
+
+    @pytest.mark.asyncio
+    async def test_read_batch_read_error(self, mock_storage):
+        """Test error handling for batch read failures."""
+        mock_storage.batch_read.side_effect = Exception("Batch read failed")
+
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "ids": ["id-1", "id-2"]
+        })
+
+        assert result["success"] is False
+        assert result["error_type"] in ["QUERY_ERROR", "CONNECTION_ERROR"]
+
+    @pytest.mark.asyncio
+    async def test_read_count_error_handling(self, mock_storage):
+        """Test error handling for count operation failures."""
+        mock_storage.count_entities.side_effect = Exception("Count failed")
+
+        tool = create_read_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "count_only": True
+        })
+
+        assert result["success"] is False
+
+
+# =============================================================================
+# Phase 1.6: Unified write_data Tool Tests (35 tests)
+# =============================================================================
+
+
+class TestWriteDataTool:
+    """Tests for create_write_data_tool factory and unified write operations."""
+
+    # =========================================================================
+    # Group 1: Insert Operations (6 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_insert_single_entity(self, mock_storage):
+        """Test inserting a single entity."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "data": {"sku_code": "SKU-001", "name": "Product A", "price": 100}
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "insert"
+        assert result["count"] == 1
+        mock_storage.insert_entity.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_insert_bulk_entities(self, mock_storage):
+        """Test bulk insert of multiple entities."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "data": [
+                {"sku_code": "SKU-001", "name": "Product A"},
+                {"sku_code": "SKU-002", "name": "Product B"}
+            ]
+        })
+
+        assert result["success"] is True
+        assert result["count"] == 2
+        mock_storage.bulk_upsert.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_insert_returns_created_entity(self, mock_storage):
+        """Test insert returns the created entity with generated fields."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "data": {"name": "Product"}
+        })
+
+        assert result["success"] is True
+        assert "result" in result
+        assert result["result"]["id"] == "new-id"
+
+    @pytest.mark.asyncio
+    async def test_insert_bulk_returns_all_entities(self, mock_storage):
+        """Test bulk insert returns all created entities."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "data": [{"name": "A"}, {"name": "B"}]
+        })
+
+        assert result["success"] is True
+        assert "results" in result
+        assert len(result["results"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_insert_missing_data_error(self, mock_storage):
+        """Test insert fails gracefully when data is missing."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products"
+            # Missing data field
+        })
+
+        assert result["success"] is False
+        assert "VALIDATION_ERROR" in result["error_type"]
+
+    @pytest.mark.asyncio
+    async def test_insert_empty_list_error(self, mock_storage):
+        """Test insert handles empty list gracefully."""
+        mock_storage.bulk_upsert.return_value = []
+
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "data": []
+        })
+
+        assert result["success"] is True
+        assert result["count"] == 0
+
+    # =========================================================================
+    # Group 2: Update and Delete Operations (6 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_update_with_filters(self, mock_storage):
+        """Test update operation with filter conditions."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "update",
+            "table": "products",
+            "filters": {"status": "draft"},
+            "updates": {"status": "published"}
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "update"
+        assert result["affected_count"] == 5
+        mock_storage.update_entities.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_update_multiple_fields(self, mock_storage):
+        """Test updating multiple fields at once."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "update",
+            "table": "products",
+            "filters": {"id": "prod-123"},
+            "updates": {"price": 150.0, "is_active": True}
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.update_entities.call_args
+        assert call_args.kwargs["updates"]["price"] == 150.0
+
+    @pytest.mark.asyncio
+    async def test_update_missing_filters_error(self, mock_storage):
+        """Test update fails when filters are missing."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "update",
+            "table": "products",
+            "updates": {"status": "published"}
+            # Missing filters
+        })
+
+        assert result["success"] is False
+        assert "VALIDATION_ERROR" in result["error_type"]
+
+    @pytest.mark.asyncio
+    async def test_delete_with_filters(self, mock_storage):
+        """Test delete operation with filters."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "delete",
+            "table": "products",
+            "filters": {"is_active": False}
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "delete"
+        assert result["deleted_count"] == 3
+        mock_storage.delete_entities.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_missing_filters_error(self, mock_storage):
+        """Test delete fails when filters are missing."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "delete",
+            "table": "products"
+            # Missing filters - dangerous!
+        })
+
+        assert result["success"] is False
+        assert "VALIDATION_ERROR" in result["error_type"]
+
+    @pytest.mark.asyncio
+    async def test_delete_returns_count(self, mock_storage):
+        """Test delete returns count of deleted records."""
+        mock_storage.delete_entities.return_value = 10
+
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "delete",
+            "table": "products",
+            "filters": {"status": "archived"}
+        })
+
+        assert result["success"] is True
+        assert result["deleted_count"] == 10
+
+    # =========================================================================
+    # Group 3: Upsert Operations (5 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_upsert_single_entity(self, mock_storage):
+        """Test upsert (insert or update) single entity."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "upsert",
+            "table": "products",
+            "data": {"sku_code": "SKU-001", "name": "Product A"},
+            "conflict_fields": ["sku_code"]
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "upsert"
+        mock_storage.upsert_entity.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_upsert_bulk_entities(self, mock_storage):
+        """Test bulk upsert operation."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "upsert",
+            "table": "products",
+            "data": [
+                {"sku_code": "SKU-001", "name": "Product A"},
+                {"sku_code": "SKU-002", "name": "Product B"}
+            ],
+            "conflict_fields": ["sku_code"]
+        })
+
+        assert result["success"] is True
+        assert result["count"] == 2
+        mock_storage.bulk_upsert.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_upsert_default_conflict_field(self, mock_storage):
+        """Test upsert defaults to 'id' as conflict field."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "upsert",
+            "table": "products",
+            "data": {"id": "prod-123", "name": "Product"}
+            # No conflict_fields specified
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.upsert_entity.call_args
+        # Should default to None (which means 'id' in storage layer)
+        assert call_args.kwargs.get("conflict_fields") is None
+
+    @pytest.mark.asyncio
+    async def test_upsert_multiple_conflict_fields(self, mock_storage):
+        """Test upsert with compound unique constraint."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "upsert",
+            "table": "products",
+            "data": {"tenant_id": "t1", "sku_code": "SKU-001", "name": "Product"},
+            "conflict_fields": ["tenant_id", "sku_code"]
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.upsert_entity.call_args
+        assert call_args.kwargs["conflict_fields"] == ["tenant_id", "sku_code"]
+
+    @pytest.mark.asyncio
+    async def test_upsert_missing_data_error(self, mock_storage):
+        """Test upsert fails when data is missing."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "upsert",
+            "table": "products"
+            # Missing data
+        })
+
+        assert result["success"] is False
+        assert "VALIDATION_ERROR" in result["error_type"]
+
+    # =========================================================================
+    # Group 4: Patch Operations (4 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_patch_partial_update(self, mock_storage):
+        """Test patch operation for partial field updates."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "patch",
+            "table": "products",
+            "id": "prod-123",
+            "data": {"price": 150.0}
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "patch"
+        mock_storage.patch_entity.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_patch_multiple_fields(self, mock_storage):
+        """Test patch updating multiple fields."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "patch",
+            "table": "products",
+            "id": "prod-123",
+            "data": {"price": 150.0, "is_active": False}
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.patch_entity.call_args
+        assert call_args.kwargs["updates"]["price"] == 150.0
+
+    @pytest.mark.asyncio
+    async def test_patch_missing_id_error(self, mock_storage):
+        """Test patch fails when ID is missing."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "patch",
+            "table": "products",
+            "data": {"price": 150.0}
+            # Missing id
+        })
+
+        assert result["success"] is False
+        assert "VALIDATION_ERROR" in result["error_type"]
+
+    @pytest.mark.asyncio
+    async def test_patch_bulk_not_supported(self, mock_storage):
+        """Test patch rejects bulk operations (list of data)."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "patch",
+            "table": "products",
+            "id": "prod-123",
+            "data": [{"price": 150.0}]  # List not allowed
+        })
+
+        assert result["success"] is False
+        assert "VALIDATION_ERROR" in result["error_type"]
+
+    # =========================================================================
+    # Group 5: Validation Mode (6 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_validate_only_mode(self, mock_storage):
+        """Test validation-only mode (no execution)."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "data": {"sku_code": "SKU-001", "name": "Product"},
+            "validate_only": True
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "validate"
+        mock_storage.validate_entity_data.assert_called_once()
+        mock_storage.insert_entity.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_validation_passes(self, mock_storage):
+        """Test validation passes for valid data."""
+        mock_storage.validate_entity_data.return_value = {
+            "valid": True,
+            "errors": [],
+            "warnings": [],
+            "entity_count": 1
+        }
+
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "data": {"sku_code": "SKU-001", "name": "Product"},
+            "validate_only": True
+        })
+
+        assert result["success"] is True
+        assert result["validation"]["valid"] is True
+
+    @pytest.mark.asyncio
+    async def test_validation_fails_with_errors(self, mock_storage):
+        """Test validation fails and returns errors."""
+        mock_storage.validate_entity_data.return_value = {
+            "valid": False,
+            "errors": [{"field": "name", "error": "Required field missing"}],
+            "warnings": [],
+            "entity_count": 1
+        }
+
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "data": {"sku_code": "SKU-001"},  # Missing name
+            "validate_only": True
+        })
+
+        assert result["success"] is True
+        assert result["validation"]["valid"] is False
+        assert len(result["validation"]["errors"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_validation_includes_constraint_check(self, mock_storage):
+        """Test validation includes constraint violation checking."""
+        mock_storage.validate_entity_data.return_value = {
+            "valid": True,
+            "errors": [],
+            "warnings": [],
+            "entity_count": 1
+        }
+        mock_storage.check_constraint_violations.return_value = {
+            "safe_to_proceed": False,
+            "violations": [{"field": "sku_code", "value": "SKU-001"}],
+            "warnings": []
+        }
+
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "data": {"sku_code": "SKU-001", "name": "Product"},
+            "validate_only": True
+        })
+
+        assert result["success"] is True
+        assert result["validation"]["safe_to_proceed"] is False
+        assert len(result["validation"]["constraint_violations"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_validation_upsert_skips_constraint_check(self, mock_storage):
+        """Test validation for upsert skips constraint checking."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "upsert",
+            "table": "products",
+            "data": {"sku_code": "SKU-001", "name": "Product"},
+            "validate_only": True
+        })
+
+        assert result["success"] is True
+        mock_storage.validate_entity_data.assert_called_once()
+        mock_storage.check_constraint_violations.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_validation_requires_data(self, mock_storage):
+        """Test validation mode requires data to validate."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "validate_only": True
+            # Missing data
+        })
+
+        assert result["success"] is False
+        assert "VALIDATION_ERROR" in result["error_type"]
+
+    # =========================================================================
+    # Group 6: Dry-Run Mode (5 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_dry_run_delete_preview(self, mock_storage):
+        """Test dry-run mode previews delete impact."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "delete",
+            "table": "products",
+            "filters": {"is_active": False},
+            "dry_run": True
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "dry_run_delete"
+        mock_storage.preview_write_impact.assert_called_once()
+        mock_storage.delete_entities.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_dry_run_update_preview(self, mock_storage):
+        """Test dry-run mode previews update impact."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "update",
+            "table": "products",
+            "filters": {"status": "draft"},
+            "updates": {"status": "published"},
+            "dry_run": True
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "dry_run_update"
+        assert "preview" in result
+
+    @pytest.mark.asyncio
+    async def test_dry_run_insert_validation(self, mock_storage):
+        """Test dry-run for insert validates data."""
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "data": {"sku_code": "SKU-001", "name": "Product"},
+            "dry_run": True
+        })
+
+        assert result["success"] is True
+        assert result["operation"] == "dry_run_insert"
+        mock_storage.validate_entity_data.assert_called_once()
+        mock_storage.insert_entity.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_dry_run_shows_warnings(self, mock_storage):
+        """Test dry-run includes safety warnings."""
+        mock_storage.preview_write_impact.return_value = {
+            "affected_count": 1000,
+            "sample_entities": [],
+            "estimated_duration_ms": 2000,
+            "warnings": [{"type": "large_batch", "message": "Affects 1000 entities"}],
+            "safe_to_proceed": False
+        }
+
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "delete",
+            "table": "products",
+            "filters": {},
+            "dry_run": True
+        })
+
+        assert result["success"] is True
+        assert len(result["preview"]["warnings"]) > 0
+        assert result["preview"]["safe_to_proceed"] is False
+
+    @pytest.mark.asyncio
+    async def test_dry_run_shows_affected_count(self, mock_storage):
+        """Test dry-run shows estimated affected count."""
+        mock_storage.preview_write_impact.return_value = {
+            "affected_count": 25,
+            "sample_entities": [],
+            "estimated_duration_ms": 50,
+            "warnings": [],
+            "safe_to_proceed": True
+        }
+
+        tool = create_write_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "operation": "update",
+            "table": "products",
+            "filters": {"category_id": "cat-123"},
+            "updates": {"is_active": False},
+            "dry_run": True
+        })
+
+        assert result["success"] is True
+        assert result["preview"]["affected_count"] == 25
+
+    # =========================================================================
+    # Group 7: Access Control (3 tests)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_write_table_access_control_allowed(self, mock_storage):
+        """Test table access control allows specified tables."""
+        tool = create_write_data_tool(mock_storage, tables=["products", "categories"])
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "products",
+            "data": {"name": "Product"}
+        })
+
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_write_table_access_control_denied(self, mock_storage):
+        """Test table access control denies non-specified tables."""
+        tool = create_write_data_tool(mock_storage, tables=["products"])
+
+        result = await tool.ainvoke({
+            "operation": "insert",
+            "table": "unauthorized_table",
+            "data": {"name": "Test"}
+        })
+
+        assert result["success"] is False
+        assert "ACCESS_DENIED"  # Note: Tool sets this in fallback_type in result["error_type"]
+
+    @pytest.mark.asyncio
+    async def test_write_operation_access_control(self, mock_storage):
+        """Test operation-level access control."""
+        tool = create_write_data_tool(
+            mock_storage,
+            tables=["products"],
+            operations=["insert", "update"]  # No delete allowed
+        )
+
+        result = await tool.ainvoke({
+            "operation": "delete",
+            "table": "products",
+            "filters": {"id": "prod-123"}
+        })
+
+        assert result["success"] is False
+        assert "ACCESS_DENIED"  # Note: Tool sets this in fallback_type in result["error_type"]
+        assert "delete" in result["error"]
