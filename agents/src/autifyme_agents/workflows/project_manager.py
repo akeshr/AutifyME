@@ -25,13 +25,16 @@ from autifyme_agents.specialists.product_architecture_specialist import (
 from autifyme_agents.tools.campaign_persistence_tools import (
     create_save_campaign_tool,
 )
+from autifyme_agents.tools.data_engine_tools import (
+    create_read_data_tool,
+    create_write_data_tool,
+)
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 from autifyme_agents.tools.pm_context_tools import (
     create_get_category_info_tool,
     create_search_catalog_summary_tool,
 )
 from autifyme_agents.tools.schema_tools import get_product_schema
-from autifyme_agents.tools.universal_crud_tool import create_database_tool
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -164,11 +167,16 @@ async def create_project_manager(
     # Image analysis tool (multimodal analysis before delegation)
     pm_tools.append(image_analysis_tool)
 
-    # Universal CRUD tool (schema-driven database operations with HITL)
+    # Universal Data Engine - Read operations (query, search, batch fetch, pagination)
+    # No HITL needed for read-only operations
+    pm_tools.append(create_read_data_tool(storage))
+
+    # Universal Data Engine - Write operations (insert, update, delete, upsert, patch)
+    # Full write access with HITL enabled for all mutations
     pm_tools.append(
-        create_database_tool(
+        create_write_data_tool(
             storage=storage,
-            allowed_operations=["create", "read", "update", "delete"],  # Full CRUD access
+            operations=["insert", "update", "delete", "upsert", "patch"],  # Full write access
         )
     )
 
@@ -202,7 +210,7 @@ async def create_project_manager(
 
     # HITL configuration
     interrupt_configs: dict[str, bool] = {
-        "execute_database_operation": True,
+        "write_data": True,  # Universal Data Engine write operations
         "save_campaign": True,
     }
 
