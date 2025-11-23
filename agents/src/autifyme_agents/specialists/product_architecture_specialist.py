@@ -121,15 +121,18 @@ def create_product_architecture_specialist(
     tools.extend([get_product_schema, get_table_schema, list_available_tables])
 
     # Storage-dependent tools
+    from autifyme_agents.tools.data_engine_tools import (
+        create_inspect_schema_tool,
+        create_read_data_tool,
+    )
     from autifyme_agents.tools.product_search_tools import (
         create_search_product_families_tool,
     )
-    from autifyme_agents.tools.query_database_tool import (
-        create_query_database_tool,
-    )
 
     tools.append(create_search_product_families_tool(storage))
-    tools.append(create_query_database_tool(storage))
+    # Universal Data Engine tools (all product tables)
+    tools.append(create_inspect_schema_tool(storage))  # Schema inspection
+    tools.append(create_read_data_tool(storage))  # Read operations
 
     # Description for PM delegation (routing decisions)
     description = (

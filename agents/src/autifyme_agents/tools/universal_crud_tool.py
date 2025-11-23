@@ -1,16 +1,20 @@
 """Universal CRUD tool - schema-driven database operations.
 
-Single tool that replaces all specialized persistence tools (save_product_family,
-add_variant_values, update_product_fields, etc.). Handles ANY operation on ANY
-table through runtime schema consultation and dynamic execution planning.
+⚠️  DEPRECATED: This tool is deprecated in favor of create_write_data_tool()
+from data_engine_tools.py (Universal Data Engine).
 
-Key Features:
-- Schema-driven validation and execution
-- Dependency resolution (topological sorting)
-- Foreign key reference resolution ($step_N.field syntax)
-- Atomic transactions with rollback
-- Business rule triggers
-- Comprehensive error handling and logging
+Migration: Replace create_database_tool(storage, operations) with:
+- create_read_data_tool(storage, tables) for read operations
+- create_write_data_tool(storage, tables, operations) for write operations
+
+New tools provide:
+- Simplified interface (no OperationIntent complexity)
+- Better access control (table + operation level)
+- Token-efficient design
+- Direct operations (insert, update, delete, upsert, patch, validate, dry-run)
+- Agent-centric naming and documentation
+
+This file kept for backward compatibility. Will be removed in v2.0.
 """
 
 import logging

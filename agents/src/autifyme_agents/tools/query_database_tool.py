@@ -1,7 +1,17 @@
 """Query database tool - flexible data retrieval for specialists.
 
-Gives specialists direct query access with advanced filtering, relations,
-pattern matching, and counting capabilities.
+⚠️  DEPRECATED: This tool is deprecated in favor of create_read_data_tool()
+from data_engine_tools.py (Universal Data Engine).
+
+Migration: Replace create_query_database_tool(storage) with create_read_data_tool(storage)
+
+New tool provides:
+- Unified read operations (query, batch read, pagination, counting)
+- Better access control (table-level restrictions)
+- Token-efficient design
+- Agent-centric naming and documentation
+
+This file kept for backward compatibility. Will be removed in v2.0.
 """
 
 import logging
