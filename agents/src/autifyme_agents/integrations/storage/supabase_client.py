@@ -1531,6 +1531,217 @@ class SupabaseStorageClient(StorageInterface):
             ) from e
 
     # ========================================================================
+    # Upsert & Patch Operations (Universal Data Engine - Phase 1.4)
+    # ========================================================================
+
+    async def upsert_entity(
+        self,
+        table: str,
+        data: dict[str, Any],
+        conflict_fields: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Insert or update entity with PostgreSQL upsert semantics.
+
+        Uses PostgREST's upsert (INSERT ... ON CONFLICT DO UPDATE) for idempotent writes.
+
+        Args:
+            table: Table name
+            data: Entity data
+            conflict_fields: Columns for conflict detection (default: ["id"])
+
+        Returns:
+            Final entity state after upsert
+
+        Raises:
+            StorageError: On upsert failure
+        """
+        try:
+            client = await self._ensure_async_client()
+            normalized_data = _normalize_numeric_types(data)
+
+            # Default to primary key if no conflict fields specified
+            on_conflict = ",".join(conflict_fields) if conflict_fields else "id"
+
+            # Execute upsert: INSERT with ON CONFLICT DO UPDATE
+            response = await client.table(table).upsert(
+                normalized_data,
+                on_conflict=on_conflict,
+                ignore_duplicates=False,  # DO UPDATE on conflict
+                returning="representation",  # Return full record
+            ).execute()
+
+            if not response.data or len(response.data) == 0:
+                raise StorageError(
+                    message=f"Upsert returned no data for {table}",
+                    operation="upsert_entity",
+                )
+
+            upserted: dict[str, Any] = response.data[0]
+
+            # Track operation for transaction
+            if self._current_transaction is not None:
+                self._current_transaction.operations.append({
+                    "type": "upsert",
+                    "table": table,
+                    "ids": [upserted.get("id")],
+                    "conflict_fields": conflict_fields or ["id"],
+                })
+
+            return upserted
+
+        except Exception as e:
+            logger.error(
+                f"Failed to upsert into {table}",
+                exc_info=True,
+                extra={"table": table, "conflict_fields": conflict_fields, "data_keys": list(data.keys())}
+            )
+            raise StorageError(
+                message=f"Upsert failed for {table}: {str(e)}",
+                operation="upsert_entity",
+                original_error=e,
+            ) from e
+
+    async def bulk_upsert(
+        self,
+        table: str,
+        data: list[dict[str, Any]],
+        conflict_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Batch upsert multiple entities with conflict resolution.
+
+        Uses PostgREST's bulk upsert for efficient idempotent batch writes.
+
+        Args:
+            table: Table name
+            data: List of entity data
+            conflict_fields: Columns for conflict detection (default: ["id"])
+
+        Returns:
+            List of final entity states after upserts
+
+        Raises:
+            StorageError: On upsert failure
+            ValueError: If data list is empty
+        """
+        if not data:
+            raise ValueError("Data list cannot be empty for bulk_upsert")
+
+        try:
+            client = await self._ensure_async_client()
+            normalized_data = _normalize_numeric_types(data)
+
+            # Default to primary key if no conflict fields specified
+            on_conflict = ",".join(conflict_fields) if conflict_fields else "id"
+
+            # Execute bulk upsert
+            response = await client.table(table).upsert(
+                normalized_data,
+                on_conflict=on_conflict,
+                ignore_duplicates=False,  # DO UPDATE on conflict
+                returning="representation",  # Return full records
+                default_to_null=True,  # Missing fields default to NULL on INSERT
+            ).execute()
+
+            if not response.data:
+                raise StorageError(
+                    message=f"Bulk upsert returned no data for {table}",
+                    operation="bulk_upsert",
+                )
+
+            upserted: list[dict[str, Any]] = response.data
+            entity_ids = [entity.get("id") for entity in upserted if entity.get("id")]
+
+            # Track operation for transaction
+            if self._current_transaction is not None:
+                self._current_transaction.operations.append({
+                    "type": "bulk_upsert",
+                    "table": table,
+                    "ids": entity_ids,
+                    "conflict_fields": conflict_fields or ["id"],
+                    "count": len(upserted),
+                })
+
+            return upserted
+
+        except ValueError:
+            # Re-raise validation errors
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to bulk upsert into {table}",
+                exc_info=True,
+                extra={"table": table, "conflict_fields": conflict_fields, "entity_count": len(data)}
+            )
+            raise StorageError(
+                message=f"Bulk upsert failed for {table}: {str(e)}",
+                operation="bulk_upsert",
+                original_error=e,
+            ) from e
+
+    async def patch_entity(
+        self,
+        table: str,
+        id: str,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Partially update entity (PATCH semantics).
+
+        Updates only specified fields using UPDATE query.
+
+        Args:
+            table: Table name
+            id: Entity ID
+            updates: Fields to update (partial data)
+
+        Returns:
+            Complete updated entity
+
+        Raises:
+            StorageError: On update failure
+            ValueError: If entity not found
+        """
+        try:
+            client = await self._ensure_async_client()
+            normalized_updates = _normalize_numeric_types(updates)
+
+            # Execute update with ID filter
+            response = await client.table(table).update(normalized_updates).eq("id", id).execute()
+
+            if not response.data or len(response.data) == 0:
+                raise ValueError(f"Entity with id '{id}' not found in {table}")
+
+            patched: dict[str, Any] = response.data[0]
+
+            # Track operation for transaction
+            if self._current_transaction is not None:
+                self._current_transaction.operations.append({
+                    "type": "patch",
+                    "table": table,
+                    "ids": [id],
+                    "updates": updates,
+                })
+
+            return patched
+
+        except ValueError:
+            # Re-raise validation errors (entity not found)
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to patch entity in {table}",
+                exc_info=True,
+                extra={"table": table, "id": id, "updates": updates}
+            )
+            raise StorageError(
+                message=f"Patch failed for {table}: {str(e)}",
+                operation="patch_entity",
+                original_error=e,
+            ) from e
+
+    # ========================================================================
     # Schema Intelligence (Universal Data Engine - Phase 1.1)
     # ========================================================================
 

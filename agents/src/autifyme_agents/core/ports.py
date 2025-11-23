@@ -656,6 +656,223 @@ class StorageInterface(ABC):
         pass
 
     # ========================================================================
+    # Upsert & Patch Operations (Universal Data Engine - Phase 1.4)
+    # ========================================================================
+
+    @abstractmethod
+    async def upsert_entity(
+        self,
+        table: str,
+        data: dict[str, Any],
+        conflict_fields: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Insert or update entity (upsert) with conflict resolution.
+
+        Universal Data Engine - Phase 1.4: Idempotent write operations.
+
+        Provides PostgreSQL-style upsert semantics:
+        - If conflict on unique constraint: UPDATE existing record
+        - If no conflict: INSERT new record
+        - Returns the final record state (inserted or updated)
+
+        Args:
+            table: Table name
+            data: Entity data (must include fields for conflict detection)
+            conflict_fields: Fields to check for conflicts (e.g., ["sku_code"])
+                           If None, uses table's primary key (id)
+                           For composite uniqueness, pass multiple fields
+
+        Returns:
+            Final entity state after upsert (with all generated fields)
+
+        Examples:
+            # Upsert by SKU code (idempotent product creation)
+            product = await storage.upsert_entity(
+                "products",
+                {
+                    "sku_code": "SKU-001",
+                    "name": "Product A",
+                    "base_price": 100.0
+                },
+                conflict_fields=["sku_code"]
+            )
+
+            # Upsert by ID (update if exists, insert if not)
+            product = await storage.upsert_entity(
+                "products",
+                {
+                    "id": "uuid-123",
+                    "sku_code": "SKU-001",
+                    "name": "Updated Product A"
+                }
+            )
+
+            # Composite uniqueness (tenant + slug)
+            category = await storage.upsert_entity(
+                "categories",
+                {"tenant_id": "t1", "slug": "bottles", "name": "Bottles"},
+                conflict_fields=["tenant_id", "slug"]
+            )
+
+        Behavior:
+            - ON CONFLICT: All fields in data are updated (full replace)
+            - created_at preserved on update (if exists)
+            - updated_at refreshed on update (if exists)
+            - Returns inserted/updated record with generated fields
+
+        Raises:
+            StorageError: On upsert failure or constraint violation
+            ValueError: If conflict_fields reference non-existent columns
+
+        Notes:
+            - Idempotent: multiple calls with same data converge to same state
+            - Atomic: operation succeeds or fails completely
+            - Safe for concurrent upserts on different conflict_fields
+        """
+        pass
+
+    @abstractmethod
+    async def bulk_upsert(
+        self,
+        table: str,
+        data: list[dict[str, Any]],
+        conflict_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Batch upsert multiple entities with conflict resolution.
+
+        Universal Data Engine - Phase 1.4: Efficient bulk idempotent writes.
+
+        Performs upsert for multiple entities in single query:
+        - Dramatically faster than N individual upserts
+        - Maintains atomicity (all succeed or all fail)
+        - Preserves order of input data in results
+
+        Args:
+            table: Table name
+            data: List of entity data (each must include conflict_fields)
+            conflict_fields: Fields to check for conflicts (e.g., ["sku_code"])
+                           If None, uses table's primary key (id)
+
+        Returns:
+            List of final entity states after upserts (with generated fields)
+            Ordered to match input data
+
+        Examples:
+            # Bulk upsert products by SKU
+            products = await storage.bulk_upsert(
+                "products",
+                [
+                    {"sku_code": "SKU-001", "name": "Product A", "price": 100},
+                    {"sku_code": "SKU-002", "name": "Product B", "price": 200},
+                    {"sku_code": "SKU-001", "name": "Product A Updated", "price": 150}
+                ],
+                conflict_fields=["sku_code"]
+            )
+            # Returns 2 records: SKU-001 (updated), SKU-002 (inserted)
+
+            # Bulk upsert with composite uniqueness
+            variants = await storage.bulk_upsert(
+                "product_variants",
+                [
+                    {"product_id": "p1", "sku": "SKU-A", "size": "M"},
+                    {"product_id": "p1", "sku": "SKU-B", "size": "L"}
+                ],
+                conflict_fields=["product_id", "sku"]
+            )
+
+        Performance:
+            - Single query for N entities (vs N queries)
+            - Efficient even for 100+ entities
+            - Respects database constraints and indexes
+
+        Behavior:
+            - Maintains same semantics as upsert_entity()
+            - Order of results matches order of input data
+            - All operations atomic (transaction-based)
+
+        Raises:
+            StorageError: On upsert failure or constraint violation
+            ValueError: If conflict_fields reference non-existent columns
+            ValueError: If data list is empty
+
+        Notes:
+            - Idempotent: safe to retry on failure
+            - Handles duplicates within data list (last occurrence wins)
+            - Generated fields (id, timestamps) populated for all records
+        """
+        pass
+
+    @abstractmethod
+    async def patch_entity(
+        self,
+        table: str,
+        id: str,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Partially update entity (PATCH semantics).
+
+        Universal Data Engine - Phase 1.4: Granular field updates.
+
+        Updates only specified fields, leaving other fields unchanged:
+        - More efficient than full entity replacement
+        - Reduces risk of data loss from stale reads
+        - Supports nested field updates (JSON columns)
+
+        Args:
+            table: Table name
+            id: Entity ID to update
+            updates: Fields to update (partial entity data)
+                    Omitted fields are NOT modified
+
+        Returns:
+            Complete updated entity (all fields, not just updated ones)
+
+        Examples:
+            # Update only price field
+            product = await storage.patch_entity(
+                "products",
+                "uuid-123",
+                {"base_price": 150.0}
+            )
+            # Other fields (name, sku_code, etc.) unchanged
+
+            # Update multiple fields
+            product = await storage.patch_entity(
+                "products",
+                "uuid-123",
+                {"base_price": 150.0, "is_active": True}
+            )
+
+            # Update nested JSON field (if supported by storage)
+            product = await storage.patch_entity(
+                "products",
+                "uuid-123",
+                {"metadata": {"color": "blue"}}  # Merges with existing metadata
+            )
+
+        Behavior:
+            - Only updates fields present in updates dict
+            - updated_at automatically refreshed (if column exists)
+            - Returns full entity after update (not just updates)
+            - Fails if entity with id doesn't exist
+
+        Raises:
+            StorageError: On update failure
+            ValueError: If entity with id not found
+
+        Notes:
+            - NOT idempotent if updated_at changes on every call
+            - For nested updates, behavior depends on storage adapter:
+              - JSON columns may support deep merge vs shallow replace
+              - See adapter docs for JSON update semantics
+            - Use upsert_entity() if you need insert-or-update semantics
+        """
+        pass
+
+    # ========================================================================
     # Schema Intelligence (Universal Data Engine - Phase 1.1)
     # ========================================================================
 
