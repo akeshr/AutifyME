@@ -329,11 +329,214 @@ def create_inspect_schema_tool(
 
 
 # =============================================================================
-# Phase 1.2-1.3: Read Engine - read_data tool (PLACEHOLDER)
+# Phase 1.2: Read Engine - Aggregations
 # =============================================================================
 
-# TODO: Implement create_read_data_tool in Phase 1.2-1.3
-# - Aggregations (count, sum, avg, min, max, GROUP BY)
+
+class AggregateDataInput(BaseModel):
+    """Input schema for aggregate_data tool."""
+
+    model_config = {"extra": "forbid"}
+
+    table: str = Field(
+        ...,
+        description="Table name to aggregate (e.g., 'products', 'campaigns')"
+    )
+    aggregates: dict[str, str] = Field(
+        ...,
+        description=(
+            "Aggregation operations as {alias: 'function(column)'}. "
+            "Examples: "
+            "{'total': 'count(*)'} - count all rows, "
+            "{'avg_price': 'avg(base_price)'} - average price, "
+            "{'min_price': 'min(base_price)', 'max_price': 'max(base_price)'} - min/max. "
+            "Supported functions: count, sum, avg, min, max"
+        )
+    )
+    filters: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Exact match filters applied before aggregation (e.g., {'is_active': True})"
+    )
+    search_patterns: dict[str, str] = Field(
+        default_factory=dict,
+        description="ILIKE patterns applied before aggregation (e.g., {'brand': '%acme%'})"
+    )
+    group_by: list[str] | None = Field(
+        default=None,
+        description="Columns to group by (e.g., ['category_id', 'brand'])"
+    )
+    having: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Filters on aggregated results. "
+            "Examples: "
+            "{'total': {'gt': 10}} - groups with total > 10, "
+            "{'avg_price': {'gte': 100, 'lte': 500}} - average price between 100-500. "
+            "Operators: gt, gte, lt, lte, eq, neq"
+        )
+    )
+
+
+def create_aggregate_data_tool(
+    storage: StorageInterface,
+    tables: list[str] | None = None,
+) -> StructuredTool:
+    """
+    Create aggregate_data tool for analytics queries.
+
+    Enables agents to perform aggregations like counting, summing, averaging
+    with GROUP BY and HAVING clauses for analytical insights.
+
+    Args:
+        storage: Storage interface for database operations
+        tables: Allowed tables (None = all tables accessible)
+
+    Returns:
+        StructuredTool configured for aggregation queries
+
+    Examples:
+        # Cataloging Specialist - Product analytics
+        aggregate_tool = create_aggregate_data_tool(
+            storage,
+            tables=["products", "product_families"]
+        )
+
+        # Market Intelligence - Full analytics access
+        aggregate_tool = create_aggregate_data_tool(storage)  # No restrictions
+    """
+    allowed_tables = tables
+
+    async def _aggregate_data_impl(
+        table: str,
+        aggregates: dict[str, str],
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        group_by: list[str] | None = None,
+        having: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Perform aggregation query with GROUP BY and HAVING.
+
+        USE WHEN:
+        - Counting records by category/group
+        - Calculating sums, averages, min/max
+        - Analyzing data distributions
+        - Getting statistical insights
+
+        NOT FOR:
+        - Fetching individual records (use read_data instead)
+        - Simple counts without grouping (use read_data with count_only)
+
+        Returns:
+            Aggregated results with all group columns and computed aggregates
+
+        Examples:
+            # Count products per category
+            aggregate_data(
+                table="products",
+                aggregates={"count": "count(*)"},
+                group_by=["category_id"]
+            )
+
+            # Average price by brand, only active products
+            aggregate_data(
+                table="products",
+                aggregates={"avg_price": "avg(base_price)", "count": "count(*)"},
+                filters={"is_active": True},
+                group_by=["brand"],
+                having={"count": {"gt": 5}}
+            )
+        """
+        try:
+            # Access control: Verify table access
+            if allowed_tables is not None and table not in allowed_tables:
+                logger.warning(
+                    f"Access denied to table: {table}",
+                    extra={"requested": table, "allowed": allowed_tables}
+                )
+                return build_agent_error_response(
+                    exception=PermissionError(f"Access denied to table: {table}"),
+                    context={"table": table},
+                    fallback_type="ACCESS_DENIED",
+                    fallback_action=(
+                        f"You don't have access to table '{table}'. "
+                        f"Available tables: {allowed_tables}. "
+                        f"Request access from system administrator if needed."
+                    )
+                )
+
+            logger.info(
+                f"Aggregating data from {table}",
+                extra={
+                    "table": table,
+                    "aggregates": list(aggregates.keys()),
+                    "group_by": group_by
+                }
+            )
+
+            # Execute aggregation query
+            results = await storage.query_aggregate(
+                table=table,
+                aggregates=aggregates,
+                filters=filters or {},
+                search_patterns=search_patterns or {},
+                group_by=group_by,
+                having=having,
+            )
+
+            logger.info(
+                f"Aggregation returned {len(results)} result(s)",
+                extra={"table": table, "result_count": len(results)}
+            )
+
+            return build_success_response({
+                "table": table,
+                "aggregates": list(aggregates.keys()),
+                "group_by": group_by or [],
+                "results": results,
+                "count": len(results),
+            })
+
+        except PermissionError:
+            # Re-raise to avoid double-wrapping
+            raise
+
+        except Exception as e:
+            logger.error(
+                f"Aggregation failed for {table}",
+                exc_info=True,
+                extra={"table": table, "aggregates": aggregates}
+            )
+            return build_agent_error_response(
+                exception=e,
+                context={"table": table},
+                fallback_type="QUERY_ERROR",
+                fallback_action=(
+                    f"Aggregation query failed for {table}. "
+                    f"Verify aggregate syntax and try again. "
+                    f"Supported functions: count, sum, avg, min, max."
+                )
+            )
+
+    return StructuredTool.from_function(
+        func=_aggregate_data_impl,
+        name="aggregate_data",
+        description=(
+            "Perform aggregation queries (count, sum, avg, min, max) with GROUP BY and HAVING. "
+            "USE WHEN: Analyzing data, counting by category, calculating statistics, getting insights. "
+            "RETURNS: Aggregated results with group columns and computed values. "
+            "NOT FOR: Fetching individual records - use read_data for that."
+        ),
+        args_schema=AggregateDataInput,
+        coroutine=_aggregate_data_impl,
+    )
+
+
+# =============================================================================
+# Phase 1.3+: Read Engine - Additional Features (PLACEHOLDER)
+# =============================================================================
+
+# TODO: Implement create_read_data_tool in Phase 1.3+
 # - Batch read (fetch multiple by ID)
 # - Pagination (cursor + offset)
 # - Full-text search (beyond ILIKE)

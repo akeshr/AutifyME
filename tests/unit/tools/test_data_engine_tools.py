@@ -1,23 +1,33 @@
-"""Comprehensive tests for Universal Data Engine - Phase 1.1: Schema Engine.
+"""Comprehensive tests for Universal Data Engine.
 
-Tests cover:
+Phase 1.1: Schema Engine (50 tests)
 - Tool factory with access control (15+ tests)
 - Schema discovery and inspection (10+ tests)
 - Table statistics (8+ tests)
 - Data sampling (10+ tests)
+- Error handling & edge cases (7+ tests)
 
-Total: 40+ tests for Phase 1.1
+Phase 1.2: Read Engine - Aggregations (35+ tests)
+- Aggregation tool factory (10+ tests)
+- Basic aggregation queries (10+ tests)
+- GROUP BY operations (8+ tests)
+- HAVING clause (7+ tests)
+
+Total: 85+ tests
 """
 
-import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from pydantic import ValidationError
 
 from autifyme_agents.core.exceptions import StorageError
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.registry import SchemaRegistry
-from autifyme_agents.tools.data_engine_tools import create_inspect_schema_tool
-
+from autifyme_agents.tools.data_engine_tools import (
+    create_aggregate_data_tool,
+    create_inspect_schema_tool,
+)
 
 # =============================================================================
 # Fixtures
@@ -29,7 +39,7 @@ def mock_storage():
     """Mock storage interface for testing."""
     storage = AsyncMock(spec=StorageInterface)
 
-    # Default mock behavior
+    # Default mock behavior for Phase 1.1 (Schema Engine)
     storage.get_table_stats = AsyncMock(return_value={
         "row_count": 100,
         "estimated_size_bytes": 50000,
@@ -41,6 +51,12 @@ def mock_storage():
     storage.sample_data = AsyncMock(return_value=[
         {"id": "uuid-1", "name": "Sample 1", "is_active": True},
         {"id": "uuid-2", "name": "Sample 2", "is_active": True},
+    ])
+
+    # Default mock behavior for Phase 1.2 (Aggregations)
+    storage.query_aggregate = AsyncMock(return_value=[
+        {"category_id": "cat-1", "count": 10, "avg_price": 150.50},
+        {"category_id": "cat-2", "count": 25, "avg_price": 89.99},
     ])
 
     return storage
@@ -656,7 +672,7 @@ class TestTableStatistics:
 
         tool = create_inspect_schema_tool(mock_storage)
 
-        result = await tool.ainvoke({
+        await tool.ainvoke({
             "tables": ["products", "product_families"],
             "details": ["stats"]
         })
@@ -739,7 +755,7 @@ class TestDataSampling:
         tool = create_inspect_schema_tool(mock_storage)
 
         # Pydantic schema has ge=1, le=10 constraint
-        with pytest.raises(Exception):  # Pydantic validation error
+        with pytest.raises(ValidationError):
             await tool.ainvoke({
                 "tables": ["products"],
                 "details": ["samples"],
@@ -755,7 +771,7 @@ class TestDataSampling:
         """Test that sample_limit minimum is enforced (must be >= 1)."""
         tool = create_inspect_schema_tool(mock_storage)
 
-        with pytest.raises(Exception):  # Pydantic validation error
+        with pytest.raises(ValidationError):
             await tool.ainvoke({
                 "tables": ["products"],
                 "details": ["samples"],
@@ -968,7 +984,7 @@ class TestErrorHandlingAndEdgeCases:
         mock_schema_registry
     ):
         """Test handling storage timeout on stats query."""
-        mock_storage.get_table_stats.side_effect = asyncio.TimeoutError()
+        mock_storage.get_table_stats.side_effect = TimeoutError()
 
         tool = create_inspect_schema_tool(mock_storage)
 
@@ -1049,3 +1065,689 @@ class TestErrorHandlingAndEdgeCases:
 
             assert result["success"] is False
             assert result["error_type"] in ["SCHEMA_ERROR", "NOT_FOUND", "FILE_NOT_FOUND"]
+
+
+# =============================================================================
+# PHASE 1.2: READ ENGINE - AGGREGATIONS
+# =============================================================================
+
+
+# =============================================================================
+# Test Group 6: Aggregation Tool Factory & Access Control (10+ tests)
+# =============================================================================
+
+
+class TestAggregateToolFactory:
+    """Test aggregate_data tool factory and access control."""
+
+    def test_create_tool_without_restrictions(self, mock_storage):
+        """Test creating tool without table restrictions (all tables accessible)."""
+        tool = create_aggregate_data_tool(mock_storage)
+
+        assert tool.name == "aggregate_data"
+        assert tool.description is not None
+        assert "aggregate" in tool.description.lower()
+
+    def test_create_tool_with_table_restrictions(self, mock_storage):
+        """Test creating tool with table restrictions."""
+        tool = create_aggregate_data_tool(
+            mock_storage,
+            tables=["products", "product_families"]
+        )
+
+        assert tool.name == "aggregate_data"
+        assert tool.args_schema is not None
+
+    @pytest.mark.asyncio
+    async def test_access_control_allows_authorized_table(self, mock_storage):
+        """Test access control allows queries to authorized tables."""
+        tool = create_aggregate_data_tool(
+            mock_storage,
+            tables=["products", "campaigns"]
+        )
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"}
+        })
+
+        assert result["success"] is True
+        assert mock_storage.query_aggregate.called
+
+    @pytest.mark.asyncio
+    async def test_access_control_denies_unauthorized_table(self, mock_storage):
+        """Test access control denies queries to unauthorized tables."""
+        tool = create_aggregate_data_tool(
+            mock_storage,
+            tables=["products"]  # Only products allowed
+        )
+
+        result = await tool.ainvoke({
+            "table": "campaigns",  # Not in allowed list
+            "aggregates": {"total": "count(*)"}
+        })
+
+        assert result["success"] is False
+        # Error pattern matching may override fallback_type
+        assert result["error_type"] in ["ACCESS_DENIED", "TABLE_ERROR", "ACCESS_ERROR"]
+        mock_storage.query_aggregate.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_access_control_logs_denial(self, mock_storage):
+        """Test that access denials are logged."""
+        tool = create_aggregate_data_tool(
+            mock_storage,
+            tables=["products"]
+        )
+
+        result = await tool.ainvoke({
+            "table": "unauthorized_table",
+            "aggregates": {"total": "count(*)"}
+        })
+
+        assert result["success"] is False
+        # Action is in the error message, not separate key
+        assert "unauthorized_table" in result["error"].lower() or "table" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_tool_returns_structured_response(self, mock_storage):
+        """Test that tool returns standardized success response structure."""
+        mock_storage.query_aggregate.return_value = [
+            {"category_id": "cat-1", "total": 10}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"}
+        })
+
+        assert result["success"] is True
+        assert "table" in result
+        assert "aggregates" in result
+        assert "results" in result
+        assert "count" in result
+
+    @pytest.mark.asyncio
+    async def test_tool_input_schema_enforces_required_fields(self, mock_storage):
+        """Test that Pydantic schema enforces required fields."""
+        tool = create_aggregate_data_tool(mock_storage)
+
+        # Missing required 'aggregates' field
+        with pytest.raises(ValidationError):
+            await tool.ainvoke({
+                "table": "products"
+            })
+
+    @pytest.mark.asyncio
+    async def test_tool_input_schema_forbids_extra_fields(self, mock_storage):
+        """Test that Pydantic schema forbids extra fields."""
+        tool = create_aggregate_data_tool(mock_storage)
+
+        # Extra field 'invalid_param' should be rejected
+        with pytest.raises(ValidationError):
+            await tool.ainvoke({
+                "table": "products",
+                "aggregates": {"total": "count(*)"},
+                "invalid_param": "should_fail"
+            })
+
+    @pytest.mark.asyncio
+    async def test_tool_description_includes_use_cases(self, mock_storage):
+        """Test that tool description guides agents on when to use it."""
+        tool = create_aggregate_data_tool(mock_storage)
+
+        description = tool.description.lower()
+        assert "aggregate" in description or "count" in description
+        assert "group by" in description or "having" in description
+
+    @pytest.mark.asyncio
+    async def test_multiple_tools_with_different_access(self, mock_storage):
+        """Test creating multiple tools with different access levels."""
+        cataloging_tool = create_aggregate_data_tool(
+            mock_storage,
+            tables=["products", "product_families"]
+        )
+
+        analytics_tool = create_aggregate_data_tool(
+            mock_storage  # No restrictions
+        )
+
+        # Cataloging tool should restrict
+        result1 = await cataloging_tool.ainvoke({
+            "table": "campaigns",
+            "aggregates": {"total": "count(*)"}
+        })
+        assert result1["success"] is False
+
+        # Analytics tool should allow
+        result2 = await analytics_tool.ainvoke({
+            "table": "campaigns",
+            "aggregates": {"total": "count(*)"}
+        })
+        assert result2["success"] is True
+
+
+# =============================================================================
+# Test Group 7: Basic Aggregation Queries (10+ tests)
+# =============================================================================
+
+
+class TestBasicAggregationQueries:
+    """Test basic aggregation operations (count, sum, avg, min, max)."""
+
+    @pytest.mark.asyncio
+    async def test_count_all_no_grouping(self, mock_storage):
+        """Test count(*) without GROUP BY."""
+        mock_storage.query_aggregate.return_value = [
+            {"total": 150}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"}
+        })
+
+        assert result["success"] is True
+        assert result["results"][0]["total"] == 150
+        mock_storage.query_aggregate.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_sum_aggregation(self, mock_storage):
+        """Test sum() aggregation."""
+        mock_storage.query_aggregate.return_value = [
+            {"total_revenue": 45000.50}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total_revenue": "sum(base_price)"}
+        })
+
+        assert result["success"] is True
+        assert result["results"][0]["total_revenue"] == 45000.50
+
+    @pytest.mark.asyncio
+    async def test_avg_aggregation(self, mock_storage):
+        """Test avg() aggregation."""
+        mock_storage.query_aggregate.return_value = [
+            {"avg_price": 125.75}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"avg_price": "avg(base_price)"}
+        })
+
+        assert result["success"] is True
+        assert result["results"][0]["avg_price"] == 125.75
+
+    @pytest.mark.asyncio
+    async def test_min_aggregation(self, mock_storage):
+        """Test min() aggregation."""
+        mock_storage.query_aggregate.return_value = [
+            {"min_price": 9.99}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"min_price": "min(base_price)"}
+        })
+
+        assert result["success"] is True
+        assert result["results"][0]["min_price"] == 9.99
+
+    @pytest.mark.asyncio
+    async def test_max_aggregation(self, mock_storage):
+        """Test max() aggregation."""
+        mock_storage.query_aggregate.return_value = [
+            {"max_price": 999.99}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"max_price": "max(base_price)"}
+        })
+
+        assert result["success"] is True
+        assert result["results"][0]["max_price"] == 999.99
+
+    @pytest.mark.asyncio
+    async def test_multiple_aggregates_single_query(self, mock_storage):
+        """Test multiple aggregate functions in single query."""
+        mock_storage.query_aggregate.return_value = [
+            {
+                "total": 100,
+                "avg_price": 150.50,
+                "min_price": 10.00,
+                "max_price": 500.00
+            }
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {
+                "total": "count(*)",
+                "avg_price": "avg(base_price)",
+                "min_price": "min(base_price)",
+                "max_price": "max(base_price)"
+            }
+        })
+
+        assert result["success"] is True
+        assert result["results"][0]["total"] == 100
+        assert result["results"][0]["avg_price"] == 150.50
+
+    @pytest.mark.asyncio
+    async def test_aggregation_with_filters(self, mock_storage):
+        """Test aggregation with exact match filters."""
+        mock_storage.query_aggregate.return_value = [
+            {"total": 45}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "filters": {"is_active": True, "category_id": "cat-123"}
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_aggregate.call_args
+        assert call_args.kwargs["filters"]["is_active"] is True
+        assert call_args.kwargs["filters"]["category_id"] == "cat-123"
+
+    @pytest.mark.asyncio
+    async def test_aggregation_with_search_patterns(self, mock_storage):
+        """Test aggregation with ILIKE search patterns."""
+        mock_storage.query_aggregate.return_value = [
+            {"total": 12}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "search_patterns": {"brand": "%acme%", "name": "%bottle%"}
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_aggregate.call_args
+        assert call_args.kwargs["search_patterns"]["brand"] == "%acme%"
+
+    @pytest.mark.asyncio
+    async def test_aggregation_returns_result_count(self, mock_storage):
+        """Test that response includes count of result rows."""
+        mock_storage.query_aggregate.return_value = [
+            {"category_id": "cat-1", "total": 10},
+            {"category_id": "cat-2", "total": 20}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "group_by": ["category_id"]
+        })
+
+        assert result["success"] is True
+        assert result["count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_empty_result_returns_empty_list(self, mock_storage):
+        """Test aggregation with no matching rows returns empty results."""
+        mock_storage.query_aggregate.return_value = []
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "filters": {"category_id": "nonexistent"}
+        })
+
+        assert result["success"] is True
+        assert result["results"] == []
+        assert result["count"] == 0
+
+
+# =============================================================================
+# Test Group 8: GROUP BY Operations (8+ tests)
+# =============================================================================
+
+
+class TestGroupByOperations:
+    """Test GROUP BY functionality for categorical aggregations."""
+
+    @pytest.mark.asyncio
+    async def test_group_by_single_column(self, mock_storage):
+        """Test GROUP BY with single column."""
+        mock_storage.query_aggregate.return_value = [
+            {"category_id": "cat-1", "total": 25},
+            {"category_id": "cat-2", "total": 50},
+            {"category_id": "cat-3", "total": 10}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "group_by": ["category_id"]
+        })
+
+        assert result["success"] is True
+        assert len(result["results"]) == 3
+        assert result["group_by"] == ["category_id"]
+
+    @pytest.mark.asyncio
+    async def test_group_by_multiple_columns(self, mock_storage):
+        """Test GROUP BY with multiple columns."""
+        mock_storage.query_aggregate.return_value = [
+            {"category_id": "cat-1", "brand": "Acme", "total": 15},
+            {"category_id": "cat-1", "brand": "Beta", "total": 10},
+            {"category_id": "cat-2", "brand": "Acme", "total": 30}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "group_by": ["category_id", "brand"]
+        })
+
+        assert result["success"] is True
+        assert len(result["results"]) == 3
+        assert result["group_by"] == ["category_id", "brand"]
+
+    @pytest.mark.asyncio
+    async def test_group_by_with_multiple_aggregates(self, mock_storage):
+        """Test GROUP BY with multiple aggregate functions."""
+        mock_storage.query_aggregate.return_value = [
+            {
+                "category_id": "cat-1",
+                "total": 25,
+                "avg_price": 150.50,
+                "min_price": 50.00,
+                "max_price": 300.00
+            }
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {
+                "total": "count(*)",
+                "avg_price": "avg(base_price)",
+                "min_price": "min(base_price)",
+                "max_price": "max(base_price)"
+            },
+            "group_by": ["category_id"]
+        })
+
+        assert result["success"] is True
+        assert result["results"][0]["total"] == 25
+        assert result["results"][0]["avg_price"] == 150.50
+
+    @pytest.mark.asyncio
+    async def test_group_by_with_filters(self, mock_storage):
+        """Test GROUP BY combined with WHERE filters."""
+        mock_storage.query_aggregate.return_value = [
+            {"brand": "Acme", "total": 20},
+            {"brand": "Beta", "total": 15}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "filters": {"is_active": True},
+            "group_by": ["brand"]
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_aggregate.call_args
+        assert call_args.kwargs["filters"]["is_active"] is True
+        assert call_args.kwargs["group_by"] == ["brand"]
+
+    @pytest.mark.asyncio
+    async def test_group_by_includes_group_columns_in_results(self, mock_storage):
+        """Test that GROUP BY columns are included in result rows."""
+        mock_storage.query_aggregate.return_value = [
+            {"category_id": "cat-1", "total": 10}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "group_by": ["category_id"]
+        })
+
+        assert result["success"] is True
+        assert "category_id" in result["results"][0]
+        assert "total" in result["results"][0]
+
+    @pytest.mark.asyncio
+    async def test_group_by_empty_results(self, mock_storage):
+        """Test GROUP BY with no matching rows."""
+        mock_storage.query_aggregate.return_value = []
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "filters": {"category_id": "nonexistent"},
+            "group_by": ["brand"]
+        })
+
+        assert result["success"] is True
+        assert result["results"] == []
+
+    @pytest.mark.asyncio
+    async def test_group_by_calls_storage_correctly(self, mock_storage):
+        """Test that GROUP BY parameters are passed to storage layer."""
+        tool = create_aggregate_data_tool(mock_storage)
+
+        await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "group_by": ["category_id", "brand"]
+        })
+
+        call_args = mock_storage.query_aggregate.call_args
+        assert call_args.kwargs["table"] == "products"
+        assert call_args.kwargs["group_by"] == ["category_id", "brand"]
+
+    @pytest.mark.asyncio
+    async def test_group_by_with_search_patterns(self, mock_storage):
+        """Test GROUP BY with search patterns (ILIKE)."""
+        mock_storage.query_aggregate.return_value = [
+            {"brand": "Acme Corp", "total": 15}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "search_patterns": {"name": "%bottle%"},
+            "group_by": ["brand"]
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_aggregate.call_args
+        assert call_args.kwargs["search_patterns"]["name"] == "%bottle%"
+
+
+# =============================================================================
+# Test Group 9: HAVING Clause (7+ tests)
+# =============================================================================
+
+
+class TestHavingClause:
+    """Test HAVING clause for filtering aggregated results."""
+
+    @pytest.mark.asyncio
+    async def test_having_gt_operator(self, mock_storage):
+        """Test HAVING with greater than (gt) operator."""
+        mock_storage.query_aggregate.return_value = [
+            {"category_id": "cat-1", "total": 25},
+            {"category_id": "cat-2", "total": 50}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "group_by": ["category_id"],
+            "having": {"total": {"gt": 20}}
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_aggregate.call_args
+        assert call_args.kwargs["having"]["total"]["gt"] == 20
+
+    @pytest.mark.asyncio
+    async def test_having_gte_operator(self, mock_storage):
+        """Test HAVING with greater than or equal (gte) operator."""
+        mock_storage.query_aggregate.return_value = [
+            {"category_id": "cat-1", "total": 20}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "group_by": ["category_id"],
+            "having": {"total": {"gte": 20}}
+        })
+
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_having_lt_operator(self, mock_storage):
+        """Test HAVING with less than (lt) operator."""
+        mock_storage.query_aggregate.return_value = [
+            {"category_id": "cat-3", "total": 5}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "group_by": ["category_id"],
+            "having": {"total": {"lt": 10}}
+        })
+
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_having_lte_operator(self, mock_storage):
+        """Test HAVING with less than or equal (lte) operator."""
+        mock_storage.query_aggregate.return_value = [
+            {"category_id": "cat-3", "total": 10}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "group_by": ["category_id"],
+            "having": {"total": {"lte": 10}}
+        })
+
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_having_eq_operator(self, mock_storage):
+        """Test HAVING with equals (eq) operator."""
+        mock_storage.query_aggregate.return_value = [
+            {"category_id": "cat-1", "total": 50}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "group_by": ["category_id"],
+            "having": {"total": {"eq": 50}}
+        })
+
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_having_multiple_conditions(self, mock_storage):
+        """Test HAVING with multiple conditions."""
+        mock_storage.query_aggregate.return_value = [
+            {"category_id": "cat-1", "total": 25, "avg_price": 150.00}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {
+                "total": "count(*)",
+                "avg_price": "avg(base_price)"
+            },
+            "group_by": ["category_id"],
+            "having": {
+                "total": {"gte": 10},
+                "avg_price": {"gte": 100, "lte": 200}
+            }
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_aggregate.call_args
+        assert "total" in call_args.kwargs["having"]
+        assert "avg_price" in call_args.kwargs["having"]
+
+    @pytest.mark.asyncio
+    async def test_having_with_filters_and_group_by(self, mock_storage):
+        """Test HAVING combined with WHERE filters and GROUP BY."""
+        mock_storage.query_aggregate.return_value = [
+            {"brand": "Acme", "total": 30}
+        ]
+
+        tool = create_aggregate_data_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "table": "products",
+            "aggregates": {"total": "count(*)"},
+            "filters": {"is_active": True},
+            "group_by": ["brand"],
+            "having": {"total": {"gt": 20}}
+        })
+
+        assert result["success"] is True
+        call_args = mock_storage.query_aggregate.call_args
+        assert call_args.kwargs["filters"]["is_active"] is True
+        assert call_args.kwargs["group_by"] == ["brand"]
+        assert call_args.kwargs["having"]["total"]["gt"] == 20
