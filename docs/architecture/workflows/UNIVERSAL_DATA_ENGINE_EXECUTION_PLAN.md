@@ -271,24 +271,90 @@ Phased implementation plan for transforming AutifyME's data layer into a Univers
 
 ---
 
+### 1.6 Agent & Prompt Refactoring
+
+**Status:** 🔲 Not Started
+
+**Goal:** Migrate agents from old tools to new Universal Data Engine tools with streamlined prompts
+
+#### Tasks:
+
+- [ ] **Create New Tool Factories** (`tools/data_engine_tools.py`)
+  - [ ] `create_inspect_schema_tool(storage, tables)` - Schema engine
+  - [ ] `create_read_data_tool(storage, tables)` - Read engine
+  - [ ] `create_write_data_tool(storage, tables, operations)` - Write engine
+  - [ ] Specialist-scoped access control (table + operation restrictions)
+  - [ ] Agent-centric tool descriptions with USE WHEN guidelines
+  - [ ] **Tests:** 25+ tests (factory, access control, all specialists)
+
+- [ ] **Refactor Cataloging Specialist** (`agents/cataloging_specialist.py`)
+  - [ ] Replace `query_database_tool` with `read_data`
+  - [ ] Replace `universal_crud_tool` with `write_data`
+  - [ ] Add `inspect_schema` for schema discovery
+  - [ ] Update prompt to use new tool names and patterns
+  - [ ] Test full cataloging workflow end-to-end
+  - [ ] **Tests:** 30+ tests (all scenarios, HITL integration)
+
+- [ ] **Update Agent Prompts** (`prompts/specialists/`)
+  - [ ] Cataloging specialist prompt - streamlined tool usage
+  - [ ] Remove database implementation details
+  - [ ] Focus on business intent and goals
+  - [ ] Add examples with new tool syntax (@name.field references)
+  - [ ] Document agent mental model (Discovery → Planning → Execution)
+  - [ ] **Tests:** Prompt validation, example verification
+
+- [ ] **Middleware Integration** (`core/middleware/`)
+  - [ ] Update tool access control middleware for new tools
+  - [ ] Ensure table restrictions enforced correctly
+  - [ ] Add audit logging for schema/data access
+  - [ ] Test access denial scenarios
+  - [ ] **Tests:** 15+ tests (access control, logging, edge cases)
+
+- [ ] **Migration Documentation** (`docs/architecture/workflows/`)
+  - [ ] Agent migration guide (old tools → new tools)
+  - [ ] Prompt engineering guide for new tools
+  - [ ] Tool usage examples per specialist type
+  - [ ] Testing checklist for migrated agents
+  - [ ] Rollback procedure
+
+**Deliverables:**
+- New tool factories with specialist-scoped access
+- Cataloging specialist fully migrated
+- Updated prompts for all specialists
+- Middleware integration complete
+- 70+ tests (integration + unit)
+- Migration documentation
+
+**Migration Strategy:**
+- Phase 1.1-1.5 build capabilities (old tools still work)
+- Phase 1.6 migrates agents to new tools
+- Old tools deprecated but functional (6-month sunset)
+- Gradual rollout: Cataloging → Campaign → Market Intel → Others
+
+---
+
 ### Phase 1 Summary
 
-**Total Tasks:** 42 tasks across 5 workstreams
-**Total Tests:** 212+ tests
-**Estimated Duration:** 2-3 weeks
+**Total Tasks:** 47 tasks across 6 workstreams
+**Total Tests:** 282+ tests
+**Estimated Duration:** 3-4 weeks
 **Dependencies:** None (foundation phase)
 
 **Key Deliverables:**
 - Schema Engine with discovery, stats, sampling
 - Read Engine with aggregations, batch read, pagination
 - Write Engine with upsert, patch, dry-run, validation
-- 200+ comprehensive tests
-- Updated documentation
+- Agent-centric tool factories with access control
+- Cataloging specialist migrated to new tools
+- Streamlined agent prompts
+- 280+ comprehensive tests
+- Complete migration documentation
 
 **Migration Impact:**
-- Existing tools continue to work
+- Existing tools continue to work (backward compatible)
 - New capabilities available immediately
-- No breaking changes
+- Cataloging specialist fully migrated
+- No breaking changes for non-migrated specialists
 
 ---
 
