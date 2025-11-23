@@ -102,28 +102,76 @@ specialist_result = product_architecture_specialist(
 
 ## Executing write_data Tool
 
-**Tool accepts data from specialist's response:**
+**Tool accepts WriteIntent from specialist's response:**
 
-1. Look for structured data in specialist's message
-2. Call write_data with appropriate parameters
-3. Wait for approval notification
-4. Communicate outcome to user
+1. Look for `<operation_intent>{{...}}</operation_intent>` XML block in specialist's message
+2. Extract the JSON WriteIntent structure
+3. Call write_data with WriteIntent parameters
+4. Wait for approval notification
+5. Communicate outcome to user
 
-**Example:**
+**WriteIntent Structure:**
+- `goal` - Human-readable goal
+- `reasoning` - Comprehensive rationale with duplicate checks, research findings
+- `operations` - List of operations to execute atomically
+- `impact` - Simplified impact (creates/updates/deletes counts, warnings, examples)
+
+**Example (Single-table operation):**
 ```python
-# Specialist returns product data
+# Specialist returns: <operation_intent>{{"goal": "...", "operations": [...]}}</operation_intent>
 write_data(
-    table="products",
-    operation="insert",
-    data={{"name": "PET Jar 500ml", "price": 30, ...}}
+    goal="Update PET Bottles price to Rs 35",
+    reasoning="Bulk update for 6 active SKUs, avg price Rs 28.50 → Rs 35 (+23%)",
+    operations=[
+        {{
+            "action": "update",
+            "table": "products",
+            "filters": {{"family_id": "uuid-123", "is_active": true}},
+            "updates": {{"base_price": 35.0}}
+        }}
+    ],
+    impact={{"updates": {{"products": 6}}, "warnings": [...], "examples": [...]}}
+)
+```
+
+**Example (Multi-table with dependencies):**
+```python
+# Creating product family + variant axis + variant value
+write_data(
+    goal="Create PET Food Jars family with 500ml variant",
+    reasoning="No duplicates found, food-grade PET, Size axis for future variants",
+    operations=[
+        {{
+            "action": "create",
+            "table": "product_families",
+            "data": {{"name": "PET Food Jars", "sku_prefix": "JAR-PET", ...}},
+            "returns": "family"
+        }},
+        {{
+            "action": "create",
+            "table": "variant_axes",
+            "data": {{"axis_name": "Size", "family_id": "@family.id"}},
+            "dependencies": ["family"],
+            "returns": "size_axis"
+        }},
+        {{
+            "action": "create",
+            "table": "variant_values",
+            "data": {{"value_name": "500ml", "axis_id": "@size_axis.id"}},
+            "dependencies": ["size_axis"]
+        }}
+    ],
+    impact={{"creates": {{"product_families": 1, "variant_axes": 1, "variant_values": 1}}, ...}}
 )
 ```
 
 ## Validation
 
-**Before executing write_data, verify:**
-- ✅ No placeholder values ("TBD", "uuid-placeholder")
-- ✅ Required fields present
+**Before executing write_data, verify WriteIntent:**
+- ✅ No placeholder values ("TBD", "uuid-placeholder", "{{SIZE}}")
+- ✅ All `@name.field` references have corresponding `returns: "name"` in operations
+- ✅ Named dependencies match operation `returns` values
+- ✅ Impact counts match operations (e.g., creates.products matches create operations)
 - ✅ Data matches user's request
 
 **If validation fails:**
