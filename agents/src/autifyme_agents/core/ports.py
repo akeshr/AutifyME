@@ -438,6 +438,138 @@ class StorageInterface(ABC):
         pass
 
     @abstractmethod
+    async def batch_read(
+        self,
+        table: str,
+        ids: list[str],
+        relations: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Fetch multiple entities by ID in single query (batch operation).
+
+        Universal Data Engine - Phase 1.3: Batch read to solve N+1 query problems.
+
+        Optimizes multi-entity retrieval by:
+        - Single query with IN clause (vs N individual queries)
+        - Optional relation prefetching to avoid cascading queries
+        - Preserves input ID order in results
+
+        Args:
+            table: Table name
+            ids: List of entity IDs to fetch
+            relations: Optional relations to prefetch (PostgREST syntax)
+                      Examples: ["products(*)", "variants(*)"]
+
+        Returns:
+            List of entities matching the IDs, in the same order as input IDs.
+            Missing IDs are omitted (no null placeholders).
+
+        Examples:
+            # Fetch 100 products by ID (single query)
+            products = await storage.batch_read(
+                "products",
+                ids=["id1", "id2", ..., "id100"]
+            )
+
+            # Fetch products with prefetched families
+            products = await storage.batch_read(
+                "products",
+                ids=product_ids,
+                relations=["product_families(id,name)"]
+            )
+
+        Performance:
+            - Efficiently handles 100+ IDs in single query
+            - Prefetching relations eliminates N+1 queries
+            - Result ordering preserved for consistent UX
+
+        Raises:
+            StorageError: On query failure
+        """
+        pass
+
+    @abstractmethod
+    async def paginate_query(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        relations: list[str] | None = None,
+        order_by: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+        cursor: str | None = None,
+        include_count: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Paginate query results with offset or cursor-based pagination.
+
+        Universal Data Engine - Phase 1.3: Smart pagination for large datasets.
+
+        Supports two pagination modes:
+        1. **Offset pagination** (traditional): page + per_page
+        2. **Cursor pagination** (efficient for large sets): cursor + per_page
+
+        Args:
+            table: Table name
+            filters: Exact match filters (e.g., {"is_active": True})
+            search_patterns: ILIKE patterns (e.g., {"name": "%bottle%"})
+            relations: Relations to include (PostgREST syntax)
+            order_by: Sort specification (e.g., "created_at.desc", "name.asc")
+            page: Page number (1-indexed, for offset pagination)
+            per_page: Items per page (default 20, max 100)
+            cursor: Cursor token for cursor-based pagination (overrides page)
+            include_count: Whether to include total count (expensive for large tables)
+
+        Returns:
+            Dict with pagination metadata and results:
+            {
+                "data": [...],          # List of entities
+                "page": 1,              # Current page (offset mode)
+                "per_page": 20,         # Items per page
+                "total": 150,           # Total count (if include_count=True)
+                "has_next": True,       # Whether more pages exist
+                "next_cursor": "xyz",   # Cursor for next page (cursor mode)
+            }
+
+        Examples:
+            # Offset pagination - Page 2, 50 items per page
+            result = await storage.paginate_query(
+                "products",
+                filters={"is_active": True},
+                page=2,
+                per_page=50,
+                include_count=True
+            )
+
+            # Cursor pagination - Efficient for large datasets
+            result = await storage.paginate_query(
+                "products",
+                cursor="eyJpZCI6IjEyMyJ9",
+                per_page=100
+            )
+
+            # With relations prefetch
+            result = await storage.paginate_query(
+                "products",
+                relations=["product_families(*)"],
+                order_by="created_at.desc",
+                page=1,
+                per_page=20
+            )
+
+        Performance:
+            - Cursor pagination is O(1) vs O(N) for large offsets
+            - include_count=False skips expensive COUNT(*) query
+            - per_page capped at 100 for safety
+
+        Raises:
+            StorageError: On query failure
+            ValueError: If per_page > 100 or page < 1
+        """
+        pass
+
+    @abstractmethod
     async def insert_entity(
         self,
         table: str,

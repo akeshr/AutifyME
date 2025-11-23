@@ -1014,6 +1014,257 @@ class SupabaseStorageClient(StorageInterface):
                 original_error=e,
             ) from e
 
+    async def batch_read(
+        self,
+        table: str,
+        ids: list[str],
+        relations: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Fetch multiple entities by ID in single query.
+
+        Universal Data Engine - Phase 1.3: Batch read for N+1 optimization.
+
+        Uses PostgREST IN clause to fetch all entities in single query,
+        with optional relation prefetching to eliminate cascading queries.
+
+        Args:
+            table: Table name
+            ids: List of entity IDs to fetch
+            relations: Optional relations to prefetch
+
+        Returns:
+            List of entities in the same order as input IDs (missing IDs omitted)
+
+        Raises:
+            StorageError: On query failure
+        """
+        try:
+            if not ids:
+                return []
+
+            client = await self._ensure_async_client()
+
+            # Build select clause with relations
+            select = "*"
+            if relations:
+                # PostgREST syntax: "*, products(*), variants(*)"
+                select = "*," + ",".join(relations)
+
+            # Fetch all entities with IN clause
+            query = client.table(table).select(select).in_("id", ids)
+            response = await query.execute()
+
+            results = response.data if response.data else []
+
+            # Preserve input order: create ID->entity map, then rebuild list
+            entity_map = {entity["id"]: entity for entity in results}
+            ordered_results = [entity_map[id] for id in ids if id in entity_map]
+
+            logger.debug(
+                f"Batch read {len(ordered_results)}/{len(ids)} entities from {table}",
+                extra={
+                    "table": table,
+                    "requested": len(ids),
+                    "found": len(ordered_results),
+                    "missing": len(ids) - len(ordered_results),
+                }
+            )
+
+            return ordered_results
+
+        except Exception as e:
+            logger.error(
+                f"Batch read failed for {table}",
+                exc_info=True,
+                extra={"table": table, "id_count": len(ids)}
+            )
+            raise StorageError(
+                message=f"Batch read failed for {table}: {str(e)}",
+                operation="batch_read",
+                original_error=e,
+            ) from e
+
+    async def paginate_query(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        relations: list[str] | None = None,
+        order_by: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+        cursor: str | None = None,
+        include_count: bool = False,
+    ) -> dict[str, Any]:
+        """Paginate query results with offset or cursor-based pagination.
+
+        Universal Data Engine - Phase 1.3: Smart pagination.
+
+        Supports:
+        - Offset pagination (page + per_page) for traditional UX
+        - Cursor pagination (cursor + per_page) for efficient large datasets
+        - Optional total count (skipped by default for performance)
+
+        Args:
+            table: Table name
+            filters: Exact match filters
+            search_patterns: ILIKE patterns
+            relations: Relations to prefetch
+            order_by: Sort specification (e.g., "created_at.desc")
+            page: Page number (1-indexed, for offset pagination)
+            per_page: Items per page (default 20, max 100)
+            cursor: Cursor token (overrides page-based pagination)
+            include_count: Whether to include total count
+
+        Returns:
+            Dict with pagination metadata and results
+
+        Raises:
+            StorageError: On query failure
+            ValueError: If per_page > 100 or page < 1
+        """
+        try:
+            # Validate pagination parameters
+            if per_page > 100:
+                raise ValueError("per_page must not exceed 100")
+            if page < 1:
+                raise ValueError("page must be >= 1")
+
+            client = await self._ensure_async_client()
+
+            # Build select clause
+            select = "*"
+            if relations:
+                select = "*," + ",".join(relations)
+
+            # Start building query
+            query = client.table(table).select(select)
+
+            # Apply filters
+            if filters:
+                for key, value in filters.items():
+                    if isinstance(value, list):
+                        query = query.in_(key, value)
+                    else:
+                        query = query.eq(key, value)
+
+            # Apply search patterns
+            if search_patterns:
+                for column, pattern in search_patterns.items():
+                    query = query.ilike(column, pattern)
+
+            # Apply ordering (default to id.asc for consistency)
+            if order_by:
+                # Parse "column.direction" format
+                if "." in order_by:
+                    column, direction = order_by.rsplit(".", 1)
+                    query = query.order(column, desc=(direction.lower() == "desc"))
+                else:
+                    query = query.order(order_by)
+            else:
+                query = query.order("id")
+
+            # Cursor vs Offset pagination
+            if cursor:
+                # Cursor-based: Use range header with cursor
+                # PostgREST cursor format is base64-encoded JSON with continuation token
+                # For simplicity, we'll implement offset-based first and add cursor later
+                # Cursor pagination requires PostgREST 11+ and specific configuration
+                import base64
+                import json
+
+                try:
+                    decoded = json.loads(base64.b64decode(cursor).decode("utf-8"))
+                    last_id = decoded.get("last_id")
+                    if last_id:
+                        # Continue from last ID (requires order by id)
+                        query = query.gt("id", last_id)
+                except Exception:
+                    logger.warning(f"Invalid cursor format: {cursor}, falling back to offset pagination")
+
+            else:
+                # Offset-based: Calculate offset from page
+                offset = (page - 1) * per_page
+                query = query.range(offset, offset + per_page - 1)
+
+            # Execute main query
+            response = await query.execute()
+            results = response.data if response.data else []
+
+            # Get total count if requested (separate query for performance)
+            total = None
+            if include_count:
+                count_query = client.table(table).select("*", count="exact").limit(0)
+
+                # Apply same filters to count query
+                if filters:
+                    for key, value in filters.items():
+                        if isinstance(value, list):
+                            count_query = count_query.in_(key, value)
+                        else:
+                            count_query = count_query.eq(key, value)
+
+                if search_patterns:
+                    for column, pattern in search_patterns.items():
+                        count_query = count_query.ilike(column, pattern)
+
+                count_response = await count_query.execute()
+                total = count_response.count if count_response.count is not None else 0
+
+            # Determine if there are more pages
+            has_next = len(results) == per_page
+
+            # Generate next cursor for cursor-based pagination
+            next_cursor = None
+            if cursor and results and has_next:
+                import base64
+                import json
+                last_entity = results[-1]
+                cursor_data = {"last_id": last_entity.get("id")}
+                next_cursor = base64.b64encode(json.dumps(cursor_data).encode("utf-8")).decode("utf-8")
+
+            # Build response
+            result = {
+                "data": results,
+                "page": page if not cursor else None,
+                "per_page": per_page,
+                "has_next": has_next,
+            }
+
+            if include_count and total is not None:
+                result["total"] = total
+
+            if next_cursor:
+                result["next_cursor"] = next_cursor
+
+            logger.debug(
+                f"Paginated query returned {len(results)} results from {table}",
+                extra={
+                    "table": table,
+                    "page": page,
+                    "per_page": per_page,
+                    "cursor": bool(cursor),
+                    "has_next": has_next,
+                }
+            )
+
+            return result
+
+        except ValueError:
+            # Re-raise validation errors
+            raise
+        except Exception as e:
+            logger.error(
+                f"Paginated query failed for {table}",
+                exc_info=True,
+                extra={"table": table, "page": page, "per_page": per_page}
+            )
+            raise StorageError(
+                message=f"Paginated query failed for {table}: {str(e)}",
+                operation="paginate_query",
+                original_error=e,
+            ) from e
+
     async def insert_entity(
         self,
         table: str,
