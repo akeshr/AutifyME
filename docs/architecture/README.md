@@ -11,6 +11,7 @@ Timeless design blueprints and implementation ground truth.
 | Document | Purpose |
 | --- | --- |
 | **[DOMAIN_DESIGN_GUIDELINES.md](./core/DOMAIN_DESIGN_GUIDELINES.md)** | **[CRITICAL]** Architectural standards for designing new domains and workflows - MUST reference when building new workflows |
+| **[UNIVERSAL_DATA_ENGINE_DESIGN.md](./core/UNIVERSAL_DATA_ENGINE_DESIGN.md)** | 🚀 **[NEW]** Universal Data Engine - Three-engine model (Schema/Read/Write) for agent data superpowers |
 | **[AGENTS_DESIGN.md](./core/AGENTS_DESIGN.md)** | Canonical agent hierarchy and context engineering patterns (design blueprint) |
 | **[ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./core/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md)** | ✅ **Ground truth** - as-built implementation verified from code |
 | **[PROJECT_MANAGER_DESIGN.md](./core/PROJECT_MANAGER_DESIGN.md)** | PM agent role, intent classification, delegation patterns |
@@ -36,6 +37,7 @@ Workflow-specific designs and orchestration patterns.
 
 | Document | Purpose |
 | --- | --- |
+| **[UNIVERSAL_DATA_ENGINE_EXECUTION_PLAN.md](./workflows/UNIVERSAL_DATA_ENGINE_EXECUTION_PLAN.md)** | 🚀 **[NEW]** Phased execution plan for Universal Data Engine (4 phases, 9-13 weeks, 791+ tests) |
 | **[WHATSAPP_CATALOGING_WORKFLOW.md](./workflows/WHATSAPP_CATALOGING_WORKFLOW.md)** | Current cataloging implementation (end-to-end) |
 | **[PRODUCT_ONBOARDING_COMPLETE_DESIGN.md](./workflows/PRODUCT_ONBOARDING_COMPLETE_DESIGN.md)** | Product onboarding workflow - 5 specialists, 4 HITL points, complete spec |
 | **[WEBHOOK_IDEMPOTENCY_DEEP_DIVE.md](./workflows/WEBHOOK_IDEMPOTENCY_DEEP_DIVE.md)** | Webhook idempotency and deduplication patterns |
