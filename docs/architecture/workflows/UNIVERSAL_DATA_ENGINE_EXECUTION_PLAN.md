@@ -91,13 +91,15 @@ Phased implementation plan for transforming AutifyME's data layer into a Univers
 
 **Status:** 🔲 Not Started
 
+**Architecture Note:** Schema stored in single JSON file (`schemas/database_schema_v1.json`) containing ALL tables. SchemaRegistry loads once at startup (in-memory), filters to requested tables at runtime. Token-efficient: agents receive only requested subset.
+
 #### Tasks:
 
 - [ ] **Schema Tool Factory** (`tools/schema_tools.py`)
   - [ ] Create `create_schema_tool()` factory with table restrictions
   - [ ] Support capability filtering (introspect, relationships, stats)
-  - [ ] Integrate with existing SchemaRegistry
-  - [ ] Add access control enforcement
+  - [ ] Integrate with existing SchemaRegistry (single-file, in-memory)
+  - [ ] Add access control enforcement (table-level filtering)
   - [ ] **Tests:** 15+ tests (factory, access control, caching)
 
 - [ ] **Schema Discovery** (`tools/schema_tools.py`)
