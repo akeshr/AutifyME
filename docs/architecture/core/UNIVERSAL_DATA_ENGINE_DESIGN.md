@@ -34,12 +34,19 @@ Transform AutifyME's data layer into a **Universal Data Engine** - three powerfu
 
 ## Vision
 
-**Two-Tool Superpower Model:**
+**Three-Engine Superpower Model:**
 - Consolidate data operations into THREE powerful engines
 - Each engine handles entire categories of operations autonomously
 - Token-efficient (schema fetched on-demand, not in prompts)
 - Role-based access control (specialist-scoped table permissions)
 - Production-grade safety (transactions, rollback, validation)
+
+**Build-from-Scratch Approach:**
+- Design ideal architecture first (no constraints)
+- Refactor existing code fearlessly
+- Keep ONLY what aligns with clean architecture
+- Absorb useful patterns, discard technical debt
+- Production-ready from first principles
 
 **Intelligence-First:**
 - Give agents schema context when they need it
@@ -49,6 +56,11 @@ Transform AutifyME's data layer into a **Universal Data Engine** - three powerfu
 - Transparent error messages with fix suggestions
 
 **Ultimate Goal:** Make data operations invisible - agents think about business logic, engine handles data mechanics.
+
+**Agent-Centric Tool Naming:**
+- `inspect_schema` - Understand data structure
+- `read_data` - Fetch, search, analyze
+- `write_data` - Create, update, delete
 
 ---
 
@@ -107,6 +119,105 @@ Transform AutifyME's data layer into a **Universal Data Engine** - three powerfu
 
 ---
 
+## Capabilities Matrix - No Loss of Power
+
+**Critical Guarantee:** Universal Data Engine ENHANCES all existing capabilities, loses NONE.
+
+### Complex Operation Support
+
+| Capability | Current (universal_crud) | Future (write_data) | Status |
+|------------|-------------------------|---------------------|--------|
+| **Multi-step transactions** | ✅ Supported | ✅ **Enhanced** (auto-execution plan) | IMPROVED |
+| **Deep dependency chains** | ✅ Supported (4+ levels) | ✅ **Same power** (named dependencies) | PRESERVED |
+| **Topological sorting** | ✅ Automatic | ✅ **Same** (auto-generated) | PRESERVED |
+| **Foreign key references** | ✅ $step_N.field, $ref:name | ✅ **@name.field** (unified syntax) | IMPROVED |
+| **Named entity tracking** | ✅ entity_refs | ✅ **returns** (cleaner) | IMPROVED |
+| **Cross-operation refs** | ✅ Supported | ✅ **Same power** | PRESERVED |
+| **Batch operations** | ✅ Supported | ✅ **Enhanced** (auto-batching) | IMPROVED |
+| **Schema validation** | ✅ Per-operation | ✅ **Same** + better errors | IMPROVED |
+| **Transaction rollback** | ✅ Automatic | ✅ **Same** | PRESERVED |
+| **Impact analysis** | ✅ Required for HITL | ✅ **Streamlined format** | IMPROVED |
+| **Conditional operations** | ✅ Query then mutate | ✅ **Same** | PRESERVED |
+| **Bulk with cross-refs** | ✅ Sequential insert | ✅ **Same** + optimization | IMPROVED |
+
+### New Capabilities Added
+
+| Capability | Status | Phase |
+|------------|--------|-------|
+| **Upsert (insert or update)** | ➕ NEW | Phase 1 |
+| **Partial update (PATCH)** | ➕ NEW | Phase 1 |
+| **Dry-run preview** | ➕ NEW | Phase 1 |
+| **Clone entities** | ➕ NEW | Phase 3 |
+| **Merge entities** | ➕ NEW | Phase 3 |
+| **Entity history** | ➕ NEW | Phase 3 |
+| **Auto-batching** | ➕ NEW | Phase 2 |
+| **Intelligent caching** | ➕ NEW | Phase 2 |
+| **N+1 elimination** | ➕ NEW | Phase 2 |
+| **Aggregations** | ➕ NEW | Phase 1 |
+| **Complex joins** | ➕ NEW | Phase 3 |
+| **Full-text search** | ➕ NEW | Phase 3 |
+
+### Proof: Complex Scenarios Still Work
+
+**Scenario 1: Deep Dependency Chain (4 levels)**
+```python
+# BEFORE (current universal_crud_tool)
+{
+    "operations": [
+        {"op_type": "insert", "table": "product_families", "depends_on": []},
+        {"op_type": "insert", "table": "variant_axes", "depends_on": [0]},
+        {"op_type": "insert", "table": "variant_values", "depends_on": [1]},
+        {"op_type": "insert", "table": "products", "depends_on": [0, 2]}
+    ],
+    "execution_plan": {  # Manual
+        "steps": [...]
+    }
+}
+
+# AFTER (write_data - streamlined)
+{
+    "goal": "Create product family with full hierarchy",
+    "operations": [
+        {"action": "create", "table": "product_families", "returns": "family"},
+        {"action": "create", "table": "variant_axes", "dependencies": ["family"]},
+        {"action": "create", "table": "variant_values", "dependencies": ["axes"]},
+        {"action": "create", "table": "products", "dependencies": ["family", "values"]}
+    ]
+    # execution_plan auto-generated (cleaner)
+}
+```
+
+**Result:** ✅ Same power, better UX
+
+**Scenario 2: Cross-References in Batch**
+```python
+# BEFORE
+{
+    "new_entities": [
+        {"sku": "BUNDLE-001", ...},
+        {"sku": "BOTTLE-001", "bundle_id": "$ref:bundle"},
+        {"sku": "CAP-001", "bundle_id": "$ref:bundle"}
+    ],
+    "entity_refs": {"bundle": 0}
+}
+
+# AFTER
+{
+    "data": [
+        {"sku": "BUNDLE-001", ...},
+        {"sku": "BOTTLE-001", "bundle_id": "@bundle.id"},
+        {"sku": "CAP-001", "bundle_id": "@bundle.id"}
+    ],
+    "returns": {"bundle": 0}
+}
+```
+
+**Result:** ✅ Same power, unified syntax
+
+**Verdict:** ALL existing complex scenarios supported with streamlined interface.
+
+---
+
 ## Target Architecture
 
 ### Three-Engine Model
@@ -153,45 +264,41 @@ Transform AutifyME's data layer into a **Universal Data Engine** - three powerfu
 
 ### Specialist-Scoped Configuration
 
-Each specialist gets three engines with domain-specific restrictions:
+Each specialist gets three tools with domain-specific restrictions:
 
 ```python
 # Cataloging Specialist - Full CRUD on product domain
 cataloging_tools = [
-    create_schema_engine(
+    create_inspect_schema_tool(
         storage,
-        tables=["product_families", "products", "variant_axes", "variant_values"],
-        capabilities=["introspect", "relationships", "constraints", "stats"]
+        tables=["product_families", "products", "variant_axes", "variant_values"]
     ),
-    create_read_engine(
+    create_read_data_tool(
         storage,
-        tables=["product_families", "products", "variant_axes", "variant_values"],
-        capabilities=["query", "count", "search", "join", "aggregate", "cache"]
+        tables=["product_families", "products", "variant_axes", "variant_values"]
     ),
-    create_write_engine(
+    create_write_data_tool(
         storage,
         tables=["product_families", "products", "variant_axes", "variant_values"],
-        operations=["create", "update", "delete", "upsert"],
-        capabilities=["transaction", "dependency_resolution", "bulk", "dry_run"]
+        operations=["create", "update", "delete", "upsert"]
     ),
 ]
 
 # Market Intelligence - Read-only, all tables
 market_intel_tools = [
-    create_schema_engine(storage),  # All tables
-    create_read_engine(storage),    # Read-only, all tables
-    # No write engine
+    create_inspect_schema_tool(storage),  # All tables
+    create_read_data_tool(storage),       # Read-only, all tables
+    # No write_data tool
 ]
 
 # Campaign Specialist - Read all, write campaigns only
 campaign_tools = [
-    create_schema_engine(storage),
-    create_read_engine(storage),
-    create_write_engine(
+    create_inspect_schema_tool(storage),  # All tables
+    create_read_data_tool(storage),       # All tables
+    create_write_data_tool(
         storage,
         tables=["campaigns", "ad_copies"],
-        operations=["create", "update"],  # No delete
-        capabilities=["transaction", "bulk", "dry_run"]
+        operations=["create", "update"]  # No delete
     ),
 ]
 ```
@@ -230,9 +337,19 @@ campaign_tools = [
 
 ## Engine Specifications
 
-### Schema Engine
+### Schema Engine (`inspect_schema`)
 
+**Tool Name:** `inspect_schema`
 **Purpose:** Discovery, validation, and schema intelligence (token-efficient, on-demand)
+
+**Agent Usage:**
+```python
+# Agents call the tool with intent
+inspect_schema(
+    tables=["products", "product_families"],
+    details=["structure", "relationships", "samples"]
+)
+```
 
 **Core Capabilities:**
 
@@ -334,9 +451,24 @@ suggest_indexes(query_pattern: dict)
 
 ---
 
-### Read Engine
+### Read Engine (`read_data`)
 
+**Tool Name:** `read_data`
 **Purpose:** Query, retrieval, aggregation (comprehensive read operations)
+
+**Agent Usage:**
+```python
+# Agents call with query intent
+read_data({
+    "goal": "Find active products in bottles category",
+    "query": {
+        "table": "products",
+        "filters": {"category": "bottles", "is_active": true},
+        "include": ["product_family"],
+        "limit": 50
+    }
+})
+```
 
 **Core Capabilities:**
 
@@ -553,9 +685,68 @@ query_cached(
 
 ---
 
-### Write Engine
+### Write Engine (`write_data`)
 
+**Tool Name:** `write_data`
 **Purpose:** Create, update, delete operations with transactions and validation
+
+**Agent Usage:**
+```python
+# Agents call with write intent (streamlined format)
+write_data({
+    "goal": "Create product family with variants",
+    "reasoning": "User requested PET Bottles family",
+    "operations": [
+        {
+            "action": "create",
+            "table": "product_families",
+            "data": {"name": "PET Bottles", "sku_prefix": "PET-BTL"},
+            "returns": "family"
+        },
+        {
+            "action": "create",
+            "table": "variant_axes",
+            "data": [
+                {"name": "Size", "family_id": "@family.id"},
+                {"name": "Color", "family_id": "@family.id"}
+            ],
+            "dependencies": ["family"]
+        }
+    ],
+    "impact": {
+        "creates": {"product_families": 1, "variant_axes": 2}
+    }
+})
+```
+
+**Streamlined Intent Schema:**
+```python
+class WriteIntent(BaseModel):
+    """Streamlined write intent - same power, less nesting."""
+
+    goal: str         # Human-readable goal
+    reasoning: str    # Why this change
+    operations: list[Operation]  # Flat list (no ChangeSpecification wrapper)
+    impact: dict      # Simplified impact (auto-validated)
+    # execution_plan auto-generated by engine
+
+class Operation(BaseModel):
+    """Enhanced operation model."""
+
+    action: str  # "create", "update", "delete", "upsert", "query"
+    table: str
+    data: list[dict] | dict | None = None
+    filters: dict | None = None
+    updates: dict | None = None
+    dependencies: list[str] = []  # Named dependencies
+    returns: str | dict[str, int] | None = None  # Named result
+    on_conflict: str = "error"  # For upsert
+    cascade: bool = False  # For delete
+```
+
+**Reference Syntax (Unified):**
+- `@name.field` - Reference named entity (e.g., `@family.id`)
+- `@[0].field` - Reference operation index (rarely needed)
 
 **Core Capabilities:**
 

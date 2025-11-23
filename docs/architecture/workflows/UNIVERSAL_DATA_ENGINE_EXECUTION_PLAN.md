@@ -52,17 +52,25 @@ Phased implementation plan for transforming AutifyME's data layer into a Univers
 
 ### Existing Code Streamlining
 
-**Refactor Existing Code:**
-- `query_database_tool.py` → Absorb into Read Engine
-- `universal_crud_tool.py` → Absorb into Write Engine
-- Storage port → Extend with new methods
-- Schema registry → Enhance with intelligence features
+**Build From Scratch, Not Extend:**
+- Design ideal `inspect_schema`, `read_data`, `write_data` tools
+- Absorb useful patterns from existing code:
+  - `query_database_tool.py` → Best patterns → `read_data`
+  - `universal_crud_tool.py` → Core engine logic → `write_data`
+  - Discard technical debt, over-complexity, confusing naming
+- Refactor storage port with clean new methods
+- Enhance schema registry with intelligence features
 
-**Keep Backward Compatibility During Migration:**
-- Old tools work alongside new engines
-- Gradual specialist migration (one at a time)
-- Deprecation warnings before removal
-- Complete migration guide
+**Migration Strategy:**
+- New tools (ideal architecture) implemented fresh
+- Old tools marked deprecated but functional
+- Specialists migrated one-by-one to new tools
+- Old tools removed after full migration (6+ months)
+
+**Tool Naming (Agent-Centric):**
+- `inspect_schema` - Understand data structure
+- `read_data` - Fetch, search, analyze
+- `write_data` - Create, update, delete
 
 ---
 
