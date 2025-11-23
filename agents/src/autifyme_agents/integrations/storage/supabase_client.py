@@ -1137,6 +1137,127 @@ class SupabaseStorageClient(StorageInterface):
             ) from e
 
     # ========================================================================
+    # Schema Intelligence (Universal Data Engine - Phase 1.1)
+    # ========================================================================
+
+    async def get_table_stats(self, table: str) -> dict[str, Any]:
+        """Get table statistics for schema intelligence.
+
+        Provides runtime metadata about table size, last update, and index usage.
+
+        Args:
+            table: Table name
+
+        Returns:
+            Dict with statistics (row_count, estimated_size_bytes, last_updated, indexes, primary_key)
+
+        Raises:
+            StorageError: On query failure or table not found
+        """
+        try:
+            client = await self._ensure_async_client()
+
+            # Get row count
+            count_response = await client.table(table).select("*", count="exact").limit(0).execute()
+            row_count = count_response.count if count_response.count is not None else 0
+
+            # Get table metadata from PostgreSQL information_schema
+            # Note: Supabase PostgREST doesn't expose pg_catalog directly,
+            # so we use RPC call or query information_schema if available
+            # For now, provide basic stats from count query
+
+            # TODO: Add RPC function in database to fetch:
+            # - pg_total_relation_size for accurate size
+            # - pg_stat_user_tables for last_updated
+            # - pg_indexes for index list
+
+            stats = {
+                "row_count": row_count,
+                "estimated_size_bytes": None,  # Requires database function
+                "last_updated": None,  # Requires pg_stat_user_tables access
+                "indexes": [],  # Requires pg_indexes access
+                "primary_key": "id",  # Convention - most tables use 'id'
+            }
+
+            logger.debug(
+                f"Fetched stats for {table}",
+                extra={"table": table, "row_count": row_count}
+            )
+
+            return stats
+
+        except Exception as e:
+            logger.error(
+                f"Failed to get stats for {table}",
+                exc_info=True,
+                extra={"table": table}
+            )
+            raise StorageError(
+                message=f"Failed to get table stats for {table}: {str(e)}",
+                operation="get_table_stats",
+                original_error=e,
+            ) from e
+
+    async def sample_data(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Fetch sample data from table for schema intelligence.
+
+        Provides real data examples to help agents understand schema usage patterns.
+
+        Args:
+            table: Table name
+            filters: Optional filters to narrow samples
+            limit: Maximum rows to return (capped at 20)
+
+        Returns:
+            List of sample rows as dicts
+
+        Raises:
+            StorageError: On query failure or table not found
+        """
+        try:
+            # Cap limit at 20 for safety
+            safe_limit = min(limit, 20)
+
+            client = await self._ensure_async_client()
+            query = client.table(table).select("*")
+
+            # Apply filters if provided
+            if filters:
+                for key, value in filters.items():
+                    if isinstance(value, list):
+                        query = query.in_(key, value)
+                    else:
+                        query = query.eq(key, value)
+
+            # Fetch samples with limit
+            response = await query.limit(safe_limit).execute()
+            samples = response.data if response.data else []
+
+            logger.debug(
+                f"Fetched {len(samples)} samples from {table}",
+                extra={"table": table, "filters": filters, "limit": safe_limit}
+            )
+
+            return samples
+
+        except Exception as e:
+            logger.error(
+                f"Failed to sample data from {table}",
+                exc_info=True,
+                extra={"table": table, "filters": filters}
+            )
+            raise StorageError(
+                message=f"Failed to sample data from {table}: {str(e)}",
+                operation="sample_data",
+                original_error=e,
+            ) from e
+
+    # ========================================================================
     # Transaction Support (Phase 3)
     # ========================================================================
 

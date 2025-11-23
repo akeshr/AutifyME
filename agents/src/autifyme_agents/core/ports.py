@@ -455,6 +455,87 @@ class StorageInterface(ABC):
         pass
 
     # ========================================================================
+    # Schema Intelligence (Universal Data Engine - Phase 1.1)
+    # ========================================================================
+
+    @abstractmethod
+    async def get_table_stats(self, table: str) -> dict[str, Any]:
+        """
+        Get table statistics for schema intelligence.
+
+        Provides runtime metadata about table size, last update, and index usage.
+        Used by inspect_schema tool to give agents context about data volume.
+
+        Args:
+            table: Table name
+
+        Returns:
+            Dict with statistics:
+                - row_count: Total rows in table
+                - estimated_size_bytes: Approximate table size
+                - last_updated: Timestamp of last modification (if available)
+                - indexes: List of index names
+                - primary_key: Primary key column name
+
+        Example:
+            stats = await storage.get_table_stats("products")
+            # Returns:
+            # {
+            #     "row_count": 1523,
+            #     "estimated_size_bytes": 2458624,
+            #     "last_updated": "2025-01-23T10:30:00Z",
+            #     "indexes": ["idx_products_sku", "idx_products_category"],
+            #     "primary_key": "id"
+            # }
+
+        Raises:
+            StorageError: On query failure or table not found
+        """
+        pass
+
+    @abstractmethod
+    async def sample_data(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        """
+        Fetch sample data from table for schema intelligence.
+
+        Provides real data examples to help agents understand schema usage patterns.
+        Used by inspect_schema tool when agents request sample data.
+
+        Args:
+            table: Table name
+            filters: Optional filters to narrow samples (e.g., {"is_active": True})
+            limit: Maximum rows to return (default: 5, max enforced by implementation)
+
+        Returns:
+            List of sample rows as dicts
+
+        Example:
+            # Get general samples
+            samples = await storage.sample_data("products", limit=3)
+
+            # Get filtered samples
+            samples = await storage.sample_data(
+                "products",
+                filters={"is_active": True, "category": "bottles"},
+                limit=5
+            )
+
+        Raises:
+            StorageError: On query failure or table not found
+
+        Notes:
+            - Implementation should enforce reasonable limit (e.g., max 10-20 rows)
+            - Should return diverse samples, not just first N rows
+            - May use RANDOM() or TABLESAMPLE for better diversity
+        """
+        pass
+
+    # ========================================================================
     # Transaction Support (Phase 3)
     # ========================================================================
 
