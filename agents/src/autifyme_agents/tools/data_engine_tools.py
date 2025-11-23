@@ -533,22 +533,813 @@ def create_aggregate_data_tool(
 
 
 # =============================================================================
-# Phase 1.3+: Read Engine - Additional Features (PLACEHOLDER)
+# Phase 1.6: Read Engine - Unified read_data tool
 # =============================================================================
 
-# TODO: Implement create_read_data_tool in Phase 1.3+
-# - Batch read (fetch multiple by ID)
-# - Pagination (cursor + offset)
-# - Full-text search (beyond ILIKE)
+
+class ReadDataInput(BaseModel):
+    """Input schema for unified read_data tool."""
+
+    model_config = {"extra": "forbid"}
+
+    table: str = Field(
+        ...,
+        description="Table name (e.g., 'products', 'product_families')"
+    )
+    filters: dict[str, Any] | None = Field(
+        None,
+        description=(
+            "Exact match filters. Examples: "
+            "{'is_active': True}, "
+            "{'category_id': 'cat-123'}, "
+            "{'status': ['draft', 'published']} - IN operator for lists"
+        )
+    )
+    search_patterns: dict[str, str] | None = Field(
+        None,
+        description=(
+            "Case-insensitive ILIKE patterns. Examples: "
+            "{'name': '%bottle%'}, "
+            "{'sku_code': 'SKU-%'} - Use % as wildcard"
+        )
+    )
+    columns: list[str] | None = Field(
+        None,
+        description="Columns to select (None = all columns). Example: ['id', 'name', 'price']"
+    )
+    relations: list[str] | None = Field(
+        None,
+        description=(
+            "Related tables to include. Use PostgREST syntax. "
+            "Examples: ['category(id,name)', 'product_family(*)']"
+        )
+    )
+    ids: list[str] | None = Field(
+        None,
+        description=(
+            "Batch fetch by IDs. When provided, fetches only these IDs. "
+            "Example: ['id1', 'id2', 'id3']"
+        )
+    )
+    limit: int | None = Field(
+        None,
+        description="Maximum rows to return (pagination). Default: no limit",
+        gt=0,
+        le=1000
+    )
+    offset: int | None = Field(
+        None,
+        description="Skip N rows (pagination). Use with limit for pages",
+        ge=0
+    )
+    count_only: bool = Field(
+        default=False,
+        description="Return only count, not actual records. Useful for analytics"
+    )
+
+
+def create_read_data_tool(
+    storage: StorageInterface,
+    tables: list[str] | None = None,
+) -> StructuredTool:
+    """
+    Create unified read_data tool for all read operations.
+
+    Universal Data Engine - Phase 1.6: Consolidates query, batch read, pagination.
+
+    Enables agents to:
+    - Query with filters and search patterns
+    - Fetch related data (joins)
+    - Batch read by IDs
+    - Paginate large result sets
+    - Count records efficiently
+
+    Args:
+        storage: Storage interface for database operations
+        tables: Allowed tables (None = all tables accessible)
+
+    Returns:
+        StructuredTool configured for read operations
+
+    Examples:
+        # Cataloging Specialist - Product domain only
+        read_tool = create_read_data_tool(
+            storage,
+            tables=["products", "product_families", "categories"]
+        )
+
+        # Market Intelligence - Full read access
+        read_tool = create_read_data_tool(storage)  # No restrictions
+    """
+    allowed_tables = tables
+
+    async def _read_data_impl(
+        table: str,
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        columns: list[str] | None = None,
+        relations: list[str] | None = None,
+        ids: list[str] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        count_only: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Unified read operation for all query patterns.
+
+        USE WHEN:
+        - Fetching individual records or lists
+        - Searching with filters or patterns
+        - Loading related data (joins)
+        - Batch fetching by IDs
+        - Paginating through results
+        - Counting records
+
+        NOT FOR:
+        - Aggregations with GROUP BY (use aggregate_data)
+        - Writing/updating data (use write_data)
+
+        Returns:
+            Query results with metadata (count, pagination info)
+
+        Examples:
+            # Basic query with filter
+            read_data(
+                table="products",
+                filters={"is_active": True},
+                limit=10
+            )
+
+            # Search with pattern
+            read_data(
+                table="products",
+                search_patterns={"name": "%bottle%"},
+                columns=["id", "name", "price"]
+            )
+
+            # Fetch with relations
+            read_data(
+                table="products",
+                filters={"id": "prod-123"},
+                relations=["category(id,name)", "product_family(*)"]
+            )
+
+            # Batch fetch by IDs
+            read_data(
+                table="products",
+                ids=["id1", "id2", "id3"]
+            )
+
+            # Count only
+            read_data(
+                table="products",
+                filters={"is_active": True},
+                count_only=True
+            )
+        """
+        try:
+            # Access control: Verify table access
+            if allowed_tables is not None and table not in allowed_tables:
+                logger.warning(
+                    f"Access denied to table: {table}",
+                    extra={"requested": table, "allowed": allowed_tables}
+                )
+                return build_agent_error_response(
+                    exception=PermissionError(f"Access denied to table: {table}"),
+                    context={"table": table},
+                    fallback_type="ACCESS_DENIED",
+                    fallback_action=(
+                        f"You don't have access to table '{table}'. "
+                        f"Available tables: {allowed_tables}. "
+                        f"Request access from system administrator if needed."
+                    )
+                )
+
+            logger.info(
+                f"Reading data from {table}",
+                extra={
+                    "table": table,
+                    "has_filters": filters is not None,
+                    "has_search": search_patterns is not None,
+                    "has_ids": ids is not None,
+                    "count_only": count_only,
+                    "limit": limit
+                }
+            )
+
+            # BATCH READ: Fetch by IDs
+            if ids is not None:
+                results = await storage.batch_read(
+                    table=table,
+                    ids=ids,
+                    relations=relations
+                )
+
+                logger.info(
+                    f"Batch read returned {len(results)} record(s)",
+                    extra={"table": table, "id_count": len(ids)}
+                )
+
+                return build_success_response({
+                    "table": table,
+                    "operation": "batch_read",
+                    "results": results,
+                    "count": len(results),
+                    "requested_ids": len(ids),
+                })
+
+            # COUNT ONLY: Efficient counting
+            if count_only:
+                count = await storage.count_entities(
+                    table=table,
+                    filters=filters
+                )
+
+                logger.info(
+                    f"Count query returned {count}",
+                    extra={"table": table}
+                )
+
+                return build_success_response({
+                    "table": table,
+                    "operation": "count",
+                    "count": count,
+                })
+
+            # STANDARD QUERY: Filters, search, relations, pagination
+            results = await storage.query_advanced(
+                table=table,
+                filters=filters,
+                columns=columns,
+                relations=relations,
+                search_patterns=search_patterns,
+                count_only=False,
+                limit=limit
+            )
+
+            # Apply offset if specified (query_advanced doesn't support offset directly)
+            if offset is not None and offset > 0:
+                results = results[offset:]
+
+            logger.info(
+                f"Query returned {len(results)} record(s)",
+                extra={
+                    "table": table,
+                    "result_count": len(results),
+                    "has_pagination": limit is not None or offset is not None
+                }
+            )
+
+            response_data: dict[str, Any] = {
+                "table": table,
+                "operation": "query",
+                "results": results,
+                "count": len(results),
+            }
+
+            # Add pagination metadata if applicable
+            if limit is not None or offset is not None:
+                response_data["pagination"] = {
+                    "limit": limit,
+                    "offset": offset or 0,
+                    "has_more": len(results) == limit if limit else False
+                }
+
+            return build_success_response(response_data)
+
+        except PermissionError:
+            # Re-raise to avoid double-wrapping
+            raise
+
+        except Exception as e:
+            logger.error(
+                f"Read operation failed for {table}",
+                exc_info=True,
+                extra={"table": table, "operation_type": "batch" if ids else "query"}
+            )
+            return build_agent_error_response(
+                exception=e,
+                context={"table": table},
+                fallback_type="QUERY_ERROR",
+                fallback_action=(
+                    f"Query failed for {table}. "
+                    f"Verify table name, filters, and search patterns. "
+                    f"Check available tables with inspect_schema tool."
+                )
+            )
+
+    return StructuredTool.from_function(
+        func=_read_data_impl,
+        name="read_data",
+        description=(
+            "Unified read operations: query with filters, search patterns, joins, batch fetch by IDs, pagination, and counting. "
+            "USE WHEN: Fetching records, searching data, loading related entities, paginating results, counting. "
+            "RETURNS: Records matching criteria with optional relations and pagination metadata. "
+            "NOT FOR: Aggregations (use aggregate_data) or writing data (use write_data)."
+        ),
+        args_schema=ReadDataInput,
+        coroutine=_read_data_impl,
+    )
 
 
 # =============================================================================
-# Phase 1.4-1.5: Write Engine - write_data tool (PLACEHOLDER)
+# Phase 1.6: Write Engine - Unified write_data tool
 # =============================================================================
 
-# TODO: Implement create_write_data_tool in Phase 1.4-1.5
-# - Upsert (insert or update)
-# - Partial update (PATCH)
-# - Dry-run mode (preview without executing)
-# - Validation preview
-# - Streamlined WriteIntent with auto-execution plan
+
+class WriteDataInput(BaseModel):
+    """Input schema for unified write_data tool."""
+
+    model_config = {"extra": "forbid"}
+
+    operation: Literal["insert", "update", "delete", "upsert", "patch"] = Field(
+        ...,
+        description=(
+            "Write operation type:\n"
+            "- insert: Create new record(s)\n"
+            "- update: Update existing record(s) matching filters\n"
+            "- delete: Delete record(s) matching filters\n"
+            "- upsert: Insert or update (idempotent, requires conflict_fields)\n"
+            "- patch: Partial update of specific fields"
+        )
+    )
+    table: str = Field(
+        ...,
+        description="Table name (e.g., 'products', 'categories')"
+    )
+    data: dict[str, Any] | list[dict[str, Any]] | None = Field(
+        None,
+        description=(
+            "Data to write. Single dict or list of dicts. "
+            "Required for: insert, upsert, patch. "
+            "Optional for: update (uses updates field instead), delete (ignored)"
+        )
+    )
+    filters: dict[str, Any] | None = Field(
+        None,
+        description=(
+            "Filter conditions for update/delete operations. "
+            "Example: {'is_active': False}, {'status': 'draft'}. "
+            "Required for: update, delete. Ignored for: insert, upsert, patch"
+        )
+    )
+    updates: dict[str, Any] | None = Field(
+        None,
+        description=(
+            "Field updates for update operation. "
+            "Example: {'status': 'published', 'updated_at': 'now()'}. "
+            "Used with filters to update multiple records. "
+            "For single-record updates, use patch instead"
+        )
+    )
+    id: str | None = Field(
+        None,
+        description="Entity ID for patch operation. Required for: patch"
+    )
+    conflict_fields: list[str] | None = Field(
+        None,
+        description=(
+            "Fields to check for conflicts in upsert operation. "
+            "Example: ['sku_code'], ['tenant_id', 'slug']. "
+            "Defaults to 'id' if not specified. "
+            "Required for: upsert with non-ID conflicts"
+        )
+    )
+    dry_run: bool = Field(
+        default=False,
+        description=(
+            "Preview mode: validate and show impact without executing. "
+            "Returns validation results, constraint violations, and affected count"
+        )
+    )
+    validate_only: bool = Field(
+        default=False,
+        description=(
+            "Validation mode: check schema and constraints without executing. "
+            "Returns validation errors and warnings"
+        )
+    )
+
+
+def create_write_data_tool(
+    storage: StorageInterface,
+    tables: list[str] | None = None,
+    operations: list[str] | None = None,
+) -> StructuredTool:
+    """
+    Create unified write_data tool for all write operations.
+
+    Universal Data Engine - Phase 1.6: Consolidates insert, update, delete, upsert, patch,
+    validation, and dry-run capabilities.
+
+    Enables agents to:
+    - Insert new records (single or bulk)
+    - Update existing records (filtered or by ID)
+    - Delete records (with safety checks)
+    - Upsert for idempotent operations
+    - Patch for partial field updates
+    - Validate before writing
+    - Preview write impact (dry-run)
+
+    Args:
+        storage: Storage interface for database operations
+        tables: Allowed tables (None = all tables accessible)
+        operations: Allowed operations (None = all operations allowed)
+                   Options: ["insert", "update", "delete", "upsert", "patch"]
+
+    Returns:
+        StructuredTool configured for write operations
+
+    Examples:
+        # Cataloging Specialist - Full CRUD on product domain
+        write_tool = create_write_data_tool(
+            storage,
+            tables=["products", "product_families", "categories"],
+            operations=["insert", "update", "upsert", "patch"]  # No delete
+        )
+
+        # Campaign Specialist - Create and update only
+        write_tool = create_write_data_tool(
+            storage,
+            tables=["campaigns", "ad_copies"],
+            operations=["insert", "update"]  # No delete, upsert, or patch
+        )
+    """
+    allowed_tables = tables
+    allowed_operations = operations
+
+    async def _write_data_impl(
+        operation: Literal["insert", "update", "delete", "upsert", "patch"],
+        table: str,
+        data: dict[str, Any] | list[dict[str, Any]] | None = None,
+        filters: dict[str, Any] | None = None,
+        updates: dict[str, Any] | None = None,
+        id: str | None = None,
+        conflict_fields: list[str] | None = None,
+        dry_run: bool = False,
+        validate_only: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Unified write operation for all mutation patterns.
+
+        USE WHEN:
+        - Creating new records
+        - Updating existing records
+        - Deleting records
+        - Idempotent upserts
+        - Partial field updates (patch)
+        - Validating before writing
+        - Previewing write impact
+
+        NOT FOR:
+        - Reading data (use read_data)
+        - Aggregations (use aggregate_data)
+
+        Returns:
+            Operation result with affected records, counts, and validation info
+
+        Examples:
+            # Insert single record
+            write_data(
+                operation="insert",
+                table="products",
+                data={"sku_code": "SKU-001", "name": "Product A", "price": 100}
+            )
+
+            # Bulk insert
+            write_data(
+                operation="insert",
+                table="products",
+                data=[
+                    {"sku_code": "SKU-001", "name": "Product A"},
+                    {"sku_code": "SKU-002", "name": "Product B"}
+                ]
+            )
+
+            # Update with filter
+            write_data(
+                operation="update",
+                table="products",
+                filters={"status": "draft"},
+                updates={"status": "published"}
+            )
+
+            # Upsert (idempotent)
+            write_data(
+                operation="upsert",
+                table="products",
+                data={"sku_code": "SKU-001", "name": "Product A Updated"},
+                conflict_fields=["sku_code"]
+            )
+
+            # Patch (partial update)
+            write_data(
+                operation="patch",
+                table="products",
+                id="prod-123",
+                data={"price": 150.0}
+            )
+
+            # Dry-run preview
+            write_data(
+                operation="delete",
+                table="products",
+                filters={"is_active": False},
+                dry_run=True
+            )
+
+            # Validation only
+            write_data(
+                operation="insert",
+                table="products",
+                data={"sku_code": "SKU-001"},  # Missing required fields
+                validate_only=True
+            )
+        """
+        try:
+            # Access control: Verify table access
+            if allowed_tables is not None and table not in allowed_tables:
+                logger.warning(
+                    f"Access denied to table: {table}",
+                    extra={"requested": table, "allowed": allowed_tables}
+                )
+                return build_agent_error_response(
+                    exception=PermissionError(f"Access denied to table: {table}"),
+                    context={"table": table},
+                    fallback_type="ACCESS_DENIED",
+                    fallback_action=(
+                        f"You don't have access to table '{table}'. "
+                        f"Available tables: {allowed_tables}. "
+                        f"Request access from system administrator if needed."
+                    )
+                )
+
+            # Access control: Verify operation access
+            if allowed_operations is not None and operation not in allowed_operations:
+                logger.warning(
+                    f"Access denied to operation: {operation}",
+                    extra={"requested": operation, "allowed": allowed_operations}
+                )
+                return build_agent_error_response(
+                    exception=PermissionError(f"Access denied to operation: {operation}"),
+                    context={"operation": operation, "table": table},
+                    fallback_type="ACCESS_DENIED",
+                    fallback_action=(
+                        f"You don't have permission for '{operation}' operation. "
+                        f"Allowed operations: {allowed_operations}. "
+                        f"Request access from system administrator if needed."
+                    )
+                )
+
+            logger.info(
+                f"Write operation: {operation} on {table}",
+                extra={
+                    "operation": operation,
+                    "table": table,
+                    "dry_run": dry_run,
+                    "validate_only": validate_only
+                }
+            )
+
+            # VALIDATION ONLY MODE
+            if validate_only:
+                if data is None:
+                    return build_agent_error_response(
+                        exception=ValueError("data is required for validation"),
+                        context={"operation": operation},
+                        fallback_type="VALIDATION_ERROR",
+                        fallback_action="Provide data to validate"
+                    )
+
+                validation_result = await storage.validate_entity_data(
+                    table=table,
+                    data=data,
+                    operation=operation  # type: ignore
+                )
+
+                # Also check constraints if not upsert
+                if operation != "upsert":
+                    constraint_result = await storage.check_constraint_violations(
+                        table=table,
+                        data=data,
+                        operation=operation  # type: ignore
+                    )
+                    validation_result["constraint_violations"] = constraint_result["violations"]
+                    validation_result["safe_to_proceed"] = (
+                        validation_result["valid"] and constraint_result["safe_to_proceed"]
+                    )
+                else:
+                    validation_result["safe_to_proceed"] = validation_result["valid"]
+
+                logger.info(
+                    f"Validation complete for {table}",
+                    extra={"valid": validation_result["valid"]}
+                )
+
+                return build_success_response({
+                    "table": table,
+                    "operation": "validate",
+                    "validation": validation_result,
+                })
+
+            # DRY-RUN MODE
+            if dry_run:
+                if operation in ("update", "delete"):
+                    # Preview impact
+                    preview = await storage.preview_write_impact(
+                        table=table,
+                        filters=filters,
+                        operation=operation  # type: ignore
+                    )
+
+                    logger.info(
+                        f"Dry-run preview for {operation} on {table}",
+                        extra={"affected_count": preview["affected_count"]}
+                    )
+
+                    return build_success_response({
+                        "table": table,
+                        "operation": f"dry_run_{operation}",
+                        "preview": preview,
+                    })
+                elif data is not None:
+                    # Validate data
+                    validation_result = await storage.validate_entity_data(
+                        table=table,
+                        data=data,
+                        operation=operation  # type: ignore
+                    )
+
+                    # Check constraints if not upsert
+                    if operation != "upsert":
+                        constraint_result = await storage.check_constraint_violations(
+                            table=table,
+                            data=data,
+                            operation=operation  # type: ignore
+                        )
+                        validation_result["constraint_violations"] = constraint_result["violations"]
+                        validation_result["safe_to_proceed"] = (
+                            validation_result["valid"] and constraint_result["safe_to_proceed"]
+                        )
+                    else:
+                        validation_result["safe_to_proceed"] = validation_result["valid"]
+
+                    logger.info(
+                        f"Dry-run validation for {operation} on {table}",
+                        extra={"valid": validation_result["valid"]}
+                    )
+
+                    return build_success_response({
+                        "table": table,
+                        "operation": f"dry_run_{operation}",
+                        "validation": validation_result,
+                    })
+
+            # EXECUTE OPERATION
+            result_data: dict[str, Any] = {
+                "table": table,
+                "operation": operation,
+            }
+
+            if operation == "insert":
+                if data is None:
+                    return build_agent_error_response(
+                        exception=ValueError("data is required for insert"),
+                        context={"operation": operation},
+                        fallback_type="VALIDATION_ERROR",
+                        fallback_action="Provide data to insert"
+                    )
+
+                # Handle single vs bulk insert
+                if isinstance(data, list):
+                    # Use bulk_upsert for efficient bulk insert
+                    # (without conflict_fields, new records are simply inserted)
+                    results = await storage.bulk_upsert(table=table, data=data)
+                    result_data["results"] = results
+                    result_data["count"] = len(results)
+                else:
+                    result = await storage.insert_entity(table=table, data=data)
+                    result_data["result"] = result
+                    result_data["count"] = 1
+
+            elif operation == "update":
+                if filters is None or updates is None:
+                    return build_agent_error_response(
+                        exception=ValueError("filters and updates are required for update"),
+                        context={"operation": operation},
+                        fallback_type="VALIDATION_ERROR",
+                        fallback_action="Provide filters and updates"
+                    )
+
+                count = await storage.update_entities(
+                    table=table,
+                    filters=filters,
+                    updates=updates
+                )
+                result_data["affected_count"] = count
+
+            elif operation == "delete":
+                if filters is None:
+                    return build_agent_error_response(
+                        exception=ValueError("filters are required for delete"),
+                        context={"operation": operation},
+                        fallback_type="VALIDATION_ERROR",
+                        fallback_action="Provide filters for delete operation"
+                    )
+
+                count = await storage.delete_entities(table=table, filters=filters)
+                result_data["deleted_count"] = count
+
+            elif operation == "upsert":
+                if data is None:
+                    return build_agent_error_response(
+                        exception=ValueError("data is required for upsert"),
+                        context={"operation": operation},
+                        fallback_type="VALIDATION_ERROR",
+                        fallback_action="Provide data to upsert"
+                    )
+
+                # Handle single vs bulk upsert
+                if isinstance(data, list):
+                    results = await storage.bulk_upsert(
+                        table=table,
+                        data=data,
+                        conflict_fields=conflict_fields
+                    )
+                    result_data["results"] = results
+                    result_data["count"] = len(results)
+                else:
+                    result = await storage.upsert_entity(
+                        table=table,
+                        data=data,
+                        conflict_fields=conflict_fields
+                    )
+                    result_data["result"] = result
+                    result_data["count"] = 1
+
+            elif operation == "patch":
+                if id is None or data is None:
+                    return build_agent_error_response(
+                        exception=ValueError("id and data are required for patch"),
+                        context={"operation": operation},
+                        fallback_type="VALIDATION_ERROR",
+                        fallback_action="Provide id and data (fields to update)"
+                    )
+
+                if isinstance(data, list):
+                    return build_agent_error_response(
+                        exception=ValueError("patch does not support bulk operations"),
+                        context={"operation": operation},
+                        fallback_type="VALIDATION_ERROR",
+                        fallback_action="Use single dict for patch, or use upsert for bulk"
+                    )
+
+                result = await storage.patch_entity(
+                    table=table,
+                    id=id,
+                    updates=data
+                )
+                result_data["result"] = result
+                result_data["count"] = 1
+
+            logger.info(
+                f"{operation.capitalize()} operation completed on {table}",
+                extra=result_data
+            )
+
+            return build_success_response(result_data)
+
+        except PermissionError:
+            # Re-raise to avoid double-wrapping
+            raise
+
+        except Exception as e:
+            logger.error(
+                f"Write operation failed: {operation} on {table}",
+                exc_info=True,
+                extra={"operation": operation, "table": table}
+            )
+            return build_agent_error_response(
+                exception=e,
+                context={"operation": operation, "table": table},
+                fallback_type="WRITE_ERROR",
+                fallback_action=(
+                    f"{operation.capitalize()} operation failed for {table}. "
+                    f"Verify data format, filters, and constraints. "
+                    f"Use dry_run=True to preview before executing."
+                )
+            )
+
+    return StructuredTool.from_function(
+        func=_write_data_impl,
+        name="write_data",
+        description=(
+            "Unified write operations: insert, update, delete, upsert (idempotent), patch (partial update), "
+            "with validation and dry-run modes. "
+            "USE WHEN: Creating, updating, or deleting records. Supports bulk operations and safety checks. "
+            "RETURNS: Operation results with affected records/counts. Validation and preview modes available. "
+            "NOT FOR: Reading data (use read_data)."
+        ),
+        args_schema=WriteDataInput,
+        coroutine=_write_data_impl,
+    )
