@@ -173,6 +173,13 @@ class FakeStorage(StorageInterface):
         # Apply filters and search patterns
         results = []
         for row in table_data:
+            # Automatically filter out soft-deleted entities unless explicitly querying for them
+            # Default: only return active entities
+            if (not filters or ("is_active" not in filters and "deleted_at" not in filters)) and (
+                row.get("is_active") is False or row.get("deleted_at") is not None
+            ):
+                continue
+
             # Exact match filters
             if filters:
                 match = all(row.get(k) == v for k, v in filters.items())
@@ -212,6 +219,13 @@ class FakeStorage(StorageInterface):
         count = 0
 
         for row in table_data:
+            # Automatically filter out soft-deleted entities unless explicitly querying for them
+            # Default: only count active entities
+            if (not filters or ("is_active" not in filters and "deleted_at" not in filters)) and (
+                row.get("is_active") is False or row.get("deleted_at") is not None
+            ):
+                continue
+
             # Exact match filters
             if filters:
                 match = all(row.get(k) == v for k, v in filters.items())
@@ -394,9 +408,308 @@ class FakeStorage(StorageInterface):
 
             return count
 
-    # ========================================================================
-    # Lifecycle Management
-    # ========================================================================
+    async def query_aggregate(
+        self,
+        table: str,
+        aggregates: dict[str, Any],
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        group_by: list[str] | None = None,
+        having: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query with aggregations - simplified implementation for testing."""
+        table_data = self.tables.get(table, [])
+
+        # Filter data
+        filtered_data = []
+        for row in table_data:
+            if filters and not all(row.get(k) == v for k, v in filters.items()):
+                continue
+            if search_patterns:
+                pattern_match = all(
+                    pattern.strip("%").lower() in str(row.get(k, "")).lower()
+                    for k, pattern in search_patterns.items()
+                )
+                if not pattern_match:
+                    continue
+            filtered_data.append(row)
+
+        # Simple aggregation without grouping
+        if not group_by:
+            result = {}
+            for alias, func in aggregates.items():
+                if "count(*)" in func or "count" in func:
+                    result[alias] = len(filtered_data)
+                elif "sum" in func:
+                    col = func.split("(")[1].split(")")[0]
+                    result[alias] = sum(float(row.get(col, 0)) for row in filtered_data)
+                elif "avg" in func:
+                    col = func.split("(")[1].split(")")[0]
+                    values = [float(row.get(col, 0)) for row in filtered_data if row.get(col) is not None]
+                    result[alias] = sum(values) / len(values) if values else 0
+                elif "min" in func:
+                    col = func.split("(")[1].split(")")[0]
+                    values = [row.get(col) for row in filtered_data if row.get(col) is not None]
+                    result[alias] = min(values) if values else None
+                elif "max" in func:
+                    col = func.split("(")[1].split(")")[0]
+                    values = [row.get(col) for row in filtered_data if row.get(col) is not None]
+                    result[alias] = max(values) if values else None
+            return [result]
+
+        # Group by (simplified)
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for row in filtered_data:
+            key = tuple(row.get(col) for col in group_by)
+            groups[key].append(row)
+
+        results = []
+        for group_key, group_rows in groups.items():
+            result = dict(zip(group_by, group_key, strict=True))
+            for alias, func in aggregates.items():
+                if "count" in func:
+                    result[alias] = len(group_rows)
+                elif "sum" in func:
+                    col = func.split("(")[1].split(")")[0]
+                    result[alias] = sum(float(row.get(col, 0)) for row in group_rows)
+                elif "avg" in func:
+                    col = func.split("(")[1].split(")")[0]
+                    values = [float(row.get(col, 0)) for row in group_rows if row.get(col) is not None]
+                    result[alias] = sum(values) / len(values) if values else 0
+            results.append(result)
+
+        return results
+
+    async def batch_read(
+        self,
+        table: str,
+        ids: list[str],
+        relations: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Fetch multiple entities by ID."""
+        table_data = self.tables.get(table, [])
+        results = []
+
+        # Preserve input order
+        for entity_id in ids:
+            for row in table_data:
+                if row.get("id") == entity_id:
+                    results.append(row.copy())
+                    break
+
+        return results
+
+    async def paginate_query(
+        self,
+        table: str,
+        page: int = 1,
+        per_page: int = 20,
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        ordering: list[dict[str, str]] | None = None,
+        include_total_count: bool = False,
+        cursor: str | None = None,
+    ) -> dict[str, Any]:
+        """Paginate query results."""
+        # Get filtered data
+        filtered_data = await self.query_entities(
+            table, filters=filters, search_patterns=search_patterns
+        )
+
+        # Apply ordering (simplified)
+        if ordering:
+            for order_spec in reversed(ordering):
+                col = order_spec.get("column")
+                direction = order_spec.get("direction", "asc")
+                if col:
+                    filtered_data.sort(
+                        key=lambda x: x.get(col, ""),
+                        reverse=(direction == "desc")
+                    )
+
+        # Calculate pagination
+        total_count = len(filtered_data) if include_total_count else None
+        start = (page - 1) * per_page
+        end = start + per_page
+        page_data = filtered_data[start:end]
+
+        return {
+            "data": page_data,
+            "page": page,
+            "per_page": per_page,
+            "total_count": total_count,
+            "has_next": end < len(filtered_data),
+            "next_cursor": None,  # Simplified - no cursor support
+        }
+
+    async def upsert_entity(
+        self,
+        table: str,
+        data: dict[str, Any],
+        conflict_fields: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Insert or update entity based on conflict fields."""
+        if not conflict_fields:
+            conflict_fields = ["id"]
+
+        table_data = self.tables.get(table, [])
+
+        # Check for existing entity
+        for row in table_data:
+            if all(row.get(field) == data.get(field) for field in conflict_fields):
+                # Update existing
+                row.update(data)
+                row["updated_at"] = datetime.now(UTC).isoformat()
+                return row
+
+        # Insert new
+        return await self.insert_entity(table, data)
+
+    async def bulk_upsert(
+        self,
+        table: str,
+        data: list[dict[str, Any]],
+        conflict_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Bulk upsert entities."""
+        results = []
+        for entity_data in data:
+            result = await self.upsert_entity(table, entity_data, conflict_fields)
+            results.append(result)
+        return results
+
+    async def patch_entity(
+        self,
+        table: str,
+        entity_id: str,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Partially update entity."""
+        table_data = self.tables.get(table, [])
+
+        for row in table_data:
+            if row.get("id") == entity_id:
+                row.update(updates)
+                row["updated_at"] = datetime.now(UTC).isoformat()
+                return row
+
+        raise ValueError(f"Entity {entity_id} not found in {table}")
+
+    async def validate_entity_data(
+        self,
+        table: str,
+        data: dict[str, Any] | list[dict[str, Any]],
+        operation: str = "insert",
+    ) -> dict[str, Any]:
+        """Validate entity data against schema."""
+        # Simplified validation for testing
+        errors = []
+        warnings = []
+
+        # Convert single entity to list
+        entities = data if isinstance(data, list) else [data]
+
+        # Basic validation: check required fields (simplified)
+        required_fields = {
+            "products": ["sku_code"],
+            "product_families": ["name"],
+        }
+
+        for i, entity in enumerate(entities):
+            if table in required_fields:
+                for field in required_fields[table]:
+                    if not entity.get(field):
+                        errors.append(f"Entity {i}: Missing required field '{field}'")
+
+        return {
+            "valid": len(errors) == 0,
+            "errors": errors,
+            "warnings": warnings,
+        }
+
+    async def check_constraint_violations(
+        self,
+        table: str,
+        data: dict[str, Any] | list[dict[str, Any]],
+        operation: str = "insert",
+        exclude_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Check for constraint violations (uniqueness, etc)."""
+        # Simplified constraint checking for testing
+        violations = []
+
+        # Convert single entity to list
+        entities = data if isinstance(data, list) else [data]
+
+        # Check unique constraints (simplified - just check sku_code for products)
+        if table == "products":
+            for i, entity in enumerate(entities):
+                sku = entity.get("sku_code")
+                if sku:
+                    existing = await self.query_entities(
+                        table, filters={"sku_code": sku}
+                    )
+                    # Filter out excluded IDs
+                    if exclude_ids:
+                        existing = [e for e in existing if e.get("id") not in exclude_ids]
+                    if existing:
+                        violations.append({
+                            "entity_index": i,
+                            "constraint": "unique_sku_code",
+                            "field": "sku_code",
+                            "value": sku,
+                        })
+
+        return violations
+
+    async def preview_write_impact(
+        self,
+        operations: list[dict[str, Any]],
+        validate: bool = True,
+    ) -> dict[str, Any]:
+        """Preview impact of write operations without executing."""
+        # Simplified preview for testing
+        impact = {
+            "creates": {},
+            "updates": {},
+            "deletes": {},
+            "validation_errors": [],
+            "warnings": [],
+            "examples": [],
+        }
+
+        for op in operations:
+            action = op.get("action")
+            table = op.get("table")
+
+            if action == "create":
+                impact["creates"][table] = impact["creates"].get(table, 0) + 1
+            elif action == "update":
+                impact["updates"][table] = impact["updates"].get(table, 0) + 1
+            elif action == "delete":
+                impact["deletes"][table] = impact["deletes"].get(table, 0) + 1
+
+        return impact
+
+    async def get_table_stats(self, table: str) -> dict[str, Any]:
+        """Get statistics about a table."""
+        table_data = self.tables.get(table, [])
+
+        return {
+            "row_count": len(table_data),
+            "columns": list(table_data[0].keys()) if table_data else [],
+            "sample_row": table_data[0] if table_data else None,
+        }
+
+    async def sample_data(
+        self,
+        table: str,
+        limit: int = 5,
+        filters: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get sample data from table."""
+        return await self.query_entities(table, filters=filters, limit=limit)
 
     # ========================================================================
     # Transaction Support (Phase 3)

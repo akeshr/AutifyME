@@ -371,6 +371,10 @@ class TestSupabaseTransactionOperationTracking:
             def delete(self):
                 return MockQuery()
 
+            def update(self, updates):
+                # Soft delete calls update() internally
+                return MockQuery()
+
         class MockClient:
             def table(self, name):
                 return MockTable()
