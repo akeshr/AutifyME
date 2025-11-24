@@ -6,8 +6,9 @@ Validates that PM correctly integrates with new unified data engine tools
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
 from autifyme_agents.core.ports import StorageInterface
@@ -57,6 +58,16 @@ def mock_langgraph_store():
     return store
 
 
+@pytest.fixture
+def mock_llm():
+    """Mock LLM for PM initialization."""
+    llm = MagicMock(spec=["invoke", "ainvoke", "bind_tools"])
+    llm.invoke = MagicMock(return_value=MagicMock(content="Test response"))
+    llm.ainvoke = AsyncMock(return_value=MagicMock(content="Test response"))
+    llm.bind_tools = MagicMock(return_value=llm)
+    return llm
+
+
 class TestPMDataEngineIntegration:
     """Integration tests for PM with Universal Data Engine tools."""
 
@@ -69,6 +80,7 @@ class TestPMDataEngineIntegration:
         mock_storage: StorageInterface,
         memory_checkpointer,
         mock_langgraph_store,
+        mock_llm,
     ):
         """Test PM can be created with new read_data and write_data tools."""
         # Mock get_store to return our mock store
@@ -79,6 +91,7 @@ class TestPMDataEngineIntegration:
             company_profile=company_profile,
             storage=mock_storage,
             checkpointer=memory_checkpointer,
+            model=mock_llm,
         )
 
         # Verify PM was created
@@ -97,6 +110,7 @@ class TestPMDataEngineIntegration:
         mock_storage: StorageInterface,
         memory_checkpointer,
         mock_langgraph_store,
+        mock_llm,
     ):
         """Test PM has both read_data and write_data tools."""
         mock_get_store.return_value = mock_langgraph_store
@@ -105,6 +119,7 @@ class TestPMDataEngineIntegration:
             company_profile=company_profile,
             storage=mock_storage,
             checkpointer=memory_checkpointer,
+            model=mock_llm,
         )
 
         # Get tool names from PM
@@ -122,6 +137,7 @@ class TestPMDataEngineIntegration:
         mock_storage: StorageInterface,
         memory_checkpointer,
         mock_langgraph_store,
+        mock_llm,
     ):
         """Test PM tools have correct access control configuration."""
         mock_get_store.return_value = mock_langgraph_store
@@ -135,6 +151,7 @@ class TestPMDataEngineIntegration:
             company_profile=company_profile,
             storage=mock_storage,
             checkpointer=memory_checkpointer,
+            model=mock_llm,
         )
 
         # Verify PM was created with correct configuration
@@ -153,6 +170,7 @@ class TestPMDataEngineIntegration:
         mock_storage: StorageInterface,
         memory_checkpointer,
         mock_langgraph_store,
+        mock_llm,
     ):
         """Test PM has HITL enabled for write_data tool."""
         mock_get_store.return_value = mock_langgraph_store
@@ -161,6 +179,7 @@ class TestPMDataEngineIntegration:
             company_profile=company_profile,
             storage=mock_storage,
             checkpointer=memory_checkpointer,
+            model=mock_llm,
         )
 
         # HITL configuration is internal to the PM
@@ -177,6 +196,7 @@ class TestPMDataEngineIntegration:
         mock_storage: StorageInterface,
         memory_checkpointer,
         mock_langgraph_store,
+        mock_llm,
     ):
         """Test PM loads base context (catalog summary + taxonomy tree)."""
         mock_get_store.return_value = mock_langgraph_store
@@ -185,6 +205,7 @@ class TestPMDataEngineIntegration:
             company_profile=company_profile,
             storage=mock_storage,
             checkpointer=memory_checkpointer,
+            model=mock_llm,
         )
 
         # Verify storage methods were called for base context loading
@@ -203,6 +224,7 @@ class TestPMDataEngineIntegration:
         mock_storage: StorageInterface,
         memory_checkpointer,
         mock_langgraph_store,
+        mock_llm,
     ):
         """Test PM migration maintains backward compatibility.
 
@@ -218,6 +240,7 @@ class TestPMDataEngineIntegration:
             company_profile=company_profile,
             storage=mock_storage,
             checkpointer=memory_checkpointer,
+            model=mock_llm,
         )
 
         # Verify PM maintains same capabilities after migration
@@ -268,6 +291,7 @@ class TestToolFactoryIntegration:
     def test_old_tool_not_imported_in_pm(self):
         """Test PM no longer imports old universal_crud_tool."""
         import inspect
+
         from autifyme_agents.workflows import project_manager
 
         # Get PM module source
