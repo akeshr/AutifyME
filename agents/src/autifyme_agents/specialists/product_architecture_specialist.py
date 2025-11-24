@@ -105,14 +105,16 @@ def create_product_architecture_specialist(
     system_prompt = load_prompt("specialists/product_architecture_specialist.prompt")
 
     # Product catalog tables (domain ownership)
+    # Complete access to product catalog domain for full CRUD operations
     product_tables = [
-        "product_families",
-        "product_variants",
-        "product_images",
-        "attributes",
-        "variant_values",
-        "categories",
-        "category_products",
+        "product_families",           # Product family definitions
+        "variant_axes",               # Variant dimensions (Size, Color, Material, etc.)
+        "variant_values",             # Values for variant axes (500ml, 1L, Red, Blue, etc.)
+        "products",                   # Product variants (SKUs)
+        "product_variant_values",     # Junction: products ↔ variant_values (M:N)
+        "product_images",             # Product images and media
+        "product_family_industries",  # Junction: product_families ↔ industries
+        "customer_segments",          # Target customer segments for products
     ]
 
     # Core tools - Minimal set for domain expertise

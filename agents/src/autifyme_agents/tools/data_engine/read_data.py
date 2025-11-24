@@ -145,38 +145,71 @@ def create_read_data_tool(
             Query results with metadata (count, pagination info)
 
         Examples:
-            # Basic query with filter
+            # Complex: Find active 500ml products across multiple families with pricing
+            read_data(
+                table="products",
+                filters={"is_active": True, "product_family_id": ["fam-1", "fam-2", "fam-3"]},
+                search_patterns={"sku": "%500ML%"},
+                columns=["id", "sku", "name", "base_price", "product_family_id"],
+                relations=["product_family(name,sku_prefix)"],
+                limit=50
+            )
+            # Returns: 500ml products from 3 families with family metadata
+
+            # Complex: Duplicate check across name variations with fuzzy matching
+            read_data(
+                table="product_families",
+                search_patterns={
+                    "name": "%PET%bottle%",
+                    "description": "%polyethylene%terephthalate%"
+                },
+                columns=["id", "name", "sku_prefix", "base_price", "created_at"]
+            )
+            # Returns: Potential duplicate families for deduplication workflow
+
+            # Complex: Paginated product catalog with full relationship graph
             read_data(
                 table="products",
                 filters={"is_active": True},
-                limit=10
+                relations=[
+                    "product_family(name,sku_prefix,material)",
+                    "product_variant_values(variant_value(name,variant_axis(name)))",
+                    "product_images(image_url,display_order)"
+                ],
+                columns=["id", "sku", "name", "base_price"],
+                limit=25,
+                offset=50
             )
+            # Returns: Page 3 (items 51-75) with nested variant data and images
 
-            # Search with pattern
+            # Complex: Junction table query for multi-axis product variants
+            read_data(
+                table="product_variant_values",
+                filters={"product_id": "prod-uuid-123"},
+                relations=[
+                    "variant_value(name,variant_axis(name,product_family_id))"
+                ]
+            )
+            # Returns: All variant dimensions for a product (e.g., Size=500ml, Color=Clear)
+
+            # Complex: Analytics query for inventory planning
             read_data(
                 table="products",
-                search_patterns={"name": "%bottle%"},
-                columns=["id", "name", "price"]
+                filters={"is_active": True, "product_family_id": "fam-pet-bottles"},
+                columns=["id", "sku", "base_price", "created_at"],
+                relations=["product_family(name)"],
+                count_only=False
             )
+            # Returns: Full product list with metadata for SKU count analysis
 
-            # Fetch with relations
+            # Complex: Batch fetch products by ID for impact calculation
             read_data(
                 table="products",
-                filters={"id": "prod-123"},
-                relations=["category(id,name)", "product_family(*)"]
+                ids=["uuid-1", "uuid-2", "uuid-3", "uuid-4", "uuid-5", "uuid-6"],
+                columns=["id", "sku", "base_price", "is_active"],
+                relations=["product_family(name)"]
             )
-
-            # Batch fetch by IDs
-            read_data(
-                table="products",
-                ids=["id1", "id2", "id3"]
-            )
-
-            # Count only
-            read_data(
-                table="products",
-                filters={"is_active": True},
-                count_only=True
+            # Returns: Specific products for bulk price update verification
             )
         """
         try:
