@@ -161,7 +161,7 @@ Specialist:
       - Use for: Names, descriptions, SKUs, any text search
       - Examples: `{"name": "%jar%"}`, `{"name": "%PET%bottle%"}`
       - **RECOMMENDED** for all name/text searches (use % as wildcard)
-      - Common mistake: Using filters for name search → returns 0 if exact match fails
+      - Common mistake: Using filters for name search → returns 0 unless exact match
     - columns (list) - Specific columns to return
     - relations (list) - Related data to include (PostgREST format)
       - **Simple**: `relations=['product_family']` - Include related product_family
