@@ -1459,62 +1459,95 @@ class SupabaseStorageClient(StorageInterface):
         self,
         table: str,
         filters: dict[str, Any],
+        soft_delete: bool = True,
     ) -> int:
         """Delete entities matching filters.
 
         Args:
             table: Table name
             filters: WHERE conditions (supports nested dict for operators like {"id": {"in": [1,2,3]}})
+            soft_delete: If True, sets is_active=False and deleted_at=now().
+                        If False, performs hard delete (permanent removal).
+                        Defaults to True for data safety.
 
         Returns:
-            Count of deleted rows
+            Count of deleted/deactivated rows
 
         Raises:
             StorageError: On delete failure
         """
         try:
             client = await self._ensure_async_client()
-            query = client.table(table).delete()
 
-            # Apply filters with operator support
-            for key, value in filters.items():
-                if isinstance(value, dict):
-                    # Handle operator syntax: {"id": {"in": [1,2,3]}}
-                    for operator, operand in value.items():
-                        if operator == "in":
-                            query = query.in_(key, operand)
-                        elif operator == "eq":
-                            query = query.eq(key, operand)
-                        elif operator == "neq":
-                            query = query.neq(key, operand)
-                        elif operator == "gt":
-                            query = query.gt(key, operand)
-                        elif operator == "gte":
-                            query = query.gte(key, operand)
-                        elif operator == "lt":
-                            query = query.lt(key, operand)
-                        elif operator == "lte":
-                            query = query.lte(key, operand)
-                        else:
-                            logger.warning(f"Unsupported operator '{operator}' in filter")
-                elif isinstance(value, list):
-                    # List value - use IN operator
-                    query = query.in_(key, value)
-                else:
-                    # Simple equality filter
-                    query = query.eq(key, value)
+            if soft_delete:
+                # Soft delete: UPDATE is_active=False and deleted_at=now()
+                from datetime import UTC, datetime
+                updates = {
+                    "is_active": False,
+                    "deleted_at": datetime.now(UTC).isoformat(),
+                    "updated_at": datetime.now(UTC).isoformat(),
+                }
 
-            response = await query.execute()
-            count = len(response.data) if response.data else 0
+                # Use update_entities for soft delete
+                count = await self.update_entities(
+                    table=table,
+                    filters=filters,
+                    updates=updates
+                )
 
-            # Track operation for transaction (no rollback capability for deletes)
-            if self._current_transaction is not None:
-                self._current_transaction.operations.append({
-                    "type": "delete",
-                    "table": table,
-                    "filters": filters,
-                    "count": count,
-                })
+                # Track operation for transaction
+                if self._current_transaction is not None:
+                    self._current_transaction.operations.append({
+                        "type": "soft_delete",
+                        "table": table,
+                        "filters": filters,
+                        "count": count,
+                    })
+
+                return count
+            else:
+                # Hard delete: Permanent removal
+                query = client.table(table).delete()
+
+                # Apply filters with operator support
+                for key, value in filters.items():
+                    if isinstance(value, dict):
+                        # Handle operator syntax: {"id": {"in": [1,2,3]}}
+                        for operator, operand in value.items():
+                            if operator == "in":
+                                query = query.in_(key, operand)
+                            elif operator == "eq":
+                                query = query.eq(key, operand)
+                            elif operator == "neq":
+                                query = query.neq(key, operand)
+                            elif operator == "gt":
+                                query = query.gt(key, operand)
+                            elif operator == "gte":
+                                query = query.gte(key, operand)
+                            elif operator == "lt":
+                                query = query.lt(key, operand)
+                            elif operator == "lte":
+                                query = query.lte(key, operand)
+                            else:
+                                logger.warning(f"Unsupported operator '{operator}' in filter")
+                    elif isinstance(value, list):
+                        # List value - use IN operator
+                        query = query.in_(key, value)
+                    else:
+                        # Simple equality filter
+                        query = query.eq(key, value)
+
+                response = await query.execute()
+                count = len(response.data) if response.data else 0
+
+                # Track operation for transaction (no rollback capability for hard deletes)
+                if self._current_transaction is not None:
+                    self._current_transaction.operations.append({
+                        "type": "delete",
+                        "table": table,
+                        "filters": filters,
+                        "count": count,
+                    })
 
             return count
 

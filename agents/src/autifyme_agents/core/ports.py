@@ -639,6 +639,7 @@ class StorageInterface(ABC):
         self,
         table: str,
         filters: dict[str, Any],
+        soft_delete: bool = True,
     ) -> int:
         """
         Delete entities matching filters.
@@ -646,9 +647,12 @@ class StorageInterface(ABC):
         Args:
             table: Table name
             filters: WHERE conditions as dict
+            soft_delete: If True, sets is_active=False and deleted_at=now().
+                        If False, performs hard delete (permanent removal).
+                        Defaults to True for data safety.
 
         Returns:
-            Count of deleted rows
+            Count of deleted/deactivated rows
 
         Raises:
             StorageError: On delete failure

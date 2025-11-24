@@ -38,6 +38,7 @@ class ExecutionResult:
         error_message: str | None = None,
         error_operation: str | None = None,
         rollback_performed: bool = False,
+        warnings: list[str] | None = None,
     ):
         """Initialize execution result."""
         self.success = success
@@ -48,6 +49,7 @@ class ExecutionResult:
         self.error_message = error_message
         self.error_operation = error_operation
         self.rollback_performed = rollback_performed
+        self.warnings = warnings or []
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for agent response."""
@@ -78,6 +80,10 @@ class ExecutionResult:
                     )
                 ),
             }
+
+            # Include warnings if any
+            if self.warnings:
+                result["warnings"] = self.warnings
         else:
             result["error"] = self.error_message
             result["error_operation"] = self.error_operation
@@ -218,8 +224,23 @@ class MultiOperationExecutor:
         except ToolException as e:
             errors.append(f"Dependency error: {str(e)}")
 
+        # Check for duplicate returns names
+        returns_names_list = [op.returns for op in intent.operations if op.returns]
+        returns_names = set(returns_names_list)
+        if len(returns_names_list) != len(returns_names):
+            # Find duplicates
+            seen = set()
+            duplicates = set()
+            for name in returns_names_list:
+                if name in seen:
+                    duplicates.add(name)
+                seen.add(name)
+            errors.append(
+                f"Duplicate returns names found: {', '.join(sorted(duplicates))}. "
+                f"Each operation must have a unique returns name for cross-references."
+            )
+
         # Check references are resolvable
-        returns_names = {op.returns for op in intent.operations if op.returns}
         for i, op in enumerate(intent.operations):
             for dep in op.dependencies:
                 if dep not in returns_names:
@@ -287,6 +308,7 @@ class MultiOperationExecutor:
                 created_entities: dict[str, list[dict[str, Any]]] = {}
                 updated_entities: dict[str, int] = {}
                 deleted_entities: dict[str, int] = {}
+                warnings: list[str] = []
 
                 for op in sorted_operations:
                     logger.info(
@@ -329,11 +351,25 @@ class MultiOperationExecutor:
                         )
                         updated_entities[op.table] = updated_entities.get(op.table, 0) + count
 
+                        # Warn if update matched 0 rows
+                        if count == 0:
+                            warnings.append(
+                                f"UPDATE on {op.table} matched 0 rows (filters: {op.filters}). "
+                                f"Operation succeeded but no data was modified."
+                            )
+
                     elif op.action == "delete":
                         count = await self._execute_delete(
                             op.table, op.filters, op.soft_delete, op.cascade
                         )
                         deleted_entities[op.table] = deleted_entities.get(op.table, 0) + count
+
+                        # Warn if delete matched 0 rows
+                        if count == 0:
+                            warnings.append(
+                                f"DELETE on {op.table} matched 0 rows (filters: {op.filters}). "
+                                f"Operation succeeded but no data was removed."
+                            )
 
                     elif op.action == "upsert":
                         result = await self._execute_upsert(
@@ -370,6 +406,7 @@ class MultiOperationExecutor:
                     updated_entities=updated_entities,
                     deleted_entities=deleted_entities,
                     execution_time_ms=execution_time_ms,
+                    warnings=warnings,
                 )
 
         except Exception as e:

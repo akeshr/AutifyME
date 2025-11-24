@@ -364,21 +364,35 @@ class FakeStorage(StorageInterface):
         self,
         table: str,
         filters: dict[str, Any],
+        soft_delete: bool = True,
     ) -> int:
         """Delete entities matching filters."""
         table_data = self.tables.get(table, [])
-        to_remove = []
 
-        for row in table_data:
-            match = all(row.get(k) == v for k, v in filters.items())
-            if match:
-                to_remove.append(row)
+        if soft_delete:
+            # Soft delete: Set is_active=False and deleted_at=now()
+            count = 0
+            for row in table_data:
+                match = all(row.get(k) == v for k, v in filters.items())
+                if match:
+                    row["is_active"] = False
+                    row["deleted_at"] = datetime.now(UTC).isoformat()
+                    row["updated_at"] = datetime.now(UTC).isoformat()
+                    count += 1
+            return count
+        else:
+            # Hard delete: Remove from storage
+            to_remove = []
+            for row in table_data:
+                match = all(row.get(k) == v for k, v in filters.items())
+                if match:
+                    to_remove.append(row)
 
-        count = len(to_remove)
-        for row in to_remove:
-            table_data.remove(row)
+            count = len(to_remove)
+            for row in to_remove:
+                table_data.remove(row)
 
-        return count
+            return count
 
     # ========================================================================
     # Lifecycle Management

@@ -171,12 +171,13 @@ async def create_project_manager(
     # No HITL needed for read-only operations
     pm_tools.append(create_read_data_tool(storage))
 
-    # Universal Data Engine - Write operations (insert, update, delete, upsert, patch)
+    # Universal Data Engine - Write operations (WriteIntent with multi-operation support)
     # Full write access with HITL enabled for all mutations
+    # tables=None means PM has access to all tables (no restrictions)
     pm_tools.append(
         create_write_data_tool(
             storage=storage,
-            operations=["insert", "update", "delete", "upsert", "patch"],  # Full write access
+            tables=None,  # Full access - no table restrictions for PM
         )
     )
 
