@@ -68,11 +68,7 @@ ERROR_PATTERNS = {
         "action": "Too many requests. Wait and retry. Implement backoff strategy.",
     },
 
-    # Permission/Access errors
-    "permission": {
-        "type": "ACCESS_ERROR",
-        "action": "Insufficient permissions. Contact administrator or use alternative approach.",
-    },
+    # Permission/Access errors (general access errors, distinct from table-level ACCESS_DENIED)
     "access": {
         "type": "ACCESS_ERROR",
         "action": "Access denied. Verify credentials or contact administrator.",
