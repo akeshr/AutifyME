@@ -327,11 +327,14 @@ class MultiOperationExecutor:
 
                     # Resolve references in data
                     resolved_data = (
-                        self._resolve_references(op.data, context) if op.data else None
+                        self._resolve_references(op.data, context) if op.data is not None else None
                     )
 
                     # Execute operation
                     if op.action == "create":
+                        # Validation ensures create has data (empty dict {} is valid)
+                        if resolved_data is None:
+                            raise ToolException("CREATE requires data")
                         result = await self._execute_create(
                             op.table, resolved_data, op.on_conflict, op.conflict_fields
                         )
@@ -353,10 +356,18 @@ class MultiOperationExecutor:
                                 context[op.returns] = result
 
                     elif op.action == "update":
+                        # Validation ensures update has filters and data/updates
+                        if op.filters is None:
+                            raise ToolException("UPDATE requires filters")
+                        updates_data = op.updates or resolved_data
+                        if updates_data is None:
+                            raise ToolException("UPDATE requires updates or data")
+                        if not isinstance(updates_data, dict):
+                            raise ToolException("UPDATE data must be dict, not list")
                         count = await self._execute_update(
                             op.table,
                             op.filters,
-                            op.updates or resolved_data,
+                            updates_data,
                         )
                         updated_entities[op.table] = updated_entities.get(op.table, 0) + count
 
@@ -368,6 +379,9 @@ class MultiOperationExecutor:
                             )
 
                     elif op.action == "delete":
+                        # Validation ensures delete has filters
+                        if op.filters is None:
+                            raise ToolException("DELETE requires filters")
                         count = await self._execute_delete(
                             op.table, op.filters, op.soft_delete, op.cascade
                         )
@@ -381,6 +395,9 @@ class MultiOperationExecutor:
                             )
 
                     elif op.action == "upsert":
+                        # Validation ensures upsert has data (empty dict {} is valid)
+                        if resolved_data is None:
+                            raise ToolException("UPSERT requires data")
                         result = await self._execute_upsert(
                             op.table, resolved_data, op.conflict_fields
                         )
@@ -519,11 +536,16 @@ class MultiOperationExecutor:
             ToolException: If reference cannot be resolved
         """
         if isinstance(data, list):
-            return [self._resolve_references(item, context) for item in data]
+            # Each item in list is a dict, recursion returns dict
+            resolved_list: list[dict[str, Any]] = []
+            for item in data:
+                resolved_item = self._resolve_references(item, context)
+                # Type narrowing: when called with dict, returns dict
+                assert isinstance(resolved_item, dict), "List items must be dicts"
+                resolved_list.append(resolved_item)
+            return resolved_list
 
-        if not isinstance(data, dict):
-            return data
-
+        # data is dict (not list per above check)
         resolved: dict[str, Any] = {}
 
         for key, value in data.items():
