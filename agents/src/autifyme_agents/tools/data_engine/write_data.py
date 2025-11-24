@@ -256,7 +256,11 @@ def create_write_data_tool(
             else:
                 return build_agent_error_response(
                     exception=Exception(result.error_message or "Unknown error"),
-                    context={"goal": goal},
+                    context={
+                        "goal": goal,
+                        "execution_time_ms": result.execution_time_ms,
+                        "rollback_performed": result.rollback_performed,
+                    },
                     fallback_type="EXECUTION_ERROR",
                     fallback_action=result.error_message or "Review operation structure and retry."
                 )

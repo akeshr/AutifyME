@@ -53,8 +53,8 @@ def mock_storage():
 
     # Mock transaction context manager
     storage.transaction = MagicMock(return_value=AsyncMock())
-    storage.transaction.return_value.__aenter__ = AsyncMock()
-    storage.transaction.return_value.__aexit__ = AsyncMock()
+    storage.transaction.return_value.__aenter__ = AsyncMock(return_value=None)
+    storage.transaction.return_value.__aexit__ = AsyncMock(return_value=None)
 
     return storage
 
@@ -806,7 +806,8 @@ class TestValidation:
         })
 
         assert result["success"] is False
-        assert "not allowed" in result["error"]
+        assert result["error_type"] == "ACCESS_DENIED"
+        assert "Access denied" in result["error"]
 
     @pytest.mark.asyncio
     async def test_access_control_multi_op_all_allowed(self, mock_storage):
@@ -843,21 +844,24 @@ class TestValidation:
         })
 
         assert result["success"] is False
-        assert "not allowed" in result["error"]
+        assert result["error_type"] == "ACCESS_DENIED"
+        assert "Access denied" in result["error"]
 
     @pytest.mark.asyncio
     async def test_validation_empty_operations_list(self, mock_storage):
         """Test validation detects empty operations list."""
         tool = create_write_data_tool(mock_storage, tables=None)
 
-        # This should fail at Pydantic validation level
-        with pytest.raises(Exception):  # Pydantic validation error
-            await tool.ainvoke({
-                "goal": "Test empty ops",
-                "reasoning": "Should fail",
-                "operations": [],  # Empty!
-                "impact": {}
-            })
+        # This should fail at Pydantic validation level (caught and returned as error response)
+        result = await tool.ainvoke({
+            "goal": "Test empty ops",
+            "reasoning": "Should fail",
+            "operations": [],  # Empty!
+            "impact": {}
+        })
+
+        assert result["success"] is False
+        assert "operations" in result["error"] or "empty" in result["error"].lower()
 
     @pytest.mark.asyncio
     async def test_validation_passes_for_valid_intent(self, mock_storage):
@@ -1285,7 +1289,7 @@ class TestEdgeCases:
 
     @pytest.mark.asyncio
     async def test_operation_without_impact_field(self, mock_storage):
-        """Test WriteIntent with minimal impact (empty dict)."""
+        """Test WriteIntent with minimal impact."""
         mock_storage.insert_entity.return_value = {"id": "1"}
 
         tool = create_write_data_tool(mock_storage, tables=None)
@@ -1296,7 +1300,7 @@ class TestEdgeCases:
             "operations": [
                 {"action": "create", "table": "t", "data": {}}
             ],
-            "impact": {}  # Empty impact
+            "impact": {"creates": {"t": 1}}  # Minimal valid impact
         })
 
         assert result["success"] is True

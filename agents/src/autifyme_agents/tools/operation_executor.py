@@ -63,8 +63,11 @@ class ExecutionResult:
             result["updated_entities"] = self.updated_entities
             result["deleted_entities"] = self.deleted_entities
 
-            # Summary counts
-            total_created = sum(len(entities) for entities in self.created_entities.values())
+            # Summary counts (handle both list[dict] and int values)
+            total_created = sum(
+                len(entities) if isinstance(entities, list) else entities
+                for entities in self.created_entities.values()
+            )
             total_updated = sum(self.updated_entities.values())
             total_deleted = sum(self.deleted_entities.values())
 
@@ -146,22 +149,24 @@ class MultiOperationExecutor:
             },
         )
 
-        # Validation mode
-        if validate_only:
-            validation_errors = await self._validate_intent(intent)
-            execution_time_ms = int((time.time() - start_time) * 1000)
+        # Validate intent first (for all modes)
+        validation_errors = await self._validate_intent(intent)
 
-            if validation_errors:
-                return ExecutionResult(
-                    success=False,
-                    error_message="Validation failed:\n" + "\n".join(validation_errors),
-                    execution_time_ms=execution_time_ms,
-                )
-            else:
-                return ExecutionResult(
-                    success=True,
-                    execution_time_ms=execution_time_ms,
-                )
+        if validation_errors:
+            execution_time_ms = int((time.time() - start_time) * 1000)
+            return ExecutionResult(
+                success=False,
+                error_message="Validation failed:\n" + "\n".join(validation_errors),
+                execution_time_ms=execution_time_ms,
+            )
+
+        # Validation mode - return after validation
+        if validate_only:
+            execution_time_ms = int((time.time() - start_time) * 1000)
+            return ExecutionResult(
+                success=True,
+                execution_time_ms=execution_time_ms,
+            )
 
         # Dry-run mode
         if dry_run:
@@ -193,6 +198,10 @@ class MultiOperationExecutor:
             List of validation error messages (empty if valid)
         """
         errors: list[str] = []
+
+        # Check operations list is not empty
+        if not intent.operations or len(intent.operations) == 0:
+            errors.append("WriteIntent must contain at least one operation")
 
         # Check operations have required data
         for i, op in enumerate(intent.operations):
