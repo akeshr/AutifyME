@@ -31,18 +31,26 @@ class ReadDataInput(BaseModel):
     filters: dict[str, Any] | None = Field(
         None,
         description=(
-            "Exact match filters. Examples: "
+            "[EXACT MATCH] Case-sensitive exact value matching. "
+            "Use when you have exact values (IDs, booleans, status codes). "
+            "Examples: "
             "{'is_active': True}, "
             "{'category_id': 'cat-123'}, "
-            "{'status': ['draft', 'published']} - IN operator for lists"
+            "{'status': ['draft', 'published']} (IN operator for lists), "
+            "{'name': {'$in': ['Exact Name 1', 'Exact Name 2']}} (requires EXACT match). "
+            "CRITICAL: For name searches, use search_patterns instead (fuzzy match)."
         )
     )
     search_patterns: dict[str, str] | None = Field(
         None,
         description=(
-            "Case-insensitive ILIKE patterns. Examples: "
-            "{'name': '%bottle%'}, "
-            "{'sku_code': 'SKU-%'} - Use % as wildcard"
+            "[FUZZY MATCH] Case-insensitive ILIKE pattern matching. "
+            "Use for searching text fields (names, descriptions, SKUs). "
+            "Examples: "
+            "{'name': '%bottle%'} (contains 'bottle'), "
+            "{'sku_code': 'SKU-%'} (starts with 'SKU-'), "
+            "{'name': '%PET%jar%'} (contains 'PET' AND 'jar'). "
+            "Use % as wildcard. RECOMMENDED for all name/text searches."
         )
     )
     columns: list[str] | None = Field(
@@ -141,11 +149,48 @@ def create_read_data_tool(
         - Aggregations with GROUP BY (use aggregate_data)
         - Writing/updating data (use write_data)
 
+        CRITICAL: filters vs search_patterns
+        =====================================
+
+        filters = EXACT MATCH (case-sensitive)
+        - Use for: IDs, booleans, enums, status codes, foreign keys
+        - Examples: {'is_active': True}, {'id': 'uuid-123'}
+        - {'name': {'$in': ['Name 1', 'Name 2']}} → ONLY matches EXACT names
+        - Returns 0 results if name doesn't match exactly (case, spacing, etc.)
+
+        search_patterns = FUZZY MATCH (case-insensitive ILIKE)
+        - Use for: Names, descriptions, SKUs, any text search
+        - Examples: {'name': '%jar%'}, {'name': '%PET%bottle%'}
+        - Matches partial strings, case-insensitive
+        - RECOMMENDED for all name/text searches
+
+        Common Mistake:
+        ❌ filters={'name': {'$in': ['PET Jar', 'PET Bottles']}}  # Returns 0 if exact name doesn't exist
+        ✅ search_patterns={'name': '%PET%'}  # Returns all products with 'PET' in name
+
         Returns:
             Query results with metadata (count, pagination info)
 
         Examples:
-            # Complex: Find active 500ml products across multiple families with pricing
+            # CRITICAL: Exact vs Fuzzy Match - Understanding the difference
+
+            # ❌ WRONG: Using filters for name search (returns 0 if names don't match exactly)
+            read_data(
+                table="product_families",
+                filters={"name": {"$in": ["PET Jar", "PET Bottles"]}},  # Requires EXACT match
+                columns=["id", "name"]
+            )
+            # Returns: [] (empty) if actual names are "PET Food Jars" or "PET Water Bottles"
+
+            # ✅ CORRECT: Using search_patterns for name search (fuzzy match)
+            read_data(
+                table="product_families",
+                search_patterns={"name": "%PET%"},  # Matches any name containing "PET"
+                columns=["id", "name"]
+            )
+            # Returns: ["PET Food Jars", "PET Water Bottles", "PET Containers", etc.]
+
+            # ✅ CORRECT: Combining exact filters with fuzzy search
             read_data(
                 table="products",
                 filters={"is_active": True, "product_family_id": ["fam-1", "fam-2", "fam-3"]},

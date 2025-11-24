@@ -153,8 +153,15 @@ Specialist:
   - **Domain restriction**: Product catalog tables only
   - **Parameters:**
     - table (str) - Table name (product_families, variant_axes, variant_values, products, product_variant_values, etc.)
-    - filters (dict) - Exact match: `{"field": "value"}` or operators: `{"field": {"$eq": "value"}}`
-    - search_patterns (dict) - Pattern matching (case-insensitive ILIKE): `{"field": "%term%"}`
+    - filters (dict) - **[EXACT MATCH]** Case-sensitive exact value matching
+      - Use for: IDs, booleans, enums, status codes, foreign keys
+      - Examples: `{"is_active": True}`, `{"id": "uuid-123"}`
+      - **CRITICAL**: `{"name": {"$in": ["Name 1"]}}` requires EXACT match (case-sensitive)
+    - search_patterns (dict) - **[FUZZY MATCH]** Case-insensitive ILIKE pattern matching
+      - Use for: Names, descriptions, SKUs, any text search
+      - Examples: `{"name": "%jar%"}`, `{"name": "%PET%bottle%"}`
+      - **RECOMMENDED** for all name/text searches (use % as wildcard)
+      - Common mistake: Using filters for name search → returns 0 if exact match fails
     - columns (list) - Specific columns to return
     - relations (list) - Related data to include (PostgREST format)
       - **Simple**: `relations=['product_family']` - Include related product_family
@@ -660,6 +667,41 @@ Steps:
    ```
    **CRITICAL**: Use `variant_axes(*, variant_values(*))` NOT `variant_axes.variant_values(*)`
 3. Format and return to PM (no write_data call - read-only operation)
+
+**Pattern 2b: Name Search - Exact vs Fuzzy Match**
+
+User: "Find PET Jar and PET Bottles families"
+
+**❌ WRONG APPROACH (returns 0 results):**
+```python
+read_data(
+    table="product_families",
+    filters={"name": {"$in": ["PET Jar", "PET Bottles"]}},  # Exact match only
+    columns=["id", "name"]
+)
+# Returns: [] (empty) if actual names are "PET Food Jars" or "PET Water Bottles"
+```
+
+**✅ CORRECT APPROACH (fuzzy match):**
+```python
+# Option 1: Search for all PET products
+read_data(
+    table="product_families",
+    search_patterns={"name": "%PET%"},  # Matches any name with "PET"
+    columns=["id", "name"]
+)
+# Returns: ["PET Food Jars", "PET Water Bottles", "PET Containers", etc.]
+
+# Option 2: Search for specific patterns
+read_data(
+    table="product_families",
+    search_patterns={"name": "%PET%jar%"},  # Contains "PET" AND "jar"
+    columns=["id", "name"]
+)
+# Returns: ["PET Food Jars", "PET Storage Jars", etc.]
+```
+
+**Key Insight:** Use search_patterns for ALL name/text searches. Use filters only for exact values (IDs, booleans, enums).
 
 **Pattern 3: UPDATE with Verification**
 
