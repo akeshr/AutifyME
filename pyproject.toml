@@ -185,6 +185,17 @@ ignore_missing_imports = true
 # **Result:** 82 source files, 0 errors, 100% type-safe codebase
 # No workarounds, no type: ignore, no cast() - clean architecture from first principles
 
+[tool.pytest.ini_options]
+# Test configuration
+testpaths = ["tests"]
+# Exclude archived tests from collection
+norecursedirs = ["archived", ".git", ".venv", "__pycache__", "node_modules"]
+# Asyncio configuration
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# Coverage configuration
+addopts = "--strict-markers --verbose"
+
 [tool.hatch.build.targets.wheel]
 packages = ["agents/src/autifyme_agents"]
 
