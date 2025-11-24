@@ -129,18 +129,44 @@ def create_inspect_schema_tool(
             Schema information for requested tables with requested details
 
         Examples:
-            # Basic structure only
+            # Complex: Multi-table schema verification before creating product family
+            inspect_schema(
+                tables=["product_families", "variant_axes", "variant_values", "products", "product_variant_values"],
+                details=["structure", "relationships"],
+                sample_limit=0
+            )
+            # Returns: Schema for 5 tables with foreign key relationships, used to plan multi-table atomic transaction
+
+            # Complex: Deep inspection with samples for duplicate detection strategy
+            inspect_schema(
+                tables=["product_families"],
+                details=["structure", "stats", "samples"],
+                sample_limit=10
+            )
+            # Returns: Column types, row count, 10 real examples to understand naming patterns for fuzzy matching
+
+            # Complex: Junction table analysis for variant value relationships
+            inspect_schema(
+                tables=["product_variant_values", "variant_values", "variant_axes"],
+                details=["structure", "relationships"],
+                sample_limit=5
+            )
+            # Returns: M:N relationship structure between products and variant values via junction table
+
+            # Complex: Full catalog structure with cascade behavior for delete operations
+            inspect_schema(
+                tables=["products", "product_images", "product_family_industries"],
+                details=["structure", "relationships", "stats"],
+                sample_limit=3
+            )
+            # Returns: Foreign keys, cascade settings, row counts to calculate delete impact
+
+            # Quick structure check (no relationships, no samples)
             inspect_schema(
                 tables=["products"],
                 details=["structure"]
             )
-
-            # Full inspection with samples
-            inspect_schema(
-                tables=["product_families", "products"],
-                details=["structure", "relationships", "stats", "samples"],
-                sample_limit=5
-            )
+            # Returns: Columns, types, constraints only (fastest query)
         """
         try:
             # Initialize default for mutable parameter

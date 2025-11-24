@@ -175,44 +175,131 @@ def create_write_data_tool(
             Execution result with created/updated/deleted entities
 
         Examples:
-            # Multi-table create with dependencies
+            # Complex: Create product family with multi-axis variants and products
             write_data(
-                goal="Create PET Bottles product family with Size variant",
-                reasoning="No duplicates found. Creating family with variant axis.",
+                goal="Create PET Food Jars family with Size and Color variants (6 SKUs)",
+                reasoning="Duplicate check: 0 matches. Web research (confidence 0.85): food-grade PET, transparent/amber common. Creating 2 axes (Size, Color), 4 variant values (500ml, 1L, Clear, Amber), 4 product combinations.",
                 operations=[
                     {
                         "action": "create",
                         "table": "product_families",
-                        "data": {"name": "PET Bottles", "sku_prefix": "PET-BTL"},
+                        "data": {
+                            "name": "PET Food Jars",
+                            "sku_prefix": "JAR-PET",
+                            "base_price": 30.0,
+                            "material": "Polyethylene Terephthalate (PET)",
+                            "is_active": True
+                        },
                         "returns": "family"
                     },
                     {
                         "action": "create",
                         "table": "variant_axes",
-                        "data": {"axis_name": "Size", "family_id": "@family.id"},
+                        "data": [
+                            {"name": "Size", "product_family_id": "@family.id", "is_active": True},
+                            {"name": "Color", "product_family_id": "@family.id", "is_active": True}
+                        ],
+                        "dependencies": ["family"],
+                        "returns": "axes_batch"
+                    },
+                    {
+                        "action": "create",
+                        "table": "variant_values",
+                        "data": [
+                            {"name": "500ml", "variant_axis_id": "@axes_batch[0].id"},
+                            {"name": "1L", "variant_axis_id": "@axes_batch[0].id"},
+                            {"name": "Clear", "variant_axis_id": "@axes_batch[1].id"},
+                            {"name": "Amber", "variant_axis_id": "@axes_batch[1].id"}
+                        ],
+                        "dependencies": ["axes_batch"],
+                        "returns": "values_batch"
+                    },
+                    {
+                        "action": "create",
+                        "table": "products",
+                        "data": [
+                            {"product_family_id": "@family.id", "sku": "JAR-PET-500ML-CLEAR", "name": "PET Food Jar 500ml Clear", "base_price": 30.0},
+                            {"product_family_id": "@family.id", "sku": "JAR-PET-500ML-AMBER", "name": "PET Food Jar 500ml Amber", "base_price": 32.0},
+                            {"product_family_id": "@family.id", "sku": "JAR-PET-1L-CLEAR", "name": "PET Food Jar 1L Clear", "base_price": 45.0},
+                            {"product_family_id": "@family.id", "sku": "JAR-PET-1L-AMBER", "name": "PET Food Jar 1L Amber", "base_price": 48.0}
+                        ],
                         "dependencies": ["family"]
                     }
                 ],
-                impact={"creates": {"product_families": 1, "variant_axes": 1}}
+                impact={
+                    "creates": {"product_families": 1, "variant_axes": 2, "variant_values": 4, "products": 4},
+                    "warnings": ["SKU count +4 (current: 45 → new: 49)", "Amber variants +6% price premium"],
+                    "examples": ["JAR-PET-500ML-CLEAR", "JAR-PET-1L-AMBER"]
+                }
             )
 
-            # Dry-run preview
+            # Complex: Tiered bulk price update with conditional logic
             write_data(
-                goal="...",
-                reasoning="...",
-                operations=[...],
-                impact={...},
-                dry_run=True
+                goal="Update PET Bottles pricing with size-based tiers (Rs 35 for small/medium, Rs 50 for large)",
+                reasoning="User requests tiered pricing. Query shows 6 active products (2x 500ml, 2x 1L, 2x 2L). Current avg Rs 28.50. New tiered pricing reflects volume premium. Three separate operations for atomic consistency.",
+                operations=[
+                    {
+                        "action": "update",
+                        "table": "products",
+                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "sku": {"$like": "%-500ML%"}},
+                        "updates": {"base_price": 35.0}
+                    },
+                    {
+                        "action": "update",
+                        "table": "products",
+                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "sku": {"$like": "%-1L%"}},
+                        "updates": {"base_price": 35.0}
+                    },
+                    {
+                        "action": "update",
+                        "table": "products",
+                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "sku": {"$like": "%-2L%"}},
+                        "updates": {"base_price": 50.0}
+                    }
+                ],
+                impact={
+                    "updates": {"products": 6},
+                    "warnings": ["CRITICAL: 6 products affected", "2L products: +56% increase", "Avg price: Rs 28.50 → Rs 40.00 (+40%)"],
+                    "examples": ["BOTTLE-PET-500ML: Rs 25→35 (+40%)", "BOTTLE-PET-2L: Rs 32→50 (+56%)"]
+                }
             )
 
-            # Validation only
+            # Complex: Soft delete with junction table cleanup
             write_data(
-                goal="...",
-                reasoning="...",
-                operations=[...],
-                impact={...},
-                validate_only=True
+                goal="Remove 250ml size from PET Bottles (discontinued) with junction cleanup",
+                reasoning="250ml discontinued per business decision. Found 3 products via product_variant_values junction. Soft deleting products, junction records, and variant value to preserve order history. No hard deletes.",
+                operations=[
+                    {
+                        "action": "update",
+                        "table": "products",
+                        "filters": {"id": {"$in": ["uuid-1", "uuid-2", "uuid-3"]}, "is_active": True},
+                        "updates": {"is_active": False, "discontinued_at": "2025-01-24T00:00:00Z"}
+                    },
+                    {
+                        "action": "update",
+                        "table": "product_variant_values",
+                        "filters": {"variant_value_id": "uuid-250ml-val", "is_active": True},
+                        "updates": {"is_active": False}
+                    },
+                    {
+                        "action": "update",
+                        "table": "variant_values",
+                        "filters": {"id": "uuid-250ml-val"},
+                        "updates": {"is_active": False}
+                    }
+                ],
+                impact={
+                    "updates": {"products": 3, "product_variant_values": 3, "variant_values": 1},
+                    "warnings": ["CRITICAL: 3 products discontinued", "Soft delete preserves order history", "SKU count -3 (45 → 42)"],
+                    "examples": ["BOTTLE-PET-250ML-CLEAR", "BOTTLE-PET-250ML-AMBER"]
+                }
             )
+
+            # Dry-run preview mode (validation without execution)
+            write_data(goal="...", reasoning="...", operations=[...], impact={...}, dry_run=True)
+
+            # Validation-only mode (schema checks without execution)
+            write_data(goal="...", reasoning="...", operations=[...], impact={...}, validate_only=True)
         """
         try:
             # Parse WriteIntent from dict inputs
