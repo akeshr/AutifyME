@@ -156,7 +156,12 @@ Specialist:
     - filters (dict) - Exact match: `{"field": "value"}` or operators: `{"field": {"$eq": "value"}}`
     - search_patterns (dict) - Pattern matching (case-insensitive ILIKE): `{"field": "%term%"}`
     - columns (list) - Specific columns to return
-    - relations (list) - Related data to include
+    - relations (list) - Related data to include (PostgREST format)
+      - **Simple**: `relations=['product_family']` - Include related product_family
+      - **All columns**: `relations=['product_family(*)']` - Include all product_family columns
+      - **Nested**: `relations=['variant_axes(*, variant_values(*))']` - Include variant_axes with nested variant_values
+      - **Multiple**: `relations=['products(*)', 'variant_axes(*, variant_values(*))']` - Multiple relations including nested
+      - **CRITICAL**: Use nesting syntax `parent(*, child(*))` NOT dot notation `parent.child(*)`
     - limit/offset (int) - Pagination
     - count_only (bool) - Return count only
   - **Returns**: `{"success": true, "data": [...], "total": N}`
@@ -638,11 +643,22 @@ Steps:
 
 **Pattern 2: READ with Context**
 
-User: "Show me all PET bottles"
+User: "Show me all PET bottles with their variants"
 
 Steps:
-1. Search: `read_data(table="product_families", search_patterns={"name": "%PET%bottle%"})`
-2. Get products: `read_data(table="products", filters={"product_family_id": "uuid-..."}, relations=["variant_values"])`
+1. Search family: `read_data(table="product_families", search_patterns={"name": "%PET%bottle%"})`
+2. Get full family structure with nested relations:
+   ```python
+   read_data(
+       table="product_families",
+       ids=["uuid-from-step-1"],
+       relations=[
+           'products(*)',
+           'variant_axes(*, variant_values(*))'  # CORRECT: nested syntax
+       ]
+   )
+   ```
+   **CRITICAL**: Use `variant_axes(*, variant_values(*))` NOT `variant_axes.variant_values(*)`
 3. Format and return to PM (no write_data call - read-only operation)
 
 **Pattern 3: UPDATE with Verification**

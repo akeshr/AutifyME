@@ -210,6 +210,18 @@ def create_read_data_tool(
                 relations=["product_family(name)"]
             )
             # Returns: Specific products for bulk price update verification
+
+            # Complex: Full product family with nested variant structure
+            read_data(
+                table="product_families",
+                ids=["uuid-pet-jars"],
+                relations=[
+                    "products(*)",
+                    "variant_axes(*, variant_values(*))"  # CORRECT nested syntax
+                ]
+            )
+            # Returns: Product family with all products and complete variant axis hierarchy
+            # CRITICAL: Use variant_axes(*, variant_values(*)) NOT variant_axes.variant_values(*)
             )
         """
         try:
