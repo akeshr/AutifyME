@@ -104,35 +104,55 @@ def create_product_architecture_specialist(
     # Load specialist prompt
     system_prompt = load_prompt("specialists/product_architecture_specialist.prompt")
 
-    # Core tools
+    # Product catalog tables (domain ownership)
+    product_tables = [
+        "product_families",
+        "product_variants",
+        "product_images",
+        "attributes",
+        "variant_values",
+        "categories",
+        "category_products",
+    ]
+
+    # Core tools - Minimal set for domain expertise
     tools: list[Any] = [
         image_analysis_tool,
         research_product_tool,       # Web research for product enrichment
         extract_web_content_tool,    # Deep content extraction from URLs
     ]
 
-    # Schema query tools (for dynamic planning)
-    from autifyme_agents.tools.schema_tools import (
-        get_product_schema,
-        get_table_schema,
-        list_available_tables,
-    )
-
-    tools.extend([get_product_schema, get_table_schema, list_available_tables])
-
-    # Storage-dependent tools
+    # Universal Data Engine tools - Domain-restricted
     from autifyme_agents.tools.data_engine import (
         create_inspect_schema_tool,
         create_read_data_tool,
-    )
-    from autifyme_agents.tools.product_search_tools import (
-        create_search_product_families_tool,
+        create_write_data_tool,
     )
 
-    tools.append(create_search_product_families_tool(storage))
-    # Universal Data Engine tools (all product tables)
-    tools.append(create_inspect_schema_tool(storage))  # Schema inspection
-    tools.append(create_read_data_tool(storage))  # Read operations
+    # Schema inspection (product catalog only)
+    tools.append(
+        create_inspect_schema_tool(
+            storage,
+            tables=product_tables,
+        )
+    )
+
+    # Read operations (product catalog only)
+    tools.append(
+        create_read_data_tool(
+            storage,
+            tables=product_tables,
+        )
+    )
+
+    # Write operations (product catalog only) with HITL
+    # Specialist owns domain mutations - presents plans for approval
+    tools.append(
+        create_write_data_tool(
+            storage,
+            tables=product_tables,
+        )
+    )
 
     # Description for PM delegation (routing decisions)
     description = (
@@ -153,7 +173,9 @@ def create_product_architecture_specialist(
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
-        # No interrupt_on - specialist has no HITL tools
+        "interrupt_on": {
+            "write_data": True,  # HITL for domain mutations
+        },
     }
 
     # Add model if specified (otherwise uses PM's default_model)

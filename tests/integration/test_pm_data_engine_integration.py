@@ -84,7 +84,7 @@ class TestPMDataEngineIntegration:
         mock_langgraph_store,
         mock_llm,
     ):
-        """Test PM can be created with new read_data and write_data tools."""
+        """Test PM can be created with minimal tool set (read_data + inspect_schema)."""
         # Mock get_store to return our mock store
         mock_get_store.return_value = mock_langgraph_store
         # Mock get_llm to return our mock LLM (for specialist creation)
@@ -108,7 +108,7 @@ class TestPMDataEngineIntegration:
     @pytest.mark.asyncio
     @patch("autifyme_agents.workflows.project_manager.get_store")
     @patch("autifyme_agents.workflows.project_manager.get_llm")
-    async def test_pm_tools_include_read_and_write(
+    async def test_pm_tools_include_read_and_inspect(
         self,
         mock_get_llm,
         mock_get_store,
@@ -118,7 +118,7 @@ class TestPMDataEngineIntegration:
         mock_langgraph_store,
         mock_llm,
     ):
-        """Test PM has both read_data and write_data tools."""
+        """Test PM has read_data and inspect_schema tools (no write_data)."""
         mock_get_store.return_value = mock_langgraph_store
         mock_get_llm.return_value = mock_llm
 
@@ -152,10 +152,11 @@ class TestPMDataEngineIntegration:
         mock_get_store.return_value = mock_langgraph_store
         mock_get_llm.return_value = mock_llm
 
-        # PM should have:
-        # - read_data tool (no table restrictions, full read access)
-        # - write_data tool (no table restrictions, all write operations)
-        # - HITL enabled for write_data
+        # PM should have (minimal orchestration tools):
+        # - read_data tool (all tables, no restrictions)
+        # - inspect_schema tool (all tables, no restrictions)
+        # - image_analysis tool
+        # - NO write_data (specialists handle mutations)
 
         pm = await create_project_manager(
             company_profile=company_profile,
@@ -184,7 +185,7 @@ class TestPMDataEngineIntegration:
         mock_langgraph_store,
         mock_llm,
     ):
-        """Test PM has HITL enabled for write_data tool."""
+        """Test PM has no HITL (specialists handle HITL at domain level)."""
         mock_get_store.return_value = mock_langgraph_store
         mock_get_llm.return_value = mock_llm
 
@@ -195,9 +196,8 @@ class TestPMDataEngineIntegration:
             model=mock_llm,
         )
 
-        # HITL configuration is internal to the PM
-        # We verify by checking PM was created successfully
-        # The HITL config is: {"write_data": True, "save_campaign": True}
+        # PM has no mutation tools - specialists handle HITL at domain level
+        # HITL config is empty: {}
         assert pm is not None
 
     @pytest.mark.asyncio
@@ -244,13 +244,12 @@ class TestPMDataEngineIntegration:
         mock_langgraph_store,
         mock_llm,
     ):
-        """Test PM migration maintains backward compatibility.
+        """Test PM architecture shift to specialist-centric design.
 
-        The migration from create_database_tool to read_data + write_data
-        should maintain the same capabilities:
-        - Full CRUD access (create, read, update, delete)
-        - No table restrictions
-        - HITL enabled for mutations
+        PM now delegates mutations to domain specialists:
+        - PM: read_data + inspect_schema (orchestration tools)
+        - Specialists: read_data + write_data with HITL (domain execution)
+        - Separation of concerns: orchestration vs execution
         """
         mock_get_store.return_value = mock_langgraph_store
         mock_get_llm.return_value = mock_llm
@@ -308,7 +307,7 @@ class TestToolFactoryIntegration:
         assert write_tool.name == "write_data"
 
     def test_old_tool_not_imported_in_pm(self):
-        """Test PM no longer imports old universal_crud_tool."""
+        """Test PM uses minimal tool set (no write_data, delegates to specialists)."""
         import inspect
 
         from autifyme_agents.workflows import project_manager
@@ -320,7 +319,10 @@ class TestToolFactoryIntegration:
         assert "from autifyme_agents.tools.universal_crud_tool import" not in source
         assert "create_database_tool" not in source or "# " in source  # Commented out
 
-        # Verify new imports exist
+        # Verify new minimal tool set imports
         assert "from autifyme_agents.tools.data_engine import" in source
         assert "create_read_data_tool" in source
-        assert "create_write_data_tool" in source
+        assert "create_inspect_schema_tool" in source
+
+        # PM should NOT import write_data (specialists handle mutations)
+        assert "create_write_data_tool" not in source
