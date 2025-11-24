@@ -73,8 +73,10 @@ class TestPMDataEngineIntegration:
 
     @pytest.mark.asyncio
     @patch("autifyme_agents.workflows.project_manager.get_store")
+    @patch("autifyme_agents.workflows.project_manager.get_llm")
     async def test_pm_creation_with_new_tools(
         self,
+        mock_get_llm,
         mock_get_store,
         company_profile: CompanyProfile,
         mock_storage: StorageInterface,
@@ -85,6 +87,8 @@ class TestPMDataEngineIntegration:
         """Test PM can be created with new read_data and write_data tools."""
         # Mock get_store to return our mock store
         mock_get_store.return_value = mock_langgraph_store
+        # Mock get_llm to return our mock LLM (for specialist creation)
+        mock_get_llm.return_value = mock_llm
 
         # Create PM (should not raise)
         pm = await create_project_manager(
@@ -103,8 +107,10 @@ class TestPMDataEngineIntegration:
 
     @pytest.mark.asyncio
     @patch("autifyme_agents.workflows.project_manager.get_store")
+    @patch("autifyme_agents.workflows.project_manager.get_llm")
     async def test_pm_tools_include_read_and_write(
         self,
+        mock_get_llm,
         mock_get_store,
         company_profile: CompanyProfile,
         mock_storage: StorageInterface,
@@ -114,6 +120,7 @@ class TestPMDataEngineIntegration:
     ):
         """Test PM has both read_data and write_data tools."""
         mock_get_store.return_value = mock_langgraph_store
+        mock_get_llm.return_value = mock_llm
 
         pm = await create_project_manager(
             company_profile=company_profile,
@@ -130,8 +137,10 @@ class TestPMDataEngineIntegration:
 
     @pytest.mark.asyncio
     @patch("autifyme_agents.workflows.project_manager.get_store")
+    @patch("autifyme_agents.workflows.project_manager.get_llm")
     async def test_pm_tools_are_properly_configured(
         self,
+        mock_get_llm,
         mock_get_store,
         company_profile: CompanyProfile,
         mock_storage: StorageInterface,
@@ -141,6 +150,7 @@ class TestPMDataEngineIntegration:
     ):
         """Test PM tools have correct access control configuration."""
         mock_get_store.return_value = mock_langgraph_store
+        mock_get_llm.return_value = mock_llm
 
         # PM should have:
         # - read_data tool (no table restrictions, full read access)
@@ -163,8 +173,10 @@ class TestPMDataEngineIntegration:
 
     @pytest.mark.asyncio
     @patch("autifyme_agents.workflows.project_manager.get_store")
+    @patch("autifyme_agents.workflows.project_manager.get_llm")
     async def test_pm_hitl_configuration(
         self,
+        mock_get_llm,
         mock_get_store,
         company_profile: CompanyProfile,
         mock_storage: StorageInterface,
@@ -174,6 +186,7 @@ class TestPMDataEngineIntegration:
     ):
         """Test PM has HITL enabled for write_data tool."""
         mock_get_store.return_value = mock_langgraph_store
+        mock_get_llm.return_value = mock_llm
 
         pm = await create_project_manager(
             company_profile=company_profile,
@@ -189,8 +202,10 @@ class TestPMDataEngineIntegration:
 
     @pytest.mark.asyncio
     @patch("autifyme_agents.workflows.project_manager.get_store")
+    @patch("autifyme_agents.workflows.project_manager.get_llm")
     async def test_pm_base_context_loaded(
         self,
+        mock_get_llm,
         mock_get_store,
         company_profile: CompanyProfile,
         mock_storage: StorageInterface,
@@ -200,6 +215,7 @@ class TestPMDataEngineIntegration:
     ):
         """Test PM loads base context (catalog summary + taxonomy tree)."""
         mock_get_store.return_value = mock_langgraph_store
+        mock_get_llm.return_value = mock_llm
 
         pm = await create_project_manager(
             company_profile=company_profile,
@@ -217,8 +233,10 @@ class TestPMDataEngineIntegration:
 
     @pytest.mark.asyncio
     @patch("autifyme_agents.workflows.project_manager.get_store")
+    @patch("autifyme_agents.workflows.project_manager.get_llm")
     async def test_pm_migration_maintains_compatibility(
         self,
+        mock_get_llm,
         mock_get_store,
         company_profile: CompanyProfile,
         mock_storage: StorageInterface,
@@ -235,6 +253,7 @@ class TestPMDataEngineIntegration:
         - HITL enabled for mutations
         """
         mock_get_store.return_value = mock_langgraph_store
+        mock_get_llm.return_value = mock_llm
 
         pm = await create_project_manager(
             company_profile=company_profile,
