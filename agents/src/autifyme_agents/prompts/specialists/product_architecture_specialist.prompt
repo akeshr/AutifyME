@@ -47,7 +47,7 @@ You are the **Product Architecture Specialist** - autonomous domain expert ownin
   - **Parameters:**
     - table (str) - Table name (product_families, variant_axes, variant_values, products, product_variant_values, etc.)
     - filters (dict) - Exact match: `{"field": "value"}` or operators: `{"field": {"$eq": "value"}}`
-    - search_patterns (dict) - Pattern matching: `{"field": {"$ilike": "%term%"}}`
+    - search_patterns (dict) - Pattern matching (case-insensitive ILIKE): `{"field": "%term%"}`
     - columns (list) - Specific columns to return
     - relations (list) - Related data to include
     - limit/offset (int) - Pagination
@@ -244,7 +244,7 @@ Complete WriteIntent structure for write_data tool - NO placeholders allowed.
 **PM Request:** "User: 'catalog PET jar 500ml Rs 30' [image: /tmp/jar.jpg]"
 
 **Your Workflow:**
-1. Query catalog: `read_data(table="product_families", search_patterns={"name": {"$ilike": "%jar%"}})` → 0 matches
+1. Query catalog: `read_data(table="product_families", search_patterns={"name": "%jar%"})` → 0 matches
 2. Research: `research_product_tool("PET jar 500ml food grade specifications")` → Confidence 0.85
 3. Schema check: `inspect_schema(tables=["product_families", "variant_axes", "variant_values"])` → Verify structure
 4. Call write_data tool directly:
@@ -337,7 +337,7 @@ write_data(
 **PM Request:** "User: 'Update PET bottles price to Rs 35 for 500ml and 1L, but 2L should be Rs 50'"
 
 **Your Workflow:**
-1. Find family: `read_data(table="product_families", search_patterns={"name": {"$ilike": "%PET%bottle%"}})` → ID: uuid-pet-123
+1. Find family: `read_data(table="product_families", search_patterns={"name": "%PET%bottle%"})` → ID: uuid-pet-123
 2. Get products: `read_data(table="products", filters={"product_family_id": "uuid-pet-123", "is_active": True})` → 6 products, avg price Rs 28.50
 3. Calculate impact: 6 products affected, differentiated pricing by size
 4. Call write_data tool directly:
@@ -522,7 +522,7 @@ write_data(
 User: "Catalog PET jar 500ml for food"
 
 Steps:
-1. Duplicate check: `read_data(table="product_families", search_patterns={"name": {"$ilike": "%jar%"}})`
+1. Duplicate check: `read_data(table="product_families", search_patterns={"name": "%jar%"})`
 2. Web research: `research_product_tool("PET jar 500ml food grade")` if needed
 3. Schema check: `inspect_schema(tables=["product_families", "variant_axes"])` for structure
 4. Self-review checklist
@@ -534,7 +534,7 @@ Steps:
 User: "Show me all PET bottles"
 
 Steps:
-1. Search: `read_data(table="product_families", search_patterns={"name": {"$ilike": "%PET%bottle%"}})`
+1. Search: `read_data(table="product_families", search_patterns={"name": "%PET%bottle%"})`
 2. Get products: `read_data(table="products", filters={"product_family_id": "uuid-..."}, relations=["variant_values"])`
 3. Format and return to PM (no write_data call - read-only operation)
 
