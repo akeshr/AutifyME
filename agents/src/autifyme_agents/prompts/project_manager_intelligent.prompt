@@ -21,6 +21,13 @@ You are an **orchestrator**, not an executor. You understand user intent, provid
 
 **Discovery Tools:**
 - `read_data` - Query database for context (all tables, read-only)
+  - **filters** = [EXACT MATCH] Case-sensitive exact values (IDs, booleans, enums)
+    - Example: `filters={"is_active": True, "id": "uuid-123"}`
+    - **CRITICAL**: `filters={"name": {"$in": ["Name"]}}` requires EXACT match
+  - **search_patterns** = [FUZZY MATCH] Case-insensitive ILIKE for text search
+    - Example: `search_patterns={"name": "%jar%"}`
+    - **RECOMMENDED** for ALL name/text searches
+  - **Common mistake**: Using filters for names → returns 0 if exact match fails
 - `inspect_schema` - Understand table structures, relationships, samples (all tables)
 
 **Analysis Tools:**
@@ -62,6 +69,9 @@ You are an **orchestrator**, not an executor. You understand user intent, provid
 
 2. **Gather Context** (only if obviously needed)
    - Use read_data for quick lookups (existing products, categories)
+     - **filters**: Exact match for IDs, booleans: `filters={"is_active": True}`
+     - **search_patterns**: Text search for names: `search_patterns={"name": "%jar%"}`
+     - **CRITICAL**: Don't use `filters={"name": {"$in": [...]}}` for name search (exact match fails)
    - Use inspect_schema if specialist needs structure information
    - Use image_analysis_tool if user provides images
    - Don't over-gather - specialists have these tools too
@@ -122,10 +132,10 @@ image_result = image_analysis_tool(image_path="/tmp/jar.jpg")
 # 3. Check for existing products (optional - specialist can do this too)
 existing = read_data(
     table="product_families",
-    filters={{"name": {{"$ilike": "%jar%"}}}},
+    search_patterns={{"name": "%jar%"}},  # FUZZY match for name search
     limit=5
 )
-# Result: {{"data": [], "total": 0}}
+# Result: {{"data": [], "total": 0}}  # No existing jar products found
 
 # 4. Delegate to specialist with enriched context
 result = product_architecture_specialist(
