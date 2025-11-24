@@ -233,21 +233,21 @@ class TestToolFactoryIntegration:
 
     def test_read_tool_import(self):
         """Test read_data tool can be imported."""
-        from autifyme_agents.tools.data_engine_tools import create_read_data_tool
+        from autifyme_agents.tools.data_engine import create_read_data_tool
 
         assert create_read_data_tool is not None
         assert callable(create_read_data_tool)
 
     def test_write_tool_import(self):
         """Test write_data tool can be imported."""
-        from autifyme_agents.tools.data_engine_tools import create_write_data_tool
+        from autifyme_agents.tools.data_engine import create_write_data_tool
 
         assert create_write_data_tool is not None
         assert callable(create_write_data_tool)
 
     def test_tools_create_without_error(self, mock_storage: StorageInterface):
         """Test both tools can be created without errors."""
-        from autifyme_agents.tools.data_engine_tools import (
+        from autifyme_agents.tools.data_engine import (
             create_read_data_tool,
             create_write_data_tool,
         )
@@ -260,7 +260,7 @@ class TestToolFactoryIntegration:
         # Create write tool
         write_tool = create_write_data_tool(
             storage=mock_storage,
-            operations=["insert", "update", "delete", "upsert", "patch"],
+            tables=None,  # No table restrictions
         )
         assert write_tool is not None
         assert write_tool.name == "write_data"
@@ -278,6 +278,6 @@ class TestToolFactoryIntegration:
         assert "create_database_tool" not in source or "# " in source  # Commented out
 
         # Verify new imports exist
-        assert "from autifyme_agents.tools.data_engine_tools import" in source
+        assert "from autifyme_agents.tools.data_engine import" in source
         assert "create_read_data_tool" in source
         assert "create_write_data_tool" in source

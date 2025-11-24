@@ -40,7 +40,7 @@ from pydantic import ValidationError
 from autifyme_agents.core.exceptions import StorageError
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.registry import SchemaRegistry
-from autifyme_agents.tools.data_engine_tools import (
+from autifyme_agents.tools.data_engine import (
     create_aggregate_data_tool,
     create_inspect_schema_tool,
     create_read_data_tool,

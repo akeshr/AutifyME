@@ -154,7 +154,7 @@ class MultiOperationExecutor:
             if validation_errors:
                 return ExecutionResult(
                     success=False,
-                    error_message=f"Validation failed:\n" + "\n".join(validation_errors),
+                    error_message="Validation failed:\n" + "\n".join(validation_errors),
                     execution_time_ms=execution_time_ms,
                 )
             else:
