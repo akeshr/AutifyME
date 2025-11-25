@@ -1,16 +1,18 @@
 # Runner V2 Refactoring Plan
 
-**Status**: In Progress | **Created**: 2025-10-19 | **Owner**: Architecture Review
+**Status**: In Progress | **Created**: 2025-10-19 | **Last Updated**: 2025-11-25
 
 ---
 
 ## Executive Summary
 
-**Problem**: `runner_v2.py` (1186 lines) violates separation of concerns - claims to be "generic HITL framework" but contains cataloging-specific logic, mixed outcome tracking, and complex interrupt handling.
+**Problem**: `runner_v2.py` (originally 1186 lines) violates separation of concerns - claims to be "generic HITL framework" but contains cataloging-specific logic, mixed outcome tracking, and complex interrupt handling.
 
 **Goal**: Extract domain-specific logic, separate cross-cutting concerns, reduce complexity, achieve true workflow-agnostic runner.
 
 **Target**: <500 lines for core runner, remaining logic in dedicated handlers/middleware.
+
+**Current Progress**: 808 lines (32% reduction) - Phase 1 complete, Phase 2 in progress.
 
 ---
 

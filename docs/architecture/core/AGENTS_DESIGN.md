@@ -450,15 +450,17 @@ agents/src/autifyme_agents/
 ```
 
 **Specialists:**
-| Specialist | Domain | Status |
-|------------|--------|--------|
-| Product Architecture | Family/variant structure | Production |
-| Taxonomy | Category classification | Production |
-| Market Intelligence | Pricing/competition analysis | Production |
-| Visual Assets | Image organization/quality | Production |
-| Content SEO | Product descriptions/SEO | Production |
-| Marketing Content | Campaign narratives/CTAs | Production |
-| Cataloging | Legacy simple cataloging | Production |
+| Specialist | Domain | Code | PM Integration |
+|------------|--------|------|----------------|
+| Product Architecture | Family/variant structure | Ready | **Integrated** |
+| Taxonomy | Category classification | Ready | Pending |
+| Market Intelligence | Pricing/competition analysis | Ready | Pending |
+| Visual Assets | Image organization/quality | Ready | Pending |
+| Content SEO | Product descriptions/SEO | Ready | Pending |
+| Marketing Content | Campaign narratives/CTAs | Ready | Pending |
+| Cataloging | Legacy simple cataloging | Ready | Deprecated |
+
+**Note:** See [SPECIALIST_BUILD_UP_PLAN.md](../workflows/SPECIALIST_BUILD_UP_PLAN.md) for integration roadmap.
 
 ---
 

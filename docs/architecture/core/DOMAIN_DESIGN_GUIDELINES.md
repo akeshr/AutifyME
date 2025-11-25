@@ -635,27 +635,29 @@ Before finalizing domain design, validate:
 ```
 agents/src/autifyme_agents/
 ├── workflows/
-│   ├── project_manager.py              # Generic PM (reference)
-│   └── basic_project_manager.py        # Legacy (for comparison)
+│   └── project_manager.py              # Intelligent PM (reference)
 ├── specialists/
 │   ├── product_architecture_specialist.py
 │   ├── taxonomy_specialist.py
 │   ├── market_intelligence_specialist.py
 │   ├── visual_assets_specialist.py
-│   └── content_seo_specialist.py
+│   ├── content_seo_specialist.py
+│   └── marketing_content_specialist.py
 ├── tools/
-│   ├── universal_crud_tool.py          # Schema-driven CRUD (all tables)
-│   └── schema_tools.py                 # Schema query tools
+│   └── data_engine/                    # Universal Data Engine
+│       ├── inspect_schema.py           # Schema discovery
+│       ├── read_data.py                # Query operations
+│       └── write_data.py               # Mutation operations
 └── prompts/
-    ├── project_manager.prompt          # Generic PM prompt
+    ├── project_manager_intelligent.prompt
     └── specialists/
         └── *.prompt                     # Specialist prompts
 ```
 
 **Documentation:**
-- `PRODUCT_ONBOARDING_BUILD_SUMMARY.md` - Architecture and components
-- `PRODUCT_ONBOARDING_COMPLETE_DESIGN.md` - Detailed design
-- `MODEL_CONFIGURATION.md` - Model strategy
+- `AGENTS_DESIGN.md` - Canonical agent hierarchy and patterns
+- `PRODUCT_ONBOARDING_COMPLETE_DESIGN.md` - Detailed workflow design
+- `UNIVERSAL_DATA_ENGINE_DESIGN.md` - Data layer architecture
 
 ---
 
@@ -673,4 +675,5 @@ agents/src/autifyme_agents/
 ---
 
 **Version History:**
+- v1.1.0 (2025-11-25): Updated file references to match current implementation
 - v1.0.0 (2025-10-24): Initial guidelines based on product onboarding design
