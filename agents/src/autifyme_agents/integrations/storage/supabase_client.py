@@ -871,6 +871,400 @@ class SupabaseStorageClient(StorageInterface):
                 original_error=e,
             ) from e
 
+    async def query_aggregate(
+        self,
+        table: str,
+        aggregates: dict[str, str],
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        group_by: list[str] | None = None,
+        having: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query with aggregations and GROUP BY using PostgREST.
+
+        Universal Data Engine - Phase 1.2: Aggregation support.
+
+        Args:
+            table: Table name
+            aggregates: Aggregation operations as {alias: "function(column)"}
+            filters: Exact match filters before aggregation
+            search_patterns: ILIKE patterns before aggregation
+            group_by: Columns to group by
+            having: Filters on aggregated results
+
+        Returns:
+            List of aggregated results
+
+        Raises:
+            StorageError: On query failure
+        """
+        try:
+            client = await self._ensure_async_client()
+
+            # Build SELECT clause with group_by columns and aggregates
+            select_parts = []
+
+            # Add group by columns
+            if group_by:
+                select_parts.extend(group_by)
+
+            # Add aggregate functions
+            # PostgREST syntax: column.function()::alias
+            for alias, aggregate_expr in aggregates.items():
+                # Parse aggregate expression like "count(*)", "sum(price)", "avg(rating)"
+                # PostgREST expects: "price.sum()::total_price" or "id.count()::total"
+
+                # Handle count(*) special case
+                if "count(*)" in aggregate_expr.lower():
+                    select_parts.append(f"id.count()::int::{alias}")
+                else:
+                    # Extract function and column: "sum(price)" -> function=sum, column=price
+                    import re
+                    match = re.match(r'(\w+)\(([^)]+)\)', aggregate_expr)
+                    if match:
+                        func, column = match.groups()
+                        # PostgREST syntax for aggregates
+                        if func.lower() in ('sum', 'avg', 'min', 'max'):
+                            select_parts.append(f"{column}.{func.lower()}()::numeric::{alias}")
+                        elif func.lower() == 'count':
+                            select_parts.append(f"{column}.count()::int::{alias}")
+                        else:
+                            logger.warning(f"Unknown aggregate function: {func}")
+                            select_parts.append(f"{column}.{func.lower()}()::{alias}")
+                    else:
+                        logger.error(f"Invalid aggregate syntax: {aggregate_expr}")
+                        raise ValueError(f"Invalid aggregate expression: {aggregate_expr}")
+
+            select_clause = ",".join(select_parts)
+
+            # Build query
+            query = client.table(table).select(select_clause)
+
+            # Apply filters
+            if filters:
+                for key, value in filters.items():
+                    if isinstance(value, list):
+                        query = query.in_(key, value)
+                    else:
+                        query = query.eq(key, value)
+
+            # Apply search patterns
+            if search_patterns:
+                for column, pattern in search_patterns.items():
+                    query = query.ilike(column, pattern)
+
+            # Note: PostgREST doesn't support HAVING clause directly
+            # We'll need to filter results in Python if having is specified
+            if having and not group_by:
+                logger.warning("HAVING clause without GROUP BY - will be ignored")
+
+            # Execute query
+            response = await query.execute()
+            results = response.data if response.data else []
+
+            # Apply HAVING filters in Python (PostgREST limitation)
+            if having and group_by and results:
+                filtered_results = []
+                for row in results:
+                    include = True
+                    for having_col, condition in having.items():
+                        if having_col not in row:
+                            continue
+
+                        value = row[having_col]
+                        if isinstance(condition, dict):
+                            # Handle operators: {"gt": 10}, {"lt": 100}, etc.
+                            for op, threshold in condition.items():
+                                if op == "gt" and not (value > threshold) or op == "gte" and not (value >= threshold) or op == "lt" and not (value < threshold) or op == "lte" and not (value <= threshold) or op == "eq" and value != threshold or op == "neq" and value == threshold:
+                                    include = False
+                        else:
+                            # Direct comparison
+                            if value != condition:
+                                include = False
+
+                    if include:
+                        filtered_results.append(row)
+
+                results = filtered_results
+
+            logger.debug(
+                f"Aggregate query returned {len(results)} results",
+                extra={
+                    "table": table,
+                    "aggregates": list(aggregates.keys()),
+                    "group_by": group_by,
+                }
+            )
+
+            return results
+
+        except Exception as e:
+            logger.error(
+                f"Aggregate query failed for {table}",
+                exc_info=True,
+                extra={
+                    "table": table,
+                    "aggregates": aggregates,
+                    "group_by": group_by,
+                }
+            )
+            raise StorageError(
+                message=f"Aggregate query failed for {table}: {str(e)}",
+                operation="query_aggregate",
+                original_error=e,
+            ) from e
+
+    async def batch_read(
+        self,
+        table: str,
+        ids: list[str],
+        relations: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Fetch multiple entities by ID in single query.
+
+        Universal Data Engine - Phase 1.3: Batch read for N+1 optimization.
+
+        Uses PostgREST IN clause to fetch all entities in single query,
+        with optional relation prefetching to eliminate cascading queries.
+
+        Args:
+            table: Table name
+            ids: List of entity IDs to fetch
+            relations: Optional relations to prefetch
+
+        Returns:
+            List of entities in the same order as input IDs (missing IDs omitted)
+
+        Raises:
+            StorageError: On query failure
+        """
+        try:
+            if not ids:
+                return []
+
+            client = await self._ensure_async_client()
+
+            # Build select clause with relations
+            select = "*"
+            if relations:
+                # PostgREST syntax: "*, products(*), variants(*)"
+                select = "*," + ",".join(relations)
+
+            # Fetch all entities with IN clause
+            query = client.table(table).select(select).in_("id", ids)
+            response = await query.execute()
+
+            results = response.data if response.data else []
+
+            # Preserve input order: create ID->entity map, then rebuild list
+            entity_map = {entity["id"]: entity for entity in results}
+            ordered_results = [entity_map[id] for id in ids if id in entity_map]
+
+            logger.debug(
+                f"Batch read {len(ordered_results)}/{len(ids)} entities from {table}",
+                extra={
+                    "table": table,
+                    "requested": len(ids),
+                    "found": len(ordered_results),
+                    "missing": len(ids) - len(ordered_results),
+                }
+            )
+
+            return ordered_results
+
+        except Exception as e:
+            logger.error(
+                f"Batch read failed for {table}",
+                exc_info=True,
+                extra={"table": table, "id_count": len(ids)}
+            )
+            raise StorageError(
+                message=f"Batch read failed for {table}: {str(e)}",
+                operation="batch_read",
+                original_error=e,
+            ) from e
+
+    async def paginate_query(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        search_patterns: dict[str, str] | None = None,
+        relations: list[str] | None = None,
+        order_by: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+        cursor: str | None = None,
+        include_count: bool = False,
+    ) -> dict[str, Any]:
+        """Paginate query results with offset or cursor-based pagination.
+
+        Universal Data Engine - Phase 1.3: Smart pagination.
+
+        Supports:
+        - Offset pagination (page + per_page) for traditional UX
+        - Cursor pagination (cursor + per_page) for efficient large datasets
+        - Optional total count (skipped by default for performance)
+
+        Args:
+            table: Table name
+            filters: Exact match filters
+            search_patterns: ILIKE patterns
+            relations: Relations to prefetch
+            order_by: Sort specification (e.g., "created_at.desc")
+            page: Page number (1-indexed, for offset pagination)
+            per_page: Items per page (default 20, max 100)
+            cursor: Cursor token (overrides page-based pagination)
+            include_count: Whether to include total count
+
+        Returns:
+            Dict with pagination metadata and results
+
+        Raises:
+            StorageError: On query failure
+            ValueError: If per_page > 100 or page < 1
+        """
+        try:
+            # Validate pagination parameters
+            if per_page > 100:
+                raise ValueError("per_page must not exceed 100")
+            if page < 1:
+                raise ValueError("page must be >= 1")
+
+            client = await self._ensure_async_client()
+
+            # Build select clause
+            select = "*"
+            if relations:
+                select = "*," + ",".join(relations)
+
+            # Start building query
+            query = client.table(table).select(select)
+
+            # Apply filters
+            if filters:
+                for key, value in filters.items():
+                    if isinstance(value, list):
+                        query = query.in_(key, value)
+                    else:
+                        query = query.eq(key, value)
+
+            # Apply search patterns
+            if search_patterns:
+                for column, pattern in search_patterns.items():
+                    query = query.ilike(column, pattern)
+
+            # Apply ordering (default to id.asc for consistency)
+            if order_by:
+                # Parse "column.direction" format
+                if "." in order_by:
+                    column, direction = order_by.rsplit(".", 1)
+                    query = query.order(column, desc=(direction.lower() == "desc"))
+                else:
+                    query = query.order(order_by)
+            else:
+                query = query.order("id")
+
+            # Cursor vs Offset pagination
+            if cursor:
+                # Cursor-based: Use range header with cursor
+                # PostgREST cursor format is base64-encoded JSON with continuation token
+                # For simplicity, we'll implement offset-based first and add cursor later
+                # Cursor pagination requires PostgREST 11+ and specific configuration
+                import base64
+                import json
+
+                try:
+                    decoded = json.loads(base64.b64decode(cursor).decode("utf-8"))
+                    last_id = decoded.get("last_id")
+                    if last_id:
+                        # Continue from last ID (requires order by id)
+                        query = query.gt("id", last_id)
+                except Exception:
+                    logger.warning(f"Invalid cursor format: {cursor}, falling back to offset pagination")
+
+            else:
+                # Offset-based: Calculate offset from page
+                offset = (page - 1) * per_page
+                query = query.range(offset, offset + per_page - 1)
+
+            # Execute main query
+            response = await query.execute()
+            results = response.data if response.data else []
+
+            # Get total count if requested (separate query for performance)
+            total = None
+            if include_count:
+                count_query = client.table(table).select("*", count="exact").limit(0)
+
+                # Apply same filters to count query
+                if filters:
+                    for key, value in filters.items():
+                        if isinstance(value, list):
+                            count_query = count_query.in_(key, value)
+                        else:
+                            count_query = count_query.eq(key, value)
+
+                if search_patterns:
+                    for column, pattern in search_patterns.items():
+                        count_query = count_query.ilike(column, pattern)
+
+                count_response = await count_query.execute()
+                total = count_response.count if count_response.count is not None else 0
+
+            # Determine if there are more pages
+            has_next = len(results) == per_page
+
+            # Generate next cursor for cursor-based pagination
+            next_cursor = None
+            if cursor and results and has_next:
+                import base64
+                import json
+                last_entity = results[-1]
+                cursor_data = {"last_id": last_entity.get("id")}
+                next_cursor = base64.b64encode(json.dumps(cursor_data).encode("utf-8")).decode("utf-8")
+
+            # Build response
+            result = {
+                "data": results,
+                "page": page if not cursor else None,
+                "per_page": per_page,
+                "has_next": has_next,
+            }
+
+            if include_count and total is not None:
+                result["total"] = total
+
+            if next_cursor:
+                result["next_cursor"] = next_cursor
+
+            logger.debug(
+                f"Paginated query returned {len(results)} results from {table}",
+                extra={
+                    "table": table,
+                    "page": page,
+                    "per_page": per_page,
+                    "cursor": bool(cursor),
+                    "has_next": has_next,
+                }
+            )
+
+            return result
+
+        except ValueError:
+            # Re-raise validation errors
+            raise
+        except Exception as e:
+            logger.error(
+                f"Paginated query failed for {table}",
+                exc_info=True,
+                extra={"table": table, "page": page, "per_page": per_page}
+            )
+            raise StorageError(
+                message=f"Paginated query failed for {table}: {str(e)}",
+                operation="paginate_query",
+                original_error=e,
+            ) from e
+
     async def insert_entity(
         self,
         table: str,
@@ -1065,62 +1459,95 @@ class SupabaseStorageClient(StorageInterface):
         self,
         table: str,
         filters: dict[str, Any],
+        soft_delete: bool = True,
     ) -> int:
         """Delete entities matching filters.
 
         Args:
             table: Table name
             filters: WHERE conditions (supports nested dict for operators like {"id": {"in": [1,2,3]}})
+            soft_delete: If True, sets is_active=False and deleted_at=now().
+                        If False, performs hard delete (permanent removal).
+                        Defaults to True for data safety.
 
         Returns:
-            Count of deleted rows
+            Count of deleted/deactivated rows
 
         Raises:
             StorageError: On delete failure
         """
         try:
             client = await self._ensure_async_client()
-            query = client.table(table).delete()
 
-            # Apply filters with operator support
-            for key, value in filters.items():
-                if isinstance(value, dict):
-                    # Handle operator syntax: {"id": {"in": [1,2,3]}}
-                    for operator, operand in value.items():
-                        if operator == "in":
-                            query = query.in_(key, operand)
-                        elif operator == "eq":
-                            query = query.eq(key, operand)
-                        elif operator == "neq":
-                            query = query.neq(key, operand)
-                        elif operator == "gt":
-                            query = query.gt(key, operand)
-                        elif operator == "gte":
-                            query = query.gte(key, operand)
-                        elif operator == "lt":
-                            query = query.lt(key, operand)
-                        elif operator == "lte":
-                            query = query.lte(key, operand)
-                        else:
-                            logger.warning(f"Unsupported operator '{operator}' in filter")
-                elif isinstance(value, list):
-                    # List value - use IN operator
-                    query = query.in_(key, value)
-                else:
-                    # Simple equality filter
-                    query = query.eq(key, value)
+            if soft_delete:
+                # Soft delete: UPDATE is_active=False and deleted_at=now()
+                from datetime import UTC, datetime
+                updates = {
+                    "is_active": False,
+                    "deleted_at": datetime.now(UTC).isoformat(),
+                    "updated_at": datetime.now(UTC).isoformat(),
+                }
 
-            response = await query.execute()
-            count = len(response.data) if response.data else 0
+                # Use update_entities for soft delete
+                count = await self.update_entities(
+                    table=table,
+                    filters=filters,
+                    updates=updates
+                )
 
-            # Track operation for transaction (no rollback capability for deletes)
-            if self._current_transaction is not None:
-                self._current_transaction.operations.append({
-                    "type": "delete",
-                    "table": table,
-                    "filters": filters,
-                    "count": count,
-                })
+                # Track operation for transaction
+                if self._current_transaction is not None:
+                    self._current_transaction.operations.append({
+                        "type": "soft_delete",
+                        "table": table,
+                        "filters": filters,
+                        "count": count,
+                    })
+
+                return count
+            else:
+                # Hard delete: Permanent removal
+                query = client.table(table).delete()
+
+                # Apply filters with operator support
+                for key, value in filters.items():
+                    if isinstance(value, dict):
+                        # Handle operator syntax: {"id": {"in": [1,2,3]}}
+                        for operator, operand in value.items():
+                            if operator == "in":
+                                query = query.in_(key, operand)
+                            elif operator == "eq":
+                                query = query.eq(key, operand)
+                            elif operator == "neq":
+                                query = query.neq(key, operand)
+                            elif operator == "gt":
+                                query = query.gt(key, operand)
+                            elif operator == "gte":
+                                query = query.gte(key, operand)
+                            elif operator == "lt":
+                                query = query.lt(key, operand)
+                            elif operator == "lte":
+                                query = query.lte(key, operand)
+                            else:
+                                logger.warning(f"Unsupported operator '{operator}' in filter")
+                    elif isinstance(value, list):
+                        # List value - use IN operator
+                        query = query.in_(key, value)
+                    else:
+                        # Simple equality filter
+                        query = query.eq(key, value)
+
+                response = await query.execute()
+                count = len(response.data) if response.data else 0
+
+                # Track operation for transaction (no rollback capability for hard deletes)
+                if self._current_transaction is not None:
+                    self._current_transaction.operations.append({
+                        "type": "delete",
+                        "table": table,
+                        "filters": filters,
+                        "count": count,
+                    })
 
             return count
 
@@ -1133,6 +1560,631 @@ class SupabaseStorageClient(StorageInterface):
             raise StorageError(
                 message=f"Delete failed for {table}: {str(e)}",
                 operation="delete_entities",
+                original_error=e,
+            ) from e
+
+    # ========================================================================
+    # Upsert & Patch Operations (Universal Data Engine - Phase 1.4)
+    # ========================================================================
+
+    async def upsert_entity(
+        self,
+        table: str,
+        data: dict[str, Any],
+        conflict_fields: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Insert or update entity with PostgreSQL upsert semantics.
+
+        Uses PostgREST's upsert (INSERT ... ON CONFLICT DO UPDATE) for idempotent writes.
+
+        Args:
+            table: Table name
+            data: Entity data
+            conflict_fields: Columns for conflict detection (default: ["id"])
+
+        Returns:
+            Final entity state after upsert
+
+        Raises:
+            StorageError: On upsert failure
+        """
+        try:
+            client = await self._ensure_async_client()
+            normalized_data = _normalize_numeric_types(data)
+
+            # Default to primary key if no conflict fields specified
+            on_conflict = ",".join(conflict_fields) if conflict_fields else "id"
+
+            # Execute upsert: INSERT with ON CONFLICT DO UPDATE
+            response = await client.table(table).upsert(
+                normalized_data,
+                on_conflict=on_conflict,
+                ignore_duplicates=False,  # DO UPDATE on conflict
+                returning="representation",  # Return full record
+            ).execute()
+
+            if not response.data or len(response.data) == 0:
+                raise StorageError(
+                    message=f"Upsert returned no data for {table}",
+                    operation="upsert_entity",
+                )
+
+            upserted: dict[str, Any] = response.data[0]
+
+            # Track operation for transaction
+            if self._current_transaction is not None:
+                self._current_transaction.operations.append({
+                    "type": "upsert",
+                    "table": table,
+                    "ids": [upserted.get("id")],
+                    "conflict_fields": conflict_fields or ["id"],
+                })
+
+            return upserted
+
+        except Exception as e:
+            logger.error(
+                f"Failed to upsert into {table}",
+                exc_info=True,
+                extra={"table": table, "conflict_fields": conflict_fields, "data_keys": list(data.keys())}
+            )
+            raise StorageError(
+                message=f"Upsert failed for {table}: {str(e)}",
+                operation="upsert_entity",
+                original_error=e,
+            ) from e
+
+    async def bulk_upsert(
+        self,
+        table: str,
+        data: list[dict[str, Any]],
+        conflict_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Batch upsert multiple entities with conflict resolution.
+
+        Uses PostgREST's bulk upsert for efficient idempotent batch writes.
+
+        Args:
+            table: Table name
+            data: List of entity data
+            conflict_fields: Columns for conflict detection (default: ["id"])
+
+        Returns:
+            List of final entity states after upserts
+
+        Raises:
+            StorageError: On upsert failure
+            ValueError: If data list is empty
+        """
+        if not data:
+            raise ValueError("Data list cannot be empty for bulk_upsert")
+
+        try:
+            client = await self._ensure_async_client()
+            normalized_data = _normalize_numeric_types(data)
+
+            # Default to primary key if no conflict fields specified
+            on_conflict = ",".join(conflict_fields) if conflict_fields else "id"
+
+            # Execute bulk upsert
+            response = await client.table(table).upsert(
+                normalized_data,
+                on_conflict=on_conflict,
+                ignore_duplicates=False,  # DO UPDATE on conflict
+                returning="representation",  # Return full records
+                default_to_null=True,  # Missing fields default to NULL on INSERT
+            ).execute()
+
+            if not response.data:
+                raise StorageError(
+                    message=f"Bulk upsert returned no data for {table}",
+                    operation="bulk_upsert",
+                )
+
+            upserted: list[dict[str, Any]] = response.data
+            entity_ids = [entity.get("id") for entity in upserted if entity.get("id")]
+
+            # Track operation for transaction
+            if self._current_transaction is not None:
+                self._current_transaction.operations.append({
+                    "type": "bulk_upsert",
+                    "table": table,
+                    "ids": entity_ids,
+                    "conflict_fields": conflict_fields or ["id"],
+                    "count": len(upserted),
+                })
+
+            return upserted
+
+        except ValueError:
+            # Re-raise validation errors
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to bulk upsert into {table}",
+                exc_info=True,
+                extra={"table": table, "conflict_fields": conflict_fields, "entity_count": len(data)}
+            )
+            raise StorageError(
+                message=f"Bulk upsert failed for {table}: {str(e)}",
+                operation="bulk_upsert",
+                original_error=e,
+            ) from e
+
+    async def patch_entity(
+        self,
+        table: str,
+        id: str,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Partially update entity (PATCH semantics).
+
+        Updates only specified fields using UPDATE query.
+
+        Args:
+            table: Table name
+            id: Entity ID
+            updates: Fields to update (partial data)
+
+        Returns:
+            Complete updated entity
+
+        Raises:
+            StorageError: On update failure
+            ValueError: If entity not found
+        """
+        try:
+            client = await self._ensure_async_client()
+            normalized_updates = _normalize_numeric_types(updates)
+
+            # Execute update with ID filter
+            response = await client.table(table).update(normalized_updates).eq("id", id).execute()
+
+            if not response.data or len(response.data) == 0:
+                raise ValueError(f"Entity with id '{id}' not found in {table}")
+
+            patched: dict[str, Any] = response.data[0]
+
+            # Track operation for transaction
+            if self._current_transaction is not None:
+                self._current_transaction.operations.append({
+                    "type": "patch",
+                    "table": table,
+                    "ids": [id],
+                    "updates": updates,
+                })
+
+            return patched
+
+        except ValueError:
+            # Re-raise validation errors (entity not found)
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to patch entity in {table}",
+                exc_info=True,
+                extra={"table": table, "id": id, "updates": updates}
+            )
+            raise StorageError(
+                message=f"Patch failed for {table}: {str(e)}",
+                operation="patch_entity",
+                original_error=e,
+            ) from e
+
+    # ========================================================================
+    # Dry-Run & Validation (Universal Data Engine - Phase 1.5)
+    # ========================================================================
+
+    async def validate_entity_data(
+        self,
+        table: str,
+        data: dict[str, Any] | list[dict[str, Any]],
+        operation: Literal["insert", "update", "upsert", "delete"],
+    ) -> dict[str, Any]:
+        """
+        Validate entity data against schema without executing operation.
+
+        Performs basic schema validation:
+        - Checks for required fields (basic validation)
+        - Type checking for common field types
+        - Returns errors/warnings without executing writes
+
+        Args:
+            table: Table name
+            data: Entity data (single dict or list of dicts)
+            operation: Operation type being validated
+
+        Returns:
+            Validation result with valid flag, errors, and warnings
+        """
+        try:
+            # Normalize to list for consistent processing
+            entities = data if isinstance(data, list) else [data]
+
+            errors: list[dict[str, Any]] = []
+            warnings: list[dict[str, Any]] = []
+
+            # Basic validation rules for common fields
+            # In production, these would come from schema registry
+            required_fields_by_table = {
+                "products": ["sku_code", "name"] if operation == "insert" else [],
+                "product_families": ["name", "sku_prefix"] if operation == "insert" else [],
+                "categories": ["name"] if operation == "insert" else [],
+            }
+
+            required_fields = required_fields_by_table.get(table, [])
+
+            # Validate each entity
+            for idx, entity in enumerate(entities):
+                # Check required fields
+                for field in required_fields:
+                    if field not in entity or entity[field] is None or entity[field] == "":
+                        errors.append({
+                            "entity_index": idx,
+                            "field": field,
+                            "error": f"Field '{field}' is required but missing or empty",
+                            "severity": "error"
+                        })
+
+                # Type validation for common fields
+                if "base_price" in entity and entity["base_price"] is not None:
+                    if not isinstance(entity["base_price"], (int, float)):
+                        errors.append({
+                            "entity_index": idx,
+                            "field": "base_price",
+                            "error": "Field 'base_price' must be a number",
+                            "severity": "error"
+                        })
+                    elif entity["base_price"] < 0:
+                        warnings.append({
+                            "entity_index": idx,
+                            "field": "base_price",
+                            "warning": "Negative price detected",
+                            "severity": "warning"
+                        })
+
+                # Check for unusually long strings (potential data issues)
+                for key, value in entity.items():
+                    if isinstance(value, str) and len(value) > 1000:
+                        warnings.append({
+                            "entity_index": idx,
+                            "field": key,
+                            "warning": f"String value exceeds 1000 characters ({len(value)} chars)",
+                            "severity": "warning"
+                        })
+
+            return {
+                "valid": len(errors) == 0,
+                "errors": errors,
+                "warnings": warnings,
+                "entity_count": len(entities),
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Validation failed for {table}",
+                exc_info=True,
+                extra={"table": table, "operation": operation}
+            )
+            raise StorageError(
+                message=f"Validation failed for {table}: {str(e)}",
+                operation="validate_entity_data",
+                original_error=e,
+            ) from e
+
+    async def check_constraint_violations(
+        self,
+        table: str,
+        data: dict[str, Any] | list[dict[str, Any]],
+        operation: Literal["insert", "update", "upsert"],
+        exclude_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Check for constraint violations before write operation.
+
+        Checks uniqueness constraints using existing storage methods.
+        Leverages check_existing_values for efficient batch checking.
+
+        Args:
+            table: Table name
+            data: Entity data (single dict or list of dicts)
+            operation: Operation type
+            exclude_ids: IDs to exclude from uniqueness check
+
+        Returns:
+            Constraint check result with safe_to_proceed flag and violations
+        """
+        try:
+            # Normalize to list
+            entities = data if isinstance(data, list) else [data]
+
+            violations: list[dict[str, Any]] = []
+            warnings: list[dict[str, Any]] = []
+            checked_constraints: list[str] = []
+
+            # Define unique fields per table
+            # In production, these would come from schema registry
+            unique_fields_by_table = {
+                "products": ["sku_code"],
+                "product_families": ["sku_prefix"],
+                "categories": ["slug"],
+                "variant_axes": ["axis_name"],
+            }
+
+            unique_fields = unique_fields_by_table.get(table, [])
+
+            # Check uniqueness constraints (skip for upsert as it handles conflicts)
+            if operation != "upsert":
+                for field in unique_fields:
+                    # Collect values to check
+                    values_to_check = [
+                        entity[field]
+                        for entity in entities
+                        if field in entity and entity[field] is not None
+                    ]
+
+                    if values_to_check:
+                        # Use existing check_existing_values method
+                        existing_values = await self.check_existing_values(
+                            table, field, values_to_check, exclude_ids
+                        )
+
+                        # Report violations for existing values
+                        for value in existing_values:
+                            violations.append({
+                                "type": "uniqueness",
+                                "field": field,
+                                "value": value,
+                                "message": f"{field} '{value}' already exists",
+                            })
+
+                        checked_constraints.append(f"{field}_unique")
+
+            # Check for large batches (performance warning)
+            if len(entities) > 100:
+                warnings.append({
+                    "type": "performance",
+                    "message": f"Large batch ({len(entities)} entities) may be slow"
+                })
+
+            # Check for duplicate values within the batch itself
+            for field in unique_fields:
+                field_values = [
+                    entity[field]
+                    for entity in entities
+                    if field in entity and entity[field] is not None
+                ]
+
+                duplicates = {v for v in field_values if field_values.count(v) > 1}
+
+                for dup_value in duplicates:
+                    violations.append({
+                        "type": "duplicate_in_batch",
+                        "field": field,
+                        "value": dup_value,
+                        "message": f"Duplicate {field} '{dup_value}' within batch"
+                    })
+
+            return {
+                "safe_to_proceed": len(violations) == 0,
+                "violations": violations,
+                "warnings": warnings,
+                "checked_constraints": checked_constraints,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Constraint check failed for {table}",
+                exc_info=True,
+                extra={"table": table, "operation": operation}
+            )
+            raise StorageError(
+                message=f"Constraint check failed for {table}: {str(e)}",
+                operation="check_constraint_violations",
+                original_error=e,
+            ) from e
+
+    async def preview_write_impact(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        operation: Literal["update", "delete"] = "update",
+        sample_size: int = 5,
+    ) -> dict[str, Any]:
+        """
+        Preview impact of update/delete operation before execution.
+
+        Uses existing count_entities and query_entities for efficient preview.
+
+        Args:
+            table: Table name
+            filters: Filter conditions
+            operation: Operation type ("update" or "delete")
+            sample_size: Number of sample entities to return
+
+        Returns:
+            Impact preview with affected_count, samples, and warnings
+        """
+        try:
+            # Get affected count
+            affected_count = await self.count_entities(table, filters=filters)
+
+            # Get sample entities
+            sample_entities: list[dict[str, Any]] = []
+            if affected_count > 0:
+                sample_entities = await self.query_entities(
+                    table,
+                    filters=filters,
+                    limit=sample_size
+                )
+
+            # Calculate estimated duration (heuristic: ~2ms per entity)
+            estimated_duration_ms = max(10, affected_count * 2)
+
+            # Generate warnings
+            warnings: list[dict[str, Any]] = []
+            safe_to_proceed = True
+
+            if filters is None or len(filters) == 0:
+                warnings.append({
+                    "type": "no_filters",
+                    "message": "Operation affects ALL entities in table"
+                })
+                safe_to_proceed = False  # Dangerous operation
+
+            if affected_count > 100:
+                warnings.append({
+                    "type": "large_batch",
+                    "message": f"Operation affects {affected_count} entities"
+                })
+
+            if affected_count == 0:
+                warnings.append({
+                    "type": "no_effect",
+                    "message": "No entities match the filter criteria"
+                })
+
+            return {
+                "affected_count": affected_count,
+                "sample_entities": sample_entities,
+                "estimated_duration_ms": estimated_duration_ms,
+                "warnings": warnings,
+                "safe_to_proceed": safe_to_proceed,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Preview failed for {table}",
+                exc_info=True,
+                extra={"table": table, "operation": operation, "filters": filters}
+            )
+            raise StorageError(
+                message=f"Preview failed for {table}: {str(e)}",
+                operation="preview_write_impact",
+                original_error=e,
+            ) from e
+
+    # ========================================================================
+    # Schema Intelligence (Universal Data Engine - Phase 1.1)
+    # ========================================================================
+
+    async def get_table_stats(self, table: str) -> dict[str, Any]:
+        """Get table statistics for schema intelligence.
+
+        Provides runtime metadata about table size, last update, and index usage.
+
+        Args:
+            table: Table name
+
+        Returns:
+            Dict with statistics (row_count, estimated_size_bytes, last_updated, indexes, primary_key)
+
+        Raises:
+            StorageError: On query failure or table not found
+        """
+        try:
+            client = await self._ensure_async_client()
+
+            # Get row count
+            count_response = await client.table(table).select("*", count="exact").limit(0).execute()
+            row_count = count_response.count if count_response.count is not None else 0
+
+            # Get table metadata from PostgreSQL information_schema
+            # Note: Supabase PostgREST doesn't expose pg_catalog directly,
+            # so we use RPC call or query information_schema if available
+            # For now, provide basic stats from count query
+
+            # TODO: Add RPC function in database to fetch:
+            # - pg_total_relation_size for accurate size
+            # - pg_stat_user_tables for last_updated
+            # - pg_indexes for index list
+
+            stats: dict[str, Any] = {
+                "row_count": row_count,
+                "estimated_size_bytes": None,  # Requires database function
+                "last_updated": None,  # Requires pg_stat_user_tables access
+                "indexes": [],  # Requires pg_indexes access
+                "primary_key": "id",  # Convention - most tables use 'id'
+            }
+
+            logger.debug(
+                f"Fetched stats for {table}",
+                extra={"table": table, "row_count": row_count}
+            )
+
+            return stats
+
+        except Exception as e:
+            logger.error(
+                f"Failed to get stats for {table}",
+                exc_info=True,
+                extra={"table": table}
+            )
+            raise StorageError(
+                message=f"Failed to get table stats for {table}: {str(e)}",
+                operation="get_table_stats",
+                original_error=e,
+            ) from e
+
+    async def sample_data(
+        self,
+        table: str,
+        filters: dict[str, Any] | None = None,
+        limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Fetch sample data from table for schema intelligence.
+
+        Provides real data examples to help agents understand schema usage patterns.
+
+        Args:
+            table: Table name
+            filters: Optional filters to narrow samples
+            limit: Maximum rows to return (capped at 20)
+
+        Returns:
+            List of sample rows as dicts
+
+        Raises:
+            StorageError: On query failure or table not found
+        """
+        try:
+            # Cap limit at 20 for safety
+            safe_limit = min(limit, 20)
+
+            client = await self._ensure_async_client()
+            query = client.table(table).select("*")
+
+            # Apply filters if provided
+            if filters:
+                for key, value in filters.items():
+                    if isinstance(value, list):
+                        query = query.in_(key, value)
+                    else:
+                        query = query.eq(key, value)
+
+            # Fetch samples with limit
+            response = await query.limit(safe_limit).execute()
+            samples = response.data if response.data else []
+
+            logger.debug(
+                f"Fetched {len(samples)} samples from {table}",
+                extra={"table": table, "filters": filters, "limit": safe_limit}
+            )
+
+            return samples
+
+        except Exception as e:
+            logger.error(
+                f"Failed to sample data from {table}",
+                exc_info=True,
+                extra={"table": table, "filters": filters}
+            )
+            raise StorageError(
+                message=f"Failed to sample data from {table}: {str(e)}",
+                operation="sample_data",
                 original_error=e,
             ) from e
 

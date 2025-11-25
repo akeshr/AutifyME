@@ -22,16 +22,11 @@ from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.specialists.product_architecture_specialist import (
     create_product_architecture_specialist,
 )
-from autifyme_agents.tools.campaign_persistence_tools import (
-    create_save_campaign_tool,
+from autifyme_agents.tools.data_engine import (
+    create_inspect_schema_tool,
+    create_read_data_tool,
 )
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
-from autifyme_agents.tools.pm_context_tools import (
-    create_get_category_info_tool,
-    create_search_catalog_summary_tool,
-)
-from autifyme_agents.tools.schema_tools import get_product_schema
-from autifyme_agents.tools.universal_crud_tool import create_database_tool
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -146,7 +141,8 @@ async def create_project_manager(
     # base_context is available to PM via initial_state
     instructions = _load_prompt(company_profile, base_context, channel)
 
-    # PM Tools
+    # PM Tools - Minimal orchestration-focused toolset
+    # PM is the orchestrator - delegates execution to domain specialists
     pm_tools: list[Any] = []
 
     # Platform-specific tools (media download)
@@ -154,26 +150,24 @@ async def create_project_manager(
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
         pm_tools.extend(create_platform_media_tools(channel))
 
-    # Context query tools (on-demand detail lookups)
-    pm_tools.append(create_search_catalog_summary_tool(storage))
-    pm_tools.append(create_get_category_info_tool(storage))
-
-    # Schema query tool (for dynamic operation planning)
-    pm_tools.append(get_product_schema)
+    # Schema inspection (understand data structure)
+    pm_tools.append(
+        create_inspect_schema_tool(
+            storage,
+            tables=None,  # PM can inspect all tables for routing decisions
+        )
+    )
 
     # Image analysis tool (multimodal analysis before delegation)
     pm_tools.append(image_analysis_tool)
 
-    # Universal CRUD tool (schema-driven database operations with HITL)
-    pm_tools.append(
-        create_database_tool(
-            storage=storage,
-            allowed_operations=["create", "read", "update", "delete"],  # Full CRUD access
-        )
-    )
+    # Universal Data Engine - Read operations only
+    # PM reads context, routes to specialists for mutations
+    pm_tools.append(create_read_data_tool(storage))
 
-    # Campaign persistence tool (HITL-enabled for marketing campaigns)
-    pm_tools.append(create_save_campaign_tool(storage))
+    # NO write_data - PM delegates mutations to specialists
+    # NO save_campaign - future Campaign Specialist will handle
+    # NO context tools - redundant with read_data + inspect_schema
 
     # Product Architecture Specialist (SubAgent spec pattern)
     # Returns dict spec that DeepAgents compiles automatically
@@ -201,10 +195,8 @@ async def create_project_manager(
     ]
 
     # HITL configuration
-    interrupt_configs: dict[str, bool] = {
-        "execute_database_operation": True,
-        "save_campaign": True,
-    }
+    # PM has no mutation tools - specialists handle HITL at domain level
+    interrupt_configs: dict[str, bool] = {}
 
     # Note: create_deep_agent adds SummarizationMiddleware by default
     # No need to pass custom middleware - use default configuration

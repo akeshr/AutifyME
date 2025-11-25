@@ -14,6 +14,16 @@ from typing import Any
 
 # Error type classification rules
 ERROR_PATTERNS = {
+    # Access control errors (check before generic table errors)
+    "access denied": {
+        "type": "ACCESS_DENIED",
+        "action": "Access denied. You don't have permission for this operation. Request access from administrator.",
+    },
+    "permission": {
+        "type": "ACCESS_DENIED",
+        "action": "Permission denied. Verify you have required access rights.",
+    },
+
     # Database/Storage errors
     "table": {
         "type": "TABLE_ERROR",
@@ -58,11 +68,7 @@ ERROR_PATTERNS = {
         "action": "Too many requests. Wait and retry. Implement backoff strategy.",
     },
 
-    # Permission/Access errors
-    "permission": {
-        "type": "ACCESS_ERROR",
-        "action": "Insufficient permissions. Contact administrator or use alternative approach.",
-    },
+    # Permission/Access errors (general access errors, distinct from table-level ACCESS_DENIED)
     "access": {
         "type": "ACCESS_ERROR",
         "action": "Access denied. Verify credentials or contact administrator.",

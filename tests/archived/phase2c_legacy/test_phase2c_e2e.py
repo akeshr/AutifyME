@@ -42,7 +42,6 @@ from autifyme_agents.tools.universal_crud_tool import (
 # Import FakeStorage from fixtures
 from tests.fixtures.fake_storage import FakeStorage
 
-
 # =============================================================================
 # Test Helpers
 # =============================================================================
@@ -718,8 +717,9 @@ class TestFullE2EExecution:
         assert result.success is True
         assert get_table_count(result.affected_entities, "variant_values") == 1
 
-        # Check database - should be empty
-        assert len(test_storage.tables["variant_values"]) == 0
+        # Check database - should be empty (use query_entities which filters soft-deleted)
+        remaining = await test_storage.query_entities("variant_values", {})
+        assert len(remaining) == 0
 
     @pytest.mark.asyncio
     async def test_e2e_complex_multi_step(self, operation_executor, test_storage):
