@@ -1,6 +1,6 @@
 **Architecture**
 - entrypoints/whatsapp_webhook.py handles FastAPI intake, persists idempotency via storage.check_and_mark_message_processed, and fires BackgroundTasks; mirror this pattern when onboarding new channels.
-- workflows/orchestration/runner_v2.py acts as blind executor with OutcomeTrackingMiddleware and blank-response retries; keep core logic here agnostic and push domain logic into handlers.
+- workflows/orchestration/runner.py acts as blind executor with OutcomeTrackingMiddleware and blank-response retries; keep core logic here agnostic and push domain logic into handlers.
 - workflows/project_manager.py builds the DeepAgents PM, loading PMBaseContext via middleware/context_middleware.py and attaching SubAgents from specialists/product_architecture_specialist.py et al.
 - Maintain hexagonal boundaries: core/ports.py defines contracts, integrations/storage/{storage_factory.py,supabase_client.py,postgres_saver_factory.py} supply adapters and must be the only Supabase/Postgres touchpoints.
 

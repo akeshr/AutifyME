@@ -419,7 +419,7 @@ agents/src/autifyme_agents/
 │   ├── channels/                       # Platform adapters (WhatsApp)
 │   ├── handlers/                       # Workflow handlers
 │   └── orchestration/
-│       └── runner_v2.py                # Main workflow orchestration
+│       └── runner.py                   # Main workflow orchestration
 ├── specialists/
 │   ├── cataloging_specialist.py        # Legacy cataloging
 │   ├── product_architecture_specialist.py

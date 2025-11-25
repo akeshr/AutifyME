@@ -89,7 +89,7 @@ Result: ~50% cache hit rate in distributed environment.
 
 ### Layer 2: Workflow Idempotency (WORKS via LangGraph checkpoints)
 
-**Code:** `runner_v2.py:286-311`
+**Code:** `runner.py:286-311`
 
 ```python
 # Check for pending HITL interrupt

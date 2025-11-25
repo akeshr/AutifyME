@@ -55,16 +55,6 @@ Monitoring, debugging, and operational patterns.
 
 ---
 
-## Technical Debt & Refactoring (`workflows/`)
-
-Active refactoring plans and technical debt tracking.
-
-| Document | Purpose |
-| --- | --- |
-| **[RUNNER_V2_REFACTORING_PLAN.md](./workflows/RUNNER_V2_REFACTORING_PLAN.md)** | ⚙️ In Progress - Runner refactoring to separate concerns |
-
----
-
 ## Technology & Patterns (`tech/`)
 
 Library patterns, prompt engineering, and development practices.

@@ -19,7 +19,7 @@ from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
 from autifyme_agents.workflows.handlers.cataloging_handler import (
     CatalogingWorkflowHandler,
 )
-from autifyme_agents.workflows.orchestration.runner_v2 import WorkflowRunner
+from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
 
 # Initialize logging for serverless environment
 try:
@@ -220,7 +220,7 @@ async def _process_message_async(
 
 
 # REMOVED: _is_approval_message() helper
-# runner_v2 uses native LangGraph patterns - ALL messages go through handle_message()
+# Runner uses native LangGraph patterns - ALL messages go through handle_message()
 # Runner automatically detects pending interrupts via pm.get_state() and invokes approval_analyzer
 
 

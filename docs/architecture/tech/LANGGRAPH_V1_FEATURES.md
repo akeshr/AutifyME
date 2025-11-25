@@ -248,7 +248,7 @@ If you detect interrupts incorrectly:
 3. OpenAI error: `"An assistant message with 'tool_calls' must be followed by tool messages"`
 4. State becomes corrupted with dangling tool calls
 
-**Fix Applied:** `runner_v2.py:286-304`, October 13, 2025
+**Fix Applied:** `runner.py:286-304`, October 13, 2025
 
 ---
 

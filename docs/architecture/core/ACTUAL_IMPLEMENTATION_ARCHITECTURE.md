@@ -434,7 +434,7 @@ overview = get_trace_overview(result.trace_id)
 - `specialists/*.py` - Specialist implementations
 - `tools/image_analysis_tool.py` - Vision API wrapper
 - `tools/data_engine/` - Universal Data Engine tools
-- `workflows/orchestration/runner_v2.py` - Workflow orchestration
+- `workflows/orchestration/runner.py` - Workflow orchestration
 
 ---
 

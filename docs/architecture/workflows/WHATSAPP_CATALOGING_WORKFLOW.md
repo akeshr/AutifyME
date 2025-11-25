@@ -14,7 +14,7 @@ This document outlines the design for the Cataloging MVP feature: enabling India
 
 - **Webhook**: `entrypoints/whatsapp_webhook.py` - FastAPI webhook (verification, routing)
 - **Channel Adapter**: `integrations/communication/whatsapp_client.py` - WhatsApp Graph API client
-- **Workflow Runner**: `workflows/orchestration/runner_v2.py` - Generic orchestrator (PM invocation, HITL detection)
+- **Workflow Runner**: `workflows/orchestration/runner.py` - Generic orchestrator (PM invocation, HITL detection)
 - **Approval Analyzer**: `workflows/approval_analyzer.py` - HITL interpretation with structured output
 - **Project Manager**: `workflows/project_manager.py` - DeepAgent (delegates to specialists via SubAgents)
 - **Cataloging Specialist**: `specialists/cataloging_specialist.py` - SubAgent (uses tools directly: image_analysis, save_product)

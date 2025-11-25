@@ -1,50 +1,17 @@
-"""Generic HITL Framework - Structured Output Architecture.
+"""Generic HITL Framework - Workflow Orchestration.
 
-Runner is a BLIND EXECUTOR that coordinates between PM and approval analyzer.
+Blind executor coordinating PM invocation and approval flows.
 
-## STRUCTURED OUTPUT ARCHITECTURE (2025-10-14)
+Architecture:
+- PM: Orchestration (delegates to specialists)
+- Approval Analyzer: HITL interpretation (structured responses)
+- Runner: Coordination (routes, manages interrupts)
 
-**Key Principle**: Use Pydantic structured outputs everywhere. No text parsing.
+Flows:
+- New message: User -> Runner -> PM -> Specialists -> HITL interrupt -> Channel
+- Resume: User approval -> Approval Analyzer -> Command -> Resume workflow
 
-**Components**:
-- **PM**: Orchestration (delegates tasks to departments)
-- **Approval Analyzer**: HITL interpretation (structured BatchApprovalResponse)
-- **Runner**: Coordination (routes based on state, manages interrupts)
-
-## How It Works
-
-### 1. New Request Flow
-```
-User message → Runner → PM → Departments → HITL interrupt → Channel
-```
-1. User sends message
-2. Runner forwards raw payload to PM
-3. PM detects intent, extracts data, downloads media
-4. PM delegates to departments via task() tool
-5. If department needs approval → interrupt occurs
-6. Runner sends approval request to user via channel
-
-### 2. Resume Flow (Structured Batch Approval)
-```
-User approval → Runner → Approval Analyzer → BatchApprovalResponse → Command → Resume
-```
-1. User responds (e.g., "approve both", "edit price to 45")
-2. Runner detects pending interrupts in checkpoint
-3. **Runner invokes approval analyzer** (not PM!)
-4. **Approval analyzer returns BatchApprovalResponse** (Pydantic model)
-5. Runner builds Command from structured response
-6. Runner executes Command
-7. HITL middleware receives N responses for N interrupts
-8. Workflow resumes
-9. ✅ **NO TEXT PARSING - TYPE SAFE!**
-
-**Benefits**:
-- ✅ Type safety with Pydantic throughout
-- ✅ No brittle text parsing
-- ✅ Clear separation: PM = orchestration, Analyzer = HITL interpretation
-- ✅ Batch approval works correctly (N responses for N interrupts)
-- ✅ Production-grade architecture
-- ✅ Easy to test and validate
+Delegates to: WorkflowHandler, OutcomeTrackingMiddleware, ApprovalCoordinator
 """
 
 from __future__ import annotations
@@ -61,7 +28,7 @@ from langgraph.errors import GraphInterrupt, GraphRecursionError
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.interrupt import InterruptInfo
-from autifyme_agents.schemas.models import CatalogingResult, CompanyProfile
+from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.handlers.approval_coordinator import ApprovalCoordinator
 from autifyme_agents.workflows.handlers.protocol import WorkflowHandler
@@ -74,45 +41,16 @@ from autifyme_agents.workflows.project_manager import create_project_manager
 
 logger = logging.getLogger(__name__)
 
-# Constants removed - threading complexity eliminated
-
 
 class WorkflowRunner:
     """Blind executor - forwards messages to PM for intelligent orchestration.
 
-    ## STRUCTURED OUTPUT ARCHITECTURE:
+    Responsibilities:
+    - Forward messages to PM, extract interrupts, execute Commands
+    - Coordinate approval flow via ApprovalCoordinator
+    - Delegate domain logic to WorkflowHandler
 
-    Runner responsibilities:
-    - Forward ALL messages to PM (blind infrastructure)
-    - Extract interrupt context from checkpoints
-    - Invoke approval_analyzer for HITL decisions
-    - Build Commands from structured responses
-    - Execute Commands for workflow resumption
-    - Send interrupts/results to user via channel
-
-    PM handles:
-    - Intent detection for new requests
-    - Task orchestration and delegation to departments
-    - Media download and processing
-    - Overall workflow management
-
-    Approval Analyzer handles:
-    - HITL interpretation (structured BatchApprovalResponse)
-    - Batch approval decisions with conversation context
-    - Type-safe approval/reject/edit responses
-
-    LangGraph + DeepAgents handle:
-    - Checkpoint state management
-    - HITL middleware interrupt/resume
-    - Message sequence synthesis
-    - Tool execution
-
-    ## KEY BENEFITS:
-    - Type-safe with Pydantic throughout
-    - Clear separation of concerns
-    - PM = orchestration, Analyzer = HITL interpretation
-    - Batch approval works correctly
-    - Production-ready architecture
+    Injected dependencies: channel, storage, workflow_handler, checkpointer
     """
 
     def __init__(
@@ -762,47 +700,4 @@ class WorkflowRunner:
 
         return config
 
-    def _find_tool_call_args(self, messages: list[Any], tool_call_id: str, tool_name: str) -> CatalogingResult | None:
-        """Find tool call arguments in AI message by tool_call_id.
-
-        Used for resume workflows where tool message has string content.
-
-        Args:
-            messages: All messages
-            tool_call_id: ID to match
-            tool_name: Expected tool name
-
-        Returns:
-            CatalogingResult if found
-        """
-        from autifyme_agents.schemas.models import CatalogingResult
-
-        for message in messages:
-            message_type = getattr(message, "type", None)
-            if not message_type and hasattr(message, "__class__"):
-                message_type = message.__class__.__name__.replace("Message", "").lower()
-            if message_type != "ai":
-                continue
-
-            # Check for tool_calls
-            tool_calls = getattr(message, "tool_calls", None)
-            if not tool_calls:
-                continue
-
-            for tc in tool_calls:
-                tc_id = tc.get("id")
-
-                # Match on ID regardless of name - resume flows use "task" instead of "save_product"
-                if tc_id == tool_call_id:
-                    args = tc.get("args", {})
-
-                    # Try direct validation
-                    try:
-                        result = CatalogingResult.model_validate(args)
-                        return result
-                    except Exception:
-                        # Validation failed, continue to next tool call
-                        pass
-
-        return None
 
