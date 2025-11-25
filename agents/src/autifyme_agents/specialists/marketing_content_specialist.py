@@ -43,7 +43,6 @@ from autifyme_agents.schemas.specialist_outputs.marketing_content import (
     MarketingContentDraft,  # noqa: F401
 )
 
-
 # =============================================================================
 # Specialist Factory
 # =============================================================================

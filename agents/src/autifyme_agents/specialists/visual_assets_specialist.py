@@ -36,7 +36,6 @@ from autifyme_agents.schemas.specialist_outputs.visual_assets import (
 )
 from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
-
 # =============================================================================
 # Tools - Visual Assets Analysis
 # =============================================================================
