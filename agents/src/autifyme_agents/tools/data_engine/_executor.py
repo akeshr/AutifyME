@@ -1,6 +1,8 @@
 """
 Multi-operation execution engine for Universal Data Engine.
 
+Internal implementation module - use write_data tool for external access.
+
 Executes WriteIntent structures with:
 - Atomic multi-table transactions
 - Dependency resolution (topological sorting)
@@ -9,7 +11,6 @@ Executes WriteIntent structures with:
 - Comprehensive error handling with rollback
 
 Based on design from UNIVERSAL_DATA_ENGINE_DESIGN.md (lines 952-1047).
-Extracted and enhanced from universal_crud_tool.py OperationExecutor.
 """
 
 import logging
