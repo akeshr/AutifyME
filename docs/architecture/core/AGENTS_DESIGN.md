@@ -1,5 +1,8 @@
 # AutifyME Agentic System Design
 
+**Created:** September 29, 2025
+**Purpose:** Canonical agent hierarchy and context engineering patterns
+
 This document outlines the architectural pattern for the multi-agent system that powers AutifyME. The design prioritizes scalability, reusability, and effective context management within a single-tenant deployment model. It describes the enduring architecture; current implementation status or roadmap commentary lives in workflow-specific documents.
 
 ---

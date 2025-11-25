@@ -1,7 +1,7 @@
 # Domain Design Guidelines
 
 **Version:** 1.0.0
-**Date:** 2025-10-24
+**Created:** October 25, 2025
 **Purpose:** Architectural standards for designing new AutifyME domains and workflows
 
 ---

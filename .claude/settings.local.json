@@ -53,7 +53,9 @@
       "Bash(supabase --version:*)",
       "Bash(git checkout:*)",
       "Bash(tee:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(for:*)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

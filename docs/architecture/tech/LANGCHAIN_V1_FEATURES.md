@@ -1,5 +1,6 @@
 # LangChain v1 (Alpha) - New Features & Capabilities
 
+**Created:** October 1, 2025
 **Installed Versions (Updated 2025-10-15):**
 LangChain `1.0.0a12` (core `1.0.0a7`, OpenAI `1.0.0a3`, Anthropic `1.0.0a2`)
 LangGraph `1.0.0a4` (checkpoint-postgres `2.0.24`)

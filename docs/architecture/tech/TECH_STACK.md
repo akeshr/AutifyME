@@ -1,5 +1,7 @@
 # Tech Stack Reference
 
+**Created:** September 29, 2025
+
 | Layer | Technology | Notes |
 | --- | --- | --- |
 | **Agents & Workflow** | LangChain v1 (`langchain`, `langchain-core`) | Production agent builder (`create_agent`) backed by LangGraph. |

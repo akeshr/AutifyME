@@ -1,6 +1,6 @@
 # Hierarchical Trace Analysis - Lazy-Loading Strategy for LangSmith
 
-**Date**: 2025-01-16
+**Created**: October 16, 2025
 **Status**: 🔬 DESIGN
 **Purpose**: Detailed guide on hierarchical trace fetching for 25x token reduction
 

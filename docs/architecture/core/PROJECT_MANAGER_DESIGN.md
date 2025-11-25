@@ -2,7 +2,7 @@
 
 > **Roadmap Document** – Timeless architecture reference. Implementation status is tracked in `../roadmap/IMPLEMENTATION_ROADMAP.md`. Production integration begins once WhatsApp PM readiness checklist is satisfied (currently pending automation and stability work).
 
-**Date:** January 22, 2025
+**Created:** October 1, 2025
 **Purpose:** Define how we use `deepagents` to implement our Project Manager Agent
 **Status:** ✅ Implemented - 2-Level Architecture (PM → Specialist → Tools)
 

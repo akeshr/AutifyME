@@ -1,5 +1,6 @@
 # LangGraph v1 (Alpha) - Production Agent Runtime
 
+**Created:** October 7, 2025
 **Installed Version:** `langgraph==1.0.0a4`
 **Related Packages:** `langgraph-checkpoint-postgres==2.0.24`, `langgraph-prebuilt==0.7.0a2`
 **Release Date:** September 29, 2025

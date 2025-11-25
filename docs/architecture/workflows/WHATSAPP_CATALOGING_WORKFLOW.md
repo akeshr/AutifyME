@@ -1,10 +1,12 @@
 # WhatsApp-Based Product Cataloging Workflow
 
+**Created:** September 30, 2025
+
 This document outlines the design for the Cataloging MVP feature: enabling Indian small business owners to build a product catalog. The current implementation validates the workflow via scripts; WhatsApp integration now supports sandbox testing with HITL approvals. Implementation notes are limited to cataloging; broader agent architecture details remain in `AGENTS_DESIGN.md`.
 
 ---
 
-## Architecture (2025-01-22)
+## Architecture
 
 **Native LangGraph HITL with 2-level DeepAgents hierarchy.**
 
