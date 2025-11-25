@@ -1507,14 +1507,211 @@ Products:
 
 ## 13. Open Questions
 
-| # | Question | Options | Decision | Date |
-|---|----------|---------|----------|------|
-| 1 | Quality grades for products? | A) On product, B) On batch, C) Both | | |
-| 2 | Customer table needed now? | A) Yes, B) Later, C) Reference only | | |
-| 3 | Multi-currency pricing? | A) Single currency/product, B) Multi-currency | | |
-| 4 | Approval workflow for products? | A) Simple status, B) Full workflow | | |
-| 5 | Product versioning/history? | A) Audit log only, B) Full versioning | | |
-| 6 | Serial number tracking? | A) Yes, B) No, C) Future | | |
+### Status Legend
+- **PENDING** - Not yet discussed
+- **DISCUSSING** - Currently in discussion
+- **DECIDED** - Decision made, documented in Decision Log
+
+---
+
+### Q1: Quality Grades (PENDING)
+
+**Context:** Products can have quality variations (A-grade, B-grade, rejected/seconds). Where should quality grade live in the data model?
+
+**Options:**
+| Option | Description | Example |
+|--------|-------------|---------|
+| A) On Product | Different SKU per grade | `BOTTLE-500ML-A`, `BOTTLE-500ML-B` as separate products |
+| B) On Batch | Same SKU, grade assigned after production/QC | Batch 2024-001 is A-grade, Batch 2024-002 is B-grade |
+| C) Both | Product has target grade, batch has actual grade | Product targets A-grade, some batches downgraded |
+
+**Decision:**
+**Date:**
+
+---
+
+### Q2: Products Without Variants (PENDING)
+
+**Context:** Can a product exist WITHOUT belonging to a product family? Examples: raw materials, one-off custom products, imported single-SKU items.
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| A) Yes | `product_family_id` is nullable, standalone products allowed |
+| B) No | Every product must belong to a family (even if family has 1 product) |
+
+**Current Design:** Option A (nullable)
+
+**Decision:**
+**Date:**
+
+---
+
+### Q3: Substitute Components in BOM (PENDING)
+
+**Context:** During production, can alternative components be used if primary is unavailable?
+
+**Example:** BOM specifies "CAP-28MM-BLU" but stock is empty. Can we use "CAP-28MM-BLU-SUPPLIER2" (same spec, different supplier)?
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| A) No substitutes | BOM is fixed, production waits for exact component |
+| B) Substitute groups | Define interchangeable components in BOM line |
+| C) Production decision | Handled at production time, not modeled in BOM |
+
+**Decision:**
+**Date:**
+
+---
+
+### Q4: Co-Products / By-Products (PENDING)
+
+**Context:** Does production ever create multiple outputs?
+
+**Example:** Making preforms generates scrap plastic that can be reprocessed or sold.
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| A) Ignore | Scrap is waste, not tracked as inventory |
+| B) Track as product | SCRAP-PET is a product with its own SKU |
+| C) Future scope | Design schema for it but implement later |
+
+**Decision:**
+**Date:**
+
+---
+
+### Q5: Tax Handling in Prices (PENDING)
+
+**Context:** How should prices be stored - with or without tax?
+
+**Options:**
+| Option | Description | Use Case |
+|--------|-------------|----------|
+| A) Tax exclusive | Prices without tax, calculated at sale | B2B transactions |
+| B) Tax inclusive | Prices include tax (MRP) | B2C/retail |
+| C) Both | Flag per price indicating inclusive/exclusive | Mixed business |
+
+**Decision:**
+**Date:**
+
+---
+
+### Q6: Negative Inventory (PENDING)
+
+**Context:** Can inventory quantity go below zero?
+
+**Options:**
+| Option | Description | Use Case |
+|--------|-------------|----------|
+| A) Never allow | Block transactions causing negative | Strict control |
+| B) Allow with warning | System warns but permits | Ship now, reconcile later |
+| C) Configurable | Per location/product setting | Flexible |
+
+**Decision:**
+**Date:**
+
+---
+
+### Q7: Customer Master Table (PENDING)
+
+**Context:** Current design has `customer_prices` referencing `customer_id` but no customers table defined.
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| A) Include now | Add customers table to this design |
+| B) Reference only | FK exists, table defined in separate CRM domain |
+| C) Defer | Remove customer_prices, add when customers domain designed |
+
+**Decision:**
+**Date:**
+
+---
+
+### Q8: Returnable Packaging (PENDING)
+
+**Context:** Some products use returnable containers (glass bottles in crates, drums, pallets).
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| A) Not needed | No returnable packaging in target MSMEs |
+| B) Track as product | Crates/drums are products with own inventory |
+| C) Future scope | Design for it later |
+
+**Decision:**
+**Date:**
+
+---
+
+### Q9: Serial Number Tracking (PENDING)
+
+**Context:** Do any products need individual unit tracking beyond batch?
+
+**Example:** Electronics with unique serial per unit, machinery with individual tracking.
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| A) Not needed | Batch tracking is sufficient for MSMEs |
+| B) Include now | Add serial number support |
+| C) Future scope | Design for it later |
+
+**Decision:**
+**Date:**
+
+---
+
+### Q10: Multi-Currency (PENDING)
+
+**Context:** Do customers pay in different currencies?
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| A) Single (INR) | All prices in INR only |
+| B) Multi-currency | Same product can have prices in different currencies |
+| C) Conversion | Store base currency, convert at transaction time |
+
+**Decision:**
+**Date:**
+
+---
+
+### Q11: Consignment Stock (PENDING)
+
+**Context:** Stock placed at customer location - customer holds it, pays only when they sell/use.
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| A) Not needed | No consignment model for target MSMEs |
+| B) Include now | Track consignment locations and stock |
+| C) Future scope | Design for it later |
+
+**Decision:**
+**Date:**
+
+---
+
+### Q12: Scope Boundaries (PENDING)
+
+**Context:** Confirm what is OUT of scope for product data model (separate domains).
+
+**Items to confirm:**
+- [ ] Purchase Orders
+- [ ] Sales Orders
+- [ ] Production/Work Orders
+- [ ] Invoicing/Billing
+- [ ] Payments
+- [ ] Shipping/Logistics
+- [ ] CRM (leads, opportunities)
+
+**Decision:**
+**Date:**
 
 ---
 
