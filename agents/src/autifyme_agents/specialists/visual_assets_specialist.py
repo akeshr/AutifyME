@@ -30,13 +30,11 @@ from typing import Any
 from langchain.tools import tool
 
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
-
-# Import output models from schemas (re-exported for backward compatibility)
 from autifyme_agents.schemas.specialist_outputs.visual_assets import (
     ImageAssetDraft,  # noqa: F401
     VisualAssetsDraft,  # noqa: F401
 )
+from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 
 # =============================================================================

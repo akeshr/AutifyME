@@ -37,8 +37,6 @@ Architecture Pattern:
 from typing import Any
 
 from autifyme_agents.core.prompt_loader import load_prompt
-
-# Import output models from schemas (re-exported for backward compatibility)
 from autifyme_agents.schemas.specialist_outputs.marketing_content import (
     CallToActionDraft,  # noqa: F401
     HeadlineVariantDraft,  # noqa: F401
