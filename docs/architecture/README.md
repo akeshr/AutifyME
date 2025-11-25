@@ -10,13 +10,13 @@ Timeless design blueprints and implementation ground truth.
 
 | Document | Purpose |
 | --- | --- |
-| **[DOMAIN_DESIGN_GUIDELINES.md](./core/DOMAIN_DESIGN_GUIDELINES.md)** | **[CRITICAL]** Architectural standards for designing new domains and workflows - MUST reference when building new workflows |
-| **[UNIVERSAL_DATA_ENGINE_DESIGN.md](./core/UNIVERSAL_DATA_ENGINE_DESIGN.md)** | 🚀 **[NEW]** Universal Data Engine - Three-engine model (Schema/Read/Write) for agent data superpowers |
-| **[AGENTS_DESIGN.md](./core/AGENTS_DESIGN.md)** | Canonical agent hierarchy and context engineering patterns (design blueprint) |
-| **[ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./core/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md)** | ✅ **Ground truth** - as-built implementation verified from code |
-| **[PROJECT_MANAGER_DESIGN.md](./core/PROJECT_MANAGER_DESIGN.md)** | PM agent role, intent classification, delegation patterns |
-| **[DYNAMIC_SCHEMA_DRIVEN_ARCHITECTURE.md](./core/DYNAMIC_SCHEMA_DRIVEN_ARCHITECTURE.md)** | 🔄 **Dynamic CRUD** - Schema-driven architecture for future-proof database operations (replaces static patterns) |
+| **[DOMAIN_DESIGN_GUIDELINES.md](./core/DOMAIN_DESIGN_GUIDELINES.md)** | **[CRITICAL]** Architectural standards for designing new domains and workflows |
+| **[AGENTS_DESIGN.md](./core/AGENTS_DESIGN.md)** | **[CANONICAL]** Agent hierarchy, context engineering, specialist patterns |
+| **[ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./core/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md)** | **[GROUND TRUTH]** As-built implementation verified from code |
+| **[UNIVERSAL_DATA_ENGINE_DESIGN.md](./core/UNIVERSAL_DATA_ENGINE_DESIGN.md)** | Three-engine model (Schema/Read/Write) - partially implemented |
 | **[WORKFLOW_DESIGN_STRATEGY.md](./core/WORKFLOW_DESIGN_STRATEGY.md)** | Workflow orchestration patterns and sequencing strategies |
+| **[DATABASE_SCHEMA_DESIGN.md](./core/DATABASE_SCHEMA_DESIGN.md)** | Database schema and table relationships |
+| **[BROWSER_AUTOMATION_SPECIALIST_DESIGN.md](./core/BROWSER_AUTOMATION_SPECIALIST_DESIGN.md)** | Browser automation specialist design (future) |
 | **[ARCHITECTURE_IMPROVEMENTS.md](./core/ARCHITECTURE_IMPROVEMENTS.md)** | Evolution and design decision history |
 
 ---
@@ -52,7 +52,6 @@ Monitoring, debugging, and operational patterns.
 | --- | --- |
 | **[MONITORING_QUERIES.md](./workflows/MONITORING_QUERIES.md)** | Database queries for monitoring and debugging |
 | **[TRACE_CORRELATION.md](./workflows/TRACE_CORRELATION.md)** | Trace debugging patterns and correlation strategies |
-| **[BUG3_ROOT_CAUSE_ANALYSIS.md](./workflows/BUG3_ROOT_CAUSE_ANALYSIS.md)** | Bug fix post-mortem (cataloging workflow) |
 
 ---
 
@@ -73,15 +72,12 @@ Library patterns, prompt engineering, and development practices.
 | Document | Purpose |
 | --- | --- |
 | **[TECH_STACK.md](./tech/TECH_STACK.md)** | Technology choices organized by architecture layer |
-| **[EXECUTABLE_SCHEMA_COMPLETE.md](./tech/EXECUTABLE_SCHEMA_COMPLETE.md)** | ✅ **Phase 2D+2E Complete** - Executable schema + transaction support (76 tests, production-ready) |
-| **[DYNAMIC_CRUD_ACCESS_CONTROL.md](./tech/DYNAMIC_CRUD_ACCESS_CONTROL.md)** | ✅ **Implemented** - Operation-scoped CRUD tools with dynamic Pydantic schemas (39 tests) |
+| **[PROMPT_ENGINEERING_STANDARDS.md](./tech/PROMPT_ENGINEERING_STANDARDS.md)** | **[CRITICAL]** Prompt design standards (Anthropic best practices) |
 | **[LANGCHAIN_V1_FEATURES.md](./tech/LANGCHAIN_V1_FEATURES.md)** | LangChain v1 native patterns (HITL, error handling, structured outputs) |
 | **[LANGGRAPH_V1_FEATURES.md](./tech/LANGGRAPH_V1_FEATURES.md)** | LangGraph orchestration patterns and gotchas |
 | **[LANGSMITH_FEATURES.md](./tech/LANGSMITH_FEATURES.md)** | LangSmith tracing and debugging |
-| **[GOOGLE_AI_MULTIMODAL_INTEGRATION.md](./tech/GOOGLE_AI_MULTIMODAL_INTEGRATION.md)** | ✅ Complete Google AI infrastructure - Gemini 2.5, image gen (Nano Banana), TTS, video (Veo 3.1), live audio, browser automation |
-| **[GOOGLE_COMPUTER_USE_GUIDE.md](./tech/GOOGLE_COMPUTER_USE_GUIDE.md)** | Browser automation with Gemini Computer Use (optional extension) |
-| **[PROMPT_OPTIMIZATION_TOOLS_ANALYSIS.md](./tech/PROMPT_OPTIMIZATION_TOOLS_ANALYSIS.md)** | Research on prompt optimization tools (Vertex AI, DSPy, cross-provider) |
-| **[PROMPT_ENGINEERING_STANDARDS.md](./tech/PROMPT_ENGINEERING_STANDARDS.md)** | **[CRITICAL]** Prompt design standards (Anthropic best practices) |
+| **[GOOGLE_AI_MULTIMODAL_INTEGRATION.md](./tech/GOOGLE_AI_MULTIMODAL_INTEGRATION.md)** | Google AI infrastructure - Gemini 2.5, multimodal capabilities |
+| **[GOOGLE_COMPUTER_USE_GUIDE.md](./tech/GOOGLE_COMPUTER_USE_GUIDE.md)** | Browser automation with Gemini Computer Use |
 | **[LIBRARY_NATIVE_PATTERNS.md](./tech/LIBRARY_NATIVE_PATTERNS.md)** | Prefer library-native solutions over custom code |
 | **[UV_REPL_BEST_PRACTICES.md](./tech/UV_REPL_BEST_PRACTICES.md)** | API verification workflow using Python REPL |
 
@@ -153,28 +149,19 @@ This gotcha cost us 3 days of debugging (Oct 2025). Learn from our pain.
 
 Before implementing any feature:
 
-1. Check **[LANGCHAIN_V1_FEATURES.md](./tech/LANGCHAIN_V1_FEATURES.md)** for native solutions
-2. Review **[AGENTS_DESIGN.md](./core/AGENTS_DESIGN.md)** for hierarchy and context engineering
+1. Review **[AGENTS_DESIGN.md](./core/AGENTS_DESIGN.md)** for hierarchy and specialist patterns
+2. Check **[DOMAIN_DESIGN_GUIDELINES.md](./core/DOMAIN_DESIGN_GUIDELINES.md)** for architectural standards
 3. **Writing prompts?** Follow **[PROMPT_ENGINEERING_STANDARDS.md](./tech/PROMPT_ENGINEERING_STANDARDS.md)**
-4. For implementation sequencing, read `../roadmap/IMPLEMENTATION_ROADMAP.md`
-5. For specialist or PM details, consult **[PROJECT_MANAGER_DESIGN.md](./core/PROJECT_MANAGER_DESIGN.md)**
-6. Follow Cursor rules in `../../.cursor/rules/`
+4. Check **[LANGCHAIN_V1_FEATURES.md](./tech/LANGCHAIN_V1_FEATURES.md)** for native solutions
+5. Follow Cursor rules in `../../.cursor/rules/`
 
 ---
 
 ## Historical Archive
 
-Old debugging sessions, bug fixes, refactor docs, research, and planning artifacts moved to `../historical/`:
-- `historical/bug-fixes/` - Bug fix summaries and post-mortems
-- `historical/refactors/` - Refactoring session notes and implementation summaries
-- `historical/debug-sessions/` - Debugging analyses and audits
-- `historical/design-specs/` - Unimplemented design specifications and rejected alternatives
-  - `design-specs/product-onboarding-alternatives/` - Rejected product onboarding designs
-  - `design-specs/hitl-patterns/` - HITL implementation proposals (not yet implemented)
-- `historical/research/` - Pre-implementation research and investigation
-  - `research/deepagents/` - DeepAgents library research (Oct 2025)
-- `historical/migrations/` - Completed migration documentation
-  - `migrations/v1-upgrade/` - LangChain v1 alpha → v1 stable migration (Oct 2025)
-- `historical/planning/` - Time-bound implementation plans (now historical)
+Archived docs moved to `../historical/` (kept for reference, not active navigation):
 
-These are kept for reference but don't clutter active navigation.
+- `historical/bug-fixes/BUG_FIXES_CHANGELOG.md` - Consolidated bug fix changelog
+- `historical/migrations/v1-upgrade/V1_MIGRATION_COMPLETE.md` - LangChain v1 migration summary
+- `historical/research/deepagents/DEEPAGENTS_LIBRARY_LIMITATIONS.md` - Known library limitations
+- `historical/research/` - Research docs (marketing analysis, platform APIs, middleware investigation)
