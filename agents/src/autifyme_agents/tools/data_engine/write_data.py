@@ -16,7 +16,7 @@ from autifyme_agents.core.tool_error_handler import (
     build_success_response,
 )
 from autifyme_agents.schemas.write_intent import Operation, WriteIntent
-from autifyme_agents.tools.operation_executor import MultiOperationExecutor
+from autifyme_agents.tools.data_engine._executor import MultiOperationExecutor
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,8 @@
 # AutifyME Agentic System Design
 
+**Created:** September 29, 2025
+**Purpose:** Canonical agent hierarchy and context engineering patterns
+
 This document outlines the architectural pattern for the multi-agent system that powers AutifyME. The design prioritizes scalability, reusability, and effective context management within a single-tenant deployment model. It describes the enduring architecture; current implementation status or roadmap commentary lives in workflow-specific documents.
 
 ---
@@ -398,40 +401,68 @@ Specialists are SubAgents, not tools, because:
 
 ## 11. Implementation Summary
 
-**Current State (v1.0.0):**
-- ✅ PM delegates directly to specialists via DeepAgents SubAgents
-- ✅ Specialists use tools to accomplish tasks
-- ✅ HITL configured via `tool_configs` on specialist tools
-- ✅ Image analysis optimized (2048px max, json_schema method)
-- ✅ Storage cleanup handlers for graceful shutdown
-- ✅ Centralized error classification with retry logic
+**Current State (v2.0.0 - November 2025):**
+- PM delegates directly to specialists via DeepAgents SubAgents
+- 7 production specialists + 4 experimental specialists
+- Universal Data Engine (inspect_schema, read_data, write_data)
+- Intelligent PM paradigm (understands, enriches, delegates)
+- Multimodal image analysis on PM level
+- Base context loaded at startup (catalog summary, taxonomy tree)
 
 **File Structure:**
 ```
 agents/src/autifyme_agents/
 ├── workflows/
-│   └── project_manager.py          # PM construction (create_deep_agent)
+│   ├── project_manager.py              # PM construction (create_deep_agent)
+│   ├── approval_analyzer.py            # Approval classification
+│   ├── outcome_tracker.py              # Workflow outcome tracking
+│   ├── channels/                       # Platform adapters (WhatsApp)
+│   ├── handlers/                       # Workflow handlers
+│   └── orchestration/
+│       └── runner.py                   # Main workflow orchestration
 ├── specialists/
-│   └── cataloging_specialist.py    # Specialist creation (create_agent)
+│   ├── cataloging_specialist.py        # Legacy cataloging
+│   ├── product_architecture_specialist.py
+│   ├── taxonomy_specialist.py
+│   ├── market_intelligence_specialist.py
+│   ├── visual_assets_specialist.py
+│   ├── content_seo_specialist.py
+│   ├── marketing_content_specialist.py
+│   └── experimental/                   # Ad copy, audience, campaign, platform
 ├── tools/
-│   ├── image_analysis_tool.py      # Vision API wrapper
-│   └── storage_tools.py            # Database persistence
+│   ├── image_analysis_tool.py          # Vision API wrapper
+│   ├── platform_tools.py               # Platform media tools
+│   ├── research_tools.py               # Web research
+│   └── data_engine/                    # Universal Data Engine
+│       ├── inspect_schema.py           # Schema discovery
+│       ├── read_data.py                # Query operations
+│       ├── write_data.py               # Mutation operations
+│       └── aggregate_data.py           # Aggregation queries
 ├── prompts/
-│   ├── project_manager.prompt
-│   └── specialists/
-│       └── cataloging_specialist.prompt
+│   ├── project_manager_intelligent.prompt
+│   ├── approval_analyzer.prompt
+│   └── specialists/                    # 9 specialist prompts
+├── schemas/
+│   ├── specialist_outputs/             # Structured output models
+│   └── registry/                       # Schema metadata
 └── integrations/
-    └── storage/                     # Supabase adapter
+    └── storage/                        # Supabase adapter
 ```
 
-**Next Steps:**
-- Add more specialists (customer service, inventory, marketing)
-- Implement PM-level multi-specialist orchestration
-- Add reviewer specialists for quality gates
-- Enhance prompt engineering for edge cases
+**Specialists:**
+| Specialist | Domain | Code | PM Integration |
+|------------|--------|------|----------------|
+| Product Architecture | Family/variant structure | Ready | **Integrated** |
+| Taxonomy | Category classification | Ready | Pending |
+| Market Intelligence | Pricing/competition analysis | Ready | Pending |
+| Visual Assets | Image organization/quality | Ready | Pending |
+| Content SEO | Product descriptions/SEO | Ready | Pending |
+| Marketing Content | Campaign narratives/CTAs | Ready | Pending |
+| Cataloging | Legacy simple cataloging | Ready | Deprecated |
+
+**Note:** See [SPECIALIST_BUILD_UP_PLAN.md](../workflows/SPECIALIST_BUILD_UP_PLAN.md) for integration roadmap.
 
 ---
 
-**Last Updated:** January 22, 2025
-**Version:** 2-Level Architecture v1.0.0
-**Next Review:** When adding new specialists or complex multi-specialist workflows
+**Last Updated:** November 25, 2025
+**Version:** 2-Level Architecture v2.0.0

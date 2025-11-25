@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, call
 from typing import Any
 
 from autifyme_agents.tools.data_engine import create_write_data_tool
-from autifyme_agents.tools.operation_executor import MultiOperationExecutor, ExecutionResult
+from autifyme_agents.tools.data_engine._executor import MultiOperationExecutor, ExecutionResult
 from autifyme_agents.schemas.write_intent import WriteIntent, Operation
 from autifyme_agents.core.ports import StorageInterface
 

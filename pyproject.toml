@@ -173,7 +173,7 @@ ignore_missing_imports = true
 #
 # ✅ Medium priority (FIXED - 0 errors):
 # - pm_context_tools.py: FIXED
-# - runner_v2.py: FIXED
+# - runner.py: FIXED
 # - product_search_tools.py: FIXED
 # - postgres_saver_factory.py: FIXED
 # - market_intelligence_specialist.py: FIXED

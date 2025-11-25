@@ -1,15 +1,117 @@
 # Tech Stack Reference
 
-| Layer | Technology | Notes |
-| --- | --- | --- |
-| **Agents & Workflow** | LangChain v1 (`langchain`, `langchain-core`) | Production agent builder (`create_agent`) backed by LangGraph. |
-|  | LangGraph v1 (`langgraph`, `langgraph.checkpoint.postgres`) | State machines, runtime context, checkpointing. |
-|  | DeepAgents (`deepagents`) | Planning-oriented middleware for future Project Manager agent. |
-| **Observability** | LangSmith | Tracing, evaluation, prompt management. |
-| **LLM Providers** | OpenAI (`langchain-openai`) | gpt-4.1-mini-2025-04-14 models with structured output support. |
-|  | Anthropic (`langchain-anthropic`) | Claude models with prompt caching middleware. |
-| **Data & Storage** | Supabase (PostgreSQL) | Single-tenant database hosting checkpoints and business data. |
-|  | PostgresSaver | LangGraph checkpoint implementation aligned with Supabase. |
-| **Runtime Tooling** | uv | Fast Python package manager. |
-|  | Python 3.11 | Required for LangChain v1 stack. |
-| **Testing & Evaluation** | Script-based workflow runs (`agents/test_cataloging_workflow.py`) | Manual validation while automated testing framework is deferred per stakeholder directive. |
+**Created:** September 29, 2025
+**Last Updated:** November 25, 2025
+
+---
+
+## Core Framework
+
+| Component | Package | Version | Purpose |
+|-----------|---------|---------|---------|
+| Agent Builder | `langchain` | >=1.0.2 | Agent construction, tools, structured outputs |
+| Orchestration | `langgraph` | >=1.0.1 | State machines, checkpointing, workflow graphs |
+| Advanced Agents | `deepagents` | >=0.2.4 | SubAgent pattern, PM orchestration |
+| Checkpointing | `langgraph-checkpoint-postgres` | >=3.0.0 | PostgreSQL state persistence |
+
+---
+
+## LLM Providers
+
+| Provider | Package | Primary Use |
+|----------|---------|-------------|
+| **Google AI** | `langchain-google-genai` | Primary - gemini-2.5-flash for PM and specialists |
+| OpenAI | `langchain-openai` | >=1.0.0 | Fallback, image analysis |
+| Anthropic | `langchain-anthropic` | >=1.0.0 | Fallback |
+
+**Default Model:** `gemini-2.5-flash` (PM: temp=0.5, Specialists: temp=0.3)
+
+---
+
+## Data & Storage
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Database | Supabase (PostgreSQL) | Single-tenant data + checkpoints |
+| Client | `supabase` | Python client for CRUD operations |
+| Postgres Driver | `psycopg[binary]` | >=3.2.10 | LangGraph checkpointer requirement |
+
+---
+
+## Research & Tools
+
+| Component | Package | Purpose |
+|-----------|---------|---------|
+| Web Search | `langchain-tavily` | >=0.2.11 | Product research, competitive analysis |
+| Image Processing | `pillow` | >=10.0.0 | Vision API optimization (resize to 2048px) |
+
+---
+
+## Webhook Stack
+
+| Component | Package | Purpose |
+|-----------|---------|---------|
+| API Framework | `fastapi` | >=0.118.0 | WhatsApp webhook endpoints |
+| Server | `uvicorn` | >=0.37.0 | ASGI server |
+
+---
+
+## Observability
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Tracing | LangSmith | Trace analysis, debugging, prompt iteration |
+
+---
+
+## Development
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Python | 3.12+ | Required version |
+| Package Manager | `uv` | Fast dependency management |
+| Linting | `ruff` | >=0.5.0 | Code quality, import sorting |
+| Type Checking | `mypy` | >=1.10.0 | Strict mode, Pydantic plugin |
+| Testing | `pytest` | >=8.0.0 | Unit + integration tests |
+
+---
+
+## Key Dependencies (pyproject.toml)
+
+```toml
+# Core
+langchain>=1.0.2
+langgraph>=1.0.1
+deepagents>=0.2.4
+
+# LLM Providers
+langchain-google-genai
+langchain-openai>=1.0.0
+langchain-anthropic>=1.0.0
+
+# Research
+langchain-tavily>=0.2.11
+
+# Data
+supabase
+psycopg[binary]>=3.2.10
+pydantic>=2.0.0
+
+# Webhook
+fastapi>=0.118.0
+uvicorn>=0.37.0
+
+# Utilities
+pillow>=10.0.0
+tenacity>=8.0.0
+python-dotenv>=1.0.0
+```
+
+---
+
+## Architecture Notes
+
+- **Hexagonal Architecture:** Core depends only on ports; adapters at edges
+- **Type Safety:** 100% mypy strict compliance, zero `type: ignore`
+- **Single Tenant:** One company context per deployment
+- **Intelligence-First:** Trust LLM reasoning, minimal scaffolding

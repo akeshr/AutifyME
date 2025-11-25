@@ -1,5 +1,6 @@
 # LangSmith - Observability & Evaluation Platform
 
+**Created:** October 7, 2025
 **Installed SDK:** `langsmith` (via environment, version tracked in pyproject.toml)
 **Platform Type:** Cloud-based SaaS (free tier available)
 **Already Integrated:** ✅ Active in AutifyME codebase

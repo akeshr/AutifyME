@@ -220,7 +220,7 @@ ADD COLUMN trace_id TEXT;
 CREATE INDEX idx_workflow_outcomes_trace_id ON workflow_outcomes(trace_id);
 ```
 
-**Update runner_v2.py** to capture trace_id:
+**Update runner.py** to capture trace_id:
 ```python
 # In _execute_workflow(), after execution:
 try:
@@ -307,7 +307,7 @@ if runs:
 
 **Changes required**:
 1. Migration: Add trace_id column to workflow_outcomes
-2. Update runner_v2.py: Capture and store trace_id
+2. Update runner.py: Capture and store trace_id
 3. Update workflow-tester agent: Direct correlation queries
 
 **Benefit**: Seamless bidirectional correlation

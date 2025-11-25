@@ -1,6 +1,6 @@
 # Actual Implementation Architecture (As-Built Reference)
 
-**Date:** January 22, 2025
+**Created:** October 14, 2025
 **Status:** ✅ Verified (2-Level Architecture v1.0.0)
 **Last Updated:** 2-Level refactoring complete - PM → Specialist → Tools
 **Purpose:** Ground truth - actual implementation as coded
@@ -96,12 +96,21 @@ def create_cataloging_specialist(storage: StorageInterface) -> Any:
     return specialist
 ```
 
-**Current Specialists:**
-- `cataloging_specialist` - Synthesizes Product models from user descriptions + image analysis
+**Current Specialists (7 Production + 4 Experimental):**
+- `product_architecture_specialist` - Family/variant structure analysis
+- `taxonomy_specialist` - Category and industry classification
+- `market_intelligence_specialist` - Pricing and competition analysis
+- `visual_assets_specialist` - Image organization and quality assessment
+- `content_seo_specialist` - Product descriptions and SEO optimization
+- `marketing_content_specialist` - Campaign narratives and CTAs
+- `cataloging_specialist` - Legacy simple product cataloging
 
-**Tools Available to Specialists:**
-- `image_analysis_tool` - Analyzes product images via Vision API
-- `save_product` - Persists products to database (HITL enabled)
+**Tools Available (Universal Data Engine):**
+- `inspect_schema` - Schema discovery and validation
+- `read_data` - Query operations with filtering and joins
+- `write_data` - Mutation operations with transactions
+- `aggregate_data` - Aggregation queries
+- `image_analysis_tool` - Multimodal image analysis
 
 **HITL Configuration:**
 - Configured via `tool_configs` on specialist
@@ -123,7 +132,7 @@ def create_cataloging_specialist(storage: StorageInterface) -> Any:
 
 ### Layer 3: Tools (Utility Functions)
 
-**Implementation:** `tools/image_analysis_tool.py`, `tools/storage_tools.py`
+**Implementation:** `tools/image_analysis_tool.py`, `tools/data_engine/`
 
 ```python
 # Actual code patterns:
@@ -422,10 +431,10 @@ overview = get_trace_overview(result.trace_id)
 
 **Key Files to Verify:**
 - `workflows/project_manager.py` - PM construction
-- `specialists/cataloging_specialist.py` - Specialist implementation
+- `specialists/*.py` - Specialist implementations
 - `tools/image_analysis_tool.py` - Vision API wrapper
-- `tools/storage_tools.py` - Database persistence
-- `workflows/orchestration/runner.py` - HITL handling
+- `tools/data_engine/` - Universal Data Engine tools
+- `workflows/orchestration/runner.py` - Workflow orchestration
 
 ---
 
@@ -557,6 +566,6 @@ When refactoring or extending:
 
 ---
 
-**Last Updated:** January 22, 2025
-**Verified Against:** Main branch (InitialDesign-2-level_v1.0.0)
-**Next Review:** When adding new specialists or workflows
+**Last Updated:** November 25, 2025
+**Verified Against:** specialist-build-up-v6 branch
+**Architecture Version:** 2-Level Architecture v2.0.0

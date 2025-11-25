@@ -13,7 +13,7 @@ Complete correlation between LangSmith traces and database records via **`trace_
 **Official LangSmith Approach**: Pass `run_id` in RunnableConfig when invoking workflows.
 
 ```python
-# runner_v2.py
+# runner.py
 tracking_id = outcome_tracker.track_workflow_start(thread_id, incoming_message)
 
 # Pass tracking_id as run_id → becomes trace_id in LangSmith
@@ -87,7 +87,7 @@ WHERE result_data->>'type' = 'approval_analysis'
 ## Related Files
 
 - `agents/src/autifyme_agents/workflows/outcome_tracker.py` - Tracking implementation
-- `agents/src/autifyme_agents/workflows/orchestration/runner_v2.py` - run_id injection
+- `agents/src/autifyme_agents/workflows/orchestration/runner.py` - run_id injection
 - `agents/src/autifyme_agents/workflows/approval_analyzer.py` - Approval tracking
 - `.claude/skills/autonomous-testing.md` - Testing guidance
 - `.claude/agents/workflow-tester.md` - Agent instructions

@@ -1,5 +1,6 @@
 # Monitoring Queries for AutifyME
 
+**Created:** October 13, 2025
 **Purpose:** Key SQL queries for monitoring production health, detecting issues, and analyzing performance.
 
 ---

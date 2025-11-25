@@ -1,9 +1,19 @@
 # Universal Data Engine - Design Specification
 
-**Status:** Design Phase
-**Created:** 2025-01-23
-**Owner:** Architecture Team
+**Status:** Partially Implemented
+**Created:** November 23, 2025
+**Last Updated:** November 25, 2025
 **Priority:** CRITICAL - Foundation for all agent data operations
+
+**Implementation Status:**
+| Engine | Tool | Status |
+|--------|------|--------|
+| Schema Engine | `inspect_schema` | Implemented |
+| Read Engine | `read_data` | Implemented |
+| Read Engine | `aggregate_data` | Implemented |
+| Write Engine | `write_data` | Implemented |
+
+**Location:** `agents/src/autifyme_agents/tools/data_engine/`
 
 ---
 
