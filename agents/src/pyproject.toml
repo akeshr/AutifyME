@@ -38,3 +38,7 @@ dependencies = [
 [tool.uv]
 # uv configuration
 # prerelease = "allow"  # No longer needed - using stable v1 releases
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

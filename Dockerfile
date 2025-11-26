@@ -16,17 +16,16 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files first (layer caching optimization)
-COPY pyproject.toml uv.lock ./
+# Copy agents/src pyproject.toml and uv.lock (minimal, production-only dependencies)
+COPY agents/src/pyproject.toml agents/src/uv.lock ./
 
-# Install dependencies into a virtual environment
-# Using --frozen ensures lockfile is respected exactly
+# Install dependencies using lockfile (reproducible builds)
 RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy source code
-COPY agents/src/autifyme_agents ./agents/src/autifyme_agents
+COPY agents/src/autifyme_agents ./autifyme_agents
 
-# Install the project itself
+# Install the project as a package
 RUN uv sync --frozen --no-dev
 
 # ----------------------------------------------------------------------------
@@ -41,11 +40,8 @@ RUN groupadd --gid 1000 appgroup && \
 # Set working directory
 WORKDIR /app
 
-# Copy virtual environment from builder
+# Copy virtual environment from builder (includes installed package)
 COPY --from=builder /app/.venv /app/.venv
-
-# Copy source code (needed for module imports)
-COPY --from=builder /app/agents/src/autifyme_agents /app/agents/src/autifyme_agents
 
 # Ensure the virtual environment is used
 ENV PATH="/app/.venv/bin:$PATH"
@@ -56,7 +52,6 @@ ENV PORT=8080
 # Python optimizations for production
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app/agents/src
 
 # Set ownership to non-root user
 RUN chown -R appuser:appgroup /app
