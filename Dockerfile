@@ -43,6 +43,9 @@ WORKDIR /app
 # Copy virtual environment from builder (includes installed package)
 COPY --from=builder /app/.venv /app/.venv
 
+# Copy source code (required - uv sync installs as editable, referencing source)
+COPY --from=builder /app/autifyme_agents /app/autifyme_agents
+
 # Ensure the virtual environment is used
 ENV PATH="/app/.venv/bin:$PATH"
 
