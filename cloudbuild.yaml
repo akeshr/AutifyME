@@ -25,7 +25,7 @@
 
 substitutions:
   _SERVICE_NAME: autifyme-webhook
-  _REGION: asia-south1
+  _REGION: europe-west1
   _MIN_INSTANCES: "0"
   _MAX_INSTANCES: "10"
 
