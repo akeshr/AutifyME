@@ -55,7 +55,8 @@
       "Bash(tee:*)",
       "Bash(git log:*)",
       "Bash(for:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(gcloud:*)"
     ],
     "deny": [],
     "ask": []
