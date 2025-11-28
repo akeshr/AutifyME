@@ -1,8 +1,8 @@
 # Product Data Model v2
 
 **Created:** 2025-11-25
-**Status:** Draft - Design Phase
-**Last Updated:** 2025-11-25
+**Status:** Design Complete - Ready for Implementation
+**Last Updated:** 2025-11-28
 **Authors:** Abhishek, Jarvis (AI)
 
 ---
@@ -231,6 +231,10 @@ CREATE TABLE products (
     category_id UUID REFERENCES product_categories(id),
     brand VARCHAR(100),
 
+    -- Tax & Identification
+    hsn_code VARCHAR(8),                    -- HSN/SAC code for GST (India)
+    barcode VARCHAR(50),                    -- EAN-13, UPC for retail/e-commerce
+
     -- Material/Physical info (for physical products)
     material VARCHAR(100),                  -- PET, PP, Cotton, etc.
     weight_grams DECIMAL(10,3),             -- Unit weight
@@ -279,6 +283,8 @@ CREATE INDEX idx_product_family ON products(product_family_id);
 CREATE INDEX idx_product_category ON products(category_id);
 CREATE INDEX idx_product_status ON products(status);
 CREATE INDEX idx_product_brand ON products(brand);
+CREATE INDEX idx_product_hsn ON products(hsn_code);
+CREATE INDEX idx_product_barcode ON products(barcode);
 ```
 
 ### 2.5 Product Flags Matrix
@@ -1795,21 +1801,33 @@ currency CHAR(3) NOT NULL DEFAULT 'INR'  -- ISO 4217 currency code
 
 ---
 
-### Q12: Scope Boundaries (PENDING)
+### Q12: Scope Boundaries (DECIDED)
 
 **Context:** Confirm what is OUT of scope for product data model (separate domains).
 
-**Items to confirm:**
-- [ ] Purchase Orders
-- [ ] Sales Orders
-- [ ] Production/Work Orders
-- [ ] Invoicing/Billing
-- [ ] Payments
-- [ ] Shipping/Logistics
-- [ ] CRM (leads, opportunities)
+**In Scope (this document):**
+- [x] Product Master (products, families, categories)
+- [x] Variants (axes, values)
+- [x] UoM (conversions)
+- [x] BOM (recipes)
+- [x] Packaging (logistics config)
+- [x] Pricing (price lists, customer prices)
+- [x] Inventory (locations, batches, stock, transactions)
+- [x] Suppliers (supplier master, supplier products)
+- [x] Digital Assets (images, composition rules)
 
-**Decision:**
-**Date:**
+**Out of Scope (separate domains):**
+- [x] Purchase Orders - Procurement domain
+- [x] Sales Orders - Sales/OMS domain
+- [x] Production/Work Orders - Manufacturing domain
+- [x] Invoicing/Billing - Finance domain
+- [x] Payments - Finance domain
+- [x] Shipping/Logistics - Logistics domain
+- [x] CRM (leads, opportunities, customer master) - CRM domain
+
+**Decision:** Scope boundaries confirmed. Product Data Model provides master data foundation; transactional domains reference it.
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1832,6 +1850,8 @@ currency CHAR(3) NOT NULL DEFAULT 'INR'  -- ISO 4217 currency code
 | 2025-11-28 | Serial tracking deferred | Batch sufficient for current MSMEs; extend when electronics/pharma onboard | Abhishek |
 | 2025-11-28 | Multi-currency on price_list | Currency column on price_lists; each list is currency-specific | Abhishek |
 | 2025-11-28 | Consignment stock deferred | Not currently used; extension point documented for future | Abhishek |
+| 2025-11-28 | HSN code and barcode on products | HSN for GST (mandatory India), barcode for retail/e-commerce | Abhishek |
+| 2025-11-28 | Scope boundaries confirmed | Product domain = master data; transactions in separate domains | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
