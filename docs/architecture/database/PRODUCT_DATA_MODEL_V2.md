@@ -1701,7 +1701,7 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 
 ---
 
-### Q8: Returnable Packaging (PENDING)
+### Q8: Returnable Packaging (DECIDED)
 
 **Context:** Some products use returnable containers (glass bottles in crates, drums, pallets).
 
@@ -1712,8 +1712,15 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 | B) Track as product | Crates/drums are products with own inventory |
 | C) Future scope | Design for it later |
 
-**Decision:**
-**Date:**
+**Decision:** Option B - Track as product.
+
+- Returnable containers (crates, drums, pallets) are products with `product_type = 'COMPONENT'`
+- No new tables needed - reuse existing product/inventory infrastructure
+- BOM can include returnables: "1 crate + 24 bottles = 1 beer case"
+- Deposit pricing via `product_prices`
+- Inventory tracks returnable stock levels
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1800,6 +1807,7 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 | 2025-11-28 | Tax flag on price_list | B2B lists tax-exclusive, MRP lists tax-inclusive; simpler than per-price flag | Abhishek |
 | 2025-11-28 | Configurable negative inventory | Per-location setting; default FALSE, enable where needed (raw materials, transit) | Abhishek |
 | 2025-11-28 | Customer master in CRM domain | Product domain references customer_id; CRM owns customers table | Abhishek |
+| 2025-11-28 | Returnables as products | Crates/drums tracked as products; reuse existing inventory infrastructure | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
