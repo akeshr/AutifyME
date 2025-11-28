@@ -1535,7 +1535,7 @@ Products:
 
 ---
 
-### Q2: Products Without Variants (PENDING)
+### Q2: Products Without Variants (DECIDED)
 
 **Context:** Can a product exist WITHOUT belonging to a product family? Examples: raw materials, one-off custom products, imported single-SKU items.
 
@@ -1547,8 +1547,12 @@ Products:
 
 **Current Design:** Option A (nullable)
 
-**Decision:**
-**Date:**
+**Decision:** Option A - Standalone products allowed. `product_family_id` is nullable.
+- Raw materials (PET-GRANULES) don't need families
+- Single-SKU traded products can exist without family overhead
+- Recommendation: Sellable finished goods SHOULD have a family for catalog consistency
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1729,6 +1733,7 @@ Products:
 | 2025-11-25 | Sales packs as products | Own SKU, own pricing, own BOM (6x bottle + shrink wrap) | Abhishek |
 | 2025-11-25 | Logistics packaging as config | Cartons/pallets are shipping units, not sellable SKUs | Abhishek |
 | 2025-11-28 | Quality grade on batch (optional) | Supports both recycling pattern (scrap as product) and B-grade sales (grade on batch) | Abhishek |
+| 2025-11-28 | Standalone products allowed | Raw materials and single-SKU items don't need family overhead | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
