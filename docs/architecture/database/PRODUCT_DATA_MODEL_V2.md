@@ -1622,7 +1622,7 @@ Products:
 
 ---
 
-### Q5: Tax Handling in Prices (PENDING)
+### Q5: Tax Handling in Prices (DECIDED)
 
 **Context:** How should prices be stored - with or without tax?
 
@@ -1633,8 +1633,21 @@ Products:
 | B) Tax inclusive | Prices include tax (MRP) | B2C/retail |
 | C) Both | Flag per price indicating inclusive/exclusive | Mixed business |
 
-**Decision:**
-**Date:**
+**Decision:** Option C - Both, with tax flag on price_list level.
+
+Omni-channel MSMEs need both:
+- B2B/Wholesale price lists: `is_tax_inclusive = FALSE`
+- MRP/Retail/D2C price lists: `is_tax_inclusive = TRUE`
+
+**Schema additions to `price_lists`:**
+```sql
+is_tax_inclusive BOOLEAN DEFAULT FALSE
+default_tax_category VARCHAR(50)  -- 'GST_18', 'GST_12', 'GST_5', 'EXEMPT'
+```
+
+All prices in a list follow same tax treatment. Simpler than per-price flag.
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1766,6 +1779,7 @@ Products:
 | 2025-11-28 | Standalone products allowed | Raw materials and single-SKU items don't need family overhead | Abhishek |
 | 2025-11-28 | Hybrid BOM: fixed + configurable | Standard products use fixed BOM per variant; configurable products use BOM templates with category/axis matching | Abhishek |
 | 2025-11-28 | Scrap as product | Track recyclables (RECYCLED-PET) as regular products for material traceability and costing | Abhishek |
+| 2025-11-28 | Tax flag on price_list | B2B lists tax-exclusive, MRP lists tax-inclusive; simpler than per-price flag | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
