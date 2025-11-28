@@ -1651,7 +1651,7 @@ All prices in a list follow same tax treatment. Simpler than per-price flag.
 
 ---
 
-### Q6: Negative Inventory (PENDING)
+### Q6: Negative Inventory (DECIDED)
 
 **Context:** Can inventory quantity go below zero?
 
@@ -1662,8 +1662,20 @@ All prices in a list follow same tax treatment. Simpler than per-price flag.
 | B) Allow with warning | System warns but permits | Ship now, reconcile later |
 | C) Configurable | Per location/product setting | Flexible |
 
-**Decision:**
-**Date:**
+**Decision:** Option C - Configurable per location.
+
+- Raw materials: Allow negative (production consumption can exceed estimates)
+- Finished goods: Block negative (can't ship what you don't have)
+- Transit locations: Allow negative (timing differences)
+
+**Schema addition to `locations`:**
+```sql
+allow_negative_inventory BOOLEAN DEFAULT FALSE
+```
+
+Default is strict (FALSE). Enable per location where flexibility needed.
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1780,6 +1792,7 @@ All prices in a list follow same tax treatment. Simpler than per-price flag.
 | 2025-11-28 | Hybrid BOM: fixed + configurable | Standard products use fixed BOM per variant; configurable products use BOM templates with category/axis matching | Abhishek |
 | 2025-11-28 | Scrap as product | Track recyclables (RECYCLED-PET) as regular products for material traceability and costing | Abhishek |
 | 2025-11-28 | Tax flag on price_list | B2B lists tax-exclusive, MRP lists tax-inclusive; simpler than per-price flag | Abhishek |
+| 2025-11-28 | Configurable negative inventory | Per-location setting; default FALSE, enable where needed (raw materials, transit) | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
