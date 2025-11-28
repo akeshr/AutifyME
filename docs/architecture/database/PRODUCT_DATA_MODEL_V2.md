@@ -1514,7 +1514,7 @@ Products:
 
 ---
 
-### Q1: Quality Grades (PENDING)
+### Q1: Quality Grades (DECIDED)
 
 **Context:** Products can have quality variations (A-grade, B-grade, rejected/seconds). Where should quality grade live in the data model?
 
@@ -1525,8 +1525,13 @@ Products:
 | B) On Batch | Same SKU, grade assigned after production/QC | Batch 2024-001 is A-grade, Batch 2024-002 is B-grade |
 | C) Both | Product has target grade, batch has actual grade | Product targets A-grade, some batches downgraded |
 
-**Decision:**
-**Date:**
+**Decision:** Option B - Quality grade on batch (optional/nullable field).
+- Businesses that recycle defects (plastics, metals) track scrap as a separate product (RECYCLED-PET)
+- Businesses that sell B-grade (textiles, ceramics) use the grade field on batches
+- Grade assigned after production/QC (realistic flow)
+- No SKU explosion
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1723,6 +1728,7 @@ Products:
 | 2025-11-25 | SKU-level BOM | Variants need different components (colored cap on clear bottle) | Abhishek |
 | 2025-11-25 | Sales packs as products | Own SKU, own pricing, own BOM (6x bottle + shrink wrap) | Abhishek |
 | 2025-11-25 | Logistics packaging as config | Cartons/pallets are shipping units, not sellable SKUs | Abhishek |
+| 2025-11-28 | Quality grade on batch (optional) | Supports both recycling pattern (scrap as product) and B-grade sales (grade on batch) | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
