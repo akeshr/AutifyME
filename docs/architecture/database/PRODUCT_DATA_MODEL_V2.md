@@ -1774,7 +1774,7 @@ currency CHAR(3) NOT NULL DEFAULT 'INR'  -- ISO 4217 currency code
 
 ---
 
-### Q11: Consignment Stock (PENDING)
+### Q11: Consignment Stock (DECIDED)
 
 **Context:** Stock placed at customer location - customer holds it, pays only when they sell/use.
 
@@ -1785,8 +1785,13 @@ currency CHAR(3) NOT NULL DEFAULT 'INR'  -- ISO 4217 currency code
 | B) Include now | Track consignment locations and stock |
 | C) Future scope | Design for it later |
 
-**Decision:**
-**Date:**
+**Decision:** Option C - Future scope.
+
+- Not currently used by target MSMEs
+- Extension point documented: add `location_type` and `customer_id` to `locations` when needed
+- Keep schema lean for initial release
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1826,6 +1831,7 @@ currency CHAR(3) NOT NULL DEFAULT 'INR'  -- ISO 4217 currency code
 | 2025-11-28 | Returnables as products | Crates/drums tracked as products; reuse existing inventory infrastructure | Abhishek |
 | 2025-11-28 | Serial tracking deferred | Batch sufficient for current MSMEs; extend when electronics/pharma onboard | Abhishek |
 | 2025-11-28 | Multi-currency on price_list | Currency column on price_lists; each list is currency-specific | Abhishek |
+| 2025-11-28 | Consignment stock deferred | Not currently used; extension point documented for future | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
