@@ -1747,7 +1747,7 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 
 ---
 
-### Q10: Multi-Currency (PENDING)
+### Q10: Multi-Currency (DECIDED)
 
 **Context:** Do customers pay in different currencies?
 
@@ -1758,8 +1758,19 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 | B) Multi-currency | Same product can have prices in different currencies |
 | C) Conversion | Store base currency, convert at transaction time |
 
-**Decision:**
-**Date:**
+**Decision:** Option B - Multi-currency support.
+
+- Add `currency CHAR(3) DEFAULT 'INR'` to `price_lists` table
+- Each price list is currency-specific (e.g., "Export USD", "Domestic INR")
+- No conversion logic in product domain - currency conversion at transaction/invoice level
+- ISO 4217 currency codes (INR, USD, EUR, GBP, etc.)
+
+**Schema change to `price_lists`:**
+```sql
+currency CHAR(3) NOT NULL DEFAULT 'INR'  -- ISO 4217 currency code
+```
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1814,6 +1825,7 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 | 2025-11-28 | Customer master in CRM domain | Product domain references customer_id; CRM owns customers table | Abhishek |
 | 2025-11-28 | Returnables as products | Crates/drums tracked as products; reuse existing inventory infrastructure | Abhishek |
 | 2025-11-28 | Serial tracking deferred | Batch sufficient for current MSMEs; extend when electronics/pharma onboard | Abhishek |
+| 2025-11-28 | Multi-currency on price_list | Currency column on price_lists; each list is currency-specific | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
