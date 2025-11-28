@@ -355,9 +355,12 @@ CREATE TABLE variant_values (
     display_label VARCHAR(255) NOT NULL,    -- UI: Blue, 500 ML
     sku_code VARCHAR(50) NOT NULL,          -- SKU segment: BLU, 500ML
 
-    -- Visual (for swatches)
+    -- Visual (for swatches/UI display)
     color_hex VARCHAR(7),                   -- #0000FF
-    image_url VARCHAR(2048),                -- Swatch image
+    image_url VARCHAR(2048),                -- Swatch thumbnail for UI
+
+    -- AI Composition (for image generation)
+    composition_asset_id UUID REFERENCES assets(id),  -- High-res asset with metadata
 
     -- Pricing
     price_adjustment DECIMAL(18,4) DEFAULT 0,  -- +/- from base price
@@ -380,6 +383,7 @@ CREATE TABLE variant_values (
 -- Indexes
 CREATE INDEX idx_value_axis ON variant_values(variant_axis_id);
 CREATE INDEX idx_value_sku_code ON variant_values(sku_code);
+CREATE INDEX idx_value_composition_asset ON variant_values(composition_asset_id);
 ```
 
 ### 3.3 Table: product_variant_values
@@ -413,16 +417,53 @@ CREATE INDEX idx_pvv_value ON product_variant_values(variant_value_id);
 Product Family: "500ml PET Bottle" (PAV-BTL-500)
 
 Axes:
-  - color (Color): [Clear/CLR, Blue/BLU, Green/GRN]
-  - neck_type (Neck Type): [28mm PCO/28PCO, 38mm PCO/38PCO]
+  - shape (Shape): [Round/RND, Square/SQR]
+  - color (Color): [White/WHT, Blue/BLU, Transparent/CLR]
+  - cap_type (Cap): [Diamond/DIA, Ribbed/RIB, Flip/FLP]
 
-Products generated (6 SKUs):
-  PAV-BTL-500-CLR-28PCO  -> variant_values: Clear, 28mm PCO
-  PAV-BTL-500-CLR-38PCO  -> variant_values: Clear, 38mm PCO
-  PAV-BTL-500-BLU-28PCO  -> variant_values: Blue, 28mm PCO
-  PAV-BTL-500-BLU-38PCO  -> variant_values: Blue, 38mm PCO
-  PAV-BTL-500-GRN-28PCO  -> variant_values: Green, 28mm PCO
-  PAV-BTL-500-GRN-38PCO  -> variant_values: Green, 38mm PCO
+Variant Values with Composition Assets:
+  Shape Axis:
+    - Round    | composition_asset_id -> bottle-round-500ml.png (transparent BG)
+    - Square   | composition_asset_id -> bottle-square-500ml.png (transparent BG)
+
+  Cap Axis:
+    - Diamond  | composition_asset_id -> cap-diamond.png (transparent BG)
+    - Ribbed   | composition_asset_id -> cap-ribbed.png (transparent BG)
+    - Flip     | composition_asset_id -> cap-flip.png (transparent BG)
+
+  Color Axis:
+    - White       | color_hex: #FFFFFF, composition_asset_id: NULL
+    - Blue        | color_hex: #0066CC, composition_asset_id: NULL
+    - Transparent | color_hex: NULL, composition_asset_id: NULL (material property)
+
+Products generated (18 SKUs):
+  PAV-BTL-500-RND-WHT-DIA  -> Round + White + Diamond Cap
+  PAV-BTL-500-RND-WHT-RIB  -> Round + White + Ribbed Cap
+  PAV-BTL-500-SQR-BLU-FLP  -> Square + Blue + Flip Cap
+  ... etc.
+```
+
+### 3.5 AI Image Composition Flow
+
+```
+SKU: PAV-BTL-500-RND-WHT-DIA (Round White Bottle + Diamond Cap)
+
+Step 1: Collect assets from variant values
+  - Shape "Round" -> bottle-round-500ml.png
+  - Cap "Diamond" -> cap-diamond.png
+  - Color "White" -> #FFFFFF (color value)
+
+Step 2: Collect artwork (if any print/label)
+  - Print artwork from product_assets -> flower-pattern.png
+
+Step 3: AI Composition
+  INPUT:  Shape template + Color + Print + Cap image
+  OUTPUT: Final studio-quality product image
+
+Step 4: Store result
+  - New asset with is_ai_generated = TRUE
+  - source_asset_ids = [shape_asset, cap_asset, print_asset]
+  - Link to product via product_assets
 ```
 
 ---
@@ -1852,6 +1893,7 @@ currency CHAR(3) NOT NULL DEFAULT 'INR'  -- ISO 4217 currency code
 | 2025-11-28 | Consignment stock deferred | Not currently used; extension point documented for future | Abhishek |
 | 2025-11-28 | HSN code and barcode on products | HSN for GST (mandatory India), barcode for retail/e-commerce | Abhishek |
 | 2025-11-28 | Scope boundaries confirmed | Product domain = master data; transactions in separate domains | Abhishek |
+| 2025-11-28 | Composition asset on variant_values | composition_asset_id links to assets table for AI image generation | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
