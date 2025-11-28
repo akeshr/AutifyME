@@ -1556,7 +1556,7 @@ Products:
 
 ---
 
-### Q3: Substitute Components in BOM (PENDING)
+### Q3: Substitute Components in BOM (DECIDED)
 
 **Context:** During production, can alternative components be used if primary is unavailable?
 
@@ -1569,8 +1569,30 @@ Products:
 | B) Substitute groups | Define interchangeable components in BOM line |
 | C) Production decision | Handled at production time, not modeled in BOM |
 
-**Decision:**
-**Date:**
+**Decision:** Hybrid approach with configurable products support:
+
+1. **Standard products (pre-defined variants):**
+   - Each variant has fixed BOM
+   - `substitution_policy` on BOM line: `FIXED` (default) or `FLEXIBLE`
+   - `FLEXIBLE` = same spec, different source allowed (production decides)
+
+2. **Configurable products (customer picks options at order):**
+   - `is_configurable = TRUE` on product_family
+   - BOM templates at family level (not SKU level)
+   - BOM template lines reference component CATEGORY + axis to match
+   - Actual components resolved at order/production time based on customer selection
+
+3. **Substitution at order level:**
+   - Customer can change variant if preferred option unavailable
+   - "Red cap out of stock, use Blue?" -> Order changes to different variant
+
+**Schema additions:**
+- `product_families.is_configurable` (BOOLEAN)
+- `bom_templates` table for configurable products
+- `bom_template_lines` with category + axis matching
+- `bom_lines.substitution_policy` (FIXED/FLEXIBLE)
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1734,6 +1756,7 @@ Products:
 | 2025-11-25 | Logistics packaging as config | Cartons/pallets are shipping units, not sellable SKUs | Abhishek |
 | 2025-11-28 | Quality grade on batch (optional) | Supports both recycling pattern (scrap as product) and B-grade sales (grade on batch) | Abhishek |
 | 2025-11-28 | Standalone products allowed | Raw materials and single-SKU items don't need family overhead | Abhishek |
+| 2025-11-28 | Hybrid BOM: fixed + configurable | Standard products use fixed BOM per variant; configurable products use BOM templates with category/axis matching | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
