@@ -1679,7 +1679,7 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 
 ---
 
-### Q7: Customer Master Table (PENDING)
+### Q7: Customer Master Table (DECIDED)
 
 **Context:** Current design has `customer_prices` referencing `customer_id` but no customers table defined.
 
@@ -1690,8 +1690,14 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 | B) Reference only | FK exists, table defined in separate CRM domain |
 | C) Defer | Remove customer_prices, add when customers domain designed |
 
-**Decision:**
-**Date:**
+**Decision:** Option B - Reference only.
+
+- Keep `customer_prices` table for B2B contract/negotiated pricing (volume deals, annual contracts, strategic accounts)
+- `customer_id` references future `customers` table in CRM domain
+- FK constraint added once CRM domain is designed
+- Domain separation: Product catalog owns pricing, CRM owns customer master
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1793,6 +1799,7 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 | 2025-11-28 | Scrap as product | Track recyclables (RECYCLED-PET) as regular products for material traceability and costing | Abhishek |
 | 2025-11-28 | Tax flag on price_list | B2B lists tax-exclusive, MRP lists tax-inclusive; simpler than per-price flag | Abhishek |
 | 2025-11-28 | Configurable negative inventory | Per-location setting; default FALSE, enable where needed (raw materials, transit) | Abhishek |
+| 2025-11-28 | Customer master in CRM domain | Product domain references customer_id; CRM owns customers table | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
