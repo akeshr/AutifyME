@@ -1724,7 +1724,7 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 
 ---
 
-### Q9: Serial Number Tracking (PENDING)
+### Q9: Serial Number Tracking (DECIDED)
 
 **Context:** Do any products need individual unit tracking beyond batch?
 
@@ -1737,8 +1737,13 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 | B) Include now | Add serial number support |
 | C) Future scope | Design for it later |
 
-**Decision:**
-**Date:**
+**Decision:** Option C - Future scope.
+
+- Batch tracking sufficient for current target MSMEs (manufacturing, FMCG, plastics)
+- Serial tracking adds significant complexity (every unit = a row)
+- Design extension point when electronics/machinery/pharma customers onboard
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1808,6 +1813,7 @@ Default is strict (FALSE). Enable per location where flexibility needed.
 | 2025-11-28 | Configurable negative inventory | Per-location setting; default FALSE, enable where needed (raw materials, transit) | Abhishek |
 | 2025-11-28 | Customer master in CRM domain | Product domain references customer_id; CRM owns customers table | Abhishek |
 | 2025-11-28 | Returnables as products | Crates/drums tracked as products; reuse existing inventory infrastructure | Abhishek |
+| 2025-11-28 | Serial tracking deferred | Batch sufficient for current MSMEs; extend when electronics/pharma onboard | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
