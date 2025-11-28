@@ -1596,7 +1596,7 @@ Products:
 
 ---
 
-### Q4: Co-Products / By-Products (PENDING)
+### Q4: Co-Products / By-Products (DECIDED)
 
 **Context:** Does production ever create multiple outputs?
 
@@ -1609,8 +1609,16 @@ Products:
 | B) Track as product | SCRAP-PET is a product with its own SKU |
 | C) Future scope | Design schema for it but implement later |
 
-**Decision:**
-**Date:**
+**Decision:** Option B - Track scrap/recyclables as a regular product.
+
+- RECYCLED-PET, SCRAP-PLASTIC etc. are products (product_type: RAW_MATERIAL)
+- `is_manufacturable: TRUE` (output of recycling/production process)
+- When production generates scrap, inventory transaction creates scrap inventory
+- Scrap can be used as input in other BOMs (mixed with virgin material)
+- No complex co-product schema needed - just model as regular product
+- `scrap_percentage` on BOM line handles expected waste
+
+**Date:** 2025-11-28
 
 ---
 
@@ -1757,6 +1765,7 @@ Products:
 | 2025-11-28 | Quality grade on batch (optional) | Supports both recycling pattern (scrap as product) and B-grade sales (grade on batch) | Abhishek |
 | 2025-11-28 | Standalone products allowed | Raw materials and single-SKU items don't need family overhead | Abhishek |
 | 2025-11-28 | Hybrid BOM: fixed + configurable | Standard products use fixed BOM per variant; configurable products use BOM templates with category/axis matching | Abhishek |
+| 2025-11-28 | Scrap as product | Track recyclables (RECYCLED-PET) as regular products for material traceability and costing | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
