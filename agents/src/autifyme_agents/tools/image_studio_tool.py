@@ -157,6 +157,8 @@ class ImageStudioOutput(BaseModel):
     """Single generated/processed image."""
     name: str = Field(description="Output name from OutputSpec")
     temp_path: str = Field(description="Local temp path to generated image")
+    base64_data: str = Field(description="Base64-encoded image data for inline display")
+    mime_type: str = Field(default="image/png", description="MIME type for the image")
     preview_path: str | None = Field(default=None, description="Smaller preview for HITL")
     format: str = Field(description="Output format (PNG, JPEG, etc)")
     width: int = Field(description="Output width in pixels")
@@ -420,9 +422,12 @@ Keep the product exactly as shown but:
         file_size = output_path.stat().st_size
 
         # Build output
+        output_mime = f"image/{input_data.output.format.lower()}"
         output = ImageStudioOutput(
             name=input_data.output.name,
             temp_path=str(output_path),
+            base64_data=generated_b64,
+            mime_type=output_mime,
             format=input_data.output.format,
             width=input_data.output.width,
             height=input_data.output.height,
@@ -431,7 +436,7 @@ Keep the product exactly as shown but:
             suggested_asset_data={
                 "name": f"{product_name} - Catalog",
                 "storage_url": str(output_path),
-                "mime_type": f"image/{input_data.output.format.lower()}",
+                "mime_type": output_mime,
                 "asset_type": "PRODUCT_IMAGE",
                 "width": input_data.output.width,
                 "height": input_data.output.height,
@@ -517,9 +522,12 @@ The scene should enhance the product's appeal for marketing purposes."""
 
         file_size = output_path.stat().st_size
 
+        output_mime = f"image/{input_data.output.format.lower()}"
         output = ImageStudioOutput(
             name=input_data.output.name,
             temp_path=str(output_path),
+            base64_data=generated_b64,
+            mime_type=output_mime,
             format=input_data.output.format,
             width=input_data.output.width,
             height=input_data.output.height,
@@ -528,7 +536,7 @@ The scene should enhance the product's appeal for marketing purposes."""
             suggested_asset_data={
                 "name": f"{product_name} - Lifestyle",
                 "storage_url": str(output_path),
-                "mime_type": f"image/{input_data.output.format.lower()}",
+                "mime_type": output_mime,
                 "asset_type": "LIFESTYLE",
                 "width": input_data.output.width,
                 "height": input_data.output.height,
