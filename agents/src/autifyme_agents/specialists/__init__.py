@@ -1,19 +1,22 @@
 """
-Specialist SubAgents for AutifyME Product Onboarding.
+Specialist SubAgents for AutifyME.
+
+Architecture Evolution:
+- Phase 3A: Catalog Specialist (domain owner for products + assets)
+- Legacy: 7 narrow specialists (to be consolidated in Phase 3B)
 
 All specialists follow the same pattern:
 - SubAgent dict format (NOT create_agent objects)
-- Domain-specific analysis only (NO persistence)
-- Return structured Pydantic models
-- PM orchestrates delegation and HITL approval
-
-Architecture:
-- Product onboarding uses 5 domain specialists
-- Each specialist is independent and reusable
-- PM synthesizes specialist outputs into unified ProductFamilyInput
-- PM owns HITL persistence tools (specialists have none)
+- Domain-specific CRUD operations with HITL
+- PM orchestrates delegation
 """
 
+# Phase 3A: Domain-owning Catalog Specialist
+from autifyme_agents.specialists.catalog_specialist import (
+    create_catalog_specialist,
+)
+
+# Legacy specialists (to be consolidated in Phase 3B)
 from autifyme_agents.specialists.cataloging_specialist import (
     create_cataloging_specialist,
 )
@@ -32,9 +35,10 @@ from autifyme_agents.specialists.visual_assets_specialist import (
 )
 
 __all__ = [
-    # Cataloging workflow (existing)
+    # Phase 3A: Domain-owning specialist
+    "create_catalog_specialist",
+    # Legacy (Phase 3B consolidation)
     "create_cataloging_specialist",
-    # Product onboarding workflow (new)
     "create_product_architecture_specialist",
     "create_taxonomy_specialist",
     "create_market_intelligence_specialist",

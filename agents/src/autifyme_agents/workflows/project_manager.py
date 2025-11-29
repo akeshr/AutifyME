@@ -19,8 +19,8 @@ from autifyme_agents.integrations.storage import get_store
 from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
-from autifyme_agents.specialists.product_architecture_specialist import (
-    create_product_architecture_specialist,
+from autifyme_agents.specialists.catalog_specialist import (
+    create_catalog_specialist,
 )
 from autifyme_agents.tools.data_engine import (
     create_inspect_schema_tool,
@@ -169,11 +169,11 @@ async def create_project_manager(
     # NO save_campaign - future Campaign Specialist will handle
     # NO context tools - redundant with read_data + inspect_schema
 
-    # Product Architecture Specialist (SubAgent spec pattern)
+    # Catalog Specialist (Phase 3A: Domain-owning specialist)
     # Returns dict spec that DeepAgents compiles automatically
     # Standard pattern used by all specialists
     #
-    # CRITICAL: Specialist needs deterministic model for structured OperationIntent
+    # CRITICAL: Specialist needs deterministic model for structured operations
     # - temperature=0.3: More deterministic for schema-driven operations
     # - thinking_budget=0: No extended reasoning needed for structured outputs
     # PM uses temperature=0.5 for orchestration; specialist needs more precision
@@ -183,7 +183,7 @@ async def create_project_manager(
         temperature=0.3,
         thinking_budget=0,
     )
-    product_architecture_specialist = create_product_architecture_specialist(
+    catalog_specialist = create_catalog_specialist(
         storage=storage,
         model=specialist_llm  # Pass configured LLM instance
     )
@@ -191,7 +191,7 @@ async def create_project_manager(
     # Add SubAgent spec to subagents list
     # DeepAgents SubAgentMiddleware compiles specialist with default_model
     subagents: list[Any] = [
-        product_architecture_specialist,  # SubAgent dict spec
+        catalog_specialist,  # Phase 3A: Domain owner for products + assets
     ]
 
     # HITL configuration
@@ -216,7 +216,7 @@ async def create_project_manager(
     initial_state = {
         "company_profile": company_profile.model_dump(),
         "base_context": base_context.model_dump(),
-        "status": "product_architecture_integrated",
+        "status": "catalog_specialist_integrated",  # Phase 3A
         "current_workflow": None,
         "specialist_results": {},
     }
