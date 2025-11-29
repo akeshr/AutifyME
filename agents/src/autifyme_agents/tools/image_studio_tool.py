@@ -222,6 +222,50 @@ def _get_mime_type(source: ImageSource) -> str:
     return "image/jpeg"
 
 
+def _extract_generated_image(response) -> str:
+    """Extract base64 image data from LLM response.
+
+    LangChain returns generated images in response.content as blocks with
+    'image_url' key containing data URL: 'data:image/png;base64,<data>'
+    """
+    # Check content_blocks first (newer LangChain structure)
+    if hasattr(response, "content_blocks") and response.content_blocks:
+        for block in response.content_blocks:
+            if isinstance(block, dict):
+                if block.get("type") == "image" and "base64" in block:
+                    return block["base64"]
+                if "image_url" in block:
+                    url = block["image_url"].get("url", "")
+                    if "base64," in url:
+                        return url.split("base64,")[-1]
+
+    # Check content (list of content blocks)
+    if hasattr(response, "content") and isinstance(response.content, list):
+        for block in response.content:
+            if isinstance(block, dict):
+                if "image_url" in block:
+                    url = block["image_url"].get("url", "")
+                    if "base64," in url:
+                        return url.split("base64,")[-1]
+                # Direct base64 in block
+                if block.get("type") == "image" and "base64" in block:
+                    return block["base64"]
+
+    # Check additional_kwargs (fallback)
+    if hasattr(response, "additional_kwargs"):
+        if "image" in response.additional_kwargs:
+            return response.additional_kwargs["image"]
+
+    # Log response structure for debugging
+    logger.error(
+        "Could not extract image from response. "
+        f"content_blocks: {getattr(response, 'content_blocks', None)}, "
+        f"content type: {type(getattr(response, 'content', None))}, "
+        f"additional_kwargs: {getattr(response, 'additional_kwargs', None)}"
+    )
+    raise ValueError("No image generated in response")
+
+
 async def _run_analyze(input_data: ImageStudioInput) -> ImageStudioResult:
     """Run image analysis using Gemini 3 Pro."""
     start_time = time.time()
@@ -361,11 +405,8 @@ Keep the product exactly as shown but:
 
         response = await llm.ainvoke([message])
 
-        # Extract generated image
-        if hasattr(response, "additional_kwargs") and "image" in response.additional_kwargs:
-            generated_b64 = response.additional_kwargs["image"]
-        else:
-            raise ValueError("No image generated in response")
+        # Extract generated image from response
+        generated_b64 = _extract_generated_image(response)
 
         # Save to temp file
         temp_dir = Path(tempfile.gettempdir()) / "image_studio"
@@ -463,10 +504,8 @@ The scene should enhance the product's appeal for marketing purposes."""
 
         response = await llm.ainvoke([message])
 
-        if hasattr(response, "additional_kwargs") and "image" in response.additional_kwargs:
-            generated_b64 = response.additional_kwargs["image"]
-        else:
-            raise ValueError("No image generated in response")
+        # Extract generated image from response
+        generated_b64 = _extract_generated_image(response)
 
         temp_dir = Path(tempfile.gettempdir()) / "image_studio"
         temp_dir.mkdir(exist_ok=True)
