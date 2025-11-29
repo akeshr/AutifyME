@@ -523,21 +523,43 @@ The scene should enhance the product's appeal for marketing purposes."""
 
 async def _image_studio_impl(
     job_type: str,
-    source: dict,
+    source: dict | ImageSource,
     product_context: dict | None = None,
-    background: dict | None = None,
+    background: dict | BackgroundSpec | None = None,
     scene_prompt: str | None = None,
-    output: dict | None = None,
+    output: dict | OutputSpec | None = None,
 ) -> dict:
     """Image studio implementation."""
+    # Handle source - may be dict or already parsed ImageSource
+    if isinstance(source, ImageSource):
+        source_obj = source
+    else:
+        source_obj = ImageSource(**source)
+
+    # Handle background
+    if background is None:
+        bg_obj = None
+    elif isinstance(background, BackgroundSpec):
+        bg_obj = background
+    else:
+        bg_obj = BackgroundSpec(**background)
+
+    # Handle output
+    if output is None:
+        output_obj = OutputSpec()
+    elif isinstance(output, OutputSpec):
+        output_obj = output
+    else:
+        output_obj = OutputSpec(**output)
+
     # Build input
     input_data = ImageStudioInput(
         job_type=job_type,
-        source=ImageSource(**source),
+        source=source_obj,
         product_context=product_context,
-        background=BackgroundSpec(**background) if background else None,
+        background=bg_obj,
         scene_prompt=scene_prompt,
-        output=OutputSpec(**output) if output else OutputSpec(),
+        output=output_obj,
     )
 
     # Route to handler
