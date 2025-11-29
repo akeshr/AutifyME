@@ -1,0 +1,82 @@
+# ============================================================================
+# Docker Build Context Exclusions
+# ============================================================================
+# Exclude files not needed in the container to speed up builds
+# and reduce image size
+# ============================================================================
+
+# Virtual environments (we build fresh in container)
+.venv/
+venv/
+ENV/
+env/
+agents/src/.venv/
+
+# Git
+.git/
+.gitignore
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Testing
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+coverage.json
+.hypothesis/
+.tox/
+
+# Documentation (not needed at runtime)
+docs/
+*.md
+!README.md
+
+# Environment files (secrets should come from Secret Manager)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Database files (local dev only)
+database/
+
+# Extensions (separate deployment)
+extensions/
+
+# Claude/AI config
+.claude/
+CLAUDE.md
+
+# Misc
+*.txt
+nul

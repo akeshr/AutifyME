@@ -55,7 +55,11 @@
       "Bash(tee:*)",
       "Bash(git log:*)",
       "Bash(for:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(gcloud:*)",
+      "Bash(cmd /c \"gcloud --version\")",
+      "Bash(powershell:*)",
+      "Bash(uv lock:*)"
     ],
     "deny": [],
     "ask": []

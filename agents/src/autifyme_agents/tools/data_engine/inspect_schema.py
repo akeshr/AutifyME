@@ -29,12 +29,13 @@ class InspectSchemaInput(BaseModel):
         ...,
         description="List of tables to inspect (e.g., ['products', 'product_families'])"
     )
-    details: list[Literal["structure", "relationships", "stats", "samples"]] = Field(
+    details: list[Literal["structure", "relationships", "constraints", "stats", "samples"]] = Field(
         default=["structure"],
         description=(
             "What to include in response:\n"
-            "- structure: Columns, types, constraints\n"
-            "- relationships: Foreign keys, cascades\n"
+            "- structure: Columns, types, nullable, defaults, descriptions\n"
+            "- relationships: Foreign keys, cascades, target tables\n"
+            "- constraints: Valid enum values, regex patterns, computed columns, JSONB schemas\n"
             "- stats: Row counts, index info\n"
             "- samples: Real data examples"
         )
@@ -109,7 +110,7 @@ def create_inspect_schema_tool(
 
     async def _inspect_schema_impl(
         tables: list[str],
-        details: list[Literal["structure", "relationships", "stats", "samples"]] | None = None,
+        details: list[Literal["structure", "relationships", "constraints", "stats", "samples"]] | None = None,
         sample_limit: int = 3,
     ) -> dict[str, Any]:
         """
@@ -223,18 +224,51 @@ def create_inspect_schema_tool(
                             "primary_key": table_schema.primary_key,
                             "columns": {
                                 name: {
-                                    "type": col.type,
+                                    "type": col.type.value if hasattr(col.type, 'value') else str(col.type),
                                     "nullable": col.nullable,
                                     "unique": col.unique,
                                     "default": col.default,
                                     "max_length": col.max_length,
+                                    "references": col.references,
                                     "description": col.description,
+                                    # Agent-critical fields (only if set)
+                                    **({"valid_values": col.valid_values} if col.valid_values else {}),
+                                    **({"pattern": col.pattern} if col.pattern else {}),
+                                    **({"computed": col.computed} if col.computed else {}),
+                                    **({"element_type": col.element_type} if col.element_type else {}),
+                                    **({"examples": col.examples} if col.examples else {}),
                                 }
                                 for name, col in table_schema.columns.items()
                             },
                             "required_columns": table_schema.get_required_columns(),
                             "unique_columns": table_schema.get_unique_columns(),
                             "indexes": table_schema.indexes,
+                        }
+
+                    # Constraints (enum values, patterns, computed, JSONB schemas)
+                    if "constraints" in details:
+                        enum_cols = table_schema.get_enum_columns()
+                        pattern_cols = table_schema.get_pattern_columns()
+                        computed_cols = table_schema.get_computed_columns()
+                        jsonb_schemas = table_schema.get_jsonb_schemas()
+
+                        table_data["constraints"] = {
+                            "enum_columns": {
+                                name: {
+                                    "valid_values": values,
+                                    "descriptions": table_schema.columns[name].valid_values_descriptions
+                                }
+                                for name, values in enum_cols.items()
+                            } if enum_cols else {},
+                            "pattern_columns": {
+                                name: {
+                                    "pattern": pattern,
+                                    "examples": table_schema.columns[name].examples
+                                }
+                                for name, pattern in pattern_cols.items()
+                            } if pattern_cols else {},
+                            "computed_columns": computed_cols,
+                            "jsonb_schemas": jsonb_schemas,
                         }
 
                     # Relationships (foreign keys, cascades)
@@ -333,9 +367,12 @@ def create_inspect_schema_tool(
         name="inspect_schema",
         description=(
             "Inspect database schema to understand data structure. "
-            "USE WHEN: Before complex operations, verifying table structure, understanding relationships, seeing sample data. "
-            "RETURNS: Schema metadata (columns, types, constraints, foreign keys, stats, samples). "
-            "CRITICAL: Returns STRUCTURE, not actual data queries - use read_data for fetching data."
+            "USE WHEN: Before complex operations, verifying table structure, understanding relationships, "
+            "checking valid enum values, validating input formats. "
+            "RETURNS: Schema metadata including columns, types, valid_values for enums, regex patterns, "
+            "computed columns (readonly), JSONB schemas, foreign keys, stats, samples. "
+            "TIP: Use details=['structure', 'constraints'] to get enum values and format patterns before insert/update. "
+            "CRITICAL: Returns STRUCTURE, not actual data - use read_data for fetching data."
         ),
         args_schema=InspectSchemaInput,
         coroutine=_inspect_schema_impl,

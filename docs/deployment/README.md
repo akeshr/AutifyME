@@ -1,18 +1,41 @@
 # Deployment Guide
 
-## 🚀 Quick Deploy Options
+## Quick Deploy Options
 
-### Option 1: Railway (Recommended - Most Beginner Friendly)
+### Option 1: Google Cloud Run (Recommended - Production Grade)
+
+**Free Tier:** 2M requests/month, 360K GB-seconds
+**Pros:** Serverless scaling, Secret Manager integration, 60-min timeout, VPC connectivity
+**Cons:** Requires GCP account setup
+
+See **[CLOUD_RUN_SETUP.md](./CLOUD_RUN_SETUP.md)** for complete guide.
+
+#### Quick Start:
+
+```bash
+# Build and deploy (from project root)
+gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/autifyme-webhook
+
+gcloud run deploy autifyme-webhook \
+  --image gcr.io/YOUR_PROJECT_ID/autifyme-webhook \
+  --region asia-south1 \
+  --allow-unauthenticated \
+  --set-secrets "SUPABASE_URL=SUPABASE_URL:latest,DATABASE_URL=DATABASE_URL:latest,..."
+```
+
+---
+
+### Option 2: Railway (Beginner Friendly)
 
 **Free Tier:** 512MB RAM, 1GB storage, custom domain with HTTPS
-**Pros:** Automatic HTTPS, GitHub integration, **no Docker required**, PostgreSQL included
-**Cons:** Limited free resources
+**Pros:** Automatic HTTPS, GitHub integration, no Docker required, PostgreSQL included
+**Cons:** Limited free resources, 5-min timeout
 
 #### Steps:
 
 1. **Connect Repository:**
    - Go to [Railway.app](https://railway.app) and sign up
-   - Click "New Project" → "Deploy from GitHub repo"
+   - Click "New Project" -> "Deploy from GitHub repo"
    - Connect your AutifyME repository
 
 2. **Configure Environment Variables:**
@@ -28,10 +51,10 @@
    ```
 
 3. **Set Custom Domain (Optional):**
-   - Go to Settings → Domains
+   - Go to Settings -> Domains
    - Add your domain (free HTTPS included)
 
-### Option 2: Render (Great Alternative)
+### Option 3: Render (Great Alternative)
 
 **Free Tier:** 750 hours/month, custom domain with HTTPS
 **Pros:** Generous free tier, PostgreSQL available
@@ -52,7 +75,7 @@
    - Create a new PostgreSQL instance on Render
    - Copy the connection string to `DATABASE_URL`
 
-### Option 3: Fly.io (Most Flexible)
+### Option 4: Fly.io (Global Deployment)
 
 **Free Tier:** 3 shared CPU, 256MB RAM, 1GB storage
 **Pros:** Global deployment, custom domains
@@ -78,7 +101,7 @@
    fly deploy
    ```
 
-## 🔒 Security Considerations
+## Security Considerations
 
 ### Environment Variables (Critical)
 - **Never commit secrets** to Git - use platform secret management
@@ -95,24 +118,26 @@
 - **Enable RLS policies** in Supabase for data isolation
 - **Regular backups** (enable in Supabase dashboard)
 
-## 📊 Cost Comparison
+## Cost Comparison
 
-| Platform | Free Tier | Paid Tier | HTTPS | Custom Domain |
-|----------|-----------|-----------|-------|---------------|
-| Railway | 512MB RAM | $5/month | ✅ | ✅ |
-| Render | 750 hrs/mo | $7/month | ✅ | ✅ |
-| Fly.io | 256MB RAM | $5/month | ✅ | ✅ |
-| Heroku | 550 hrs/mo | $7/month | ✅ | ❌ Free |
+| Platform | Free Tier | Paid Tier | HTTPS | Timeout | Best For |
+|----------|-----------|-----------|-------|---------|----------|
+| Cloud Run | 2M req/mo | Pay-per-use | Yes | 60 min | Production |
+| Railway | 512MB RAM | $5/month | Yes | 5 min | Beginners |
+| Render | 750 hrs/mo | $7/month | Yes | 30 sec | Side projects |
+| Fly.io | 256MB RAM | $5/month | Yes | 5 min | Global reach |
+| Vercel | 100K req/mo | $20/month | Yes | 30 sec | Frontend + API |
 
-## 🔍 Monitoring & Debugging
+## Monitoring & Debugging
 
 ### Health Checks
 - **Endpoint:** `GET /health`
 - **Returns:** `{"status": "healthy", "service": "autifyme-webhook"}`
 
 ### Logs
-- **Railway:** Dashboard → Logs tab
-- **Render:** Dashboard → Logs tab
+- **Cloud Run:** `gcloud run services logs read autifyme-webhook --region asia-south1`
+- **Railway:** Dashboard -> Logs tab
+- **Render:** Dashboard -> Logs tab
 - **Fly.io:** `fly logs`
 
 ### LangSmith Monitoring
@@ -120,7 +145,7 @@
 - Cost tracking per request
 - Performance metrics dashboard
 
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### Common Issues:
 
@@ -140,7 +165,7 @@
    - Check LangSmith for bottleneck identification
    - Consider agent caching middleware
 
-## 🔄 CI/CD with GitHub Actions
+## CI/CD with GitHub Actions
 
 The included `.github/workflows/ci-cd.yml` provides:
 
@@ -154,7 +179,7 @@ The included `.github/workflows/ci-cd.yml` provides:
 VERCEL_TOKEN=your_vercel_api_token
 ```
 
-## 🚀 Vercel Deployment
+## Vercel Deployment
 
 AutifyME uses Vercel for serverless deployment of the FastAPI application.
 
@@ -196,7 +221,7 @@ AutifyME uses Vercel for serverless deployment of the FastAPI application.
 - **Global CDN** - Fast response times worldwide
 - **Integrated monitoring** - Built-in logs and analytics
 
-## 📈 Scaling Considerations
+## Scaling Considerations
 
 ### Function Timeouts:
 - **Free tier**: 10 seconds execution time
@@ -220,7 +245,7 @@ AutifyME uses Vercel for serverless deployment of the FastAPI application.
 - Supabase free tier: 500MB database, 50MB file storage
 - Upgrade path: $25/month Pro plan (2GB database, 100GB files)
 
-## 🎯 Production Checklist
+## Production Checklist
 
 - [ ] HTTPS enabled and working
 - [ ] Webhook verification successful

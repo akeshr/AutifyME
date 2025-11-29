@@ -1,0 +1,2545 @@
+{
+  "version": "v2",
+  "domain": "complete_database",
+  "description": "Complete AutifyME database schema v2 - Universal product data model for Indian MSMEs supporting manufacturers, assemblers, traders with multi-channel pricing, BOM, inventory, and AI-powered asset composition",
+  "tables": {
+    "uom": {
+      "name": "uom",
+      "description": "Master table for units of measure. Every quantity in the system references a UoM.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "unique": true,
+          "description": "Short code for display: KG, PCS, PACK. Always uppercase."
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": false,
+          "description": "Full name: Kilogram, Pieces, Pack"
+        },
+        "uom_category": {
+          "name": "uom_category",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "description": "UoM category. Same-category UoMs can be converted to each other.",
+          "valid_values": ["WEIGHT", "COUNT", "VOLUME", "LENGTH", "PACKAGE", "TIME", "AREA"],
+          "valid_values_descriptions": {
+            "WEIGHT": "Mass units - MT, KG, G, MG, LB, OZ",
+            "COUNT": "Discrete units - PCS, DOZEN, GROSS, PAIR",
+            "VOLUME": "Liquid/gas - KL, L, ML, GAL",
+            "LENGTH": "Linear - M, CM, MM, FT, IN, YD",
+            "PACKAGE": "Logistics - PACK, CARTON, PALLET, BOX",
+            "TIME": "Duration - HR, MIN, DAY",
+            "AREA": "Surface - SQM, SQFT"
+          }
+        },
+        "is_base_unit": {
+          "name": "is_base_unit",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "description": "True for reference unit in category (KG for WEIGHT). Conversions relative to base."
+        },
+        "decimal_places": {
+          "name": "decimal_places",
+          "type": "integer",
+          "nullable": false,
+          "default": "2",
+          "description": "Display precision. 0 for discrete (PCS), 2-4 for continuous (KG)."
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [],
+      "business_rules": [],
+      "indexes": ["code", "uom_category"]
+    },
+    "uom_conversion": {
+      "name": "uom_conversion",
+      "description": "Global UoM conversions (not product-specific). Use for standard conversions like MT->KG. Formula: from_qty * conversion_factor = to_qty",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "from_uom_id": {
+          "name": "from_uom_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "uom.id",
+          "description": "Source UoM"
+        },
+        "to_uom_id": {
+          "name": "to_uom_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "uom.id",
+          "description": "Target UoM"
+        },
+        "conversion_factor": {
+          "name": "conversion_factor",
+          "type": "decimal",
+          "nullable": false,
+          "description": "Multiply from_qty by this to get to_qty. MT->KG = 1000"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Whether conversion is active"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "from_uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Source UoM reference"
+        },
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "to_uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Target UoM reference"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["from_uom_id", "to_uom_id"]
+    },
+    "product_uom_conversion": {
+      "name": "product_uom_conversion",
+      "description": "Product-specific UoM conversions. Use when a 'pack' means different quantities for different products.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "products.id",
+          "description": "Product this conversion applies to"
+        },
+        "from_uom_id": {
+          "name": "from_uom_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "uom.id",
+          "description": "Source UoM"
+        },
+        "to_uom_id": {
+          "name": "to_uom_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "uom.id",
+          "description": "Target UoM"
+        },
+        "conversion_factor": {
+          "name": "conversion_factor",
+          "type": "decimal",
+          "nullable": false,
+          "description": "Product-specific multiplier"
+        },
+        "context": {
+          "name": "context",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "default": "ALL",
+          "description": "Where conversion applies: PURCHASE, INVENTORY, SALES, or ALL"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Product this conversion applies to"
+        },
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "from_uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Source UoM"
+        },
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "to_uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Target UoM"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_id", "from_uom_id", "to_uom_id"]
+    },
+    "product_families": {
+      "name": "product_families",
+      "description": "Product family grouping for variants. Products with variants share a family.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_group_id": {
+          "name": "product_group_id",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": false,
+          "unique": true,
+          "description": "Business identifier (e.g., 'SHOE-AIR-MAX')"
+        },
+        "sku_prefix": {
+          "name": "sku_prefix",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "description": "SKU prefix for all variants"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": false,
+          "description": "Product family name"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "description": "Family-level description"
+        },
+        "brand": {
+          "name": "brand",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "Brand name"
+        },
+        "is_configurable": {
+          "name": "is_configurable",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "description": "True if family has BOM templates for configurable products"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Soft delete flag"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [],
+      "business_rules": [],
+      "indexes": ["product_group_id", "sku_prefix", "brand"]
+    },
+    "products": {
+      "name": "products",
+      "description": "Master product catalog. Each row is a unique SKU. Central table linking to all product-related data.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "sku": {
+          "name": "sku",
+          "type": "text",
+          "nullable": false,
+          "unique": true,
+          "description": "Stock Keeping Unit - unique product identifier"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "description": "Product display name"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "description": "Product description"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "product_families.id",
+          "description": "Parent family for variants. NULL for standalone products."
+        },
+        "product_type": {
+          "name": "product_type",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "default": "FINISHED_GOOD",
+          "description": "Determines applicable workflows and behaviors",
+          "valid_values": ["RAW_MATERIAL", "COMPONENT", "FINISHED_GOOD", "PACK", "BUNDLE", "SERVICE"],
+          "valid_values_descriptions": {
+            "RAW_MATERIAL": "Purchased from suppliers, used in manufacturing. is_purchasable=true, is_manufacturable=false typical",
+            "COMPONENT": "Manufactured intermediate product, used in higher-level assemblies. Has BOM, is_manufacturable=true",
+            "FINISHED_GOOD": "End product sold to customers. is_sellable=true. May have BOM if manufactured",
+            "PACK": "Bundle of same product in fixed quantity (e.g., 6-pack). is_stockable=true, has BOM",
+            "BUNDLE": "Virtual grouping of different products. is_stockable=false, components tracked separately",
+            "SERVICE": "Non-stockable service item. is_stockable=false, is_sellable=true"
+          }
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "default": "ACTIVE",
+          "description": "Product lifecycle status. Workflow: DRAFT -> ACTIVE -> DISCONTINUED -> ARCHIVED",
+          "valid_values": ["DRAFT", "ACTIVE", "DISCONTINUED", "ARCHIVED"],
+          "valid_values_descriptions": {
+            "DRAFT": "Incomplete product, not usable in operations",
+            "ACTIVE": "Available for all operations (purchase, manufacture, sell)",
+            "DISCONTINUED": "No new orders, but existing stock can be sold",
+            "ARCHIVED": "Historical only, hidden from operational queries"
+          }
+        },
+        "base_uom_id": {
+          "name": "base_uom_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "uom.id",
+          "description": "Primary UoM. All internal quantities in this unit."
+        },
+        "purchase_uom_id": {
+          "name": "purchase_uom_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "uom.id",
+          "description": "UoM for purchase orders. May differ from base_uom."
+        },
+        "inventory_uom_id": {
+          "name": "inventory_uom_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "uom.id",
+          "description": "UoM for stock tracking. Usually same as base_uom."
+        },
+        "sales_uom_id": {
+          "name": "sales_uom_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "uom.id",
+          "description": "UoM for sales orders/invoices."
+        },
+        "is_purchasable": {
+          "name": "is_purchasable",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Can be purchased from suppliers"
+        },
+        "is_manufacturable": {
+          "name": "is_manufacturable",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "description": "Has BOM, can be manufactured"
+        },
+        "is_sellable": {
+          "name": "is_sellable",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Can be sold to customers"
+        },
+        "is_stockable": {
+          "name": "is_stockable",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Tracks inventory. False for SERVICE type."
+        },
+        "hsn_code": {
+          "name": "hsn_code",
+          "type": "varchar",
+          "max_length": 8,
+          "nullable": true,
+          "description": "HSN code for GST (India). 4-8 digits.",
+          "pattern": "^[0-9]{4,8}$",
+          "examples": ["8471", "84713010", "6204"]
+        },
+        "gst_rate": {
+          "name": "gst_rate",
+          "type": "decimal",
+          "nullable": false,
+          "default": "18.00",
+          "description": "GST percentage: 0, 5, 12, 18, 28"
+        },
+        "barcode": {
+          "name": "barcode",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": true,
+          "unique": true,
+          "description": "EAN-13, UPC-A, or internal barcode"
+        },
+        "reorder_point": {
+          "name": "reorder_point",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0",
+          "description": "Stock level triggering reorder alert"
+        },
+        "safety_stock": {
+          "name": "safety_stock",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0",
+          "description": "Minimum buffer inventory"
+        },
+        "min_sales_qty": {
+          "name": "min_sales_qty",
+          "type": "decimal",
+          "nullable": false,
+          "default": "1",
+          "description": "Minimum sellable quantity"
+        },
+        "production_strategy": {
+          "name": "production_strategy",
+          "type": "varchar",
+          "max_length": 30,
+          "nullable": false,
+          "default": "MAKE_TO_STOCK",
+          "description": "Manufacturing strategy for inventory planning",
+          "valid_values": ["MAKE_TO_STOCK", "MAKE_TO_ORDER", "ASSEMBLE_TO_ORDER"],
+          "valid_values_descriptions": {
+            "MAKE_TO_STOCK": "Manufacture to inventory based on forecasts",
+            "MAKE_TO_ORDER": "Manufacture only when customer order received",
+            "ASSEMBLE_TO_ORDER": "Keep components in stock, assemble on order"
+          }
+        },
+        "country_of_origin": {
+          "name": "country_of_origin",
+          "type": "varchar",
+          "max_length": 2,
+          "nullable": true,
+          "description": "ISO 3166-1 alpha-2 code"
+        },
+        "shelf_life_days": {
+          "name": "shelf_life_days",
+          "type": "integer",
+          "nullable": true,
+          "description": "Days from manufacturing to expiry"
+        },
+        "lifecycle_stage": {
+          "name": "lifecycle_stage",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "default": "MATURE",
+          "description": "Product lifecycle stage for marketing/pricing decisions",
+          "valid_values": ["INTRODUCTION", "GROWTH", "MATURE", "DECLINE"],
+          "valid_values_descriptions": {
+            "INTRODUCTION": "New product, building market awareness",
+            "GROWTH": "Increasing sales, expanding market share",
+            "MATURE": "Stable sales, established market position",
+            "DECLINE": "Decreasing sales, consider discontinuation"
+          }
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "default": "1",
+          "description": "Product revision number"
+        },
+        "custom_attributes": {
+          "name": "custom_attributes",
+          "type": "jsonb",
+          "nullable": true,
+          "default": "'{}'::jsonb",
+          "description": "Extensible key-value attributes for domain-specific data",
+          "jsonb_schema": {
+            "description": "Free-form key-value pairs. Common patterns:",
+            "examples": {
+              "apparel": {"material": "Cotton", "fit": "Regular", "care": "Machine wash"},
+              "electronics": {"voltage": "220V", "warranty_months": 12, "certifications": ["CE", "FCC"]},
+              "food": {"allergens": ["nuts", "dairy"], "dietary": "vegan", "organic": true}
+            }
+          }
+        },
+        "tags": {
+          "name": "tags",
+          "type": "array",
+          "nullable": true,
+          "default": "'{}'::text[]",
+          "description": "Categorization tags for filtering and search",
+          "element_type": "text",
+          "examples": [["new-arrival", "bestseller"], ["clearance", "seasonal"]]
+        },
+        "price": {
+          "name": "price",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Legacy: Default selling price"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Soft delete flag"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Products can belong to a product family for variant grouping"
+        },
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "base_uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Primary unit of measure"
+        },
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "purchase_uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Purchase unit of measure"
+        },
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "inventory_uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Inventory tracking unit of measure"
+        },
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "sales_uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Sales unit of measure"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["sku", "product_type", "status", "hsn_code", "barcode"]
+    },
+    "bom": {
+      "name": "bom",
+      "description": "Bill of Materials header. Defines what components are needed to manufacture a product. Only ONE active BOM per product (partial unique index enforced).",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "products.id",
+          "description": "Finished product this BOM produces. Product must have is_manufacturable=true."
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": false,
+          "description": "Human-readable name with version"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "description": "BOM description"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "default": "1",
+          "description": "Increment when components change"
+        },
+        "bom_type": {
+          "name": "bom_type",
+          "type": "varchar",
+          "max_length": 30,
+          "nullable": false,
+          "default": "MANUFACTURING",
+          "description": "BOM processing type",
+          "valid_values": ["MANUFACTURING", "ASSEMBLY", "PHANTOM", "TEMPLATE"],
+          "valid_values_descriptions": {
+            "MANUFACTURING": "Standard production BOM - components consumed, product manufactured",
+            "ASSEMBLY": "Assemble from finished components - no transformation, just packaging",
+            "PHANTOM": "Virtual sub-assembly - explodes to components during MRP, not stocked separately",
+            "TEMPLATE": "Master BOM for variant products - copied and customized per variant"
+          }
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "default": "ACTIVE",
+          "description": "BOM lifecycle status. Only ONE active BOM per product allowed.",
+          "valid_values": ["DRAFT", "ACTIVE", "OBSOLETE"],
+          "valid_values_descriptions": {
+            "DRAFT": "Under development, not usable for production",
+            "ACTIVE": "Current production BOM. Only ONE active per product",
+            "OBSOLETE": "Replaced by newer version, kept for history"
+          }
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "date",
+          "nullable": false,
+          "default": "CURRENT_DATE",
+          "description": "BOM effective start date"
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "date",
+          "nullable": true,
+          "description": "BOM effective end date"
+        },
+        "standard_qty": {
+          "name": "standard_qty",
+          "type": "decimal",
+          "nullable": false,
+          "default": "1",
+          "description": "Output quantity this BOM produces"
+        },
+        "total_cost": {
+          "name": "total_cost",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Rolled-up component cost"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "description": "User who created this BOM"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Product this BOM produces"
+        }
+      ],
+      "business_rules": [
+        {
+          "rule_type": "unique_active_bom",
+          "trigger": "before_insert",
+          "handler": "validate_single_active_bom",
+          "parameters": {},
+          "description": "Only one ACTIVE BOM per product (enforced by partial unique index)",
+          "enabled": true
+        }
+      ],
+      "indexes": ["product_id", "status"]
+    },
+    "bom_lines": {
+      "name": "bom_lines",
+      "description": "BOM line items - components needed to manufacture the parent product.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "bom_id": {
+          "name": "bom_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "bom.id",
+          "description": "Parent BOM"
+        },
+        "component_id": {
+          "name": "component_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "products.id",
+          "description": "Component product required"
+        },
+        "line_number": {
+          "name": "line_number",
+          "type": "integer",
+          "nullable": false,
+          "description": "Sequence within BOM. Use 10, 20, 30 for easy insertion."
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "decimal",
+          "nullable": false,
+          "description": "Quantity per standard_qty of parent"
+        },
+        "uom_id": {
+          "name": "uom_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "uom.id",
+          "description": "UoM for quantity"
+        },
+        "scrap_factor": {
+          "name": "scrap_factor",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0",
+          "description": "Expected waste %. 0.05 = 5% scrap."
+        },
+        "operation_sequence": {
+          "name": "operation_sequence",
+          "type": "integer",
+          "nullable": false,
+          "default": "10",
+          "description": "Production step using this component"
+        },
+        "component_type": {
+          "name": "component_type",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "default": "MATERIAL",
+          "description": "Type: MATERIAL, CONSUMABLE, TOOL, OVERHEAD"
+        },
+        "position_code": {
+          "name": "position_code",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": true,
+          "description": "Physical position on product"
+        },
+        "substitution_policy": {
+          "name": "substitution_policy",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "default": "NONE",
+          "description": "Policy: NONE, MANUAL_APPROVE, AUTO_SUBSTITUTE"
+        },
+        "substitute_component_id": {
+          "name": "substitute_component_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "products.id",
+          "description": "Alternate component if substitution allowed"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "nullable": true,
+          "description": "Line notes"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "bom",
+          "foreign_key": "bom_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Lines belong to BOM header"
+        },
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "component_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Component product"
+        },
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "substitute_component_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Substitute component if allowed"
+        },
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Unit of measure for quantity"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["bom_id", "component_id"]
+    },
+    "price_lists": {
+      "name": "price_lists",
+      "description": "Price list headers defining pricing contexts with currency, tax treatment, and effectivity.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "unique": true,
+          "description": "Programmatic reference: RETAIL_INR, WHOLESALE_USD"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": false,
+          "description": "Price list name"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "description": "Price list description"
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar",
+          "max_length": 3,
+          "nullable": false,
+          "default": "INR",
+          "description": "ISO 4217 currency code"
+        },
+        "is_tax_inclusive": {
+          "name": "is_tax_inclusive",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "True = prices include tax (B2C). False = tax-exclusive (B2B)."
+        },
+        "default_tax_category": {
+          "name": "default_tax_category",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "default": "STANDARD",
+          "description": "Tax category: STANDARD (18%), REDUCED (5%), ZERO, EXEMPT"
+        },
+        "list_type": {
+          "name": "list_type",
+          "type": "varchar",
+          "max_length": 30,
+          "nullable": false,
+          "default": "SALES",
+          "description": "Type: SALES, PURCHASE, TRANSFER, PROMOTIONAL"
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "nullable": false,
+          "default": "100",
+          "description": "Higher = higher priority when multiple lists match"
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "date",
+          "nullable": false,
+          "default": "CURRENT_DATE",
+          "description": "Price list effective start"
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "date",
+          "nullable": true,
+          "description": "Price list effective end"
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "default": "ACTIVE",
+          "description": "Status: DRAFT, ACTIVE, EXPIRED, ARCHIVED"
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "description": "Fallback list when no specific list applies"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [],
+      "business_rules": [],
+      "indexes": ["code", "list_type", "status"]
+    },
+    "product_prices": {
+      "name": "product_prices",
+      "description": "Product prices within price lists. Supports quantity-based tiered pricing.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "price_list_id": {
+          "name": "price_list_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "price_lists.id",
+          "description": "Parent price list"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "products.id",
+          "description": "Product being priced"
+        },
+        "unit_price": {
+          "name": "unit_price",
+          "type": "decimal",
+          "nullable": false,
+          "description": "Price per unit in price list currency"
+        },
+        "min_quantity": {
+          "name": "min_quantity",
+          "type": "decimal",
+          "nullable": false,
+          "default": "1",
+          "description": "Minimum qty for this tier. Example: 1=retail, 100=wholesale"
+        },
+        "price_uom_id": {
+          "name": "price_uom_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "uom.id",
+          "description": "UoM for price. NULL defaults to product.sales_uom_id"
+        },
+        "cost_price": {
+          "name": "cost_price",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Cost for margin calculation"
+        },
+        "margin_percent": {
+          "name": "margin_percent",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Margin percentage"
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "date",
+          "nullable": true,
+          "description": "Price effective start"
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "date",
+          "nullable": true,
+          "description": "Price effective end"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Whether price is active"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "price_lists",
+          "foreign_key": "price_list_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Prices belong to price list"
+        },
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Prices are for a product"
+        },
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "price_uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Price unit of measure"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["price_list_id", "product_id", "is_active"]
+    },
+    "locations": {
+      "name": "locations",
+      "description": "Physical and virtual inventory locations. Supports hierarchical structure (BIN->ZONE->WAREHOUSE).",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "unique": true,
+          "description": "Programmatic reference: WH-DELHI-01"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": false,
+          "description": "Location name"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "description": "Location description"
+        },
+        "location_type": {
+          "name": "location_type",
+          "type": "varchar",
+          "max_length": 30,
+          "nullable": false,
+          "default": "WAREHOUSE",
+          "description": "Physical or virtual location classification",
+          "valid_values": ["WAREHOUSE", "STORE", "ZONE", "BIN", "VIRTUAL", "TRANSIT"],
+          "valid_values_descriptions": {
+            "WAREHOUSE": "Primary storage facility",
+            "STORE": "Retail location",
+            "ZONE": "Area within a warehouse",
+            "BIN": "Specific shelf/slot/rack position",
+            "VIRTUAL": "Non-physical (for adjustments, scrap)",
+            "TRANSIT": "In-transit between locations"
+          }
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "locations.id",
+          "description": "Parent location for hierarchy"
+        },
+        "address_line1": {
+          "name": "address_line1",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": true,
+          "description": "Address line 1"
+        },
+        "address_line2": {
+          "name": "address_line2",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": true,
+          "description": "Address line 2"
+        },
+        "city": {
+          "name": "city",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "City"
+        },
+        "state": {
+          "name": "state",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "State"
+        },
+        "postal_code": {
+          "name": "postal_code",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": true,
+          "description": "Postal code"
+        },
+        "country": {
+          "name": "country",
+          "type": "varchar",
+          "max_length": 2,
+          "nullable": false,
+          "default": "IN",
+          "description": "ISO 3166-1 alpha-2 country code"
+        },
+        "allow_negative_inventory": {
+          "name": "allow_negative_inventory",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "description": "If true, stock can go negative (backorder)"
+        },
+        "is_sellable": {
+          "name": "is_sellable",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "If false, inventory here cannot be sold (damaged, quarantine)"
+        },
+        "is_receivable": {
+          "name": "is_receivable",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "If false, cannot receive stock here"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Soft delete flag"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "locations",
+          "foreign_key": "parent_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Parent location for hierarchy"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["code", "location_type", "parent_id"]
+    },
+    "suppliers": {
+      "name": "suppliers",
+      "description": "Supplier master for procurement operations. GST and PAN validated by CHECK constraints.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "unique": true,
+          "description": "Supplier code"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": false,
+          "description": "Supplier name"
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": true,
+          "description": "Supplier email"
+        },
+        "phone": {
+          "name": "phone",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": true,
+          "description": "Supplier phone"
+        },
+        "website": {
+          "name": "website",
+          "type": "varchar",
+          "max_length": 500,
+          "nullable": true,
+          "description": "Supplier website"
+        },
+        "contact_name": {
+          "name": "contact_name",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": true,
+          "description": "Primary contact name"
+        },
+        "contact_email": {
+          "name": "contact_email",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": true,
+          "description": "Primary contact email"
+        },
+        "contact_phone": {
+          "name": "contact_phone",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": true,
+          "description": "Primary contact phone"
+        },
+        "address_line1": {
+          "name": "address_line1",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": true,
+          "description": "Address line 1"
+        },
+        "address_line2": {
+          "name": "address_line2",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": true,
+          "description": "Address line 2"
+        },
+        "city": {
+          "name": "city",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "City"
+        },
+        "state": {
+          "name": "state",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "State"
+        },
+        "postal_code": {
+          "name": "postal_code",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": true,
+          "description": "Postal code"
+        },
+        "country": {
+          "name": "country",
+          "type": "varchar",
+          "max_length": 2,
+          "nullable": false,
+          "default": "IN",
+          "description": "ISO 3166-1 alpha-2 country code"
+        },
+        "gstin": {
+          "name": "gstin",
+          "type": "varchar",
+          "max_length": 15,
+          "nullable": true,
+          "description": "GST Identification Number (India). 15 alphanumeric characters.",
+          "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$",
+          "examples": ["27AAPFU0939F1ZV", "09AAACH7409R1ZZ"]
+        },
+        "pan": {
+          "name": "pan",
+          "type": "varchar",
+          "max_length": 10,
+          "nullable": true,
+          "description": "Permanent Account Number (India). 10 alphanumeric characters.",
+          "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]{1}$",
+          "examples": ["AAPFU0939F", "AAACH7409R"]
+        },
+        "payment_terms": {
+          "name": "payment_terms",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": false,
+          "default": "NET30",
+          "description": "Payment terms"
+        },
+        "credit_limit": {
+          "name": "credit_limit",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Credit limit"
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar",
+          "max_length": 3,
+          "nullable": false,
+          "default": "INR",
+          "description": "Default currency"
+        },
+        "default_price_list_id": {
+          "name": "default_price_list_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "price_lists.id",
+          "description": "Default price list for this supplier"
+        },
+        "supplier_type": {
+          "name": "supplier_type",
+          "type": "varchar",
+          "max_length": 30,
+          "nullable": false,
+          "default": "VENDOR",
+          "description": "Type: VENDOR, MANUFACTURER, DISTRIBUTOR, CONTRACTOR"
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "Supplier category"
+        },
+        "rating": {
+          "name": "rating",
+          "type": "decimal",
+          "nullable": true,
+          "description": "0-5 stars rating"
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "default": "ACTIVE",
+          "description": "Status: PROSPECT, ACTIVE, ON_HOLD, INACTIVE"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "nullable": true,
+          "description": "Notes"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "price_lists",
+          "foreign_key": "default_price_list_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Default price list for supplier"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["code", "status", "supplier_type"]
+    },
+    "batches": {
+      "name": "batches",
+      "description": "Batch/Lot master for inventory tracking. Each batch has its own expiry, cost, grade.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "batch_number": {
+          "name": "batch_number",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": false,
+          "description": "Batch number, unique within product"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "products.id",
+          "description": "Product this batch belongs to"
+        },
+        "manufacturing_date": {
+          "name": "manufacturing_date",
+          "type": "date",
+          "nullable": true,
+          "description": "Manufacturing date"
+        },
+        "expiry_date": {
+          "name": "expiry_date",
+          "type": "date",
+          "nullable": true,
+          "description": "Expiry date. NULL for non-perishable."
+        },
+        "grade": {
+          "name": "grade",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": true,
+          "description": "Quality grade: A, B, C, PREMIUM, STANDARD, ECONOMY"
+        },
+        "supplier_batch": {
+          "name": "supplier_batch",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "Supplier's batch reference"
+        },
+        "supplier_id": {
+          "name": "supplier_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "suppliers.id",
+          "description": "Supplier who provided this batch"
+        },
+        "unit_cost": {
+          "name": "unit_cost",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Cost for FIFO/LIFO valuation"
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "default": "ACTIVE",
+          "description": "Status: ACTIVE, QUARANTINE, EXPIRED, CONSUMED"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "nullable": true,
+          "description": "Notes"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Batches belong to products"
+        },
+        {
+          "type": "parent",
+          "target_table": "suppliers",
+          "foreign_key": "supplier_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Batch from supplier"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_id", "expiry_date", "status"]
+    },
+    "inventory": {
+      "name": "inventory",
+      "description": "Current stock levels by location, product, and optionally batch. Partial unique indexes enforce uniqueness for batch/non-batch scenarios.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "locations.id",
+          "description": "Storage location"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "products.id",
+          "description": "Product"
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "batches.id",
+          "description": "Batch. NULL for non-batch-tracked products."
+        },
+        "quantity_on_hand": {
+          "name": "quantity_on_hand",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0",
+          "description": "Physical stock. Negative only if location.allow_negative_inventory=true"
+        },
+        "quantity_reserved": {
+          "name": "quantity_reserved",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0",
+          "description": "Reserved for orders not yet shipped"
+        },
+        "quantity_available": {
+          "name": "quantity_available",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0",
+          "description": "Available to promise. Formula: quantity_on_hand - quantity_reserved",
+          "computed": true
+        },
+        "last_count_date": {
+          "name": "last_count_date",
+          "type": "date",
+          "nullable": true,
+          "description": "Last physical count date"
+        },
+        "last_count_qty": {
+          "name": "last_count_qty",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Quantity at last count"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "locations",
+          "foreign_key": "location_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Inventory at location"
+        },
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Inventory for product"
+        },
+        {
+          "type": "parent",
+          "target_table": "batches",
+          "foreign_key": "batch_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Inventory for batch"
+        }
+      ],
+      "business_rules": [
+        {
+          "rule_type": "negative_inventory_check",
+          "trigger": "before_update",
+          "handler": "check_negative_inventory",
+          "parameters": {},
+          "description": "Inventory.quantity_on_hand can only be negative if location.allow_negative_inventory = true",
+          "enabled": true
+        }
+      ],
+      "indexes": ["location_id", "product_id", "batch_id"]
+    },
+    "inventory_transactions": {
+      "name": "inventory_transactions",
+      "description": "Immutable audit log of all inventory movements. Every stock change creates a transaction. NEVER update or delete.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "transaction_type": {
+          "name": "transaction_type",
+          "type": "varchar",
+          "max_length": 30,
+          "nullable": false,
+          "description": "Inventory movement type. Determines required location fields.",
+          "valid_values": ["RECEIPT", "ISSUE", "TRANSFER", "ADJUSTMENT_IN", "ADJUSTMENT_OUT", "PRODUCTION_IN", "PRODUCTION_OUT", "RETURN_IN", "RETURN_OUT", "SCRAP"],
+          "valid_values_descriptions": {
+            "RECEIPT": "Goods received (from PO). Requires to_location_id",
+            "ISSUE": "Goods issued (to SO or consumption). Requires from_location_id",
+            "TRANSFER": "Move between locations. Requires BOTH from_location_id AND to_location_id",
+            "ADJUSTMENT_IN": "Inventory increase (count variance). Requires to_location_id",
+            "ADJUSTMENT_OUT": "Inventory decrease (count variance). Requires from_location_id",
+            "PRODUCTION_IN": "Finished goods from manufacturing. Requires to_location_id",
+            "PRODUCTION_OUT": "Components consumed in manufacturing. Requires from_location_id",
+            "RETURN_IN": "Customer return received. Requires to_location_id",
+            "RETURN_OUT": "Return to supplier. Requires from_location_id",
+            "SCRAP": "Disposed/written off. Requires from_location_id"
+          }
+        },
+        "transaction_date": {
+          "name": "transaction_date",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Transaction timestamp"
+        },
+        "reference_type": {
+          "name": "reference_type",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": true,
+          "description": "Reference type: PURCHASE_ORDER, SALES_ORDER, PRODUCTION_ORDER, STOCK_COUNT"
+        },
+        "reference_id": {
+          "name": "reference_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Reference document ID"
+        },
+        "reference_number": {
+          "name": "reference_number",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "Human-readable reference: PO-2024-001"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "products.id",
+          "description": "Product moved"
+        },
+        "from_location_id": {
+          "name": "from_location_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "locations.id",
+          "description": "Source location. Required for ISSUE, TRANSFER, *_OUT"
+        },
+        "to_location_id": {
+          "name": "to_location_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "locations.id",
+          "description": "Destination location. Required for RECEIPT, TRANSFER, *_IN"
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "batches.id",
+          "description": "Batch moved"
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "decimal",
+          "nullable": false,
+          "description": "Quantity moved. Always positive. Direction indicated by type."
+        },
+        "uom_id": {
+          "name": "uom_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "uom.id",
+          "description": "Unit of measure"
+        },
+        "unit_cost": {
+          "name": "unit_cost",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Unit cost at time of transaction"
+        },
+        "total_cost": {
+          "name": "total_cost",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Total cost of transaction"
+        },
+        "reason_code": {
+          "name": "reason_code",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": true,
+          "description": "Reason: DAMAGED, EXPIRED, CYCLE_COUNT, etc."
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "nullable": true,
+          "description": "Transaction notes"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "description": "User who created transaction"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Product moved"
+        },
+        {
+          "type": "parent",
+          "target_table": "locations",
+          "foreign_key": "from_location_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Source location"
+        },
+        {
+          "type": "parent",
+          "target_table": "locations",
+          "foreign_key": "to_location_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Destination location"
+        },
+        {
+          "type": "parent",
+          "target_table": "batches",
+          "foreign_key": "batch_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Batch moved"
+        },
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Unit of measure"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_id", "transaction_date", "transaction_type", "from_location_id", "to_location_id"]
+    },
+    "supplier_products": {
+      "name": "supplier_products",
+      "description": "Links suppliers to products they can provide with supplier-specific pricing and lead times.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "supplier_id": {
+          "name": "supplier_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "suppliers.id",
+          "description": "Supplier"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "products.id",
+          "description": "Product supplied"
+        },
+        "supplier_sku": {
+          "name": "supplier_sku",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "Supplier's product code"
+        },
+        "supplier_product_name": {
+          "name": "supplier_product_name",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": true,
+          "description": "Supplier's product name"
+        },
+        "unit_price": {
+          "name": "unit_price",
+          "type": "decimal",
+          "nullable": false,
+          "description": "Unit price from supplier"
+        },
+        "price_uom_id": {
+          "name": "price_uom_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "uom.id",
+          "description": "UoM for price"
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar",
+          "max_length": 3,
+          "nullable": false,
+          "default": "INR",
+          "description": "Currency"
+        },
+        "min_order_qty": {
+          "name": "min_order_qty",
+          "type": "decimal",
+          "nullable": false,
+          "default": "1",
+          "description": "Minimum order quantity"
+        },
+        "order_multiple": {
+          "name": "order_multiple",
+          "type": "decimal",
+          "nullable": false,
+          "default": "1",
+          "description": "Must order in multiples of this"
+        },
+        "lead_time_days": {
+          "name": "lead_time_days",
+          "type": "integer",
+          "nullable": false,
+          "default": "7",
+          "description": "Lead time in days"
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "nullable": false,
+          "default": "100",
+          "description": "Priority (higher = preferred)"
+        },
+        "is_preferred": {
+          "name": "is_preferred",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "description": "Primary supplier for this product"
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "date",
+          "nullable": false,
+          "default": "CURRENT_DATE",
+          "description": "Effective start"
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "date",
+          "nullable": true,
+          "description": "Effective end"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Whether active"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "nullable": true,
+          "description": "Notes"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "suppliers",
+          "foreign_key": "supplier_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Supplier"
+        },
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Product supplied"
+        },
+        {
+          "type": "parent",
+          "target_table": "uom",
+          "foreign_key": "price_uom_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Price UoM"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["supplier_id", "product_id", "is_active", "is_preferred"]
+    },
+    "assets": {
+      "name": "assets",
+      "description": "Digital asset master for all media files. Supports AI composition tracking.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": false,
+          "description": "Asset name"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "description": "Asset description"
+        },
+        "storage_url": {
+          "name": "storage_url",
+          "type": "text",
+          "nullable": false,
+          "description": "Full URL to asset"
+        },
+        "storage_provider": {
+          "name": "storage_provider",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "default": "SUPABASE",
+          "description": "Provider: SUPABASE, S3, GCS, CLOUDINARY, EXTERNAL"
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "varchar",
+          "max_length": 255,
+          "nullable": false,
+          "description": "Original file name"
+        },
+        "file_size_bytes": {
+          "name": "file_size_bytes",
+          "type": "bigint",
+          "nullable": true,
+          "description": "File size in bytes"
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "MIME type"
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "nullable": true,
+          "description": "Width in pixels"
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "nullable": true,
+          "description": "Height in pixels"
+        },
+        "asset_type": {
+          "name": "asset_type",
+          "type": "varchar",
+          "max_length": 30,
+          "nullable": false,
+          "default": "IMAGE",
+          "description": "Type: IMAGE, VIDEO, DOCUMENT, MODEL_3D, OTHER"
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "Asset category"
+        },
+        "is_ai_generated": {
+          "name": "is_ai_generated",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "description": "Whether AI-generated"
+        },
+        "source_asset_ids": {
+          "name": "source_asset_ids",
+          "type": "array",
+          "nullable": true,
+          "description": "For AI-generated: source assets used (uuid[])"
+        },
+        "generation_prompt": {
+          "name": "generation_prompt",
+          "type": "text",
+          "nullable": true,
+          "description": "AI generation prompt"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "nullable": true,
+          "default": "'{}'::jsonb",
+          "description": "Additional metadata"
+        },
+        "tags": {
+          "name": "tags",
+          "type": "array",
+          "nullable": true,
+          "default": "'{}'::text[]",
+          "description": "Tags"
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "default": "ACTIVE",
+          "description": "Status: UPLOADING, PROCESSING, ACTIVE, ARCHIVED, DELETED"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        },
+        "uploaded_by": {
+          "name": "uploaded_by",
+          "type": "uuid",
+          "nullable": true,
+          "description": "User who uploaded"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [],
+      "business_rules": [],
+      "indexes": ["status", "asset_type", "category"]
+    },
+    "product_assets": {
+      "name": "product_assets",
+      "description": "Links assets to products or product families. XOR constraint: must have product_id OR product_family_id, never both, never neither.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "products.id",
+          "description": "Product. XOR with product_family_id."
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "product_families.id",
+          "description": "Product family. XOR with product_id."
+        },
+        "asset_id": {
+          "name": "asset_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "assets.id",
+          "description": "Asset"
+        },
+        "asset_role": {
+          "name": "asset_role",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "default": "GALLERY",
+          "description": "Role: PRIMARY, GALLERY, THUMBNAIL, LIFESTYLE, ZOOM, SIZE_CHART, TECHNICAL, CERTIFICATE, VIDEO_THUMBNAIL"
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "description": "Display order"
+        },
+        "alt_text": {
+          "name": "alt_text",
+          "type": "varchar",
+          "max_length": 500,
+          "nullable": true,
+          "description": "Alt text for accessibility"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Whether active"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Asset for product"
+        },
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Asset for product family"
+        },
+        {
+          "type": "parent",
+          "target_table": "assets",
+          "foreign_key": "asset_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Asset reference"
+        }
+      ],
+      "business_rules": [
+        {
+          "rule_type": "xor_constraint",
+          "trigger": "before_insert",
+          "handler": "validate_product_asset_xor",
+          "parameters": {"columns": ["product_id", "product_family_id"]},
+          "description": "Must have product_id OR product_family_id, not both, not neither",
+          "enabled": true
+        }
+      ],
+      "indexes": ["product_id", "product_family_id", "asset_id", "asset_role"]
+    },
+    "asset_composition_rules": {
+      "name": "asset_composition_rules",
+      "description": "Rules for AI-powered image composition. Defines how to generate product images automatically.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "max_length": 200,
+          "nullable": false,
+          "description": "Rule name"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "description": "Rule description"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "product_families.id",
+          "description": "Apply to specific product family"
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar",
+          "max_length": 100,
+          "nullable": true,
+          "description": "Apply to category"
+        },
+        "rule_type": {
+          "name": "rule_type",
+          "type": "varchar",
+          "max_length": 50,
+          "nullable": false,
+          "description": "Type: BACKGROUND_SWAP, LIFESTYLE_COMPOSITE, SIZE_VARIANT, COLOR_VARIANT, MULTI_ANGLE, PRODUCT_ON_MODEL, FLAT_LAY"
+        },
+        "rule_config": {
+          "name": "rule_config",
+          "type": "jsonb",
+          "nullable": false,
+          "description": "Rule configuration: {prompt_template, layers[], blend_mode, position, scale}"
+        },
+        "background_asset_id": {
+          "name": "background_asset_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "assets.id",
+          "description": "Background asset for composition"
+        },
+        "overlay_asset_ids": {
+          "name": "overlay_asset_ids",
+          "type": "array",
+          "nullable": true,
+          "description": "Overlay assets (uuid[])"
+        },
+        "output_format": {
+          "name": "output_format",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": false,
+          "default": "PNG",
+          "description": "Output format: PNG, JPEG, WEBP"
+        },
+        "output_width": {
+          "name": "output_width",
+          "type": "integer",
+          "nullable": true,
+          "description": "Output width in pixels"
+        },
+        "output_height": {
+          "name": "output_height",
+          "type": "integer",
+          "nullable": true,
+          "description": "Output height in pixels"
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "nullable": false,
+          "default": "100",
+          "description": "Priority (higher = preferred)"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Whether active"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Rule for product family"
+        },
+        {
+          "type": "parent",
+          "target_table": "assets",
+          "foreign_key": "background_asset_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Background asset"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_family_id", "category", "rule_type", "is_active"]
+    }
+  }
+}

@@ -42,7 +42,7 @@ class ColumnType(str, Enum):
 
 
 class ColumnSchema(BaseModel):
-    """Column metadata for runtime validation."""
+    """Column metadata for runtime validation and agent operations."""
 
     name: str = Field(..., description="Column name")
     type: ColumnType = Field(..., description="Column data type")
@@ -55,6 +55,36 @@ class ColumnSchema(BaseModel):
         None, description="Foreign key reference (format: table.column)"
     )
     description: str | None = Field(None, description="Column description")
+
+    # Agent-critical fields for autonomous operations
+    valid_values: list[str] | None = Field(
+        None,
+        description="Allowed enum values. Agent MUST use one of these values."
+    )
+    valid_values_descriptions: dict[str, str] | None = Field(
+        None,
+        description="Business meaning for each valid value: {value: description}"
+    )
+    pattern: str | None = Field(
+        None,
+        description="Regex pattern for validation (e.g., GST: '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$')"
+    )
+    computed: bool = Field(
+        default=False,
+        description="True if column is computed/readonly. Agent should NOT update this column."
+    )
+    element_type: str | None = Field(
+        None,
+        description="For ARRAY type - element data type (e.g., 'text', 'uuid')"
+    )
+    jsonb_schema: dict[str, Any] | None = Field(
+        None,
+        description="For JSONB type - expected structure with key descriptions"
+    )
+    examples: list[Any] | None = Field(
+        None,
+        description="Sample valid values for agent guidance"
+    )
 
 
 # =============================================================================
@@ -171,6 +201,50 @@ class TableSchema(BaseModel):
             for name, col in self.columns.items()
             if col.unique and not col.primary_key
         ]
+
+    def get_enum_columns(self) -> dict[str, list[str]]:
+        """Get columns with valid_values (enum constraints).
+
+        Returns:
+            Dict of column_name -> list of valid values
+        """
+        return {
+            name: col.valid_values
+            for name, col in self.columns.items()
+            if col.valid_values
+        }
+
+    def get_computed_columns(self) -> list[str]:
+        """Get computed/readonly columns that agents should NOT update."""
+        return [
+            name
+            for name, col in self.columns.items()
+            if col.computed
+        ]
+
+    def get_pattern_columns(self) -> dict[str, str]:
+        """Get columns with regex pattern constraints.
+
+        Returns:
+            Dict of column_name -> regex pattern
+        """
+        return {
+            name: col.pattern
+            for name, col in self.columns.items()
+            if col.pattern
+        }
+
+    def get_jsonb_schemas(self) -> dict[str, dict[str, Any]]:
+        """Get JSONB columns with their expected schemas.
+
+        Returns:
+            Dict of column_name -> jsonb_schema
+        """
+        return {
+            name: col.jsonb_schema
+            for name, col in self.columns.items()
+            if col.jsonb_schema
+        }
 
     # =========================================================================
     # Executable Schema: Validation Methods
