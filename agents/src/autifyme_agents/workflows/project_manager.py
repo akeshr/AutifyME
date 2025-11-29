@@ -26,7 +26,6 @@ from autifyme_agents.tools.data_engine import (
     create_inspect_schema_tool,
     create_read_data_tool,
 )
-from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -158,8 +157,8 @@ async def create_project_manager(
         )
     )
 
-    # Image analysis tool (multimodal analysis before delegation)
-    pm_tools.append(image_analysis_tool)
+    # NO image_analysis_tool - delegate to catalog_specialist
+    # Specialist owns image analysis as part of product domain
 
     # Universal Data Engine - Read operations only
     # PM reads context, routes to specialists for mutations
