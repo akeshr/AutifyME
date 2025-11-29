@@ -541,21 +541,57 @@ class StorageAdapter:
 
 ## LLM Provider Integration
 
-Uses llm_factory for swappable providers:
+Uses llm_factory with **Gemini 3 Pro** for best quality:
+
+### Primary LLM Configuration
 
 ```python
-# Analysis - Vision LLM
-llm = get_llm(provider="google", model="gemini-2.5-flash", task="vision")
+from autifyme_agents.core.llm_factory import get_llm
 
-# Background removal - Replicate
-llm = get_llm(provider="replicate", model="remove-bg")
+# Image Generation - Gemini 3 Pro Image (Nano Banana Pro)
+# RECOMMENDED: Studio-quality 2K/4K resolution output
+llm_generation = get_llm(
+    provider="google",
+    model="gemini-3-pro-image-preview",
+    temperature=0.7,  # Creative variation
+    response_modalities=["TEXT", "IMAGE"],  # Enable image output
+)
 
-# Lifestyle generation - Stability AI
-llm = get_llm(provider="stability", model="sd-xl")
-
-# Enhancement - Various
-llm = get_llm(provider="replicate", model="real-esrgan")  # Upscaling
+# Image Analysis - Gemini 3 Pro
+# Best reasoning for quality assessment and self-review
+llm_analysis = get_llm(
+    provider="google",
+    model="gemini-3-pro-preview",
+    temperature=0.3,  # Deterministic analysis
+)
 ```
+
+### Fallback Options
+
+```python
+# Fallback: Gemini 2.5 Flash Image (faster, lower cost)
+llm_generation_fallback = get_llm(
+    provider="google",
+    model="gemini-2.5-flash-image-preview",
+    temperature=0.7,
+    response_modalities=["TEXT", "IMAGE"],
+)
+
+# External APIs for specific operations
+# Background removal - Replicate (rembg)
+# Enhancement - Replicate (Real-ESRGAN)
+# These don't use llm_factory - direct API calls
+```
+
+### Model Selection Matrix
+
+| Job Type | Primary Model | Fallback | Rationale |
+|----------|---------------|----------|-----------|
+| analyze | gemini-3-pro-preview | gemini-2.5-flash | Best reasoning for quality assessment |
+| product_shot | gemini-3-pro-image-preview | gemini-2.5-flash-image | Studio-quality output |
+| lifestyle | gemini-3-pro-image-preview | gemini-2.5-flash-image | Creative scene generation |
+| enhance | Replicate (Real-ESRGAN) | - | Specialized upscaling |
+| composite | PIL/Pillow | - | Deterministic layering |
 
 ---
 
@@ -579,16 +615,17 @@ llm = get_llm(provider="replicate", model="real-esrgan")  # Upscaling
 
 ## API Options
 
-| Capability | Options |
-|------------|---------|
-| Background Removal | Remove.bg, Replicate (rembg), Stability |
-| Enhancement | Replicate (Real-ESRGAN), Topaz |
-| Lifestyle Generation | Stability AI, Replicate (SDXL), OpenAI DALL-E |
-| Composition | PIL/Pillow, ImageMagick |
-| Analysis | Google Gemini Vision, OpenAI Vision |
+| Capability | Primary | Fallback | Notes |
+|------------|---------|----------|-------|
+| Image Generation | Gemini 3 Pro Image | Gemini 2.5 Flash Image | Native multimodal |
+| Image Analysis | Gemini 3 Pro | Gemini 2.5 Flash | Vision + reasoning |
+| Background Removal | Replicate (rembg) | Remove.bg | Specialized |
+| Enhancement | Replicate (Real-ESRGAN) | Topaz | Upscaling |
+| Composition | PIL/Pillow | ImageMagick | Deterministic |
 
 ---
 
 **Version History:**
+- v1.2.0 (2025-11-29): Added Gemini 3 Pro configuration, model selection matrix
 - v1.1.0 (2025-11-29): Refactored to StructuredTool pattern with rich Pydantic schemas
 - v1.0.0 (2025-11-29): Initial design document

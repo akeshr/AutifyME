@@ -37,7 +37,10 @@ def get_llm(
             OpenAI models: 'gpt-4.1-mini', 'gpt-4.1', 'gpt-4.1-nano', 'gpt-5-mini-2025-08-07'
             Anthropic models: 'claude-3-5-sonnet-20241022'
             Google Gemini models:
-                - 2.5 Series (Latest): 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'
+                - 3.0 Series (Latest - Nov 2025):
+                    - 'gemini-3-pro-preview': Best reasoning, multimodal understanding, agentic capabilities
+                    - 'gemini-3-pro-image-preview': Image generation (Nano Banana Pro), 2K/4K resolution
+                - 2.5 Series: 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'
                 - 2.0 Series: 'gemini-2.0-flash', 'gemini-2.0-flash-lite'
                 - Preview variants: 'gemini-2.5-pro-preview-06-05', 'gemini-2.5-flash-preview-09-2025', etc.
                 - Image Generation (Nano Banana): 'gemini-2.5-flash-image', 'gemini-2.5-flash-image-preview'
@@ -107,10 +110,14 @@ def get_llm(
         - Safety settings control content filtering across 4 harm categories
         - Knowledge cutoff: January 2025 (2.5 series), August 2024 (2.0 series)
 
-        **Image Generation (Nano Banana):**
-        - Model: gemini-2.5-flash-image or gemini-2.5-flash-image-preview
-        - Set response_modalities=["TEXT", "IMAGE"] or ["IMAGE"]
-        - Pricing: $0.039 per image (1290 output tokens)
+        **Image Generation:**
+        - Gemini 3 Pro Image (Nano Banana Pro) - RECOMMENDED for Image Studio:
+          Model: gemini-3-pro-image-preview
+          Resolution: 2K/4K studio-quality output
+          Set response_modalities=["TEXT", "IMAGE"] or ["IMAGE"]
+        - Gemini 2.5 Flash Image (Nano Banana):
+          Model: gemini-2.5-flash-image or gemini-2.5-flash-image-preview
+          Pricing: $0.039 per image (1290 output tokens)
         - Capabilities: Generate, edit, blend images; maintain character consistency
         - Retrieve images from response.additional_kwargs["image"] as base64
 
@@ -168,7 +175,7 @@ def get_llm(
         )
     elif provider == "google":
         # Google Gemini models with full parameter support
-        # Supports all Gemini 2.5 and 2.0 models with multimodal capabilities
+        # Supports Gemini 3.0, 2.5, and 2.0 series with multimodal capabilities
 
         # Build kwargs dict with only provided parameters
         gemini_kwargs = {
@@ -176,10 +183,11 @@ def get_llm(
             "temperature": temperature,
         }
 
-        # CRITICAL: Disable thinking by default for Flash/Flash-Lite models
-        # Gemini 2.5 has adaptive thinking enabled by default which wastes time/money
-        # Set thinking_budget=0 to disable (only works for Flash/Flash-Lite, not Pro)
-        if thinking_budget is None and ("flash" in model.lower()):
+        # CRITICAL: Set thinking budget defaults by model type
+        # - Flash models: Limited thinking (512) to optimize speed/cost
+        # - Pro models: Keep default thinking for complex reasoning
+        # - Image models: No thinking budget (different generation mode)
+        if thinking_budget is None and ("flash" in model.lower()) and ("image" not in model.lower()):
             thinking_budget = 512
 
         # Add optional parameters only if provided
