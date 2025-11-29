@@ -55,6 +55,16 @@ Monitoring, debugging, and operational patterns.
 
 ---
 
+## Tools Design (`tools/`)
+
+Detailed design documents for powerful, atomic tools.
+
+| Document | Purpose |
+| --- | --- |
+| **[IMAGE_STUDIO_TOOL.md](./tools/IMAGE_STUDIO_TOOL.md)** | Unified image tool - analyze, generate, enhance, compose with self-review pattern |
+
+---
+
 ## Technology & Patterns (`tech/`)
 
 Library patterns, prompt engineering, and development practices.
