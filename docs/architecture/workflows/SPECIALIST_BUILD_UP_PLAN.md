@@ -2,8 +2,8 @@
 
 **Created:** October 28, 2025
 **Last Updated:** November 29, 2025
-**Status:** Database Schema v2 Complete - Ready for Specialist Consolidation
-**Strategy:** Token-optimized 2-specialist architecture with shared tools
+**Status:** Database Schema v2 Complete - Ready for Phase 3A (Minimal Catalog Specialist)
+**Strategy:** Hybrid approach - minimal consolidation -> Image Studio -> full consolidation
 
 ---
 
@@ -288,32 +288,52 @@ User approves -> asset persisted, linked to product
 
 ## Upcoming Phases
 
-### Phase 3: Catalog Specialist Consolidation (8-10 hours)
+### Execution Strategy: Hybrid Approach
 
-**Goal:** Merge existing specialists into unified Catalog Specialist
+**Rationale:** Balance architecture integrity with user value delivery.
+
+The original Phase 3 (full consolidation) delays Image Studio by 8-10 hours. Analysis shows:
+- Image Studio is a TOOL, not a specialist - works with any specialist
+- BUT self-review pattern needs clear ownership for product imagery
+- Minimal Catalog Specialist provides that ownership without full consolidation
+
+**Execution Order:** 3A -> 5 -> 3B -> 4
+
+| Phase | Hours | Cumulative | Deliverable |
+|-------|-------|------------|-------------|
+| 3A | 4-5h | 4-5h | Catalog Specialist (minimal) |
+| 5 | 10-12h | 14-17h | Image Studio Tool |
+| 3B | 4-5h | 18-22h | Full consolidation |
+| 4 | 6-8h | 24-30h | Operations Specialist |
+
+---
+
+### Phase 3A: Minimal Catalog Specialist (4-5 hours)
+
+**Goal:** Establish clear ownership for product imagery before Image Studio
+
+**Why First:**
+- Image Studio's self-review pattern requires ONE specialist to own product imagery
+- 7 narrow specialists create ambiguous ownership (Visual Assets? Product Architecture?)
+- Catalog Specialist provides clear boundary: "all product catalog operations"
 
 **Tasks:**
-1. [ ] Create Catalog Specialist prompt (products + BOM + pricing + assets)
-2. [ ] Configure table access control (CRUD vs READ)
-3. [ ] Integrate Image Studio tool
-4. [ ] Test complete product onboarding workflow
-5. [ ] Deprecate narrow specialists (Product Architecture, Visual Assets, etc.)
+1. [ ] Create Catalog Specialist prompt (products + assets + image responsibilities)
+2. [ ] Configure table access control (products, product_families, assets, product_assets)
+3. [ ] Wire into PM as primary product specialist (replace product_architecture_specialist)
+4. [ ] Test basic product CRUD workflow
+5. [ ] Document specialist-tool contract for Image Studio integration
 
-**Merged Capabilities:**
-- Product Architecture -> product definition, families, variants
-- Visual Assets -> asset management, image processing
-- Content SEO -> product descriptions (or keep as tool?)
-- Pricing logic -> price lists, tiered pricing
+**Scope Boundaries:**
+- IN: Product CRUD, asset management, image processing ownership
+- OUT: Full BOM/pricing integration, narrow specialist deprecation (deferred to 3B)
 
-### Phase 4: Operations Specialist (6-8 hours)
+**Success Criteria:**
+- Catalog Specialist can create products with associated assets
+- Clear ownership for image_studio tool integration
+- PM routes product image requests to Catalog Specialist
 
-**Goal:** Build Operations Specialist for supply chain
-
-**Tasks:**
-1. [ ] Create Operations Specialist prompt
-2. [ ] Configure table access (suppliers, inventory, locations)
-3. [ ] Test supplier onboarding workflow
-4. [ ] Test inventory operations (receive, transfer, adjust)
+---
 
 ### Phase 5: Image Studio Tool (10-12 hours)
 
@@ -321,8 +341,13 @@ User approves -> asset persisted, linked to product
 
 **Design Doc:** [IMAGE_STUDIO_TOOL.md](../tools/IMAGE_STUDIO_TOOL.md)
 
+**Why After 3A:**
+- Catalog Specialist owns product imagery (clear self-review ownership)
+- Self-review pattern: Catalog Specialist calls image_studio twice (generate + analyze)
+- Feedback iteration: PM routes user feedback to Catalog Specialist with context
+
 **Tasks:**
-1. [ ] Define Pydantic models for all job specs
+1. [ ] Define Pydantic models for all job specs (ImageStudioInput, OutputSpec, etc.)
 2. [ ] Implement job routing and validation
 3. [ ] Merge existing image_analysis_tool into analyze job
 4. [ ] Integrate background removal API (Remove.bg/Replicate)
@@ -332,8 +357,57 @@ User approves -> asset persisted, linked to product
 8. [ ] Add preview generation for HITL
 9. [ ] Update storage adapter for temp -> permanent move
 10. [ ] Add review_context to HITL payload
-11. [ ] Test self-review pattern
+11. [ ] Test self-review pattern with Catalog Specialist
 12. [ ] Test feedback iteration flow
+
+**User Value Delivered:**
+- Phone photos -> professional catalog images
+- Self-review ensures quality before user approval
+- Feedback loop for adjustments ("make background cream")
+
+---
+
+### Phase 3B: Complete Consolidation (4-5 hours)
+
+**Goal:** Finish specialist consolidation, realize full token savings
+
+**Why After Image Studio:**
+- Image Studio validates the consolidated architecture pattern
+- Real usage data informs what to include vs. keep as tools
+- Avoid over-engineering consolidation before validation
+
+**Tasks:**
+1. [ ] Expand Catalog Specialist prompt (add BOM, pricing, SEO capabilities)
+2. [ ] Deprecate narrow specialists (Product Architecture, Visual Assets, Content SEO, etc.)
+3. [ ] Update PM routing to use only Catalog Specialist for product domain
+4. [ ] Migrate/archive narrow specialist tests
+5. [ ] Verify 45% token reduction achieved
+6. [ ] Update documentation
+
+**Merged Capabilities (Full):**
+- Product Architecture -> product definition, families, variants
+- Visual Assets -> asset management (image processing via Image Studio tool)
+- Content SEO -> product descriptions
+- Pricing logic -> price lists, tiered pricing
+
+**Success Criteria:**
+- Single Catalog Specialist handles 80%+ of product workflows
+- Token usage reduced ~45% compared to 7-specialist model
+- All 444+ tests passing (with narrow specialist tests archived/migrated)
+
+---
+
+### Phase 4: Operations Specialist (6-8 hours)
+
+**Goal:** Build Operations Specialist for supply chain
+
+**Tasks:**
+1. [ ] Create Operations Specialist prompt
+2. [ ] Configure table access (suppliers, inventory, locations, batches)
+3. [ ] Test supplier onboarding workflow
+4. [ ] Test inventory operations (receive, transfer, adjust)
+
+---
 
 ### Phase 6: Marketing Specialist (future)
 
@@ -366,6 +440,7 @@ User approves -> asset persisted, linked to product
 ---
 
 **Version History:**
+- v3.2.0 (2025-11-29): Hybrid execution strategy (3A -> 5 -> 3B -> 4), split Phase 3 into minimal (3A) and full consolidation (3B), prioritize Image Studio user value
 - v3.1.0 (2025-11-29): Extracted Image Studio design to separate doc, added self-review pattern, stateless specialist considerations
 - v3.0.0 (2025-11-29): Consolidated to 2-specialist model, added Image Studio design, marked Database Schema v2 complete
 - v2.0.0 (2025-11-25): Streamlined doc - archived detailed phase notes (3943 -> 180 lines)
