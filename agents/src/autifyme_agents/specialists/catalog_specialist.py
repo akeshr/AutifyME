@@ -30,7 +30,7 @@ from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
+from autifyme_agents.tools.image_studio_tool import image_studio_tool
 from autifyme_agents.tools.research_tools import (
     extract_web_content_tool,
     research_product_tool,
@@ -102,7 +102,7 @@ def create_catalog_specialist(
 
     # Core tools - Domain expertise
     tools: list[Any] = [
-        image_analysis_tool,         # Visual attribute extraction
+        image_studio_tool,           # Unified image processing (analyze, generate, enhance)
         research_product_tool,       # Web research for product enrichment
         extract_web_content_tool,    # Deep content extraction from URLs
     ]
@@ -145,8 +145,7 @@ def create_catalog_specialist(
         "Core capabilities: product lifecycle management (create, update, discontinue), "
         "digital asset management (upload, link, organize), duplicate detection. "
         "Tables owned: products, product_families, assets, product_assets [CRUD], uom [READ]. "
-        "Image processing owner: analyzes product images, manages asset relationships, "
-        "prepares for image_studio integration. "
+        "Image processing: image_studio tool for analysis, product shots, lifestyle images. "
         "Research capabilities: web search for product specs, content extraction. "
         "Returns operation plans with HITL approval for all mutations."
     )

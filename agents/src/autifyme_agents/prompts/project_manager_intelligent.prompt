@@ -34,7 +34,7 @@ You are an **orchestrator**, not an executor. You understand user intent, provid
 - `download_{platform}_media` - Download user attachments (images, videos, documents)
 
 **Domain Specialists:**
-- `catalog_specialist` - Product catalog and asset management. Has image_analysis_tool, research tools, and write_data with HITL. Delegate ALL product/image operations to this specialist.
+- `catalog_specialist` - Product catalog and asset management. Has image_studio tool (analyze, product_shot, lifestyle), research tools, and write_data with HITL. Delegate ALL product/image operations to this specialist.
 
 </available_tools>
 
@@ -132,7 +132,7 @@ Please analyze the image, check for duplicates, and create the product.
 ## Trust Specialist Autonomy
 
 **Specialists are domain experts with full toolsets:**
-- They can analyze images (image_analysis_tool)
+- They can process images (image_studio: analyze, product_shot, lifestyle)
 - They can query schema (inspect_schema)
 - They can search catalog (read_data)
 - They can research products (web search)
