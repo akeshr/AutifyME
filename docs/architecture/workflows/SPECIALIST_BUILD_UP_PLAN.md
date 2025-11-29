@@ -1,7 +1,7 @@
 # Specialist Build-Up Integration Plan
 
 **Created:** October 28, 2025
-**Last Updated:** November 25, 2025
+**Last Updated:** November 29, 2025
 **Status:** Phase 2G Complete - Ready for Phase 3 (Taxonomy Specialist Integration)
 **Strategy:** Incremental build-up - add specialists one by one, test each before adding next
 
@@ -61,6 +61,52 @@ Specialists = "Deep Domain Experts"
 - PM intelligent from message 1 (has base context)
 - Scales (base = 1-2K tokens)
 - Always fresh (details queried when needed)
+
+---
+
+## Pending: Database Infrastructure
+
+### Product Data Model v2 (PENDING IMPLEMENTATION)
+
+**Status:** Design Complete - Ready for Implementation
+**Document:** `docs/architecture/database/PRODUCT_DATA_MODEL_V2.md`
+**Estimated Effort:** 15-20 hours
+
+**Overview:**
+Universal product data model for Indian MSMEs supporting all business types (manufacturers, assemblers, traders) and all sales channels (B2B, D2C, online, offline).
+
+**Schema Summary (22 Tables across 9 Domains):**
+
+| Domain | Tables | Purpose |
+|--------|--------|---------|
+| Product Master | products, product_families, product_categories | Core product data |
+| Variants | variant_axes, variant_values, product_variant_values | Product variations |
+| UoM | uom, uom_conversion, product_uom_conversion | Unit handling |
+| BOM | bom, bom_lines | Manufacturing recipes |
+| Packaging | packaging_configs | Logistics packaging |
+| Pricing | price_lists, product_prices, customer_prices | Multi-currency pricing |
+| Inventory | locations, batches, inventory, inventory_transactions | Stock management |
+| Suppliers | suppliers, supplier_products | Procurement |
+| Digital Assets | assets, product_assets, asset_composition_rules | AI image composition |
+
+**Key Design Decisions:**
+- SKU-level BOM for variant flexibility
+- Hybrid BOM: fixed + configurable products
+- Multi-currency pricing with tax-inclusive/exclusive flag
+- AI image composition via `composition_asset_id` on variant_values
+- HSN code + GST rate for Indian tax compliance
+- Inventory planning (reorder_point, safety_stock)
+
+**Implementation Tasks:**
+- [ ] Create Supabase migrations for all 22 tables
+- [ ] Seed UoM and category reference data
+- [ ] Update Pydantic models in `schemas/`
+- [ ] Integrate with existing specialists (Product Architecture, Taxonomy)
+- [ ] Update `read_data` tool for new schema
+
+**Dependencies:**
+- Blocks: Full product onboarding workflow
+- Affects: All product-related specialists
 
 ---
 
