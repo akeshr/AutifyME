@@ -47,13 +47,11 @@ async def chat_with_pm(message: str, image_path: Path | None = None, thread_id: 
     storage: StorageInterface = get_storage()
     company_profile = storage.get_company_profile()
     pm_checkpointer = get_checkpointer()
-    specialist_checkpointer = get_checkpointer()  # Separate checkpointer for context isolation
 
     # Create PM
     pm = await create_project_manager(
         company_profile=company_profile,
         checkpointer=pm_checkpointer,
-        specialist_checkpointer=specialist_checkpointer,
         storage=storage,
     )
 
