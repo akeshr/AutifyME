@@ -2,7 +2,7 @@
 
 **Created:** 2025-11-25
 **Status:** Design Complete - Ready for Implementation
-**Last Updated:** 2025-11-28
+**Last Updated:** 2025-11-29
 **Authors:** Abhishek, Jarvis (AI)
 
 ---
@@ -233,6 +233,7 @@ CREATE TABLE products (
 
     -- Tax & Identification
     hsn_code VARCHAR(8),                    -- HSN/SAC code for GST (India)
+    gst_rate DECIMAL(5,2),                  -- GST rate: 5.00, 12.00, 18.00, 28.00
     barcode VARCHAR(50),                    -- EAN-13, UPC for retail/e-commerce
 
     -- Material/Physical info (for physical products)
@@ -256,6 +257,13 @@ CREATE TABLE products (
     is_manufacturable BOOLEAN DEFAULT FALSE, -- Has BOM, can be produced
     is_sellable BOOLEAN DEFAULT FALSE,      -- Can be sold to customers
     is_stockable BOOLEAN DEFAULT TRUE,      -- Tracked in inventory
+
+    -- Inventory Planning
+    reorder_point DECIMAL(18,6),            -- Trigger reorder when stock falls below
+    safety_stock DECIMAL(18,6),             -- Minimum buffer stock to maintain
+
+    -- Sales Control
+    min_sales_qty DECIMAL(18,6),            -- Minimum order quantity for B2B sales
 
     -- Lifecycle
     status product_status DEFAULT 'DRAFT',
@@ -1894,6 +1902,9 @@ currency CHAR(3) NOT NULL DEFAULT 'INR'  -- ISO 4217 currency code
 | 2025-11-28 | HSN code and barcode on products | HSN for GST (mandatory India), barcode for retail/e-commerce | Abhishek |
 | 2025-11-28 | Scope boundaries confirmed | Product domain = master data; transactions in separate domains | Abhishek |
 | 2025-11-28 | Composition asset on variant_values | composition_asset_id links to assets table for AI image generation | Abhishek |
+| 2025-11-29 | GST rate on products | Direct rate storage for offline invoicing and quick calculations | Abhishek |
+| 2025-11-29 | Inventory planning fields | reorder_point and safety_stock for automated reorder alerts | Abhishek |
+| 2025-11-29 | Sales MOQ on products | min_sales_qty for B2B minimum order requirements | Abhishek |
 | 2025-11-25 | Single tenant | Current architecture, no multi-company needed | Abhishek |
 
 ---
