@@ -1,6 +1,9 @@
-# Autonomous Testing Skill
+---
+name: autonomous-testing
+description: Execute autonomous testing where AI monitors PM behavior and triggers debugging when issues arise
+---
 
-Execute autonomous testing where AI monitors PM behavior and triggers debugging when issues arise.
+# Autonomous Testing
 
 ## Your Role
 
@@ -95,4 +98,3 @@ assert result2.interrupt_occurred, "PM should trigger HITL"
 
 - **Architecture**: `docs/architecture/testing/AUTONOMOUS_TESTING_FRAMEWORK.md`
 - **Implementation**: `tests/tools/intelligent_execution.py`
-- **Command**: `.claude/commands/test-intelligent.md`

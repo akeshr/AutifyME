@@ -50,6 +50,99 @@ def test_column_schema_with_reference():
     assert col.references == "product_families.id"
 
 
+def test_column_schema_with_valid_values():
+    """Test column schema with enum valid_values constraint."""
+    col = ColumnSchema(
+        name="product_type",
+        type=ColumnType.VARCHAR,
+        nullable=False,
+        valid_values=["RAW_MATERIAL", "COMPONENT", "FINISHED_GOOD", "PACK"],
+        valid_values_descriptions={
+            "RAW_MATERIAL": "Purchased from suppliers",
+            "COMPONENT": "Assembled from raw materials",
+            "FINISHED_GOOD": "End product sold to customers",
+            "PACK": "Bundle of products"
+        }
+    )
+
+    assert col.valid_values == ["RAW_MATERIAL", "COMPONENT", "FINISHED_GOOD", "PACK"]
+    assert col.valid_values_descriptions["RAW_MATERIAL"] == "Purchased from suppliers"
+
+
+def test_column_schema_with_pattern():
+    """Test column schema with regex pattern constraint."""
+    col = ColumnSchema(
+        name="gstin",
+        type=ColumnType.VARCHAR,
+        nullable=True,
+        pattern=r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$",
+        examples=["27AAPFU0939F1ZV", "09AAACH7409R1ZZ"]
+    )
+
+    assert col.pattern is not None
+    assert col.examples == ["27AAPFU0939F1ZV", "09AAACH7409R1ZZ"]
+
+
+def test_column_schema_computed():
+    """Test column schema with computed (readonly) flag."""
+    col = ColumnSchema(
+        name="quantity_available",
+        type=ColumnType.DECIMAL,
+        nullable=False,
+        computed=True,
+        description="Available to promise. Formula: quantity_on_hand - quantity_reserved"
+    )
+
+    assert col.computed is True
+
+
+def test_column_schema_with_element_type():
+    """Test column schema with array element_type."""
+    col = ColumnSchema(
+        name="tags",
+        type=ColumnType.ARRAY,
+        nullable=True,
+        element_type="text",
+        description="Product tags for categorization"
+    )
+
+    assert col.element_type == "text"
+
+
+def test_column_schema_with_jsonb_schema():
+    """Test column schema with JSONB schema definition."""
+    col = ColumnSchema(
+        name="custom_attributes",
+        type=ColumnType.JSONB,
+        nullable=True,
+        jsonb_schema={
+            "type": "object",
+            "additionalProperties": True,
+            "description": "Flexible key-value pairs for custom attributes"
+        }
+    )
+
+    assert col.jsonb_schema is not None
+    assert col.jsonb_schema["type"] == "object"
+
+
+def test_column_schema_defaults():
+    """Test column schema defaults for new agent-critical fields."""
+    col = ColumnSchema(
+        name="simple_column",
+        type=ColumnType.VARCHAR,
+        nullable=True
+    )
+
+    assert col.valid_values is None
+    assert col.valid_values_descriptions is None
+    assert col.pattern is None
+    assert col.computed is False
+    assert col.element_type is None
+    assert col.jsonb_schema is None
+    assert col.examples is None
+
+
 # =============================================================================
 # Test Relationship
 # =============================================================================
@@ -194,6 +287,159 @@ def test_table_schema_get_required_columns():
     assert "id" not in required  # Primary key excluded
     assert "description" not in required  # Nullable
     assert "created_at" not in required  # Has default
+
+
+def test_table_schema_get_enum_columns():
+    """Test extracting columns with valid_values (enum constraints)."""
+    table = TableSchema(
+        name="products",
+        columns={
+            "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False),
+            "product_type": ColumnSchema(
+                name="product_type",
+                type=ColumnType.VARCHAR,
+                nullable=False,
+                valid_values=["RAW_MATERIAL", "COMPONENT", "FINISHED_GOOD"]
+            ),
+            "status": ColumnSchema(
+                name="status",
+                type=ColumnType.VARCHAR,
+                nullable=False,
+                valid_values=["ACTIVE", "DRAFT", "DISCONTINUED"]
+            ),
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)
+        }
+    )
+
+    enum_cols = table.get_enum_columns()
+    assert "product_type" in enum_cols
+    assert "status" in enum_cols
+    assert "id" not in enum_cols
+    assert "name" not in enum_cols
+    assert enum_cols["product_type"] == ["RAW_MATERIAL", "COMPONENT", "FINISHED_GOOD"]
+
+
+def test_table_schema_get_computed_columns():
+    """Test extracting computed (readonly) columns."""
+    table = TableSchema(
+        name="inventory",
+        columns={
+            "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False),
+            "quantity_on_hand": ColumnSchema(
+                name="quantity_on_hand",
+                type=ColumnType.DECIMAL,
+                nullable=False
+            ),
+            "quantity_reserved": ColumnSchema(
+                name="quantity_reserved",
+                type=ColumnType.DECIMAL,
+                nullable=False
+            ),
+            "quantity_available": ColumnSchema(
+                name="quantity_available",
+                type=ColumnType.DECIMAL,
+                nullable=False,
+                computed=True
+            )
+        }
+    )
+
+    computed_cols = table.get_computed_columns()
+    assert "quantity_available" in computed_cols
+    assert "quantity_on_hand" not in computed_cols
+    assert "quantity_reserved" not in computed_cols
+
+
+def test_table_schema_get_pattern_columns():
+    """Test extracting columns with regex pattern constraints."""
+    table = TableSchema(
+        name="suppliers",
+        columns={
+            "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False),
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False),
+            "gstin": ColumnSchema(
+                name="gstin",
+                type=ColumnType.VARCHAR,
+                nullable=True,
+                pattern=r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
+            ),
+            "pan": ColumnSchema(
+                name="pan",
+                type=ColumnType.VARCHAR,
+                nullable=True,
+                pattern=r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$"
+            )
+        }
+    )
+
+    pattern_cols = table.get_pattern_columns()
+    assert "gstin" in pattern_cols
+    assert "pan" in pattern_cols
+    assert "name" not in pattern_cols
+    assert pattern_cols["pan"] == r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$"
+
+
+def test_table_schema_get_jsonb_schemas():
+    """Test extracting JSONB columns with their schemas."""
+    table = TableSchema(
+        name="products",
+        columns={
+            "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False),
+            "custom_attributes": ColumnSchema(
+                name="custom_attributes",
+                type=ColumnType.JSONB,
+                nullable=True,
+                jsonb_schema={
+                    "type": "object",
+                    "additionalProperties": True
+                }
+            ),
+            "metadata": ColumnSchema(
+                name="metadata",
+                type=ColumnType.JSONB,
+                nullable=True,
+                jsonb_schema={
+                    "type": "object",
+                    "properties": {"source": {"type": "string"}}
+                }
+            ),
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)
+        }
+    )
+
+    jsonb_schemas = table.get_jsonb_schemas()
+    assert "custom_attributes" in jsonb_schemas
+    assert "metadata" in jsonb_schemas
+    assert "name" not in jsonb_schemas
+    assert jsonb_schemas["custom_attributes"]["type"] == "object"
+
+
+def test_table_schema_get_enum_columns_empty():
+    """Test get_enum_columns returns empty dict when no enum columns."""
+    table = TableSchema(
+        name="simple",
+        columns={
+            "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False),
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)
+        }
+    )
+
+    enum_cols = table.get_enum_columns()
+    assert enum_cols == {}
+
+
+def test_table_schema_get_computed_columns_empty():
+    """Test get_computed_columns returns empty list when no computed columns."""
+    table = TableSchema(
+        name="simple",
+        columns={
+            "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False),
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)
+        }
+    )
+
+    computed_cols = table.get_computed_columns()
+    assert computed_cols == []
 
 
 # =============================================================================

@@ -6,12 +6,22 @@ and other dependencies across the test suite.
 
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+
+# =============================================================================
+# Disable LangChain/LangSmith tracing for tests
+# =============================================================================
+# Set environment variables before any LangChain imports to disable tracing
+# This prevents rate limit errors and speeds up test execution
+os.environ["LANGCHAIN_TRACING_V2"] = "false"
+os.environ["LANGSMITH_TRACING"] = "false"
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import MemorySaver
 

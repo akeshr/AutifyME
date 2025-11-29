@@ -437,6 +437,238 @@ class TestSchemaDiscoveryAndInspection:
         assert "samples" in table_data
 
     @pytest.mark.asyncio
+    async def test_inspect_constraints_detail(
+        self,
+        mock_storage,
+        mock_schema_registry
+    ):
+        """Test inspecting constraints (enum values, patterns, computed columns)."""
+        # Setup mock table with constraints
+        mock_registry = mock_schema_registry.return_value
+        mock_table = MagicMock()
+        mock_table.name = "products"
+        mock_table.columns = {
+            "product_type": MagicMock(
+                valid_values=["RAW_MATERIAL", "COMPONENT", "FINISHED_GOOD"],
+                valid_values_descriptions={
+                    "RAW_MATERIAL": "Purchased from suppliers",
+                    "COMPONENT": "Assembled from raw materials"
+                }
+            ),
+            "gstin": MagicMock(
+                pattern=r"^[0-9]{2}[A-Z]{5}",
+                examples=["27AAPFU0939F1ZV"]
+            ),
+            "quantity_available": MagicMock(computed=True),
+            "custom_attributes": MagicMock(
+                jsonb_schema={"type": "object", "additionalProperties": True}
+            )
+        }
+        mock_table.get_enum_columns = MagicMock(return_value={
+            "product_type": ["RAW_MATERIAL", "COMPONENT", "FINISHED_GOOD"]
+        })
+        mock_table.get_pattern_columns = MagicMock(return_value={
+            "gstin": r"^[0-9]{2}[A-Z]{5}"
+        })
+        mock_table.get_computed_columns = MagicMock(return_value=["quantity_available"])
+        mock_table.get_jsonb_schemas = MagicMock(return_value={
+            "custom_attributes": {"type": "object", "additionalProperties": True}
+        })
+        mock_registry.get_table = MagicMock(return_value=mock_table)
+
+        tool = create_inspect_schema_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "tables": ["products"],
+            "details": ["constraints"]
+        })
+
+        assert result["success"] is True
+        table_data = result["tables"]["products"]
+        assert "constraints" in table_data
+        constraints = table_data["constraints"]
+        assert "enum_columns" in constraints
+        assert "pattern_columns" in constraints
+        assert "computed_columns" in constraints
+        assert "jsonb_schemas" in constraints
+
+    @pytest.mark.asyncio
+    async def test_inspect_constraints_enum_values_with_descriptions(
+        self,
+        mock_storage,
+        mock_schema_registry
+    ):
+        """Test constraints include enum values with business descriptions."""
+        mock_registry = mock_schema_registry.return_value
+        mock_table = MagicMock()
+        mock_table.name = "products"
+        mock_table.columns = {
+            "status": MagicMock(
+                valid_values=["ACTIVE", "DRAFT", "DISCONTINUED"],
+                valid_values_descriptions={
+                    "ACTIVE": "Available for sale",
+                    "DRAFT": "Under development",
+                    "DISCONTINUED": "No longer available"
+                }
+            )
+        }
+        mock_table.get_enum_columns = MagicMock(return_value={
+            "status": ["ACTIVE", "DRAFT", "DISCONTINUED"]
+        })
+        mock_table.get_pattern_columns = MagicMock(return_value={})
+        mock_table.get_computed_columns = MagicMock(return_value=[])
+        mock_table.get_jsonb_schemas = MagicMock(return_value={})
+        mock_registry.get_table = MagicMock(return_value=mock_table)
+
+        tool = create_inspect_schema_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "tables": ["products"],
+            "details": ["constraints"]
+        })
+
+        assert result["success"] is True
+        constraints = result["tables"]["products"]["constraints"]
+        enum_cols = constraints["enum_columns"]
+        assert "status" in enum_cols
+        assert enum_cols["status"]["valid_values"] == ["ACTIVE", "DRAFT", "DISCONTINUED"]
+        assert "descriptions" in enum_cols["status"]
+
+    @pytest.mark.asyncio
+    async def test_inspect_constraints_pattern_with_examples(
+        self,
+        mock_storage,
+        mock_schema_registry
+    ):
+        """Test constraints include patterns with example values."""
+        mock_registry = mock_schema_registry.return_value
+        mock_table = MagicMock()
+        mock_table.name = "suppliers"
+        mock_table.columns = {
+            "gstin": MagicMock(
+                pattern=r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$",
+                examples=["27AAPFU0939F1ZV", "09AAACH7409R1ZZ"]
+            )
+        }
+        mock_table.get_enum_columns = MagicMock(return_value={})
+        mock_table.get_pattern_columns = MagicMock(return_value={
+            "gstin": r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
+        })
+        mock_table.get_computed_columns = MagicMock(return_value=[])
+        mock_table.get_jsonb_schemas = MagicMock(return_value={})
+        mock_registry.get_table = MagicMock(return_value=mock_table)
+
+        tool = create_inspect_schema_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "tables": ["suppliers"],
+            "details": ["constraints"]
+        })
+
+        assert result["success"] is True
+        constraints = result["tables"]["suppliers"]["constraints"]
+        pattern_cols = constraints["pattern_columns"]
+        assert "gstin" in pattern_cols
+        assert "pattern" in pattern_cols["gstin"]
+        assert "examples" in pattern_cols["gstin"]
+
+    @pytest.mark.asyncio
+    async def test_inspect_constraints_computed_columns_list(
+        self,
+        mock_storage,
+        mock_schema_registry
+    ):
+        """Test constraints list computed (readonly) columns."""
+        mock_registry = mock_schema_registry.return_value
+        mock_table = MagicMock()
+        mock_table.name = "inventory"
+        mock_table.columns = {
+            "quantity_available": MagicMock(computed=True),
+            "total_value": MagicMock(computed=True)
+        }
+        mock_table.get_enum_columns = MagicMock(return_value={})
+        mock_table.get_pattern_columns = MagicMock(return_value={})
+        mock_table.get_computed_columns = MagicMock(return_value=[
+            "quantity_available", "total_value"
+        ])
+        mock_table.get_jsonb_schemas = MagicMock(return_value={})
+        mock_registry.get_table = MagicMock(return_value=mock_table)
+
+        tool = create_inspect_schema_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "tables": ["inventory"],
+            "details": ["constraints"]
+        })
+
+        assert result["success"] is True
+        constraints = result["tables"]["inventory"]["constraints"]
+        computed_cols = constraints["computed_columns"]
+        assert "quantity_available" in computed_cols
+        assert "total_value" in computed_cols
+
+    @pytest.mark.asyncio
+    async def test_inspect_structure_includes_agent_critical_fields(
+        self,
+        mock_storage,
+        mock_schema_registry
+    ):
+        """Test structure includes agent-critical fields (valid_values, pattern, computed)."""
+        mock_registry = mock_schema_registry.return_value
+        mock_table = MagicMock()
+        mock_table.name = "products"
+        mock_table.description = "Product table"
+        mock_table.primary_key = "id"
+        mock_table.indexes = []
+        mock_table.columns = {
+            "id": MagicMock(
+                type="uuid",
+                nullable=False,
+                unique=True,
+                default=None,
+                max_length=None,
+                references=None,
+                description="Primary key",
+                valid_values=None,
+                pattern=None,
+                computed=False,
+                element_type=None,
+                examples=None
+            ),
+            "product_type": MagicMock(
+                type="varchar",
+                nullable=False,
+                unique=False,
+                default=None,
+                max_length=50,
+                references=None,
+                description="Type of product",
+                valid_values=["RAW_MATERIAL", "FINISHED_GOOD"],
+                pattern=None,
+                computed=False,
+                element_type=None,
+                examples=None
+            )
+        }
+        mock_table.get_required_columns = MagicMock(return_value=["product_type"])
+        mock_table.get_unique_columns = MagicMock(return_value=[])
+        mock_registry.get_table = MagicMock(return_value=mock_table)
+
+        tool = create_inspect_schema_tool(mock_storage)
+
+        result = await tool.ainvoke({
+            "tables": ["products"],
+            "details": ["structure"]
+        })
+
+        assert result["success"] is True
+        structure = result["tables"]["products"]["structure"]
+        columns = structure["columns"]
+        # Should include valid_values in column info
+        assert "valid_values" in columns["product_type"]
+        assert columns["product_type"]["valid_values"] == ["RAW_MATERIAL", "FINISHED_GOOD"]
+
+    @pytest.mark.asyncio
     async def test_inspect_multiple_tables(
         self,
         mock_storage,
