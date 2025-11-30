@@ -137,7 +137,7 @@ async def create_project_manager(
     specialist_llm = get_llm(
         provider="google",
         model="gemini-3-pro-preview",
-        temperature=0.3,
+        temperature=0.5,
     )
 
     # Domain Specialists
