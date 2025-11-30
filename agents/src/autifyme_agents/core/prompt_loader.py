@@ -15,7 +15,7 @@ def load_prompt(file_name: str) -> str:
 
     Args:
         file_name: The name of the prompt file, relative to the `prompts` directory.
-                   e.g., "specialists/cataloging_specialist.prompt"
+                   e.g., "specialists/catalog_specialist.prompt"
 
     Returns:
         The string content of the prompt template.

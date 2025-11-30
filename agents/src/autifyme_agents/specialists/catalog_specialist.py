@@ -19,7 +19,7 @@ Responsibilities:
 - Query catalog schema dynamically (inspect_schema)
 - Search catalog for duplicates (read_data with search_patterns)
 - Research product specs via web (research_product_tool)
-- Process product images (image_studio: analyze, edit, generate)
+- Process product images (image_studio: analyze, edit, generate via Gemini 3 Pro Image)
 - Generate complete operation plans (WriteIntent)
 - Execute mutations with HITL approval (write_data)
 - Self-review for completeness before submission
@@ -44,7 +44,7 @@ from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
+from autifyme_agents.tools.image_studio import create_image_studio_tool
 from autifyme_agents.tools.research_tools import (
     extract_web_content_tool,
     research_product_tool,
@@ -120,7 +120,7 @@ def create_catalog_specialist(
     Capabilities:
     - Schema-driven CRUD with HITL approval
     - Autonomous web research for product enrichment
-    - Image analysis for visual attribute extraction
+    - Image Studio for visual processing (analyze, edit, generate)
     - Duplicate detection via catalog search
     - Multi-table atomic transactions
     - Self-review pattern before HITL submission
@@ -165,9 +165,8 @@ def create_catalog_specialist(
     # Tool Configuration
     # ==========================================================================
 
-    # Core analysis and research tools
+    # Core research tools
     tools: list[Any] = [
-        image_analysis_tool,       # Visual attribute extraction
         research_product_tool,     # Web research for product enrichment
         extract_web_content_tool,  # Deep content extraction from URLs
     ]
@@ -214,7 +213,6 @@ def create_catalog_specialist(
 
     # Image Studio - Gemini 3 Pro Image (Nano Banana Pro)
     # Unified image processing: analyze, edit, generate
-    from autifyme_agents.tools.image_studio import create_image_studio_tool
     tools.append(create_image_studio_tool())
 
     # ==========================================================================
@@ -252,9 +250,3 @@ def create_catalog_specialist(
     return spec
 
 
-# =============================================================================
-# Backward Compatibility Alias
-# =============================================================================
-
-# Alias for gradual migration from product_architecture_specialist
-create_product_architecture_specialist = create_catalog_specialist

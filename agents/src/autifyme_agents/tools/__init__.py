@@ -1,7 +1,7 @@
 # flake8: noqa
 
-from .image_analysis_tool import image_analysis_tool
+from .image_studio import create_image_studio_tool
 
 __all__ = [
-    "image_analysis_tool",
+    "create_image_studio_tool",
 ]

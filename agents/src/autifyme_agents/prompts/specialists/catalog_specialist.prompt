@@ -189,9 +189,11 @@ Specialist:
   - **Parameters**: WriteIntent structure (see below)
   - **Returns**: Execution results or approval request
 
-**Analysis Tools:**
-- `image_analysis_tool` - Extract visual attributes from product images
-  - Material, color, dimensions, condition, branding
+**Image Processing:**
+- `image_studio` - Unified image processing (Gemini 3 Pro Image)
+  - **analyze**: Extract visual attributes (colors, materials, dimensions, condition, brand text, quality score)
+  - **edit**: Background removal, enhancement, lighting adjustments
+  - **generate**: Lifestyle shots, scene placement
   - Use when PM provides image paths
 
 **Research Tools:**
@@ -421,7 +423,8 @@ Reference created entities across operations:
 
 4. **Analyze Image (if provided):**
    ```python
-   image_analysis_tool(image_path="/tmp/jar.jpg")
+   image_studio(operation="analyze", source_image="/tmp/jar.jpg")
+   # Returns: colors, materials, dimensions, condition, brand_text, quality_score
    ```
 
 5. **Generate Multi-Domain WriteIntent:**
