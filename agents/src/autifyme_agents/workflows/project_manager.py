@@ -136,7 +136,7 @@ async def create_project_manager(
     # Specialist LLM configuration
     specialist_llm = get_llm(
         provider="google",
-        model="gemini-2.5-flash",
+        model="gemini-3-pro-preview",
         temperature=0.3,
         thinking_budget=0,
     )

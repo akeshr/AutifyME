@@ -1,24 +1,25 @@
 """Multimodal Injection Middleware - Transforms text messages to include images.
 
 Intercepts messages containing image paths and injects actual image data
-as multimodal content. Works for both:
+as multimodal content. Uses TWO interception points for reliability:
 
-1. **Input images** (HumanMessage from PM delegation)
-   - PM sends: "Process /tmp/photo.jpg"
-   - Specialist SEES the actual image
+1. **wrap_tool_call** - Intercepts tool output IMMEDIATELY after execution
+   - Parses structured tool response (dict) to extract image paths
+   - Injects images into ToolMessage before any serialization
+   - More reliable than regex parsing of JSON strings
 
-2. **Output images** (ToolMessage from tool results)
-   - image_studio returns: {"output_images": ["/tmp/result.png"]}
-   - Specialist SEES the generated/edited image
+2. **wrap_model_call** - Intercepts before LLM sees messages (fallback + input)
+   - Handles input images from PM delegation (HumanMessage)
+   - Falls back for any ToolMessage paths missed by wrap_tool_call
 
-This allows the specialist's LLM to SEE images directly (~258-1000 tokens)
-instead of receiving just text paths (which would be useless).
+Scenarios covered:
+- PM sends image path to specialist -> wrap_model_call injects into HumanMessage
+- Tool returns image path -> wrap_tool_call injects into ToolMessage
+- Tool output as string -> wrap_model_call regex fallback
 
 Architecture:
-- Intercepts ModelRequest.messages before each model call
-- Extracts image paths from HumanMessage and ToolMessage content
-- Loads and encodes images as base64 data URIs
-- Transforms message content to multimodal format
+- wrap_tool_call: Intercepts structured tool results, extracts paths from dict
+- wrap_model_call: Scans all messages, transforms to multimodal content
 - Specialist LLM receives [text + image] content blocks
 """
 
@@ -26,6 +27,7 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import logging
 import re
 from collections.abc import Awaitable, Callable
@@ -36,8 +38,10 @@ from langchain.agents.middleware.types import (
     AgentMiddleware,
     ModelRequest,
     ModelResponse,
+    ToolCallRequest,
 )
 from langchain_core.messages import HumanMessage, ToolMessage
+from langgraph.types import Command
 from PIL import Image
 
 logger = logging.getLogger(__name__)
@@ -150,10 +154,7 @@ def _extract_image_paths(text: str) -> list[str]:
     unique_paths: list[str] = []
     for match in matches:
         # match is a tuple of capture groups, one will be non-empty
-        if isinstance(match, tuple):
-            path = next((m for m in match if m), None)
-        else:
-            path = match
+        path = next((m for m in match if m), None) if isinstance(match, tuple) else match
 
         if not path:
             continue
@@ -166,6 +167,41 @@ def _extract_image_paths(text: str) -> list[str]:
             unique_paths.append(normalized)
 
     return unique_paths
+
+
+def _extract_paths_from_dict(data: dict[str, Any]) -> list[str]:
+    """Extract image paths from structured tool output (dict).
+
+    Recursively searches for 'path' keys in the tool output structure.
+    Handles image_studio output format: {"outputs": [{"path": "..."}]}
+
+    Args:
+        data: Structured tool output dictionary
+
+    Returns:
+        List of image paths found
+    """
+    paths: list[str] = []
+
+    def _recurse(obj: Any) -> None:
+        if isinstance(obj, dict):
+            # Check for 'path' key that looks like an image path
+            if "path" in obj:
+                path_val = obj["path"]
+                if isinstance(path_val, str) and any(
+                    path_val.lower().endswith(ext)
+                    for ext in (".jpg", ".jpeg", ".png", ".gif", ".webp")
+                ):
+                    paths.append(path_val)
+            # Recurse into all values
+            for value in obj.values():
+                _recurse(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                _recurse(item)
+
+    _recurse(data)
+    return paths
 
 
 def _transform_to_multimodal(
@@ -339,3 +375,128 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         # Process messages to inject images
         request.messages = self._process_messages(request.messages)
         return await handler(request)
+
+    # =========================================================================
+    # Tool-level interception (more reliable for tool outputs)
+    # =========================================================================
+
+    def _process_tool_result(
+        self,
+        result: ToolMessage | Command,
+        tool_name: str | None,
+    ) -> ToolMessage | Command:
+        """Process tool result to inject images.
+
+        Called immediately after tool execution, before any serialization.
+        This is more reliable than parsing JSON strings in wrap_model_call.
+
+        Args:
+            result: Tool execution result
+            tool_name: Name of the tool that was called
+
+        Returns:
+            Modified result with images injected if applicable
+        """
+        if not self.enabled:
+            return result
+
+        # Only process ToolMessage (not Command)
+        if not isinstance(result, ToolMessage):
+            return result
+
+        image_paths: list[str] = []
+
+        # Try structured extraction first (more reliable)
+        if isinstance(result.content, dict):
+            image_paths = _extract_paths_from_dict(result.content)
+            if image_paths:
+                logger.info(
+                    "Extracting %d image(s) from structured tool output: %s",
+                    len(image_paths),
+                    tool_name or "unknown",
+                    extra={"paths": image_paths}
+                )
+                # Convert dict to JSON string for multimodal transformation
+                text_content = json.dumps(result.content, indent=2)
+                multimodal_content = _transform_to_multimodal(text_content, image_paths)
+                return ToolMessage(
+                    content=multimodal_content,
+                    tool_call_id=result.tool_call_id,
+                    name=result.name,
+                )
+
+        # Fallback to string extraction
+        elif isinstance(result.content, str):
+            image_paths = _extract_image_paths(result.content)
+            if image_paths:
+                logger.info(
+                    "Extracting %d image(s) from string tool output: %s",
+                    len(image_paths),
+                    tool_name or "unknown",
+                    extra={"paths": image_paths}
+                )
+                multimodal_content = _transform_to_multimodal(
+                    result.content, image_paths
+                )
+                return ToolMessage(
+                    content=multimodal_content,
+                    tool_call_id=result.tool_call_id,
+                    name=result.name,
+                )
+
+        return result
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        """Intercept tool call and inject images into the result.
+
+        This runs IMMEDIATELY after tool execution, allowing us to work
+        with structured data before any serialization happens.
+
+        Args:
+            request: The tool call request
+            handler: The next handler in the chain
+
+        Returns:
+            Tool result with images injected
+        """
+        # Execute the tool
+        result = handler(request)
+
+        # Get tool name for logging
+        tool_name = request.tool.name if request.tool else None
+
+        # Only process image-producing tools
+        if tool_name in ("image_studio", "view_image"):
+            return self._process_tool_result(result, tool_name)
+
+        return result
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+    ) -> ToolMessage | Command:
+        """(async) Intercept tool call and inject images into the result.
+
+        Args:
+            request: The tool call request
+            handler: The next handler in the chain
+
+        Returns:
+            Tool result with images injected
+        """
+        # Execute the tool
+        result = await handler(request)
+
+        # Get tool name for logging
+        tool_name = request.tool.name if request.tool else None
+
+        # Only process image-producing tools
+        if tool_name in ("image_studio", "view_image"):
+            return self._process_tool_result(result, tool_name)
+
+        return result
