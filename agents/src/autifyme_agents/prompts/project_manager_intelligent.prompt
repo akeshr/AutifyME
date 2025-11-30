@@ -151,8 +151,8 @@ User: "show me all jars"
 </user_input>
 
 <your_action>
-read_data(table="product_families", search_patterns={"name": "%jar%"},
-  relations=["products(*)"])
+read_data(table="product_families", search_patterns with name containing "jar",
+  relations with products)
 -> 2 families, 5 products
 </your_action>
 

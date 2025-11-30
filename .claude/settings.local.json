@@ -61,7 +61,9 @@
       "Bash(powershell:*)",
       "Bash(uv lock:*)",
       "Skill(specialist-creation)",
-      "Skill(prompt-engineering)"
+      "Skill(prompt-engineering)",
+      "Bash(cmd /c \"tree /F /A c:\\Abhi\\personal\\self\\AutifyME\")",
+      "Bash(sort:*)"
     ],
     "deny": [],
     "ask": []
