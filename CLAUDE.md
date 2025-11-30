@@ -65,17 +65,12 @@ Every change—whether design, architecture, or code—must meet this standard:
 
 ### LangChain & Agent Patterns
 - Default to LangChain v1 native patterns (structured outputs, ToolStrategy, middleware-based HITL)
-- Use `create_agent` for specialists, `create_deep_agent` for orchestrators, maintain `{messages}`/`{agent_scratchpad}` contract
-- HITL via DeepAgents `tool_configs` + HumanInTheLoopMiddleware (not interrupt_before/after)
-- Delegate cross-cutting concerns to middleware (tools stay focused, reusable, context-light)
-- Design specialists/tools for single responsibility and reuse across workflows
-- Use multimodal payloads, avoid brittle prompt hacks
+- Use `create_agent` for specialists, `create_deep_agent` for orchestrators
+- HITL via DeepAgents `tool_configs` + HumanInTheLoopMiddleware
+- Delegate cross-cutting concerns to middleware
 
 ### Tool Development Standards
-- **[CRITICAL] ATOMIC Tools:** Each tool does ONE thing powerfully and completely - no partial operations, no orchestration within tools
-- **[CRITICAL] Always use StructuredTool:** All tools must be built using `StructuredTool.from_function()` with Pydantic schemas for input/output validation
-- **Rich return values:** Tools return structured, actionable data that enables agent reasoning
-- **No side-channel communication:** Tools communicate only through their defined inputs/outputs
+- **[CRITICAL] ATOMIC + StructuredTool:** One thing powerfully, Pydantic schemas, structured returns
 
 ### Autonomous Behavior Standards
 - **Dynamic Planning:** Agents analyze context and plan adaptively, not follow rigid recipes
@@ -86,13 +81,8 @@ Every change—whether design, architecture, or code—must meet this standard:
 - **Learning Orientation:** System should improve from past executions
 
 ### Prompt Engineering for Autonomy
-- **Version prompts alongside code** - avoid hardcoded instructions in agent logic
-- **Follow `docs/architecture/tech/PROMPT_ENGINEERING_STANDARDS.md`** - no Python code in prompts, use XML structure, canonical examples, right altitude for hierarchy level
-- **Design for autonomy, not recipes:** Prompts should enable dynamic decision-making, not prescribe rigid execution sequences
-- **PM prompts enable planning:** Analyze context first, then plan adaptively (not "Phase 1→2→3")
-- **Specialist prompts enable adaptation:** Handle missing data, self-review outputs, iterate when confidence is low
-- **Avoid hardcoded orchestration:** Let agents decide sequence based on available data and dependencies
-- **Enable transparent failures:** Agents should flag limitations and adapt, not silently fail or rigidly error
+- **Version prompts alongside code** - no hardcoded instructions in agent logic
+- **XML structure, right altitude, canonical examples** - no Python code in prompts
 
 ### Documentation & Libraries
 - Update architectural docs in lockstep with major decisions
