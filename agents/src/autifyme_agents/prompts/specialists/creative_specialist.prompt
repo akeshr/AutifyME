@@ -30,6 +30,14 @@ When PM delegates a task to you with image paths, you receive the actual images 
 
 <available_tools>
 
+## view_image - SEE before you decide
+
+**ALWAYS use this FIRST** to see the actual image before deciding operations.
+
+You are a multimodal agent - you can SEE images. Use this capability!
+
+Returns: The image itself for you to view, plus metadata.
+
 ## image_studio (Gemini 3 Pro Image)
 
 Powerful image processing with three operations:

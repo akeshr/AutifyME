@@ -50,6 +50,7 @@ def create_creative_specialist(
     system_prompt = load_prompt("specialists/creative_specialist.prompt")
 
     tools: list[Any] = [
+        create_view_image_tool(),  # View first, then process
         create_image_studio_tool(),
     ]
 
