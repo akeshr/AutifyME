@@ -345,6 +345,13 @@ class ImageStudioInput(BaseModel):
 # =============================================================================
 
 
+class CustomAttribute(BaseModel):
+    """Key-value pair for custom attributes (Gemini-compatible)."""
+
+    name: str = Field(description="Attribute name")
+    value: str = Field(description="Attribute value")
+
+
 class ProductDetection(BaseModel):
     """Single product detected in multi-product image."""
 
@@ -388,7 +395,10 @@ class AnalysisResult(BaseModel):
     background_type: str | None = None
     quality_score: float = Field(ge=0.0, le=1.0, default=0.0)
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
-    custom_attributes: dict = Field(default_factory=dict)
+    custom_attributes: list[CustomAttribute] = Field(
+        default_factory=list,
+        description="Custom extracted attributes as key-value pairs"
+    )
 
     # Multi-product detection
     product_count: int = Field(default=1, description="Number of products detected")
@@ -444,9 +454,9 @@ class ImageStudioOutput(BaseModel):
     analysis: AnalysisResult | None = None
 
     # For asset creation (suggested data for WriteIntent)
-    suggested_asset_data: dict | None = Field(
+    suggested_asset_data: str | None = Field(
         default=None,
-        description="Pre-populated asset record for WriteIntent"
+        description="JSON string with pre-populated asset record for WriteIntent"
     )
 
     # Warnings, errors, and guidance
