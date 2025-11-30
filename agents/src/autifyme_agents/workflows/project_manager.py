@@ -138,7 +138,6 @@ async def create_project_manager(
         provider="google",
         model="gemini-3-pro-preview",
         temperature=0.3,
-        thinking_budget=0,
     )
 
     # Domain Specialists
