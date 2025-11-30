@@ -1,16 +1,23 @@
 """Multimodal Injection Middleware - Transforms text messages to include images.
 
-When PM delegates to a specialist with image paths in the description,
-this middleware intercepts the incoming HumanMessage and injects the
-actual image data as multimodal content.
+Intercepts messages containing image paths and injects actual image data
+as multimodal content. Works for both:
 
-This allows the specialist's LLM to SEE images directly (~258 tokens)
-instead of receiving just a text path.
+1. **Input images** (HumanMessage from PM delegation)
+   - PM sends: "Process /tmp/photo.jpg"
+   - Specialist SEES the actual image
+
+2. **Output images** (ToolMessage from tool results)
+   - image_studio returns: {"output_images": ["/tmp/result.png"]}
+   - Specialist SEES the generated/edited image
+
+This allows the specialist's LLM to SEE images directly (~258-1000 tokens)
+instead of receiving just text paths (which would be useless).
 
 Architecture:
-- Intercepts incoming HumanMessage before model call
-- Extracts image paths using regex pattern
-- Loads and encodes images as base64
+- Intercepts ModelRequest.messages before each model call
+- Extracts image paths from HumanMessage and ToolMessage content
+- Loads and encodes images as base64 data URIs
 - Transforms message content to multimodal format
 - Specialist LLM receives [text + image] content blocks
 """
@@ -30,7 +37,7 @@ from langchain.agents.middleware.types import (
     ModelRequest,
     ModelResponse,
 )
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 from PIL import Image
 
 logger = logging.getLogger(__name__)
@@ -205,8 +212,12 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
     def _process_messages(self, messages: list[Any]) -> list[Any]:
         """Process messages to inject images.
 
-        Looks for HumanMessage with text content containing image paths,
-        and transforms them to multimodal content.
+        Looks for HumanMessage and ToolMessage with text content containing
+        image paths, and transforms them to multimodal content.
+
+        This allows the specialist to:
+        1. SEE input images from PM delegation (HumanMessage)
+        2. SEE output images from tool results (ToolMessage)
 
         Args:
             messages: List of messages
@@ -223,7 +234,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                 image_paths = _extract_image_paths(msg.content)
                 if image_paths:
                     logger.info(
-                        "Injecting %d image(s) into message",
+                        "Injecting %d image(s) into HumanMessage",
                         len(image_paths),
                         extra={"paths": image_paths}
                     )
@@ -232,6 +243,28 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                     )
                     # Create new HumanMessage with multimodal content
                     processed.append(HumanMessage(content=multimodal_content))
+                else:
+                    processed.append(msg)
+            elif isinstance(msg, ToolMessage) and isinstance(msg.content, str):
+                # Also inject images from tool responses (e.g., image_studio output)
+                image_paths = _extract_image_paths(msg.content)
+                if image_paths:
+                    logger.info(
+                        "Injecting %d image(s) into ToolMessage from %s",
+                        len(image_paths),
+                        msg.name or "unknown tool",
+                        extra={"paths": image_paths}
+                    )
+                    multimodal_content = _transform_to_multimodal(
+                        msg.content, image_paths
+                    )
+                    # Create new ToolMessage with multimodal content
+                    # Preserve tool_call_id which is required for ToolMessage
+                    processed.append(ToolMessage(
+                        content=multimodal_content,
+                        tool_call_id=msg.tool_call_id,
+                        name=msg.name,
+                    ))
                 else:
                     processed.append(msg)
             else:
