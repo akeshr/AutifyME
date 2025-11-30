@@ -71,8 +71,15 @@ Every change—whether design, architecture, or code—must meet this standard:
 - Design specialists/tools for single responsibility and reuse across workflows
 - Use multimodal payloads, avoid brittle prompt hacks
 
+### Tool Development Standards
+- **[CRITICAL] ATOMIC Tools:** Each tool does ONE thing powerfully and completely - no partial operations, no orchestration within tools
+- **[CRITICAL] Always use StructuredTool:** All tools must be built using `StructuredTool.from_function()` with Pydantic schemas for input/output validation
+- **Rich return values:** Tools return structured, actionable data that enables agent reasoning
+- **No side-channel communication:** Tools communicate only through their defined inputs/outputs
+
 ### Autonomous Behavior Standards
 - **Dynamic Planning:** Agents analyze context and plan adaptively, not follow rigid recipes
+- **Suggestive Agents:** Agents come to the user with details, options, and recommendations - not wait passively for everything to be specified
 - **Graceful Adaptation:** Handle missing data, tool failures, and edge cases with fallback strategies
 - **Self-Review:** Critique outputs before returning; iterate when confidence is low
 - **Transparent Communication:** Flag limitations, assumptions, and data gaps clearly
@@ -80,7 +87,7 @@ Every change—whether design, architecture, or code—must meet this standard:
 
 ### Prompt Engineering for Autonomy
 - **Version prompts alongside code** - avoid hardcoded instructions in agent logic
-- **Follow `PROMPT_ENGINEERING_STANDARDS.md`** - no Python code in prompts, use XML structure, canonical examples, right altitude for hierarchy level
+- **Follow `docs/architecture/tech/PROMPT_ENGINEERING_STANDARDS.md`** - no Python code in prompts, use XML structure, canonical examples, right altitude for hierarchy level
 - **Design for autonomy, not recipes:** Prompts should enable dynamic decision-making, not prescribe rigid execution sequences
 - **PM prompts enable planning:** Analyze context first, then plan adaptively (not "Phase 1→2→3")
 - **Specialist prompts enable adaptation:** Handle missing data, self-review outputs, iterate when confidence is low
@@ -150,21 +157,27 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 
 ### Common Gotchas
 
-**LangChain v1**:
-- Prerelease stack (`langchain==1.0.0`, `langgraph==1.0.0`, `deepagents==0.1.4`)
-- APIs unstable; verify with `inspect`/`dir` before use
+**LangChain v1 Stack**:
+- Stable releases: `langchain>=1.0.2`, `langgraph>=1.0.1`, `deepagents>=0.2.4`
+- Verify APIs with `inspect`/`dir` before depending on them
 
 **Windows**:
 - Use `.venv\Scripts\activate` (not `source`)
 - Git line endings: LF (`.gitattributes`)
 
 **Error Handling**:
-- Tools must raise `ToolException` (prevents infinite loops)
+- Tools NEVER raise exceptions - return structured dicts with `{"success": bool, "error": ...}`
+- Use `build_agent_error_response()` from `core.tool_error_handler` for consistent error handling
+- Error responses include actionable guidance enabling agents to reason and retry intelligently
+
+**Console Output**:
+- Always use `safe_print` instead of `print` for CLI/test output
+
+**Testing**:
+- Always use the autonomous testing framework for test scenarios (not manual scripts)
 
 ### Quick Navigation
 
 - **Project Status**: `README.md`
 - **Architecture Docs**: `docs/architecture/README.md` (navigation hub)
 - **LangSmith Traces**: https://smith.langchain.com
-- Always use `safe_print` instead of `print`
-- Always use testing framework for test scenarios
