@@ -1,7 +1,7 @@
 """Image Studio Tool - Pydantic Schemas.
 
 Comprehensive input/output schemas for Gemini 3 Pro Image operations.
-Supports: analyze, edit, generate with full multi-product handling.
+Supports: edit, generate with full multi-product handling.
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ from pydantic import BaseModel, Field
 class ImageOperation(str, Enum):
     """Supported image operations."""
 
-    ANALYZE = "analyze"    # Extract visual attributes, detect multiple products
     EDIT = "edit"          # Modify image: background, enhance, extract, crop
     GENERATE = "generate"  # Create new image: lifestyle, studio, composite
 
@@ -156,37 +155,6 @@ class FocusRegionSpec(BaseModel):
     )
 
 
-class AnalysisAttributes(BaseModel):
-    """Configuration for analyze operation - what to extract.
-
-    Enable all relevant attributes for comprehensive product analysis.
-    """
-
-    colors: bool = Field(default=True, description="Extract dominant colors")
-    materials: bool = Field(default=True, description="Identify materials")
-    dimensions: bool = Field(default=True, description="Estimate dimensions from visual cues")
-    condition: bool = Field(default=True, description="Assess condition (new, used, damaged)")
-    brand_text: bool = Field(default=True, description="Extract visible text, logos, brand names")
-    product_category: bool = Field(default=True, description="Classify product type")
-    quality_score: bool = Field(default=True, description="Rate image quality 0-1")
-    background_type: bool = Field(default=True, description="Identify background type")
-
-    # Multi-product analysis
-    detect_all_products: bool = Field(
-        default=True,
-        description="Detect and list ALL products in image (for group photos)"
-    )
-    identify_variants: bool = Field(
-        default=True,
-        description="Identify product variants (size, color, etc.)"
-    )
-
-    custom_attributes: list[str] = Field(
-        default_factory=list,
-        description="Additional attributes: ['certifications', 'packaging_type', 'target_age']"
-    )
-
-
 class OutputSpec(BaseModel):
     """Output configuration for generated/edited images."""
 
@@ -210,12 +178,6 @@ class ImageStudioInput(BaseModel):
 
     CAPABILITIES (Gemini 3 Pro Image):
 
-    ANALYZE:
-    - Single product: Extract all visual attributes
-    - Multi-product group: Detect ALL products, list positions, identify variants
-    - Quality assessment: Score image quality, suggest improvements
-    - Text extraction: All visible text, logos, brand names
-
     EDIT:
     - Background: Remove, replace solid/gradient, blur, or generate scene
     - Extract product: Isolate specific product from group photo
@@ -231,20 +193,7 @@ class ImageStudioInput(BaseModel):
 
     EXAMPLES:
 
-    1. Analyze group photo with multiple variants:
-    ```python
-    ImageStudioInput(
-        operation="analyze",
-        source_image="/tmp/group.jpg",
-        analysis=AnalysisAttributes(
-            detect_all_products=True,
-            identify_variants=True,
-            custom_attributes=["variant_size", "variant_color"]
-        )
-    )
-    ```
-
-    2. Extract single product from group:
+    1. Extract single product from group:
     ```python
     ImageStudioInput(
         operation="edit",
@@ -259,7 +208,7 @@ class ImageStudioInput(BaseModel):
     )
     ```
 
-    3. Remove background and enhance:
+    2. Remove background and enhance:
     ```python
     ImageStudioInput(
         operation="edit",
@@ -274,7 +223,7 @@ class ImageStudioInput(BaseModel):
     )
     ```
 
-    4. Generate lifestyle shot:
+    3. Generate lifestyle shot:
     ```python
     ImageStudioInput(
         operation="generate",
@@ -294,21 +243,21 @@ class ImageStudioInput(BaseModel):
     )
     ```
 
-    5. Complex edit with custom instruction:
+    4. Complex edit with custom instruction:
     ```python
     ImageStudioInput(
         operation="edit",
         source_image="/tmp/group.jpg",
-        custom_instruction="Extract each of the 3 jar variants separately and create individual product shots with white background",
+        custom_instruction="Extract each of the 3 jar variants separately",
         output=OutputSpec(format="PNG")
     )
     ```
     """
 
-    operation: ImageOperation = Field(description="Operation: analyze, edit, generate")
+    operation: ImageOperation = Field(description="Operation: edit or generate")
     source_image: str | None = Field(
         default=None,
-        description="Path to source image (required for analyze/edit, optional for generate)"
+        description="Path to source image (required for edit, optional for generate)"
     )
     reference_images: list[str] = Field(
         default_factory=list,
@@ -333,7 +282,6 @@ class ImageStudioInput(BaseModel):
     enhancement: EnhancementSpec | None = None
     scene: SceneSpec | None = None
     placement: ProductPlacement | None = None
-    analysis: AnalysisAttributes | None = None
     extraction: ExtractionSpec | None = None
     focus: FocusRegionSpec | None = None
 
@@ -345,30 +293,6 @@ class ImageStudioInput(BaseModel):
 # =============================================================================
 
 
-class CustomAttribute(BaseModel):
-    """Key-value pair for custom attributes (Gemini-compatible)."""
-
-    name: str = Field(description="Attribute name")
-    value: str = Field(description="Attribute value")
-
-
-class ProductDetection(BaseModel):
-    """Single product detected in multi-product image."""
-
-    index: int = Field(description="Product index (1-based)")
-    description: str = Field(description="Brief description of this product")
-    position: str = Field(description="Position in image: left, center, right, top, bottom")
-    relative_size: Literal["largest", "medium", "smallest"] = "medium"
-    distinguishing_features: list[str] = Field(
-        default_factory=list,
-        description="Features that distinguish this from others: color, size, label"
-    )
-    suggested_extraction: str = Field(
-        default="",
-        description="Suggested extraction description for this product"
-    )
-
-
 class ImageMetadata(BaseModel):
     """Metadata for generated/edited images."""
 
@@ -377,55 +301,6 @@ class ImageMetadata(BaseModel):
     format: str
     size_bytes: int
     aspect_ratio: str
-
-
-class AnalysisResult(BaseModel):
-    """Result from analyze operation.
-
-    For multi-product images, product_inventory lists each detected product.
-    """
-
-    # Single-product attributes
-    colors: list[str] = Field(default_factory=list)
-    materials: list[str] = Field(default_factory=list)
-    dimensions: str | None = None
-    condition: str | None = None
-    brand_text: list[str] = Field(default_factory=list)
-    product_category: str | None = None
-    background_type: str | None = None
-    quality_score: float = Field(ge=0.0, le=1.0, default=0.0)
-    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
-    custom_attributes: list[CustomAttribute] = Field(
-        default_factory=list,
-        description="Custom extracted attributes as key-value pairs"
-    )
-
-    # Multi-product detection
-    product_count: int = Field(default=1, description="Number of products detected")
-    multi_product_warning: str | None = Field(
-        default=None,
-        description="Warning and guidance for multi-product images"
-    )
-    product_inventory: list[ProductDetection] = Field(
-        default_factory=list,
-        description="Detailed inventory of each product detected"
-    )
-
-    # Variant detection
-    detected_variants: list[str] = Field(
-        default_factory=list,
-        description="Variant types detected: '500ml red', '1L blue', etc."
-    )
-    variant_axis: str | None = Field(
-        default=None,
-        description="Primary variant axis if detected: Size, Color, Material"
-    )
-
-    # Recommendations
-    suggested_operations: list[str] = Field(
-        default_factory=list,
-        description="Recommended follow-up operations: 'Extract each variant', 'Remove background'"
-    )
 
 
 class OutputVariant(BaseModel):
@@ -449,9 +324,6 @@ class ImageStudioOutput(BaseModel):
 
     # For generate/edit operations
     outputs: list[OutputVariant] = Field(default_factory=list)
-
-    # For analyze operation
-    analysis: AnalysisResult | None = None
 
     # For asset creation (suggested data for WriteIntent)
     suggested_asset_data: str | None = Field(

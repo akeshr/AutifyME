@@ -1,21 +1,17 @@
-"""Image Studio Tool - Gemini 3 Pro Image (Nano Banana Pro) integration.
+"""Image Studio Tool - Gemini 3 Pro Image integration.
 
 Unified tool for product image operations:
-- analyze: Extract visual attributes
-- edit: Background removal, enhancement, cleanup
+- edit: Background removal, enhancement, extraction, cleanup
 - generate: Lifestyle shots, scene placement
 
 Architecture: Single atomic tool with structured Pydantic schema.
-One powerful LLM = One powerful tool.
-
-Note: Specialists see images via MultimodalInjectionMiddleware (not view_image tool).
 """
 
 from autifyme_agents.tools.image_studio.schemas import (
-    AnalysisAttributes,
-    AnalysisResult,
     BackgroundSpec,
     EnhancementSpec,
+    ExtractionSpec,
+    FocusRegionSpec,
     FramingSpec,
     ImageMetadata,
     ImageOperation,
@@ -41,12 +37,12 @@ __all__ = [
     "EnhancementSpec",
     "SceneSpec",
     "ProductPlacement",
-    "AnalysisAttributes",
+    "ExtractionSpec",
+    "FocusRegionSpec",
     "OutputSpec",
     "ImageStudioInput",
     # Output schemas
     "ImageMetadata",
-    "AnalysisResult",
     "OutputVariant",
     "ImageStudioOutput",
     # Error codes

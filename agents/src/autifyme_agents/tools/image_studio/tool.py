@@ -1,7 +1,6 @@
-"""Image Studio Tool - Comprehensive image processing with Gemini 3 Pro Image.
+"""Image Studio Tool - Image editing and generation with Gemini 3 Pro Image.
 
 Operations:
-- analyze: Extract attributes, detect multiple products, identify variants
 - edit: Background removal, extraction from groups, enhancement, reframing
 - generate: Lifestyle shots, studio shots, scene composites
 
@@ -29,8 +28,6 @@ from autifyme_agents.core.tool_error_handler import (
     build_success_response,
 )
 from autifyme_agents.tools.image_studio.schemas import (
-    AnalysisAttributes,
-    AnalysisResult,
     BackgroundSpec,
     EnhancementSpec,
     ExtractionSpec,
@@ -67,18 +64,8 @@ GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 # =============================================================================
 
 
-def _get_gemini3_image_llm(
-    output_spec: OutputSpec | None = None,
-    for_analysis: bool = False,
-):
+def _get_gemini3_image_llm(output_spec: OutputSpec | None = None):
     """Get Gemini 3 Pro Image LLM with proper configuration."""
-    if for_analysis:
-        return get_llm(
-            provider="google",
-            model=GEMINI_3_IMAGE_MODEL,
-            response_modalities=["TEXT"],
-        )
-
     aspect_ratio = output_spec.aspect_ratio if output_spec else "1:1"
     if aspect_ratio == "original":
         aspect_ratio = "1:1"  # Fallback for generation
@@ -204,80 +191,6 @@ def _extract_image_from_response(response: Any) -> str | None:
 # =============================================================================
 # Prompt Builders
 # =============================================================================
-
-
-def _build_analyze_prompt(input_spec: ImageStudioInput) -> str:
-    """Build comprehensive analysis prompt."""
-    analysis = input_spec.analysis or AnalysisAttributes()
-    sections = []
-
-    # Standard attributes
-    if analysis.colors:
-        sections.append("COLORS: List all dominant colors (e.g., 'transparent', 'amber', 'red', 'blue')")
-    if analysis.materials:
-        sections.append("MATERIALS: Identify materials (e.g., 'PET plastic', 'glass', 'aluminum', 'paper')")
-    if analysis.dimensions:
-        sections.append("DIMENSIONS: Estimate size/dimensions from visual cues, labels, or context")
-    if analysis.condition:
-        sections.append("CONDITION: Assess condition (new, used, damaged, worn)")
-    if analysis.brand_text:
-        sections.append("BRAND_TEXT: Extract ALL visible text, logos, brand names, labels")
-    if analysis.product_category:
-        sections.append("PRODUCT_CATEGORY: Classify product type (jar, bottle, container, box, etc.)")
-    if analysis.quality_score:
-        sections.append("QUALITY_SCORE: Rate image quality 0.0-1.0 (consider lighting, focus, composition, resolution)")
-    if analysis.background_type:
-        sections.append("BACKGROUND_TYPE: Describe background (solid white, cluttered, gradient, transparent, natural)")
-
-    # Custom attributes
-    for attr in analysis.custom_attributes:
-        sections.append(f"CUSTOM - {attr.upper()}: Extract {attr}")
-
-    # Multi-product detection (CRITICAL)
-    multi_product_section = """
-MULTI-PRODUCT DETECTION (CRITICAL):
-- PRODUCT_COUNT: Count ALL distinct products/items in image (not just 1!)
-- For EACH product found, add to product_inventory:
-  - index: Product number (1, 2, 3...)
-  - description: Brief description ("500ml red jar", "1L clear bottle")
-  - position: Where in image ("left", "center", "right", "top", "bottom", "foreground")
-  - relative_size: "largest", "medium", or "smallest"
-  - distinguishing_features: What makes this unique ["red cap", "500ml label", "square shape"]
-  - suggested_extraction: How to extract this ("the red jar on the left", "the largest bottle")
-"""
-
-    variant_section = ""
-    if analysis.identify_variants:
-        variant_section = """
-VARIANT DETECTION:
-- detected_variants: List each variant found (e.g., ["500ml clear", "1L clear", "500ml amber"])
-- variant_axis: Primary differentiation axis (Size, Color, Material, Shape)
-"""
-
-    recommendations_section = """
-RECOMMENDATIONS:
-- suggested_operations: List recommended follow-up operations based on what you see:
-  - If multiple products: ["Extract each product individually", "Create separate images for each variant"]
-  - If poor quality: ["Enhance image quality", "Improve lighting"]
-  - If cluttered background: ["Remove background", "Replace with solid white"]
-"""
-
-    return f"""Analyze this product image COMPREHENSIVELY.
-
-ATTRIBUTES TO EXTRACT:
-{chr(10).join(f'- {s}' for s in sections)}
-
-{multi_product_section}
-{variant_section}
-{recommendations_section}
-
-IMPORTANT: If you see multiple products/variants in ONE image, you MUST:
-1. Set product_count to the actual number (2, 3, 4, etc.)
-2. Fill product_inventory with details for EACH product
-3. Set multi_product_warning explaining what you found
-4. Suggest extraction operations for each product
-
-Return structured JSON matching the AnalysisResult schema."""
 
 
 def _build_edit_prompt(input_spec: ImageStudioInput) -> str:
@@ -442,97 +355,6 @@ def _build_generate_prompt(input_spec: ImageStudioInput) -> str:
 # =============================================================================
 # Operation Handlers
 # =============================================================================
-
-
-def _handle_analyze(input_spec: ImageStudioInput) -> ImageStudioOutput:
-    """Handle analyze operation with comprehensive multi-product detection."""
-    if not input_spec.source_image:
-        return ImageStudioOutput(
-            success=False,
-            operation=ImageOperation.ANALYZE,
-            error="source_image required for analyze operation",
-            error_code=ImageStudioErrorCode.INVALID_INPUT,
-        )
-
-    try:
-        image_uri, _ = _load_and_encode_image(input_spec.source_image)
-        llm = _get_gemini3_image_llm(for_analysis=True)
-        prompt = _build_analyze_prompt(input_spec)
-
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": image_uri}},
-                ],
-            }
-        ]
-
-        structured_llm = llm.with_structured_output(
-            AnalysisResult,
-            method="json_schema",
-            include_raw=False,
-        )
-
-        result = structured_llm.invoke(messages)
-
-        if isinstance(result, dict):
-            result = AnalysisResult(**result)
-
-        # Build warnings and next_steps
-        warnings = []
-        next_steps = []
-
-        if result.quality_score < 0.5:
-            warnings.append(f"Low image quality score: {result.quality_score:.2f}")
-            next_steps.append("Consider enhancing image quality before cataloging")
-
-        if result.product_count > 1:
-            warnings.append(f"Multiple products detected: {result.product_count}")
-            result.multi_product_warning = (
-                f"Image contains {result.product_count} products. "
-                "Use extraction to create individual product images."
-            )
-            # Add extraction suggestions for each product
-            for product in result.product_inventory:
-                next_steps.append(
-                    f"Extract product {product.index}: {product.suggested_extraction}"
-                )
-
-        # Add any suggested operations from analysis
-        next_steps.extend(result.suggested_operations)
-
-        return ImageStudioOutput(
-            success=True,
-            operation=ImageOperation.ANALYZE,
-            analysis=result,
-            warnings=warnings,
-            next_steps=next_steps,
-        )
-
-    except FileNotFoundError as e:
-        return ImageStudioOutput(
-            success=False,
-            operation=ImageOperation.ANALYZE,
-            error=str(e),
-            error_code=ImageStudioErrorCode.FILE_NOT_FOUND,
-        )
-    except ValueError as e:
-        return ImageStudioOutput(
-            success=False,
-            operation=ImageOperation.ANALYZE,
-            error=str(e),
-            error_code=ImageStudioErrorCode.CORRUPT_FILE,
-        )
-    except Exception as e:
-        logger.exception("Analyze operation failed")
-        return ImageStudioOutput(
-            success=False,
-            operation=ImageOperation.ANALYZE,
-            error=str(e),
-            error_code=ImageStudioErrorCode.API_ERROR,
-        )
 
 
 def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
@@ -710,7 +532,6 @@ def _image_studio_impl(
     enhancement: dict | None = None,
     scene: dict | None = None,
     placement: dict | None = None,
-    analysis: dict | None = None,
     extraction: dict | None = None,
     focus: dict | None = None,
     output: dict | None = None,
@@ -737,15 +558,12 @@ def _image_studio_impl(
             enhancement=_maybe_convert(enhancement, EnhancementSpec),
             scene=_maybe_convert(scene, SceneSpec),
             placement=_maybe_convert(placement, ProductPlacement),
-            analysis=_maybe_convert(analysis, AnalysisAttributes),
             extraction=_maybe_convert(extraction, ExtractionSpec),
             focus=_maybe_convert(focus, FocusRegionSpec),
             output=_maybe_convert(output, OutputSpec) or OutputSpec(),
         )
 
-        if input_spec.operation == ImageOperation.ANALYZE:
-            result = _handle_analyze(input_spec)
-        elif input_spec.operation == ImageOperation.EDIT:
+        if input_spec.operation == ImageOperation.EDIT:
             result = _handle_edit(input_spec)
         elif input_spec.operation == ImageOperation.GENERATE:
             result = _handle_generate(input_spec)
@@ -787,12 +605,6 @@ def create_image_studio_tool() -> StructuredTool:
 
     CAPABILITIES (Gemini 3 Pro Image):
 
-    ANALYZE:
-    - Single product: Extract colors, materials, dimensions, brand text
-    - Multi-product group: Detect ALL products, list positions, identify each variant
-    - Quality assessment: Score 0-1, suggest improvements
-    - Returns product_inventory with extraction suggestions for each item
-
     EDIT:
     - Background: Remove (transparent), solid color, gradient, blur, generate scene
     - Extract product: Isolate specific product from group photo
@@ -807,31 +619,20 @@ def create_image_studio_tool() -> StructuredTool:
     return StructuredTool.from_function(
         func=_image_studio_impl,
         name="image_studio",
-        description="""Process product images with Gemini 3 Pro Image.
+        description="""Edit and generate product images with Gemini 3 Pro Image.
 
 OPERATIONS:
 
-1. ANALYZE - Extract visual attributes and detect multiple products
-   - Detects ALL products in image (group photos, variants)
-   - Returns product_inventory with position and extraction suggestions
-   - Identifies variant axes (Size, Color, Material)
-   - Rates image quality 0-1
-
-2. EDIT - Modify image: extract, background, enhance
+1. EDIT - Modify image: extract, background, enhance
    - EXTRACT: Isolate specific product from group ("the red jar on left")
    - BACKGROUND: Remove (transparent), solid, gradient, blur, scene
    - ENHANCE: Sharpen, denoise, upscale 2x/4x, color correct
    - REFRAME: Crop, zoom, adjust composition
 
-3. GENERATE - Create new images
+2. GENERATE - Create new images
    - LIFESTYLE: Product in scenes (kitchen, office, outdoor)
    - STUDIO: Clean professional backgrounds
    - CUSTOM: Any scene via custom_instruction
-
-MULTI-PRODUCT WORKFLOW:
-1. analyze(source_image) -> Get product_inventory with positions
-2. For each product: edit(extraction={"target_description": "..."})
-3. Create individual assets for each extracted image
 
 KEY PARAMETERS:
 - custom_instruction: Free-form text for complex operations
