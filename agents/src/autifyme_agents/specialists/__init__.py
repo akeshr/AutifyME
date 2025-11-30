@@ -1,14 +1,19 @@
 """
 Specialist SubAgents for AutifyME.
 
-Architecture (Phase 3 - Consolidated Domain Specialists):
-- PM -> Specialists -> Tools (2-level hierarchy)
+Architecture (2-Level Domain Specialists):
+- PM -> Specialists -> Tools
 - Domain-centric design: reusable specialists, not workflow-specific agents
 
-Primary Specialist:
-- catalog_specialist: Unified domain expert for product catalog operations
+Active Specialists:
+- creative_specialist: Media and visual operations ("how we present")
+  - image_studio: analyze, edit, generate (Gemini 3 Pro Image)
+  - Multi-product detection, extraction, enhancement
+  - Returns processed image paths
+
+- catalog_specialist: Product catalog operations ("what we sell")
   - PIM: product_families, products, variants
-  - DAM: assets, product_assets
+  - DAM: assets, product_assets (records only)
   - Pricing: price_lists, product_prices
   - Manufacturing: bom, bom_lines
 
@@ -22,10 +27,10 @@ Pattern:
 - PM orchestrates, specialists execute
 """
 
-from autifyme_agents.specialists.catalog_specialist import (
-    create_catalog_specialist,
-)
+from autifyme_agents.specialists.catalog_specialist import create_catalog_specialist
+from autifyme_agents.specialists.creative_specialist import create_creative_specialist
 
 __all__ = [
     "create_catalog_specialist",
+    "create_creative_specialist",
 ]

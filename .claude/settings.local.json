@@ -59,7 +59,9 @@
       "Bash(gcloud:*)",
       "Bash(cmd /c \"gcloud --version\")",
       "Bash(powershell:*)",
-      "Bash(uv lock:*)"
+      "Bash(uv lock:*)",
+      "Skill(specialist-creation)",
+      "Skill(prompt-engineering)"
     ],
     "deny": [],
     "ask": []

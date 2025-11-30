@@ -5,7 +5,7 @@ to appropriate specialists, and communicates outcomes.
 
 Architecture:
 - PM is orchestrator (read-only tools)
-- Specialists are domain experts (write tools with HITL)
+- Specialists are domain experts (creative + catalog)
 - DeepAgents handles specialist compilation and state
 """
 
@@ -25,6 +25,7 @@ from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.specialists.catalog_specialist import create_catalog_specialist
+from autifyme_agents.specialists.creative_specialist import create_creative_specialist
 from autifyme_agents.tools.data_engine import (
     create_inspect_schema_tool,
     create_read_data_tool,
@@ -132,19 +133,22 @@ async def create_project_manager(
     pm_tools.append(create_inspect_schema_tool(storage, tables=None))
     pm_tools.append(create_read_data_tool(storage))
 
-    # Catalog Specialist - domain expert with write capabilities
+    # Specialist LLM configuration
     specialist_llm = get_llm(
         provider="google",
         model="gemini-2.5-flash",
         temperature=0.3,
         thinking_budget=0,
     )
+
+    # Domain Specialists
+    creative_specialist = create_creative_specialist(model=specialist_llm)
     catalog_specialist = create_catalog_specialist(
         storage=storage,
         model=specialist_llm,
     )
 
-    subagents: list[Any] = [catalog_specialist]
+    subagents: list[Any] = [creative_specialist, catalog_specialist]
 
     project_manager = create_deep_agent(
         tools=pm_tools,

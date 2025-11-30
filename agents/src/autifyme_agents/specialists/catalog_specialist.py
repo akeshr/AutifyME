@@ -3,7 +3,7 @@ Catalog Specialist - Domain expert for product catalog operations.
 
 Domain Ownership ("What We Sell"):
 - PIM: product families, variants, SKUs
-- DAM: assets, product-asset links
+- DAM: assets (metadata/records), product-asset links
 - Pricing: price lists, product prices
 - Manufacturing: BOM, component lines
 - Master Data: UOM (read-only)
@@ -11,8 +11,8 @@ Domain Ownership ("What We Sell"):
 Architecture:
 - SubAgent spec dict for PM delegation
 - Schema-driven CRUD with HITL approval
-- Image Studio for visual processing
 - Autonomous research and enrichment
+- Does NOT process images (Creative Specialist does that)
 """
 
 from typing import Any
@@ -21,7 +21,6 @@ from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.tools.image_studio import create_image_studio_tool
 from autifyme_agents.tools.research_tools import (
     extract_web_content_tool,
     research_product_tool,
@@ -103,14 +102,13 @@ def create_catalog_specialist(
     tools.append(create_read_data_tool(storage, tables=CATALOG_TABLES_ALL))
     tools.append(create_aggregate_data_tool(storage, tables=CATALOG_TABLES_ALL))
     tools.append(create_write_data_tool(storage, tables=CATALOG_TABLES_CRUD))
-    tools.append(create_image_studio_tool())
 
     description = (
         "Catalog Specialist - domain expert for product catalog operations. "
-        "Handles: products, families, variants, pricing, assets, BOM. "
-        "Capabilities: schema-driven CRUD, web research, image processing "
-        "(analyze/edit/generate), duplicate detection, multi-table atomic transactions. "
-        "Does NOT handle: suppliers, inventory, locations."
+        "Handles: products, families, variants, pricing, asset records, BOM. "
+        "Capabilities: schema-driven CRUD, web research, duplicate detection, "
+        "multi-table atomic transactions. Receives processed images from "
+        "Creative Specialist. Does NOT process images directly."
     )
 
     spec: dict[str, Any] = {
