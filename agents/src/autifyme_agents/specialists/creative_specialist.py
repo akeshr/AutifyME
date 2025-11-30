@@ -1,22 +1,24 @@
 """
-Creative Specialist - Domain expert for media and visual operations.
+Creative Specialist - Professional product photographer and image editor.
 
 Domain Ownership ("How We Present"):
-- Image Processing: analyze, edit, generate, extract, enhance
-- Multi-product handling: detect variants, isolate products
-- Visual optimization: backgrounds, lighting, framing, upscaling
+- Studio-quality image processing for e-commerce
+- Multi-product extraction with professional isolation
+- Marketplace-ready hero shots (Amazon, Shopify, Instagram quality)
+- Lifestyle and contextual scene generation
 
 Architecture:
 - SubAgent spec dict for PM delegation
 - Owns image_studio tool (Gemini 3 Pro Image)
 - Uses MultimodalInjectionMiddleware to SEE images in delegation messages
-- Returns processed images for other specialists to use
+- Returns studio-grade processed images for catalog creation
 - Does NOT create database records (Catalog Specialist owns that)
 
-Multimodal Vision:
-- When PM delegates with image paths, middleware injects actual images
-- Specialist's LLM sees images directly (~258 tokens per image)
-- No need for separate view_image tool - images are in the message
+Professional Standards:
+- Pure white backgrounds for hero shots
+- Studio lighting with proper shadows
+- Color-accurate, sharpened, enhanced output
+- 70-85% product coverage, centered composition
 """
 
 from typing import Any
@@ -29,7 +31,7 @@ from autifyme_agents.middleware import MultimodalInjectionMiddleware
 from autifyme_agents.tools.image_studio import create_image_studio_tool
 
 # Creative Specialist uses Gemini 3 Pro for multimodal reasoning (can see images)
-CREATIVE_SPECIALIST_MODEL = "gemini-3-pro"
+CREATIVE_SPECIALIST_MODEL = "gemini-3-pro-preview"
 
 
 def create_creative_specialist(
@@ -54,12 +56,12 @@ def create_creative_specialist(
     ]
 
     description = (
-        "Creative Specialist - domain expert for media and visual operations. "
-        "Handles: image analysis, multi-product detection, variant extraction, "
-        "background removal/replacement, enhancement, lifestyle generation. "
-        "Capabilities: analyze group photos (detect 2+ products), extract individual "
-        "products, optimize images, generate scenes. Returns processed image paths. "
-        "NOTE: Include image paths in task description - specialist SEES images directly. "
+        "Creative Specialist - professional product photographer creating studio-quality images. "
+        "Produces: marketplace-ready hero shots (pure white background, studio lighting, color-accurate), "
+        "multi-product extraction with clean isolation, lifestyle shots with contextual scenes. "
+        "Standards: 70-85% product coverage, proper framing, enhancement suite (sharpness, color correction, denoise). "
+        "Include image paths in task - specialist SEES and diagnoses images like a professional photographer. "
+        "Returns: processed image paths with professional assessment. "
         "Does NOT handle: database operations, product records, pricing."
     )
 
