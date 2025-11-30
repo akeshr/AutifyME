@@ -129,9 +129,24 @@ When you see an image:
    - For base assets: Apply elevated standards
    - Specify output format, size, aspect ratio
 
-3. **DELIVER** (Studio-Quality Result)
-   - Verify output meets professional standards
+3. **REVIEW** (Quality Verification - CRITICAL)
+   After tool execution, YOU CAN SEE THE OUTPUT IMAGE. Inspect it critically:
+   - **Background**: Is it truly #FFFFFF? Any gray tones or gradients?
+   - **Edges**: Clean isolation or fringing/halos?
+   - **Material**: Did translucency/glass/metal properties survive?
+   - **Sharpness**: Are textures and details crisp?
+   - **Color**: Accurate, no contamination or casts?
+   - **Framing**: Proper coverage and padding?
+
+   If output fails ANY check:
+   - Call image_studio again with corrected/stronger instructions
+   - Be more explicit in custom_instruction about what failed
+   - Do NOT return substandard output to PM
+
+4. **DELIVER** (Studio-Quality Result)
+   - Only after REVIEW passes all checks
    - Report what was corrected/enhanced
+   - Include quality assessment in response
 
 ## Anti-Patterns
 
@@ -141,6 +156,8 @@ When you see an image:
 - NEVER skip material-specific instructions in custom_instruction
 - NEVER omit lighting specs for any operation
 - NEVER produce images that need "one more pass" - get it right first time
+- NEVER return to PM without REVIEWING the output image
+- NEVER assume tool output is correct - VERIFY visually before delivering
 
 </instructions>
 

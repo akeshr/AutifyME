@@ -42,10 +42,24 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-# Match common image paths: /tmp/..., C:\..., etc.
+# Match common image paths in various contexts:
+# - Plain text: /tmp/file.jpg or C:\path\file.png
+# - JSON strings: "path": "/tmp/file.jpg" or "path": "C:\\path\\file.png"
+# - With escaped backslashes in JSON: C:\\\\Users\\\\...
 IMAGE_PATH_PATTERN = re.compile(
-    r'(?:^|[\s:])([A-Za-z]:[/\\][^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp)|'
-    r'/[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))',
+    r'(?:'
+    # Unix paths: /tmp/..., /var/...
+    r'(/(?:tmp|var|home|Users)[/][^\s<>"\'\\]+\.(?:jpg|jpeg|png|gif|webp))'
+    r'|'
+    # Windows paths with normal slashes: C:/Users/...
+    r'([A-Za-z]:/[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))'
+    r'|'
+    # Windows paths with single backslash: C:\Users\...
+    r'([A-Za-z]:\\[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))'
+    r'|'
+    # Windows paths with escaped backslashes in JSON: C:\\Users\\...
+    r'([A-Za-z]:\\\\[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))'
+    r')',
     re.IGNORECASE
 )
 
@@ -118,21 +132,39 @@ def _load_and_encode_image(image_path: str) -> tuple[str, dict[str, Any]] | None
 def _extract_image_paths(text: str) -> list[str]:
     """Extract image file paths from text.
 
+    Handles paths in various formats:
+    - Plain text paths
+    - JSON-embedded paths with escaped backslashes
+    - Windows and Unix paths
+
     Args:
         text: Text that may contain image paths
 
     Returns:
-        List of unique image paths found
+        List of unique image paths found (normalized for filesystem access)
     """
     matches = IMAGE_PATH_PATTERN.findall(text)
-    # Deduplicate while preserving order
+    # findall returns tuples when pattern has multiple groups
+    # Extract the non-empty match from each tuple
     seen: set[str] = set()
     unique_paths: list[str] = []
     for match in matches:
-        normalized = match.strip()
+        # match is a tuple of capture groups, one will be non-empty
+        if isinstance(match, tuple):
+            path = next((m for m in match if m), None)
+        else:
+            path = match
+
+        if not path:
+            continue
+
+        # Normalize escaped backslashes from JSON (\\\\  -> \\ and \\ -> \)
+        normalized = path.replace("\\\\", "\\").strip()
+
         if normalized not in seen:
             seen.add(normalized)
             unique_paths.append(normalized)
+
     return unique_paths
 
 
