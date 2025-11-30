@@ -1,11 +1,7 @@
 """Image Studio Tool - Pydantic Schemas.
 
-Structured input/output schemas for Gemini 3 Pro Image (Nano Banana Pro) operations.
-All image operations use typed fields - NO string instructions.
-
-Design Decision: Single unified tool with structured Pydantic schema.
-One powerful LLM = One powerful tool. Specialist orchestrates by constructing
-appropriate input schema for analyze, edit, or generate operations.
+Structured input/output schemas for image operations.
+All parameters are typed - no string instructions.
 """
 
 from __future__ import annotations

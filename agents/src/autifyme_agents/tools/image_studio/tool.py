@@ -1,14 +1,13 @@
-"""Image Studio Tool - Gemini 3 Pro Image (Nano Banana Pro) implementation.
+"""Image Studio Tool - Unified image processing with Gemini 3 Pro Image.
 
-Unified tool for product image operations using structured Pydantic schemas.
-Converts structured input to Gemini API calls, handles responses, saves outputs.
-
-Architecture: Atomic tool - one powerful LLM = one powerful tool.
+Operations: analyze, edit, generate.
+Architecture: Atomic tool with structured Pydantic input/output.
 """
 
 from __future__ import annotations
 
 import base64
+import io
 import logging
 import platform
 import tempfile
@@ -150,8 +149,6 @@ def _load_and_encode_image(image_path: str) -> tuple[str, str]:
                 img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
             # Encode to base64
-            import io
-
             buffer = io.BytesIO()
             img.save(buffer, format=fmt, quality=JPEG_QUALITY, optimize=True)
             encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
@@ -208,7 +205,8 @@ def _save_base64_image(
         )
 
     logger.info(
-        f"Saved image to {file_path}",
+        "Saved image to %s",
+        file_path,
         extra={"width": width, "height": height, "size_bytes": len(image_bytes)},
     )
 
@@ -548,7 +546,7 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
                 ref_uri, _ = _load_and_encode_image(ref_path)
                 content.append({"type": "image_url", "image_url": {"url": ref_uri}})
             except Exception as e:
-                logger.warning(f"Failed to load reference image {ref_path}: {e}")
+                logger.warning("Failed to load reference image %s: %s", ref_path, e)
 
         messages = [{"role": "user", "content": content}]
 
@@ -704,13 +702,11 @@ def create_image_studio_tool() -> StructuredTool:
         func=_image_studio_impl,
         name="image_studio",
         description=(
-            "Process product images using Gemini 3 Pro Image (Nano Banana Pro). "
-            "Supports three operations:\n"
+            "Process product images with Gemini 3 Pro Image. Operations:\n"
             "- analyze: Extract visual attributes (colors, materials, quality)\n"
-            "- edit: Modify image (background removal, enhancement, lighting)\n"
-            "- generate: Create lifestyle shots with product in scene\n\n"
-            "All parameters are structured - no string instructions needed. "
-            "Returns structured output with file paths for HITL preview."
+            "- edit: Modify image (background, enhancement, lighting)\n"
+            "- generate: Create lifestyle shots with product in scene\n"
+            "All parameters are structured. Returns file paths for HITL preview."
         ),
         args_schema=ImageStudioInput,
         return_direct=False,

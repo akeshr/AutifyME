@@ -1,7 +1,12 @@
 """Project Manager - Central orchestrator for AutifyME workflows.
 
 Orchestrates domain specialists via SubAgent pattern. Detects intent, delegates
-to appropriate specialists, synthesizes results, and persists via HITL-enabled tools.
+to appropriate specialists, and communicates outcomes.
+
+Architecture:
+- PM is orchestrator (read-only tools)
+- Specialists are domain experts (write tools with HITL)
+- DeepAgents handles specialist compilation and state
 """
 
 from __future__ import annotations
@@ -19,9 +24,7 @@ from autifyme_agents.integrations.storage import get_store
 from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
-from autifyme_agents.specialists.catalog_specialist import (
-    create_catalog_specialist,
-)
+from autifyme_agents.specialists.catalog_specialist import create_catalog_specialist
 from autifyme_agents.tools.data_engine import (
     create_inspect_schema_tool,
     create_read_data_tool,
@@ -34,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
-    """Return configured LLM for PM. Defaults to gemini-2.5-flash for orchestration."""
+    """Return configured LLM for PM. Defaults to gemini-2.5-flash."""
     if model is not None:
         return model
     return get_llm(provider="google", model="gemini-2.5-flash", temperature=0.5)
@@ -45,18 +48,13 @@ def _load_prompt(
     base_context: Any,
     channel: MessagingChannel | None = None,
 ) -> str:
-    """Load and format PM prompt with company context and base context.
-
-    Base context is formatted into system prompt so LLM can see the actual data.
-    """
+    """Load and format PM prompt with company context."""
     prompt_template = load_prompt("project_manager_intelligent.prompt")
 
-    # Extract platform name from channel (same logic as platform_tools.py)
     platform_name = "unknown"
     if channel is not None:
         platform_name = channel.__class__.__name__.replace("Channel", "").lower()
 
-    # Format catalog summary for prompt
     catalog_summary_text = f"""
 **Your Catalog Summary (Loaded at Startup):**
 - Total Product Families: {base_context.catalog_summary.total_families}
@@ -65,7 +63,6 @@ def _load_prompt(
 - Top Categories: {', '.join(base_context.catalog_summary.top_categories)}
 """
 
-    # Format taxonomy tree (just root categories for now)
     root_categories = [cat.name for cat in base_context.taxonomy_tree.root_categories]
     taxonomy_text = f"""
 **Your Taxonomy Tree (Loaded at Startup):**
@@ -91,42 +88,27 @@ async def create_project_manager(
 ) -> Any:
     """Create Project Manager agent.
 
-    PM orchestrates domain specialists for business workflows. Uses SubAgent pattern
-    for specialist delegation and HITL-enabled persistence tools.
-
     Args:
         company_profile: Company context for brand voice and positioning
-        model: LLM for orchestration (defaults to gemini-2.5-flash-lite)
-        checkpointer: LangGraph checkpointer for PM state persistence
+        model: LLM for orchestration (defaults to gemini-2.5-flash)
+        checkpointer: LangGraph checkpointer for state persistence
         storage: Storage adapter for database operations
         channel: Messaging channel for platform-specific operations
 
     Returns:
         Compiled DeepAgent
-
-    Notes:
-        - DeepAgents SubAgentMiddleware handles specialist compilation
-        - Specialists use default_model and default_middleware from SubAgentMiddleware
-        - PM's checkpointer is passed to create_deep_agent
-        - Specialist state managed by DeepAgents internally
     """
     if checkpointer is None:
-        raise ValueError(
-            "checkpointer is required for Project Manager (DeepAgents requirement)"
-        )
+        raise ValueError("checkpointer is required for Project Manager")
 
     if storage is None:
-        raise ValueError(
-            "storage is required for Project Manager (tools dependency)"
-        )
+        raise ValueError("storage is required for Project Manager")
 
     llm = _resolve_model(model)
     store = get_store()
 
     # Load base context (catalog summary + taxonomy tree)
-    # Uses await since we're in async context
-    # Gracefully degrades to empty summaries if DB unavailable
-    logger.info("Loading base context for PM (catalog summary + taxonomy tree)")
+    logger.info("Loading base context for PM")
     base_context = await load_base_context(company_profile, storage)
     logger.info(
         "Base context loaded",
@@ -136,43 +118,21 @@ async def create_project_manager(
         }
     )
 
-    # Load intelligent prompt with company context
-    # base_context is available to PM via initial_state
     instructions = _load_prompt(company_profile, base_context, channel)
 
-    # PM Tools - Minimal orchestration-focused toolset
-    # PM is the orchestrator - delegates execution to domain specialists
+    # PM Tools - Read-only, orchestration-focused
     pm_tools: list[Any] = []
 
-    # Platform-specific tools (media download)
+    # Platform media download
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
         pm_tools.extend(create_platform_media_tools(channel))
 
-    # Schema inspection (understand data structure)
-    pm_tools.append(
-        create_inspect_schema_tool(
-            storage,
-            tables=None,  # PM can inspect all tables for routing decisions
-        )
-    )
-
-    # Universal Data Engine - Read operations only
-    # PM reads context, routes to specialists for mutations
+    # Schema inspection and read operations
+    pm_tools.append(create_inspect_schema_tool(storage, tables=None))
     pm_tools.append(create_read_data_tool(storage))
 
-    # NO write_data - PM delegates mutations to specialists
-    # NO save_campaign - future Campaign Specialist will handle
-    # NO context tools - redundant with read_data + inspect_schema
-
-    # Catalog Specialist (SubAgent spec pattern)
-    # Unified domain expert for all product catalog operations
-    # Consolidates: PIM, DAM, Pricing, Manufacturing (BOM)
-    #
-    # CRITICAL: Specialist needs deterministic model for structured WriteIntent
-    # - temperature=0.3: More deterministic for schema-driven operations
-    # - thinking_budget=0: No extended reasoning needed for structured outputs
-    # PM uses temperature=0.5 for orchestration; specialist needs more precision
+    # Catalog Specialist - domain expert with write capabilities
     specialist_llm = get_llm(
         provider="google",
         model="gemini-2.5-flash",
@@ -181,29 +141,17 @@ async def create_project_manager(
     )
     catalog_specialist = create_catalog_specialist(
         storage=storage,
-        model=specialist_llm  # Pass configured LLM instance
+        model=specialist_llm,
     )
 
-    # Add SubAgent spec to subagents list
-    # DeepAgents SubAgentMiddleware compiles specialist with default_model
-    subagents: list[Any] = [
-        catalog_specialist,  # Unified catalog domain expert
-    ]
-
-    # HITL configuration
-    # PM has no mutation tools - specialists handle HITL at domain level
-    interrupt_configs: dict[str, bool] = {}
-
-    # Note: create_deep_agent adds SummarizationMiddleware by default
-    # No need to pass custom middleware - use default configuration
-    # Default: triggers at ~170K tokens, keeps last 6 messages
+    subagents: list[Any] = [catalog_specialist]
 
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
         subagents=subagents,
-        interrupt_on=interrupt_configs,
+        interrupt_on={},
         checkpointer=checkpointer,
         store=store,
         context_schema=CompanyContext,
@@ -212,7 +160,7 @@ async def create_project_manager(
     initial_state = {
         "company_profile": company_profile.model_dump(),
         "base_context": base_context.model_dump(),
-        "status": "catalog_specialist_integrated",
+        "status": "ready",
         "current_workflow": None,
         "specialist_results": {},
     }
