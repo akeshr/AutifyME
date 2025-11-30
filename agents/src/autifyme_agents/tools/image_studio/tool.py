@@ -486,7 +486,10 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
             except Exception as e:
                 logger.warning("Failed to load reference image %s: %s", ref_path, e)
 
-        messages = [{"role": "user", "content": content}]
+        messages = [
+            {"role": "system", "content": TOOL_SYSTEM_PROMPT},
+            {"role": "user", "content": content},
+        ]
         response = llm.invoke(messages)
 
         # Extract image using helper function
