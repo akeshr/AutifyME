@@ -286,24 +286,40 @@ User approves -> asset persisted, linked to product
 
 ---
 
-## Upcoming Phases
+## Completed: Phase 3 - Catalog Specialist Consolidation
 
-### Phase 3: Catalog Specialist Consolidation (8-10 hours)
+**Status:** Core consolidation complete (4-5 hours)
+**Completed:** November 30, 2025
 
-**Goal:** Merge existing specialists into unified Catalog Specialist
+**What Was Done:**
+1. [x] Created `catalog_specialist.py` with expanded domain coverage
+2. [x] Defined complete table access matrix (17 tables across 5 sub-domains)
+3. [x] Created comprehensive `catalog_specialist.prompt` with domain sections
+4. [x] Updated PM to use Catalog Specialist
+5. [x] Updated PM prompt with new delegation patterns
+6. [x] Maintained backward compatibility (product_architecture_specialist alias)
 
-**Tasks:**
-1. [ ] Create Catalog Specialist prompt (products + BOM + pricing + assets)
-2. [ ] Configure table access control (CRUD vs READ)
-3. [ ] Integrate Image Studio tool
-4. [ ] Test complete product onboarding workflow
-5. [ ] Deprecate narrow specialists (Product Architecture, Visual Assets, etc.)
+**Domain Ownership:**
+| Sub-Domain | Tables | Authority |
+|------------|--------|-----------|
+| **PIM** | product_families, products, variant_axes, variant_values, product_variant_values, product_family_industries, customer_segments | CRUD |
+| **DAM** | assets, product_assets, asset_composition_rules, product_images | CRUD |
+| **Pricing** | price_lists, product_prices | CRUD |
+| **Manufacturing** | bom, bom_lines | CRUD |
+| **Master Data** | uom, uom_conversion, product_uom_conversion | READ (uom), CRUD (product_uom) |
 
 **Merged Capabilities:**
 - Product Architecture -> product definition, families, variants
-- Visual Assets -> asset management, image processing
-- Content SEO -> product descriptions (or keep as tool?)
-- Pricing logic -> price lists, tiered pricing
+- Visual Assets -> asset management, DAM operations
+- Content SEO -> embedded in product descriptions
+- Pricing Logic -> price lists, tiered pricing
+- Taxonomy -> industry classification via product_family_industries
+
+**Remaining for Phase 3:**
+- [ ] Image Studio tool integration (depends on Phase 5)
+- [ ] End-to-end product onboarding test
+
+## Upcoming Phases
 
 ### Phase 4: Operations Specialist (6-8 hours)
 

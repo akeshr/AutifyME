@@ -24,6 +24,11 @@ def get_llm(
     safety_settings: dict[HarmCategory, HarmBlockThreshold] | None = None,
     response_modalities: list[Literal["TEXT", "IMAGE", "AUDIO"]] | None = None,
     response_mime_type: str | None = None,
+    # Gemini 3 Image Generation parameters
+    image_aspect_ratio: Literal[
+        "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
+    ] | None = None,
+    image_size: Literal["1K", "2K", "4K"] | None = None,
 ) -> BaseChatModel:
     """
     Factory function to instantiate and return a language model client.
@@ -37,10 +42,12 @@ def get_llm(
             OpenAI models: 'gpt-4.1-mini', 'gpt-4.1', 'gpt-4.1-nano', 'gpt-5-mini-2025-08-07'
             Anthropic models: 'claude-3-5-sonnet-20241022'
             Google Gemini models:
-                - 2.5 Series (Latest): 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'
+                - 3.0 Series (Latest): 'gemini-3-pro', 'gemini-3-flash'
+                - 2.5 Series: 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'
                 - 2.0 Series: 'gemini-2.0-flash', 'gemini-2.0-flash-lite'
                 - Preview variants: 'gemini-2.5-pro-preview-06-05', 'gemini-2.5-flash-preview-09-2025', etc.
-                - Image Generation (Nano Banana): 'gemini-2.5-flash-image', 'gemini-2.5-flash-image-preview'
+                - Image Generation (Nano Banana Pro): 'gemini-3-pro-image-preview' (RECOMMENDED)
+                - Image Generation (Legacy): 'gemini-2.5-flash-image' (retiring Oct 2025)
                 - Text-to-Speech: 'gemini-2.5-pro-preview-tts', 'gemini-2.5-flash-preview-tts'
                 - Computer Use: 'gemini-2.5-computer-use-preview-10-2025'
                 - Note: Computer Use, Video (Veo), and Live API require separate integration modules
@@ -76,6 +83,12 @@ def get_llm(
             Default: ["TEXT"] for text-only generation.
         response_mime_type: MIME type for structured outputs (e.g., "application/json").
             Used to enforce specific output formats.
+        image_aspect_ratio: Aspect ratio for Gemini 3 image generation.
+            Options: "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
+            Default: "1:1" for square images.
+        image_size: Output size for Gemini 3 image generation.
+            Options: "1K", "2K", "4K"
+            Default: "2K" for balanced quality/performance.
 
     Returns:
         An instance of a BaseChatModel.
@@ -107,11 +120,13 @@ def get_llm(
         - Safety settings control content filtering across 4 harm categories
         - Knowledge cutoff: January 2025 (2.5 series), August 2024 (2.0 series)
 
-        **Image Generation (Nano Banana):**
-        - Model: gemini-2.5-flash-image or gemini-2.5-flash-image-preview
+        **Image Generation (Nano Banana Pro - Gemini 3):**
+        - Model: gemini-3-pro-image-preview (RECOMMENDED)
+        - Legacy: gemini-2.5-flash-image (retiring Oct 2025)
         - Set response_modalities=["TEXT", "IMAGE"] or ["IMAGE"]
-        - Pricing: $0.039 per image (1290 output tokens)
-        - Capabilities: Generate, edit, blend images; maintain character consistency
+        - Capabilities: Generate, edit, analyze; 1K/2K/4K output; up to 14 reference images
+        - Character consistency across generations; advanced text rendering
+        - Thought Signatures: Gemini 3 returns encrypted thought signatures for multi-turn
         - Retrieve images from response.additional_kwargs["image"] as base64
 
         **Text-to-Speech (TTS):**
@@ -208,6 +223,21 @@ def get_llm(
             gemini_kwargs["response_modalities"] = converted_modalities
         if response_mime_type is not None:
             gemini_kwargs["response_mime_type"] = response_mime_type
+
+        # Gemini 3 Image Generation configuration
+        # Build image_config for generation_config if image params provided
+        if image_aspect_ratio is not None or image_size is not None:
+            image_config = {}
+            if image_aspect_ratio is not None:
+                image_config["aspectRatio"] = image_aspect_ratio
+            if image_size is not None:
+                image_config["imageSize"] = image_size
+            # Pass through model_kwargs for generation_config.imageConfig
+            if "model_kwargs" not in gemini_kwargs:
+                gemini_kwargs["model_kwargs"] = {}
+            gemini_kwargs["model_kwargs"]["generation_config"] = {
+                "imageConfig": image_config
+            }
 
         llm = ChatGoogleGenerativeAI(**gemini_kwargs)
     else:

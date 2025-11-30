@@ -2206,6 +2206,163 @@ class SupabaseStorageClient(StorageInterface):
         return SupabaseTransaction(self)
 
     # ========================================================================
+    # File Storage (Supabase Storage Buckets)
+    # ========================================================================
+
+    async def upload_asset(
+        self,
+        file_path: str,
+        bucket: str = "assets",
+        folder: str = "products",
+        content_type: str | None = None,
+    ) -> dict[str, Any]:
+        """Upload file to Supabase Storage bucket.
+
+        Used for persisting processed images after HITL approval.
+        Follows pattern: bucket/folder/timestamp_uuid.ext
+
+        Args:
+            file_path: Local file path to upload
+            bucket: Storage bucket name (default: "assets")
+            folder: Folder within bucket (default: "products")
+            content_type: MIME type (auto-detected if None)
+
+        Returns:
+            Dict with storage_path, public_url, size_bytes
+
+        Raises:
+            StorageError: On upload failure
+            FileNotFoundError: If local file doesn't exist
+        """
+        from pathlib import Path
+        import mimetypes
+        import uuid
+        from datetime import datetime
+
+        try:
+            local_path = Path(file_path)
+            if not local_path.exists():
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            # Generate unique storage path
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_id = str(uuid.uuid4())[:8]
+            extension = local_path.suffix.lower()
+            storage_filename = f"{timestamp}_{unique_id}{extension}"
+            storage_path = f"{folder}/{storage_filename}"
+
+            # Auto-detect content type
+            if content_type is None:
+                content_type, _ = mimetypes.guess_type(str(local_path))
+                content_type = content_type or "application/octet-stream"
+
+            # Read file content
+            file_content = local_path.read_bytes()
+
+            # Upload to Supabase Storage
+            client = self._ensure_client()
+            client.storage.from_(bucket).upload(
+                path=storage_path,
+                file=file_content,
+                file_options={"content-type": content_type},
+            )
+
+            # Get public URL
+            public_url = client.storage.from_(bucket).get_public_url(storage_path)
+
+            logger.info(
+                f"Uploaded asset to {bucket}/{storage_path}",
+                extra={
+                    "bucket": bucket,
+                    "storage_path": storage_path,
+                    "size_bytes": len(file_content),
+                    "content_type": content_type,
+                }
+            )
+
+            return {
+                "success": True,
+                "storage_path": storage_path,
+                "bucket": bucket,
+                "public_url": public_url,
+                "size_bytes": len(file_content),
+                "content_type": content_type,
+            }
+
+        except FileNotFoundError:
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to upload asset to {bucket}/{folder}",
+                exc_info=True,
+                extra={"file_path": file_path, "bucket": bucket, "folder": folder}
+            )
+            raise StorageError(
+                message=f"Asset upload failed: {str(e)}",
+                operation="upload_asset",
+                original_error=e,
+            ) from e
+
+    async def delete_asset(
+        self,
+        storage_path: str,
+        bucket: str = "assets",
+    ) -> bool:
+        """Delete file from Supabase Storage bucket.
+
+        Used for cleanup on HITL rejection or error recovery.
+
+        Args:
+            storage_path: Path within bucket (e.g., "products/20251130_abc123.png")
+            bucket: Storage bucket name (default: "assets")
+
+        Returns:
+            True if deleted successfully
+
+        Raises:
+            StorageError: On delete failure
+        """
+        try:
+            client = self._ensure_client()
+            client.storage.from_(bucket).remove([storage_path])
+
+            logger.info(
+                f"Deleted asset from {bucket}/{storage_path}",
+                extra={"bucket": bucket, "storage_path": storage_path}
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Failed to delete asset from {bucket}/{storage_path}",
+                exc_info=True,
+                extra={"storage_path": storage_path, "bucket": bucket}
+            )
+            raise StorageError(
+                message=f"Asset delete failed: {str(e)}",
+                operation="delete_asset",
+                original_error=e,
+            ) from e
+
+    def get_asset_public_url(
+        self,
+        storage_path: str,
+        bucket: str = "assets",
+    ) -> str:
+        """Get public URL for stored asset.
+
+        Args:
+            storage_path: Path within bucket
+            bucket: Storage bucket name
+
+        Returns:
+            Public URL for the asset
+        """
+        client = self._ensure_client()
+        return client.storage.from_(bucket).get_public_url(storage_path)
+
+    # ========================================================================
     # Lifecycle Management
     # ========================================================================
 

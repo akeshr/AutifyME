@@ -17,6 +17,65 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 
+class AssetUpload(BaseModel):
+    """
+    File upload specification for WriteIntent.
+
+    Processed BEFORE database operations. The uploaded file's public URL
+    can be referenced in operations using @name.public_url syntax.
+
+    Example:
+        asset_uploads=[
+            AssetUpload(
+                temp_path="/tmp/media_downloads/20251130_edit_abc123.png",
+                returns="product_image",
+                folder="products"
+            )
+        ]
+        operations=[
+            Operation(
+                action="create",
+                table="assets",
+                data={
+                    "file_url": "@product_image.public_url",
+                    "file_type": "image/png",
+                    "file_size": "@product_image.size_bytes"
+                },
+                returns="asset"
+            )
+        ]
+    """
+
+    model_config = {"extra": "forbid"}
+
+    temp_path: str = Field(
+        ...,
+        description=(
+            "Local file path to upload (from Image Studio or WhatsApp media).\n"
+            "Example: '/tmp/media_downloads/20251130_edit_abc123.png'"
+        ),
+    )
+
+    returns: str = Field(
+        ...,
+        description=(
+            "Name to assign to upload result.\n"
+            "Operations can reference: @name.public_url, @name.storage_path, "
+            "@name.size_bytes, @name.content_type"
+        ),
+    )
+
+    bucket: str = Field(
+        default="assets",
+        description="Storage bucket name (default: 'assets')",
+    )
+
+    folder: str = Field(
+        default="products",
+        description="Folder within bucket (default: 'products')",
+    )
+
+
 class Operation(BaseModel):
     """
     Single operation within a WriteIntent.
@@ -135,6 +194,7 @@ class WriteIntent(BaseModel):
     - Auto-generated execution plan (not manual)
     - Unified @name.field reference syntax
     - Flat operations list (no ChangeSpecification nesting)
+    - Asset uploads processed before database operations
     """
 
     model_config = {"extra": "forbid"}
@@ -156,6 +216,19 @@ class WriteIntent(BaseModel):
         ),
     )
 
+    asset_uploads: list[AssetUpload] = Field(
+        default_factory=list,
+        description=(
+            "Files to upload BEFORE database operations.\n"
+            "Each upload's result can be referenced in operations:\n"
+            "- @name.public_url: Public URL of uploaded file\n"
+            "- @name.storage_path: Path within storage bucket\n"
+            "- @name.size_bytes: File size in bytes\n"
+            "- @name.content_type: MIME type\n"
+            "Uploads execute atomically: if any fails, no DB operations run."
+        ),
+    )
+
     operations: list[Operation] = Field(
         ...,
         description=(
@@ -173,6 +246,7 @@ class WriteIntent(BaseModel):
             "  'creates': {'table_name': count, ...},\n"
             "  'updates': {'table_name': count, ...},\n"
             "  'deletes': {'table_name': count, ...},\n"
+            "  'asset_uploads': count,\n"
             "  'warnings': ['warning1', 'warning2'],\n"
             "  'examples': ['example SKU 1', 'example SKU 2']\n"
             "}"

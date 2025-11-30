@@ -10,10 +10,12 @@ The interface is split into focused mixins for organization:
 - AnalyticsMixin: Workflow outcomes and schema intelligence
 - WebhookMixin: Idempotency for duplicate message detection
 - LifecycleMixin: Transaction and cleanup operations
+- FileStorageMixin: Asset upload/download operations
 """
 
 from ._analytics_mixin import AnalyticsMixin
 from ._crud_mixin import CRUDMixin
+from ._file_storage_mixin import FileStorageMixin
 from ._lifecycle_mixin import LifecycleMixin
 from ._validation_mixin import ValidationMixin
 from ._webhook_mixin import WebhookMixin
@@ -25,6 +27,7 @@ class StorageInterface(
     AnalyticsMixin,
     WebhookMixin,
     LifecycleMixin,
+    FileStorageMixin,
 ):
     """
     Abstract interface (the "Port") for all storage operations.
@@ -35,6 +38,7 @@ class StorageInterface(
     - AnalyticsMixin: get_company_profile, workflow_outcome tracking, schema stats
     - WebhookMixin: check_and_mark_message_processed
     - LifecycleMixin: transaction, cleanup
+    - FileStorageMixin: upload_asset, delete_asset, get_asset_public_url
 
     Implementations:
     - SupabaseStorageClient (integrations/storage/supabase_client.py)
