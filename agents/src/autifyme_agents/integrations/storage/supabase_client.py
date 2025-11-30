@@ -2234,10 +2234,10 @@ class SupabaseStorageClient(StorageInterface):
             StorageError: On upload failure
             FileNotFoundError: If local file doesn't exist
         """
-        from pathlib import Path
         import mimetypes
         import uuid
         from datetime import datetime
+        from pathlib import Path
 
         try:
             local_path = Path(file_path)
