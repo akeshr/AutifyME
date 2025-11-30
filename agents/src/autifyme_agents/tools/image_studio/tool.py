@@ -629,19 +629,30 @@ def _image_studio_impl(
     Converts dict inputs to Pydantic models and dispatches to handlers.
     """
     try:
+        # Helper to handle both dict and Pydantic model inputs
+        # (LangChain's args_schema may already convert dicts to Pydantic models)
+        def _maybe_convert(value, model_class):
+            if value is None:
+                return None
+            if isinstance(value, model_class):
+                return value  # Already converted by args_schema
+            if isinstance(value, dict):
+                return model_class(**value)  # Convert dict to model
+            return value
+
         # Build input spec from individual fields
         input_spec = ImageStudioInput(
-            operation=ImageOperation(operation),
+            operation=ImageOperation(operation) if isinstance(operation, str) else operation,
             source_image=source_image,
             reference_images=reference_images or [],
-            background=BackgroundSpec(**background) if background else None,
-            lighting=LightingSpec(**lighting) if lighting else None,
-            framing=FramingSpec(**framing) if framing else None,
-            enhancement=EnhancementSpec(**enhancement) if enhancement else None,
-            scene=SceneSpec(**scene) if scene else None,
-            placement=ProductPlacement(**placement) if placement else None,
-            analysis=AnalysisAttributes(**analysis) if analysis else None,
-            output=OutputSpec(**output) if output else OutputSpec(),
+            background=_maybe_convert(background, BackgroundSpec),
+            lighting=_maybe_convert(lighting, LightingSpec),
+            framing=_maybe_convert(framing, FramingSpec),
+            enhancement=_maybe_convert(enhancement, EnhancementSpec),
+            scene=_maybe_convert(scene, SceneSpec),
+            placement=_maybe_convert(placement, ProductPlacement),
+            analysis=_maybe_convert(analysis, AnalysisAttributes),
+            output=_maybe_convert(output, OutputSpec) or OutputSpec(),
         )
 
         # Dispatch to handler

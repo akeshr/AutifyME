@@ -724,6 +724,89 @@ class FakeStorage(StorageInterface):
         return FakeTransaction(self)
 
     # ========================================================================
+    # File Storage (FileStorageMixin Implementation)
+    # ========================================================================
+
+    async def upload_asset(
+        self,
+        file_path: str,
+        bucket: str = "assets",
+        folder: str = "products",
+        content_type: str | None = None,
+    ) -> dict[str, Any]:
+        """Upload file to in-memory storage.
+
+        Simulates Supabase Storage bucket upload for testing.
+        """
+        import mimetypes
+        from pathlib import Path
+
+        local_path = Path(file_path)
+        if not local_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        # Generate unique storage path
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        extension = local_path.suffix.lower()
+        storage_filename = f"{timestamp}_{unique_id}{extension}"
+        storage_path = f"{folder}/{storage_filename}"
+
+        # Auto-detect content type
+        if content_type is None:
+            content_type, _ = mimetypes.guess_type(str(local_path))
+            content_type = content_type or "application/octet-stream"
+
+        # Read file content
+        file_content = local_path.read_bytes()
+
+        # Store in in-memory storage
+        if not hasattr(self, "_file_storage"):
+            self._file_storage: dict[str, dict[str, Any]] = {}
+
+        bucket_key = f"{bucket}/{storage_path}"
+        self._file_storage[bucket_key] = {
+            "content": file_content,
+            "content_type": content_type,
+            "size_bytes": len(file_content),
+        }
+
+        # Generate fake public URL
+        public_url = f"https://fake-storage.test/{bucket}/{storage_path}"
+
+        return {
+            "success": True,
+            "storage_path": storage_path,
+            "bucket": bucket,
+            "public_url": public_url,
+            "size_bytes": len(file_content),
+            "content_type": content_type,
+        }
+
+    async def delete_asset(
+        self,
+        storage_path: str,
+        bucket: str = "assets",
+    ) -> bool:
+        """Delete file from in-memory storage."""
+        if not hasattr(self, "_file_storage"):
+            self._file_storage = {}
+
+        bucket_key = f"{bucket}/{storage_path}"
+        if bucket_key in self._file_storage:
+            del self._file_storage[bucket_key]
+            return True
+        return True  # Idempotent - return True even if not found
+
+    def get_asset_public_url(
+        self,
+        storage_path: str,
+        bucket: str = "assets",
+    ) -> str:
+        """Get public URL for stored asset."""
+        return f"https://fake-storage.test/{bucket}/{storage_path}"
+
+    # ========================================================================
     # Lifecycle Management
     # ========================================================================
 

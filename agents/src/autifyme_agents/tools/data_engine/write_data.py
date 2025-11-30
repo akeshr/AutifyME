@@ -15,7 +15,7 @@ from autifyme_agents.core.tool_error_handler import (
     build_agent_error_response,
     build_success_response,
 )
-from autifyme_agents.schemas.write_intent import Operation, WriteIntent
+from autifyme_agents.schemas.write_intent import AssetUpload, Operation, WriteIntent
 from autifyme_agents.tools.data_engine._executor import MultiOperationExecutor
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,20 @@ class WriteDataInput(BaseModel):
             "Reasoning and context for this operation.\n"
             "Includes: classification rationale, duplicate check results, "
             "research findings, warnings, assumptions."
+        ),
+    )
+
+    asset_uploads: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "Files to upload BEFORE database operations.\n"
+            "Each upload has:\n"
+            "- temp_path: Local file path (from Image Studio or WhatsApp media)\n"
+            "- returns: Name for reference (@name.public_url, @name.storage_path)\n"
+            "- bucket: Storage bucket (default: 'assets')\n"
+            "- folder: Folder within bucket (default: 'products')\n\n"
+            "Uploads execute atomically: if any fails, no DB operations run.\n"
+            "Use @name.public_url in operations to reference uploaded file URL."
         ),
     )
 
@@ -79,6 +93,7 @@ class WriteDataInput(BaseModel):
             "  'creates': {'table_name': count, ...},\n"
             "  'updates': {'table_name': count, ...},\n"
             "  'deletes': {'table_name': count, ...},\n"
+            "  'asset_uploads': count,\n"
             "  'warnings': ['warning1', 'warning2'],\n"
             "  'examples': ['example SKU 1', 'example SKU 2']\n"
             "}"
@@ -149,6 +164,7 @@ def create_write_data_tool(
         reasoning: str,
         operations: list[dict[str, Any]],
         impact: dict[str, Any],
+        asset_uploads: list[dict[str, Any]] | None = None,
         dry_run: bool = False,
         validate_only: bool = False,
     ) -> dict[str, Any]:
@@ -306,8 +322,9 @@ def create_write_data_tool(
             write_intent = WriteIntent(
                 goal=goal,
                 reasoning=reasoning,
+                asset_uploads=[AssetUpload(**au) for au in (asset_uploads or [])],
                 operations=[Operation(**op) for op in operations],
-                impact=impact
+                impact=impact,
             )
 
             # Access control: Verify all tables in operations

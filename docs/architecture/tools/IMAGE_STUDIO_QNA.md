@@ -420,12 +420,25 @@ class ImageStudioOutput(BaseModel):
 - [x] Add temp file management (uses same dir as WhatsApp media)
 - [x] Add to Catalog Specialist
 - [x] Extend storage client with `upload_asset` (for HITL approval flow)
+- [x] Add `FileStorageMixin` to `StorageInterface` (hexagonal architecture)
+- [x] Extend `WriteIntent` with `asset_uploads` field
+- [x] Update executor to handle asset uploads before DB operations
 - [ ] Test end-to-end scenarios
 
 ---
 
 **Completed:** Nov 30, 2025
 
+**Architecture Summary:**
+
+```
+Image Studio --> temp_path --> WriteIntent.asset_uploads --> Executor
+                                                               |
+                                        1. Upload assets (storage.upload_asset)
+                                        2. Store in context (@name.public_url)
+                                        3. Execute DB operations (transaction)
+                                        4. On error: rollback uploads + transaction
+```
+
 **Remaining:**
-1. Extend storage client with `upload_asset` for Supabase Storage
-2. Test end-to-end product onboarding with real images
+1. Test end-to-end product onboarding with real images
