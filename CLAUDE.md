@@ -84,17 +84,11 @@ Every change—whether design, architecture, or code—must meet this standard:
 - **Version prompts alongside code** - no hardcoded instructions in agent logic
 - **XML structure, right altitude, canonical examples** - no Python code in prompts
 
-### Documentation & Libraries
-- Update architectural docs in lockstep with major decisions
-- **Library verification priority**: (1) Official docs + source code, (2) Python REPL inspection (`uv run python -c`), (3) Local docs
-- Always verify APIs with `inspect`/`dir` before depending on them
-- Capture context-engineering strategies and extension points for reuse
-
 ### Documentation Strategy
-- **[CRITICAL]Check first, then decide**: Review existing docs before creating new ones; update rather than duplicate
-- **[CRITICAL]Create only when necessary**: Novel topics, complex specifications, long-term architectural impact
-- **Make scannable**: Date/status header, executive summary, tables/schemas/examples, implementation checklists
-- **Connect the dots**: Link related docs, mark open questions, align with architectural canon
+- **[CRITICAL] Check first, update rather than duplicate**: Review existing docs before creating new ones
+- **Create only when necessary**: Novel topics, complex specifications, long-term architectural impact
+- **Make scannable**: Date/status header, executive summary, tables/schemas/examples
+- Update architectural docs in lockstep with major decisions
 
 ### Quality Standards
 - Treat testing, observability, recovery as foundational (not optional)
@@ -141,15 +135,10 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 
 **Prerequisites**: Python 3.12+, `uv`, PostgreSQL
 
-### Architectural Canon
-
-**Navigation hub**: `docs/architecture/README.md` - All docs categorized by concern
-
 ### Common Gotchas
 
 **LangChain v1 Stack**:
 - Stable releases: `langchain>=1.0.2`, `langgraph>=1.0.1`, `deepagents>=0.2.4`
-- Verify APIs with `inspect`/`dir` before depending on them
 
 **Windows**:
 - Use `.venv\Scripts\activate` (not `source`)
