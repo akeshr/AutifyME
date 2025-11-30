@@ -180,6 +180,27 @@ def _save_base64_image(
     return file_path, metadata
 
 
+def _extract_image_from_response(response: Any) -> str | None:
+    """Extract base64 image data from Gemini response.
+
+    Gemini 3 returns images at response.content[0]["image_url"]["url"] as data URI.
+    """
+    content = getattr(response, "content", None)
+    if isinstance(content, list) and len(content) > 0:
+        part = content[0]
+        if isinstance(part, dict) and "image_url" in part:
+            url = part["image_url"].get("url", "")
+            if url.startswith("data:"):
+                return url
+
+    logger.warning(
+        "No image in response. content_type=%s, content_len=%s",
+        type(content).__name__,
+        len(content) if isinstance(content, list) else "N/A",
+    )
+    return None
+
+
 # =============================================================================
 # Prompt Builders
 # =============================================================================
@@ -541,15 +562,14 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
 
         response = llm.invoke(messages)
 
-        image_data = None
-        if hasattr(response, "additional_kwargs"):
-            image_data = response.additional_kwargs.get("image")
+        # Extract image using helper function
+        image_data = _extract_image_from_response(response)
 
         if not image_data:
             return ImageStudioOutput(
                 success=False,
                 operation=ImageOperation.EDIT,
-                error="No image returned from API",
+                error="No image returned from API - check logs for response structure",
                 error_code=ImageStudioErrorCode.API_ERROR,
             )
 
@@ -624,15 +644,14 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
         messages = [{"role": "user", "content": content}]
         response = llm.invoke(messages)
 
-        image_data = None
-        if hasattr(response, "additional_kwargs"):
-            image_data = response.additional_kwargs.get("image")
+        # Extract image using helper function
+        image_data = _extract_image_from_response(response)
 
         if not image_data:
             return ImageStudioOutput(
                 success=False,
                 operation=ImageOperation.GENERATE,
-                error="No image returned from API",
+                error="No image returned from API - check logs for response structure",
                 error_code=ImageStudioErrorCode.API_ERROR,
             )
 

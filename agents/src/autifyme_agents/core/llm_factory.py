@@ -127,7 +127,7 @@ def get_llm(
         - Capabilities: Generate, edit, analyze; 1K/2K/4K output; up to 14 reference images
         - Character consistency across generations; advanced text rendering
         - Thought Signatures: Gemini 3 returns encrypted thought signatures for multi-turn
-        - Retrieve images from response.additional_kwargs["image"] as base64
+        - Retrieve images from response.content[0]["image_url"]["url"] as data URI (base64)
 
         **Text-to-Speech (TTS):**
         - Models: gemini-2.5-pro-preview-tts, gemini-2.5-flash-preview-tts
