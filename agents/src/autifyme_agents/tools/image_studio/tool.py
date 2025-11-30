@@ -1,6 +1,10 @@
-"""Image Studio Tool - Unified image processing with Gemini 3 Pro Image.
+"""Image Studio Tool - Comprehensive image processing with Gemini 3 Pro Image.
 
-Operations: analyze, edit, generate.
+Operations:
+- analyze: Extract attributes, detect multiple products, identify variants
+- edit: Background removal, extraction from groups, enhancement, reframing
+- generate: Lifestyle shots, studio shots, scene composites
+
 Architecture: Atomic tool with structured Pydantic input/output.
 """
 
@@ -29,6 +33,8 @@ from autifyme_agents.tools.image_studio.schemas import (
     AnalysisResult,
     BackgroundSpec,
     EnhancementSpec,
+    ExtractionSpec,
+    FocusRegionSpec,
     FramingSpec,
     ImageMetadata,
     ImageOperation,
@@ -44,18 +50,15 @@ from autifyme_agents.tools.image_studio.schemas import (
 
 logger = logging.getLogger(__name__)
 
-# Use same temp directory as WhatsApp media downloads (consistency)
+# Use same temp directory as WhatsApp media downloads
 if platform.system() == "Windows":
     MEDIA_DIR = Path(tempfile.gettempdir()) / "media_downloads"
 else:
     MEDIA_DIR = Path("/tmp/media_downloads")
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Image processing constants
 MAX_DIMENSION = 2048
 JPEG_QUALITY = 85
-
-# Gemini 3 Pro Image model ID
 GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 
 
@@ -68,25 +71,17 @@ def _get_gemini3_image_llm(
     output_spec: OutputSpec | None = None,
     for_analysis: bool = False,
 ):
-    """Get Gemini 3 Pro Image LLM with proper configuration.
-
-    Args:
-        output_spec: Output specifications for image generation/editing
-        for_analysis: If True, only TEXT modality (no image generation)
-
-    Returns:
-        Configured LLM for Gemini 3 Pro Image
-    """
+    """Get Gemini 3 Pro Image LLM with proper configuration."""
     if for_analysis:
-        # Analysis only needs TEXT output
         return get_llm(
             provider="google",
             model=GEMINI_3_IMAGE_MODEL,
             response_modalities=["TEXT"],
         )
 
-    # For edit/generate, include IMAGE modality with config
     aspect_ratio = output_spec.aspect_ratio if output_spec else "1:1"
+    if aspect_ratio == "original":
+        aspect_ratio = "1:1"  # Fallback for generation
     image_size = output_spec.size if output_spec else "2K"
 
     return get_llm(
@@ -104,29 +99,16 @@ def _get_gemini3_image_llm(
 
 
 def _load_and_encode_image(image_path: str) -> tuple[str, str]:
-    """Load image, resize if needed, encode to base64 data URI.
-
-    Args:
-        image_path: Path to source image
-
-    Returns:
-        Tuple of (base64_data_uri, mime_type)
-
-    Raises:
-        FileNotFoundError: If image doesn't exist
-        ValueError: If image is corrupt
-    """
+    """Load image, resize if needed, encode to base64 data URI."""
     path = Path(image_path)
     if not path.exists():
         raise FileNotFoundError(f"Image not found: {image_path}")
 
     try:
         with Image.open(path) as img:
-            # Determine format
             fmt = img.format or "JPEG"
             mime_type = f"image/{fmt.lower()}"
 
-            # Convert to RGB if needed
             if img.mode in ("RGBA", "LA", "P"):
                 rgb_img = Image.new("RGB", img.size, (255, 255, 255))
                 if img.mode == "RGBA":
@@ -137,7 +119,6 @@ def _load_and_encode_image(image_path: str) -> tuple[str, str]:
                 fmt = "JPEG"
                 mime_type = "image/jpeg"
 
-            # Resize if too large
             width, height = img.size
             if max(width, height) > MAX_DIMENSION:
                 if width > height:
@@ -148,7 +129,6 @@ def _load_and_encode_image(image_path: str) -> tuple[str, str]:
                     new_width = int(width * (MAX_DIMENSION / height))
                 img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
-            # Encode to base64
             buffer = io.BytesIO()
             img.save(buffer, format=fmt, quality=JPEG_QUALITY, optimize=True)
             encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
@@ -165,35 +145,22 @@ def _save_base64_image(
     base64_data: str,
     operation: str,
     output_spec: OutputSpec,
+    description: str | None = None,
 ) -> tuple[Path, ImageMetadata]:
-    """Save base64 image data to temp file.
-
-    Args:
-        base64_data: Base64 encoded image (may include data URI prefix)
-        operation: Operation name for filename
-        output_spec: Output configuration
-
-    Returns:
-        Tuple of (file_path, metadata)
-    """
-    # Strip data URI prefix if present
+    """Save base64 image data to temp file."""
     if "," in base64_data:
         base64_data = base64_data.split(",", 1)[1]
 
-    # Decode
     image_bytes = base64.b64decode(base64_data)
 
-    # Generate filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = str(uuid.uuid4())[:8]
     extension = output_spec.format.lower()
     filename = f"{timestamp}_{operation}_{unique_id}.{extension}"
     file_path = MEDIA_DIR / filename
 
-    # Save file
     file_path.write_bytes(image_bytes)
 
-    # Get metadata
     with Image.open(file_path) as img:
         width, height = img.size
         metadata = ImageMetadata(
@@ -218,70 +185,149 @@ def _save_base64_image(
 # =============================================================================
 
 
-def _build_analyze_prompt(analysis: AnalysisAttributes) -> str:
-    """Build analysis prompt from AnalysisAttributes."""
+def _build_analyze_prompt(input_spec: ImageStudioInput) -> str:
+    """Build comprehensive analysis prompt."""
+    analysis = input_spec.analysis or AnalysisAttributes()
     sections = []
 
+    # Standard attributes
     if analysis.colors:
-        sections.append("COLORS: List all dominant colors visible (e.g., 'transparent', 'amber', 'white')")
+        sections.append("COLORS: List all dominant colors (e.g., 'transparent', 'amber', 'red', 'blue')")
     if analysis.materials:
-        sections.append("MATERIALS: Identify materials (e.g., 'PET plastic', 'glass', 'aluminum')")
+        sections.append("MATERIALS: Identify materials (e.g., 'PET plastic', 'glass', 'aluminum', 'paper')")
     if analysis.dimensions:
-        sections.append("DIMENSIONS: Estimate size/dimensions from visual cues or labels")
+        sections.append("DIMENSIONS: Estimate size/dimensions from visual cues, labels, or context")
     if analysis.condition:
-        sections.append("CONDITION: Assess product condition (new, used, damaged)")
+        sections.append("CONDITION: Assess condition (new, used, damaged, worn)")
     if analysis.brand_text:
-        sections.append("BRAND_TEXT: Extract all visible text, logos, brand names")
+        sections.append("BRAND_TEXT: Extract ALL visible text, logos, brand names, labels")
     if analysis.product_category:
-        sections.append("PRODUCT_CATEGORY: Classify product type (e.g., 'jar', 'bottle', 'container')")
+        sections.append("PRODUCT_CATEGORY: Classify product type (jar, bottle, container, box, etc.)")
     if analysis.quality_score:
-        sections.append("QUALITY_SCORE: Rate image quality 0.0-1.0 (lighting, focus, composition)")
+        sections.append("QUALITY_SCORE: Rate image quality 0.0-1.0 (consider lighting, focus, composition, resolution)")
     if analysis.background_type:
-        sections.append("BACKGROUND_TYPE: Describe background (solid, cluttered, gradient, transparent)")
+        sections.append("BACKGROUND_TYPE: Describe background (solid white, cluttered, gradient, transparent, natural)")
 
+    # Custom attributes
     for attr in analysis.custom_attributes:
         sections.append(f"CUSTOM - {attr.upper()}: Extract {attr}")
 
-    return f"""Analyze this product image and extract the following attributes:
+    # Multi-product detection (CRITICAL)
+    multi_product_section = """
+MULTI-PRODUCT DETECTION (CRITICAL):
+- PRODUCT_COUNT: Count ALL distinct products/items in image (not just 1!)
+- For EACH product found, add to product_inventory:
+  - index: Product number (1, 2, 3...)
+  - description: Brief description ("500ml red jar", "1L clear bottle")
+  - position: Where in image ("left", "center", "right", "top", "bottom", "foreground")
+  - relative_size: "largest", "medium", or "smallest"
+  - distinguishing_features: What makes this unique ["red cap", "500ml label", "square shape"]
+  - suggested_extraction: How to extract this ("the red jar on the left", "the largest bottle")
+"""
 
+    variant_section = ""
+    if analysis.identify_variants:
+        variant_section = """
+VARIANT DETECTION:
+- detected_variants: List each variant found (e.g., ["500ml clear", "1L clear", "500ml amber"])
+- variant_axis: Primary differentiation axis (Size, Color, Material, Shape)
+"""
+
+    recommendations_section = """
+RECOMMENDATIONS:
+- suggested_operations: List recommended follow-up operations based on what you see:
+  - If multiple products: ["Extract each product individually", "Create separate images for each variant"]
+  - If poor quality: ["Enhance image quality", "Improve lighting"]
+  - If cluttered background: ["Remove background", "Replace with solid white"]
+"""
+
+    return f"""Analyze this product image COMPREHENSIVELY.
+
+ATTRIBUTES TO EXTRACT:
 {chr(10).join(f'- {s}' for s in sections)}
 
-Also detect:
-- PRODUCT_COUNT: How many distinct products are in the image?
-- If multiple products detected, set multi_product_warning
+{multi_product_section}
+{variant_section}
+{recommendations_section}
+
+IMPORTANT: If you see multiple products/variants in ONE image, you MUST:
+1. Set product_count to the actual number (2, 3, 4, etc.)
+2. Fill product_inventory with details for EACH product
+3. Set multi_product_warning explaining what you found
+4. Suggest extraction operations for each product
 
 Return structured JSON matching the AnalysisResult schema."""
 
 
 def _build_edit_prompt(input_spec: ImageStudioInput) -> str:
-    """Build edit prompt from structured input."""
+    """Build comprehensive edit prompt."""
     instructions = ["Edit this product image with the following specifications:"]
 
+    # Custom instruction takes priority
+    if input_spec.custom_instruction:
+        instructions.append(f"\nCUSTOM INSTRUCTION: {input_spec.custom_instruction}")
+
+    # Extraction from group photo
+    if input_spec.extraction:
+        ex = input_spec.extraction
+        extraction_inst = f"EXTRACT PRODUCT: Isolate and extract '{ex.target_description}'"
+        if ex.position_hint:
+            extraction_inst += f" (hint: {ex.position_hint} side of image)"
+        if ex.isolate:
+            extraction_inst += ". Remove ALL other products from the image."
+        if ex.clean_edges:
+            extraction_inst += " Clean up edges for professional appearance."
+        instructions.append(extraction_inst)
+
+    # Focus/crop region
+    if input_spec.focus:
+        fo = input_spec.focus
+        if fo.type == "custom" and fo.custom_focus:
+            instructions.append(f"FOCUS: Crop/zoom to focus on {fo.custom_focus}")
+        elif fo.type == "product":
+            instructions.append("FOCUS: Crop to focus on the main product, remove excess background")
+        elif fo.type == "label":
+            instructions.append("FOCUS: Crop to focus on product label/branding")
+        if fo.zoom_level != 1.0:
+            instructions.append(f"ZOOM: Apply {fo.zoom_level}x zoom")
+        if fo.position:
+            instructions.append(f"FOCUS POSITION: Emphasize {fo.position} area of image")
+
+    # Background
     if input_spec.background:
         bg = input_spec.background
-        if bg.type == "solid":
+        if bg.type == "remove" or bg.type == "transparent":
+            instructions.append("BACKGROUND: Remove background completely (transparent PNG)")
+        elif bg.type == "solid":
             instructions.append(f"BACKGROUND: Replace with solid {bg.color} color")
-        elif bg.type == "transparent":
-            instructions.append("BACKGROUND: Make background transparent (PNG)")
         elif bg.type == "gradient":
             instructions.append(f"BACKGROUND: Apply gradient from {bg.color} to {bg.gradient_end}")
         elif bg.type == "blur":
             instructions.append(f"BACKGROUND: Blur background ({bg.blur_strength} strength)")
+        elif bg.type == "scene" and bg.scene_description:
+            instructions.append(f"BACKGROUND: Generate new background scene: {bg.scene_description}")
 
+    # Lighting
     if input_spec.lighting:
         lt = input_spec.lighting
         instructions.append(
             f"LIGHTING: Apply {lt.type} lighting from {lt.direction}, "
-            f"intensity={lt.intensity}, temperature={lt.color_temperature}"
+            f"intensity={lt.intensity}, temperature={lt.color_temperature}, shadows={lt.shadows}"
         )
 
+    # Framing
     if input_spec.framing:
         fr = input_spec.framing
-        instructions.append(
-            f"FRAMING: Product should cover {fr.product_coverage_percent}% of frame, "
-            f"aligned {fr.alignment}, angle={fr.angle}, padding={fr.padding_percent}%"
-        )
+        framing_inst = f"FRAMING: Product coverage {fr.product_coverage_percent}%, aligned {fr.alignment}"
+        if fr.angle != "front":
+            framing_inst += f", angle={fr.angle}"
+        if fr.padding_percent > 0:
+            framing_inst += f", padding={fr.padding_percent}%"
+        if fr.crop_to_product:
+            framing_inst += ", crop tightly to product"
+        instructions.append(framing_inst)
 
+    # Enhancement
     if input_spec.enhancement:
         en = input_spec.enhancement
         enhancements = []
@@ -291,54 +337,85 @@ def _build_edit_prompt(input_spec: ImageStudioInput) -> str:
             enhancements.append(f"contrast={en.contrast}")
         if en.saturation != "none":
             enhancements.append(f"saturation={en.saturation}")
+        if en.brightness != "none":
+            enhancements.append(f"brightness={en.brightness}")
         if en.denoise:
             enhancements.append("denoise")
         if en.upscale != "none":
             enhancements.append(f"upscale={en.upscale}")
         if en.color_correction:
-            enhancements.append("color_correction")
+            enhancements.append("auto_color_correction")
+        if en.remove_blemishes:
+            enhancements.append("remove_blemishes")
+        if en.restore_details:
+            enhancements.append("AI_restore_details")
         if enhancements:
             instructions.append(f"ENHANCE: Apply {', '.join(enhancements)}")
 
     # Output specs
     out = input_spec.output
     instructions.append(
-        f"OUTPUT: Generate {out.size} image, aspect ratio {out.aspect_ratio}, format {out.format}"
+        f"OUTPUT: {out.size} image, aspect ratio {out.aspect_ratio}, format {out.format}"
     )
 
     return "\n".join(instructions)
 
 
 def _build_generate_prompt(input_spec: ImageStudioInput) -> str:
-    """Build generation prompt from structured input."""
-    if not input_spec.scene:
-        return "Generate a professional product photo with clean studio background."
+    """Build comprehensive generation prompt."""
+    instructions = []
 
-    sc = input_spec.scene
-    pl = input_spec.placement or ProductPlacement()
+    # Custom instruction
+    if input_spec.custom_instruction:
+        instructions.append(f"INSTRUCTION: {input_spec.custom_instruction}")
 
-    prompt = f"""Generate a lifestyle product photograph:
-
-SCENE:
+    # Scene specification
+    if input_spec.scene:
+        sc = input_spec.scene
+        if sc.environment == "custom" and sc.custom_description:
+            instructions.append(f"SCENE: {sc.custom_description}")
+        else:
+            instructions.append(f"""SCENE:
 - Environment: {sc.environment}
 - Style: {sc.style}
 - Mood: {sc.mood}
-- Time of day: {sc.time_of_day}
+- Time of day: {sc.time_of_day}""")
 
-PRODUCT PLACEMENT:
+    # Product placement
+    if input_spec.placement:
+        pl = input_spec.placement
+        instructions.append(f"""PRODUCT PLACEMENT:
 - Position: {pl.position}
 - Scale: {pl.scale}
 - Surface: {pl.surface or 'appropriate for scene'}
+- Angle: {pl.angle}
+- Shadow: {'realistic shadow' if pl.shadow else 'no shadow'}""")
 
-The product from the source image should be seamlessly placed in this scene.
-Maintain product details and proportions accurately.
-"""
+    # Lighting
+    if input_spec.lighting:
+        lt = input_spec.lighting
+        instructions.append(
+            f"LIGHTING: {lt.type} from {lt.direction}, {lt.intensity} intensity, "
+            f"{lt.color_temperature} temperature, {lt.shadows} shadows"
+        )
+
+    # Default if no scene specified
+    if not instructions:
+        instructions.append(
+            "Generate a professional product photograph with clean, well-lit studio background."
+        )
+
+    # Core requirement
+    instructions.append(
+        "\nThe product from the source image must be seamlessly integrated. "
+        "Maintain exact product details, proportions, and quality."
+    )
 
     # Output specs
     out = input_spec.output
-    prompt += f"\nOUTPUT: {out.size} image, aspect ratio {out.aspect_ratio}, format {out.format}"
+    instructions.append(f"\nOUTPUT: {out.size}, {out.aspect_ratio} aspect ratio, {out.format}")
 
-    return prompt
+    return "\n".join(instructions)
 
 
 # =============================================================================
@@ -347,7 +424,7 @@ Maintain product details and proportions accurately.
 
 
 def _handle_analyze(input_spec: ImageStudioInput) -> ImageStudioOutput:
-    """Handle analyze operation."""
+    """Handle analyze operation with comprehensive multi-product detection."""
     if not input_spec.source_image:
         return ImageStudioOutput(
             success=False,
@@ -357,17 +434,10 @@ def _handle_analyze(input_spec: ImageStudioInput) -> ImageStudioOutput:
         )
 
     try:
-        # Load and encode image
         image_uri, _ = _load_and_encode_image(input_spec.source_image)
-
-        # Get Gemini 3 Pro Image for analysis (TEXT output only)
         llm = _get_gemini3_image_llm(for_analysis=True)
+        prompt = _build_analyze_prompt(input_spec)
 
-        # Build prompt
-        analysis_attrs = input_spec.analysis or AnalysisAttributes()
-        prompt = _build_analyze_prompt(analysis_attrs)
-
-        # Build message with image
         messages = [
             {
                 "role": "user",
@@ -378,7 +448,6 @@ def _handle_analyze(input_spec: ImageStudioInput) -> ImageStudioOutput:
             }
         ]
 
-        # Get structured output
         structured_llm = llm.with_structured_output(
             AnalysisResult,
             method="json_schema",
@@ -387,26 +456,38 @@ def _handle_analyze(input_spec: ImageStudioInput) -> ImageStudioOutput:
 
         result = structured_llm.invoke(messages)
 
-        # Convert to AnalysisResult if needed
         if isinstance(result, dict):
             result = AnalysisResult(**result)
 
-        # Check for warnings
+        # Build warnings and next_steps
         warnings = []
+        next_steps = []
+
         if result.quality_score < 0.5:
             warnings.append(f"Low image quality score: {result.quality_score:.2f}")
+            next_steps.append("Consider enhancing image quality before cataloging")
+
         if result.product_count > 1:
             warnings.append(f"Multiple products detected: {result.product_count}")
             result.multi_product_warning = (
                 f"Image contains {result.product_count} products. "
-                "Consider using single product images for catalog."
+                "Use extraction to create individual product images."
             )
+            # Add extraction suggestions for each product
+            for product in result.product_inventory:
+                next_steps.append(
+                    f"Extract product {product.index}: {product.suggested_extraction}"
+                )
+
+        # Add any suggested operations from analysis
+        next_steps.extend(result.suggested_operations)
 
         return ImageStudioOutput(
             success=True,
             operation=ImageOperation.ANALYZE,
             analysis=result,
             warnings=warnings,
+            next_steps=next_steps,
         )
 
     except FileNotFoundError as e:
@@ -434,7 +515,7 @@ def _handle_analyze(input_spec: ImageStudioInput) -> ImageStudioOutput:
 
 
 def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
-    """Handle edit operation."""
+    """Handle edit operation including extraction and enhancement."""
     if not input_spec.source_image:
         return ImageStudioOutput(
             success=False,
@@ -444,16 +525,10 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
         )
 
     try:
-        # Load and encode image
         image_uri, _ = _load_and_encode_image(input_spec.source_image)
-
-        # Get Gemini 3 Pro Image for editing with output config
         llm = _get_gemini3_image_llm(output_spec=input_spec.output)
-
-        # Build prompt
         prompt = _build_edit_prompt(input_spec)
 
-        # Build message with image
         messages = [
             {
                 "role": "user",
@@ -464,10 +539,8 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
             }
         ]
 
-        # Invoke
         response = llm.invoke(messages)
 
-        # Extract image from response
         image_data = None
         if hasattr(response, "additional_kwargs"):
             image_data = response.additional_kwargs.get("image")
@@ -480,11 +553,15 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
                 error_code=ImageStudioErrorCode.API_ERROR,
             )
 
-        # Save output
+        # Generate description based on operation
+        description = "Edited image"
+        if input_spec.extraction:
+            description = f"Extracted: {input_spec.extraction.target_description}"
+        elif input_spec.background and input_spec.background.type in ("transparent", "remove"):
+            description = "Background removed"
+
         file_path, metadata = _save_base64_image(
-            image_data,
-            "edit",
-            input_spec.output,
+            image_data, "edit", input_spec.output, description
         )
 
         output_variant = OutputVariant(
@@ -492,6 +569,7 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
             path=str(file_path),
             preview_path=str(file_path),
             metadata=metadata,
+            description=description,
         )
 
         return ImageStudioOutput(
@@ -525,22 +603,17 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
 
 
 def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
-    """Handle generate operation (lifestyle shots)."""
+    """Handle generate operation for lifestyle and studio shots."""
     try:
-        # Get Gemini 3 Pro Image for generation with output config
         llm = _get_gemini3_image_llm(output_spec=input_spec.output)
-
-        # Build prompt
         prompt = _build_generate_prompt(input_spec)
 
-        # Build message (optionally with source image for reference)
         content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
 
         if input_spec.source_image:
             image_uri, _ = _load_and_encode_image(input_spec.source_image)
             content.append({"type": "image_url", "image_url": {"url": image_uri}})
 
-        # Add reference images (up to 14 for Gemini 3)
         for ref_path in input_spec.reference_images[:14]:
             try:
                 ref_uri, _ = _load_and_encode_image(ref_path)
@@ -549,11 +622,8 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
                 logger.warning("Failed to load reference image %s: %s", ref_path, e)
 
         messages = [{"role": "user", "content": content}]
-
-        # Invoke
         response = llm.invoke(messages)
 
-        # Extract image from response
         image_data = None
         if hasattr(response, "additional_kwargs"):
             image_data = response.additional_kwargs.get("image")
@@ -566,11 +636,12 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
                 error_code=ImageStudioErrorCode.API_ERROR,
             )
 
-        # Save output
+        description = "Generated image"
+        if input_spec.scene:
+            description = f"Lifestyle: {input_spec.scene.environment}"
+
         file_path, metadata = _save_base64_image(
-            image_data,
-            "generate",
-            input_spec.output,
+            image_data, "generate", input_spec.output, description
         )
 
         output_variant = OutputVariant(
@@ -578,6 +649,7 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
             path=str(file_path),
             preview_path=str(file_path),
             metadata=metadata,
+            description=description,
         )
 
         return ImageStudioOutput(
@@ -612,6 +684,7 @@ def _image_studio_impl(
     operation: str,
     source_image: str | None = None,
     reference_images: list[str] | None = None,
+    custom_instruction: str | None = None,
     background: dict | None = None,
     lighting: dict | None = None,
     framing: dict | None = None,
@@ -619,30 +692,26 @@ def _image_studio_impl(
     scene: dict | None = None,
     placement: dict | None = None,
     analysis: dict | None = None,
+    extraction: dict | None = None,
+    focus: dict | None = None,
     output: dict | None = None,
 ) -> dict[str, Any]:
-    """Image Studio tool implementation.
-
-    Internal function that handles the actual processing.
-    Converts dict inputs to Pydantic models and dispatches to handlers.
-    """
+    """Image Studio tool implementation."""
     try:
-        # Helper to handle both dict and Pydantic model inputs
-        # (LangChain's args_schema may already convert dicts to Pydantic models)
         def _maybe_convert(value, model_class):
             if value is None:
                 return None
             if isinstance(value, model_class):
-                return value  # Already converted by args_schema
+                return value
             if isinstance(value, dict):
-                return model_class(**value)  # Convert dict to model
+                return model_class(**value)
             return value
 
-        # Build input spec from individual fields
         input_spec = ImageStudioInput(
             operation=ImageOperation(operation) if isinstance(operation, str) else operation,
             source_image=source_image,
             reference_images=reference_images or [],
+            custom_instruction=custom_instruction,
             background=_maybe_convert(background, BackgroundSpec),
             lighting=_maybe_convert(lighting, LightingSpec),
             framing=_maybe_convert(framing, FramingSpec),
@@ -650,10 +719,11 @@ def _image_studio_impl(
             scene=_maybe_convert(scene, SceneSpec),
             placement=_maybe_convert(placement, ProductPlacement),
             analysis=_maybe_convert(analysis, AnalysisAttributes),
+            extraction=_maybe_convert(extraction, ExtractionSpec),
+            focus=_maybe_convert(focus, FocusRegionSpec),
             output=_maybe_convert(output, OutputSpec) or OutputSpec(),
         )
 
-        # Dispatch to handler
         if input_spec.operation == ImageOperation.ANALYZE:
             result = _handle_analyze(input_spec)
         elif input_spec.operation == ImageOperation.EDIT:
@@ -668,7 +738,6 @@ def _image_studio_impl(
                 error_code=ImageStudioErrorCode.INVALID_INPUT,
             )
 
-        # Convert to dict for return
         if result.success:
             return build_success_response(result.model_dump())
         else:
@@ -678,6 +747,7 @@ def _image_studio_impl(
                 "error_code": result.error_code,
                 "operation": result.operation.value,
                 "warnings": result.warnings,
+                "next_steps": result.next_steps,
             }
 
     except Exception as e:
@@ -694,20 +764,62 @@ def _image_studio_impl(
 
 
 def create_image_studio_tool() -> StructuredTool:
-    """Create the Image Studio tool with structured input.
+    """Create the Image Studio tool.
 
-    Returns StructuredTool for use in agent toolkits.
+    CAPABILITIES (Gemini 3 Pro Image):
+
+    ANALYZE:
+    - Single product: Extract colors, materials, dimensions, brand text
+    - Multi-product group: Detect ALL products, list positions, identify each variant
+    - Quality assessment: Score 0-1, suggest improvements
+    - Returns product_inventory with extraction suggestions for each item
+
+    EDIT:
+    - Background: Remove (transparent), solid color, gradient, blur, generate scene
+    - Extract product: Isolate specific product from group photo
+    - Enhance: Sharpen, denoise, upscale 2x/4x, color correct, remove blemishes
+    - Reframe: Crop, zoom, change composition, adjust padding
+
+    GENERATE:
+    - Lifestyle shots: Product in realistic scenes (kitchen, office, retail)
+    - Studio shots: Clean professional backgrounds
+    - Custom scenes: Describe any environment
     """
     return StructuredTool.from_function(
         func=_image_studio_impl,
         name="image_studio",
-        description=(
-            "Process product images with Gemini 3 Pro Image. Operations:\n"
-            "- analyze: Extract visual attributes (colors, materials, quality)\n"
-            "- edit: Modify image (background, enhancement, lighting)\n"
-            "- generate: Create lifestyle shots with product in scene\n"
-            "All parameters are structured. Returns file paths for HITL preview."
-        ),
+        description="""Process product images with Gemini 3 Pro Image.
+
+OPERATIONS:
+
+1. ANALYZE - Extract visual attributes and detect multiple products
+   - Detects ALL products in image (group photos, variants)
+   - Returns product_inventory with position and extraction suggestions
+   - Identifies variant axes (Size, Color, Material)
+   - Rates image quality 0-1
+
+2. EDIT - Modify image: extract, background, enhance
+   - EXTRACT: Isolate specific product from group ("the red jar on left")
+   - BACKGROUND: Remove (transparent), solid, gradient, blur, scene
+   - ENHANCE: Sharpen, denoise, upscale 2x/4x, color correct
+   - REFRAME: Crop, zoom, adjust composition
+
+3. GENERATE - Create new images
+   - LIFESTYLE: Product in scenes (kitchen, office, outdoor)
+   - STUDIO: Clean professional backgrounds
+   - CUSTOM: Any scene via custom_instruction
+
+MULTI-PRODUCT WORKFLOW:
+1. analyze(source_image) -> Get product_inventory with positions
+2. For each product: edit(extraction={"target_description": "..."})
+3. Create individual assets for each extracted image
+
+KEY PARAMETERS:
+- custom_instruction: Free-form text for complex operations
+- extraction: {target_description, position_hint, isolate}
+- background: {type: transparent|solid|gradient|blur|scene}
+- enhancement: {sharpness, denoise, upscale, color_correction}
+- scene: {environment, style, mood} for lifestyle generation""",
         args_schema=ImageStudioInput,
         return_direct=False,
     )

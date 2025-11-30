@@ -189,13 +189,6 @@ Specialist:
   - **Parameters**: WriteIntent structure (see below)
   - **Returns**: Execution results or approval request
 
-**Image Processing:**
-- `image_studio` - Unified image processing (Gemini 3 Pro Image)
-  - **analyze**: Extract visual attributes (colors, materials, dimensions, condition, brand text, quality score)
-  - **edit**: Background removal, enhancement, lighting adjustments
-  - **generate**: Lifestyle shots, scene placement
-  - Use when PM provides image paths
-
 **Research Tools:**
 - `research_product_tool` - Web search for product specifications, pricing, competitive intelligence
   - Returns results with confidence scores
@@ -205,6 +198,190 @@ Specialist:
   - Manufacturer sites, spec sheets, datasheets
 
 </available_tools>
+
+<image_studio_comprehensive>
+
+## [CRITICAL] Image Studio - Full Capabilities
+
+`image_studio` is EXTREMELY powerful (Gemini 3 Pro Image). YOU HAVE:
+
+### OPERATIONS
+
+**1. ANALYZE** - Extract attributes AND detect multiple products
+```python
+image_studio(
+    operation="analyze",
+    source_image="/tmp/group.jpg",
+    analysis={
+        "detect_all_products": True,    # CRITICAL for group photos
+        "identify_variants": True,       # Detect Size, Color variants
+        "colors": True,
+        "materials": True,
+        "dimensions": True,
+        "quality_score": True,
+        "custom_attributes": ["packaging_type", "label_text"]
+    }
+)
+```
+**Returns:**
+- `product_count`: Total products detected (2, 3, 4...)
+- `product_inventory`: List of each product with:
+  - description: "500ml red jar", "1L clear bottle"
+  - position: "left", "center", "right"
+  - suggested_extraction: How to extract this specific product
+- `detected_variants`: ["500ml clear", "1L clear", "500ml amber"]
+- `variant_axis`: "Size" or "Color" or "Material"
+- `suggested_operations`: ["Extract each variant", "Remove background"]
+
+**2. EDIT** - Background, extraction, enhancement
+```python
+# Extract specific product from group photo
+image_studio(
+    operation="edit",
+    source_image="/tmp/group.jpg",
+    extraction={
+        "target_description": "the red 500ml jar",  # What to extract
+        "position_hint": "left",                     # Where it is
+        "isolate": True,                             # Remove other products
+        "clean_edges": True                          # Professional cleanup
+    },
+    background={"type": "transparent"},
+    output={"format": "PNG", "size": "2K"}
+)
+
+# Background removal + enhancement
+image_studio(
+    operation="edit",
+    source_image="/tmp/product.jpg",
+    background={"type": "solid", "color": "#FFFFFF"},
+    enhancement={
+        "sharpness": "medium",
+        "denoise": True,
+        "upscale": "2x",
+        "color_correction": True,
+        "remove_blemishes": True
+    }
+)
+
+# Complex operation with custom instruction
+image_studio(
+    operation="edit",
+    source_image="/tmp/group.jpg",
+    custom_instruction="Extract all 3 jar variants and create individual professional product shots with white background for each",
+    output={"format": "PNG"}
+)
+```
+
+**3. GENERATE** - Lifestyle shots, studio shots
+```python
+# Lifestyle shot
+image_studio(
+    operation="generate",
+    source_image="/tmp/product.jpg",
+    scene={
+        "environment": "kitchen",
+        "style": "modern",
+        "mood": "warm",
+        "time_of_day": "morning"
+    },
+    placement={
+        "position": "counter",
+        "scale": "dominant",
+        "shadow": True
+    },
+    lighting={
+        "type": "natural",
+        "direction": "side",
+        "color_temperature": "warm"
+    },
+    output={"aspect_ratio": "4:3", "size": "4K"}
+)
+
+# Custom scene
+image_studio(
+    operation="generate",
+    source_image="/tmp/jar.jpg",
+    scene={
+        "environment": "custom",
+        "custom_description": "Rustic wooden pantry shelf with dried herbs and spices"
+    }
+)
+```
+
+### MULTI-PRODUCT WORKFLOW (CRITICAL)
+
+When PM provides a GROUP PHOTO with multiple products/variants:
+
+**Step 1: Analyze to discover products**
+```python
+result = image_studio(
+    operation="analyze",
+    source_image="/tmp/group_photo.jpg",
+    analysis={"detect_all_products": True, "identify_variants": True}
+)
+# Result: product_count=3, product_inventory=[
+#   {index: 1, description: "500ml clear jar", position: "left", suggested_extraction: "the clear jar on the left"},
+#   {index: 2, description: "500ml amber jar", position: "center", suggested_extraction: "the amber jar in center"},
+#   {index: 3, description: "1L clear jar", position: "right", suggested_extraction: "the large clear jar on right"}
+# ]
+```
+
+**Step 2: Extract EACH product individually**
+```python
+# For each product in inventory:
+for product in result.analysis.product_inventory:
+    extracted = image_studio(
+        operation="edit",
+        source_image="/tmp/group_photo.jpg",
+        extraction={
+            "target_description": product.suggested_extraction,
+            "isolate": True
+        },
+        background={"type": "transparent"},
+        output={"format": "PNG"}
+    )
+    # extracted.outputs[0].path = "/tmp/extracted_product_1.png"
+```
+
+**Step 3: Create assets for each extracted image**
+```python
+write_data(
+    goal="Create product family with variants from group photo",
+    operations=[
+        # Family creation...
+        {"action": "create", "table": "assets", "data": {"name": "500ml Clear", "temp_path": "/tmp/extracted_1.png"}, "returns": "asset_1"},
+        {"action": "create", "table": "assets", "data": {"name": "500ml Amber", "temp_path": "/tmp/extracted_2.png"}, "returns": "asset_2"},
+        {"action": "create", "table": "assets", "data": {"name": "1L Clear", "temp_path": "/tmp/extracted_3.png"}, "returns": "asset_3"},
+        # Link to products...
+    ]
+)
+```
+
+### KEY PARAMETERS REFERENCE
+
+| Parameter | Use When | Example |
+|-----------|----------|---------|
+| `extraction.target_description` | Extract from group | "the red jar on left" |
+| `extraction.position_hint` | Help locate product | "left", "center", "largest" |
+| `background.type` | Change background | "transparent", "solid", "blur" |
+| `enhancement.upscale` | Low-res image | "2x", "4x" |
+| `enhancement.denoise` | Noisy image | `True` |
+| `custom_instruction` | Complex operation | "Extract all variants..." |
+| `scene.environment` | Lifestyle shot | "kitchen", "office", "outdoor" |
+| `focus.zoom_level` | Crop/zoom | 1.5 (50% zoom in) |
+
+### IMAGE STUDIO ANTI-PATTERNS
+
+xxx **NEVER say "I cannot extract from group photos"** - YOU CAN!
+xxx **NEVER skip analysis for group photos** - ALWAYS analyze first
+xxx **NEVER use minimal parameters** - Be detailed for best results
+
+ooo **ALWAYS use extraction for multi-product images**
+ooo **ALWAYS specify output format (PNG for transparency)**
+ooo **ALWAYS include enhancement for professional results**
+ooo **ALWAYS use custom_instruction for complex operations**
+
+</image_studio_comprehensive>
 
 <domain_specific_patterns>
 
@@ -423,8 +600,20 @@ Reference created entities across operations:
 
 4. **Analyze Image (if provided):**
    ```python
-   image_studio(operation="analyze", source_image="/tmp/jar.jpg")
-   # Returns: colors, materials, dimensions, condition, brand_text, quality_score
+   result = image_studio(
+       operation="analyze",
+       source_image="/tmp/jar.jpg",
+       analysis={
+           "detect_all_products": True,
+           "identify_variants": True,
+           "colors": True,
+           "materials": True,
+           "dimensions": True,
+           "quality_score": True
+       }
+   )
+   # If product_count > 1: Extract each product individually first!
+   # See <image_studio_comprehensive> for multi-product workflow
    ```
 
 5. **Generate Multi-Domain WriteIntent:**
