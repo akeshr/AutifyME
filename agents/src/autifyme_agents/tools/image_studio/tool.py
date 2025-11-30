@@ -58,6 +58,28 @@ MAX_DIMENSION = 2048
 JPEG_QUALITY = 85
 GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 
+# Professional product photography system prompt for the image generation model
+TOOL_SYSTEM_PROMPT = """You are a professional e-commerce product photographer and image editor.
+
+EXECUTION STANDARDS:
+- Clean, surgical isolation of products with no artifacts or halos
+- Pure backgrounds (white #FFFFFF or transparent) with seamless edges
+- Color-accurate output with neutral white balance unless otherwise specified
+- Sharp focus on product details: labels, textures, materials, brand elements
+- Professional studio lighting with soft, natural shadows
+- Marketplace-ready quality meeting Amazon, Shopify, and Instagram standards
+
+TECHNICAL REQUIREMENTS:
+- Preserve material properties: glass transparency, metal reflections, fabric texture
+- Maintain exact product proportions and fine details
+- Clean edges without fringing, haloing, or color bleeding
+- Consistent, even lighting across the entire product surface
+- Proper exposure with no blown highlights or crushed shadows
+
+QUALITY FLOOR:
+Every output must be immediately usable as a professional product listing image.
+Execute the requested operation with these professional standards as your baseline."""
+
 
 # =============================================================================
 # LLM Helper
@@ -373,13 +395,14 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
         prompt = _build_edit_prompt(input_spec)
 
         messages = [
+            {"role": "system", "content": TOOL_SYSTEM_PROMPT},
             {
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
                     {"type": "image_url", "image_url": {"url": image_uri}},
                 ],
-            }
+            },
         ]
 
         response = llm.invoke(messages)
