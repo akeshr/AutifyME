@@ -29,12 +29,10 @@ from autifyme_agents.tools.image_studio.schemas import (
     SceneSpec,
 )
 from autifyme_agents.tools.image_studio.tool import create_image_studio_tool
-from autifyme_agents.tools.image_studio.view_image import create_view_image_tool
 
 __all__ = [
-    # Tool factories
+    # Tool factory
     "create_image_studio_tool",
-    "create_view_image_tool",
     # Input schemas
     "ImageOperation",
     "BackgroundSpec",
