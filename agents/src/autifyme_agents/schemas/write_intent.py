@@ -29,6 +29,7 @@ class AssetUpload(BaseModel):
             AssetUpload(
                 temp_path="/tmp/media_downloads/20251130_edit_abc123.png",
                 returns="product_image",
+                caption="PET Jar 500ml Clear - product photo",
                 folder="products"
             )
         ]
@@ -62,6 +63,16 @@ class AssetUpload(BaseModel):
             "Name to assign to upload result.\n"
             "Operations can reference: @name.public_url, @name.storage_path, "
             "@name.size_bytes, @name.content_type"
+        ),
+    )
+
+    caption: str = Field(
+        default="",
+        description=(
+            "Human-readable caption for HITL image preview.\n"
+            "Describe what this specific image shows.\n"
+            "Example: 'PET Jar 500ml Clear - product photo'\n"
+            "Keep under 200 chars. Sent with image in WhatsApp."
         ),
     )
 
@@ -195,6 +206,7 @@ class WriteIntent(BaseModel):
     - Unified @name.field reference syntax
     - Flat operations list (no ChangeSpecification nesting)
     - Asset uploads processed before database operations
+    - LLM-generated hitl_summary for human approval
     """
 
     model_config = {"extra": "forbid"}
@@ -213,6 +225,23 @@ class WriteIntent(BaseModel):
             "Reasoning and context for this operation.\n"
             "Includes: classification rationale, duplicate check results, "
             "research findings, warnings, assumptions."
+        ),
+    )
+
+    hitl_summary: str = Field(
+        default="",
+        description=(
+            "Human-readable approval summary for HITL messaging (<1500 chars).\n"
+            "Write this for the business user who will approve/reject.\n"
+            "Include: operation goal, key impacts, warnings, sample SKUs/names.\n"
+            "End with approval instructions.\n"
+            "If empty, system generates fallback from goal/impact.\n"
+            "Example:\n"
+            "'Creating PET Jars family with 2 size variants.\n"
+            "Impact: 1 family, 2 products. Uploading 2 images.\n"
+            "Warning: SKU count increases by 2.\n"
+            "Examples: JAR-PET-500ML, JAR-PET-1L.\n"
+            "Reply *approve* to proceed or *reject* to cancel.'"
         ),
     )
 
@@ -241,14 +270,12 @@ class WriteIntent(BaseModel):
     impact: dict[str, Any] = Field(
         ...,
         description=(
-            "Simplified impact analysis.\n"
+            "Simplified impact analysis for logging/analytics.\n"
             "Format: {\n"
             "  'creates': {'table_name': count, ...},\n"
             "  'updates': {'table_name': count, ...},\n"
             "  'deletes': {'table_name': count, ...},\n"
-            "  'asset_uploads': count,\n"
-            "  'warnings': ['warning1', 'warning2'],\n"
-            "  'examples': ['example SKU 1', 'example SKU 2']\n"
+            "  'warnings': ['warning1', 'warning2']\n"
             "}"
         ),
     )

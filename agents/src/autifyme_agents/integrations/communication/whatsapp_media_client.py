@@ -109,6 +109,89 @@ class WhatsAppMediaClient:
 
         return media_path, content_bytes, mime_type
 
+    def upload_media(self, file_path: str, mime_type: str | None = None) -> str:
+        """Upload local media file to WhatsApp and return media_id.
+
+        WhatsApp Cloud API requires media to be uploaded before sending.
+        The returned media_id can be used with send_image().
+
+        Args:
+            file_path: Local path to the media file
+            mime_type: Optional MIME type (auto-detected from extension if not provided)
+
+        Returns:
+            WhatsApp media_id for the uploaded file
+
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            httpx.HTTPStatusError: If upload fails
+        """
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Media file not found: {file_path}")
+
+        # Auto-detect MIME type from extension
+        if not mime_type:
+            mime_type = self._derive_mime_type(path.suffix.lower())
+
+        logger.info(
+            "Uploading media to WhatsApp",
+            extra={"file_path": file_path, "mime_type": mime_type, "size_bytes": path.stat().st_size}
+        )
+
+        # WhatsApp media upload endpoint
+        upload_url = f"https://graph.facebook.com/{self.api_version}/{settings.WHATSAPP_PHONE_NUMBER_ID}/media"
+
+        with open(path, "rb") as f:
+            files = {
+                "file": (path.name, f, mime_type),
+            }
+            data = {
+                "messaging_product": "whatsapp",
+                "type": mime_type,
+            }
+
+            response = httpx.post(
+                upload_url,
+                headers={"Authorization": f"Bearer {self.access_token}"},
+                files=files,
+                data=data,
+                timeout=60.0,  # Longer timeout for uploads
+            )
+
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError:
+            logger.error(
+                "Failed to upload media to WhatsApp",
+                extra={"status": response.status_code, "file_path": file_path, "response": response.text}
+            )
+            raise
+
+        result: dict[str, Any] = response.json()
+        media_id: str = result["id"]
+
+        logger.info(
+            "Media uploaded to WhatsApp",
+            extra={"file_path": file_path, "media_id": media_id}
+        )
+
+        return media_id
+
+    @staticmethod
+    def _derive_mime_type(extension: str) -> str:
+        """Derive MIME type from file extension."""
+        ext_map = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".webp": "image/webp",
+            ".gif": "image/gif",
+            ".mp4": "video/mp4",
+            ".pdf": "application/pdf",
+        }
+        return ext_map.get(extension, "application/octet-stream")
+
     @staticmethod
     def _derive_suffix(content_type: str | None) -> str:
         """Derive file extension from MIME type."""

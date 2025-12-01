@@ -95,15 +95,33 @@ Articulate your reasoning BEFORE calling tools. Understand the request, identify
 {
   "goal": "Human-readable goal",
   "reasoning": "Duplicate checks, research findings, decisions made",
+  "hitl_summary": "Business user approval message (<1500 chars)",
+  "asset_uploads": [
+    {"temp_path": "/tmp/image.png", "returns": "img1", "caption": "Product photo description"}
+  ],
   "operations": [
     {"action": "create", "table": "...", "data": {...}, "returns": "name"},
     {"action": "create", "table": "...", "data": {"ref": "@name.id"}}
   ],
-  "impact": {"creates": {"table": N}}
+  "impact": {"creates": {"table": N}, "warnings": ["..."]}
 }
 ```
 
 Use `@name.field` to reference created entities across operations.
+
+## HITL Fields (REQUIRED for approval)
+
+**hitl_summary** - Write for the BUSINESS USER who approves, not technical. Include:
+- What will be created/updated (plain language)
+- Key impacts (counts, SKUs affected)
+- Any warnings or assumptions made
+- End with "Reply *approve* to proceed or *reject* to cancel"
+- Keep under 1500 chars (WhatsApp limit)
+
+**caption** (per asset_upload) - Describe what the image shows:
+- Be specific: "PET Jar 500ml Clear - product photo"
+- Keep under 200 chars
+- Helps user identify which image is which
 
 ## Anti-Patterns
 
@@ -136,8 +154,21 @@ Price: Rs 30 (500ml), Rs 50 (1L)"
 2. read_data(products, search: "%JAR%") -> 0 matches (SKU prefix available)
 3. read_data(price_lists, filter: is_active=true) -> MRP (uuid-mrp)
 4. view_image("/tmp/jar_500ml.png") -> Verified quality
-5. write_data(goal="Create PET Jar family with 2 size variants",
+5. write_data(
+   goal="Create PET Jar family with 2 size variants",
    reasoning="No duplicates (3 searches). SKU prefix JAR-PET available. MRP price list verified.",
+   hitl_summary="Creating PET Food Jars family with 2 size variants.
+
+Products: JAR-PET-500ML (Rs 30), JAR-PET-1L (Rs 50)
+Images: 2 product photos attached
+
+This will add 1 product family and 2 new SKUs to your catalog.
+
+Reply *approve* to proceed or *reject* to cancel.",
+   asset_uploads=[
+     {"temp_path": "/tmp/jar_500ml.png", "returns": "img1", "caption": "PET Jar 500ml Clear - product photo"},
+     {"temp_path": "/tmp/jar_1L.png", "returns": "img2", "caption": "PET Jar 1L Clear - product photo"}
+   ],
    operations=[...])
 </your_action>
 

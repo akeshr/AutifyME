@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
-from autifyme_agents.schemas.models import CatalogingResult, Product
+from autifyme_agents.schemas.models import CatalogingResult
+from autifyme_agents.schemas.write_intent import WriteIntent
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.message_utils import extract_text_content
-from autifyme_agents.workflows.orchestration.message_formatter import (
-    format_batch_approval_message,
-    format_operation_intent_approval_message,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +32,6 @@ class CatalogingWorkflowHandler:
     def extract_result(self, messages: list[Any]) -> CatalogingResult | None:
         """Extract CatalogingResult from PM messages.
 
-        Handles two formats:
-        1. Initial workflow: Tool message with dict content {tool_name, result}
-        2. Resume workflow: Tool message with tool_call_id referencing AI message
-
         Args:
             messages: PM output messages
 
@@ -53,7 +47,6 @@ class CatalogingWorkflowHandler:
 
             content = getattr(message, "content", None)
 
-            # Format 1: Dict content with tool_name and result
             if isinstance(content, dict):
                 tool_name = content.get("tool_name")
                 if tool_name != "save_product":
@@ -66,12 +59,10 @@ class CatalogingWorkflowHandler:
                     return tool_output.result
                 except ValueError:
                     continue
-
-            # Format 2: String content (resume workflow) - find tool call
             else:
                 tool_call_id = getattr(message, "tool_call_id", None)
                 if tool_call_id:
-                    result = self._find_tool_call_args(messages, tool_call_id, "save_product")
+                    result = self._find_tool_call_args(messages, tool_call_id)
                     if result:
                         return result
 
@@ -95,8 +86,6 @@ class CatalogingWorkflowHandler:
                 continue
 
             content = getattr(message, "content", None)
-
-            # Extract text from content (handles both OpenAI string and Gemini list formats)
             text = extract_text_content(content)
             if text:
                 return text
@@ -113,213 +102,77 @@ class CatalogingWorkflowHandler:
         thread_id: str,
         interrupt_value: Any,
     ) -> None:
-        """Send cataloging-specific Product interrupts to user.
-
-        Handles batch approval for parallel tool calls.
+        """Send WriteIntent interrupts to user for HITL approval.
 
         Args:
             sender: Channel-specific sender ID
             thread_id: Conversation thread ID
-            interrupt_value: Interrupt value (may be list of actions or single dict)
+            interrupt_value: Interrupt value (WriteIntent dict or action_requests)
         """
         logger.debug(
             "Handling cataloging interrupt",
             extra={
                 "thread_id": thread_id,
                 "interrupt_type": type(interrupt_value).__name__,
-                "is_list": isinstance(interrupt_value, list),
-                "length_if_list": len(interrupt_value) if isinstance(interrupt_value, list) else "N/A",
             }
         )
 
         try:
-            # Collect all products (for batch approval)
-            products_to_approve: list[Product] = []
-
             # Handle DeepAgents interrupt format with action_requests
             if isinstance(interrupt_value, dict) and "action_requests" in interrupt_value:
                 action_requests = interrupt_value.get("action_requests", [])
                 logger.info(
-                    "Processing DeepAgents interrupt with action_requests",
+                    "Processing DeepAgents interrupt",
                     extra={"thread_id": thread_id, "action_count": len(action_requests)}
                 )
 
-                for idx, action_req in enumerate(action_requests):
-                    # DeepAgents format: {'name': 'execute_database_operation', 'args': {...}}
+                for action_req in action_requests:
                     tool_name = action_req.get("name", "unknown")
-                    clean_value = action_req.get("args", {})
+                    args = action_req.get("args", {})
 
-                    # Check if this is OperationIntent (execute_database_operation)
-                    if tool_name == "execute_database_operation" and 'intent_type' in clean_value and 'change_spec' in clean_value:
-                        logger.debug(
-                            "Detected OperationIntent in action_requests",
-                            extra={
-                                "thread_id": thread_id,
-                                "intent_type": clean_value.get('intent_type'),
-                                "summary": clean_value.get('user_request_summary', '')[:50]
-                            }
-                        )
-                        # Format and send OperationIntent approval
-                        approval_message = format_operation_intent_approval_message(clean_value)
-                        self.channel.send_text(sender, approval_message)
-                        return  # OperationIntent handled, exit early
+                    if tool_name == "write_data" and self._is_write_intent(args):
+                        self._send_write_intent_approval(sender, args)
+                        return
 
-                    # Legacy Product approval
-                    logger.debug(
-                        f"Processing action_request {idx + 1} of {len(action_requests)}",
-                        extra={
-                            "thread_id": thread_id,
-                            "tool_name": tool_name,
-                            "product_name": clean_value.get("name", "unknown"),
-                        }
-                    )
-
-                    # Convert to Product and add to batch
-                    if isinstance(clean_value, dict):
-                        draft = Product.model_validate(clean_value)
-                        products_to_approve.append(draft)
-
-                # Send all products in batch
-                if len(products_to_approve) > 0:
-                    logger.info(
-                        "Sending batch approval request",
-                        extra={
-                            "thread_id": thread_id,
-                            "product_count": len(products_to_approve),
-                            "product_names": [p.name for p in products_to_approve],
-                        }
-                    )
-
-                    if len(products_to_approve) == 1:
-                        # Single product - use standard approval request
-                        self.channel.send_approval_request(sender, products_to_approve[0])
-                    else:
-                        # Multiple products - send batch approval
-                        self._send_batch_approval(sender, products_to_approve)
-
-            # Legacy format: list of action dicts
-            elif isinstance(interrupt_value, list) and len(interrupt_value) > 0:
-                logger.info(
-                    "Processing legacy batch interrupt",
-                    extra={"thread_id": thread_id, "action_count": len(interrupt_value)}
+                # No WriteIntent found in action_requests
+                logger.warning(
+                    "No WriteIntent found in action_requests",
+                    extra={"thread_id": thread_id, "tools": [ar.get("name") for ar in action_requests]}
                 )
 
-                for idx, action in enumerate(interrupt_value):
+            # Handle legacy list format
+            elif isinstance(interrupt_value, list) and len(interrupt_value) > 0:
+                for action in interrupt_value:
                     if isinstance(action, dict) and "action_request" in action:
-                        # Legacy DeepAgents format - extract clean args
                         action_request = action.get("action_request", {})
-                        clean_value = action_request.get("args", {})
+                        args = action_request.get("args", {})
                         tool_name = action_request.get("action", "unknown")
 
-                        # Check if this is OperationIntent
-                        if tool_name == "execute_database_operation" and 'intent_type' in clean_value and 'change_spec' in clean_value:
-                            logger.debug(
-                                "Detected OperationIntent in legacy format",
-                                extra={
-                                    "thread_id": thread_id,
-                                    "intent_type": clean_value.get('intent_type'),
-                                    "summary": clean_value.get('user_request_summary', '')[:50]
-                                }
-                            )
-                            # Format and send OperationIntent approval
-                            approval_message = format_operation_intent_approval_message(clean_value)
-                            self.channel.send_text(sender, approval_message)
-                            return  # OperationIntent handled, exit early
+                        if tool_name == "write_data" and self._is_write_intent(args):
+                            self._send_write_intent_approval(sender, args)
+                            return
 
-                        # Legacy Product approval
-                        logger.debug(
-                            f"Unwrapping action {idx + 1} of {len(interrupt_value)}",
-                            extra={
-                                "thread_id": thread_id,
-                                "tool_name": tool_name,
-                                "product_name": clean_value.get("name", "unknown"),
-                            }
-                        )
+            # Handle single dict (direct WriteIntent)
+            elif isinstance(interrupt_value, dict) and self._is_write_intent(interrupt_value):
+                self._send_write_intent_approval(sender, interrupt_value)
+                return
 
-                        # Convert to Product and add to batch
-                        if isinstance(clean_value, dict):
-                            draft = Product.model_validate(clean_value)
-                            products_to_approve.append(draft)
-
-                # Send all products in batch
-                if len(products_to_approve) > 0:
-                    logger.info(
-                        "Sending batch approval request",
-                        extra={
-                            "thread_id": thread_id,
-                            "product_count": len(products_to_approve),
-                            "product_names": [p.name for p in products_to_approve],
-                        }
-                    )
-
-                    if len(products_to_approve) == 1:
-                        # Single product - use standard approval request
-                        self.channel.send_approval_request(sender, products_to_approve[0])
-                    else:
-                        # Multiple products - send batch approval
-                        self._send_batch_approval(sender, products_to_approve)
-
-            # Handle single interrupt case (simple dict)
-            elif isinstance(interrupt_value, dict):
-                logger.info(
-                    "Processing single interrupt",
-                    extra={"thread_id": thread_id}
-                )
-
-                # Check if this is an OperationIntent (Phase 2C CRUD operations)
-                if 'intent_type' in interrupt_value and 'change_spec' in interrupt_value:
-                    logger.debug(
-                        "Detected OperationIntent interrupt",
-                        extra={
-                            "thread_id": thread_id,
-                            "intent_type": interrupt_value.get('intent_type'),
-                            "summary": interrupt_value.get('user_request_summary', '')[:50]
-                        }
-                    )
-                    # Format OperationIntent approval message
-                    approval_message = format_operation_intent_approval_message(interrupt_value)
-                    self.channel.send_text(sender, approval_message)
-                else:
-                    # Legacy Product approval - convert dict args to Product object for channel
-                    draft = Product.model_validate(interrupt_value)
-                    logger.debug(
-                        "Converted single interrupt to Product",
-                        extra={"thread_id": thread_id, "product_name": draft.name}
-                    )
-                    self.channel.send_approval_request(sender, draft)
-
-            logger.info(
-                "Interrupt(s) forwarded to user - awaiting response",
-                extra={
-                    "thread_id": thread_id,
-                    "product_count": len(products_to_approve) if products_to_approve else 1,
-                },
+            # Unknown format
+            logger.warning(
+                "Unknown interrupt format",
+                extra={"thread_id": thread_id, "type": type(interrupt_value).__name__}
             )
 
         except Exception as exc:
             logger.exception("Failed to send interrupt to user", exc_info=exc, extra={"thread_id": thread_id})
             self.channel.send_error(sender, "processing", "I encountered an issue requesting your input.")
 
-    # --- Internal Methods ---
-
     def _find_tool_call_args(
         self,
         messages: list[Any],
         tool_call_id: str,
-        tool_name: str,
     ) -> CatalogingResult | None:
-        """Find tool call arguments in AI message by tool_call_id.
-
-        Used for resume workflows where tool message has string content.
-
-        Args:
-            messages: All messages
-            tool_call_id: ID to match
-            tool_name: Expected tool name
-
-        Returns:
-            CatalogingResult if found
-        """
+        """Find tool call arguments in AI message by tool_call_id."""
         for message in messages:
             message_type = getattr(message, "type", None)
             if not message_type and hasattr(message, "__class__"):
@@ -327,39 +180,74 @@ class CatalogingWorkflowHandler:
             if message_type != "ai":
                 continue
 
-            # Check for tool_calls
             tool_calls = getattr(message, "tool_calls", None)
             if not tool_calls:
                 continue
 
             for tc in tool_calls:
-                tc_id = tc.get("id")
-
-                # Match on ID regardless of name - resume flows use "task" instead of "save_product"
-                if tc_id == tool_call_id:
+                if tc.get("id") == tool_call_id:
                     args = tc.get("args", {})
-
-                    # Try direct validation
                     try:
-                        result = CatalogingResult.model_validate(args)
-                        return result
-                    except Exception as e:
-                        # Validation failed, continue to next tool call
-                        logger.debug(
-                            "Tool call %s validation failed, checking next: %s",
-                            tc_id,
-                            e
-                        )
+                        return CatalogingResult.model_validate(args)
+                    except Exception:
                         continue
 
         return None
 
-    def _send_batch_approval(self, sender: str, products: list[Product]) -> None:
-        """Send batch approval request with ALL products displayed together.
+    def _is_write_intent(self, value: dict[str, Any]) -> bool:
+        """Check if dict represents a WriteIntent."""
+        return (
+            isinstance(value, dict)
+            and "goal" in value
+            and "reasoning" in value
+            and "operations" in value
+            and "impact" in value
+        )
 
-        Args:
-            sender: Channel-specific sender ID
-            products: List of Product objects to approve
-        """
-        batch_message = format_batch_approval_message(products)
-        self.channel.send_text(sender, batch_message)
+    def _send_write_intent_approval(self, sender: str, write_intent_dict: dict[str, Any]) -> None:
+        """Send WriteIntent approval with images and summary."""
+        try:
+            write_intent = WriteIntent.model_validate(write_intent_dict)
+
+            logger.info(
+                "Sending WriteIntent approval",
+                extra={
+                    "sender": sender,
+                    "goal": write_intent.goal[:50],
+                    "asset_count": len(write_intent.asset_uploads),
+                    "operation_count": len(write_intent.operations),
+                }
+            )
+
+            # Send each asset image with caption
+            for asset in write_intent.asset_uploads:
+                try:
+                    if not Path(asset.temp_path).exists():
+                        logger.warning("Asset file not found", extra={"temp_path": asset.temp_path})
+                        continue
+
+                    self.channel.send_image(
+                        sender,
+                        asset.temp_path,
+                        caption=asset.caption if asset.caption else None,
+                    )
+                except Exception as img_err:
+                    logger.warning("Failed to send asset image", extra={"error": str(img_err)})
+
+            # Send summary text
+            summary = write_intent.hitl_summary or write_intent.generate_hitl_summary()
+            self.channel.send_text(sender, summary)
+
+            logger.info(
+                "WriteIntent approval sent",
+                extra={"sender": sender, "summary_length": len(summary)}
+            )
+
+        except Exception as e:
+            logger.error("Failed to send WriteIntent approval", extra={"error": str(e)}, exc_info=True)
+            fallback_msg = (
+                f"*Database Operation Approval*\n\n"
+                f"*Goal:* {write_intent_dict.get('goal', 'Unknown')}\n\n"
+                f"Reply *approve* to proceed or *reject* to cancel."
+            )
+            self.channel.send_text(sender, fallback_msg)

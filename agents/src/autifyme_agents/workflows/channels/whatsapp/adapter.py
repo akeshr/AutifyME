@@ -13,7 +13,7 @@ from typing import Any, Literal
 
 from autifyme_agents.core.logging_config import get_logger
 from autifyme_agents.integrations.communication import WhatsAppClient, WhatsAppMediaClient
-from autifyme_agents.schemas.models import CatalogingResult, Product
+from autifyme_agents.schemas.models import CatalogingResult
 from autifyme_agents.workflows.channels.protocol import ChannelError
 
 logger = get_logger(__name__)
@@ -130,38 +130,6 @@ class WhatsAppChannel:
                 original_error=exc,
             ) from exc
 
-    def send_approval_request(
-        self,
-        recipient: str,
-        draft: Product,
-    ) -> dict[str, Any]:
-        """Send HITL approval request formatted for WhatsApp.
-
-        Uses WhatsApp markdown for formatting:
-        - *bold* for labels
-        - Plain text for values
-        - Newlines for structure
-
-        Args:
-            recipient: WhatsApp phone number
-            draft: Product draft requiring approval
-
-        Returns:
-            WhatsApp API response dict
-
-        Raises:
-            ChannelError: If message sending fails
-        """
-        # Format draft with WhatsApp markdown
-        message = self._format_approval_message(draft)
-
-        logger.info(
-            "Sending WhatsApp approval request",
-            extra={"recipient": recipient, "product_name": draft.name},
-        )
-
-        return self.send_text(recipient, message)
-
     def send_completion(
         self,
         recipient: str,
@@ -265,6 +233,77 @@ class WhatsAppChannel:
                 original_error=exc,
             ) from exc
 
+    def send_image(
+        self,
+        recipient: str,
+        image_path: str,
+        caption: str | None = None,
+    ) -> dict[str, Any]:
+        """Send image with optional caption via WhatsApp.
+
+        Uploads local file to WhatsApp, then sends as image message.
+        Used for HITL approval flow to show asset previews.
+
+        Args:
+            recipient: WhatsApp phone number (e.g., "919876543210")
+            image_path: Local file path to the image
+            caption: Optional caption text (max 1024 chars, auto-truncated)
+
+        Returns:
+            WhatsApp API response dict
+
+        Raises:
+            ChannelError: If upload or send fails
+        """
+        try:
+            logger.debug(
+                "Sending WhatsApp image",
+                extra={
+                    "recipient": recipient,
+                    "image_path": image_path,
+                    "has_caption": caption is not None,
+                },
+            )
+
+            # Step 1: Upload media to WhatsApp
+            media_id = self.media.upload_media(image_path)
+
+            # Step 2: Send image message with media_id
+            result = self.client.send_image(recipient, media_id, caption=caption)
+
+            logger.info(
+                "WhatsApp image sent successfully",
+                extra={
+                    "recipient": recipient,
+                    "image_path": image_path,
+                    "media_id": media_id,
+                    "message_id": result.get("message_id"),
+                },
+            )
+
+            return result
+
+        except FileNotFoundError as exc:
+            logger.error(
+                "Image file not found for WhatsApp send",
+                extra={"recipient": recipient, "image_path": image_path}
+            )
+            raise ChannelError(
+                f"Image file not found: {image_path}",
+                channel="whatsapp",
+                recipient=recipient,
+                original_error=exc,
+            ) from exc
+
+        except Exception as exc:
+            logger.exception("Failed to send WhatsApp image", exc_info=exc)
+            raise ChannelError(
+                f"Failed to send image: {str(exc)}",
+                channel="whatsapp",
+                recipient=recipient,
+                original_error=exc,
+            ) from exc
+
     def format_thread_id(self, sender: str) -> str:
         """Generate WhatsApp-specific thread ID for checkpointing.
 
@@ -280,37 +319,6 @@ class WhatsAppChannel:
         """
         phone_number_id = self.client.phone_number_id
         return f"whatsapp:{phone_number_id}:{sender}"
-
-    def _format_approval_message(self, draft: Product) -> str:
-        """Format product draft as WhatsApp approval request.
-
-        Args:
-            draft: Product draft to format
-
-        Returns:
-            Formatted message string with WhatsApp markdown
-        """
-        lines = ["*Approval Needed*\n"]
-
-        lines.append(f"*Product:* {draft.name}")
-
-        if draft.price is not None:
-            lines.append(f"*Price:* {draft.price}")
-
-        if draft.sizes:
-            sizes_text = ", ".join(str(s) for s in draft.sizes if s)
-            lines.append(f"*Sizes:* {sizes_text}")
-
-        if draft.colors:
-            colors_text = ", ".join(str(c) for c in draft.colors if c)
-            lines.append(f"*Colors:* {colors_text}")
-
-        if draft.description:
-            lines.append(f"*Description:* {draft.description}")
-
-        lines.append("\nReply *approve* or *reject*.")
-
-        return "\n".join(lines)
 
     def _get_default_error_message(
         self,

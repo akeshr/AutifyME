@@ -9,9 +9,10 @@ Design Pattern: Strategy Pattern + Protocol (structural subtyping)
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-from autifyme_agents.schemas.models import CatalogingResult, Product
+if TYPE_CHECKING:
+    from autifyme_agents.schemas.models import CatalogingResult
 
 
 class MessagingChannel(Protocol):
@@ -46,30 +47,6 @@ class MessagingChannel(Protocol):
 
         Raises:
             ChannelError: If message sending fails
-        """
-        ...
-
-    def send_approval_request(
-        self,
-        recipient: str,
-        draft: Product,
-    ) -> dict[str, Any]:
-        """Send HITL approval request formatted for this channel.
-
-        Args:
-            recipient: Channel-specific recipient ID
-            draft: Product draft requiring approval
-
-        Returns:
-            Channel-specific response dict
-
-        Raises:
-            ChannelError: If message sending fails
-
-        Notes:
-            - Formatting is channel-specific (e.g., WhatsApp markdown, SMS plain text)
-            - Should include all relevant product details
-            - Should prompt for approve/reject response
         """
         ...
 
@@ -137,6 +114,34 @@ class MessagingChannel(Protocol):
             - File should be temporary (caller is responsible for cleanup)
             - Should handle authentication/authorization internally
             - None return indicates graceful failure (not an error)
+        """
+        ...
+
+    def send_image(
+        self,
+        recipient: str,
+        image_path: str,
+        caption: str | None = None,
+    ) -> dict[str, Any]:
+        """Send an image with optional caption.
+
+        Used for HITL approval flow to show asset previews to user.
+
+        Args:
+            recipient: Channel-specific recipient ID
+            image_path: Local file path to the image
+            caption: Optional caption text (channel-specific limits apply)
+
+        Returns:
+            Channel-specific response dict
+
+        Raises:
+            ChannelError: If image sending fails
+
+        Notes:
+            - WhatsApp caption limit: 1024 chars
+            - If image_path doesn't exist, should raise ChannelError
+            - Supports common formats: PNG, JPG, WEBP
         """
         ...
 
