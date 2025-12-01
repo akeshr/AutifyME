@@ -163,7 +163,7 @@ class OutputSpec(BaseModel):
     aspect_ratio: Literal["1:1", "3:4", "4:3", "9:16", "16:9", "original"] = "1:1"
     quality: int = Field(default=90, ge=1, le=100, description="JPEG quality")
     variants: list[Literal["master", "thumbnail", "social", "square", "portrait", "landscape"]] = Field(
-        default_factory=lambda: ["master"],
+        default_factory=lambda: ["master"],  # type: ignore[arg-type]
         description="Output variants to generate",
     )
 

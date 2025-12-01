@@ -32,7 +32,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from langchain.agents.middleware.types import (
     AgentMiddleware,
@@ -310,7 +310,9 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                         msg.content, image_paths
                     )
                     # Create new HumanMessage with multimodal content
-                    processed.append(HumanMessage(content=multimodal_content))
+                    processed.append(HumanMessage(
+                        content=cast(list[str | dict[Any, Any]], multimodal_content)
+                    ))
                 else:
                     processed.append(msg)
             elif isinstance(msg, ToolMessage) and isinstance(msg.content, str):
@@ -329,7 +331,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                     # Create new ToolMessage with multimodal content
                     # Preserve tool_call_id which is required for ToolMessage
                     processed.append(ToolMessage(
-                        content=multimodal_content,
+                        content=cast(list[str | dict[Any, Any]], multimodal_content),
                         tool_call_id=msg.tool_call_id,
                         name=msg.name,
                     ))
@@ -382,9 +384,9 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
 
     def _process_tool_result(
         self,
-        result: ToolMessage | Command,
+        result: ToolMessage | Command[Any],
         tool_name: str | None,
-    ) -> ToolMessage | Command:
+    ) -> ToolMessage | Command[Any]:
         """Process tool result to inject images.
 
         Called immediately after tool execution, before any serialization.
@@ -425,8 +427,10 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         image_paths: list[str] = []
 
         # Try structured extraction first (more reliable)
-        if isinstance(result.content, dict):
-            image_paths = _extract_paths_from_dict(result.content)
+        # Note: ToolMessage.content is typed as str | list but may be dict at runtime
+        content = result.content
+        if isinstance(content, dict):  # type: ignore[unreachable]
+            image_paths = _extract_paths_from_dict(content)  # type: ignore[unreachable]
             if image_paths:
                 logger.info(
                     "Extracting %d image(s) from structured tool output: %s",
@@ -435,17 +439,17 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                     extra={"paths": image_paths}
                 )
                 # Convert dict to JSON string for multimodal transformation
-                text_content = json.dumps(result.content, indent=2)
+                text_content = json.dumps(content, indent=2)
                 multimodal_content = _transform_to_multimodal(text_content, image_paths)
                 return ToolMessage(
-                    content=multimodal_content,
+                    content=cast(list[str | dict[Any, Any]], multimodal_content),
                     tool_call_id=result.tool_call_id,
                     name=result.name,
                 )
 
         # Fallback to string extraction
-        elif isinstance(result.content, str):
-            image_paths = _extract_image_paths(result.content)
+        if isinstance(content, str):
+            image_paths = _extract_image_paths(content)
             logger.debug(
                 "[MULTIMODAL] String extraction found %d path(s): %s",
                 len(image_paths),
@@ -458,18 +462,16 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                     tool_name or "unknown",
                     extra={"paths": image_paths}
                 )
-                multimodal_content = _transform_to_multimodal(
-                    result.content, image_paths
-                )
+                multimodal_content = _transform_to_multimodal(content, image_paths)
                 return ToolMessage(
-                    content=multimodal_content,
+                    content=cast(list[str | dict[Any, Any]], multimodal_content),
                     tool_call_id=result.tool_call_id,
                     name=result.name,
                 )
-        else:
-            logger.debug(
-                "[MULTIMODAL] Content is neither dict nor str: %s",
-                type(result.content).__name__
+        elif not isinstance(content, list):  # Defensive: handles unexpected content types
+            logger.debug(  # type: ignore[unreachable]
+                "[MULTIMODAL] Content is neither dict nor str nor list: %s",
+                type(content).__name__
             )
 
         logger.debug("[MULTIMODAL] No image paths found, returning original result")
@@ -478,8 +480,8 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
     def wrap_tool_call(
         self,
         request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
+        handler: Callable[[ToolCallRequest], ToolMessage | Command[Any]],
+    ) -> ToolMessage | Command[Any]:
         """Intercept tool call and inject images into the result.
 
         This runs IMMEDIATELY after tool execution, allowing us to work
@@ -524,8 +526,8 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
     async def awrap_tool_call(
         self,
         request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
-    ) -> ToolMessage | Command:
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]],
+    ) -> ToolMessage | Command[Any]:
         """(async) Intercept tool call and inject images into the result.
 
         Args:

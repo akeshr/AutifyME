@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from google.ai.generativelanguage_v1beta import GenerationConfig
 from langchain.chat_models import BaseChatModel
@@ -227,7 +227,7 @@ def get_llm(
         # Gemini 3 Image Generation configuration
         # Build image_config for generation_config if image params provided
         if image_aspect_ratio is not None or image_size is not None:
-            image_config = {}
+            image_config: dict[str, Any] = {}
             if image_aspect_ratio is not None:
                 image_config["aspectRatio"] = image_aspect_ratio
             if image_size is not None:
@@ -235,9 +235,9 @@ def get_llm(
             # Pass through model_kwargs for generation_config.imageConfig
             if "model_kwargs" not in gemini_kwargs:
                 gemini_kwargs["model_kwargs"] = {}
-            gemini_kwargs["model_kwargs"]["generation_config"] = {
-                "imageConfig": image_config
-            }
+            model_kwargs = gemini_kwargs["model_kwargs"]
+            if isinstance(model_kwargs, dict):
+                model_kwargs["generation_config"] = {"imageConfig": image_config}
 
         llm = ChatGoogleGenerativeAI(**gemini_kwargs)
     else:

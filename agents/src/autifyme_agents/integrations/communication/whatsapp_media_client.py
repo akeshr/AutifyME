@@ -142,7 +142,7 @@ class WhatsAppMediaClient:
         # WhatsApp media upload endpoint
         upload_url = f"https://graph.facebook.com/{self.api_version}/{settings.WHATSAPP_PHONE_NUMBER_ID}/media"
 
-        with open(path, "rb") as f:
+        with path.open("rb") as f:
             files = {
                 "file": (path.name, f, mime_type),
             }

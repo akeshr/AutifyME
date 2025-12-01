@@ -1,4 +1,4 @@
-"""Cataloging workflow handler - domain-specific logic extracted from runner."""
+"""WriteIntent workflow handler - generic HITL approval for database operations."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from autifyme_agents.schemas.models import CatalogingResult
 from autifyme_agents.schemas.write_intent import WriteIntent
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.message_utils import extract_text_content
@@ -14,59 +13,25 @@ from autifyme_agents.workflows.message_utils import extract_text_content
 logger = logging.getLogger(__name__)
 
 
-class CatalogingWorkflowHandler:
-    """Handles cataloging-specific result extraction and interrupt handling.
+class WriteIntentHandler:
+    """Generic handler for WriteIntent HITL approval flow.
 
-    Extracted from WorkflowRunner to achieve separation of concerns.
-    Generic runner delegates cataloging domain logic to this handler.
+    Handles:
+    - Extracting AI response summaries from PM messages
+    - Processing WriteIntent interrupts for user approval
+    - Sending asset previews and approval summaries via channel
+
+    Works with any workflow type (cataloging, marketing, etc.) that uses
+    WriteIntent for database operations.
     """
 
     def __init__(self, channel: MessagingChannel):
-        """Initialize cataloging handler.
+        """Initialize handler.
 
         Args:
             channel: Messaging channel for sending user notifications
         """
         self.channel = channel
-
-    def extract_result(self, messages: list[Any]) -> CatalogingResult | None:
-        """Extract CatalogingResult from PM messages.
-
-        Args:
-            messages: PM output messages
-
-        Returns:
-            CatalogingResult if found, None otherwise
-        """
-        for message in messages:
-            message_type = getattr(message, "type", None)
-            if not message_type and hasattr(message, "__class__"):
-                message_type = message.__class__.__name__.replace("Message", "").lower()
-            if message_type != "tool":
-                continue
-
-            content = getattr(message, "content", None)
-
-            if isinstance(content, dict):
-                tool_name = content.get("tool_name")
-                if tool_name != "save_product":
-                    continue
-
-                try:
-                    from autifyme_agents.schemas.agent_outputs import CatalogingToolOutput
-
-                    tool_output = CatalogingToolOutput.model_validate(content)
-                    return tool_output.result
-                except ValueError:
-                    continue
-            else:
-                tool_call_id = getattr(message, "tool_call_id", None)
-                if tool_call_id:
-                    result = self._find_tool_call_args(messages, tool_call_id)
-                    if result:
-                        return result
-
-        return None
 
     def extract_summary(self, messages: list[Any]) -> str | None:
         """Extract AI summary for conversational responses.
@@ -110,7 +75,7 @@ class CatalogingWorkflowHandler:
             interrupt_value: Interrupt value (WriteIntent dict or action_requests)
         """
         logger.debug(
-            "Handling cataloging interrupt",
+            "Handling HITL interrupt",
             extra={
                 "thread_id": thread_id,
                 "interrupt_type": type(interrupt_value).__name__,
@@ -167,33 +132,6 @@ class CatalogingWorkflowHandler:
             logger.exception("Failed to send interrupt to user", exc_info=exc, extra={"thread_id": thread_id})
             self.channel.send_error(sender, "processing", "I encountered an issue requesting your input.")
 
-    def _find_tool_call_args(
-        self,
-        messages: list[Any],
-        tool_call_id: str,
-    ) -> CatalogingResult | None:
-        """Find tool call arguments in AI message by tool_call_id."""
-        for message in messages:
-            message_type = getattr(message, "type", None)
-            if not message_type and hasattr(message, "__class__"):
-                message_type = message.__class__.__name__.replace("Message", "").lower()
-            if message_type != "ai":
-                continue
-
-            tool_calls = getattr(message, "tool_calls", None)
-            if not tool_calls:
-                continue
-
-            for tc in tool_calls:
-                if tc.get("id") == tool_call_id:
-                    args = tc.get("args", {})
-                    try:
-                        return CatalogingResult.model_validate(args)
-                    except Exception:
-                        continue
-
-        return None
-
     def _is_write_intent(self, value: dict[str, Any]) -> bool:
         """Check if dict represents a WriteIntent."""
         return (
@@ -234,13 +172,18 @@ class CatalogingWorkflowHandler:
                 except Exception as img_err:
                     logger.warning("Failed to send asset image", extra={"error": str(img_err)})
 
-            # Send summary text
-            summary = write_intent.hitl_summary or write_intent.generate_hitl_summary()
-            self.channel.send_text(sender, summary)
+            # Send summary text (required - LLM must generate)
+            if not write_intent.hitl_summary:
+                logger.error(
+                    "WriteIntent missing hitl_summary - LLM prompt violation",
+                    extra={"sender": sender, "goal": write_intent.goal[:50]}
+                )
+                raise ValueError("hitl_summary is required - LLM must generate approval summary")
+            self.channel.send_text(sender, write_intent.hitl_summary)
 
             logger.info(
                 "WriteIntent approval sent",
-                extra={"sender": sender, "summary_length": len(summary)}
+                extra={"sender": sender, "summary_length": len(write_intent.hitl_summary)}
             )
 
         except Exception as e:

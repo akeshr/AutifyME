@@ -9,10 +9,7 @@ Design Pattern: Strategy Pattern + Protocol (structural subtyping)
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Protocol
-
-if TYPE_CHECKING:
-    from autifyme_agents.schemas.models import CatalogingResult
+from typing import Any, Literal, Protocol
 
 
 class MessagingChannel(Protocol):
@@ -47,29 +44,6 @@ class MessagingChannel(Protocol):
 
         Raises:
             ChannelError: If message sending fails
-        """
-        ...
-
-    def send_completion(
-        self,
-        recipient: str,
-        result: CatalogingResult,
-    ) -> dict[str, Any]:
-        """Send workflow completion message.
-
-        Args:
-            recipient: Channel-specific recipient ID
-            result: Cataloging result to communicate
-
-        Returns:
-            Channel-specific response dict
-
-        Raises:
-            ChannelError: If message sending fails
-
-        Notes:
-            - Message should be success-focused and user-friendly
-            - Include product name and confirmation
         """
         ...
 

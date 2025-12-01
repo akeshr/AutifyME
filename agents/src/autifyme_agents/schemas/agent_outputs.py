@@ -5,8 +5,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from autifyme_agents.schemas.models import CatalogingResult
-
 
 class AgentOutput(BaseModel):
     """Base model for all agent outputs with consistent success flag."""
@@ -65,13 +63,6 @@ class ImageAnalysisResult(BaseModel):
         default_factory=list,
         description="Visible brand elements, logos, or manufacturer markings (e.g., 'Pavisha logo on cap', 'FDA marking')."
     )
-
-
-class CatalogingToolOutput(BaseModel):
-    """Structured message emitted by the save_product tool."""
-
-    tool_name: Literal["save_product"] = Field(..., description="Name of the tool producing the output.")
-    result: CatalogingResult = Field(..., description="Serialized cataloging result payload.")
 
 
 # =============================================================================

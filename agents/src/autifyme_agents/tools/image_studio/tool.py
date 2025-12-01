@@ -17,8 +17,9 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.tools import StructuredTool
 from PIL import Image
 
@@ -44,6 +45,8 @@ from autifyme_agents.tools.image_studio.schemas import (
     ProductPlacement,
     SceneSpec,
 )
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +89,7 @@ Execute the requested operation with these professional standards as your baseli
 # =============================================================================
 
 
-def _get_gemini3_image_llm(output_spec: OutputSpec | None = None):
+def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatModel:
     """Get Gemini 3 Pro Image LLM with proper configuration."""
     aspect_ratio = output_spec.aspect_ratio if output_spec else "1:1"
     if aspect_ratio == "original":
@@ -200,7 +203,7 @@ def _extract_image_from_response(response: Any) -> str | None:
         if isinstance(part, dict) and "image_url" in part:
             url = part["image_url"].get("url", "")
             if url.startswith("data:"):
-                return url
+                return str(url)
 
     logger.warning(
         "No image in response. content_type=%s, content_len=%s",
@@ -405,7 +408,7 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
             },
         ]
 
-        response = llm.invoke(messages)
+        response = llm.invoke(messages)  # type: ignore[arg-type]
 
         # Extract image using helper function
         image_data = _extract_image_from_response(response)
@@ -490,7 +493,7 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
             {"role": "system", "content": TOOL_SYSTEM_PROMPT},
             {"role": "user", "content": content},
         ]
-        response = llm.invoke(messages)
+        response = llm.invoke(messages)  # type: ignore[arg-type]
 
         # Extract image using helper function
         image_data = _extract_image_from_response(response)
@@ -552,26 +555,26 @@ def _image_studio_impl(
     source_image: str | None = None,
     reference_images: list[str] | None = None,
     custom_instruction: str | None = None,
-    background: dict | None = None,
-    lighting: dict | None = None,
-    framing: dict | None = None,
-    enhancement: dict | None = None,
-    scene: dict | None = None,
-    placement: dict | None = None,
-    extraction: dict | None = None,
-    focus: dict | None = None,
-    output: dict | None = None,
+    background: dict[str, Any] | None = None,
+    lighting: dict[str, Any] | None = None,
+    framing: dict[str, Any] | None = None,
+    enhancement: dict[str, Any] | None = None,
+    scene: dict[str, Any] | None = None,
+    placement: dict[str, Any] | None = None,
+    extraction: dict[str, Any] | None = None,
+    focus: dict[str, Any] | None = None,
+    output: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Image Studio tool implementation."""
     try:
-        def _maybe_convert(value, model_class):
+        def _maybe_convert(value: Any, model_class: type[T]) -> T | None:
             if value is None:
                 return None
             if isinstance(value, model_class):
                 return value
             if isinstance(value, dict):
                 return model_class(**value)
-            return value
+            return value  # type: ignore[no-any-return]
 
         input_spec = ImageStudioInput(
             operation=ImageOperation(operation) if isinstance(operation, str) else operation,
@@ -593,8 +596,8 @@ def _image_studio_impl(
             result = _handle_edit(input_spec)
         elif input_spec.operation == ImageOperation.GENERATE:
             result = _handle_generate(input_spec)
-        else:
-            result = ImageStudioOutput(
+        else:  # Defensive: future enum values
+            result = ImageStudioOutput(  # type: ignore[unreachable]
                 success=False,
                 operation=input_spec.operation,
                 error=f"Unknown operation: {input_spec.operation}",

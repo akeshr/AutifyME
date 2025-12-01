@@ -294,28 +294,17 @@ class WorkflowRunner:
                     extra={"thread_id": thread_id, "attempt": attempt}
                 )
 
-                # Send workflow-specific completion to user
-                cataloging_result = self.workflow_handler.extract_result(messages)
-                if cataloging_result:
-                    self.channel.send_completion(sender, cataloging_result)
-                    logger.info("Workflow completed", extra={"thread_id": thread_id, "tracking_id": tracking_id})
-                    return
-
-                # Send conversational response
+                # Send PM response to user
                 summary = self.workflow_handler.extract_summary(messages)
                 if summary:
                     self.channel.send_text(sender, summary)
-                    logger.info("Conversational response sent", extra={"thread_id": thread_id})
-                    return
+                    logger.info("PM response sent", extra={"thread_id": thread_id, "tracking_id": tracking_id})
                 else:
                     logger.warning(
                         "No response extracted from PM messages",
-                        extra={
-                            "thread_id": thread_id,
-                            "message_count": len(messages),
-                        }
+                        extra={"thread_id": thread_id, "message_count": len(messages)}
                     )
-                    return
+                return
 
             except GraphRecursionError as exc:
                 logger.exception("PM recursion limit exceeded", exc_info=exc)

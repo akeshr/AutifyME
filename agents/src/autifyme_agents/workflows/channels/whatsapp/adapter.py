@@ -13,7 +13,6 @@ from typing import Any, Literal
 
 from autifyme_agents.core.logging_config import get_logger
 from autifyme_agents.integrations.communication import WhatsAppClient, WhatsAppMediaClient
-from autifyme_agents.schemas.models import CatalogingResult
 from autifyme_agents.workflows.channels.protocol import ChannelError
 
 logger = get_logger(__name__)
@@ -129,39 +128,6 @@ class WhatsAppChannel:
                 recipient=recipient,
                 original_error=exc,
             ) from exc
-
-    def send_completion(
-        self,
-        recipient: str,
-        result: CatalogingResult,
-    ) -> dict[str, Any]:
-        """Send workflow completion message.
-
-        Args:
-            recipient: WhatsApp phone number
-            result: Cataloging result to communicate
-
-        Returns:
-            WhatsApp API response dict
-
-        Raises:
-            ChannelError: If message sending fails
-        """
-        if result.success:
-            message = f"✅ *Cataloging Complete*\n\n{result.product_name or 'Product'} has been added to your catalog!\n\n{result.message}"
-        else:
-            message = f"❌ *Cataloging Failed*\n\n{result.message}"
-
-        logger.info(
-            "Sending WhatsApp completion message",
-            extra={
-                "recipient": recipient,
-                "success": result.success,
-                "product_name": result.product_name,
-            },
-        )
-
-        return self.send_text(recipient, message)
 
     def send_error(
         self,

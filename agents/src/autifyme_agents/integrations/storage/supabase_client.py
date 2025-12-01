@@ -1601,7 +1601,7 @@ class SupabaseStorageClient(StorageInterface):
                 normalized_data,
                 on_conflict=on_conflict,
                 ignore_duplicates=False,  # DO UPDATE on conflict
-                returning="representation",  # Return full record
+                returning="representation",
             ).execute()
 
             if not response.data or len(response.data) == 0:
@@ -1610,7 +1610,7 @@ class SupabaseStorageClient(StorageInterface):
                     operation="upsert_entity",
                 )
 
-            upserted: dict[str, Any] = response.data[0]
+            upserted = response.data[0]
 
             # Track operation for transaction
             if self._current_transaction is not None:
@@ -1673,7 +1673,7 @@ class SupabaseStorageClient(StorageInterface):
                 normalized_data,
                 on_conflict=on_conflict,
                 ignore_duplicates=False,  # DO UPDATE on conflict
-                returning="representation",  # Return full records
+                returning="representation",
                 default_to_null=True,  # Missing fields default to NULL on INSERT
             ).execute()
 
@@ -1683,7 +1683,7 @@ class SupabaseStorageClient(StorageInterface):
                     operation="bulk_upsert",
                 )
 
-            upserted: list[dict[str, Any]] = response.data
+            upserted = response.data
             entity_ids = [entity.get("id") for entity in upserted if entity.get("id")]
 
             # Track operation for transaction
@@ -1746,7 +1746,7 @@ class SupabaseStorageClient(StorageInterface):
             if not response.data or len(response.data) == 0:
                 raise ValueError(f"Entity with id '{id}' not found in {table}")
 
-            patched: dict[str, Any] = response.data[0]
+            patched = response.data[0]
 
             # Track operation for transaction
             if self._current_transaction is not None:
