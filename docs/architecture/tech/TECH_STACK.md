@@ -9,10 +9,10 @@
 
 | Component | Package | Version | Purpose |
 |-----------|---------|---------|---------|
-| Agent Builder | `langchain` | >=1.0.2 | Agent construction, tools, structured outputs |
-| Orchestration | `langgraph` | >=1.0.1 | State machines, checkpointing, workflow graphs |
-| Advanced Agents | `deepagents` | >=0.2.4 | SubAgent pattern, PM orchestration |
-| Checkpointing | `langgraph-checkpoint-postgres` | >=3.0.0 | PostgreSQL state persistence |
+| Agent Builder | `langchain` | >=1.1.0 | Agent construction, tools, structured outputs |
+| Orchestration | `langgraph` | >=1.0.4 | State machines, checkpointing, workflow graphs |
+| Advanced Agents | `deepagents` | >=0.2.8 | SubAgent pattern, PM orchestration |
+| Checkpointing | `langgraph-checkpoint-postgres` | >=3.0.1 | PostgreSQL state persistence |
 
 ---
 
@@ -20,9 +20,9 @@
 
 | Provider | Package | Primary Use |
 |----------|---------|-------------|
-| **Google AI** | `langchain-google-genai` | Primary - gemini-2.5-flash for PM and specialists |
-| OpenAI | `langchain-openai` | >=1.0.0 | Fallback, image analysis |
-| Anthropic | `langchain-anthropic` | >=1.0.0 | Fallback |
+| **Google AI** | `langchain-google-genai>=3.2.0` | Primary - gemini-2.5-flash for PM and specialists |
+| OpenAI | `langchain-openai>=1.1.0` | Fallback, image analysis |
+| Anthropic | `langchain-anthropic>=1.2.0` | Fallback |
 
 **Default Model:** `gemini-2.5-flash` (PM: temp=0.5, Specialists: temp=0.3)
 
@@ -80,31 +80,31 @@
 
 ```toml
 # Core
-langchain>=1.0.2
-langgraph>=1.0.1
-deepagents>=0.2.4
+langchain>=1.1.0
+langgraph>=1.0.4
+deepagents>=0.2.8
 
 # LLM Providers
-langchain-google-genai
-langchain-openai>=1.0.0
-langchain-anthropic>=1.0.0
+langchain-google-genai>=3.2.0
+langchain-openai>=1.1.0
+langchain-anthropic>=1.2.0
 
 # Research
-langchain-tavily>=0.2.11
+langchain-tavily>=0.2.13
 
 # Data
-supabase
-psycopg[binary]>=3.2.10
-pydantic>=2.0.0
+supabase>=2.24.0
+psycopg[binary]>=3.2.13
+pydantic>=2.12.5
 
 # Webhook
-fastapi>=0.118.0
-uvicorn>=0.37.0
+fastapi>=0.123.0
+uvicorn>=0.38.0
 
 # Utilities
-pillow>=10.0.0
-tenacity>=8.0.0
-python-dotenv>=1.0.0
+pillow>=12.0.0
+tenacity>=9.1.2
+python-dotenv>=1.2.1
 ```
 
 ---

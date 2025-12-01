@@ -72,6 +72,14 @@ Every change—whether design, architecture, or code—must meet this standard:
 ### Tool Development Standards
 - **[CRITICAL] ATOMIC + StructuredTool:** One thing powerfully, Pydantic schemas, structured returns
 
+### **[CRITICAL] Proactive Skill Usage**
+Invoke project skills automatically at the start of relevant work - do not wait to be told:
+
+- **`prompt-engineering`**: Creating, refactoring, or reviewing PM/specialist prompts
+- **`specialist-creation`**: Adding new specialists or modifying specialist architecture
+- **`tool-development`**: Building new tools, refactoring existing tools, reviewing tool implementations
+- **`autonomous-testing`**: Testing workflows, validating PM behavior, post-implementation verification
+
 ### Autonomous Behavior Standards
 - **Dynamic Planning:** Agents analyze context and plan adaptively, not follow rigid recipes
 - **Suggestive Agents:** Agents come to the user with details, options, and recommendations - not wait passively for everything to be specified
@@ -138,7 +146,7 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 ### Common Gotchas
 
 **LangChain v1 Stack**:
-- Stable releases: `langchain>=1.0.2`, `langgraph>=1.0.1`, `deepagents>=0.2.4`
+- Stable releases: `langchain>=1.1.0`, `langgraph>=1.0.4`, `deepagents>=0.2.8`
 
 **Windows**:
 - Use `.venv\Scripts\activate` (not `source`)

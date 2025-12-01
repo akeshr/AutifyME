@@ -20,8 +20,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from autifyme_agents.tools.image_studio import (
-    AnalysisAttributes,
-    AnalysisResult,
     BackgroundSpec,
     EnhancementSpec,
     FramingSpec,
@@ -81,7 +79,6 @@ class TestImageStudioSchemas:
 
     def test_image_operation_enum_values(self):
         """Test ImageOperation enum has correct values."""
-        assert ImageOperation.ANALYZE.value == "analyze"
         assert ImageOperation.GENERATE.value == "generate"
         assert ImageOperation.EDIT.value == "edit"
 
@@ -113,12 +110,12 @@ class TestImageStudioSchemas:
         spec = FramingSpec(product_coverage_percent=80, padding_percent=10)
         assert spec.product_coverage_percent == 80
 
-        # Invalid - out of range
+        # Invalid - out of range (must be 20-100)
         with pytest.raises(ValueError):
-            FramingSpec(product_coverage_percent=120)  # > 95
+            FramingSpec(product_coverage_percent=120)  # > 100
 
         with pytest.raises(ValueError):
-            FramingSpec(padding_percent=2)  # < 5
+            FramingSpec(padding_percent=60)  # > 50
 
     def test_enhancement_spec_defaults(self):
         """Test EnhancementSpec defaults."""
@@ -146,15 +143,6 @@ class TestImageStudioSchemas:
         assert spec.scale == "dominant"
         assert spec.surface == "table"
 
-    def test_analysis_attributes_defaults(self):
-        """Test AnalysisAttributes defaults."""
-        attrs = AnalysisAttributes()
-        assert attrs.colors is True
-        assert attrs.materials is True
-        assert attrs.dimensions is True
-        assert attrs.quality_score is True
-        assert attrs.custom_attributes == []
-
     def test_output_spec_defaults(self):
         """Test OutputSpec defaults."""
         spec = OutputSpec()
@@ -176,17 +164,6 @@ class TestImageStudioSchemas:
 
         with pytest.raises(ValueError):
             OutputSpec(quality=101)  # > 100
-
-    def test_image_studio_input_analyze(self):
-        """Test ImageStudioInput for analyze operation."""
-        input_spec = ImageStudioInput(
-            operation=ImageOperation.ANALYZE,
-            source_image="/path/to/image.png",
-            analysis=AnalysisAttributes(colors=True, materials=True),
-        )
-        assert input_spec.operation == ImageOperation.ANALYZE
-        assert input_spec.source_image == "/path/to/image.png"
-        assert input_spec.analysis is not None
 
     def test_image_studio_input_edit(self):
         """Test ImageStudioInput for edit operation."""
@@ -213,21 +190,6 @@ class TestImageStudioSchemas:
         assert input_spec.scene is not None
         assert input_spec.placement is not None
 
-    def test_analysis_result_schema(self):
-        """Test AnalysisResult schema."""
-        result = AnalysisResult(
-            colors=["red", "blue"],
-            materials=["plastic", "metal"],
-            product_category="container",
-            quality_score=0.85,
-            confidence=0.9,
-            product_count=1,
-        )
-        assert result.quality_score == 0.85
-        assert result.confidence == 0.9
-        assert result.product_count == 1
-
-
 # =============================================================================
 # Group 2: Tool Factory Tests (8 tests)
 # =============================================================================
@@ -241,7 +203,6 @@ class TestImageStudioToolFactory:
         tool = create_image_studio_tool()
         assert tool.name == "image_studio"
         assert "Gemini 3 Pro Image" in tool.description
-        assert "analyze" in tool.description.lower()
         assert "edit" in tool.description.lower()
         assert "generate" in tool.description.lower()
 
@@ -253,7 +214,6 @@ class TestImageStudioToolFactory:
     def test_tool_description_includes_operations(self):
         """Test tool description lists all operations."""
         tool = create_image_studio_tool()
-        assert "analyze" in tool.description.lower()
         assert "edit" in tool.description.lower()
         assert "generate" in tool.description.lower()
 
@@ -1007,7 +967,7 @@ class TestErrorHandling:
         try:
             tool = create_image_studio_tool()
             result = tool.invoke({
-                "operation": "analyze",
+                "operation": "edit",
                 "source_image": corrupt_path,
             })
 
@@ -1039,7 +999,7 @@ class TestErrorHandling:
 
         tool = create_image_studio_tool()
         result = tool.invoke({
-            "operation": "analyze",
+            "operation": "edit",
             "source_image": "/tmp/test.png",
         })
 
@@ -1050,7 +1010,7 @@ class TestErrorHandling:
         """Test empty source_image path."""
         tool = create_image_studio_tool()
         result = tool.invoke({
-            "operation": "analyze",
+            "operation": "edit",
             "source_image": "",
         })
 
@@ -1070,12 +1030,12 @@ class TestErrorHandling:
 
         tool = create_image_studio_tool()
         result = tool.invoke({
-            "operation": "analyze",
+            "operation": "edit",
             "source_image": "/tmp/test.png",
         })
 
         # Should handle JSON parse error gracefully
-        assert result["success"] is False or "analysis" in result
+        assert result["success"] is False or "output_variants" in result
 
     def test_error_codes_are_valid(self):
         """Test all error codes are valid class attributes."""
@@ -1094,11 +1054,11 @@ class TestErrorHandling:
         """Test error responses have consistent structure."""
         tool = create_image_studio_tool()
         result = tool.invoke({
-            "operation": "analyze",
+            "operation": "edit",
             "source_image": "/nonexistent/path.png",
         })
 
         assert result["success"] is False
         assert "error" in result
         assert "error_code" in result
-        assert result["operation"] == "analyze"
+        assert result["operation"] == "edit"
