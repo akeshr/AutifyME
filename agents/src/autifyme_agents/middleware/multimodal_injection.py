@@ -67,7 +67,7 @@ IMAGE_PATH_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-MAX_IMAGE_DIMENSION = 1024  # Larger for specialist (more detail than view_image)
+MAX_IMAGE_DIMENSION = 1024  # Larger for specialist (higher detail for image_studio)
 
 
 def _load_and_encode_image(image_path: str) -> tuple[str, dict[str, Any]] | None:
@@ -398,11 +398,29 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             Modified result with images injected if applicable
         """
         if not self.enabled:
+            logger.debug("[MULTIMODAL] _process_tool_result: DISABLED, skipping")
             return result
 
         # Only process ToolMessage (not Command)
         if not isinstance(result, ToolMessage):
+            logger.debug("[MULTIMODAL] _process_tool_result: Not a ToolMessage, skipping")
             return result
+
+        logger.debug(
+            "[MULTIMODAL] _process_tool_result: content type=%s, content preview=%s",
+            type(result.content).__name__,
+            str(result.content)[:200] if result.content else "None"
+        )
+
+        # Skip if already multimodal (list with image_url blocks)
+        if isinstance(result.content, list):
+            has_image = any(
+                isinstance(block, dict) and block.get("type") == "image_url"
+                for block in result.content
+            )
+            if has_image:
+                logger.debug("[MULTIMODAL] Content already multimodal, skipping")
+                return result
 
         image_paths: list[str] = []
 
@@ -428,6 +446,11 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         # Fallback to string extraction
         elif isinstance(result.content, str):
             image_paths = _extract_image_paths(result.content)
+            logger.debug(
+                "[MULTIMODAL] String extraction found %d path(s): %s",
+                len(image_paths),
+                image_paths[:3] if image_paths else "none"
+            )
             if image_paths:
                 logger.info(
                     "Extracting %d image(s) from string tool output: %s",
@@ -443,7 +466,13 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                     tool_call_id=result.tool_call_id,
                     name=result.name,
                 )
+        else:
+            logger.debug(
+                "[MULTIMODAL] Content is neither dict nor str: %s",
+                type(result.content).__name__
+            )
 
+        logger.debug("[MULTIMODAL] No image paths found, returning original result")
         return result
 
     def wrap_tool_call(
@@ -463,15 +492,32 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         Returns:
             Tool result with images injected
         """
-        # Execute the tool
-        result = handler(request)
-
         # Get tool name for logging
         tool_name = request.tool.name if request.tool else None
 
-        # Only process image-producing tools
-        if tool_name in ("image_studio", "view_image"):
-            return self._process_tool_result(result, tool_name)
+        logger.debug(
+            "[MULTIMODAL] wrap_tool_call INVOKED for tool: %s",
+            tool_name or "unknown"
+        )
+
+        # Execute the tool
+        result = handler(request)
+
+        logger.debug(
+            "[MULTIMODAL] Tool result type: %s, content type: %s",
+            type(result).__name__,
+            type(result.content).__name__ if hasattr(result, "content") else "N/A"
+        )
+
+        # Only process image_studio tool (view_image handles its own multimodal output)
+        if tool_name == "image_studio":
+            processed = self._process_tool_result(result, tool_name)
+            logger.debug(
+                "[MULTIMODAL] After processing - content type: %s, is_list: %s",
+                type(processed.content).__name__ if hasattr(processed, "content") else "N/A",
+                isinstance(processed.content, list) if hasattr(processed, "content") else False
+            )
+            return processed
 
         return result
 
@@ -489,14 +535,31 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         Returns:
             Tool result with images injected
         """
-        # Execute the tool
-        result = await handler(request)
-
         # Get tool name for logging
         tool_name = request.tool.name if request.tool else None
 
-        # Only process image-producing tools
-        if tool_name in ("image_studio", "view_image"):
-            return self._process_tool_result(result, tool_name)
+        logger.debug(
+            "[MULTIMODAL] awrap_tool_call INVOKED for tool: %s",
+            tool_name or "unknown"
+        )
+
+        # Execute the tool
+        result = await handler(request)
+
+        logger.debug(
+            "[MULTIMODAL] Tool result type: %s, content type: %s",
+            type(result).__name__,
+            type(result.content).__name__ if hasattr(result, "content") else "N/A"
+        )
+
+        # Only process image_studio tool (view_image handles its own multimodal output)
+        if tool_name == "image_studio":
+            processed = self._process_tool_result(result, tool_name)
+            logger.debug(
+                "[MULTIMODAL] After processing - content type: %s, is_list: %s",
+                type(processed.content).__name__ if hasattr(processed, "content") else "N/A",
+                isinstance(processed.content, list) if hasattr(processed, "content") else False
+            )
+            return processed
 
         return result

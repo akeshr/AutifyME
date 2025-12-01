@@ -26,6 +26,7 @@ from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.specialists.catalog_specialist import create_catalog_specialist
 from autifyme_agents.specialists.creative_specialist import create_creative_specialist
+from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.data_engine import (
     create_inspect_schema_tool,
     create_read_data_tool,
@@ -132,6 +133,9 @@ async def create_project_manager(
     # Schema inspection and read operations
     pm_tools.append(create_inspect_schema_tool(storage, tables=None))
     pm_tools.append(create_read_data_tool(storage))
+
+    # Image viewing - universal tool for verifying images
+    pm_tools.append(create_view_image_tool())
 
     # Specialist LLM configuration
     specialist_llm = get_llm(

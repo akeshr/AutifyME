@@ -1,6 +1,19 @@
-"""View Image Tool - Allows agents to see images before processing.
+"""View Image Tool - Universal image viewing for any agent.
 
-Returns image as multimodal content so the agent's LLM can see it directly.
+Global utility that returns images as multimodal content, enabling
+any agent's LLM to SEE images directly without middleware.
+
+Architecture:
+- Returns multimodal content blocks (text + image_url)
+- No middleware required - tool owns its output format
+- Any agent with this tool can view and analyze images
+- Resizes images for efficient token usage (512px max dimension)
+
+Use Cases:
+- PM verifying specialist output before responding to user
+- Any specialist needing to inspect images before processing
+- Catalog Specialist validating product images
+- Quality checks across the system
 """
 
 from __future__ import annotations
@@ -17,7 +30,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-MAX_DIMENSION = 512  # Smaller size for efficient token usage
+MAX_DIMENSION = 512  # Optimized for efficient token usage
 
 
 class ViewImageInput(BaseModel):
@@ -91,16 +104,12 @@ def _view_image_impl(image_path: str) -> list[dict[str, Any]]:
         return [
             {
                 "type": "text",
-                "text": f"Image loaded from {metadata['path']} ({metadata['original_size']}). I can now see this image:"
+                "text": f"Image: {metadata['path']} ({metadata['original_size']}, {metadata['format']})"
             },
             {
                 "type": "image_url",
                 "image_url": {"url": data_uri}
             },
-            {
-                "type": "text",
-                "text": "Based on what I see in this image, I will decide what processing is needed."
-            }
         ]
 
     except Exception as e:
@@ -111,19 +120,21 @@ def _view_image_impl(image_path: str) -> list[dict[str, Any]]:
 def create_view_image_tool() -> StructuredTool:
     """Create the view_image tool.
 
-    Returns multimodal content so the agent can SEE the image directly.
+    Returns multimodal content so any agent can SEE images directly.
+    No middleware required - the tool handles image injection itself.
     """
     return StructuredTool.from_function(
         func=_view_image_impl,
         name="view_image",
         description="""View an image file. Returns the actual image so you can SEE it.
 
-Use this to look at an image before deciding what operations to perform.
-After calling this, you will see the image and can make informed decisions about:
-- How many products are in the image
-- Product types, colors, sizes
-- Background quality
-- What processing is needed
+Use this to look at any image and make informed decisions:
+- Inspect product photos before processing
+- Verify output quality from other tools
+- Analyze image content, colors, composition
+- Count products, identify types, assess backgrounds
+
+After calling this, you will see the image directly in your context.
 
 Example: view_image("/tmp/product.jpg") -> You see the actual image""",
         args_schema=ViewImageInput,

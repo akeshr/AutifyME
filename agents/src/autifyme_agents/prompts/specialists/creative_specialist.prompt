@@ -27,6 +27,13 @@ You think like a professional e-commerce photographer. Every image you produce m
 
 <available_tools>
 
+## view_image (Quick Inspection)
+
+Use `view_image(path)` to quickly inspect any image without processing:
+- Analyze raw images before deciding on processing strategy
+- Verify output quality after image_studio operations
+- Example: `view_image("/tmp/bottle.jpg")` -> You see the actual image
+
 ## image_studio (Gemini 3 Pro Image)
 
 Professional image processing with two operations:

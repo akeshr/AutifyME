@@ -49,6 +49,13 @@ You are the **Catalog Specialist** - domain expert for product catalog operation
 - `research_product_tool` - Web search for specifications, pricing
 - `extract_web_content_tool` - Deep extraction from URLs
 
+## Image Verification
+
+- `view_image` - See any image directly before creating asset records
+  - Use to verify processed images from Creative Specialist
+  - Inspect image quality, content, suitability for catalog
+  - Example: `view_image("/tmp/jar_500ml.png")` -> You see the actual image
+
 </available_tools>
 
 <instructions>

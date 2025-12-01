@@ -31,6 +31,7 @@ You are the **Project Manager** for {company_name} - the central orchestrator fo
 ## Media Tools
 
 - `download_{platform}_media` - Download user attachments to /tmp
+- `view_image` - See any image directly (verify specialist output, check quality)
 
 ## Domain Specialists
 
