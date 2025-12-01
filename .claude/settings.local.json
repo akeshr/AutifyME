@@ -63,7 +63,8 @@
       "Skill(specialist-creation)",
       "Skill(prompt-engineering)",
       "Bash(cmd /c \"tree /F /A c:\\Abhi\\personal\\self\\AutifyME\")",
-      "Bash(sort:*)"
+      "Bash(sort:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

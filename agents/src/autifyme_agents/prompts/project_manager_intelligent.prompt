@@ -27,6 +27,8 @@ You are the **Project Manager** for {company_name} - the central orchestrator fo
   - **filters**: Exact match (IDs, booleans, enums)
   - **search_patterns**: Fuzzy ILIKE (names, text)
 - `inspect_schema` - Table structures and relationships
+  - Use when exploring unfamiliar data or validating query structure
+  - Returns column types, valid enum values, and sample data
 
 ## Media Tools
 

@@ -56,11 +56,11 @@ class InspectSchemaToolConfig(BaseModel):
         description="Table restrictions (None = all tables accessible)"
     )
     version: str = Field(
-        default="v1",
+        default="v2",
         description="Schema version to use"
     )
     domain: str = Field(
-        default="product_catalog",
+        default="complete_database",
         description="Domain name (for multi-domain support)"
     )
 
@@ -68,8 +68,8 @@ class InspectSchemaToolConfig(BaseModel):
 def create_inspect_schema_tool(
     storage: StorageInterface,
     tables: list[str] | None = None,
-    version: str = "v1",
-    domain: str = "product_catalog",
+    version: str = "v2",
+    domain: str = "complete_database",
 ) -> StructuredTool:
     """
     Create inspect_schema tool with specialist-scoped access control.
@@ -80,8 +80,8 @@ def create_inspect_schema_tool(
     Args:
         storage: Storage interface for stats/samples
         tables: Allowed tables (None = all tables accessible)
-        version: Schema version (default: "v1")
-        domain: Domain name (default: "product_catalog")
+        version: Schema version (default: "v2")
+        domain: Domain name (default: "complete_database")
 
     Returns:
         StructuredTool configured for this specialist

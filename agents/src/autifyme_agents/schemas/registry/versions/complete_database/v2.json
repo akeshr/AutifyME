@@ -2540,6 +2540,876 @@
       ],
       "business_rules": [],
       "indexes": ["product_family_id", "category", "rule_type", "is_active"]
+    },
+    "variant_axes": {
+      "name": "variant_axes",
+      "description": "Defines dimensions along which a product family varies (e.g., size, color, cap_type). Each axis belongs to one product family.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "product_families.id",
+          "description": "Product family this axis belongs to"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "description": "Internal axis name in snake_case (e.g., 'size', 'color', 'cap_type')",
+          "pattern": "^[a-z_]+$",
+          "examples": ["size", "color", "cap_type", "neck_type", "material"]
+        },
+        "display_label": {
+          "name": "display_label",
+          "type": "text",
+          "nullable": false,
+          "description": "Human-readable label for UI (e.g., 'Size', 'Color', 'Cap Type')"
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "description": "Display order within the family's axes"
+        },
+        "schema_property": {
+          "name": "schema_property",
+          "type": "text",
+          "nullable": true,
+          "description": "Schema.org property mapping for SEO (e.g., 'size', 'color')"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Axis belongs to product family; deleted when family deleted"
+        }
+      ],
+      "business_rules": [
+        {
+          "rule_type": "case_insensitive_unique",
+          "trigger": "before_insert",
+          "handler": "validate_unique_axis_name",
+          "parameters": {"columns": ["product_family_id", "name"]},
+          "description": "Axis name must be unique within product family (case-insensitive)",
+          "enabled": true
+        }
+      ],
+      "indexes": ["product_family_id", "name"]
+    },
+    "variant_values": {
+      "name": "variant_values",
+      "description": "Specific values for each variant axis (e.g., '500ml', 'Blue', 'Diamond'). Links to variant_axes.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "variant_axis_id": {
+          "name": "variant_axis_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "variant_axes.id",
+          "description": "Parent axis this value belongs to"
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "nullable": false,
+          "description": "Internal value identifier (e.g., '500ml', 'blue', 'diamond')"
+        },
+        "display_label": {
+          "name": "display_label",
+          "type": "text",
+          "nullable": false,
+          "description": "Human-readable label for UI (e.g., '500 ML', 'Blue', 'Diamond Cap')"
+        },
+        "sku_code": {
+          "name": "sku_code",
+          "type": "text",
+          "nullable": false,
+          "description": "SKU segment for this value (e.g., '500ML', 'BLU', 'DIA'). Uppercase alphanumeric.",
+          "pattern": "^[A-Z0-9-]+$",
+          "examples": ["500ML", "1L", "BLU", "WHT", "DIA", "RIB"]
+        },
+        "color_hex": {
+          "name": "color_hex",
+          "type": "text",
+          "nullable": true,
+          "description": "Hex color code for color variants (e.g., '#FFFFFF')",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "examples": ["#FFFFFF", "#0000FF", "#FF5733"]
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "nullable": true,
+          "description": "URL to swatch or sample image for this value"
+        },
+        "price_adjustment": {
+          "name": "price_adjustment",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0",
+          "description": "Price delta from family base price. Can be positive or negative."
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "description": "Display order within axis values"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Soft delete flag"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "variant_axes",
+          "foreign_key": "variant_axis_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Value belongs to axis; deleted when axis deleted"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["variant_axis_id", "value", "sku_code"]
+    },
+    "product_variant_values": {
+      "name": "product_variant_values",
+      "description": "M:N junction linking products to their variant dimension values. Each product references multiple variant_values (one per axis).",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "products.id",
+          "description": "Product this variant value applies to"
+        },
+        "variant_value_id": {
+          "name": "variant_value_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "variant_values.id",
+          "description": "Variant value for this product"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Junction deleted when product deleted"
+        },
+        {
+          "type": "parent",
+          "target_table": "variant_values",
+          "foreign_key": "variant_value_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Junction deleted when variant value deleted"
+        }
+      ],
+      "business_rules": [
+        {
+          "rule_type": "unique_constraint",
+          "trigger": "before_insert",
+          "handler": "validate_unique_product_variant",
+          "parameters": {"columns": ["product_id", "variant_value_id"]},
+          "description": "Product can only have each variant value once",
+          "enabled": true
+        }
+      ],
+      "indexes": ["product_id", "variant_value_id"]
+    },
+    "product_family_industries": {
+      "name": "product_family_industries",
+      "description": "M:N junction for multi-industry targeting. Links product families to industries they serve with industry-specific benefits and use cases.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "product_families.id",
+          "description": "Product family"
+        },
+        "industry_naics_code": {
+          "name": "industry_naics_code",
+          "type": "text",
+          "nullable": false,
+          "references": "industries.naics_code",
+          "description": "NAICS industry code"
+        },
+        "industry_use_case": {
+          "name": "industry_use_case",
+          "type": "text",
+          "nullable": true,
+          "description": "How this product solves problems in this specific industry"
+        },
+        "industry_benefits": {
+          "name": "industry_benefits",
+          "type": "array",
+          "nullable": false,
+          "default": "'{}'::text[]",
+          "element_type": "text",
+          "description": "Array of benefit strings for this industry",
+          "examples": [["Food-safe packaging", "Extended shelf life"], ["Chemical resistant", "Lab-grade clarity"]]
+        },
+        "compliance_notes": {
+          "name": "compliance_notes",
+          "type": "text",
+          "nullable": true,
+          "description": "Industry-specific compliance requirements"
+        },
+        "is_primary_industry": {
+          "name": "is_primary_industry",
+          "type": "boolean",
+          "nullable": true,
+          "default": "false",
+          "description": "Main target industry flag"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Industry link deleted when family deleted"
+        },
+        {
+          "type": "parent",
+          "target_table": "industries",
+          "foreign_key": "industry_naics_code",
+          "target_column": "naics_code",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Industry reference"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_family_id", "industry_naics_code", "is_primary_industry"]
+    },
+    "customer_segments": {
+      "name": "customer_segments",
+      "description": "B2B/B2C/D2C messaging strategies per product family. Defines tone, benefits, pain points for each customer type.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "product_families.id",
+          "description": "Product family (NULL for global segments)"
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "campaigns.id",
+          "description": "Campaign-specific segment (NULL for product segments)"
+        },
+        "segment_type": {
+          "name": "segment_type",
+          "type": "text",
+          "nullable": false,
+          "description": "Customer type classification",
+          "valid_values": ["b2b", "b2c", "d2c", "wholesale", "enterprise", "retail"],
+          "valid_values_descriptions": {
+            "b2b": "Business-to-business customers",
+            "b2c": "Business-to-consumer end users",
+            "d2c": "Direct-to-consumer online buyers",
+            "wholesale": "Bulk buyers and distributors",
+            "enterprise": "Large corporate accounts",
+            "retail": "Retail store customers"
+          }
+        },
+        "segment_label": {
+          "name": "segment_label",
+          "type": "text",
+          "nullable": false,
+          "description": "Human-readable segment name"
+        },
+        "tone": {
+          "name": "tone",
+          "type": "text",
+          "nullable": false,
+          "description": "Marketing tone for this segment",
+          "valid_values": ["professional", "casual", "technical", "emotional", "educational", "aspirational"],
+          "valid_values_descriptions": {
+            "professional": "Formal business language",
+            "casual": "Friendly, conversational tone",
+            "technical": "Specs-focused, detailed",
+            "emotional": "Story-driven, feelings-based",
+            "educational": "Informative, how-to focused",
+            "aspirational": "Lifestyle, aspiration-driven"
+          }
+        },
+        "key_benefits": {
+          "name": "key_benefits",
+          "type": "array",
+          "nullable": false,
+          "default": "'{}'::text[]",
+          "element_type": "text",
+          "description": "Key benefits to highlight for this segment"
+        },
+        "pain_points": {
+          "name": "pain_points",
+          "type": "array",
+          "nullable": false,
+          "default": "'{}'::text[]",
+          "element_type": "text",
+          "description": "Pain points this segment experiences"
+        },
+        "primary_channels": {
+          "name": "primary_channels",
+          "type": "array",
+          "nullable": false,
+          "default": "'{}'::text[]",
+          "element_type": "text",
+          "description": "Preferred marketing channels (linkedin, instagram, email, etc.)"
+        },
+        "content_formats": {
+          "name": "content_formats",
+          "type": "array",
+          "nullable": false,
+          "default": "'{}'::text[]",
+          "element_type": "text",
+          "description": "Preferred content formats (video, carousel, whitepaper)"
+        },
+        "pricing_notes": {
+          "name": "pricing_notes",
+          "type": "text",
+          "nullable": true,
+          "description": "Pricing strategy notes for this segment"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Segment deleted when family deleted"
+        },
+        {
+          "type": "parent",
+          "target_table": "campaigns",
+          "foreign_key": "campaign_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Segment deleted when campaign deleted"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_family_id", "campaign_id", "segment_type"]
+    },
+    "product_images": {
+      "name": "product_images",
+      "description": "Multi-level image storage supporting family-level (shared) or product-specific images. Legacy table - prefer assets + product_assets for new implementations.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "product_families.id",
+          "description": "If set, image applies to all variants in family"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "products.id",
+          "description": "If set, image applies only to this specific product"
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "nullable": false,
+          "description": "Image URL"
+        },
+        "alt_text": {
+          "name": "alt_text",
+          "type": "text",
+          "nullable": true,
+          "description": "Alt text for accessibility"
+        },
+        "image_type": {
+          "name": "image_type",
+          "type": "text",
+          "nullable": false,
+          "description": "Semantic classification for different contexts",
+          "valid_values": ["primary", "gallery", "thumbnail", "lifestyle", "closeup", "video_thumbnail"],
+          "valid_values_descriptions": {
+            "primary": "Main product image, hero shot",
+            "gallery": "Additional product images",
+            "thumbnail": "Small preview image",
+            "lifestyle": "Product in context/use",
+            "closeup": "Detail/zoom shot",
+            "video_thumbnail": "Video preview image"
+          }
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "description": "Display order"
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "nullable": true,
+          "description": "Width in pixels"
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "nullable": true,
+          "description": "Height in pixels"
+        },
+        "file_size_bytes": {
+          "name": "file_size_bytes",
+          "type": "integer",
+          "nullable": true,
+          "description": "File size in bytes"
+        },
+        "whatsapp_media_id": {
+          "name": "whatsapp_media_id",
+          "type": "text",
+          "nullable": true,
+          "description": "WhatsApp media ID for uploaded images"
+        },
+        "is_primary": {
+          "name": "is_primary",
+          "type": "boolean",
+          "nullable": true,
+          "default": "false",
+          "description": "Hero image shown first in listings/catalogs"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Image deleted when family deleted"
+        },
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Image deleted when product deleted"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_family_id", "product_id", "image_type", "is_primary"]
+    },
+    "marketing_content": {
+      "name": "marketing_content",
+      "description": "Platform-specific marketing content with versioning and performance tracking. Supports product onboarding and campaign content.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "description": "Primary key"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "product_families.id",
+          "description": "Product family (NULL for campaign-only content)"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "products.id",
+          "description": "Specific product (NULL for family-level content)"
+        },
+        "customer_segment_id": {
+          "name": "customer_segment_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "customer_segments.id",
+          "description": "Target customer segment"
+        },
+        "industry_naics_code": {
+          "name": "industry_naics_code",
+          "type": "text",
+          "nullable": true,
+          "references": "industries.naics_code",
+          "description": "Target industry"
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "campaigns.id",
+          "description": "Campaign ID (NULL for product onboarding content)"
+        },
+        "campaign_asset_id": {
+          "name": "campaign_asset_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "campaign_assets.id",
+          "description": "Campaign asset referenced by this content"
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "nullable": false,
+          "description": "Target platform",
+          "valid_values": ["instagram", "facebook", "twitter", "linkedin", "youtube", "tiktok", "website", "email", "catalog"],
+          "valid_values_descriptions": {
+            "instagram": "Instagram posts, stories, reels",
+            "facebook": "Facebook posts and ads",
+            "twitter": "Twitter/X posts",
+            "linkedin": "LinkedIn posts and articles",
+            "youtube": "YouTube descriptions",
+            "tiktok": "TikTok captions",
+            "website": "Website product pages",
+            "email": "Email marketing",
+            "catalog": "Product catalog descriptions"
+          }
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "nullable": false,
+          "description": "Content format",
+          "valid_values": ["post", "story", "reel", "video", "carousel", "ad", "description", "title", "caption", "subject_line", "catalog_description"],
+          "valid_values_descriptions": {
+            "post": "Standard social media post",
+            "story": "Story format (Instagram, Facebook)",
+            "reel": "Short-form video (Reels, Shorts)",
+            "video": "Long-form video description",
+            "carousel": "Multi-image carousel",
+            "ad": "Paid advertisement",
+            "description": "Product description",
+            "title": "Product title",
+            "caption": "Image caption",
+            "subject_line": "Email subject line",
+            "catalog_description": "Full catalog entry"
+          }
+        },
+        "content_text": {
+          "name": "content_text",
+          "type": "text",
+          "nullable": false,
+          "description": "The actual marketing content"
+        },
+        "content_metadata": {
+          "name": "content_metadata",
+          "type": "jsonb",
+          "nullable": true,
+          "default": "'{}'::jsonb",
+          "description": "Platform-specific metadata (aspect_ratio, duration, call_to_action, etc.)"
+        },
+        "hashtags": {
+          "name": "hashtags",
+          "type": "array",
+          "nullable": true,
+          "default": "'{}'::text[]",
+          "element_type": "text",
+          "description": "Hashtags for social media"
+        },
+        "keywords": {
+          "name": "keywords",
+          "type": "array",
+          "nullable": true,
+          "default": "'{}'::text[]",
+          "element_type": "text",
+          "description": "SEO keywords"
+        },
+        "meta_title": {
+          "name": "meta_title",
+          "type": "text",
+          "nullable": true,
+          "description": "SEO meta title"
+        },
+        "meta_description": {
+          "name": "meta_description",
+          "type": "text",
+          "nullable": true,
+          "description": "SEO meta description"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "default": "1",
+          "description": "Content version for A/B testing"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": true,
+          "default": "true",
+          "description": "Only one active version per platform/type/entity combo"
+        },
+        "impressions": {
+          "name": "impressions",
+          "type": "integer",
+          "nullable": true,
+          "default": "0",
+          "description": "Performance: impressions"
+        },
+        "clicks": {
+          "name": "clicks",
+          "type": "integer",
+          "nullable": true,
+          "default": "0",
+          "description": "Performance: clicks"
+        },
+        "conversions": {
+          "name": "conversions",
+          "type": "integer",
+          "nullable": true,
+          "default": "0",
+          "description": "Performance: conversions"
+        },
+        "generated_by": {
+          "name": "generated_by",
+          "type": "text",
+          "nullable": true,
+          "description": "AI model or user who generated content"
+        },
+        "generation_prompt_version": {
+          "name": "generation_prompt_version",
+          "type": "text",
+          "nullable": true,
+          "description": "AI prompt version for traceability"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "When content was published"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Content deleted when family deleted"
+        },
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Content deleted when product deleted"
+        },
+        {
+          "type": "parent",
+          "target_table": "customer_segments",
+          "foreign_key": "customer_segment_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Content deleted when segment deleted"
+        },
+        {
+          "type": "parent",
+          "target_table": "industries",
+          "foreign_key": "industry_naics_code",
+          "target_column": "naics_code",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Industry reference"
+        },
+        {
+          "type": "parent",
+          "target_table": "campaigns",
+          "foreign_key": "campaign_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Content deleted when campaign deleted"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["product_family_id", "product_id", "customer_segment_id", "campaign_id", "platform", "content_type", "is_active"]
     }
   }
 }
