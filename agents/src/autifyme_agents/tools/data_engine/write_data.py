@@ -27,6 +27,9 @@ class WriteDataInput(BaseModel):
 
     As per UNIVERSAL_DATA_ENGINE_DESIGN.md (lines 722-745).
     Streamlined multi-operation write intent with auto-dependency resolution.
+
+    Uses nested Pydantic models (Operation, AssetUpload) so specialists see
+    the exact schema with all required/optional fields and validation.
     """
 
     model_config = {"extra": "forbid"}
@@ -48,38 +51,21 @@ class WriteDataInput(BaseModel):
         ),
     )
 
-    asset_uploads: list[dict[str, Any]] = Field(
+    asset_uploads: list[AssetUpload] = Field(
         default_factory=list,
         description=(
             "Files to upload BEFORE database operations.\n"
-            "Each upload has:\n"
-            "- temp_path: Local file path (from Image Studio or WhatsApp media)\n"
-            "- returns: Name for reference (@name.public_url, @name.storage_path)\n"
-            "- bucket: Storage bucket (default: 'assets')\n"
-            "- folder: Folder within bucket (default: 'products')\n\n"
             "Uploads execute atomically: if any fails, no DB operations run.\n"
             "Use @name.public_url in operations to reference uploaded file URL."
         ),
     )
 
-    operations: list[dict[str, Any]] = Field(
+    operations: list[Operation] = Field(
         ...,
         description=(
             "List of operations to execute atomically.\n"
-            "Each operation has:\n"
-            "- action: 'create'|'update'|'delete'|'upsert'\n"
-            "- table: table name\n"
-            "- data: dict or list of dicts (for create/upsert)\n"
-            "- filters: dict (for update/delete)\n"
-            "- updates: dict (for update)\n"
-            "- dependencies: list of operation names (optional)\n"
-            "- returns: name for this operation's result (optional)\n"
-            "- on_conflict: 'error'|'skip'|'update' (optional)\n"
-            "- conflict_fields: list of fields (for upsert, optional)\n"
-            "- cascade: bool (for delete, optional)\n"
-            "- soft_delete: bool (for delete, default True)\n\n"
             "Engine automatically orders by dependencies (topological sort).\n"
-            "All operations execute in single transaction with automatic rollback.\n\n"
+            "All operations execute in single transaction with automatic rollback.\n"
             "Reference syntax: Use @name.field to reference previous operations.\n"
             "Example: 'family_id': '@family.id' references operation with returns='family'"
         ),
@@ -162,9 +148,9 @@ def create_write_data_tool(
     async def _write_data_impl(
         goal: str,
         reasoning: str,
-        operations: list[dict[str, Any]],
+        operations: list[Operation],
         impact: dict[str, Any],
-        asset_uploads: list[dict[str, Any]] | None = None,
+        asset_uploads: list[AssetUpload] | None = None,
         dry_run: bool = False,
         validate_only: bool = False,
     ) -> dict[str, Any]:
@@ -318,12 +304,12 @@ def create_write_data_tool(
             write_data(goal="...", reasoning="...", operations=[...], impact={...}, validate_only=True)
         """
         try:
-            # Parse WriteIntent from dict inputs
+            # Build WriteIntent from typed inputs (already validated by Pydantic)
             write_intent = WriteIntent(
                 goal=goal,
                 reasoning=reasoning,
-                asset_uploads=[AssetUpload(**au) for au in (asset_uploads or [])],
-                operations=[Operation(**op) for op in operations],
+                asset_uploads=asset_uploads or [],
+                operations=operations,
                 impact=impact,
             )
 
