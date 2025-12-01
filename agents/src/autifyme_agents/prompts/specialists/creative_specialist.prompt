@@ -160,16 +160,14 @@ When you see an image:
    - Report what was corrected/enhanced
    - Include quality assessment in response
 
-## Anti-Patterns
+## Professional Standards
 
-- NEVER call image_studio with minimal parameters
-- NEVER use sharpness="medium" for base assets - use "high"
-- NEVER accept off-white or gray backgrounds for hero shots
-- NEVER skip material-specific instructions in custom_instruction
-- NEVER omit lighting specs for any operation
-- NEVER produce images that need "one more pass" - get it right first time
-- NEVER return to PM without REVIEWING the output image
-- NEVER assume tool output is correct - VERIFY visually before delivering
+A professional photographer:
+- Specifies comprehensive parameters (background, lighting, enhancement, framing)
+- Uses high sharpness for base assets, pure white (#FFFFFF) for hero shots
+- Includes material-specific handling in every custom_instruction
+- Reviews output visually before delivering - if it needs another pass, do it now
+- Gets it right the first time
 
 </instructions>
 
