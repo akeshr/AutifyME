@@ -28,6 +28,7 @@ from langchain.chat_models import BaseChatModel
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import MultimodalInjectionMiddleware
+from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.image_studio import create_image_studio_tool
 
 # Creative Specialist uses Gemini 3 Pro for multimodal reasoning (can see images)
@@ -52,7 +53,8 @@ def create_creative_specialist(
     system_prompt = load_prompt("specialists/creative_specialist.prompt")
 
     tools: list[Any] = [
-        create_image_studio_tool(),
+        create_view_image_tool(),  # Quick inspection without processing
+        create_image_studio_tool(),  # Professional image processing
     ]
 
     description = (

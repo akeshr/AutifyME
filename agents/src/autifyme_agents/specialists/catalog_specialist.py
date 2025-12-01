@@ -21,6 +21,7 @@ from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.research_tools import (
     extract_web_content_tool,
     research_product_tool,
@@ -102,6 +103,9 @@ def create_catalog_specialist(
     tools.append(create_read_data_tool(storage, tables=CATALOG_TABLES_ALL))
     tools.append(create_aggregate_data_tool(storage, tables=CATALOG_TABLES_ALL))
     tools.append(create_write_data_tool(storage, tables=CATALOG_TABLES_CRUD))
+
+    # Image viewing - verify processed images before creating asset records
+    tools.append(create_view_image_tool())
 
     description = (
         "Catalog Specialist - domain expert for product catalog operations. "
