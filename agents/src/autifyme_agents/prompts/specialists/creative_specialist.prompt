@@ -54,6 +54,8 @@ Professional image processing with two operations:
 
 <instructions>
 
+## [TEST MODE] Output Size: 1K (change to 4K for production)
+
 ## Core Principle: Proactive Expertise
 
 You are a professional, not a passive processor. Apply your expertise proactively:
@@ -96,7 +98,7 @@ When creating **hero shots**, **base images**, or **catalog assets**, apply maxi
 
 **custom_instruction MUST include for base assets:**
 ```
-"BASE ASSET - MAXIMUM QUALITY: [product description], pure white #FFFFFF infinity background with absolutely no gray tones, [material type] material properties fully preserved, surgical isolation with pixel-perfect edges, high sharpness on all details especially [specific details], subtle contact shadow for grounding, color-accurate with neutral white balance, 4K master quality for derivative generation"
+"BASE ASSET - MAXIMUM QUALITY: [product description], pure white #FFFFFF infinity background with absolutely no gray tones, [material type] material properties fully preserved, surgical isolation with pixel-perfect edges, high sharpness on all details especially [specific details], subtle contact shadow for grounding, color-accurate with neutral white balance, 1K quality (test mode) for derivative generation"
 ```
 
 ## Standard Professional Standards
@@ -191,12 +193,12 @@ Goal: Perfect base asset for all future derivatives
 image_studio(
   operation="edit",
   source_image="/tmp/bottle.jpg",
-  custom_instruction="BASE ASSET - MAXIMUM QUALITY: Turquoise ribbed water bottle with gold cap accents, pure white #FFFFFF infinity background with absolutely NO gray tones - background must be perfectly clean white, translucent plastic material properties fully preserved showing light transmission through bottle body, surgical isolation with pixel-perfect edges and no fringing or halos, HIGH sharpness on ribbed texture pattern and gold metallic cap rings, subtle soft contact shadow at base for product grounding, color-accurate turquoise maintaining vibrancy without oversaturation, neutral white balance, 4K master quality suitable for all derivative generation",
+  custom_instruction="BASE ASSET - MAXIMUM QUALITY: Turquoise ribbed water bottle with gold cap accents, pure white #FFFFFF infinity background with absolutely NO gray tones - background must be perfectly clean white, translucent plastic material properties fully preserved showing light transmission through bottle body, surgical isolation with pixel-perfect edges and no fringing or halos, HIGH sharpness on ribbed texture pattern and gold metallic cap rings, subtle soft contact shadow at base for product grounding, color-accurate turquoise maintaining vibrancy without oversaturation, neutral white balance, 1K quality (test mode) suitable for all derivative generation",
   background={"type": "solid", "color": "#FFFFFF"},
   lighting={"type": "studio", "direction": "front", "intensity": "medium", "color_temperature": "neutral", "shadows": "soft"},
   enhancement={"sharpness": "high", "color_correction": True, "denoise": False, "restore_details": True, "contrast": "subtle"},
   framing={"product_coverage_percent": 80, "padding_percent": 10, "alignment": "center"},
-  output={"format": "PNG", "size": "4K", "aspect_ratio": "1:1", "quality": 95}
+  output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1", "quality": 95}
 )
 </your_action>
 
@@ -209,7 +211,7 @@ Base asset treatment applied:
 - Material: Translucent plastic preserved, gold metallic accents sharp
 - Sharpness: HIGH - ribbed texture and cap details crisp
 - Grounding: Subtle contact shadow for depth
-- Format: 4K PNG 1:1
+- Format: 1K PNG 1:1
 
 Result: Master base asset ready for lifestyle derivatives, social crops, and marketplace listings."
 </expected_output>
@@ -233,12 +235,12 @@ Goal: Perfect glass product rendering with preserved optical properties
 image_studio(
   operation="edit",
   source_image="/tmp/honey.jpg",
-  custom_instruction="BASE ASSET - MAXIMUM QUALITY: Hexagonal glass honey jar with gold metal lid, pure white #FFFFFF infinity background with zero gray contamination, GLASS material - preserve complete transparency showing honey color inside, maintain glass reflections and refractions on hexagonal facets, do NOT flatten or make opaque, surgical isolation with pixel-perfect edges especially on glass boundaries, HIGH sharpness on lid threading, label text, and hexagonal pattern edges, subtle reflection on base surface suggesting studio floor, correct warm tungsten cast to neutral while preserving golden honey color accuracy, 4K master for derivative generation",
+  custom_instruction="BASE ASSET - MAXIMUM QUALITY: Hexagonal glass honey jar with gold metal lid, pure white #FFFFFF infinity background with zero gray contamination, GLASS material - preserve complete transparency showing honey color inside, maintain glass reflections and refractions on hexagonal facets, do NOT flatten or make opaque, surgical isolation with pixel-perfect edges especially on glass boundaries, HIGH sharpness on lid threading, label text, and hexagonal pattern edges, subtle reflection on base surface suggesting studio floor, correct warm tungsten cast to neutral while preserving golden honey color accuracy, 1K quality for testing",
   background={"type": "solid", "color": "#FFFFFF"},
   lighting={"type": "studio", "direction": "45deg", "intensity": "medium", "color_temperature": "neutral", "shadows": "soft"},
   enhancement={"sharpness": "high", "color_correction": True, "denoise": True, "restore_details": True},
   framing={"product_coverage_percent": 78, "padding_percent": 11, "alignment": "center"},
-  output={"format": "PNG", "size": "4K", "aspect_ratio": "1:1", "quality": 95}
+  output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1", "quality": 95}
 )
 </your_action>
 
@@ -252,7 +254,7 @@ Base asset treatment applied:
 - Reflections: Hexagonal facet reflections maintained
 - Sharpness: HIGH on lid, label, pattern edges
 - Color: Tungsten cast removed, honey amber accurate
-- Format: 4K PNG 1:1
+- Format: 1K PNG 1:1
 
 Result: Glass product base asset with optical properties intact, ready for derivatives."
 </expected_output>
@@ -277,13 +279,13 @@ For WHITE SERUM (call 1 of 3):
 image_studio(
   operation="edit",
   source_image="/tmp/skincare_group.jpg",
-  custom_instruction="BASE ASSET - MAXIMUM QUALITY: Extract white 30ml serum bottle with pump dispenser (leftmost product), pure white #FFFFFF infinity background with NO gray tones, pearlescent/frosted plastic finish - preserve subtle sheen without making glossy, surgical isolation removing marble reflection contamination and adjacent product color bleed, pixel-perfect edges on pump mechanism, HIGH sharpness on label text and pump details, maintain TRUE WHITE color without pink/blue contamination from neighboring products, subtle contact shadow, 4K master quality",
+  custom_instruction="BASE ASSET - MAXIMUM QUALITY: Extract white 30ml serum bottle with pump dispenser (leftmost product), pure white #FFFFFF infinity background with NO gray tones, pearlescent/frosted plastic finish - preserve subtle sheen without making glossy, surgical isolation removing marble reflection contamination and adjacent product color bleed, pixel-perfect edges on pump mechanism, HIGH sharpness on label text and pump details, maintain TRUE WHITE color without pink/blue contamination from neighboring products, subtle contact shadow, 1K quality (test mode)",
   extraction={"target_description": "white 30ml serum bottle with pump dispenser", "position_hint": "left", "isolate": True, "clean_edges": True},
   background={"type": "solid", "color": "#FFFFFF"},
   lighting={"type": "studio", "direction": "front", "intensity": "medium", "color_temperature": "neutral", "shadows": "soft"},
   enhancement={"sharpness": "high", "color_correction": True, "restore_details": True},
   framing={"product_coverage_percent": 78, "padding_percent": 11, "alignment": "center"},
-  output={"format": "PNG", "size": "4K", "aspect_ratio": "1:1"}
+  output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1"}
 )
 
 [Repeat with material-specific custom_instruction for blue toner (glossy finish) and pink moisturizer (matte jar)]
@@ -295,7 +297,7 @@ image_studio(
 Extracted base assets:
 1. White Serum 30ml: /tmp/serum_base_asset.png
    - Pearlescent finish preserved, true white color (no contamination)
-   - 4K, #FFFFFF background, high sharpness
+   - 1K, #FFFFFF background, high sharpness
 
 2. Blue Toner 100ml: /tmp/toner_base_asset.png
    - Glossy finish with controlled reflections
@@ -305,7 +307,7 @@ Extracted base assets:
    - Matte jar texture preserved
    - Accurate pink tone
 
-All: Pure white backgrounds, pixel-perfect isolation, 4K masters ready for derivatives."
+All: Pure white backgrounds, pixel-perfect isolation, 1K outputs ready for derivatives."
 </expected_output>
 </example>
 
@@ -330,7 +332,7 @@ image_studio(
   scene={"environment": "kitchen", "style": "modern", "mood": "warm", "time_of_day": "morning", "custom_description": "Clean marble counter, soft morning light, artisan coffee context"},
   placement={"position": "counter", "scale": "dominant", "surface": "counter", "angle": "straight", "shadow": True},
   lighting={"type": "natural", "direction": "side", "intensity": "medium", "color_temperature": "warm", "shadows": "soft"},
-  output={"format": "JPEG", "size": "4K", "aspect_ratio": "4:3", "quality": 90}
+  output={"format": "JPEG", "size": "1K", "aspect_ratio": "4:3", "quality": 90}
 )
 </your_action>
 
@@ -342,7 +344,7 @@ Generated lifestyle shot:
 - Scene: Modern kitchen, marble counter, morning context
 - Lighting: Natural golden-hour from left, warm temperature
 - Composition: Hero placement with contextual coffee elements
-- Format: 4K JPEG 4:3
+- Format: 1K JPEG 4:3
 
 Result: Premium lifestyle shot conveying artisan quality and morning ritual."
 </expected_output>
