@@ -75,17 +75,28 @@ MAX_IMAGE_DIMENSION = 1024  # Larger for specialist (higher detail for image_stu
 
 
 def _load_and_encode_image(image_path: str) -> tuple[str, dict[str, Any]] | None:
-    """Load image from URL or local path and encode as base64 data URI.
+    """Load image from storage_path/URL/local path and encode as base64 data URI.
 
     Args:
-        image_path: storage_url (https://...) or local file path
+        image_path: storage_path, URL, or local file path
 
     Returns:
         Tuple of (data_uri, metadata) or None if loading fails
     """
     try:
-        # Handle URLs (storage_url from download_media/image_studio)
-        img: Image.Image  # Type hint: resize/convert returns Image.Image, not ImageFile
+        # Import here to avoid circular dependency
+        from autifyme_agents.core.storage_utils import build_storage_url, is_storage_path
+
+        # Convert storage_path to URL if needed
+        if is_storage_path(image_path):
+            try:
+                image_path = build_storage_url(image_path)
+            except ValueError:
+                logger.warning("Cannot build URL for storage_path: %s", image_path)
+                return None
+
+        # Handle URLs
+        img: Image.Image
         if image_path.startswith(("http://", "https://")):
             import httpx
 
@@ -192,35 +203,27 @@ def _extract_image_paths(text: str) -> list[str]:
 
 
 def _extract_paths_from_dict(data: dict[str, Any]) -> list[str]:
-    """Extract image paths/URLs from structured tool output (dict).
+    """Extract image paths from structured tool output (dict).
 
-    Recursively searches for 'path' and 'storage_url' keys in the tool output.
+    Recursively searches for 'storage_path' key in the tool output.
     Handles:
-    - image_studio output: {"outputs": [{"path": "...", "storage_url": "..."}]}
-    - download_media output: {"storage_url": "..."}
+    - image_studio output: {"outputs": [{"storage_path": "pending/..."}]}
+    - download_media output: {"storage_path": "inbox/..."}
 
     Args:
         data: Structured tool output dictionary
 
     Returns:
-        List of image paths/URLs found
+        List of storage_paths found
     """
     paths: list[str] = []
 
     def _recurse(obj: Any) -> None:
         if isinstance(obj, dict):
-            # Check for 'storage_url' key (preferred - cloud storage)
-            if "storage_url" in obj:
-                url_val = obj["storage_url"]
-                if isinstance(url_val, str) and url_val.startswith(("http://", "https://")):
-                    paths.append(url_val)
-            # Check for 'path' key (local paths or URLs)
-            if "path" in obj:
-                path_val = obj["path"]
-                if isinstance(path_val, str) and any(
-                    path_val.lower().endswith(ext)
-                    for ext in (".jpg", ".jpeg", ".png", ".gif", ".webp")
-                ):
+            # Check for 'storage_path' key (primary - Supabase bucket path)
+            if "storage_path" in obj:
+                path_val = obj["storage_path"]
+                if isinstance(path_val, str) and path_val:
                     paths.append(path_val)
             # Recurse into all values
             for value in obj.values():

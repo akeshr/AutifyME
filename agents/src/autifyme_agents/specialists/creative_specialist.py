@@ -14,12 +14,11 @@ Architecture:
 - Has write_data (scoped to assets) for persisting processed images
 - Has read_data (scoped to assets + product images) for reference
 - Uses MultimodalInjectionMiddleware to SEE images in delegation messages
-- Returns studio-grade processed images with asset records
 
 Storage Architecture:
 - Generated images are uploaded to pending/{thread_id}/ immediately
 - On write_data with HITL approval, images are moved to products/
-- storage_url (persistent) should be used for references, not local paths
+- All tools use storage_path (relative path) - URL is derived where needed
 
 Professional Standards:
 - Pure white backgrounds for hero shots
@@ -95,11 +94,9 @@ def create_creative_specialist(
         "Creative Specialist - professional product photographer creating studio-quality images. "
         "Produces: marketplace-ready hero shots (pure white background, studio lighting, color-accurate), "
         "multi-product extraction with clean isolation, lifestyle shots with contextual scenes. "
-        "Standards: 70-85% product coverage, proper framing, enhancement suite (sharpness, color correction, denoise). "
-        "Include image storage_url (from inbox/) in task - specialist SEES and diagnoses images. "
-        "Returns: processed images with storage_url (in pending/). thread_id auto-injected from session. "
-        "Can create asset records via write_data (HITL approval required). "
-        "Does NOT handle: product records, pricing, catalog hierarchy."
+        "Include storage_path (from inbox/) in task - specialist SEES images. "
+        "Returns: processed images with storage_path (in pending/). "
+        "Can create asset records via write_data (HITL approval required)."
     )
 
     # Use provided model or default to Gemini 3 Pro (multimodal)

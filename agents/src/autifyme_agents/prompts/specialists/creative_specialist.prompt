@@ -48,7 +48,7 @@ image_studio(
   output={...}
 )
 ```
-Returns: `storage_url`, `storage_path`, `mime_type` (use storage_url for references)
+Returns: `storage_path`, `mime_type` (use storage_path for view_image, write_data)
 
 ### 3. read_data(...) - Check Existing Assets
 ```python
@@ -164,10 +164,10 @@ image_studio(
   framing={"product_coverage_percent": 80, "padding_percent": 10},
   output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1"}
 )
--> Returns: {storage_url: "https://supabase.../pending/.../bottle_edit.png", storage_path: "pending/.../bottle_edit.png"}
+-> Returns: {storage_path: "pending/.../bottle_edit.png"}
 
 // 3. VERIFY
-view_image("https://supabase.../pending/.../bottle_edit.png")
+view_image("pending/.../bottle_edit.png")
 -> Background: Pure white #FFFFFF - OK
 -> Material: Translucent preserved - OK
 -> Sharpness: HIGH - OK
@@ -220,10 +220,10 @@ image_studio(
   enhancement={"sharpness": "high", "color_correction": True, "restore_details": True},
   output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1"}
 )
--> Returns: {storage_url: "https://supabase.../pending/.../perfume_v1.png"}
+-> Returns: {storage_path: "pending/.../perfume_v1.png"}
 
 // 3. VERIFY - FAILS
-view_image("https://supabase.../pending/.../perfume_v1.png")
+view_image("pending/.../perfume_v1.png")
 -> Background: Slight gray gradient near bottom - FAIL
 -> Glass facets: Slightly flattened - FAIL
 -> Need stronger instructions
@@ -238,10 +238,10 @@ image_studio(
   enhancement={"sharpness": "high", "color_correction": True, "restore_details": True},
   output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1"}
 )
--> Returns: {storage_url: "https://supabase.../pending/.../perfume_v2.png"}
+-> Returns: {storage_path: "pending/.../perfume_v2.png"}
 
 // 5. VERIFY - PASSES
-view_image("https://supabase.../pending/.../perfume_v2.png")
+view_image("pending/.../perfume_v2.png")
 -> Background: Pure #FFFFFF - OK
 -> Glass: Facet refractions preserved - OK
 -> Sharpness: Crisp throughout - OK
@@ -296,7 +296,7 @@ image_studio(
   enhancement={"sharpness": "high", "color_correction": True},
   output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1"}
 )
--> Returns: {storage_url: "https://supabase.../pending/.../mug.png", storage_path: "pending/.../mug.png"}
+-> Returns: {storage_path: "pending/.../mug.png"}
 
 // 3. EXECUTE - TUMBLER (material: stainless/reflective)
 image_studio(
@@ -308,7 +308,7 @@ image_studio(
   enhancement={"sharpness": "high", "color_correction": True},
   output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1"}
 )
--> Returns: {storage_url: "https://supabase.../pending/.../tumbler.png", storage_path: "pending/.../tumbler.png"}
+-> Returns: {storage_path: "pending/.../tumbler.png"}
 
 // 4. EXECUTE - BOTTLE (material: plastic/translucent)
 image_studio(
@@ -320,12 +320,12 @@ image_studio(
   enhancement={"sharpness": "high", "color_correction": True},
   output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1"}
 )
--> Returns: {storage_url: "https://supabase.../pending/.../bottle.png", storage_path: "pending/.../bottle.png"}
+-> Returns: {storage_path: "pending/.../bottle.png"}
 
 // 5. VERIFY ALL
-view_image("https://supabase.../pending/.../mug.png") -> Matte ceramic OK
-view_image("https://supabase.../pending/.../tumbler.png") -> Metal reflections OK
-view_image("https://supabase.../pending/.../bottle.png") -> Translucency OK
+view_image("pending/.../mug.png") -> Matte ceramic OK
+view_image("pending/.../tumbler.png") -> Metal reflections OK
+view_image("pending/.../bottle.png") -> Translucency OK
 
 // 6. PERSIST ALL (MANDATORY - one write_data for batch)
 write_data(
@@ -356,7 +356,7 @@ write_data(
 Always return to PM:
 1. **Professional Assessment**: What you diagnosed (subject, material, issues, intent)
 2. **Treatment Applied**: Specific corrections and enhancements
-3. **Storage URLs**: Cloud URLs for processed images (storage_url from output)
+3. **Storage Paths**: storage_path from image_studio output for view_image and write_data
 4. **Quality Notes**: Material handling, base asset readiness
 5. **HITL Status**: Asset records created, awaiting approval
 

@@ -143,12 +143,19 @@ def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatMod
 
 
 def _load_and_encode_image(image_path: str) -> tuple[str, str]:
-    """Load image from URL or local path, resize if needed, encode to base64 data URI.
+    """Load image from storage_path/URL/local path, resize if needed, encode to base64.
 
     Args:
-        image_path: storage_url (https://...) or local file path
+        image_path: storage_path, URL, or local file path
     """
-    # Handle URLs (storage_url from download_media/image_studio)
+    # Import here to avoid circular dependency
+    from autifyme_agents.core.storage_utils import build_storage_url, is_storage_path
+
+    # Convert storage_path to URL if needed
+    if is_storage_path(image_path):
+        image_path = build_storage_url(image_path)
+
+    # Handle URLs
     img: Image.Image  # Type hint: resize/convert returns Image.Image, not ImageFile
     if image_path.startswith(("http://", "https://")):
         import httpx
@@ -205,19 +212,19 @@ def _save_base64_image(
     output_spec: OutputSpec,
     description: str | None = None,
     thread_id: str | None = None,
-) -> tuple[Path, ImageMetadata, str | None, str | None]:
+) -> tuple[Path, ImageMetadata, str | None]:
     """Save base64 image data to temp file and optionally upload to pending.
 
     Args:
         base64_data: Base64-encoded image data (may include data URI prefix)
-        operation: Operation type for filename (e.g., "edit", "generate")
+        operation: Operation type for filename
         output_spec: Output specification for format/size
         description: Optional description for logging
         thread_id: Optional thread ID for pending upload organization
 
     Returns:
-        Tuple of (local_path, metadata, storage_url, storage_path)
-        storage_url and storage_path are None if upload not performed
+        Tuple of (local_path, metadata, storage_path)
+        storage_path is None if upload not performed
     """
     if "," in base64_data:
         base64_data = base64_data.split(",", 1)[1]
@@ -249,11 +256,9 @@ def _save_base64_image(
     )
 
     # Upload to Supabase pending if storage and thread_id available
-    storage_url: str | None = None
     storage_path: str | None = None
 
     if _storage_client is not None and thread_id is not None:
-        # Determine content type
         content_type_map = {
             "png": "image/png",
             "jpeg": "image/jpeg",
@@ -263,10 +268,8 @@ def _save_base64_image(
         content_type = content_type_map.get(extension, "image/png")
 
         try:
-            # Run async upload in sync context
             try:
-                asyncio.get_running_loop()  # Check if loop exists (raises RuntimeError if not)
-                # Already in async context - use thread pool
+                asyncio.get_running_loop()
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(
@@ -280,7 +283,6 @@ def _save_base64_image(
                     )
                     upload_result = future.result()
             except RuntimeError:
-                # No running loop - safe to use asyncio.run
                 upload_result = asyncio.run(
                     _storage_client.upload_to_pending(
                         file_bytes=image_bytes,
@@ -290,25 +292,18 @@ def _save_base64_image(
                     )
                 )
 
-            storage_url = upload_result["public_url"]
             storage_path = upload_result["storage_path"]
-
             logger.info(
                 "Uploaded image to pending storage",
-                extra={
-                    "storage_url": storage_url,
-                    "storage_path": storage_path,
-                    "thread_id": thread_id,
-                },
+                extra={"storage_path": storage_path, "thread_id": thread_id},
             )
         except Exception as upload_error:
-            # Log but don't fail - local path still usable for same-request
             logger.warning(
-                f"Failed to upload to pending storage (local path available): {upload_error}",
+                f"Failed to upload to pending storage: {upload_error}",
                 extra={"filename": filename, "thread_id": thread_id},
             )
 
-    return file_path, metadata, storage_url, storage_path
+    return file_path, metadata, storage_path
 
 
 def _extract_image_from_response(response: Any) -> str | None:
@@ -547,7 +542,7 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
         elif input_spec.background and input_spec.background.type in ("transparent", "remove"):
             description = "Background removed"
 
-        file_path, metadata, storage_url, storage_path = _save_base64_image(
+        file_path, metadata, storage_path = _save_base64_image(
             image_data, "edit", input_spec.output, description, input_spec.thread_id
         )
 
@@ -557,7 +552,6 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
             preview_path=str(file_path),
             metadata=metadata,
             description=description,
-            storage_url=storage_url,
             storage_path=storage_path,
         )
 
@@ -631,7 +625,7 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
         if input_spec.scene:
             description = f"Lifestyle: {input_spec.scene.environment}"
 
-        file_path, metadata, storage_url, storage_path = _save_base64_image(
+        file_path, metadata, storage_path = _save_base64_image(
             image_data, "generate", input_spec.output, description, input_spec.thread_id
         )
 
@@ -641,7 +635,6 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
             preview_path=str(file_path),
             metadata=metadata,
             description=description,
-            storage_url=storage_url,
             storage_path=storage_path,
         )
 
@@ -790,9 +783,8 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
     - Custom scenes: Describe any environment
 
     STORAGE:
-    - When storage is provided and thread_id is passed to the tool,
-      generated images are uploaded to pending/{thread_id}/ for persistence
-    - storage_url and storage_path are included in output for WriteIntent
+    - Generated images are uploaded to pending/{thread_id}/ for persistence
+    - storage_path is included in output for write_data
     """
     # Set module-level storage client
     _set_storage_client(storage)

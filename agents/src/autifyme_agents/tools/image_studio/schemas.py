@@ -258,13 +258,13 @@ class ImageStudioInput(BaseModel):
     source_image: str | None = Field(
         default=None,
         description=(
-            "Source image: storage_url (from download_media/image_studio) or local path. "
+            "Source image: storage_path (from download_media/image_studio). "
             "Required for edit, optional for generate."
         )
     )
     reference_images: list[str] = Field(
         default_factory=list,
-        description="Additional reference images (storage_url or local path) for style/context (up to 14)"
+        description="Additional reference images (storage_path) for style/context (up to 14)"
     )
 
     # Thread ID for cloud storage persistence (auto-injected from RunnableConfig)
@@ -319,25 +319,17 @@ class ImageMetadata(BaseModel):
 class OutputVariant(BaseModel):
     """Single output variant (master, thumbnail, social).
 
-    IMPORTANT: Use storage_url for all references. Local paths are ephemeral on serverless.
+    Use storage_path for all references. URL is derived where needed.
     """
 
     variant: str
-    path: str = Field(description="Local path (EPHEMERAL - do not use for references)")
-    preview_path: str = Field(description="Local preview path (EPHEMERAL)")
+    path: str = Field(description="Local path (ephemeral)")
+    preview_path: str = Field(description="Local preview path (ephemeral)")
     metadata: ImageMetadata
-    description: str | None = Field(
-        default=None,
-        description="Description of what this variant contains"
-    )
-    # Cloud storage - PRIMARY fields for all references
-    storage_url: str | None = Field(
-        default=None,
-        description="Supabase public URL - USE THIS for all references (persistent)"
-    )
+    description: str | None = Field(default=None)
     storage_path: str | None = Field(
         default=None,
-        description="Bucket path (pending/{thread_id}/...) - use in write_data asset_uploads"
+        description="Bucket path (e.g., 'pending/thread_id/file.png'). Use in view_image, write_data."
     )
 
 

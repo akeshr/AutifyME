@@ -26,10 +26,10 @@ class MediaDownloadResult(BaseModel):
     """Result of media download - cloud storage only (serverless-compatible).
 
     Note: Tool returns plain dict with these fields (not this model instance).
+    Returns storage_path (relative path) - URL is derived where needed.
     """
 
-    storage_url: str = Field(description="Supabase public URL (persistent)")
-    storage_path: str = Field(description="Path within Supabase bucket (for write_data)")
+    storage_path: str = Field(description="Path within Supabase bucket (e.g., 'inbox/thread_id/file.jpg')")
     mime_type: str = Field(description="MIME type of the media")
     size_bytes: int = Field(description="File size in bytes")
 
@@ -88,20 +88,14 @@ def create_platform_media_tools(
         media_id: str,
         config: Annotated[RunnableConfig, InjectedToolArg] = None,  # type: ignore[assignment]
     ) -> dict[str, Any]:
-        """Download media from the messaging platform and persist to Supabase.
-
-        Downloads media and uploads to Supabase inbox for serverless persistence.
-        Returns storage_url for all subsequent operations.
+        """Download media from messaging platform and persist to Supabase inbox.
 
         Args:
             media_id: Platform-specific media identifier
-            config: RunnableConfig (auto-injected by LangChain via InjectedToolArg)
+            config: RunnableConfig (auto-injected)
 
         Returns:
-            Dict with storage_url, storage_path, mime_type, size_bytes
-
-        Raises:
-            Exception: If download or upload fails
+            Dict with storage_path, mime_type, size_bytes
         """
         # Extract thread_id from config (auto-injected by LangChain)
         thread_id: str | None = None
@@ -161,7 +155,6 @@ def create_platform_media_tools(
                 )
 
             result = {
-                "storage_url": upload_result["public_url"],
                 "storage_path": upload_result["storage_path"],
                 "mime_type": mime_type,
                 "size_bytes": len(media_bytes),
@@ -169,11 +162,7 @@ def create_platform_media_tools(
 
             logger.info(
                 "Media persisted to inbox",
-                extra={
-                    "media_id": media_id,
-                    "storage_url": result["storage_url"],
-                    "thread_id": thread_id,
-                }
+                extra={"media_id": media_id, "storage_path": result["storage_path"]}
             )
             return result
 
@@ -184,14 +173,13 @@ def create_platform_media_tools(
             )
             raise
 
-    # Create StructuredTool (properly injects RunnableConfig unlike @tool decorator)
     download_media_tool = StructuredTool.from_function(
         func=_download_media_impl,
         name=f"download_{platform_name}_media",
         description=(
             f"Download media from {platform_name} and persist to Supabase inbox/. "
-            f"Returns: storage_url (public URL for references), storage_path (bucket path), mime_type, size_bytes. "
-            f"Use storage_url in all subsequent operations - images are already persistent."
+            f"Returns: storage_path (e.g., 'inbox/thread_id/file.jpg'), mime_type, size_bytes. "
+            f"Use storage_path in image_studio, view_image, and write_data."
         ),
         args_schema=DownloadMediaInput,
         return_direct=False,

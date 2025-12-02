@@ -39,23 +39,30 @@ class ViewImageInput(BaseModel):
 
     image_path: str = Field(
         description=(
-            "Image source - accepts storage_url (from image_studio/download_media) "
-            "or local path. Example: 'https://...supabase.co/.../image.png' or '/tmp/preview.jpg'"
+            "Image source - storage_path from download_media/image_studio. "
+            "Example: 'inbox/thread_id/photo.jpg' or 'pending/thread_id/edit.png'"
         )
     )
 
 
 def _load_image_as_data_uri(image_path: str) -> tuple[str, dict[str, Any]]:
-    """Load image from URL or local path and convert to data URI.
+    """Load image from storage_path/URL/local path and convert to data URI.
 
     Args:
-        image_path: storage_url (https://...) or local file path
+        image_path: storage_path, URL, or local file path
 
     Returns:
         Tuple of (data_uri, metadata)
     """
-    # Handle URLs (storage_url from image_studio/download_media)
-    img: Image.Image  # Type hint: resize/convert returns Image.Image, not ImageFile
+    # Import here to avoid circular dependency
+    from autifyme_agents.core.storage_utils import build_storage_url, is_storage_path
+
+    # Convert storage_path to URL if needed
+    if is_storage_path(image_path):
+        image_path = build_storage_url(image_path)
+
+    # Handle URLs
+    img: Image.Image
     if image_path.startswith(("http://", "https://")):
         import httpx
 
@@ -146,20 +153,17 @@ def create_view_image_tool() -> StructuredTool:
     """Create the view_image tool.
 
     Returns multimodal content so any agent can SEE images directly.
-    No middleware required - the tool handles image injection itself.
     """
     return StructuredTool.from_function(
         func=_view_image_impl,
         name="view_image",
         description=(
-            "View an image from storage_url or local path. Returns the actual image so you can SEE it.\n\n"
+            "View an image. Returns the actual image so you can SEE it.\n\n"
             "Use this to:\n"
-            "- Diagnose source images from inbox/ (download_media storage_url)\n"
-            "- Verify outputs from image_studio (pending/ storage_url)\n"
-            "- Quality check before write_data\n"
-            "- Analyze content, colors, composition, product count\n\n"
-            "After calling, you see the image directly in your context.\n\n"
-            "Example: view_image('https://...supabase.co/.../image.png')"
+            "- Diagnose source images from inbox/ (download_media)\n"
+            "- Verify outputs from image_studio (pending/)\n"
+            "- Quality check before write_data\n\n"
+            "Example: view_image('inbox/thread_id/photo.jpg')"
         ),
         args_schema=ViewImageInput,
         return_direct=False,
