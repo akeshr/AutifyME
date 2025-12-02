@@ -3,8 +3,10 @@ from typing import Any, Literal
 from google.ai.generativelanguage_v1beta import GenerationConfig
 from langchain.chat_models import BaseChatModel
 from langchain_anthropic import ChatAnthropic
-from langchain_google_genai import ChatGoogleGenerativeAI, HarmBlockThreshold, HarmCategory
+from langchain_google_genai import HarmBlockThreshold, HarmCategory
 from langchain_openai import ChatOpenAI
+
+from autifyme_agents.core.gemini_retry import GeminiWithRetry
 
 
 def get_llm(
@@ -29,6 +31,9 @@ def get_llm(
         "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
     ] | None = None,
     image_size: Literal["1K", "2K", "4K"] | None = None,
+    # Retry configuration for Gemini blank response handling
+    max_retries: int = 3,
+    retry_base_delay: float = 1.0,
 ) -> BaseChatModel:
     """
     Factory function to instantiate and return a language model client.
@@ -89,6 +94,10 @@ def get_llm(
         image_size: Output size for Gemini 3 image generation.
             Options: "1K", "2K", "4K"
             Default: "2K" for balanced quality/performance.
+        max_retries: Maximum retry attempts for Gemini blank responses (default: 3).
+            Gemini occasionally returns blank responses; this handles automatic retry.
+        retry_base_delay: Base delay in seconds for exponential backoff (default: 1.0).
+            Actual delay = base * 2^(attempt-1) + jitter.
 
     Returns:
         An instance of a BaseChatModel.
@@ -239,7 +248,11 @@ def get_llm(
             if isinstance(model_kwargs, dict):
                 model_kwargs["generation_config"] = {"imageConfig": image_config}
 
-        llm = ChatGoogleGenerativeAI(**gemini_kwargs)
+        # Add retry configuration for blank response handling
+        gemini_kwargs["max_retries"] = max_retries
+        gemini_kwargs["retry_base_delay"] = retry_base_delay
+
+        llm = GeminiWithRetry(**gemini_kwargs)
     else:
         raise ValueError(f"Unsupported LLM provider: {provider}")
 
