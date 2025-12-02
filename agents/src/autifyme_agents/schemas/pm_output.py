@@ -23,7 +23,7 @@ class ImageAttachment(BaseModel):
 
     path: str = Field(
         ...,
-        description="Image source: storage_url (preferred) or local path",
+        description="Image source: storage_path (e.g., 'pending/thread_id/image.png') or local path",
     )
     caption: str | None = Field(
         default=None,

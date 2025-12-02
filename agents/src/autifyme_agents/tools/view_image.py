@@ -4,17 +4,18 @@ Global utility that returns images as multimodal content, enabling
 any agent's LLM to SEE images directly without middleware.
 
 Architecture:
-- Accepts both local paths AND storage_url (Supabase public URLs)
+- Accepts storage_path (inbox/, pending/) or local paths
+- Converts storage_path to URL internally for fetching
 - Returns multimodal content blocks (text + image_url)
 - No middleware required - tool owns its output format
 - Any agent with this tool can view and analyze images
 - Resizes images for efficient token usage (512px max dimension)
 
 Use Cases:
-- View images from inbox/ (download_media storage_url)
-- Verify output from image_studio (pending/ storage_url)
+- View images from inbox/ (download_media output)
+- Verify output from image_studio (pending/)
 - Quality checks before write_data
-- Inspect any image by URL or local path
+- Inspect any image by storage_path or local path
 """
 
 from __future__ import annotations

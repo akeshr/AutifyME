@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
+from autifyme_agents.core.storage_utils import build_storage_url
 from autifyme_agents.schemas.write_intent import WriteIntent
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.message_utils import extract_text_content
@@ -26,16 +26,13 @@ class WriteIntentHandler:
     WriteIntent for database operations.
     """
 
-    def __init__(self, channel: MessagingChannel, supabase_url: str | None = None):
+    def __init__(self, channel: MessagingChannel):
         """Initialize handler.
 
         Args:
             channel: Messaging channel for sending user notifications
-            supabase_url: Optional Supabase project URL for building asset URLs.
-                          Falls back to SUPABASE_URL environment variable.
         """
         self.channel = channel
-        self._supabase_url = supabase_url or os.getenv("SUPABASE_URL")
 
     def extract_summary(self, messages: list[Any]) -> str | None:
         """Extract AI summary for conversational responses.
@@ -146,23 +143,6 @@ class WriteIntentHandler:
             and "impact" in value
         )
 
-    def _build_storage_url(self, storage_path: str, bucket: str = "assets") -> str | None:
-        """Build full Supabase storage URL from storage_path.
-
-        Args:
-            storage_path: Relative path within bucket (e.g., "pending/thread_id/image.png")
-            bucket: Storage bucket name (default: "assets")
-
-        Returns:
-            Full public URL or None if SUPABASE_URL not configured
-        """
-        if not self._supabase_url:
-            logger.warning("Cannot build storage URL: SUPABASE_URL not configured")
-            return None
-        # Pattern: https://{project}.supabase.co/storage/v1/object/public/{bucket}/{path}
-        base_url = self._supabase_url.rstrip("/")
-        return f"{base_url}/storage/v1/object/public/{bucket}/{storage_path}"
-
     def _send_write_intent_approval(self, sender: str, write_intent_dict: dict[str, Any]) -> None:
         """Send WriteIntent approval with images and summary."""
         try:
@@ -186,7 +166,10 @@ class WriteIntentHandler:
 
                     # 1. Build URL from storage_path (primary path for Supabase files)
                     if asset.storage_path:
-                        image_source = self._build_storage_url(asset.storage_path, asset.bucket)
+                        try:
+                            image_source = build_storage_url(asset.storage_path, asset.bucket)
+                        except ValueError:
+                            logger.warning("Cannot build storage URL: SUPABASE_URL not configured")
                     # 2. Fallback to temp_path (local file for external uploads)
                     elif asset.temp_path:
                         image_source = asset.temp_path
