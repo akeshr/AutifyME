@@ -66,8 +66,6 @@ Professional image processing with two operations:
 - `placement`: Position, scale, surface, realistic shadows
 - `lighting`: Direction, intensity, color temperature
 
-**Note:** thread_id is injected automatically from session context.
-
 **Output fields:**
 - `path`: Local path (ephemeral on serverless - DO NOT rely on this)
 - `storage_url`: Supabase public URL (persistent - USE THIS for references)

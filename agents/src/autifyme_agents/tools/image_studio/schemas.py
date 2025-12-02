@@ -264,12 +264,12 @@ class ImageStudioInput(BaseModel):
         description="Additional reference images for style/context (up to 14)"
     )
 
-    # Thread ID for cloud storage persistence
+    # Thread ID for cloud storage persistence (auto-injected from RunnableConfig)
     thread_id: str | None = Field(
         default=None,
         description=(
             "Conversation thread ID for organizing pending uploads. "
-            "Required for cloud storage persistence. "
+            "Auto-injected from session context - do not pass explicitly. "
             "Format: 'whatsapp:{phone_number_id}:{sender}'"
         )
     )
