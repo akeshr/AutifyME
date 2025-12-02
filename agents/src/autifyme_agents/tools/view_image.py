@@ -119,13 +119,17 @@ def _view_image_impl(image_path: str) -> list[dict[str, Any]]:
     """View an image - returns multimodal content for agent to see.
 
     Args:
-        image_path: storage_url (https://...) or local file path
+        image_path: storage_path (inbox/..., pending/...) or local file path
 
     Returns content blocks that include the actual image for the agent's LLM.
     """
-    # Check existence for local paths (URLs validated during fetch)
+    # Import here to avoid circular dependency
+    from autifyme_agents.core.storage_utils import is_storage_path
+
+    # Check existence for local paths only (storage paths and URLs validated during fetch)
     is_url = image_path.startswith(("http://", "https://"))
-    if not is_url and not Path(image_path).exists():
+    is_storage = is_storage_path(image_path)
+    if not is_url and not is_storage and not Path(image_path).exists():
         return [{"type": "text", "text": f"Error: Image not found at {image_path}"}]
 
     try:
