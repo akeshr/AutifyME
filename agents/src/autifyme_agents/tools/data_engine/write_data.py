@@ -51,6 +51,25 @@ class WriteDataInput(BaseModel):
         ),
     )
 
+    hitl_summary: str = Field(
+        ...,
+        description=(
+            "REQUIRED: Human-readable approval summary for HITL (<1500 chars).\n"
+            "Write for the BUSINESS USER who will approve/reject.\n\n"
+            "MUST include:\n"
+            "- What will be created/updated (plain language)\n"
+            "- Key impacts (counts, SKUs, prices)\n"
+            "- Any warnings or assumptions\n"
+            "- End with: 'Reply *approve* to proceed or *reject* to cancel'\n\n"
+            "Example:\n"
+            "'Creating PET Jars family with 2 size variants.\n\n"
+            "Products: JAR-PET-500ML (Rs 30), JAR-PET-1L (Rs 50)\n"
+            "Images: 2 product photos attached\n\n"
+            "This will add 1 product family and 2 new SKUs.\n\n"
+            "Reply *approve* to proceed or *reject* to cancel.'"
+        ),
+    )
+
     asset_uploads: list[AssetUpload] = Field(
         default_factory=list,
         description=(
@@ -148,6 +167,7 @@ def create_write_data_tool(
     async def _write_data_impl(
         goal: str,
         reasoning: str,
+        hitl_summary: str,
         operations: list[Operation],
         impact: dict[str, Any],
         asset_uploads: list[AssetUpload] | None = None,
@@ -181,6 +201,7 @@ def create_write_data_tool(
             write_data(
                 goal="Create PET Food Jars family with Size and Color variants (6 SKUs)",
                 reasoning="Duplicate check: 0 matches. Web research (confidence 0.85): food-grade PET, transparent/amber common. Creating 2 axes (Size, Color), 4 variant values (500ml, 1L, Clear, Amber), 4 product combinations.",
+                hitl_summary="Creating PET Food Jars family with 4 product variants.\n\nProducts:\n- JAR-PET-500ML-CLEAR (Rs 30)\n- JAR-PET-500ML-AMBER (Rs 32)\n- JAR-PET-1L-CLEAR (Rs 45)\n- JAR-PET-1L-AMBER (Rs 48)\n\nThis will add 1 product family, 2 variant axes, and 4 new SKUs to your catalog.\n\nReply *approve* to proceed or *reject* to cancel.",
                 operations=[
                     {
                         "action": "create",
@@ -308,6 +329,7 @@ def create_write_data_tool(
             write_intent = WriteIntent(
                 goal=goal,
                 reasoning=reasoning,
+                hitl_summary=hitl_summary,
                 asset_uploads=asset_uploads or [],
                 operations=operations,
                 impact=impact,

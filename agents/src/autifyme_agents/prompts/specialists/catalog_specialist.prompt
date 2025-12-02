@@ -182,7 +182,7 @@ Which pricing approach?"
 </expected_output>
 </example>
 
-<example scenario="Pricing update">
+<example scenario="Pricing update - complete write_data">
 <user_input>
 PM: "Add wholesale price Rs 25 to JAR-PET-500ML"
 </user_input>
@@ -190,14 +190,23 @@ PM: "Add wholesale price Rs 25 to JAR-PET-500ML"
 <your_reasoning>
 - Request: Add price to existing product
 - Need to verify: Product exists, wholesale price_list exists, no duplicate price
-- Plan: Query product, query price_list, check existing prices, then write_data
 </your_reasoning>
 
 <your_action>
-1. read_data(products, search: "%JAR-PET-500ML%") -> product_id: uuid-product
-2. read_data(price_lists, search: "%wholesale%") -> uuid-wholesale
+1. read_data(products, search: "%JAR-PET-500ML%") -> product_id: uuid-product-123
+2. read_data(price_lists, search: "%wholesale%") -> uuid-wholesale-456
 3. read_data(product_prices, filter: product_id + price_list_id) -> 0 matches
-4. write_data(goal="Add wholesale pricing", reasoning="Product and price list verified, no existing price")
+4. write_data(
+   goal="Add wholesale price to JAR-PET-500ML",
+   reasoning="Product verified (uuid-product-123), wholesale price list verified (uuid-wholesale-456), no existing wholesale price.",
+   hitl_summary="Adding wholesale pricing for JAR-PET-500ML.\n\nPrice: Rs 25 (Wholesale tier)\nProduct: JAR-PET-500ML\n\nReply *approve* to proceed or *reject* to cancel.",
+   operations=[{
+     "action": "create",
+     "table": "product_prices",
+     "data": {"product_id": "uuid-product-123", "price_list_id": "uuid-wholesale-456", "price": 25.0}
+   }],
+   impact={"creates": {"product_prices": 1}}
+)
 </your_action>
 
 <expected_output>
