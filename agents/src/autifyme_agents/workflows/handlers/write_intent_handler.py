@@ -181,16 +181,13 @@ class WriteIntentHandler:
             # Send each asset image with caption
             for asset in write_intent.asset_uploads:
                 try:
-                    # Determine image source (prefer URL for WhatsApp)
+                    # Determine image source
                     image_source: str | None = None
 
-                    # 1. Use storage_url if provided
-                    if asset.storage_url:
-                        image_source = asset.storage_url
-                    # 2. Build URL from storage_path if available
-                    elif asset.storage_path:
+                    # 1. Build URL from storage_path (primary path for Supabase files)
+                    if asset.storage_path:
                         image_source = self._build_storage_url(asset.storage_path, asset.bucket)
-                    # 3. Fallback to temp_path (local file)
+                    # 2. Fallback to temp_path (local file for external uploads)
                     elif asset.temp_path:
                         image_source = asset.temp_path
 
@@ -199,11 +196,7 @@ class WriteIntentHandler:
                         continue
 
                     # For local paths (temp_path), check existence
-                    if (
-                        asset.temp_path
-                        and image_source == asset.temp_path
-                        and not Path(image_source).exists()
-                    ):
+                    if asset.temp_path and not Path(image_source).exists():
                         logger.warning("Asset file not found", extra={"temp_path": asset.temp_path})
                         continue
 

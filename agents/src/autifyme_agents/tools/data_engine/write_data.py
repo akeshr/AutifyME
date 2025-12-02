@@ -74,8 +74,7 @@ class WriteDataInput(BaseModel):
         default_factory=list,
         description=(
             "Files to persist BEFORE database operations (atomically).\n"
-            "REQUIRED: storage_path from image_studio/download_media.\n"
-            "OPTIONAL: storage_url (auto-derived from storage_path if not provided).\n"
+            "Use storage_path from image_studio/download_media output.\n"
             "Example: AssetUpload(storage_path='pending/.../img.png', returns='hero', caption='Product photo')\n"
             "Reference in operations: '@hero.public_url', '@hero.size_bytes', '@hero.caption'"
         ),

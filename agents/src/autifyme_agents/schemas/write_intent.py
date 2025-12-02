@@ -24,8 +24,8 @@ class AssetUpload(BaseModel):
     Processed BEFORE database operations. The uploaded file's public URL
     can be referenced in operations using @name.public_url syntax.
 
-    REQUIRED: storage_path from image_studio output.
-    OPTIONAL: storage_url (auto-derived from storage_path if not provided).
+    Use storage_path from image_studio output. The HITL handler auto-derives
+    the full public URL for WhatsApp preview.
 
     Example:
         asset_uploads=[
@@ -60,18 +60,8 @@ class AssetUpload(BaseModel):
         description=(
             "Path within Supabase bucket (from image_studio/download_media outputs).\n"
             "Example: 'pending/whatsapp_123_919/20251130_edit_abc123.png'\n"
-            "Executor MOVES file from pending/ to target_folder upon HITL approval."
-        ),
-    )
-
-    # Public URL for HITL display (optional - auto-derived from storage_path if not provided)
-    storage_url: str | None = Field(
-        default=None,
-        description=(
-            "Supabase public URL (from image_studio/download_media outputs).\n"
-            "Example: 'https://xxx.supabase.co/storage/v1/object/public/assets/pending/...'\n"
-            "OPTIONAL: Auto-derived from storage_path if not provided.\n"
-            "Used for HITL preview in WhatsApp."
+            "Executor MOVES file from pending/ to target_folder upon HITL approval.\n"
+            "HITL handler auto-derives full public URL for WhatsApp preview."
         ),
     )
 
