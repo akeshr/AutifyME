@@ -15,8 +15,8 @@ import logging
 from pathlib import Path
 from typing import Any, Protocol
 
-from langchain.tools import tool
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,12 @@ class StorageUploader(Protocol):
         ...
 
 
+class DownloadMediaInput(BaseModel):
+    """Input schema for download_media tool."""
+
+    media_id: str = Field(description="Platform-specific media identifier")
+
+
 def create_platform_media_tools(
     channel: MediaDownloader,
     storage: StorageUploader | None = None,
@@ -80,10 +86,8 @@ def create_platform_media_tools(
     """
     platform_name = channel.__class__.__name__.replace("Channel", "").lower()
 
-    @tool
-    def download_media(
+    def _download_media_impl(
         media_id: str,
-        thread_id: str | None = None,
         config: RunnableConfig | None = None,
     ) -> dict[str, Any]:
         """Download media from the messaging platform and persist to Supabase.
@@ -93,8 +97,7 @@ def create_platform_media_tools(
 
         Args:
             media_id: Platform-specific media identifier
-            thread_id: Auto-injected from session context
-            config: RunnableConfig (auto-injected by LangChain)
+            config: RunnableConfig (auto-injected by LangChain with thread_id)
 
         Returns:
             Dict with storage_url, storage_path, mime_type, size_bytes
@@ -102,8 +105,9 @@ def create_platform_media_tools(
         Raises:
             Exception: If download or upload fails
         """
-        # Inject thread_id from config if not explicitly provided
-        if thread_id is None and config is not None:
+        # Extract thread_id from config (auto-injected by LangChain)
+        thread_id: str | None = None
+        if config is not None:
             configurable = config.get("configurable", {})
             thread_id = configurable.get("thread_id")
 
@@ -182,12 +186,17 @@ def create_platform_media_tools(
             )
             raise
 
-    # Set dynamic name and description based on platform
-    download_media.name = f"download_{platform_name}_media"
-    download_media.description = (
-        f"Download media from {platform_name} and persist to Supabase inbox/. "
-        f"Returns: storage_url (public URL for references), storage_path (bucket path), mime_type, size_bytes. "
-        f"Use storage_url in all subsequent operations - images are already persistent."
+    # Create StructuredTool (properly injects RunnableConfig unlike @tool decorator)
+    download_media_tool = StructuredTool.from_function(
+        func=_download_media_impl,
+        name=f"download_{platform_name}_media",
+        description=(
+            f"Download media from {platform_name} and persist to Supabase inbox/. "
+            f"Returns: storage_url (public URL for references), storage_path (bucket path), mime_type, size_bytes. "
+            f"Use storage_url in all subsequent operations - images are already persistent."
+        ),
+        args_schema=DownloadMediaInput,
+        return_direct=False,
     )
 
-    return [download_media]
+    return [download_media_tool]
