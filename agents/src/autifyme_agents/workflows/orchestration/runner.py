@@ -29,6 +29,7 @@ from autifyme_agents.core.config import settings
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.interrupt import InterruptInfo
 from autifyme_agents.schemas.models import CompanyProfile
+from autifyme_agents.schemas.pm_output import PMOutput
 from autifyme_agents.workflows.channels.protocol import MessagingChannel
 from autifyme_agents.workflows.handlers.approval_coordinator import ApprovalCoordinator
 from autifyme_agents.workflows.handlers.protocol import WorkflowHandler
@@ -294,16 +295,56 @@ class WorkflowRunner:
                     extra={"thread_id": thread_id, "attempt": attempt}
                 )
 
-                # Send PM response to user
-                summary = self.workflow_handler.extract_summary(messages)
-                if summary:
-                    self.channel.send_text(sender, summary)
-                    logger.info("PM response sent", extra={"thread_id": thread_id, "tracking_id": tracking_id})
+                # Check for structured response (PMOutput schema)
+                structured_response = result.get("structured_response")
+                if structured_response and isinstance(structured_response, PMOutput):
+                    # Send images first (if any)
+                    if structured_response.images:
+                        for img in structured_response.images:
+                            try:
+                                self.channel.send_image(sender, img.path, img.caption)
+                                logger.debug(
+                                    "Image sent to user",
+                                    extra={"path": img.path, "has_caption": img.caption is not None}
+                                )
+                            except Exception as img_err:
+                                logger.warning(
+                                    "Failed to send image",
+                                    extra={"path": img.path, "error": str(img_err)}
+                                )
+
+                    # Send text message
+                    if structured_response.message:
+                        self.channel.send_text(sender, structured_response.message)
+                        logger.info(
+                            "PM structured response sent",
+                            extra={
+                                "thread_id": thread_id,
+                                "tracking_id": tracking_id,
+                                "image_count": len(structured_response.images) if structured_response.images else 0,
+                                "await_feedback": structured_response.await_feedback,
+                            }
+                        )
+
+                    # Handle await_feedback (interrupt for user response)
+                    if structured_response.await_feedback:
+                        logger.info(
+                            "PM awaiting user feedback",
+                            extra={"thread_id": thread_id}
+                        )
+                        # Note: Feedback loop is handled by next user message
+                        # No explicit interrupt needed - PM state is preserved
                 else:
-                    logger.warning(
-                        "No response extracted from PM messages",
-                        extra={"thread_id": thread_id, "message_count": len(messages)}
-                    )
+                    # Fallback to legacy extract_summary for non-structured responses
+                    summary = self.workflow_handler.extract_summary(messages)
+                    if summary:
+                        self.channel.send_text(sender, summary)
+                        logger.info("PM response sent (legacy)", extra={"thread_id": thread_id, "tracking_id": tracking_id})
+                    else:
+                        logger.warning(
+                            "No response extracted from PM messages",
+                            extra={"thread_id": thread_id, "message_count": len(messages)}
+                        )
                 return
 
             except GraphRecursionError as exc:

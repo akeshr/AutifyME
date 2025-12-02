@@ -15,6 +15,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from deepagents import create_deep_agent
+from langchain.agents.structured_output import ToolStrategy
 from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -24,6 +25,7 @@ from autifyme_agents.integrations.storage import get_store
 from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
+from autifyme_agents.schemas.pm_output import PMOutput
 from autifyme_agents.specialists.catalog_specialist import create_catalog_specialist
 from autifyme_agents.specialists.creative_specialist import create_creative_specialist
 from autifyme_agents.tools import create_view_image_tool
@@ -153,11 +155,18 @@ async def create_project_manager(
 
     subagents: list[Any] = [creative_specialist, catalog_specialist]
 
+    # Structured output for multimodal responses (text + images)
+    response_format = ToolStrategy(
+        schema=PMOutput,
+        handle_errors=True,  # Retry on parse errors
+    )
+
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
         subagents=subagents,
+        response_format=response_format,
         interrupt_on={},
         checkpointer=checkpointer,
         store=store,
