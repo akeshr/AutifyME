@@ -23,17 +23,13 @@ logger = logging.getLogger(__name__)
 
 
 class MediaDownloadResult(BaseModel):
-    """Result of media download with both local and cloud paths."""
+    """Result of media download - cloud storage only (serverless-compatible).
 
-    local_path: str = Field(description="Local filesystem path (may be ephemeral)")
-    storage_url: str | None = Field(
-        default=None,
-        description="Supabase public URL (persistent, preferred for references)"
-    )
-    storage_path: str | None = Field(
-        default=None,
-        description="Path within Supabase bucket (for move operations)"
-    )
+    Note: Tool returns plain dict with these fields (not this model instance).
+    """
+
+    storage_url: str = Field(description="Supabase public URL (persistent)")
+    storage_path: str = Field(description="Path within Supabase bucket (for write_data)")
     mime_type: str = Field(description="MIME type of the media")
     size_bytes: int = Field(description="File size in bytes")
 
