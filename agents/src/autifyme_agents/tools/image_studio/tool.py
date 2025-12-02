@@ -5,10 +5,16 @@ Operations:
 - generate: Lifestyle shots, studio shots, scene composites
 
 Architecture: Atomic tool with structured Pydantic input/output.
+
+Storage Architecture:
+    Generated images are uploaded to Supabase pending/ folder for persistence
+    across Vercel serverless invocations. Images await HITL approval before
+    being moved to products/ folder via WriteIntent.
 """
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import logging
@@ -17,7 +23,7 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.tools import StructuredTool
@@ -47,6 +53,31 @@ from autifyme_agents.tools.image_studio.schemas import (
 )
 
 T = TypeVar("T")
+
+
+class StorageUploader(Protocol):
+    """Minimal interface for storage upload capability."""
+
+    async def upload_to_pending(
+        self,
+        file_bytes: bytes,
+        thread_id: str,
+        filename: str,
+        content_type: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Upload to pending folder."""
+        ...
+
+
+# Module-level storage reference (set by tool factory)
+_storage_client: StorageUploader | None = None
+
+
+def _set_storage_client(storage: StorageUploader | None) -> None:
+    """Set the storage client for pending uploads."""
+    global _storage_client
+    _storage_client = storage
 
 logger = logging.getLogger(__name__)
 
@@ -158,8 +189,21 @@ def _save_base64_image(
     operation: str,
     output_spec: OutputSpec,
     description: str | None = None,
-) -> tuple[Path, ImageMetadata]:
-    """Save base64 image data to temp file."""
+    thread_id: str | None = None,
+) -> tuple[Path, ImageMetadata, str | None, str | None]:
+    """Save base64 image data to temp file and optionally upload to pending.
+
+    Args:
+        base64_data: Base64-encoded image data (may include data URI prefix)
+        operation: Operation type for filename (e.g., "edit", "generate")
+        output_spec: Output specification for format/size
+        description: Optional description for logging
+        thread_id: Optional thread ID for pending upload organization
+
+    Returns:
+        Tuple of (local_path, metadata, storage_url, storage_path)
+        storage_url and storage_path are None if upload not performed
+    """
     if "," in base64_data:
         base64_data = base64_data.split(",", 1)[1]
 
@@ -189,7 +233,67 @@ def _save_base64_image(
         extra={"width": width, "height": height, "size_bytes": len(image_bytes)},
     )
 
-    return file_path, metadata
+    # Upload to Supabase pending if storage and thread_id available
+    storage_url: str | None = None
+    storage_path: str | None = None
+
+    if _storage_client is not None and thread_id is not None:
+        # Determine content type
+        content_type_map = {
+            "png": "image/png",
+            "jpeg": "image/jpeg",
+            "jpg": "image/jpeg",
+            "webp": "image/webp",
+        }
+        content_type = content_type_map.get(extension, "image/png")
+
+        try:
+            # Run async upload in sync context
+            try:
+                loop = asyncio.get_running_loop()
+                # Already in async context - use thread pool
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        asyncio.run,
+                        _storage_client.upload_to_pending(
+                            file_bytes=image_bytes,
+                            thread_id=thread_id,
+                            filename=filename,
+                            content_type=content_type,
+                        )
+                    )
+                    upload_result = future.result()
+            except RuntimeError:
+                # No running loop - safe to use asyncio.run
+                upload_result = asyncio.run(
+                    _storage_client.upload_to_pending(
+                        file_bytes=image_bytes,
+                        thread_id=thread_id,
+                        filename=filename,
+                        content_type=content_type,
+                    )
+                )
+
+            storage_url = upload_result["public_url"]
+            storage_path = upload_result["storage_path"]
+
+            logger.info(
+                "Uploaded image to pending storage",
+                extra={
+                    "storage_url": storage_url,
+                    "storage_path": storage_path,
+                    "thread_id": thread_id,
+                },
+            )
+        except Exception as upload_error:
+            # Log but don't fail - local path still usable for same-request
+            logger.warning(
+                f"Failed to upload to pending storage (local path available): {upload_error}",
+                extra={"filename": filename, "thread_id": thread_id},
+            )
+
+    return file_path, metadata, storage_url, storage_path
 
 
 def _extract_image_from_response(response: Any) -> str | None:
@@ -428,8 +532,8 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
         elif input_spec.background and input_spec.background.type in ("transparent", "remove"):
             description = "Background removed"
 
-        file_path, metadata = _save_base64_image(
-            image_data, "edit", input_spec.output, description
+        file_path, metadata, storage_url, storage_path = _save_base64_image(
+            image_data, "edit", input_spec.output, description, input_spec.thread_id
         )
 
         output_variant = OutputVariant(
@@ -438,6 +542,8 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
             preview_path=str(file_path),
             metadata=metadata,
             description=description,
+            storage_url=storage_url,
+            storage_path=storage_path,
         )
 
         return ImageStudioOutput(
@@ -510,8 +616,8 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
         if input_spec.scene:
             description = f"Lifestyle: {input_spec.scene.environment}"
 
-        file_path, metadata = _save_base64_image(
-            image_data, "generate", input_spec.output, description
+        file_path, metadata, storage_url, storage_path = _save_base64_image(
+            image_data, "generate", input_spec.output, description, input_spec.thread_id
         )
 
         output_variant = OutputVariant(
@@ -520,6 +626,8 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
             preview_path=str(file_path),
             metadata=metadata,
             description=description,
+            storage_url=storage_url,
+            storage_path=storage_path,
         )
 
         return ImageStudioOutput(
@@ -554,6 +662,7 @@ def _image_studio_impl(
     operation: str,
     source_image: str | None = None,
     reference_images: list[str] | None = None,
+    thread_id: str | None = None,
     custom_instruction: str | None = None,
     background: dict[str, Any] | None = None,
     lighting: dict[str, Any] | None = None,
@@ -580,6 +689,7 @@ def _image_studio_impl(
             operation=ImageOperation(operation) if isinstance(operation, str) else operation,
             source_image=source_image,
             reference_images=reference_images or [],
+            thread_id=thread_id,
             custom_instruction=custom_instruction,
             background=_maybe_convert(background, BackgroundSpec),
             lighting=_maybe_convert(lighting, LightingSpec),
@@ -629,8 +739,11 @@ def _image_studio_impl(
         )
 
 
-def create_image_studio_tool() -> StructuredTool:
+def create_image_studio_tool(storage: StorageUploader | None = None) -> StructuredTool:
     """Create the Image Studio tool.
+
+    Args:
+        storage: Optional storage client for persisting images to Supabase pending/
 
     CAPABILITIES (Gemini 3 Pro Image):
 
@@ -644,7 +757,15 @@ def create_image_studio_tool() -> StructuredTool:
     - Lifestyle shots: Product in realistic scenes (kitchen, office, retail)
     - Studio shots: Clean professional backgrounds
     - Custom scenes: Describe any environment
+
+    STORAGE:
+    - When storage is provided and thread_id is passed to the tool,
+      generated images are uploaded to pending/{thread_id}/ for persistence
+    - storage_url and storage_path are included in output for WriteIntent
     """
+    # Set module-level storage client
+    _set_storage_client(storage)
+
     return StructuredTool.from_function(
         func=_image_studio_impl,
         name="image_studio",

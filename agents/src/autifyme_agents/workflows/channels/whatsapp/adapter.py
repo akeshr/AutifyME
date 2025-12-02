@@ -199,6 +199,46 @@ class WhatsAppChannel:
                 original_error=exc,
             ) from exc
 
+    def download_media_with_bytes(self, media_id: str) -> tuple[Path, bytes, str]:
+        """Download media file via WhatsApp Graph API with bytes.
+
+        Returns path, bytes, and MIME type. Used by platform tools when
+        storage persistence is needed (upload to Supabase inbox).
+
+        Args:
+            media_id: WhatsApp media ID from message
+
+        Returns:
+            Tuple of (Path, bytes, MIME type)
+
+        Raises:
+            ChannelError: If download fails
+        """
+        try:
+            logger.debug("Downloading WhatsApp media with bytes", extra={"media_id": media_id})
+
+            media_path, media_bytes, mime_type = self.media.download_media(media_id)
+
+            logger.info(
+                "WhatsApp media downloaded with bytes",
+                extra={
+                    "media_id": media_id,
+                    "path": str(media_path),
+                    "size_bytes": len(media_bytes),
+                    "mime_type": mime_type,
+                },
+            )
+
+            return media_path, media_bytes, mime_type
+
+        except Exception as exc:
+            logger.exception("Failed to download WhatsApp media", exc_info=exc)
+            raise ChannelError(
+                f"Failed to download media: {str(exc)}",
+                channel="whatsapp",
+                original_error=exc,
+            ) from exc
+
     def send_image(
         self,
         recipient: str,

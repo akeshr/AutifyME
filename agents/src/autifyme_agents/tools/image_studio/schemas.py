@@ -264,6 +264,16 @@ class ImageStudioInput(BaseModel):
         description="Additional reference images for style/context (up to 14)"
     )
 
+    # Thread ID for cloud storage persistence
+    thread_id: str | None = Field(
+        default=None,
+        description=(
+            "Conversation thread ID for organizing pending uploads. "
+            "Required for cloud storage persistence. "
+            "Format: 'whatsapp:{phone_number_id}:{sender}'"
+        )
+    )
+
     # Custom instruction for complex operations
     custom_instruction: str | None = Field(
         default=None,
@@ -313,6 +323,15 @@ class OutputVariant(BaseModel):
     description: str | None = Field(
         default=None,
         description="Description of what this variant contains"
+    )
+    # Cloud storage fields (for persistence across serverless invocations)
+    storage_url: str | None = Field(
+        default=None,
+        description="Supabase public URL (persistent, use for references)"
+    )
+    storage_path: str | None = Field(
+        default=None,
+        description="Path within Supabase bucket (for move operations in WriteIntent)"
     )
 
 
