@@ -83,9 +83,9 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
             Delay in seconds
         """
         # Exponential backoff: base * 2^(attempt-1)
-        delay = self.retry_base_delay * (2 ** (attempt - 1))
+        delay: float = self.retry_base_delay * (2 ** (attempt - 1))
         # Add jitter (0-50% of delay)
-        jitter = delay * random.uniform(0, 0.5)
+        jitter: float = delay * random.uniform(0, 0.5)
         return delay + jitter
 
     def invoke(

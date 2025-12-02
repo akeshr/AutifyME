@@ -195,7 +195,7 @@ def get_llm(
         # Supports all Gemini 2.5 and 2.0 models with multimodal capabilities
 
         # Build kwargs dict with only provided parameters
-        gemini_kwargs = {
+        gemini_kwargs: dict[str, Any] = {
             "model": model,
             "temperature": temperature,
         }
