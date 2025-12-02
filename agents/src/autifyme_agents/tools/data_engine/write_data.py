@@ -73,9 +73,10 @@ class WriteDataInput(BaseModel):
     asset_uploads: list[AssetUpload] = Field(
         default_factory=list,
         description=(
-            "Files to upload BEFORE database operations.\n"
-            "Uploads execute atomically: if any fails, no DB operations run.\n"
-            "Use @name.public_url in operations to reference uploaded file URL."
+            "Files to persist BEFORE database operations (atomically).\n"
+            "PREFERRED: Use storage_path from image_studio/download_media outputs.\n"
+            "Example: asset_uploads=[AssetUpload(storage_path='pending/.../img.png', returns='hero')]\n"
+            "Reference in operations: '@hero.public_url', '@hero.size_bytes'"
         ),
     )
 
@@ -412,7 +413,7 @@ def create_write_data_tool(
             "- Create product family with variants: operations=[{create product_families, returns='family'}, {create variant_axes with '@family.id', returns='axes'}, {create products with '@family.id'}]\n"
             "- Tiered bulk price update: Multiple update operations with different filters for size-based pricing\n"
             "- Soft delete with cleanup: Update products is_active=False, then update junction table, then variant_values\n"
-            "- Asset upload + DB: asset_uploads=[{source_url, destination_path, name}] then reference '@name.public_url' in operations\n\n"
+            "- Asset upload + DB: asset_uploads=[{storage_path='pending/...', returns='hero', caption='...'}] then '@hero.public_url' in operations\n\n"
             "MODES:\n"
             "- dry_run=True: Validate and show impact without executing\n"
             "- validate_only=True: Schema/constraint checks only\n\n"

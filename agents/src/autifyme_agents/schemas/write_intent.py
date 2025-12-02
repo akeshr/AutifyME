@@ -24,21 +24,10 @@ class AssetUpload(BaseModel):
     Processed BEFORE database operations. The uploaded file's public URL
     can be referenced in operations using @name.public_url syntax.
 
-    Two modes:
-    1. temp_path: Upload from local /tmp path (legacy, may fail on serverless)
-    2. storage_path: Move from Supabase pending/ to target folder (preferred)
+    Use storage_path from image_studio/download_media outputs. Files in pending/
+    are moved to target_folder (products/) upon HITL approval.
 
-    Example with temp_path (legacy):
-        asset_uploads=[
-            AssetUpload(
-                temp_path="/tmp/media_downloads/20251130_edit_abc123.png",
-                returns="product_image",
-                caption="PET Jar 500ml Clear - product photo",
-                folder="products"
-            )
-        ]
-
-    Example with storage_path (preferred for serverless):
+    Example:
         asset_uploads=[
             AssetUpload(
                 storage_path="pending/whatsapp_123_919/20251130_edit_abc123.png",
@@ -65,23 +54,22 @@ class AssetUpload(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    # Option 1: Local file path (legacy - may fail on serverless)
-    temp_path: str | None = Field(
-        default=None,
-        description=(
-            "Local file path to upload (from Image Studio or WhatsApp media).\n"
-            "Example: '/tmp/media_downloads/20251130_edit_abc123.png'\n"
-            "NOTE: May fail on serverless due to /tmp ephemerality. Use storage_path instead."
-        ),
-    )
-
-    # Option 2: Supabase storage path (preferred - already persisted)
+    # Primary: Supabase storage path (from image_studio/download_media)
     storage_path: str | None = Field(
         default=None,
         description=(
-            "Path within Supabase bucket (from Image Studio or download_media).\n"
+            "Path within Supabase bucket (from image_studio/download_media outputs).\n"
             "Example: 'pending/whatsapp_123_919/20251130_edit_abc123.png'\n"
-            "Executor will MOVE file to target_folder instead of uploading."
+            "Executor MOVES file from pending/ to target_folder upon HITL approval."
+        ),
+    )
+
+    # Fallback: Local file path (for external file uploads only)
+    temp_path: str | None = Field(
+        default=None,
+        description=(
+            "Local file path for external uploads not already in Supabase.\n"
+            "Use storage_path for image_studio/download_media outputs instead."
         ),
     )
 

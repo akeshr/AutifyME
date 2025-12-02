@@ -314,24 +314,27 @@ class ImageMetadata(BaseModel):
 
 
 class OutputVariant(BaseModel):
-    """Single output variant (master, thumbnail, social)."""
+    """Single output variant (master, thumbnail, social).
+
+    IMPORTANT: Use storage_url for all references. Local paths are ephemeral on serverless.
+    """
 
     variant: str
-    path: str
-    preview_path: str
+    path: str = Field(description="Local path (EPHEMERAL - do not use for references)")
+    preview_path: str = Field(description="Local preview path (EPHEMERAL)")
     metadata: ImageMetadata
     description: str | None = Field(
         default=None,
         description="Description of what this variant contains"
     )
-    # Cloud storage fields (for persistence across serverless invocations)
+    # Cloud storage - PRIMARY fields for all references
     storage_url: str | None = Field(
         default=None,
-        description="Supabase public URL (persistent, use for references)"
+        description="Supabase public URL - USE THIS for all references (persistent)"
     )
     storage_path: str | None = Field(
         default=None,
-        description="Path within Supabase bucket (for move operations in WriteIntent)"
+        description="Bucket path (pending/{thread_id}/...) - use in write_data asset_uploads"
     )
 
 

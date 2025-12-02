@@ -189,9 +189,9 @@ def create_platform_media_tools(
     # Set dynamic name and description based on platform
     download_media.name = f"download_{platform_name}_media"
     download_media.description = (
-        f"Download media from {platform_name} and persist to Supabase inbox. "
-        f"Returns storage_url (persistent, USE THIS) and local_path (ephemeral fallback). "
-        f"CRITICAL: Always use storage_url for image references - local_path is deleted on serverless."
+        f"Download media from {platform_name} and persist to Supabase inbox/. "
+        f"Returns: storage_url (public URL for references), storage_path (bucket path), mime_type, size_bytes. "
+        f"Use storage_url in all subsequent operations - images are already persistent."
     )
 
     return [download_media]

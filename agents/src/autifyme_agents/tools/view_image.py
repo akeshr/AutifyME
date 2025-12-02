@@ -4,16 +4,17 @@ Global utility that returns images as multimodal content, enabling
 any agent's LLM to SEE images directly without middleware.
 
 Architecture:
+- Accepts both local paths AND storage_url (Supabase public URLs)
 - Returns multimodal content blocks (text + image_url)
 - No middleware required - tool owns its output format
 - Any agent with this tool can view and analyze images
 - Resizes images for efficient token usage (512px max dimension)
 
 Use Cases:
-- PM verifying specialist output before responding to user
-- Any specialist needing to inspect images before processing
-- Catalog Specialist validating product images
-- Quality checks across the system
+- View images from inbox/ (download_media storage_url)
+- Verify output from image_studio (pending/ storage_url)
+- Quality checks before write_data
+- Inspect any image by URL or local path
 """
 
 from __future__ import annotations
@@ -36,18 +37,37 @@ MAX_DIMENSION = 512  # Optimized for efficient token usage
 class ViewImageInput(BaseModel):
     """Input schema for view_image tool."""
 
-    image_path: str = Field(description="Path to image file to view")
+    image_path: str = Field(
+        description=(
+            "Image source - accepts storage_url (from image_studio/download_media) "
+            "or local path. Example: 'https://...supabase.co/.../image.png' or '/tmp/preview.jpg'"
+        )
+    )
 
 
 def _load_image_as_data_uri(image_path: str) -> tuple[str, dict[str, Any]]:
-    """Load image and convert to data URI.
+    """Load image from URL or local path and convert to data URI.
+
+    Args:
+        image_path: storage_url (https://...) or local file path
 
     Returns:
         Tuple of (data_uri, metadata)
     """
-    path = Path(image_path)
+    # Handle URLs (storage_url from image_studio/download_media)
+    if image_path.startswith(("http://", "https://")):
+        import httpx
 
-    with Image.open(path) as img:
+        response = httpx.get(image_path, timeout=30)
+        response.raise_for_status()
+        img = Image.open(io.BytesIO(response.content))
+        source_type = "url"
+    else:
+        path = Path(image_path)
+        img = Image.open(path)
+        source_type = "local"
+
+    with img:
         original_size = img.size
         original_format = img.format or "JPEG"
 
@@ -78,7 +98,8 @@ def _load_image_as_data_uri(image_path: str) -> tuple[str, dict[str, Any]]:
         data_uri = f"data:image/jpeg;base64,{encoded}"
 
     metadata = {
-        "path": str(path),
+        "source": image_path,
+        "type": source_type,
         "original_size": f"{original_size[0]}x{original_size[1]}",
         "format": original_format,
     }
@@ -89,11 +110,14 @@ def _load_image_as_data_uri(image_path: str) -> tuple[str, dict[str, Any]]:
 def _view_image_impl(image_path: str) -> list[dict[str, Any]]:
     """View an image - returns multimodal content for agent to see.
 
+    Args:
+        image_path: storage_url (https://...) or local file path
+
     Returns content blocks that include the actual image for the agent's LLM.
     """
-    path = Path(image_path)
-
-    if not path.exists():
+    # Check existence for local paths (URLs validated during fetch)
+    is_url = image_path.startswith(("http://", "https://"))
+    if not is_url and not Path(image_path).exists():
         return [{"type": "text", "text": f"Error: Image not found at {image_path}"}]
 
     try:
@@ -104,7 +128,7 @@ def _view_image_impl(image_path: str) -> list[dict[str, Any]]:
         return [
             {
                 "type": "text",
-                "text": f"Image: {metadata['path']} ({metadata['original_size']}, {metadata['format']})"
+                "text": f"Image ({metadata['type']}): {metadata['original_size']}, {metadata['format']}"
             },
             {
                 "type": "image_url",
@@ -126,17 +150,16 @@ def create_view_image_tool() -> StructuredTool:
     return StructuredTool.from_function(
         func=_view_image_impl,
         name="view_image",
-        description="""View an image file. Returns the actual image so you can SEE it.
-
-Use this to look at any image and make informed decisions:
-- Inspect product photos before processing
-- Verify output quality from other tools
-- Analyze image content, colors, composition
-- Count products, identify types, assess backgrounds
-
-After calling this, you will see the image directly in your context.
-
-Example: view_image("/tmp/product.jpg") -> You see the actual image""",
+        description=(
+            "View an image from storage_url or local path. Returns the actual image so you can SEE it.\n\n"
+            "Use this to:\n"
+            "- Diagnose source images from inbox/ (download_media storage_url)\n"
+            "- Verify outputs from image_studio (pending/ storage_url)\n"
+            "- Quality check before write_data\n"
+            "- Analyze content, colors, composition, product count\n\n"
+            "After calling, you see the image directly in your context.\n\n"
+            "Example: view_image('https://...supabase.co/.../image.png')"
+        ),
         args_schema=ViewImageInput,
         return_direct=False,
     )
