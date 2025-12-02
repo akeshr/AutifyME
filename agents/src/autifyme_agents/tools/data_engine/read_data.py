@@ -70,7 +70,10 @@ class ReadDataInput(BaseModel):
             "- ['product_family(*)', 'product_images(image_url,display_order)'] - multiple relations\n"
             "- ['variant_axes(*,variant_values(*))'] - axes with nested values (CORRECT)\n"
             "- ['product_variant_values(variant_value(name,variant_axis(name)))'] - deep nesting\n"
-            "CRITICAL: For nested relations, wrap child inside parent parentheses, not dot notation."
+            "CRITICAL:\n"
+            "- Nested relations: wrap child inside parent parentheses, NOT dot notation\n"
+            "- Table names MUST be exact (e.g., 'price_lists' not 'price_list')\n"
+            "- Use inspect_schema with details=['relationships'] to verify foreign key targets"
         )
     )
     ids: list[str] | None = Field(
