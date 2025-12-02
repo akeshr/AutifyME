@@ -2554,7 +2554,7 @@ class SupabaseStorageClient(StorageInterface):
                 file_bytes = client.storage.from_(bucket).download(source_path)
             except Exception as download_error:
                 if "not found" in str(download_error).lower():
-                    raise FileNotFoundError(f"Source file not found: {source_path}")
+                    raise FileNotFoundError(f"Source file not found: {source_path}") from download_error
                 raise
 
             # Generate new filename in target folder
