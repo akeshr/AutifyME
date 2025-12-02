@@ -8,9 +8,9 @@ Design Pattern: Adapter - adapts WhatsApp API to generic MessagingChannel interf
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 import httpx
 
@@ -251,8 +251,8 @@ class WhatsAppChannel:
         """Send image with optional caption via WhatsApp.
 
         Handles both URLs and local file paths:
-        - URL (http/https): Downloads to temp file, uploads to WhatsApp
-        - Local path: Uploads directly to WhatsApp
+        - URL (http/https): Fetches bytes, uploads directly to WhatsApp
+        - Local path: Reads bytes, uploads to WhatsApp
 
         Used for HITL approval flow to show asset previews.
 
@@ -280,36 +280,29 @@ class WhatsAppChannel:
                 },
             )
 
-            # Handle URLs - download to temp file first
-            upload_path = image_source
+            # Get bytes and metadata based on source type
             if is_url:
-                # Fetch image from URL
+                # Fetch from URL
                 response = httpx.get(image_source, timeout=30)
                 response.raise_for_status()
+                file_bytes = response.content
 
-                # Determine file extension from Content-Type or URL
-                content_type = response.headers.get("Content-Type", "")
-                if "png" in content_type or image_source.endswith(".png"):
-                    suffix = ".png"
-                elif "webp" in content_type or image_source.endswith(".webp"):
-                    suffix = ".webp"
-                else:
-                    suffix = ".jpg"
+                # Extract filename from URL path
+                parsed = urlparse(image_source)
+                filename = Path(parsed.path).name or "image.jpg"
 
-                # Save to temp file
-                with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-                    tmp.write(response.content)
-                    upload_path = tmp.name
+                # Get MIME type from Content-Type header or derive from filename
+                mime_type = response.headers.get("Content-Type", "").split(";")[0]
+                if not mime_type or mime_type == "application/octet-stream":
+                    mime_type = self.media._derive_mime_type(Path(filename).suffix.lower())
 
-                logger.debug(
-                    "Downloaded URL to temp file",
-                    extra={"url": image_source[:100], "temp_path": upload_path}
-                )
+                # Upload bytes directly to WhatsApp
+                media_id = self.media.upload_media_from_bytes(file_bytes, filename, mime_type)
+            else:
+                # Local file - use existing upload_media
+                media_id = self.media.upload_media(image_source)
 
-            # Step 1: Upload media to WhatsApp
-            media_id = self.media.upload_media(upload_path)
-
-            # Step 2: Send image message with media_id
+            # Send image message with media_id
             result = self.client.send_image(recipient, media_id, caption=caption)
 
             logger.info(

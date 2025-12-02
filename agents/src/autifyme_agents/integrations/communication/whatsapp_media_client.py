@@ -134,37 +134,61 @@ class WhatsAppMediaClient:
         if not mime_type:
             mime_type = self._derive_mime_type(path.suffix.lower())
 
+        file_bytes = path.read_bytes()
+        return self.upload_media_from_bytes(file_bytes, path.name, mime_type)
+
+    def upload_media_from_bytes(
+        self,
+        file_bytes: bytes,
+        filename: str,
+        mime_type: str,
+    ) -> str:
+        """Upload media bytes to WhatsApp and return media_id.
+
+        Core upload method - accepts raw bytes directly.
+        Used by upload_media() and WhatsAppChannel.send_image() for URL sources.
+
+        Args:
+            file_bytes: Raw file content
+            filename: Filename for the upload (used by WhatsApp)
+            mime_type: MIME type of the content
+
+        Returns:
+            WhatsApp media_id for the uploaded file
+
+        Raises:
+            httpx.HTTPStatusError: If upload fails
+        """
         logger.info(
             "Uploading media to WhatsApp",
-            extra={"file_path": file_path, "mime_type": mime_type, "size_bytes": path.stat().st_size}
+            extra={"filename": filename, "mime_type": mime_type, "size_bytes": len(file_bytes)}
         )
 
         # WhatsApp media upload endpoint
         upload_url = f"https://graph.facebook.com/{self.api_version}/{settings.WHATSAPP_PHONE_NUMBER_ID}/media"
 
-        with path.open("rb") as f:
-            files = {
-                "file": (path.name, f, mime_type),
-            }
-            data = {
-                "messaging_product": "whatsapp",
-                "type": mime_type,
-            }
+        files = {
+            "file": (filename, file_bytes, mime_type),
+        }
+        data = {
+            "messaging_product": "whatsapp",
+            "type": mime_type,
+        }
 
-            response = httpx.post(
-                upload_url,
-                headers={"Authorization": f"Bearer {self.access_token}"},
-                files=files,
-                data=data,
-                timeout=60.0,  # Longer timeout for uploads
-            )
+        response = httpx.post(
+            upload_url,
+            headers={"Authorization": f"Bearer {self.access_token}"},
+            files=files,
+            data=data,
+            timeout=60.0,  # Longer timeout for uploads
+        )
 
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError:
             logger.error(
                 "Failed to upload media to WhatsApp",
-                extra={"status": response.status_code, "file_path": file_path, "response": response.text}
+                extra={"status": response.status_code, "filename": filename, "response": response.text}
             )
             raise
 
@@ -173,7 +197,7 @@ class WhatsAppMediaClient:
 
         logger.info(
             "Media uploaded to WhatsApp",
-            extra={"file_path": file_path, "media_id": media_id}
+            extra={"filename": filename, "media_id": media_id}
         )
 
         return media_id
