@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from langchain.tools import tool
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -84,17 +85,26 @@ def create_platform_media_tools(
     platform_name = channel.__class__.__name__.replace("Channel", "").lower()
 
     @tool
-    def download_media(media_id: str, thread_id: str | None = None) -> dict[str, Any]:
+    def download_media(
+        media_id: str,
+        thread_id: str | None = None,
+        config: RunnableConfig | None = None,
+    ) -> dict[str, Any]:
         """Download media from the messaging platform and persist to cloud storage.
 
         Downloads media from the platform, optionally uploads to Supabase inbox
         for persistence across serverless invocations. Returns both local path
         (for immediate use) and cloud URL (for persistent references).
 
+        thread_id is automatically injected from RunnableConfig if not provided.
+        This enables automatic cloud storage persistence without requiring the
+        LLM to explicitly pass thread_id.
+
         Args:
             media_id: Platform-specific media identifier
             thread_id: Conversation thread ID for organizing uploads (e.g., "whatsapp:123:919...")
-                      Required if storage persistence is enabled.
+                      Auto-injected from RunnableConfig if not provided.
+            config: RunnableConfig (auto-injected by LangChain runtime)
 
         Returns:
             Dict with:
@@ -107,6 +117,16 @@ def create_platform_media_tools(
         Raises:
             Exception: If media download fails
         """
+        # Inject thread_id from config if not explicitly provided
+        if thread_id is None and config is not None:
+            configurable = config.get("configurable", {})
+            thread_id = configurable.get("thread_id")
+            if thread_id:
+                logger.debug(
+                    "Injected thread_id from RunnableConfig",
+                    extra={"thread_id": thread_id}
+                )
+
         try:
             logger.info(
                 f"Downloading media from {platform_name}",
@@ -139,8 +159,8 @@ def create_platform_media_tools(
                 try:
                     # Run async upload in sync context
                     try:
-                        loop = asyncio.get_running_loop()
-                        # Already in async context - create task
+                        asyncio.get_running_loop()  # Check if loop exists (raises RuntimeError if not)
+                        # Already in async context - use thread pool
                         import concurrent.futures
                         with concurrent.futures.ThreadPoolExecutor() as executor:
                             future = executor.submit(

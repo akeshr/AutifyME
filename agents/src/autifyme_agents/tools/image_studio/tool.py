@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Protocol, TypeVar
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import StructuredTool
 from PIL import Image
 
@@ -250,7 +251,7 @@ def _save_base64_image(
         try:
             # Run async upload in sync context
             try:
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()  # Check if loop exists (raises RuntimeError if not)
                 # Already in async context - use thread pool
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -673,8 +674,24 @@ def _image_studio_impl(
     extraction: dict[str, Any] | None = None,
     focus: dict[str, Any] | None = None,
     output: dict[str, Any] | None = None,
+    config: RunnableConfig | None = None,
 ) -> dict[str, Any]:
-    """Image Studio tool implementation."""
+    """Image Studio tool implementation.
+
+    thread_id is automatically injected from RunnableConfig if not provided.
+    This enables automatic cloud storage persistence without requiring the
+    LLM to explicitly pass thread_id.
+    """
+    # Inject thread_id from config if not explicitly provided
+    if thread_id is None and config is not None:
+        configurable = config.get("configurable", {})
+        thread_id = configurable.get("thread_id")
+        if thread_id:
+            logger.debug(
+                "Injected thread_id from RunnableConfig",
+                extra={"thread_id": thread_id}
+            )
+
     try:
         def _maybe_convert(value: Any, model_class: type[T]) -> T | None:
             if value is None:
