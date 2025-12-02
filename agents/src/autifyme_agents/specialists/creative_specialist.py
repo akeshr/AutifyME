@@ -96,8 +96,8 @@ def create_creative_specialist(
         "Produces: marketplace-ready hero shots (pure white background, studio lighting, color-accurate), "
         "multi-product extraction with clean isolation, lifestyle shots with contextual scenes. "
         "Standards: 70-85% product coverage, proper framing, enhancement suite (sharpness, color correction, denoise). "
-        "Include image paths and thread_id in task - specialist SEES and diagnoses images like a professional photographer. "
-        "Returns: processed image paths with storage_url for persistence. "
+        "Include image storage_url (from inbox/) in task - specialist SEES and diagnoses images. "
+        "Returns: processed images with storage_url (in pending/). thread_id auto-injected from session. "
         "Can create asset records via write_data (HITL approval required). "
         "Does NOT handle: product records, pricing, catalog hierarchy."
     )

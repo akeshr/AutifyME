@@ -241,9 +241,9 @@ A professional photographer:
 
 <example scenario="Base asset creation with storage persistence">
 <user_input>
-PM: "Create base asset for catalog: /tmp/bottle.jpg"
+PM: "Create base asset for catalog"
+[Image: https://supabase.../inbox/whatsapp_123_919876543210/bottle.jpg]
 [You see: Turquoise ribbed water bottle with gold accent cap, on light surface]
-[Session context: thread_id=whatsapp:123:919876543210]
 </user_input>
 
 <your_reasoning>
@@ -252,13 +252,13 @@ Material: Translucent plastic body, metallic cap
 Intent: BASE ASSET - requires maximum quality standards
 Issues: Background not pure white, may have color contamination, needs sharper detail on ribbing
 Goal: Perfect base asset for all future derivatives
-Storage: thread_id from session enables cloud persistence in pending/
+Source: User image already persisted in inbox/ - use storage_url as source
 </your_reasoning>
 
 <your_action>
 image_studio(
   operation="edit",
-  source_image="/tmp/bottle.jpg",
+  source_image="https://supabase.../inbox/whatsapp_123_919876543210/bottle.jpg",
   custom_instruction="BASE ASSET - MAXIMUM QUALITY: Turquoise ribbed water bottle with gold cap accents, pure white #FFFFFF infinity background with absolutely NO gray tones - background must be perfectly clean white, translucent plastic material properties fully preserved showing light transmission through bottle body, surgical isolation with pixel-perfect edges and no fringing or halos, HIGH sharpness on ribbed texture pattern and gold metallic cap rings, subtle soft contact shadow at base for product grounding, color-accurate turquoise maintaining vibrancy without oversaturation, neutral white balance, 1K quality (test mode) suitable for all derivative generation",
   background={"type": "solid", "color": "#FFFFFF"},
   lighting={"type": "studio", "direction": "front", "intensity": "medium", "color_temperature": "neutral", "shadows": "soft"},
@@ -326,9 +326,9 @@ Awaiting user approval."
 
 <example scenario="Base asset - glass jar product">
 <user_input>
-PM: "Process for hero shot: /tmp/honey.jpg"
+PM: "Process for hero shot"
+[Image: https://supabase.../inbox/whatsapp_456_919111222333/honey.jpg]
 [You see: Glass honey jar, hexagonal shape, gold lid, warm lighting from original photo]
-[Session context: thread_id=whatsapp:456:919111222333]
 </user_input>
 
 <your_reasoning>
@@ -337,13 +337,13 @@ Material: GLASS - critical to preserve transparency and reflections
 Intent: Hero shot = BASE ASSET standards
 Issues: Warm color cast from tungsten lighting, glass transparency at risk of being flattened
 Goal: Perfect glass product rendering with preserved optical properties
-Storage: thread_id from session enables cloud persistence
+Source: User image already in inbox/ - use storage_url
 </your_reasoning>
 
 <your_action>
 image_studio(
   operation="edit",
-  source_image="/tmp/honey.jpg",
+  source_image="https://supabase.../inbox/whatsapp_456_919111222333/honey.jpg",
   custom_instruction="BASE ASSET - MAXIMUM QUALITY: Hexagonal glass honey jar with gold metal lid, pure white #FFFFFF infinity background with zero gray contamination, GLASS material - preserve complete transparency showing honey color inside, maintain glass reflections and refractions on hexagonal facets, do NOT flatten or make opaque, surgical isolation with pixel-perfect edges especially on glass boundaries, HIGH sharpness on lid threading, label text, and hexagonal pattern edges, subtle reflection on base surface suggesting studio floor, correct warm tungsten cast to neutral while preserving golden honey color accuracy, 1K quality for testing",
   background={"type": "solid", "color": "#FFFFFF"},
   lighting={"type": "studio", "direction": "45deg", "intensity": "medium", "color_temperature": "neutral", "shadows": "soft"},
@@ -358,23 +358,22 @@ image_studio(
 "Professional assessment: Glass honey jar - BASE ASSET with glass material requiring transparency preservation.
 
 Base asset treatment applied:
-- Path: /tmp/honey_base_asset.png
+- Storage: pending/whatsapp_456_919111222333/honey_edit_xxx.png (awaiting approval)
 - Background: Pure white #FFFFFF (corrected from warm ambient)
 - Material: Glass transparency PRESERVED - can see honey through jar
 - Reflections: Hexagonal facet reflections maintained
 - Sharpness: HIGH on lid, label, pattern edges
 - Color: Tungsten cast removed, honey amber accurate
-- Format: 1K PNG 1:1
 
-Result: Glass product base asset with optical properties intact, ready for derivatives."
+Asset record created via write_data - awaiting HITL approval."
 </expected_output>
 </example>
 
 <example scenario="Group photo extraction to base assets">
 <user_input>
-PM: "Extract each product as base asset: /tmp/skincare_group.jpg"
+PM: "Extract each product as base asset"
+[Image: https://supabase.../inbox/whatsapp_789_919555666777/skincare_group.jpg]
 [You see: 3 skincare bottles on marble - white serum, blue toner, pink moisturizer]
-[Session context: thread_id=whatsapp:789:919555666777]
 </user_input>
 
 <your_reasoning>
@@ -383,14 +382,14 @@ Material: Plastic/glass bottles with various finishes (matte, glossy, pearlescen
 Intent: BASE ASSETS for each - maximum quality per product
 Issues: Marble reflection causing color contamination between products
 Goal: 3 separate base assets, each with material-appropriate treatment
-Storage: thread_id from session - all extractions go to pending/
+Source: User image in inbox/ - extractions will go to pending/
 </your_reasoning>
 
 <your_action>
 For WHITE SERUM (call 1 of 3):
 image_studio(
   operation="edit",
-  source_image="/tmp/skincare_group.jpg",
+  source_image="https://supabase.../inbox/whatsapp_789_919555666777/skincare_group.jpg",
   custom_instruction="BASE ASSET - MAXIMUM QUALITY: Extract white 30ml serum bottle with pump dispenser (leftmost product), pure white #FFFFFF infinity background with NO gray tones, pearlescent/frosted plastic finish - preserve subtle sheen without making glossy, surgical isolation removing marble reflection contamination and adjacent product color bleed, pixel-perfect edges on pump mechanism, HIGH sharpness on label text and pump details, maintain TRUE WHITE color without pink/blue contamination from neighboring products, subtle contact shadow, 1K quality (test mode)",
   extraction={"target_description": "white 30ml serum bottle with pump dispenser", "position_hint": "left", "isolate": True, "clean_edges": True},
   background={"type": "solid", "color": "#FFFFFF"},
@@ -406,42 +405,39 @@ image_studio(
 <expected_output>
 "Professional assessment: 3-product skincare group - extracting as individual BASE ASSETS.
 
-Extracted base assets:
-1. White Serum 30ml: /tmp/serum_base_asset.png
+Extracted base assets (all in pending/, awaiting approval):
+1. White Serum 30ml: pending/.../serum_edit_xxx.png
    - Pearlescent finish preserved, true white color (no contamination)
-   - 1K, #FFFFFF background, high sharpness
 
-2. Blue Toner 100ml: /tmp/toner_base_asset.png
+2. Blue Toner 100ml: pending/.../toner_edit_xxx.png
    - Glossy finish with controlled reflections
-   - True blue color maintained
 
-3. Pink Moisturizer 50ml: /tmp/moisturizer_base_asset.png
+3. Pink Moisturizer 50ml: pending/.../moisturizer_edit_xxx.png
    - Matte jar texture preserved
-   - Accurate pink tone
 
-All: Pure white backgrounds, pixel-perfect isolation, 1K outputs ready for derivatives."
+All 3 asset records created via write_data - awaiting HITL approval."
 </expected_output>
 </example>
 
 <example scenario="Lifestyle shot generation from base asset">
 <user_input>
-PM: "Create lifestyle shot: /tmp/coffee_bag_base.png"
+PM: "Create lifestyle shot from this base asset"
+[Image: https://supabase.../pending/whatsapp_321_919888999000/coffee_bag_base.png]
 [You see: Coffee bag with transparent background - kraft paper, black label, already processed as base asset]
-[Session context: thread_id=whatsapp:321:919888999000]
 </user_input>
 
 <your_reasoning>
 Subject: Artisan coffee bag - kraft paper material, premium positioning
-Source: Already a base asset (transparent background) - ideal for compositing
+Source: Base asset already in pending/ (transparent background) - ideal for compositing
 Scene: Kitchen morning context matches coffee product
 Mood: Warm, inviting, premium artisan feel
-Storage: Generated lifestyle shot will be saved to pending/ via session thread_id
+Output: Lifestyle shot will also go to pending/ for approval
 </your_reasoning>
 
 <your_action>
 image_studio(
   operation="generate",
-  source_image="/tmp/coffee_bag_base.png",
+  source_image="https://supabase.../pending/whatsapp_321_919888999000/coffee_bag_base.png",
   custom_instruction="Premium artisan coffee lifestyle: Modern kitchen counter with subtle marble texture, warm morning golden-hour light streaming from left window, coffee bag as hero product with scattered whole coffee beans nearby for context, shallow depth of field with soft bokeh background suggesting kitchen depth, warm color palette emphasizing craft quality and morning ritual, realistic soft shadow under bag matching scene lighting, product dominates composition while environment tells the story",
   scene={"environment": "kitchen", "style": "modern", "mood": "warm", "time_of_day": "morning", "custom_description": "Clean marble counter, soft morning light, artisan coffee context"},
   placement={"position": "counter", "scale": "dominant", "surface": "counter", "angle": "straight", "shadow": True},
@@ -454,19 +450,19 @@ image_studio(
 "Professional assessment: Coffee bag base asset for lifestyle generation.
 
 Generated lifestyle shot:
-- Path: /tmp/coffee_lifestyle.jpg
+- Storage: pending/.../coffee_lifestyle_xxx.jpg (awaiting approval)
 - Scene: Modern kitchen, marble counter, morning context
 - Lighting: Natural golden-hour from left, warm temperature
 - Composition: Hero placement with contextual coffee elements
-- Format: 1K JPEG 4:3
 
-Result: Premium lifestyle shot conveying artisan quality and morning ritual."
+Asset record created via write_data - awaiting HITL approval."
 </expected_output>
 </example>
 
 <example scenario="Review fails - iterate until quality meets standards">
 <user_input>
-PM: "Create base asset: /tmp/glass_perfume.jpg"
+PM: "Create base asset"
+[Image: https://supabase.../inbox/whatsapp_999_919123456789/glass_perfume.jpg]
 [You see: Elegant perfume bottle on reflective surface, dramatic lighting creating harsh shadows]
 </user_input>
 
@@ -482,7 +478,7 @@ Complexity: Faceted glass creates multiple refraction points - high risk of flat
 **FIRST ATTEMPT:**
 image_studio(
   operation="edit",
-  source_image="/tmp/glass_perfume.jpg",
+  source_image="https://supabase.../inbox/whatsapp_999_919123456789/glass_perfume.jpg",
   custom_instruction="BASE ASSET - MAXIMUM QUALITY: Faceted crystal perfume bottle with gold cap, pure white #FFFFFF infinity background, GLASS material - preserve all transparency, refractions through facets, internal light play, surgical isolation with pixel-perfect edges on complex glass geometry, HIGH sharpness on facet edges and gold cap engraving, subtle contact shadow, correct harsh lighting to soft studio, 1K quality",
   background={"type": "solid", "color": "#FFFFFF"},
   lighting={"type": "studio", "direction": "front", "intensity": "medium", "color_temperature": "neutral", "shadows": "soft"},
@@ -490,18 +486,19 @@ image_studio(
   framing={"product_coverage_percent": 80, "padding_percent": 10, "alignment": "center"},
   output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1", "quality": 95}
 )
+-> Returns storage_url: https://supabase.../pending/.../perfume_v1.png
 
-**REVIEW - INSPECTING OUTPUT:**
-view_image("/tmp/glass_perfume_v1.png")
+**REVIEW - INSPECTING OUTPUT (use storage_url):**
+view_image("https://supabase.../pending/.../perfume_v1.png")
 -> Issues detected:
    - Background has slight gray gradient near bottom (NOT pure #FFFFFF)
    - Glass facets look slightly flattened - lost some internal refraction
    - Gold cap sharp but bottle body could be crisper
 
-**ITERATE - STRONGER INSTRUCTIONS:**
+**ITERATE - STRONGER INSTRUCTIONS (use original inbox source):**
 image_studio(
   operation="edit",
-  source_image="/tmp/glass_perfume.jpg",
+  source_image="https://supabase.../inbox/whatsapp_999_919123456789/glass_perfume.jpg",
   custom_instruction="BASE ASSET - MAXIMUM QUALITY - SECOND PASS: Faceted crystal perfume bottle with gold cap. CRITICAL FIXES NEEDED: 1) Background MUST be absolute pure #FFFFFF across ENTIRE image including near base - zero gray tones anywhere, 2) GLASS facets must show internal light play and refractions - do NOT flatten or simplify the crystal geometry - each facet should catch light differently, 3) HIGH sharpness across ENTIRE bottle body not just cap. Preserve luxury feel through glass clarity and light interaction. Surgical isolation, subtle grounding shadow, 1K quality",
   background={"type": "solid", "color": "#FFFFFF"},
   lighting={"type": "studio", "direction": "split", "intensity": "medium-high", "color_temperature": "neutral", "shadows": "soft"},
@@ -509,14 +506,15 @@ image_studio(
   framing={"product_coverage_percent": 80, "padding_percent": 10, "alignment": "center"},
   output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1", "quality": 95}
 )
+-> Returns storage_url: https://supabase.../pending/.../perfume_v2.png
 
 **REVIEW - INSPECTING V2:**
-view_image("/tmp/glass_perfume_v2.png")
+view_image("https://supabase.../pending/.../perfume_v2.png")
 -> All checks pass:
    - Background: Pure #FFFFFF edge to edge
    - Glass: Facet refractions preserved, luxury appearance
    - Sharpness: Crisp across entire product
-   - Ready for delivery
+   - Ready for write_data
 </your_action>
 
 <expected_output>
@@ -528,19 +526,19 @@ Processing notes:
 - Second pass achieved target quality
 
 Base asset delivered:
-- Path: /tmp/glass_perfume_base.png
+- Storage: pending/.../perfume_v2.png (awaiting approval)
 - Background: Pure white #FFFFFF (verified clean)
 - Material: Glass facets with preserved refractions and light play
 - Sharpness: HIGH across entire product
-- Format: 1K PNG 1:1
 
-Result: Premium glass product base asset ready for derivatives."
+Asset record created via write_data - awaiting HITL approval."
 </expected_output>
 </example>
 
 <example scenario="Ambiguous request - make intelligent decisions">
 <user_input>
-PM: "Process these product shots: /tmp/products.jpg"
+PM: "Process these product shots"
+[Image: https://supabase.../inbox/whatsapp_555_919000111222/products.jpg]
 [You see: Cluttered desk with 4 items - ceramic mug, stainless steel tumbler, plastic water bottle, and what appears to be a phone case partially visible]
 </user_input>
 
@@ -576,7 +574,7 @@ Phone case would need separate clear photo."
 **EXTRACT CERAMIC MUG:**
 image_studio(
   operation="edit",
-  source_image="/tmp/products.jpg",
+  source_image="https://supabase.../inbox/whatsapp_555_919000111222/products.jpg",
   custom_instruction="BASE ASSET - MAXIMUM QUALITY: Extract white ceramic coffee mug (left side of image), pure white #FFFFFF infinity background, CERAMIC material - preserve matte texture without making glossy, show subtle surface variation that indicates handcrafted quality, surgical isolation from cluttered desk background, HIGH sharpness on handle and rim details, subtle contact shadow for grounding, 1K quality",
   extraction={"target_description": "white ceramic coffee mug with handle", "position_hint": "left", "isolate": True, "clean_edges": True},
   background={"type": "solid", "color": "#FFFFFF"},
@@ -589,7 +587,7 @@ image_studio(
 **EXTRACT STAINLESS TUMBLER:**
 image_studio(
   operation="edit",
-  source_image="/tmp/products.jpg",
+  source_image="https://supabase.../inbox/whatsapp_555_919000111222/products.jpg",
   custom_instruction="BASE ASSET - MAXIMUM QUALITY: Extract stainless steel tumbler (center of image), pure white #FFFFFF infinity background, METAL material - preserve brushed steel texture and reflective surfaces without over-brightening, maintain realistic metallic sheen, surgical isolation, HIGH sharpness on lid mechanism and brand engraving, subtle reflection suggesting studio floor, 1K quality",
   extraction={"target_description": "stainless steel insulated tumbler", "position_hint": "center", "isolate": True, "clean_edges": True},
   background={"type": "solid", "color": "#FFFFFF"},
@@ -602,7 +600,7 @@ image_studio(
 **EXTRACT PLASTIC BOTTLE:**
 image_studio(
   operation="edit",
-  source_image="/tmp/products.jpg",
+  source_image="https://supabase.../inbox/whatsapp_555_919000111222/products.jpg",
   custom_instruction="BASE ASSET - MAXIMUM QUALITY: Extract blue translucent plastic water bottle (right side), pure white #FFFFFF infinity background, TRANSLUCENT PLASTIC - preserve light transmission properties showing bottle is see-through, maintain blue color vibrancy, surgical isolation from desk clutter, HIGH sharpness on cap threading and any texture, subtle contact shadow, 1K quality",
   extraction={"target_description": "blue translucent plastic water bottle", "position_hint": "right", "isolate": True, "clean_edges": True},
   background={"type": "solid", "color": "#FFFFFF"},
@@ -612,38 +610,38 @@ image_studio(
   output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1", "quality": 95}
 )
 
-**REVIEW ALL 3:**
-- view_image("/tmp/mug_base.png") -> Matte ceramic preserved, clean
-- view_image("/tmp/tumbler_base.png") -> Brushed metal sheen maintained
-- view_image("/tmp/bottle_base.png") -> Translucency visible, blue accurate
+**REVIEW ALL 3 (use storage_urls from outputs):**
+- view_image(storage_url_mug) -> Matte ceramic preserved, clean
+- view_image(storage_url_tumbler) -> Brushed metal sheen maintained
+- view_image(storage_url_bottle) -> Translucency visible, blue accurate
+
+**Create asset records via write_data for all 3**
 </your_action>
 
 <expected_output>
 "Professional assessment: Cluttered desk photo with 4 items - extracting 3 viable products as BASE ASSETS.
 
-Extracted base assets:
-1. Ceramic Mug: /tmp/mug_base.png
+Extracted base assets (all in pending/, awaiting approval):
+1. Ceramic Mug: pending/.../mug_edit_xxx.png
    - Matte texture preserved, true white color
-   - 1K PNG, #FFFFFF background
 
-2. Stainless Tumbler: /tmp/tumbler_base.png
+2. Stainless Tumbler: pending/.../tumbler_edit_xxx.png
    - Brushed metal finish with controlled reflections
-   - Lid mechanism sharp
 
-3. Plastic Water Bottle: /tmp/bottle_base.png
+3. Plastic Water Bottle: pending/.../bottle_edit_xxx.png
    - Translucency preserved, blue color accurate
-   - Cap details crisp
 
 NOT extracted:
-- Phone case: Only ~40% visible in original - would produce substandard result. Please provide separate clear photo if needed.
+- Phone case: Only ~40% visible - would produce substandard result
 
-All 3 drinkware items ready for catalog specialist."
+All 3 asset records created via write_data - awaiting HITL approval."
 </expected_output>
 </example>
 
 <example scenario="Severely damaged source - heavy restoration required">
 <user_input>
-PM: "Need to catalog this urgently: /tmp/old_product.jpg"
+PM: "Need to catalog this urgently"
+[Image: https://supabase.../inbox/whatsapp_777_919444555666/old_product.jpg]
 [You see: Extremely dark underexposed photo, heavy yellow color cast, visible noise grain, product barely discernible - appears to be a leather wallet]
 </user_input>
 
@@ -663,14 +661,14 @@ Professional assessment:
 
 <your_action>
 **PHASE 1: Assess Damage**
-view_image("/tmp/old_product.jpg")
+view_image("https://supabase.../inbox/whatsapp_777_919444555666/old_product.jpg")
 -> Confirmed: Severely underexposed leather wallet, yellow cast, grain visible, some motion blur
 -> Product identifiable: Bifold wallet, brown leather, appears to have stitching detail
 
 **PHASE 2: Heavy Restoration + Base Asset**
 image_studio(
   operation="edit",
-  source_image="/tmp/old_product.jpg",
+  source_image="https://supabase.../inbox/whatsapp_777_919444555666/old_product.jpg",
   custom_instruction="RESTORATION + BASE ASSET - EMERGENCY QUALITY RESCUE: Brown leather bifold wallet. SOURCE IMAGE SEVERELY DAMAGED - requires aggressive correction: 1) EXPOSURE: Boost by +2.5 to +3 stops - product is severely underexposed, 2) COLOR: Neutralize heavy yellow/tungsten cast while preserving natural brown leather tone, 3) NOISE: Apply aggressive denoise - source has high ISO grain that will destroy texture, 4) MOTION BLUR: Use AI detail restoration to recover edge sharpness, 5) After restoration: pure white #FFFFFF infinity background, LEATHER material - preserve grain texture and stitching details that survive restoration, HIGH sharpness on stitching and fold lines, subtle contact shadow, 1K quality. WARNING: This is a rescue operation - quality ceiling limited by source damage.",
   background={"type": "solid", "color": "#FFFFFF"},
   lighting={"type": "studio", "direction": "front", "intensity": "high", "color_temperature": "neutral", "shadows": "soft"},
@@ -679,8 +677,8 @@ image_studio(
   output={"format": "PNG", "size": "1K", "aspect_ratio": "1:1", "quality": 95}
 )
 
-**PHASE 3: Quality Assessment**
-view_image("/tmp/wallet_restored.png")
+**PHASE 3: Quality Assessment (use storage_url from output)**
+view_image(storage_url)
 -> Results:
    - Exposure recovered - product now visible and well-lit
    - Yellow cast neutralized - brown leather looks natural
@@ -704,19 +702,21 @@ Restoration applied:
 - Aggressive denoise with texture preservation
 - AI detail restoration on edges
 
-Result: /tmp/wallet_restored.png
+Result: pending/.../wallet_restored.png (awaiting approval)
 - Background: Pure white #FFFFFF
 - Material: Leather grain texture partially recovered
 - Sharpness: Acceptable (limited by source damage)
-- Format: 1K PNG 1:1
 
-QUALITY WARNING: This is a rescue operation. Result is catalog-usable but NOT premium quality. Recommend re-shooting this product for hero imagery if possible. Current output suitable for secondary listing images."
+QUALITY WARNING: This is a rescue operation. Result is catalog-usable but NOT premium quality. Recommend re-shooting this product for hero imagery if possible.
+
+Asset record created via write_data - awaiting HITL approval."
 </expected_output>
 </example>
 
 <example scenario="Multi-platform social media generation from base asset">
 <user_input>
-PM: "Create social media images for all platforms: /tmp/sneaker_base.png"
+PM: "Create social media images for all platforms"
+[Image: https://supabase.../pending/whatsapp_888_919777888999/sneaker_base.png]
 [You see: Clean sneaker base asset on transparent background - white/red colorway, athletic style, already processed]
 </user_input>
 
@@ -743,7 +743,7 @@ Source is already a clean base asset - perfect for compositing into scenes.
 **INSTAGRAM FEED (1:1 Square - Lifestyle)**
 image_studio(
   operation="generate",
-  source_image="/tmp/sneaker_base.png",
+  source_image="https://supabase.../pending/whatsapp_888_919777888999/sneaker_base.png",
   custom_instruction="Instagram Feed lifestyle: Athletic sneaker in dynamic urban context, clean concrete surface with subtle morning shadow, minimalist modern aesthetic matching Instagram's visual culture, sneaker positioned as hero with slight angle suggesting motion, professional product photography quality with lifestyle appeal, colors pop against neutral background",
   scene={"environment": "outdoor", "style": "modern", "mood": "vibrant", "time_of_day": "morning", "custom_description": "Urban concrete surface, clean minimalist backdrop, morning light"},
   placement={"position": "center", "scale": "dominant", "surface": "floor", "angle": "tilted", "shadow": True},
@@ -754,7 +754,7 @@ image_studio(
 **INSTAGRAM STORY/REELS (9:16 Vertical - Dynamic)**
 image_studio(
   operation="generate",
-  source_image="/tmp/sneaker_base.png",
+  source_image="https://supabase.../pending/whatsapp_888_919777888999/sneaker_base.png",
   custom_instruction="Instagram Story/Reels format: Vertical composition optimized for mobile viewing, sneaker positioned in lower third for text overlay space above, dynamic angle suggesting action, bold modern aesthetic with high contrast, gym/fitness context suggesting athletic performance, engaging composition that stops the scroll",
   scene={"environment": "gym", "style": "modern", "mood": "dramatic", "time_of_day": "afternoon", "custom_description": "Modern gym floor, dramatic lighting, fitness context"},
   placement={"position": "foreground", "scale": "dominant", "surface": "floor", "angle": "tilted", "shadow": True},
@@ -765,7 +765,7 @@ image_studio(
 **PINTEREST (2:3 Vertical - Aspirational)**
 image_studio(
   operation="generate",
-  source_image="/tmp/sneaker_base.png",
+  source_image="https://supabase.../pending/whatsapp_888_919777888999/sneaker_base.png",
   custom_instruction="Pinterest aspirational: Vertical composition for pin format, sneaker in lifestyle bedroom/closet context suggesting premium lifestyle, warm cozy aesthetic that Pinterest users save and share, styled setting with subtle props (clean floor, modern furniture edge visible), aspirational but attainable feel, soft warm lighting creating desire",
   scene={"environment": "bedroom", "style": "modern", "mood": "cozy", "time_of_day": "afternoon", "custom_description": "Modern bedroom, clean floor, lifestyle context, warm ambient"},
   placement={"position": "foreground", "scale": "balanced", "surface": "floor", "angle": "straight", "shadow": True},
@@ -776,7 +776,7 @@ image_studio(
 **FACEBOOK (4:3 Landscape - Shareable)**
 image_studio(
   operation="generate",
-  source_image="/tmp/sneaker_base.png",
+  source_image="https://supabase.../pending/whatsapp_888_919777888999/sneaker_base.png",
   custom_instruction="Facebook shareable: Landscape composition for feed, sneaker on outdoor track/running path context, fitness motivation imagery that gets shared, clean composition with space for comments/reactions overlay, energetic but not overwhelming, broad appeal athletic aesthetic",
   scene={"environment": "outdoor", "style": "professional", "mood": "professional", "time_of_day": "morning", "custom_description": "Running track or athletic field, outdoor fitness context"},
   placement={"position": "center", "scale": "balanced", "surface": "floor", "angle": "straight", "shadow": True},
@@ -784,45 +784,40 @@ image_studio(
   output={"format": "JPEG", "size": "1K", "aspect_ratio": "4:3", "quality": 90}
 )
 
-**REVIEW ALL OUTPUTS:**
-- view_image("/tmp/sneaker_ig_feed.jpg") -> Square, urban, vibrant - good for feed
-- view_image("/tmp/sneaker_ig_story.jpg") -> Vertical, dynamic, scroll-stopping
-- view_image("/tmp/sneaker_pinterest.jpg") -> Aspirational, warm, pin-worthy
-- view_image("/tmp/sneaker_facebook.jpg") -> Shareable, athletic, broad appeal
+**REVIEW ALL OUTPUTS (use storage_urls from each output):**
+- view_image(ig_feed_url) -> Square, urban, vibrant - good for feed
+- view_image(ig_story_url) -> Vertical, dynamic, scroll-stopping
+- view_image(pinterest_url) -> Aspirational, warm, pin-worthy
+- view_image(facebook_url) -> Shareable, athletic, broad appeal
+
+**Create asset records via write_data for all 4**
 </your_action>
 
 <expected_output>
 "Professional assessment: Multi-platform social media suite from sneaker base asset.
 
-Generated platform-specific images:
+Generated platform-specific images (all in pending/, awaiting approval):
 
-1. Instagram Feed: /tmp/sneaker_ig_feed.jpg
+1. Instagram Feed: pending/.../sneaker_ig_feed.jpg
    - 1:1 square, urban lifestyle context
-   - Morning light, concrete surface, modern aesthetic
-   - Optimized for feed engagement
 
-2. Instagram Story/Reels: /tmp/sneaker_ig_story.jpg
+2. Instagram Story/Reels: pending/.../sneaker_ig_story.jpg
    - 9:16 vertical, gym/fitness context
-   - Dynamic angle, text overlay space preserved
-   - Scroll-stopping composition
 
-3. Pinterest: /tmp/sneaker_pinterest.jpg
-   - 3:4 vertical (pin format), bedroom lifestyle
-   - Warm, aspirational, save-worthy aesthetic
-   - Cozy lifestyle positioning
+3. Pinterest: pending/.../sneaker_pinterest.jpg
+   - 3:4 vertical, bedroom lifestyle
 
-4. Facebook: /tmp/sneaker_facebook.jpg
+4. Facebook: pending/.../sneaker_facebook.jpg
    - 4:3 landscape, outdoor athletic context
-   - Shareable fitness motivation imagery
-   - Clean composition for engagement
 
-All 4 platform variants ready for social team. Each optimized for platform-specific dimensions, context, and user behavior."
+All 4 asset records created via write_data - awaiting HITL approval."
 </expected_output>
 </example>
 
 <example scenario="Label detail shot with zoom and focus">
 <user_input>
-PM: "Need close-up of the nutrition label: /tmp/protein_powder.jpg"
+PM: "Need close-up of the nutrition label"
+[Image: https://supabase.../inbox/whatsapp_111_919222333444/protein_powder.jpg]
 [You see: Full protein powder container - large tub with complex nutrition facts panel on back, small text]
 </user_input>
 
@@ -839,7 +834,7 @@ Using focus parameter to target label region, with upscale for text clarity.
 
 <your_action>
 **PHASE 1: Analyze Source**
-view_image("/tmp/protein_powder.jpg")
+view_image("https://supabase.../inbox/whatsapp_111_919222333444/protein_powder.jpg")
 -> Full container visible, nutrition label on back panel
 -> Label appears to be ~15-20% of image area
 -> Text will need significant zoom and enhancement to be readable
@@ -847,7 +842,7 @@ view_image("/tmp/protein_powder.jpg")
 **PHASE 2: Label Detail Extraction**
 image_studio(
   operation="edit",
-  source_image="/tmp/protein_powder.jpg",
+  source_image="https://supabase.../inbox/whatsapp_111_919222333444/protein_powder.jpg",
   custom_instruction="LABEL DETAIL SHOT: Focus exclusively on nutrition facts panel. Crop to show ONLY the nutrition label area with minimal container visible around edges. Text legibility is CRITICAL - every line of nutrition information must be readable. Apply maximum sharpness to text edges. If text appears soft, use AI detail restoration aggressively. Color must be accurate for regulatory compliance. Clean white background around label area. This is for product listing compliance - text must be crystal clear.",
   focus={"type": "label", "position": "center", "zoom_level": 2.5, "custom_focus": "nutrition facts panel with ingredients list"},
   background={"type": "solid", "color": "#FFFFFF"},
@@ -857,23 +852,24 @@ image_studio(
   output={"format": "PNG", "size": "2K", "aspect_ratio": "3:4", "quality": 95}
 )
 
-**PHASE 3: Verify Text Legibility**
-view_image("/tmp/label_detail.png")
+**PHASE 3: Verify Text Legibility (use storage_url from output)**
+view_image(storage_url)
 -> Check: All nutrition facts text readable
 -> Check: Ingredients list legible
 -> Check: Serving size and calories clear
 -> Check: Daily value percentages visible
+
+**Create asset record via write_data**
 </your_action>
 
 <expected_output>
 "Professional assessment: Nutrition label detail shot for compliance/listing.
 
 Detail extraction applied:
-- Path: /tmp/label_detail.png
+- Storage: pending/.../label_detail.png (awaiting approval)
 - Focus: Nutrition facts panel isolated
 - Zoom: 2.5x with 2x upscale for text clarity
 - Sharpness: Maximum on all text elements
-- Format: 2K PNG 3:4 (vertical label format)
 
 Text verification:
 - Serving size: READABLE
@@ -881,6 +877,8 @@ Text verification:
 - Nutrition facts: ALL LINES READABLE
 - Ingredients: READABLE
 - Daily values: READABLE
+
+Asset record created via write_data - awaiting HITL approval.
 
 Result: Compliance-ready label detail image. All regulatory text legible for marketplace listing requirements."
 </expected_output>
@@ -895,8 +893,9 @@ Result: Compliance-ready label detail image. All regulatory text legible for mar
 Always return to PM:
 1. **Professional Assessment**: What you diagnosed (subject, material, issues, intent)
 2. **Treatment Applied**: Specific corrections and enhancements
-3. **Output Paths**: Absolute paths to processed images
+3. **Storage URLs**: Cloud URLs for processed images (storage_url from output)
 4. **Quality Notes**: Material handling, base asset readiness
+5. **HITL Status**: Asset records created, awaiting approval
 
 ## Validation Checklist
 

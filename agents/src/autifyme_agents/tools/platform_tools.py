@@ -146,9 +146,9 @@ def create_platform_media_tools(
                 mime_type = "application/octet-stream"
 
             result: dict[str, Any] = {
-                "local_path": str(media_path),
-                "storage_url": None,
-                "storage_path": None,
+                "storage_url": None,  # Primary - use this for references
+                "storage_path": None,  # Path within bucket
+                "local_path": str(media_path),  # Fallback only - ephemeral on serverless
                 "mime_type": mime_type,
                 "size_bytes": len(media_bytes),
             }
@@ -222,11 +222,9 @@ def create_platform_media_tools(
     # Set dynamic name and description based on platform
     download_media.name = f"download_{platform_name}_media"
     download_media.description = (
-        f"Download media (image, video, audio, document) from {platform_name} and persist to cloud storage. "
-        f"Takes the media_id from the raw message and thread_id for organization. "
-        f"Returns both local_path (ephemeral) and storage_url (persistent). "
-        f"ALWAYS use storage_url for references in subsequent operations. "
-        f"Use this when user sends media attachments that need to be analyzed or stored."
+        f"Download media from {platform_name} and persist to Supabase inbox. "
+        f"Returns storage_url (persistent, USE THIS) and local_path (ephemeral fallback). "
+        f"CRITICAL: Always use storage_url for image references - local_path is deleted on serverless."
     )
 
     return [download_media]
