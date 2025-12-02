@@ -266,7 +266,7 @@ def _transform_to_multimodal(
             # Add metadata as text for context
             content_blocks.append({
                 "type": "text",
-                "text": f"[Above image: {metadata['path']} ({metadata['original_size']})]",
+                "text": f"[Above image: {metadata['source']} ({metadata['original_size']})]",
             })
 
     return content_blocks
