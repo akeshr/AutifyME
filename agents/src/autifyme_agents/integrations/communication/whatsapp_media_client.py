@@ -132,7 +132,7 @@ class WhatsAppMediaClient:
 
         # Auto-detect MIME type from extension
         if not mime_type:
-            mime_type = self._derive_mime_type(path.suffix.lower())
+            mime_type = self.derive_mime_type(path.suffix.lower())
 
         file_bytes = path.read_bytes()
         return self.upload_media_from_bytes(file_bytes, path.name, mime_type)
@@ -203,8 +203,17 @@ class WhatsAppMediaClient:
         return media_id
 
     @staticmethod
-    def _derive_mime_type(extension: str) -> str:
-        """Derive MIME type from file extension."""
+    def derive_mime_type(extension: str) -> str:
+        """Derive MIME type from file extension.
+
+        Public utility - used by WhatsAppChannel for URL-based uploads.
+
+        Args:
+            extension: File extension including dot (e.g., ".png", ".jpg")
+
+        Returns:
+            MIME type string (defaults to "application/octet-stream")
+        """
         ext_map = {
             ".jpg": "image/jpeg",
             ".jpeg": "image/jpeg",

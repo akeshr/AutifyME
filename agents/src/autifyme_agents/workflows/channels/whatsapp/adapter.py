@@ -294,7 +294,7 @@ class WhatsAppChannel:
                 # Get MIME type from Content-Type header or derive from filename
                 mime_type = response.headers.get("Content-Type", "").split(";")[0]
                 if not mime_type or mime_type == "application/octet-stream":
-                    mime_type = self.media._derive_mime_type(Path(filename).suffix.lower())
+                    mime_type = self.media.derive_mime_type(Path(filename).suffix.lower())
 
                 # Upload bytes directly to WhatsApp
                 media_id = self.media.upload_media_from_bytes(file_bytes, filename, mime_type)
