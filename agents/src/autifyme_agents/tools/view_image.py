@@ -55,6 +55,7 @@ def _load_image_as_data_uri(image_path: str) -> tuple[str, dict[str, Any]]:
         Tuple of (data_uri, metadata)
     """
     # Handle URLs (storage_url from image_studio/download_media)
+    img: Image.Image  # Type hint: resize/convert returns Image.Image, not ImageFile
     if image_path.startswith(("http://", "https://")):
         import httpx
 

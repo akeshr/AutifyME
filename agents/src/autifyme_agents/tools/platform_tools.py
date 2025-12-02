@@ -39,14 +39,12 @@ class MediaDownloader(Protocol):
 
     Tools layer depends only on this protocol, not on full MessagingChannel.
     This preserves hexagonal architecture (core doesn't depend on adapters).
+
+    Note: download_media_with_bytes is optional - implementation checks via hasattr.
     """
 
     def download_media(self, media_id: str) -> Path | None:
         """Download media and return local path."""
-        ...
-
-    def download_media_with_bytes(self, media_id: str) -> tuple[Path, bytes, str]:
-        """Download media and return path, bytes, and mime type."""
         ...
 
 

@@ -149,6 +149,7 @@ def _load_and_encode_image(image_path: str) -> tuple[str, str]:
         image_path: storage_url (https://...) or local file path
     """
     # Handle URLs (storage_url from download_media/image_studio)
+    img: Image.Image  # Type hint: resize/convert returns Image.Image, not ImageFile
     if image_path.startswith(("http://", "https://")):
         import httpx
 

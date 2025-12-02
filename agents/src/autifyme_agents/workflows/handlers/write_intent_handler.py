@@ -160,13 +160,20 @@ class WriteIntentHandler:
             # Send each asset image with caption
             for asset in write_intent.asset_uploads:
                 try:
-                    if not Path(asset.temp_path).exists():
+                    # Skip if no path available
+                    image_path = asset.temp_path or asset.storage_path
+                    if not image_path:
+                        logger.warning("Asset has no path", extra={"returns": asset.returns})
+                        continue
+
+                    # For local paths, check existence
+                    if asset.temp_path and not Path(asset.temp_path).exists():
                         logger.warning("Asset file not found", extra={"temp_path": asset.temp_path})
                         continue
 
                     self.channel.send_image(
                         sender,
-                        asset.temp_path,
+                        image_path,
                         caption=asset.caption if asset.caption else None,
                     )
                 except Exception as img_err:
