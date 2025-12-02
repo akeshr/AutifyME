@@ -397,12 +397,27 @@ def create_write_data_tool(
         func=_write_data_impl,
         name="write_data",
         description=(
-            "Execute multi-operation write intent with atomic transactions and dependency resolution. "
-            "USE WHEN: Creating multi-table entities, operations with dependencies, cross-table references. "
-            "SUPPORTS: Atomic ACID transactions, topological dependency sorting, @name.field references, "
-            "validation and dry-run modes. "
-            "RETURNS: Execution result with created/updated/deleted entities, or errors with rollback. "
-            "NOT FOR: Reading data (use read_data) or schema inspection (use inspect_schema)."
+            "Execute atomic multi-table transactions with dependency resolution and cross-table references.\n\n"
+            "REQUIRED FIELDS:\n"
+            "- goal: Human-readable intent ('Create PET Bottles family with Size variants')\n"
+            "- reasoning: Investigation results, duplicate checks, research findings, assumptions\n"
+            "- hitl_summary: Business user approval message (<1500 chars) ending with 'Reply *approve* to proceed or *reject* to cancel'\n"
+            "- operations: List of {action, table, data, returns?, dependencies?, filters?, updates?}\n"
+            "- impact: {creates: {table: count}, updates: {table: count}, deletes: {table: count}, warnings: [], examples: []}\n\n"
+            "REFERENCE SYNTAX (@name.field):\n"
+            "- Single result: '@family.id' references operation with returns='family'\n"
+            "- Batch result: '@axes_batch[0].id' references first item from batch operation\n"
+            "- Engine auto-resolves dependencies via topological sort\n\n"
+            "SCENARIOS:\n"
+            "- Create product family with variants: operations=[{create product_families, returns='family'}, {create variant_axes with '@family.id', returns='axes'}, {create products with '@family.id'}]\n"
+            "- Tiered bulk price update: Multiple update operations with different filters for size-based pricing\n"
+            "- Soft delete with cleanup: Update products is_active=False, then update junction table, then variant_values\n"
+            "- Asset upload + DB: asset_uploads=[{source_url, destination_path, name}] then reference '@name.public_url' in operations\n\n"
+            "MODES:\n"
+            "- dry_run=True: Validate and show impact without executing\n"
+            "- validate_only=True: Schema/constraint checks only\n\n"
+            "RETURNS: {success, operations_executed, results_by_name, execution_time_ms, rollback_performed?}\n\n"
+            "NOT FOR: Reading data (use read_data) or schema discovery (use inspect_schema)."
         ),
         args_schema=WriteDataInput,
         coroutine=_write_data_impl,

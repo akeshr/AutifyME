@@ -41,11 +41,21 @@ class AggregateDataInput(BaseModel):
     )
     filters: dict[str, Any] = Field(
         default_factory=dict,
-        description="Exact match filters applied before aggregation (e.g., {'is_active': True})"
+        description=(
+            "[EXACT MATCH] Case-sensitive filters applied BEFORE aggregation.\n"
+            "Use for: IDs, booleans, enums, status codes.\n"
+            "Examples: {'is_active': True}, {'product_family_id': 'uuid-123'}, {'status': ['active','draft']}.\n"
+            "CRITICAL: For text/name filtering, use search_patterns instead (fuzzy match)."
+        )
     )
     search_patterns: dict[str, str] = Field(
         default_factory=dict,
-        description="ILIKE patterns applied before aggregation (e.g., {'brand': '%acme%'})"
+        description=(
+            "[FUZZY MATCH] Case-insensitive ILIKE patterns applied BEFORE aggregation.\n"
+            "Use % as wildcard.\n"
+            "Examples: {'name': '%jar%'} (contains), {'sku': 'PET-%'} (starts with), {'name': '%PET%bottle%'} (contains both).\n"
+            "Use for: name searches, SKU patterns, description matching."
+        )
     )
     group_by: list[str] | None = Field(
         default=None,
@@ -208,10 +218,25 @@ def create_aggregate_data_tool(
         func=_aggregate_data_impl,
         name="aggregate_data",
         description=(
-            "Perform aggregation queries (count, sum, avg, min, max) with GROUP BY and HAVING. "
-            "USE WHEN: Analyzing data, counting by category, calculating statistics, getting insights. "
-            "RETURNS: Aggregated results with group columns and computed values. "
-            "NOT FOR: Fetching individual records - use read_data for that."
+            "Perform analytics with aggregations (count, sum, avg, min, max) and GROUP BY/HAVING.\n\n"
+            "AGGREGATES SYNTAX:\n"
+            "- Format: {'alias': 'function(column)'}\n"
+            "- Functions: count(*), sum(col), avg(col), min(col), max(col)\n"
+            "- Multiple: {'total': 'count(*)', 'avg_price': 'avg(base_price)', 'price_range': 'max(base_price)-min(base_price)'}\n\n"
+            "SCENARIOS:\n"
+            "- Catalog health: aggregates={'count':'count(*)','avg_price':'avg(base_price)'}, group_by=['product_family_id'] - products per family with pricing\n"
+            "- Find sparse families: aggregates={'count':'count(*)'}, group_by=['product_family_id'], having={'count':{'lt':5}} - families with <5 products\n"
+            "- Price variance audit: aggregates={'spread':'max(base_price)-min(base_price)'}, group_by=['product_family_id'], having={'spread':{'gt':50}} - inconsistent pricing\n"
+            "- Variant coverage: table='variant_values', aggregates={'count':'count(*)'}, group_by=['variant_axis_id'] - values per axis\n"
+            "- Executive dashboard: aggregates={'total':'count(*)','active':'sum(case when is_active then 1 else 0 end)','catalog_value':'sum(base_price)'} - no group_by for totals\n\n"
+            "HAVING OPERATORS:\n"
+            "- {'alias': {'gt': N}} - greater than\n"
+            "- {'alias': {'gte': N}} - greater than or equal\n"
+            "- {'alias': {'lt': N}} - less than\n"
+            "- {'alias': {'lte': N}} - less than or equal\n"
+            "- Multiple: {'count': {'gte': 10}, 'total_value': {'gte': 1000}} - AND logic\n\n"
+            "RETURNS: {results: [{group_col: val, alias: computed_val}, ...], count: N}\n\n"
+            "NOT FOR: Fetching individual records (use read_data), simple counts without grouping (use read_data with count_only=True)."
         ),
         args_schema=AggregateDataInput,
         coroutine=_aggregate_data_impl,

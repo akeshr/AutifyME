@@ -366,13 +366,20 @@ def create_inspect_schema_tool(
         func=_inspect_schema_impl,
         name="inspect_schema",
         description=(
-            "CALL FIRST before ANY database operation (read_data, aggregate_data, write_data). "
-            "Discover what tables exist, their columns, relationships, and constraints. "
-            "Without this, you don't know: which tables to query, what columns are available, "
-            "what enum values are valid, how tables relate to each other. "
-            "USE details=['structure'] for columns/types, ['relationships'] for foreign keys, "
-            "['constraints'] for enums/patterns, ['samples'] for real data examples. "
-            "RETURNS: Table schemas with columns, types, valid_values, patterns, foreign keys, samples."
+            "CALL FIRST before ANY database operation. Discovers table structure, relationships, constraints, and sample data.\n\n"
+            "SCENARIOS:\n"
+            "- Before creating product family: inspect tables=['product_families','variant_axes','variant_values','products'] with details=['structure','relationships'] to understand multi-table transaction structure\n"
+            "- Duplicate detection strategy: inspect tables=['product_families'] with details=['structure','samples'] sample_limit=10 to see naming patterns for fuzzy matching\n"
+            "- Understanding M:N relationships: inspect tables=['product_variant_values','variant_values','products'] with details=['relationships'] to see junction table structure\n"
+            "- Quick column check: inspect tables=['products'] with details=['structure'] for fastest response\n\n"
+            "DETAILS OPTIONS:\n"
+            "- 'structure': Columns, types, nullable, defaults, required_columns, unique_columns (DEFAULT)\n"
+            "- 'relationships': Foreign keys, cascade behavior, target tables (CRITICAL for multi-table ops)\n"
+            "- 'constraints': Enum valid_values, regex patterns, computed columns, JSONB schemas\n"
+            "- 'stats': Row counts, index info\n"
+            "- 'samples': Real data examples (use sample_limit to control count)\n\n"
+            "RETURNS: {tables: {table_name: {structure?, relationships?, constraints?, stats?, samples?}}}\n\n"
+            "NOT FOR: Fetching actual data (use read_data) or analytics (use aggregate_data)."
         ),
         args_schema=InspectSchemaInput,
         coroutine=_inspect_schema_impl,
