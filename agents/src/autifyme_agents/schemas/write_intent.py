@@ -78,7 +78,7 @@ class AssetUpload(BaseModel):
         description=(
             "Name to assign to upload result.\n"
             "Operations can reference: @name.public_url, @name.storage_path, "
-            "@name.size_bytes, @name.content_type"
+            "@name.size_bytes, @name.content_type, @name.caption"
         ),
     )
 
@@ -291,6 +291,7 @@ class WriteIntent(BaseModel):
             "- @name.storage_path: Path within storage bucket\n"
             "- @name.size_bytes: File size in bytes\n"
             "- @name.content_type: MIME type\n"
+            "- @name.caption: Human-readable caption for alt text\n"
             "Uploads execute atomically: if any fails, no DB operations run."
         ),
     )

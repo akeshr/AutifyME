@@ -118,7 +118,7 @@ def create_creative_specialist(
         "system_prompt": system_prompt,
         "model": specialist_model,
         "middleware": middleware,
-        "interrupt_on": {},  # HITL is on write_data tool, not the specialist itself
+        "interrupt_on": {"write_data": True},  # HITL approval before write_data execution
     }
 
     return spec

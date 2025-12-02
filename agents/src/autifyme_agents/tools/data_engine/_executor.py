@@ -352,7 +352,11 @@ class MultiOperationExecutor:
                         uploaded_assets.append(move_result)
 
                         # Store in context for reference resolution
-                        context[asset_upload.returns] = move_result
+                        # Include caption from AssetUpload for @name.caption reference
+                        context[asset_upload.returns] = {
+                            **move_result,
+                            "caption": asset_upload.caption,
+                        }
 
                         logger.info(
                             f"Asset moved: {move_result['public_url']}",
@@ -381,7 +385,11 @@ class MultiOperationExecutor:
                         uploaded_assets.append(upload_result)
 
                         # Store in context for reference resolution
-                        context[asset_upload.returns] = upload_result
+                        # Include caption from AssetUpload for @name.caption reference
+                        context[asset_upload.returns] = {
+                            **upload_result,
+                            "caption": asset_upload.caption,
+                        }
 
                         logger.info(
                             f"Asset uploaded: {upload_result['public_url']}",
