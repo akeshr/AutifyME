@@ -23,11 +23,11 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Protocol, TypeVar
+from typing import Annotated, Any, Protocol, TypeVar
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import StructuredTool
+from langchain_core.tools import InjectedToolArg, StructuredTool
 from PIL import Image
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -688,11 +688,11 @@ def _image_studio_impl(
     extraction: dict[str, Any] | None = None,
     focus: dict[str, Any] | None = None,
     output: dict[str, Any] | None = None,
-    config: RunnableConfig | None = None,
+    config: Annotated[RunnableConfig, InjectedToolArg] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """Image Studio tool implementation.
 
-    thread_id is automatically injected from RunnableConfig if not provided.
+    thread_id is automatically injected from RunnableConfig via InjectedToolArg.
     This enables automatic cloud storage persistence without requiring the
     LLM to explicitly pass thread_id.
     """

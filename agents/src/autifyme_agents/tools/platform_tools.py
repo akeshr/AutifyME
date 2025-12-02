@@ -13,10 +13,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Annotated, Any, Protocol
 
 from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import StructuredTool
+from langchain_core.tools import InjectedToolArg, StructuredTool
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ def create_platform_media_tools(
 
     def _download_media_impl(
         media_id: str,
-        config: RunnableConfig | None = None,
+        config: Annotated[RunnableConfig, InjectedToolArg] = None,  # type: ignore[assignment]
     ) -> dict[str, Any]:
         """Download media from the messaging platform and persist to Supabase.
 
@@ -95,7 +95,7 @@ def create_platform_media_tools(
 
         Args:
             media_id: Platform-specific media identifier
-            config: RunnableConfig (auto-injected by LangChain with thread_id)
+            config: RunnableConfig (auto-injected by LangChain via InjectedToolArg)
 
         Returns:
             Dict with storage_url, storage_path, mime_type, size_bytes
