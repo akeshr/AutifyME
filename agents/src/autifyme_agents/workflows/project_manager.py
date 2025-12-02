@@ -42,7 +42,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     """Return configured LLM for PM. Defaults to gemini-2.5-flash."""
     if model is not None:
         return model
-    return get_llm(provider="google", model="gemini-2.5-flash", temperature=0.7)
+    return get_llm(provider="google", model="gemini-2.5-pro", temperature=0.7)
 
 
 def _load_prompt(
@@ -140,12 +140,12 @@ async def create_project_manager(
     # Specialist LLM configuration
     specialist_llm = get_llm(
         provider="google",
-        model="gemini-2.5-flash",
+        model="gemini-2.5-pro",
         temperature=0.7,
     )
 
     # Domain Specialists
-    creative_specialist = create_creative_specialist(model=specialist_llm)
+    creative_specialist = create_creative_specialist(model=None)
     catalog_specialist = create_catalog_specialist(
         storage=storage,
         model=specialist_llm,

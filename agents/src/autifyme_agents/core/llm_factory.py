@@ -194,7 +194,7 @@ def get_llm(
         # CRITICAL: Disable thinking by default for Flash/Flash-Lite models
         # Gemini 2.5 has adaptive thinking enabled by default which wastes time/money
         # Set thinking_budget=0 to disable (only works for Flash/Flash-Lite, not Pro)
-        if thinking_budget is None and ("flash" in model.lower()):
+        if thinking_budget is None:
             thinking_budget = 512
 
         # Add optional parameters only if provided
