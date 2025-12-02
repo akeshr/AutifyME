@@ -366,13 +366,13 @@ def create_inspect_schema_tool(
         func=_inspect_schema_impl,
         name="inspect_schema",
         description=(
-            "Inspect database schema to understand data structure. "
-            "USE WHEN: Before complex operations, verifying table structure, understanding relationships, "
-            "checking valid enum values, validating input formats. "
-            "RETURNS: Schema metadata including columns, types, valid_values for enums, regex patterns, "
-            "computed columns (readonly), JSONB schemas, foreign keys, stats, samples. "
-            "TIP: Use details=['structure', 'constraints'] to get enum values and format patterns before insert/update. "
-            "CRITICAL: Returns STRUCTURE, not actual data - use read_data for fetching data."
+            "CALL FIRST before ANY database operation (read_data, aggregate_data, write_data). "
+            "Discover what tables exist, their columns, relationships, and constraints. "
+            "Without this, you don't know: which tables to query, what columns are available, "
+            "what enum values are valid, how tables relate to each other. "
+            "USE details=['structure'] for columns/types, ['relationships'] for foreign keys, "
+            "['constraints'] for enums/patterns, ['samples'] for real data examples. "
+            "RETURNS: Table schemas with columns, types, valid_values, patterns, foreign keys, samples."
         ),
         args_schema=InspectSchemaInput,
         coroutine=_inspect_schema_impl,
