@@ -257,11 +257,14 @@ class ImageStudioInput(BaseModel):
     operation: ImageOperation = Field(description="Operation: edit or generate")
     source_image: str | None = Field(
         default=None,
-        description="Path to source image (required for edit, optional for generate)"
+        description=(
+            "Source image: storage_url (from download_media/image_studio) or local path. "
+            "Required for edit, optional for generate."
+        )
     )
     reference_images: list[str] = Field(
         default_factory=list,
-        description="Additional reference images for style/context (up to 14)"
+        description="Additional reference images (storage_url or local path) for style/context (up to 14)"
     )
 
     # Thread ID for cloud storage persistence (auto-injected from RunnableConfig)

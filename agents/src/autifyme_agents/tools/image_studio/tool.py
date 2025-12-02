@@ -143,13 +143,26 @@ def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatMod
 
 
 def _load_and_encode_image(image_path: str) -> tuple[str, str]:
-    """Load image, resize if needed, encode to base64 data URI."""
-    path = Path(image_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Image not found: {image_path}")
+    """Load image from URL or local path, resize if needed, encode to base64 data URI.
+
+    Args:
+        image_path: storage_url (https://...) or local file path
+    """
+    # Handle URLs (storage_url from download_media/image_studio)
+    if image_path.startswith(("http://", "https://")):
+        import httpx
+
+        response = httpx.get(image_path, timeout=60)
+        response.raise_for_status()
+        img = Image.open(io.BytesIO(response.content))
+    else:
+        path = Path(image_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Image not found: {image_path}")
+        img = Image.open(path)
 
     try:
-        with Image.open(path) as img:
+        with img:
             fmt = img.format or "JPEG"
             mime_type = f"image/{fmt.lower()}"
 
