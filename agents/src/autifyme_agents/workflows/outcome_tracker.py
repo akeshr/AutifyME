@@ -332,34 +332,46 @@ class OutcomeTracker:
         Args:
             workflow: Complete workflow record
         """
-        # Extract business-relevant result data
-        result_data = None
+        # Extract result summary from result_data
+        result_summary = None
         if workflow.result and workflow.result.result_data:
             result_data = self._make_json_serializable(workflow.result.result_data)
+            # Create human-readable summary from result_data
+            if isinstance(result_data, dict):
+                result_summary = result_data.get("summary") or result_data.get("note") or str(result_data.get("status", "completed"))
+            else:
+                result_summary = str(result_data)[:500] if result_data else None
 
-        # Build lightweight business outcome payload
+        # Build outcome payload matching WorkflowOutcome model
         outcome_payload: dict[str, Any] = {
+            # Required identifiers
             "tracking_id": workflow.tracking_id,
             "thread_id": workflow.thread_id,
-            "trace_id": workflow.trace_id,  # LangSmith trace ID for observability correlation
-            # Business context
             "sender_id": workflow.message.sender_id,
-            "message_text": workflow.message.text or "",  # Required field
+            "message_text": workflow.message.text or "",
+            "message_hash": workflow.message_hash,
+            # Optional media info
+            "media_id": workflow.message.media_id,
+            "media_type": workflow.message.media_type,
             "platform": workflow.message.platform,
-            "message_hash": workflow.message_hash,  # For similarity matching
-            "received_at": workflow.message.received_at,  # Message timestamp
-            # Routing decision (business logic) - use defaults for direct responses
+            # Timing (using model field names)
+            "received_at": workflow.message.received_at,
+            "completed_at": workflow.ended_at,
+            "duration_seconds": workflow.duration_seconds,
+            # Routing decision
             "intent": workflow.routing.intent if workflow.routing else "conversational",
             "department": workflow.routing.department if workflow.routing else "direct_response",
-            # Outcome (business success/failure)
+            "routing_reasoning": workflow.routing.reasoning if workflow.routing else None,
+            # Outcome
             "success": workflow.result.success if workflow.result else False,
-            "result_data": result_data,  # Cataloging result with product details
-            # Timestamps (reference for joining with LangSmith)
-            "started_at": workflow.started_at,
-            "ended_at": workflow.ended_at,
-            # Phase 2: Learning metadata
-            "learned_patterns": [],
-            "applied_strategies": [],
+            "result_summary": result_summary,
+            "error_message": workflow.result.error_message if workflow.result else None,
+            # Specialist tracking (Phase 2 - not yet populated)
+            "specialists_invoked": [],
+            "tool_calls_count": 0,
+            # HITL tracking
+            "required_approval": False,
+            "approval_status": None,
         }
 
         try:
