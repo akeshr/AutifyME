@@ -2506,7 +2506,7 @@ class SupabaseStorageClient(StorageInterface):
                 extra={
                     "zone": zone,
                     "thread_id": thread_id,
-                    "filename": filename,
+                    "file_name": filename,  # Renamed: 'filename' conflicts with LogRecord
                     "bucket": bucket,
                 }
             )
