@@ -8,8 +8,11 @@ Design Pattern: Adapter - adapts WhatsApp API to generic MessagingChannel interf
 
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from typing import Any, Literal
+
+import httpx
 
 from autifyme_agents.core.logging_config import get_logger
 from autifyme_agents.integrations.communication import WhatsAppClient, WhatsAppMediaClient
@@ -242,17 +245,20 @@ class WhatsAppChannel:
     def send_image(
         self,
         recipient: str,
-        image_path: str,
+        image_source: str,
         caption: str | None = None,
     ) -> dict[str, Any]:
         """Send image with optional caption via WhatsApp.
 
-        Uploads local file to WhatsApp, then sends as image message.
+        Handles both URLs and local file paths:
+        - URL (http/https): Downloads to temp file, uploads to WhatsApp
+        - Local path: Uploads directly to WhatsApp
+
         Used for HITL approval flow to show asset previews.
 
         Args:
             recipient: WhatsApp phone number (e.g., "919876543210")
-            image_path: Local file path to the image
+            image_source: URL (Supabase storage) or local file path
             caption: Optional caption text (max 1024 chars, auto-truncated)
 
         Returns:
@@ -262,17 +268,46 @@ class WhatsAppChannel:
             ChannelError: If upload or send fails
         """
         try:
+            is_url = image_source.startswith(("http://", "https://"))
+
             logger.debug(
                 "Sending WhatsApp image",
                 extra={
                     "recipient": recipient,
-                    "image_path": image_path,
+                    "image_source": image_source[:100],
+                    "is_url": is_url,
                     "has_caption": caption is not None,
                 },
             )
 
+            # Handle URLs - download to temp file first
+            upload_path = image_source
+            if is_url:
+                # Fetch image from URL
+                response = httpx.get(image_source, timeout=30)
+                response.raise_for_status()
+
+                # Determine file extension from Content-Type or URL
+                content_type = response.headers.get("Content-Type", "")
+                if "png" in content_type or image_source.endswith(".png"):
+                    suffix = ".png"
+                elif "webp" in content_type or image_source.endswith(".webp"):
+                    suffix = ".webp"
+                else:
+                    suffix = ".jpg"
+
+                # Save to temp file
+                with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                    tmp.write(response.content)
+                    upload_path = tmp.name
+
+                logger.debug(
+                    "Downloaded URL to temp file",
+                    extra={"url": image_source[:100], "temp_path": upload_path}
+                )
+
             # Step 1: Upload media to WhatsApp
-            media_id = self.media.upload_media(image_path)
+            media_id = self.media.upload_media(upload_path)
 
             # Step 2: Send image message with media_id
             result = self.client.send_image(recipient, media_id, caption=caption)
@@ -281,7 +316,7 @@ class WhatsAppChannel:
                 "WhatsApp image sent successfully",
                 extra={
                     "recipient": recipient,
-                    "image_path": image_path,
+                    "image_source": image_source[:100],
                     "media_id": media_id,
                     "message_id": result.get("message_id"),
                 },
@@ -292,10 +327,22 @@ class WhatsAppChannel:
         except FileNotFoundError as exc:
             logger.error(
                 "Image file not found for WhatsApp send",
-                extra={"recipient": recipient, "image_path": image_path}
+                extra={"recipient": recipient, "image_source": image_source}
             )
             raise ChannelError(
-                f"Image file not found: {image_path}",
+                f"Image file not found: {image_source}",
+                channel="whatsapp",
+                recipient=recipient,
+                original_error=exc,
+            ) from exc
+
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "Failed to fetch image from URL",
+                extra={"recipient": recipient, "url": image_source, "status": exc.response.status_code}
+            )
+            raise ChannelError(
+                f"Failed to fetch image from URL: {exc.response.status_code}",
                 channel="whatsapp",
                 recipient=recipient,
                 original_error=exc,
