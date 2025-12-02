@@ -118,7 +118,7 @@ view_image("/tmp/containers.jpg")
 **PHASE 2: Pre-Delegation Context Gathering**
 read_data(
   table="product_families",
-  search_patterns={"name": "%jar%"},
+  search_patterns={{"name": "%jar%"}},
   relations=["products(id, sku, name)"],
   columns=["id", "name", "sku_prefix"]
 )
@@ -126,7 +126,7 @@ read_data(
 
 read_data(
   table="product_families",
-  search_patterns={"name": "%bottle%"},
+  search_patterns={{"name": "%bottle%"}},
   relations=["products(id, sku, name)"],
   columns=["id", "name", "sku_prefix"]
 )
@@ -134,7 +134,7 @@ read_data(
 
 read_data(
   table="product_families",
-  search_patterns={"name": "%aluminum%", "name": "%can%"},
+  search_patterns={{"name": "%aluminum%", "name": "%can%"}},
   columns=["id", "name"]
 )
 -> No aluminum/can families exist
@@ -234,7 +234,7 @@ view_image("/tmp/bottle.jpg")
 **PHASE 2: Catalog Context**
 read_data(
   table="product_families",
-  search_patterns={"name": "%bottle%", "name": "%water%"},
+  search_patterns={{"name": "%bottle%", "name": "%water%"}},
   relations=["products(id, sku, name, product_prices(price, price_list(name)))"],
   columns=["id", "name", "sku_prefix", "description"]
 )
@@ -376,7 +376,7 @@ This context helps me communicate impact clearly and helps specialist execute co
 **PHASE 1: Understand Scope**
 read_data(
   table="product_families",
-  search_patterns={"name": "%jar%"},
+  search_patterns={{"name": "%jar%"}},
   columns=["id", "name", "sku_prefix"],
   relations=["products(id, sku, name)"]
 )
@@ -393,7 +393,7 @@ read_data(
 
 read_data(
   table="product_prices",
-  filters={"product_id": ["uuid-1", "uuid-2", ...]},  // jar product IDs
+  filters={{"product_id": ["uuid-1", "uuid-2", ...]}},  // jar product IDs
   relations=["price_list(name)"],
   columns=["product_id", "price", "price_list_id"]
 )
@@ -477,8 +477,8 @@ No image provided - must work with existing catalog assets
 **PHASE 1: Identify Best Sellers**
 read_data(
   table="products",
-  search_patterns={"sku": "%JAR%"},
-  filters={"status": "ACTIVE", "is_sellable": true},
+  search_patterns={{"sku": "%JAR%"}},
+  filters={{"status": "ACTIVE", "is_sellable": true}},
   relations=["product_assets(asset(url, type))", "product_family(name)"],
   columns=["id", "sku", "name"]
 )
