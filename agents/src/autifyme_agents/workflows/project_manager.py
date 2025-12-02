@@ -41,10 +41,23 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
-    """Return configured LLM for PM. Defaults to gemini-2.5-flash."""
+    """Return configured LLM for PM. Defaults to gemini-2.5-pro.
+
+    Configuration rationale:
+    - thinking_budget=0: PM is orchestrator (routing, delegation), not deep reasoner.
+      Disabling adaptive thinking prevents blank responses from thinking-only outputs.
+    - max_retries=5: Production resilience against Gemini's occasional blank responses.
+    - temperature=0.7: Balanced creativity for user communication.
+    """
     if model is not None:
         return model
-    return get_llm(provider="google", model="gemini-2.5-pro", temperature=0.7)
+    return get_llm(
+        provider="google",
+        model="gemini-2.5-pro",
+        temperature=0.7,
+        thinking_budget=0,  # PM orchestrates; specialists reason
+        max_retries=5,  # Increase resilience against blank responses
+    )
 
 
 def _load_prompt(

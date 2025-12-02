@@ -103,6 +103,20 @@ class FakeStorage(StorageInterface):
         self.workflow_outcomes.append(outcome_with_id)
         return outcome_id
 
+    def save_workflow_outcome_dict(self, payload: dict[str, Any]) -> str:
+        """Save workflow outcome from dict (bypasses Pydantic model).
+
+        Args:
+            payload: Dict matching workflow_outcomes table columns
+
+        Returns:
+            Generated outcome ID
+        """
+        outcome_id = str(uuid.uuid4())
+        outcome_with_id = {**payload, "id": outcome_id}
+        self.workflow_outcomes.append(outcome_with_id)
+        return outcome_id
+
     def get_workflow_outcomes(
         self,
         *,

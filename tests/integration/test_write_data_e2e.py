@@ -18,6 +18,9 @@ import pytest
 from autifyme_agents.tools.data_engine import create_write_data_tool
 from tests.fixtures.fake_storage import FakeStorage
 
+# Standard HITL summary for all tests
+TEST_HITL_SUMMARY = "Test operation. Reply *approve* to proceed or *reject* to cancel."
+
 
 @pytest.fixture
 def storage():
@@ -69,6 +72,7 @@ class TestWriteDataBasicE2E:
         result = await write_tool.ainvoke({
             "goal": "Create a new product family",
             "reasoning": "User requested new product family for PET bottles",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -97,6 +101,7 @@ class TestWriteDataBasicE2E:
         result = await write_tool.ainvoke({
             "goal": "Create product family with variant axis",
             "reasoning": "Testing dependency resolution",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -139,6 +144,7 @@ class TestWriteDataBasicE2E:
         result = await write_tool.ainvoke({
             "goal": "Update product name and price",
             "reasoning": "User requested name change",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "update",
@@ -169,6 +175,7 @@ class TestWriteDataBasicE2E:
         result = await write_tool.ainvoke({
             "goal": "Soft delete product",
             "reasoning": "Product discontinued",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "delete",
@@ -195,6 +202,7 @@ class TestWriteDataBasicE2E:
         result = await write_tool.ainvoke({
             "goal": "Create product (dry run)",
             "reasoning": "Testing dry run",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -229,6 +237,7 @@ class TestWriteDataAssetUploadsE2E:
         result = await write_tool.ainvoke({
             "goal": "Create product with image",
             "reasoning": "New product with product photo",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "asset_uploads": [
                 {
                     "temp_path": temp_image_file,
@@ -269,6 +278,7 @@ class TestWriteDataAssetUploadsE2E:
         result = await write_tool.ainvoke({
             "goal": "Create product with main and thumbnail images",
             "reasoning": "Product with multiple image variants",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "asset_uploads": [
                 {
                     "temp_path": temp_image_file,
@@ -315,6 +325,7 @@ class TestWriteDataAssetUploadsE2E:
         result = await write_tool.ainvoke({
             "goal": "Create asset record with full metadata",
             "reasoning": "Store image with metadata",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "asset_uploads": [
                 {
                     "temp_path": temp_image_file,
@@ -354,6 +365,7 @@ class TestWriteDataAssetUploadsE2E:
         result = await write_tool.ainvoke({
             "goal": "Create product family with image and variant",
             "reasoning": "Full product setup with image",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "asset_uploads": [
                 {
                     "temp_path": temp_image_file,
@@ -415,6 +427,7 @@ class TestWriteDataErrorHandlingE2E:
         result = await write_tool.ainvoke({
             "goal": "Create with missing file",
             "reasoning": "Testing error handling",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "asset_uploads": [
                 {
                     "temp_path": "/nonexistent/path/image.png",
@@ -442,6 +455,7 @@ class TestWriteDataErrorHandlingE2E:
         result = await write_tool.ainvoke({
             "goal": "Create with missing required data",
             "reasoning": "Testing validation",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -459,6 +473,7 @@ class TestWriteDataErrorHandlingE2E:
         result = await write_tool.ainvoke({
             "goal": "Create with circular deps",
             "reasoning": "Testing circular detection",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -497,6 +512,7 @@ class TestComplexWorkflowE2E:
         result = await write_tool.ainvoke({
             "goal": "Create complete product catalog entry",
             "reasoning": "Full product setup: family -> axes -> values -> product -> image",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "asset_uploads": [
                 {
                     "temp_path": temp_image_file,
@@ -611,6 +627,7 @@ class TestComplexWorkflowE2E:
         result = await write_tool.ainvoke({
             "goal": "Bulk create product variants",
             "reasoning": "Creating multiple SKU variants at once",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -656,6 +673,7 @@ class TestComplexWorkflowE2E:
         result = await write_tool.ainvoke({
             "goal": "Mixed operations: create, update, delete",
             "reasoning": "Comprehensive catalog update",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 # Create new product
                 {

@@ -22,6 +22,9 @@ import pytest
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.tools.data_engine import create_write_data_tool
 
+# Standard HITL summary for all tests
+TEST_HITL_SUMMARY = "Test operation. Reply *approve* to proceed or *reject* to cancel."
+
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -71,6 +74,7 @@ class TestSingleOperationExecution:
         result = await tool.ainvoke({
             "goal": "Create test product",
             "reasoning": "User requested new product",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [{
                 "action": "create",
                 "table": "products",
@@ -92,6 +96,7 @@ class TestSingleOperationExecution:
         result = await tool.ainvoke({
             "goal": "Update product price",
             "reasoning": "Price adjustment requested",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [{
                 "action": "update",
                 "table": "products",
@@ -113,6 +118,7 @@ class TestSingleOperationExecution:
         result = await tool.ainvoke({
             "goal": "Delete inactive products",
             "reasoning": "Cleanup requested",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [{
                 "action": "delete",
                 "table": "products",
@@ -139,6 +145,7 @@ class TestSingleOperationExecution:
         result = await tool.ainvoke({
             "goal": "Permanently delete test data",
             "reasoning": "Test cleanup",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [{
                 "action": "delete",
                 "table": "test_products",
@@ -164,6 +171,7 @@ class TestSingleOperationExecution:
         result = await tool.ainvoke({
             "goal": "Create multiple products",
             "reasoning": "Bulk import",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [{
                 "action": "create",
                 "table": "products",
@@ -189,6 +197,7 @@ class TestSingleOperationExecution:
         result = await tool.ainvoke({
             "goal": "Update non-existent product",
             "reasoning": "User requested update",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [{
                 "action": "update",
                 "table": "products",
@@ -213,6 +222,7 @@ class TestSingleOperationExecution:
         result = await tool.ainvoke({
             "goal": "Delete obsolete data",
             "reasoning": "Cleanup",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [{
                 "action": "delete",
                 "table": "products",
@@ -234,6 +244,7 @@ class TestSingleOperationExecution:
         result = await tool.ainvoke({
             "goal": "Create product",
             "reasoning": "Test",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [{
                 "action": "create",
                 "table": "products",
@@ -254,6 +265,7 @@ class TestSingleOperationExecution:
         result = await tool.ainvoke({
             "goal": "Create product",
             "reasoning": "Preview",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [{
                 "action": "create",
                 "table": "products",
@@ -276,6 +288,7 @@ class TestSingleOperationExecution:
         result = await tool.ainvoke({
             "goal": "Create product",
             "reasoning": "Validation check",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [{
                 "action": "create",
                 "table": "products",
@@ -311,6 +324,7 @@ class TestMultiOperationDependencies:
         result = await tool.ainvoke({
             "goal": "Create family and axis",
             "reasoning": "Setup product structure",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -354,6 +368,7 @@ class TestMultiOperationDependencies:
         result = await tool.ainvoke({
             "goal": "Create family, axis, and value",
             "reasoning": "Complete product hierarchy",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -395,6 +410,7 @@ class TestMultiOperationDependencies:
         result = await tool.ainvoke({
             "goal": "Create family with multiple axes",
             "reasoning": "Multi-dimensional variants",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -436,6 +452,7 @@ class TestMultiOperationDependencies:
         result = await tool.ainvoke({
             "goal": "Complex dependency",
             "reasoning": "Test diamond pattern",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t1", "data": {"v": 1}, "returns": "a"},
                 {"action": "create", "table": "t2", "data": {"ref": "@a.id"}, "dependencies": ["a"], "returns": "b"},
@@ -461,6 +478,7 @@ class TestMultiOperationDependencies:
         result = await tool.ainvoke({
             "goal": "Reference nested field",
             "reasoning": "Test deep access",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -494,6 +512,7 @@ class TestMultiOperationDependencies:
         result = await tool.ainvoke({
             "goal": "Create with multiple refs",
             "reasoning": "Test multi-ref resolution",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "users", "data": {"name": "Alice"}, "returns": "user"},
                 {"action": "create", "table": "categories", "data": {"name": "Food"}, "returns": "category"},
@@ -533,6 +552,7 @@ class TestMultiOperationDependencies:
         result = await tool.ainvoke({
             "goal": "Test execution order",
             "reasoning": "Verify topological sort",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 # This depends on B, should execute last
                 {"action": "create", "table": "C", "data": {"ref": "@b.id"}, "dependencies": ["b"]},
@@ -559,6 +579,7 @@ class TestMultiOperationDependencies:
         result = await tool.ainvoke({
             "goal": "Create then update",
             "reasoning": "Test mixed operations",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -592,6 +613,7 @@ class TestMultiOperationDependencies:
         result = await tool.ainvoke({
             "goal": "Bulk create with refs",
             "reasoning": "Test list resolution",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "families", "data": {"name": "F1"}, "returns": "fam"},
                 {
@@ -630,6 +652,7 @@ class TestMultiOperationDependencies:
         result = await tool.ainvoke({
             "goal": "Create complete product with 2 axes",
             "reasoning": "Full product setup",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "product_families", "data": {"name": "Jars"}, "returns": "family"},
                 {"action": "create", "table": "variant_axes", "data": {"name": "Size", "family_id": "@family.id"}, "dependencies": ["family"], "returns": "size_axis"},
@@ -670,6 +693,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Test duplicate returns",
             "reasoning": "Should fail validation",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t1", "data": {}, "returns": "obj"},
                 {"action": "create", "table": "t2", "data": {}, "returns": "obj"}  # Duplicate!
@@ -688,6 +712,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Test missing dependency",
             "reasoning": "Should fail validation",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -710,6 +735,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Test circular dependency",
             "reasoning": "Should fail validation",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t1", "data": {"ref": "@b.id"}, "dependencies": ["b"], "returns": "a"},
                 {"action": "create", "table": "t2", "data": {"ref": "@a.id"}, "dependencies": ["a"], "returns": "b"}
@@ -728,6 +754,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Test missing data",
             "reasoning": "Should fail validation",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "products"}  # No data field!
             ],
@@ -745,6 +772,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Test missing filters",
             "reasoning": "Should fail validation",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "update", "table": "products", "updates": {"price": 100}}  # No filters!
             ],
@@ -762,6 +790,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Test missing filters",
             "reasoning": "Should fail validation",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "delete", "table": "products"}  # No filters! Dangerous!
             ],
@@ -779,6 +808,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Create in allowed table",
             "reasoning": "Should succeed",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "products", "data": {"name": "Test"}}
             ],
@@ -795,6 +825,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Create in unauthorized table",
             "reasoning": "Should fail",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "admin_users", "data": {"name": "Hacker"}}
             ],
@@ -815,6 +846,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Create in multiple allowed tables",
             "reasoning": "Should succeed",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "categories", "data": {"name": "Food"}, "returns": "cat"},
                 {"action": "create", "table": "products", "data": {"category_id": "@cat.id"}, "dependencies": ["cat"]}
@@ -832,6 +864,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Mixed authorized and unauthorized",
             "reasoning": "Should fail",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "products", "data": {"name": "OK"}},
                 {"action": "create", "table": "unauthorized_table", "data": {"bad": True}}
@@ -852,6 +885,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Test empty ops",
             "reasoning": "Should fail",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [],  # Empty!
             "impact": {}
         })
@@ -869,6 +903,7 @@ class TestValidation:
         result = await tool.ainvoke({
             "goal": "Valid intent",
             "reasoning": "All fields correct",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "products", "data": {"name": "Test"}}
             ],
@@ -900,6 +935,7 @@ class TestErrorHandlingAndRollback:
         result = await tool.ainvoke({
             "goal": "Test rollback",
             "reasoning": "Second op should fail",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t1", "data": {"name": "First"}},
                 {"action": "create", "table": "t2", "data": {"name": "Second"}}
@@ -922,6 +958,7 @@ class TestErrorHandlingAndRollback:
         result = await tool.ainvoke({
             "goal": "Test invalid ref",
             "reasoning": "Reference non-existent field",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t1", "data": {"name": "A"}, "returns": "obj"},
                 {
@@ -948,6 +985,7 @@ class TestErrorHandlingAndRollback:
         result = await tool.ainvoke({
             "goal": "Test malformed ref",
             "reasoning": "Bad syntax",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t1", "data": {"name": "A"}, "returns": "obj"},
                 {
@@ -973,6 +1011,7 @@ class TestErrorHandlingAndRollback:
         result = await tool.ainvoke({
             "goal": "Test update error",
             "reasoning": "Trigger constraint error",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "update",
@@ -1013,6 +1052,7 @@ class TestErrorHandlingAndRollback:
         result = await tool.ainvoke({
             "goal": "Test error timing",
             "reasoning": "Should track time even on error",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t", "data": {}}
             ],
@@ -1038,6 +1078,7 @@ class TestErrorHandlingAndRollback:
         result = await tool.ainvoke({
             "goal": "Test partial rollback",
             "reasoning": "Third op fails",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t1", "data": {}},
                 {"action": "create", "table": "t2", "data": {}},
@@ -1060,6 +1101,7 @@ class TestErrorHandlingAndRollback:
         await tool.ainvoke({
             "goal": "Test transaction",
             "reasoning": "Verify transaction used",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t", "data": {}}
             ],
@@ -1090,6 +1132,7 @@ class TestEdgeCases:
         result = await tool.ainvoke({
             "goal": "Test None result",
             "reasoning": "Edge case",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t", "data": {}, "returns": "obj"}
             ],
@@ -1109,6 +1152,7 @@ class TestEdgeCases:
         result = await tool.ainvoke({
             "goal": "Reference None",
             "reasoning": "Should fail",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t1", "data": {}, "returns": "obj"},
                 {"action": "create", "table": "t2", "data": {"ref": "@obj.id"}, "dependencies": ["obj"]}
@@ -1129,6 +1173,7 @@ class TestEdgeCases:
         result = await tool.ainvoke({
             "goal": "Test empty string",
             "reasoning": "Not a ref",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t", "data": {"name": ""}}  # Empty string, not @ref
             ],
@@ -1150,6 +1195,7 @@ class TestEdgeCases:
         result = await tool.ainvoke({
             "goal": "Test special chars",
             "reasoning": "Edge case",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t1", "data": {}, "returns": "obj_with_underscore"},
                 {"action": "create", "table": "t2", "data": {"ref": "@obj_with_underscore.id"}, "dependencies": ["obj_with_underscore"]}
@@ -1175,6 +1221,7 @@ class TestEdgeCases:
         result = await tool.ainvoke({
             "goal": "Bulk operations",
             "reasoning": "Performance test",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": operations,
             "impact": {"creates": {f"table_{i}": 1 for i in range(50)}}
         })
@@ -1192,6 +1239,7 @@ class TestEdgeCases:
         result = await tool.ainvoke({
             "goal": "Test Unicode",
             "reasoning": "Special chars",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "products", "data": {"name": "Café ☕ 日本語"}}
             ],
@@ -1225,6 +1273,7 @@ class TestEdgeCases:
         result = await tool.ainvoke({
             "goal": "Test nesting",
             "reasoning": "Deep structure",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "objects", "data": nested_data}
             ],
@@ -1243,6 +1292,7 @@ class TestEdgeCases:
         result = await tool.ainvoke({
             "goal": "Test null values",
             "reasoning": "Edge case",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t", "data": {"nullable_field": None}}
             ],
@@ -1264,6 +1314,7 @@ class TestEdgeCases:
         result = await tool.ainvoke({
             "goal": "Test edge values",
             "reasoning": "Type boundaries",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {
                     "action": "create",
@@ -1293,6 +1344,7 @@ class TestEdgeCases:
         result = await tool.ainvoke({
             "goal": "Minimal impact",
             "reasoning": "Edge case",
+            "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t", "data": {}}
             ],

@@ -461,8 +461,8 @@ class SupabaseStorageClient(StorageInterface):
         outcome_dict = outcome.model_dump(mode="json")
 
         # Validate required fields before attempting insert
-        # Note: WorkflowOutcome model uses received_at (not started_at)
-        required_fields = ["tracking_id", "thread_id", "sender_id", "message_hash", "success", "received_at"]
+        # Must match NOT NULL columns in workflow_outcomes table
+        required_fields = ["tracking_id", "thread_id", "sender_id", "message_hash", "success", "received_at", "started_at"]
         missing_fields = [field for field in required_fields if field not in outcome_dict or outcome_dict[field] is None]
 
         if missing_fields:

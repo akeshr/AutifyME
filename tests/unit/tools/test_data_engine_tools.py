@@ -344,10 +344,11 @@ class TestToolFactoryAndAccessControl:
         assert tool.name == "inspect_schema"
 
     def test_tool_description_contains_use_when_guidance(self, mock_storage):
-        """Test that tool description includes USE WHEN guidance."""
+        """Test that tool description includes usage guidance."""
         tool = create_inspect_schema_tool(mock_storage)
 
-        assert "USE WHEN" in tool.description
+        # Tool descriptions follow SCENARIOS format
+        assert "SCENARIOS" in tool.description or "CALL FIRST" in tool.description
         assert "RETURNS" in tool.description
         assert "CRITICAL" in tool.description
 

@@ -332,53 +332,48 @@ class OutcomeTracker:
         Args:
             workflow: Complete workflow record
         """
-        # Extract result summary from result_data
-        result_summary = None
+        # Extract result_data as JSONB
+        result_data = None
         if workflow.result and workflow.result.result_data:
             result_data = self._make_json_serializable(workflow.result.result_data)
-            # Create human-readable summary from result_data
-            if isinstance(result_data, dict):
-                result_summary = result_data.get("summary") or result_data.get("note") or str(result_data.get("status", "completed"))
-            else:
-                result_summary = str(result_data)[:500] if result_data else None
 
-        # Build outcome payload matching WorkflowOutcome model
+        # Build outcome using WorkflowOutcome model (aligned with DB schema)
         outcome_payload: dict[str, Any] = {
-            # Required identifiers
+            # Required identifiers (NOT NULL in DB)
             "tracking_id": workflow.tracking_id,
             "thread_id": workflow.thread_id,
             "sender_id": workflow.message.sender_id,
-            "message_text": workflow.message.text or "",
             "message_hash": workflow.message_hash,
-            # Optional media info
+            "received_at": workflow.message.received_at,
+            "started_at": workflow.started_at,
+            "success": workflow.result.success if workflow.result else False,
+            # Optional message info
+            "message_text": workflow.message.text or "",
             "media_id": workflow.message.media_id,
             "media_type": workflow.message.media_type,
             "platform": workflow.message.platform,
-            # Timing (using model field names)
-            "received_at": workflow.message.received_at,
-            "completed_at": workflow.ended_at,
-            "duration_seconds": workflow.duration_seconds,
             # Routing decision
             "intent": workflow.routing.intent if workflow.routing else "conversational",
             "department": workflow.routing.department if workflow.routing else "direct_response",
             "routing_reasoning": workflow.routing.reasoning if workflow.routing else None,
+            "routing_confidence": workflow.routing.confidence if workflow.routing else None,
             # Outcome
-            "success": workflow.result.success if workflow.result else False,
-            "result_summary": result_summary,
+            "error_type": workflow.result.error_type if workflow.result else None,
             "error_message": workflow.result.error_message if workflow.result else None,
-            # Specialist tracking (Phase 2 - not yet populated)
-            "specialists_invoked": [],
-            "tool_calls_count": 0,
-            # HITL tracking
-            "required_approval": False,
-            "approval_status": None,
+            "resolution_strategy": workflow.result.resolution_strategy if workflow.result else None,
+            "result_data": result_data,
+            # Timing
+            "duration_seconds": workflow.duration_seconds,
+            "ended_at": workflow.ended_at,
+            # LangSmith correlation
+            "trace_id": workflow.trace_id,
         }
 
         try:
-            # Convert dict to WorkflowOutcome model
+            # Use WorkflowOutcome model (now aligned with database schema)
             outcome_model = WorkflowOutcome.model_validate(outcome_payload)
             outcome_id = self.storage.save_workflow_outcome(outcome_model)
-            status = outcome_payload.get("result_data", {}).get("status") if isinstance(outcome_payload.get("result_data"), dict) else "completed"
+            status = result_data.get("status") if isinstance(result_data, dict) else "completed"
             logger.info(
                 "Workflow outcome persisted",
                 extra={
