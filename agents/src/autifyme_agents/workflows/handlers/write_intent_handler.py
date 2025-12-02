@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -25,13 +26,16 @@ class WriteIntentHandler:
     WriteIntent for database operations.
     """
 
-    def __init__(self, channel: MessagingChannel):
+    def __init__(self, channel: MessagingChannel, supabase_url: str | None = None):
         """Initialize handler.
 
         Args:
             channel: Messaging channel for sending user notifications
+            supabase_url: Optional Supabase project URL for building asset URLs.
+                          Falls back to SUPABASE_URL environment variable.
         """
         self.channel = channel
+        self._supabase_url = supabase_url or os.getenv("SUPABASE_URL")
 
     def extract_summary(self, messages: list[Any]) -> str | None:
         """Extract AI summary for conversational responses.
@@ -142,6 +146,23 @@ class WriteIntentHandler:
             and "impact" in value
         )
 
+    def _build_storage_url(self, storage_path: str, bucket: str = "assets") -> str | None:
+        """Build full Supabase storage URL from storage_path.
+
+        Args:
+            storage_path: Relative path within bucket (e.g., "pending/thread_id/image.png")
+            bucket: Storage bucket name (default: "assets")
+
+        Returns:
+            Full public URL or None if SUPABASE_URL not configured
+        """
+        if not self._supabase_url:
+            logger.warning("Cannot build storage URL: SUPABASE_URL not configured")
+            return None
+        # Pattern: https://{project}.supabase.co/storage/v1/object/public/{bucket}/{path}
+        base_url = self._supabase_url.rstrip("/")
+        return f"{base_url}/storage/v1/object/public/{bucket}/{storage_path}"
+
     def _send_write_intent_approval(self, sender: str, write_intent_dict: dict[str, Any]) -> None:
         """Send WriteIntent approval with images and summary."""
         try:
@@ -160,24 +181,44 @@ class WriteIntentHandler:
             # Send each asset image with caption
             for asset in write_intent.asset_uploads:
                 try:
-                    # Skip if no path available
-                    image_path = asset.temp_path or asset.storage_path
-                    if not image_path:
-                        logger.warning("Asset has no path", extra={"returns": asset.returns})
+                    # Determine image source (prefer URL for WhatsApp)
+                    image_source: str | None = None
+
+                    # 1. Use storage_url if provided
+                    if asset.storage_url:
+                        image_source = asset.storage_url
+                    # 2. Build URL from storage_path if available
+                    elif asset.storage_path:
+                        image_source = self._build_storage_url(asset.storage_path, asset.bucket)
+                    # 3. Fallback to temp_path (local file)
+                    elif asset.temp_path:
+                        image_source = asset.temp_path
+
+                    if not image_source:
+                        logger.warning("Asset has no image source", extra={"returns": asset.returns})
                         continue
 
-                    # For local paths, check existence
-                    if asset.temp_path and not Path(asset.temp_path).exists():
+                    # For local paths (temp_path), check existence
+                    if (
+                        asset.temp_path
+                        and image_source == asset.temp_path
+                        and not Path(image_source).exists()
+                    ):
                         logger.warning("Asset file not found", extra={"temp_path": asset.temp_path})
                         continue
 
+                    logger.info(
+                        "Sending asset image for HITL preview",
+                        extra={"returns": asset.returns, "source": image_source[:50]}
+                    )
+
                     self.channel.send_image(
                         sender,
-                        image_path,
+                        image_source,
                         caption=asset.caption if asset.caption else None,
                     )
                 except Exception as img_err:
-                    logger.warning("Failed to send asset image", extra={"error": str(img_err)})
+                    logger.warning("Failed to send asset image", extra={"error": str(img_err), "returns": asset.returns})
 
             # Send summary text (required - LLM must generate)
             if not write_intent.hitl_summary:

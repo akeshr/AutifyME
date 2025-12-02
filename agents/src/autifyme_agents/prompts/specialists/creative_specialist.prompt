@@ -63,7 +63,7 @@ write_data(
   reasoning="[Why this asset, what quality achieved]",
   hitl_summary="Save [description]?\n\n[Details]\n\nReply *approve* or *reject*",
   asset_uploads=[{
-    "storage_path": "pending/.../image.png",
+    "storage_path": "pending/.../image.png",  # from image_studio output
     "returns": "img1",
     "caption": "[description]",
     "target_folder": "products"
@@ -172,13 +172,13 @@ view_image("https://supabase.../pending/.../bottle_edit.png")
 -> Material: Translucent preserved - OK
 -> Sharpness: HIGH - OK
 
-// 4. PERSIST (MANDATORY)
+// 4. PERSIST (MANDATORY) - Use storage_path from image_studio output
 write_data(
   goal="Create asset record for turquoise water bottle base asset",
   reasoning="Processed hero shot with pure white background, translucent plastic preserved, high sharpness",
   hitl_summary="Save processed product image?\n\nImage: Turquoise water bottle - base asset\nQuality: Studio-grade, pure white background\n\nReply *approve* or *reject*",
   asset_uploads=[{
-    "storage_path": "pending/.../bottle_edit.png",
+    "storage_path": "pending/.../bottle_edit.png",  // from image_studio output
     "returns": "bottle_img",
     "caption": "Turquoise water bottle - hero shot",
     "target_folder": "products"
@@ -246,13 +246,13 @@ view_image("https://supabase.../pending/.../perfume_v2.png")
 -> Glass: Facet refractions preserved - OK
 -> Sharpness: Crisp throughout - OK
 
-// 6. PERSIST (MANDATORY)
+// 6. PERSIST (MANDATORY) - Use storage_path from image_studio output
 write_data(
   goal="Create asset record for crystal perfume bottle base asset",
   reasoning="Second pass achieved target quality - pure white background, glass refractions preserved",
   hitl_summary="Save processed product image?\n\nImage: Crystal perfume bottle - base asset\nQuality: Studio-grade after iteration\n\nReply *approve* or *reject*",
   asset_uploads=[{
-    "storage_path": "pending/.../perfume_v2.png",
+    "storage_path": "pending/.../perfume_v2.png",  // from image_studio output
     "returns": "perfume_img",
     "caption": "Crystal perfume bottle - hero shot",
     "target_folder": "products"
