@@ -158,6 +158,10 @@ class WriteIntentHandler:
                 }
             )
 
+            # Track image sending results
+            images_sent = 0
+            image_errors: list[str] = []
+
             # Send each asset image with caption
             for asset in write_intent.asset_uploads:
                 try:
@@ -168,24 +172,31 @@ class WriteIntentHandler:
                     if asset.storage_path:
                         try:
                             image_source = build_storage_url(asset.storage_path, asset.bucket)
-                        except ValueError:
-                            logger.warning("Cannot build storage URL: SUPABASE_URL not configured")
+                        except ValueError as e:
+                            error_msg = f"URL build failed for {asset.returns}: {e}"
+                            logger.error(error_msg)
+                            image_errors.append(error_msg)
+                            continue
                     # 2. Fallback to temp_path (local file for external uploads)
                     elif asset.temp_path:
                         image_source = asset.temp_path
 
                     if not image_source:
-                        logger.warning("Asset has no image source", extra={"returns": asset.returns})
+                        error_msg = f"No image source for {asset.returns}"
+                        logger.error(error_msg)
+                        image_errors.append(error_msg)
                         continue
 
                     # For local paths (temp_path), check existence
                     if asset.temp_path and not Path(image_source).exists():
-                        logger.warning("Asset file not found", extra={"temp_path": asset.temp_path})
+                        error_msg = f"File not found: {asset.temp_path}"
+                        logger.error(error_msg)
+                        image_errors.append(error_msg)
                         continue
 
                     logger.info(
                         "Sending asset image for HITL preview",
-                        extra={"returns": asset.returns, "source": image_source[:50]}
+                        extra={"returns": asset.returns, "source": image_source[:80]}
                     )
 
                     self.channel.send_image(
@@ -193,8 +204,23 @@ class WriteIntentHandler:
                         image_source,
                         caption=asset.caption if asset.caption else None,
                     )
+                    images_sent += 1
+
                 except Exception as img_err:
-                    logger.warning("Failed to send asset image", extra={"error": str(img_err), "returns": asset.returns})
+                    error_msg = f"Send failed for {asset.returns}: {img_err}"
+                    logger.error(error_msg, exc_info=True)
+                    image_errors.append(error_msg)
+
+            # Log summary
+            logger.info(
+                "Image sending complete",
+                extra={
+                    "sender": sender,
+                    "total": len(write_intent.asset_uploads),
+                    "sent": images_sent,
+                    "errors": len(image_errors),
+                }
+            )
 
             # Send summary text (required - LLM must generate)
             if not write_intent.hitl_summary:
@@ -203,11 +229,17 @@ class WriteIntentHandler:
                     extra={"sender": sender, "goal": write_intent.goal[:50]}
                 )
                 raise ValueError("hitl_summary is required - LLM must generate approval summary")
-            self.channel.send_text(sender, write_intent.hitl_summary)
+
+            # Append error info if images failed
+            summary = write_intent.hitl_summary
+            if image_errors:
+                summary += f"\n\n[{len(image_errors)} image(s) failed to send]"
+
+            self.channel.send_text(sender, summary)
 
             logger.info(
                 "WriteIntent approval sent",
-                extra={"sender": sender, "summary_length": len(write_intent.hitl_summary)}
+                extra={"sender": sender, "summary_length": len(summary), "images_sent": images_sent}
             )
 
         except Exception as e:
