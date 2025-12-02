@@ -90,42 +90,26 @@ def create_platform_media_tools(
         thread_id: str | None = None,
         config: RunnableConfig | None = None,
     ) -> dict[str, Any]:
-        """Download media from the messaging platform and persist to cloud storage.
+        """Download media from the messaging platform and persist to Supabase.
 
-        Downloads media from the platform, optionally uploads to Supabase inbox
-        for persistence across serverless invocations. Returns both local path
-        (for immediate use) and cloud URL (for persistent references).
-
-        thread_id is automatically injected from RunnableConfig if not provided.
-        This enables automatic cloud storage persistence without requiring the
-        LLM to explicitly pass thread_id.
+        Downloads media and uploads to Supabase inbox for serverless persistence.
+        Returns storage_url for all subsequent operations.
 
         Args:
             media_id: Platform-specific media identifier
-            thread_id: Conversation thread ID for organizing uploads (e.g., "whatsapp:123:919...")
-                      Auto-injected from RunnableConfig if not provided.
-            config: RunnableConfig (auto-injected by LangChain runtime)
+            thread_id: Auto-injected from session context
+            config: RunnableConfig (auto-injected by LangChain)
 
         Returns:
-            Dict with:
-                - local_path: Local filesystem path (ephemeral on serverless)
-                - storage_url: Supabase public URL (persistent, use this for references)
-                - storage_path: Path within bucket (for move operations)
-                - mime_type: MIME type of the media
-                - size_bytes: File size in bytes
+            Dict with storage_url, storage_path, mime_type, size_bytes
 
         Raises:
-            Exception: If media download fails
+            Exception: If download or upload fails
         """
         # Inject thread_id from config if not explicitly provided
         if thread_id is None and config is not None:
             configurable = config.get("configurable", {})
             thread_id = configurable.get("thread_id")
-            if thread_id:
-                logger.debug(
-                    "Injected thread_id from RunnableConfig",
-                    extra={"thread_id": thread_id}
-                )
 
         try:
             logger.info(
@@ -137,7 +121,6 @@ def create_platform_media_tools(
             if hasattr(channel, 'download_media_with_bytes'):
                 media_path, media_bytes, mime_type = channel.download_media_with_bytes(media_id)
             else:
-                # Fallback for channels without bytes support
                 downloaded_path = channel.download_media(media_id)
                 if downloaded_path is None:
                     raise ValueError(f"Failed to download media: {media_id}")
@@ -145,69 +128,53 @@ def create_platform_media_tools(
                 media_bytes = media_path.read_bytes()
                 mime_type = "application/octet-stream"
 
-            result: dict[str, Any] = {
-                "storage_url": None,  # Primary - use this for references
-                "storage_path": None,  # Path within bucket
-                "local_path": str(media_path),  # Fallback only - ephemeral on serverless
+            # Storage is required - fail if not configured
+            if storage is None or thread_id is None:
+                raise ValueError(
+                    "Storage and thread_id required for media persistence. "
+                    f"storage={storage is not None}, thread_id={thread_id}"
+                )
+
+            filename = Path(media_path).name
+
+            # Upload to Supabase inbox
+            try:
+                asyncio.get_running_loop()
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        asyncio.run,
+                        storage.upload_to_inbox(
+                            file_bytes=media_bytes,
+                            thread_id=thread_id,
+                            filename=filename,
+                            content_type=mime_type,
+                        )
+                    )
+                    upload_result = future.result()
+            except RuntimeError:
+                upload_result = asyncio.run(
+                    storage.upload_to_inbox(
+                        file_bytes=media_bytes,
+                        thread_id=thread_id,
+                        filename=filename,
+                        content_type=mime_type,
+                    )
+                )
+
+            result = {
+                "storage_url": upload_result["public_url"],
+                "storage_path": upload_result["storage_path"],
                 "mime_type": mime_type,
                 "size_bytes": len(media_bytes),
             }
 
-            # Upload to Supabase inbox if storage is available and thread_id provided
-            if storage is not None and thread_id is not None:
-                filename = Path(media_path).name
-                try:
-                    # Run async upload in sync context
-                    try:
-                        asyncio.get_running_loop()  # Check if loop exists (raises RuntimeError if not)
-                        # Already in async context - use thread pool
-                        import concurrent.futures
-                        with concurrent.futures.ThreadPoolExecutor() as executor:
-                            future = executor.submit(
-                                asyncio.run,
-                                storage.upload_to_inbox(
-                                    file_bytes=media_bytes,
-                                    thread_id=thread_id,
-                                    filename=filename,
-                                    content_type=mime_type,
-                                )
-                            )
-                            upload_result = future.result()
-                    except RuntimeError:
-                        # No running loop - safe to use asyncio.run
-                        upload_result = asyncio.run(
-                            storage.upload_to_inbox(
-                                file_bytes=media_bytes,
-                                thread_id=thread_id,
-                                filename=filename,
-                                content_type=mime_type,
-                            )
-                        )
-
-                    result["storage_url"] = upload_result["public_url"]
-                    result["storage_path"] = upload_result["storage_path"]
-
-                    logger.info(
-                        "Media persisted to inbox",
-                        extra={
-                            "media_id": media_id,
-                            "storage_url": result["storage_url"],
-                            "thread_id": thread_id,
-                        }
-                    )
-                except Exception as upload_error:
-                    # Log but don't fail - local path still usable for same-request
-                    logger.warning(
-                        f"Failed to persist media to inbox (local path still available): {upload_error}",
-                        extra={"media_id": media_id, "thread_id": thread_id}
-                    )
-
             logger.info(
-                "Media downloaded successfully",
+                "Media persisted to inbox",
                 extra={
                     "media_id": media_id,
-                    "local_path": result["local_path"],
                     "storage_url": result["storage_url"],
+                    "thread_id": thread_id,
                 }
             )
             return result
