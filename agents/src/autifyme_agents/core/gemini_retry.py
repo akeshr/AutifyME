@@ -46,8 +46,15 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
     def _is_blank_response(self, message: AIMessage) -> bool:
         """Check if response is blank/empty.
 
-        Handles both string content (OpenAI format) and list content
-        (Gemini multimodal format).
+        A response is considered VALID (not blank) if ANY of these are true:
+        - Has tool_calls (primary format)
+        - Has tool_calls in additional_kwargs (legacy format)
+        - Has function_call in additional_kwargs (older format)
+        - Has non-empty text content
+        - Has multimodal content blocks (images, audio, etc.)
+
+        A response is BLANK only if:
+        - No tool calls AND no meaningful content
 
         Args:
             message: AI message to check
@@ -55,22 +62,60 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
         Returns:
             True if response is blank, False otherwise
         """
+        # Check 1: Tool calls (primary format) - valid response
+        if message.tool_calls:
+            return False
+
+        # Check 2: Tool calls in additional_kwargs (legacy format) - valid response
+        additional_kwargs = getattr(message, "additional_kwargs", {}) or {}
+        if additional_kwargs.get("tool_calls"):
+            return False
+
+        # Check 3: Function call (older format) - valid response
+        if additional_kwargs.get("function_call"):
+            return False
+
+        # Check 4: Content validation
         content = message.content
+
+        # Empty content with no tool calls = blank
         if not content:
             return True
-        if isinstance(content, str) and not content.strip():
-            return True
-        if isinstance(content, list) and len(content) == 0:
-            return True
-        # Check for list with only empty text blocks
+
+        # String content
+        if isinstance(content, str):
+            return not content.strip()
+
+        # List content (multimodal format)
         if isinstance(content, list):
-            has_content = any(
-                (isinstance(block, dict) and block.get("text", "").strip())
-                or (isinstance(block, str) and block.strip())
-                for block in content
-            )
-            if not has_content:
+            if len(content) == 0:
                 return True
+
+            # Check for any meaningful content in blocks
+            for block in content:
+                # String block with content
+                if isinstance(block, str) and block.strip():
+                    return False
+
+                # Dict block - check for various content types
+                if isinstance(block, dict):
+                    # Text content
+                    if block.get("text", "").strip():
+                        return False
+                    # Image content (base64 or URL)
+                    if block.get("image_url") or block.get("image"):
+                        return False
+                    # Audio content
+                    if block.get("audio") or block.get("audio_url"):
+                        return False
+                    # Any other type field indicates content
+                    if block.get("type") and block.get("type") != "text":
+                        return False
+
+            # All blocks were empty
+            return True
+
+        # Unknown content type - assume not blank
         return False
 
     def _get_retry_delay(self, attempt: int) -> float:

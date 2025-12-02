@@ -157,6 +157,7 @@ async def create_project_manager(
         provider="google",
         model="gemini-2.5-pro",
         temperature=0.7,
+        max_retries=5,  # Match PM resilience for blank response handling
     )
 
     # Domain Specialists
