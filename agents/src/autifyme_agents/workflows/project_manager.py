@@ -44,8 +44,8 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     """Return configured LLM for PM. Defaults to gemini-2.5-pro.
 
     Configuration rationale:
-    - thinking_budget=0: PM is orchestrator (routing, delegation), not deep reasoner.
-      Disabling adaptive thinking prevents blank responses from thinking-only outputs.
+    - thinking_budget=128: Minimum for Pro models (cannot disable like Flash).
+      PM is orchestrator so minimal thinking suffices.
     - max_retries=5: Production resilience against Gemini's occasional blank responses.
     - temperature=0.7: Balanced creativity for user communication.
     """
@@ -55,7 +55,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
         provider="google",
         model="gemini-2.5-pro",
         temperature=0.7,
-        thinking_budget=0,  # PM orchestrates; specialists reason
+        thinking_budget=128,  # Pro minimum; PM orchestrates, specialists reason
         max_retries=5,  # Increase resilience against blank responses
     )
 
