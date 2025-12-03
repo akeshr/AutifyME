@@ -1,11 +1,26 @@
 """Factory for creating and configuring the LangGraph PostgresStore for long-term memory."""
 
+import atexit
+
 from langgraph.store.postgres import PostgresStore
 
 from autifyme_agents.core.config import settings
 
 _store_instance = None
 _store_cm = None
+
+
+def _cleanup_store() -> None:
+    """Clean up PostgresStore context manager on process exit."""
+    global _store_cm, _store_instance
+    if _store_cm is not None:
+        try:
+            _store_cm.__exit__(None, None, None)
+        except Exception:
+            # Suppress errors during cleanup - process is exiting anyway
+            pass
+        _store_cm = None
+        _store_instance = None
 
 
 def get_store(setup: bool = False) -> PostgresStore:
@@ -27,6 +42,10 @@ def get_store(setup: bool = False) -> PostgresStore:
         # from_conn_string returns context manager, enter it once for app lifetime
         _store_cm = PostgresStore.from_conn_string(settings.DATABASE_URL)
         _store_instance = _store_cm.__enter__()
+
+        # Register cleanup handler to properly close connections on exit
+        atexit.register(_cleanup_store)
+
         if setup:
             _store_instance.setup()
 
