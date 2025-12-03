@@ -519,19 +519,27 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
         )
 
     try:
-        image_uri, _ = _load_and_encode_image(input_spec.source_image)
         llm = _get_gemini3_image_llm(output_spec=input_spec.output)
         prompt = _build_edit_prompt(input_spec)
 
+        # Build content with source image first
+        source_uri, _ = _load_and_encode_image(input_spec.source_image)
+        content: list[dict[str, Any]] = [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": source_uri}},
+        ]
+
+        # Add reference images (limit to 14 to stay within API limits)
+        for ref_path in input_spec.reference_images[:14]:
+            try:
+                ref_uri, _ = _load_and_encode_image(ref_path)
+                content.append({"type": "image_url", "image_url": {"url": ref_uri}})
+            except Exception as e:
+                logger.warning("Failed to load reference image %s: %s", ref_path, e)
+
         messages = [
             {"role": "system", "content": TOOL_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": image_uri}},
-                ],
-            },
+            {"role": "user", "content": content},
         ]
 
         response = llm.invoke(messages)  # type: ignore[arg-type]
