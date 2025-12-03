@@ -143,10 +143,19 @@ class WriteIntentHandler:
             and "impact" in value
         )
 
+    # Fields that belong to WriteIntent domain model (excludes tool-layer fields like dry_run)
+    _WRITE_INTENT_FIELDS = {"goal", "reasoning", "hitl_summary", "asset_uploads", "operations", "impact"}
+
     def _send_write_intent_approval(self, sender: str, write_intent_dict: dict[str, Any]) -> None:
         """Send WriteIntent approval with images and summary."""
         try:
-            write_intent = WriteIntent.model_validate(write_intent_dict)
+            # Filter to WriteIntent fields only - tool args may contain extra fields
+            # (e.g., dry_run, validate_only from WriteDataInput) that WriteIntent rejects
+            filtered_dict = {
+                k: v for k, v in write_intent_dict.items()
+                if k in self._WRITE_INTENT_FIELDS
+            }
+            write_intent = WriteIntent.model_validate(filtered_dict)
 
             logger.info(
                 "Sending WriteIntent approval",
