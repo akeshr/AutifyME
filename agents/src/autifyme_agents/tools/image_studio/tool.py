@@ -352,45 +352,40 @@ def _build_edit_prompt(input_spec: ImageStudioInput) -> str:
     if input_spec.custom_instruction:
         instructions.append(f"\nCUSTOM INSTRUCTION: {input_spec.custom_instruction}")
 
-    # Extraction from group photo
+    # Extraction from group photo - pass all provided values
     if input_spec.extraction:
         ex = input_spec.extraction
-        extraction_inst = f"EXTRACT PRODUCT: Isolate and extract '{ex.target_description}'"
+        parts = [f"EXTRACT PRODUCT:\n- Target: {ex.target_description}"]
         if ex.position_hint:
-            extraction_inst += f" (hint: {ex.position_hint} side of image)"
-        if ex.isolate:
-            extraction_inst += ". Remove ALL other products from the image."
-        if ex.clean_edges:
-            extraction_inst += " Clean up edges for professional appearance."
-        instructions.append(extraction_inst)
+            parts.append(f"- Position hint: {ex.position_hint}")
+        parts.append(f"- Isolate (remove others): {ex.isolate}")
+        parts.append(f"- Clean edges: {ex.clean_edges}")
+        instructions.append("\n".join(parts))
 
-    # Focus/crop region
+    # Focus/crop region - pass all provided values
     if input_spec.focus:
         fo = input_spec.focus
-        if fo.type == "custom" and fo.custom_focus:
-            instructions.append(f"FOCUS: Crop/zoom to focus on {fo.custom_focus}")
-        elif fo.type == "product":
-            instructions.append("FOCUS: Crop to focus on the main product, remove excess background")
-        elif fo.type == "label":
-            instructions.append("FOCUS: Crop to focus on product label/branding")
-        if fo.zoom_level != 1.0:
-            instructions.append(f"ZOOM: Apply {fo.zoom_level}x zoom")
+        parts = [f"FOCUS:\n- Type: {fo.type}"]
         if fo.position:
-            instructions.append(f"FOCUS POSITION: Emphasize {fo.position} area of image")
+            parts.append(f"- Position: {fo.position}")
+        parts.append(f"- Zoom level: {fo.zoom_level}x")
+        if fo.custom_focus:
+            parts.append(f"- Custom focus: {fo.custom_focus}")
+        instructions.append("\n".join(parts))
 
-    # Background
+    # Background - pass all provided values
     if input_spec.background:
         bg = input_spec.background
-        if bg.type == "remove" or bg.type == "transparent":
-            instructions.append("BACKGROUND: Remove background completely (transparent PNG)")
-        elif bg.type == "solid":
-            instructions.append(f"BACKGROUND: Replace with solid {bg.color} color")
-        elif bg.type == "gradient":
-            instructions.append(f"BACKGROUND: Apply gradient from {bg.color} to {bg.gradient_end}")
-        elif bg.type == "blur":
-            instructions.append(f"BACKGROUND: Blur background ({bg.blur_strength} strength)")
-        elif bg.type == "scene" and bg.scene_description:
-            instructions.append(f"BACKGROUND: Generate new background scene: {bg.scene_description}")
+        parts = [f"BACKGROUND:\n- Type: {bg.type}"]
+        if bg.color:
+            parts.append(f"- Color: {bg.color}")
+        if bg.gradient_end:
+            parts.append(f"- Gradient end: {bg.gradient_end}")
+        if bg.blur_strength:
+            parts.append(f"- Blur strength: {bg.blur_strength}")
+        if bg.scene_description:
+            parts.append(f"- Scene description: {bg.scene_description}")
+        instructions.append("\n".join(parts))
 
     # Lighting
     if input_spec.lighting:
@@ -400,42 +395,23 @@ def _build_edit_prompt(input_spec: ImageStudioInput) -> str:
             f"intensity={lt.intensity}, temperature={lt.color_temperature}, shadows={lt.shadows}"
         )
 
-    # Framing
+    # Framing - all fields have defaults, send all
     if input_spec.framing:
         fr = input_spec.framing
-        framing_inst = f"FRAMING: Product coverage {fr.product_coverage_percent}%, aligned {fr.alignment}"
-        if fr.angle != "front":
-            framing_inst += f", angle={fr.angle}"
-        if fr.padding_percent > 0:
-            framing_inst += f", padding={fr.padding_percent}%"
-        if fr.crop_to_product:
-            framing_inst += ", crop tightly to product"
-        instructions.append(framing_inst)
+        instructions.append(
+            f"FRAMING: coverage={fr.product_coverage_percent}%, align={fr.alignment}, "
+            f"angle={fr.angle}, padding={fr.padding_percent}%, crop_to_product={fr.crop_to_product}"
+        )
 
-    # Enhancement
+    # Enhancement - all fields have defaults, send all (don't filter "none" values)
     if input_spec.enhancement:
         en = input_spec.enhancement
-        enhancements = []
-        if en.sharpness != "none":
-            enhancements.append(f"sharpness={en.sharpness}")
-        if en.contrast != "none":
-            enhancements.append(f"contrast={en.contrast}")
-        if en.saturation != "none":
-            enhancements.append(f"saturation={en.saturation}")
-        if en.brightness != "none":
-            enhancements.append(f"brightness={en.brightness}")
-        if en.denoise:
-            enhancements.append("denoise")
-        if en.upscale != "none":
-            enhancements.append(f"upscale={en.upscale}")
-        if en.color_correction:
-            enhancements.append("auto_color_correction")
-        if en.remove_blemishes:
-            enhancements.append("remove_blemishes")
-        if en.restore_details:
-            enhancements.append("AI_restore_details")
-        if enhancements:
-            instructions.append(f"ENHANCE: Apply {', '.join(enhancements)}")
+        instructions.append(
+            f"ENHANCEMENT: sharpness={en.sharpness}, contrast={en.contrast}, "
+            f"saturation={en.saturation}, brightness={en.brightness}, denoise={en.denoise}, "
+            f"upscale={en.upscale}, color_correction={en.color_correction}, "
+            f"remove_blemishes={en.remove_blemishes}, restore_details={en.restore_details}"
+        )
 
     # Output specs
     out = input_spec.output
@@ -450,7 +426,7 @@ def _build_generate_prompt(input_spec: ImageStudioInput) -> str:
     """Build comprehensive generation prompt."""
     instructions = []
 
-    # Custom instruction
+    # Custom instruction takes priority
     if input_spec.custom_instruction:
         instructions.append(f"INSTRUCTION: {input_spec.custom_instruction}")
 
@@ -466,15 +442,15 @@ def _build_generate_prompt(input_spec: ImageStudioInput) -> str:
 - Mood: {sc.mood}
 - Time of day: {sc.time_of_day}""")
 
-    # Product placement
+    # Product placement - pass all provided values
     if input_spec.placement:
         pl = input_spec.placement
-        instructions.append(f"""PRODUCT PLACEMENT:
-- Position: {pl.position}
-- Scale: {pl.scale}
-- Surface: {pl.surface or 'appropriate for scene'}
-- Angle: {pl.angle}
-- Shadow: {'realistic shadow' if pl.shadow else 'no shadow'}""")
+        parts = [f"PRODUCT PLACEMENT:\n- Position: {pl.position}\n- Scale: {pl.scale}"]
+        if pl.surface:
+            parts.append(f"- Surface: {pl.surface}")
+        parts.append(f"- Angle: {pl.angle}")
+        parts.append(f"- Shadow: {pl.shadow}")
+        instructions.append("\n".join(parts))
 
     # Lighting
     if input_spec.lighting:
@@ -484,17 +460,11 @@ def _build_generate_prompt(input_spec: ImageStudioInput) -> str:
             f"{lt.color_temperature} temperature, {lt.shadows} shadows"
         )
 
-    # Default if no scene specified
+    # Default fallback only if specialist sent nothing
     if not instructions:
         instructions.append(
             "Generate a professional product photograph with clean, well-lit studio background."
         )
-
-    # Core requirement
-    instructions.append(
-        "\nThe product from the source image must be seamlessly integrated. "
-        "Maintain exact product details, proportions, and quality."
-    )
 
     # Output specs
     out = input_spec.output

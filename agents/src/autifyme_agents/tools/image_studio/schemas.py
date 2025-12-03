@@ -160,7 +160,7 @@ class OutputSpec(BaseModel):
 
     format: Literal["PNG", "JPEG", "WEBP"] = "PNG"
     size: Literal["1K", "2K", "4K"] = "2K"
-    aspect_ratio: Literal["1:1", "3:4", "4:3", "9:16", "16:9", "original"] = "1:1"
+    aspect_ratio: Literal["1:1", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "original"] = "1:1"
     quality: int = Field(default=90, ge=1, le=100, description="JPEG quality")
     variants: list[Literal["master", "thumbnail", "social", "square", "portrait", "landscape"]] = Field(
         default_factory=lambda: ["master"],  # type: ignore[arg-type]
