@@ -18,6 +18,32 @@ import os
 logger = logging.getLogger(__name__)
 
 
+def normalize_storage_path(path: str) -> str:
+    """Normalize storage path by removing leading slashes.
+
+    LLMs sometimes add leading slashes to storage paths. This ensures
+    consistency before URL construction or path validation.
+
+    Args:
+        path: Storage path that may have leading slashes
+
+    Returns:
+        Normalized path without leading slashes
+
+    Examples:
+        >>> normalize_storage_path("/inbox/thread/img.png")
+        "inbox/thread/img.png"
+        >>> normalize_storage_path("inbox/thread/img.png")
+        "inbox/thread/img.png"
+    """
+    # Don't touch URLs
+    if path.startswith(("http://", "https://")):
+        return path
+
+    # Strip leading slashes/backslashes
+    return path.lstrip("/\\")
+
+
 def build_storage_url(
     path: str,
     bucket: str = "assets",
@@ -27,6 +53,8 @@ def build_storage_url(
 
     If the path is already a URL (starts with http:// or https://),
     returns it unchanged. Otherwise, constructs the full public URL.
+
+    Handles and normalizes leading slashes that LLMs sometimes add.
 
     Args:
         path: Relative path within bucket (e.g., "pending/thread_id/image.png")
@@ -44,12 +72,18 @@ def build_storage_url(
         >>> build_storage_url("pending/whatsapp_123/img.png")
         "https://xxx.supabase.co/storage/v1/object/public/assets/pending/whatsapp_123/img.png"
 
+        >>> build_storage_url("/inbox/whatsapp_123/img.png")  # Leading slash normalized
+        "https://xxx.supabase.co/storage/v1/object/public/assets/inbox/whatsapp_123/img.png"
+
         >>> build_storage_url("https://already-a-url.com/image.png")
         "https://already-a-url.com/image.png"
     """
     # Passthrough if already a URL
     if path.startswith(("http://", "https://")):
         return path
+
+    # Normalize: remove leading slashes (LLMs sometimes add them)
+    path = normalize_storage_path(path)
 
     # Get Supabase URL from param or env
     base_url = supabase_url or os.getenv("SUPABASE_URL")
@@ -70,20 +104,35 @@ def build_storage_url(
 def is_storage_path(path: str) -> bool:
     """Check if a path is a relative storage path (not a URL or local path).
 
+    Handles leading slashes that LLMs sometimes add.
+
     Args:
         path: Path to check
 
     Returns:
         True if this looks like a relative Supabase storage path
+
+    Examples:
+        >>> is_storage_path("inbox/thread/img.png")
+        True
+        >>> is_storage_path("/inbox/thread/img.png")  # Leading slash OK
+        True
+        >>> is_storage_path("https://example.com/img.png")
+        False
+        >>> is_storage_path("/tmp/local/file.png")
+        False
     """
     # URLs are not storage paths
     if path.startswith(("http://", "https://")):
         return False
 
-    # Absolute local paths are not storage paths
-    if path.startswith(("/", "\\")) or (len(path) > 1 and path[1] == ":"):
+    # Normalize: remove leading slashes before checking
+    normalized = path.lstrip("/\\")
+
+    # Windows absolute paths are not storage paths (e.g., "C:\...")
+    if len(normalized) > 1 and normalized[1] == ":":
         return False
 
     # Relative paths starting with known folders are storage paths
     storage_prefixes = ("pending/", "inbox/", "products/")
-    return path.startswith(storage_prefixes)
+    return normalized.startswith(storage_prefixes)
