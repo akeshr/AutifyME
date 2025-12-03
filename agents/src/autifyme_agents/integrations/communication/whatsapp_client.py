@@ -117,7 +117,7 @@ class WhatsAppClient:
         Raises:
             httpx.HTTPStatusError: If API call fails
         """
-        image_payload: dict[str, Any] = {"id": media_id}
+        image_payload: dict[str, Any] = {"id": media_id, "quality": "hd"}
         if caption:
             # WhatsApp caption limit is 1024 chars
             if len(caption) > 1024:
