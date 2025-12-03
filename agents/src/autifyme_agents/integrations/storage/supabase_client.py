@@ -492,6 +492,15 @@ class SupabaseStorageClient(StorageInterface):
                     "Check table schema and permissions."
                 )
 
+            # Validate response structure before accessing
+            first_row = response.data[0]
+            if "id" not in first_row:
+                raise RuntimeError(
+                    f"Supabase response missing 'id' field. Got keys: {list(first_row.keys())}"
+                )
+
+            outcome_id: str = first_row["id"]
+
             logger.info(
                 "Persisted workflow outcome",
                 extra={
@@ -499,10 +508,10 @@ class SupabaseStorageClient(StorageInterface):
                     "success": outcome_dict.get("success"),
                     "intent": outcome_dict.get("intent"),
                     "department": outcome_dict.get("department"),
+                    "outcome_id": outcome_id,
                 },
             )
 
-            outcome_id: str = response.data[0]["id"]
             return outcome_id
 
         except Exception as e:

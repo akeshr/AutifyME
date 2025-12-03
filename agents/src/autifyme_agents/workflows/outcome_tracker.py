@@ -204,16 +204,16 @@ class OutcomeTracker:
                 alternative_departments=alternatives or [],
             )
 
-        logger.info(
-            "Routing decision tracked",
-            extra={
-                "tracking_id": workflow.tracking_id,
-                "thread_id": workflow.thread_id,
-                "intent": intent,
-                "department": department,
-                "confidence": confidence,
-            },
-        )
+            logger.info(
+                "Routing decision tracked",
+                extra={
+                    "tracking_id": workflow.tracking_id,
+                    "thread_id": workflow.thread_id,
+                    "intent": intent,
+                    "department": department,
+                    "confidence": confidence,
+                },
+            )
 
     def set_trace_id(self, tracking_id: str, trace_id: str) -> None:
         """Set LangSmith trace ID for observability correlation.
@@ -232,14 +232,14 @@ class OutcomeTracker:
 
             workflow.trace_id = trace_id
 
-        logger.debug(
-            "Trace ID linked to workflow",
-            extra={
-                "tracking_id": workflow.tracking_id,
-                "thread_id": workflow.thread_id,
-                "trace_id": trace_id,
-            },
-        )
+            logger.debug(
+                "Trace ID linked to workflow",
+                extra={
+                    "tracking_id": workflow.tracking_id,
+                    "thread_id": workflow.thread_id,
+                    "trace_id": trace_id,
+                },
+            )
 
     def track_workflow_end(
         self,
@@ -277,26 +277,28 @@ class OutcomeTracker:
                 resolution_strategy=resolution_strategy,
             )
 
-        logger.info(
-            "Workflow completed",
-            extra={
+            # Capture values while still holding lock
+            log_extra = {
                 "tracking_id": workflow.tracking_id,
                 "thread_id": workflow.thread_id,
                 "success": success,
                 "duration_seconds": workflow.duration_seconds,
                 "error_type": workflow.result.error_type,
-            },
-        )
+            }
+            # Take a snapshot for persistence (workflow may be removed after lock release)
+            workflow_snapshot = workflow
+
+            # Cleanup - remove from active workflows before releasing lock
+            self._active_workflows.pop(tracking_id, None)
+
+        logger.info("Workflow completed", extra=log_extra)
 
         # Persist to storage (Phase 1.2 extension - needs database table)
-        self._persist_outcome(workflow)
+        # Safe to use snapshot - object won't be modified after removal from dict
+        self._persist_outcome(workflow_snapshot)
 
         # Trigger learning (Phase 2 - routing optimization)
-        # self._trigger_learning(workflow)
-
-        # Cleanup - remove from active workflows
-        with self._lock:
-            self._active_workflows.pop(tracking_id, None)
+        # self._trigger_learning(workflow_snapshot)
 
     def get_workflow_metrics(
         self,
