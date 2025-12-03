@@ -976,7 +976,14 @@ class SupabaseStorageClient(StorageInterface):
                         if isinstance(condition, dict):
                             # Handle operators: {"gt": 10}, {"lt": 100}, etc.
                             for op, threshold in condition.items():
-                                if op == "gt" and not (value > threshold) or op == "gte" and not (value >= threshold) or op == "lt" and not (value < threshold) or op == "lte" and not (value <= threshold) or op == "eq" and value != threshold or op == "neq" and value == threshold:
+                                if (
+                                    (op == "gt" and not (value > threshold))
+                                    or (op == "gte" and not (value >= threshold))
+                                    or (op == "lt" and not (value < threshold))
+                                    or (op == "lte" and not (value <= threshold))
+                                    or (op == "eq" and value != threshold)
+                                    or (op == "neq" and value == threshold)
+                                ):
                                     include = False
                         else:
                             # Direct comparison
