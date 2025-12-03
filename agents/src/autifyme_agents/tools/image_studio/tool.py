@@ -312,7 +312,7 @@ def _save_base64_image(
         except Exception as upload_error:
             logger.warning(
                 f"Failed to upload to pending storage: {upload_error}",
-                extra={"filename": filename, "thread_id": thread_id},
+                extra={"file_name": filename, "thread_id": thread_id},
             )
 
     return file_path, metadata, storage_path

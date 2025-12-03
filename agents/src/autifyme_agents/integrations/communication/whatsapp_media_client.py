@@ -161,7 +161,7 @@ class WhatsAppMediaClient:
         """
         logger.info(
             "Uploading media to WhatsApp",
-            extra={"filename": filename, "mime_type": mime_type, "size_bytes": len(file_bytes)}
+            extra={"file_name": filename, "mime_type": mime_type, "size_bytes": len(file_bytes)}
         )
 
         # WhatsApp media upload endpoint
@@ -188,7 +188,7 @@ class WhatsAppMediaClient:
         except httpx.HTTPStatusError:
             logger.error(
                 "Failed to upload media to WhatsApp",
-                extra={"status": response.status_code, "filename": filename, "response": response.text}
+                extra={"status": response.status_code, "file_name": filename, "response": response.text}
             )
             raise
 
@@ -197,7 +197,7 @@ class WhatsAppMediaClient:
 
         logger.info(
             "Media uploaded to WhatsApp",
-            extra={"filename": filename, "media_id": media_id}
+            extra={"file_name": filename, "media_id": media_id}
         )
 
         return media_id
