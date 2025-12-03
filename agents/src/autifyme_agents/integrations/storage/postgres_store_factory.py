@@ -2,13 +2,15 @@
 
 import atexit
 import contextlib
+from contextlib import AbstractContextManager
+from typing import Any
 
 from langgraph.store.postgres import PostgresStore
 
 from autifyme_agents.core.config import settings
 
-_store_instance = None
-_store_cm = None
+_store_instance: PostgresStore | None = None
+_store_cm: AbstractContextManager[Any] | None = None
 
 
 def _cleanup_store() -> None:
