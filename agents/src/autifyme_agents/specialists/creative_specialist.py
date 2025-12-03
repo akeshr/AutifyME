@@ -11,6 +11,7 @@ Domain Ownership ("How We Present"):
 Architecture:
 - SubAgent spec dict for PM delegation
 - Owns image_studio tool (Gemini 3 Pro Image)
+- Has inspect_schema (scoped to assets/product_images) for schema discovery
 - Has write_data (scoped to assets) for persisting processed images
 - Has read_data (scoped to assets + product images) for reference
 - Uses MultimodalInjectionMiddleware to SEE images in delegation messages
@@ -82,9 +83,12 @@ def create_creative_specialist(
     # Add scoped data tools if storage is provided
     if storage is not None:
         from autifyme_agents.tools.data_engine import (
+            create_inspect_schema_tool,
             create_read_data_tool,
             create_write_data_tool,
         )
+        # Schema discovery for write_data - understand table structure before writing
+        tools.append(create_inspect_schema_tool(storage, tables=CREATIVE_READ_TABLES))
         # Scoped read access to asset-related tables
         tools.append(create_read_data_tool(storage, tables=CREATIVE_READ_TABLES))
         # Scoped write access to assets table only
@@ -96,7 +100,8 @@ def create_creative_specialist(
         "multi-product extraction with clean isolation, lifestyle shots with contextual scenes. "
         "Include storage_path (from inbox/) in task - specialist SEES images. "
         "Returns: processed images with storage_path (in pending/). "
-        "Can create asset records via write_data (HITL approval required)."
+        "Has inspect_schema for schema discovery before write_data. "
+        "Creates asset records via write_data (HITL approval required)."
     )
 
     # Use provided model or default to Gemini 3 Pro (multimodal)
