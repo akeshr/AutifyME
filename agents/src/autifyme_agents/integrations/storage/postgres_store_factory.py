@@ -1,6 +1,7 @@
 """Factory for creating and configuring the LangGraph PostgresStore for long-term memory."""
 
 import atexit
+import contextlib
 
 from langgraph.store.postgres import PostgresStore
 
@@ -14,11 +15,9 @@ def _cleanup_store() -> None:
     """Clean up PostgresStore context manager on process exit."""
     global _store_cm, _store_instance
     if _store_cm is not None:
-        try:
+        # Suppress errors during cleanup - process is exiting anyway
+        with contextlib.suppress(Exception):
             _store_cm.__exit__(None, None, None)
-        except Exception:
-            # Suppress errors during cleanup - process is exiting anyway
-            pass
         _store_cm = None
         _store_instance = None
 
