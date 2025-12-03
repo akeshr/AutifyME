@@ -24,15 +24,20 @@ class AssetUpload(BaseModel):
     Processed BEFORE database operations. The uploaded file's public URL
     can be referenced in operations using @name.public_url syntax.
 
+    Use storage_path from image_studio output. The HITL handler auto-derives
+    the full public URL for WhatsApp preview.
+
     Example:
         asset_uploads=[
             AssetUpload(
-                temp_path="/tmp/media_downloads/20251130_edit_abc123.png",
+                storage_path="pending/whatsapp_123_919/20251130_edit_abc123.png",
                 returns="product_image",
                 caption="PET Jar 500ml Clear - product photo",
-                folder="products"
+                target_folder="products"
             )
         ]
+
+    Operations reference:
         operations=[
             Operation(
                 action="create",
@@ -49,11 +54,23 @@ class AssetUpload(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    temp_path: str = Field(
-        ...,
+    # Primary: Supabase storage path (from image_studio/download_media)
+    storage_path: str | None = Field(
+        default=None,
         description=(
-            "Local file path to upload (from Image Studio or WhatsApp media).\n"
-            "Example: '/tmp/media_downloads/20251130_edit_abc123.png'"
+            "Path within Supabase bucket (from image_studio/download_media outputs).\n"
+            "Example: 'pending/whatsapp_123_919/20251130_edit_abc123.png'\n"
+            "Executor MOVES file from pending/ to target_folder upon HITL approval.\n"
+            "HITL handler auto-derives full public URL for WhatsApp preview."
+        ),
+    )
+
+    # Fallback: Local file path (for external file uploads only)
+    temp_path: str | None = Field(
+        default=None,
+        description=(
+            "Local file path for external uploads not already in Supabase.\n"
+            "Use storage_path for image_studio/download_media outputs instead."
         ),
     )
 
@@ -62,7 +79,7 @@ class AssetUpload(BaseModel):
         description=(
             "Name to assign to upload result.\n"
             "Operations can reference: @name.public_url, @name.storage_path, "
-            "@name.size_bytes, @name.content_type"
+            "@name.size_bytes, @name.content_type, @name.caption"
         ),
     )
 
@@ -81,10 +98,31 @@ class AssetUpload(BaseModel):
         description="Storage bucket name (default: 'assets')",
     )
 
+    # For temp_path: folder to upload into
     folder: str = Field(
         default="products",
-        description="Folder within bucket (default: 'products')",
+        description="Folder within bucket for upload (default: 'products')",
     )
+
+    # For storage_path: folder to move into
+    target_folder: str = Field(
+        default="products",
+        description="Target folder for move operation (default: 'products')",
+    )
+
+    @field_validator("storage_path", "temp_path", mode="after")
+    @classmethod
+    def validate_path_provided(cls, v: str | None, info: Any) -> str | None:
+        """Validate that at least one path is provided."""
+        # This runs for each field, actual validation in model_validator
+        return v
+
+    def model_post_init(self, __context: Any) -> None:
+        """Validate that exactly one of temp_path or storage_path is provided."""
+        if self.temp_path is None and self.storage_path is None:
+            raise ValueError("Either temp_path or storage_path must be provided")
+        if self.temp_path is not None and self.storage_path is not None:
+            raise ValueError("Cannot provide both temp_path and storage_path")
 
 
 class Operation(BaseModel):
@@ -254,6 +292,7 @@ class WriteIntent(BaseModel):
             "- @name.storage_path: Path within storage bucket\n"
             "- @name.size_bytes: File size in bytes\n"
             "- @name.content_type: MIME type\n"
+            "- @name.caption: Human-readable caption for alt text\n"
             "Uploads execute atomically: if any fails, no DB operations run."
         ),
     )

@@ -140,10 +140,10 @@ async def create_project_manager(
     # PM Tools - Read-only, orchestration-focused
     pm_tools: list[Any] = []
 
-    # Platform media download
+    # Platform media download (with storage for inbox persistence)
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
-        pm_tools.extend(create_platform_media_tools(channel))
+        pm_tools.extend(create_platform_media_tools(channel, storage=storage))
 
     # Schema inspection and read operations
     pm_tools.append(create_inspect_schema_tool(storage, tables=None))
@@ -160,11 +160,14 @@ async def create_project_manager(
         max_retries=5,  # Match PM resilience for blank response handling
     )
 
-    # Domain Specialists
-    creative_specialist = create_creative_specialist(model=None)
-    catalog_specialist = create_catalog_specialist(
-        storage=storage,
+    # Domain Specialists (with storage for image persistence)
+    creative_specialist = create_creative_specialist(
         model=specialist_llm,
+        storage=storage,
+    )
+    catalog_specialist = create_catalog_specialist(
+        model=specialist_llm,
+        storage=storage,
     )
 
     subagents: list[Any] = [creative_specialist, catalog_specialist]

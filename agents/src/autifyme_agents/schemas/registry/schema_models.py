@@ -465,7 +465,7 @@ class TableSchema(BaseModel):
                 logger.error(
                     "Case-insensitive uniqueness check failed for variant_axes",
                     exc_info=True,
-                    extra={"name": name, "family_id": family_id}
+                    extra={"axis_name": name, "family_id": family_id}
                 )
 
         return result

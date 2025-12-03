@@ -160,7 +160,7 @@ class OutputSpec(BaseModel):
 
     format: Literal["PNG", "JPEG", "WEBP"] = "PNG"
     size: Literal["1K", "2K", "4K"] = "2K"
-    aspect_ratio: Literal["1:1", "3:4", "4:3", "9:16", "16:9", "original"] = "1:1"
+    aspect_ratio: Literal["1:1", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "original"] = "1:1"
     quality: int = Field(default=90, ge=1, le=100, description="JPEG quality")
     variants: list[Literal["master", "thumbnail", "social", "square", "portrait", "landscape"]] = Field(
         default_factory=lambda: ["master"],  # type: ignore[arg-type]
@@ -257,11 +257,24 @@ class ImageStudioInput(BaseModel):
     operation: ImageOperation = Field(description="Operation: edit or generate")
     source_image: str | None = Field(
         default=None,
-        description="Path to source image (required for edit, optional for generate)"
+        description=(
+            "Source image: storage_path (from download_media/image_studio). "
+            "Required for edit, optional for generate."
+        )
     )
     reference_images: list[str] = Field(
         default_factory=list,
-        description="Additional reference images for style/context (up to 14)"
+        description="Additional reference images (storage_path) for style/context (up to 14)"
+    )
+
+    # Thread ID for cloud storage persistence (auto-injected from RunnableConfig)
+    thread_id: str | None = Field(
+        default=None,
+        description=(
+            "Conversation thread ID for organizing pending uploads. "
+            "Auto-injected from session context - do not pass explicitly. "
+            "Format: 'whatsapp:{phone_number_id}:{sender}'"
+        )
     )
 
     # Custom instruction for complex operations
@@ -304,15 +317,19 @@ class ImageMetadata(BaseModel):
 
 
 class OutputVariant(BaseModel):
-    """Single output variant (master, thumbnail, social)."""
+    """Single output variant (master, thumbnail, social).
+
+    Use storage_path for all references. URL is derived where needed.
+    """
 
     variant: str
-    path: str
-    preview_path: str
+    path: str = Field(description="Local path (ephemeral)")
+    preview_path: str = Field(description="Local preview path (ephemeral)")
     metadata: ImageMetadata
-    description: str | None = Field(
+    description: str | None = Field(default=None)
+    storage_path: str | None = Field(
         default=None,
-        description="Description of what this variant contains"
+        description="Bucket path (e.g., 'pending/thread_id/file.png'). Use in view_image, write_data."
     )
 
 

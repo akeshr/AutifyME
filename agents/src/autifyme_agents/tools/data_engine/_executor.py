@@ -323,38 +323,83 @@ class MultiOperationExecutor:
             # Resolve dependencies (topological sort)
             sorted_operations = self._resolve_dependencies(intent.operations)
 
-            # Phase 1: Upload assets BEFORE transaction
-            # (uploads are outside transaction since they're not DB ops)
+            # Phase 1: Process assets BEFORE transaction
+            # (uploads/moves are outside transaction since they're not DB ops)
             context: dict[str, Any] = {}  # Stores results by name for @ref resolution
 
             if intent.asset_uploads:
                 for asset_upload in intent.asset_uploads:
-                    logger.info(
-                        f"Uploading asset: {asset_upload.temp_path} -> {asset_upload.bucket}/{asset_upload.folder}",
-                        extra={
-                            "temp_path": asset_upload.temp_path,
-                            "bucket": asset_upload.bucket,
-                            "folder": asset_upload.folder,
-                            "returns": asset_upload.returns,
-                        },
-                    )
+                    # Two modes: storage_path (move) vs temp_path (upload)
+                    if asset_upload.storage_path is not None:
+                        # Mode 1: Move from pending/ to target folder (preferred)
+                        logger.info(
+                            f"Moving asset: {asset_upload.storage_path} -> {asset_upload.bucket}/{asset_upload.target_folder}",
+                            extra={
+                                "storage_path": asset_upload.storage_path,
+                                "bucket": asset_upload.bucket,
+                                "target_folder": asset_upload.target_folder,
+                                "returns": asset_upload.returns,
+                            },
+                        )
 
-                    upload_result = await self.storage.upload_asset(
-                        file_path=asset_upload.temp_path,
-                        bucket=asset_upload.bucket,
-                        folder=asset_upload.folder,
-                    )
+                        move_result = await self.storage.move_asset(
+                            source_path=asset_upload.storage_path,
+                            target_folder=asset_upload.target_folder,
+                            bucket=asset_upload.bucket,
+                        )
 
-                    # Track for potential rollback
-                    uploaded_assets.append(upload_result)
+                        # Track for potential rollback
+                        uploaded_assets.append(move_result)
 
-                    # Store in context for reference resolution
-                    context[asset_upload.returns] = upload_result
+                        # Store in context for reference resolution
+                        # Include caption from AssetUpload for @name.caption reference
+                        context[asset_upload.returns] = {
+                            **move_result,
+                            "caption": asset_upload.caption,
+                        }
 
-                    logger.info(
-                        f"Asset uploaded: {upload_result['public_url']}",
-                        extra={"returns": asset_upload.returns, "public_url": upload_result["public_url"]},
-                    )
+                        logger.info(
+                            f"Asset moved: {move_result['public_url']}",
+                            extra={"returns": asset_upload.returns, "public_url": move_result["public_url"]},
+                        )
+
+                    elif asset_upload.temp_path is not None:
+                        # Mode 2: Upload from local /tmp path (legacy, may fail on serverless)
+                        logger.info(
+                            f"Uploading asset: {asset_upload.temp_path} -> {asset_upload.bucket}/{asset_upload.folder}",
+                            extra={
+                                "temp_path": asset_upload.temp_path,
+                                "bucket": asset_upload.bucket,
+                                "folder": asset_upload.folder,
+                                "returns": asset_upload.returns,
+                            },
+                        )
+
+                        upload_result = await self.storage.upload_asset(
+                            file_path=asset_upload.temp_path,
+                            bucket=asset_upload.bucket,
+                            folder=asset_upload.folder,
+                        )
+
+                        # Track for potential rollback
+                        uploaded_assets.append(upload_result)
+
+                        # Store in context for reference resolution
+                        # Include caption from AssetUpload for @name.caption reference
+                        context[asset_upload.returns] = {
+                            **upload_result,
+                            "caption": asset_upload.caption,
+                        }
+
+                        logger.info(
+                            f"Asset uploaded: {upload_result['public_url']}",
+                            extra={"returns": asset_upload.returns, "public_url": upload_result["public_url"]},
+                        )
+                    else:
+                        # Validation should have caught this, but defensive
+                        raise ToolException(
+                            f"AssetUpload '{asset_upload.returns}' has neither storage_path nor temp_path"
+                        )
 
             # Phase 2: Execute database operations in transaction
             async with self.storage.transaction():

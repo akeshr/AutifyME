@@ -5,10 +5,16 @@ Operations:
 - generate: Lifestyle shots, studio shots, scene composites
 
 Architecture: Atomic tool with structured Pydantic input/output.
+
+Storage Architecture:
+    Generated images are uploaded to Supabase pending/ folder for persistence
+    across Vercel serverless invocations. Images await HITL approval before
+    being moved to products/ folder via WriteIntent.
 """
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import logging
@@ -17,10 +23,11 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Annotated, Any, Protocol, TypeVar
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.tools import StructuredTool
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import InjectedToolArg, StructuredTool
 from PIL import Image
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -48,6 +55,31 @@ from autifyme_agents.tools.image_studio.schemas import (
 
 T = TypeVar("T")
 
+
+class StorageUploader(Protocol):
+    """Minimal interface for storage upload capability."""
+
+    async def upload_to_pending(
+        self,
+        file_bytes: bytes,
+        thread_id: str,
+        filename: str,
+        content_type: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Upload to pending folder."""
+        ...
+
+
+# Module-level storage reference (set by tool factory)
+_storage_client: StorageUploader | None = None
+
+
+def _set_storage_client(storage: StorageUploader | None) -> None:
+    """Set the storage client for pending uploads."""
+    global _storage_client
+    _storage_client = storage
+
 logger = logging.getLogger(__name__)
 
 # Use same temp directory as WhatsApp media downloads
@@ -62,26 +94,38 @@ JPEG_QUALITY = 85
 GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 
 # Professional product photography system prompt for the image generation model
-TOOL_SYSTEM_PROMPT = """You are a professional e-commerce product photographer and image editor.
+TOOL_SYSTEM_PROMPT = """You are a master commercial photographer whose work appears in Vogue, Apple campaigns, and luxury brand catalogs.
 
-EXECUTION STANDARDS:
-- Clean, surgical isolation of products with no artifacts or halos
-- Pure backgrounds (white #FFFFFF or transparent) with seamless edges
-- Color-accurate output with neutral white balance unless otherwise specified
-- Sharp focus on product details: labels, textures, materials, brand elements
-- Professional studio lighting with soft, natural shadows
-- Marketplace-ready quality meeting Amazon, Shopify, and Instagram standards
+EXECUTE THE CREATIVE DIRECTION - The instruction is your brief. Honor it precisely.
 
-TECHNICAL REQUIREMENTS:
-- Preserve material properties: glass transparency, metal reflections, fabric texture
-- Maintain exact product proportions and fine details
-- Clean edges without fringing, haloing, or color bleeding
-- Consistent, even lighting across the entire product surface
-- Proper exposure with no blown highlights or crushed shadows
+LIGHT IS EVERYTHING:
+- Light reveals form, texture, and material truth
+- Specular highlights define surface quality - controlled, never blown
+- Shadows create dimension - density appropriate to mood
+- Rim light separates subject from background when needed
+- Color temperature serves the story - warm for organic, cool for tech
 
-QUALITY FLOOR:
-Every output must be immediately usable as a professional product listing image.
-Execute the requested operation with these professional standards as your baseline."""
+MATERIAL TRUTH:
+- Glass: Internal caustics, edge refraction, transparency depth - never flat
+- Metal: Gradient reflections, micro-texture, controlled specularity
+- Fabric: Weave texture, drape shadows, fiber detail at edges
+- Plastic: Surface sheen gradient, translucency where present, no fake shine
+- Wood: Grain direction, tonal variation, natural matte quality
+- Ceramic/Stone: Subtle surface texture, weight impression, matte-to-satin range
+
+COMPOSITION MASTERY:
+- Negative space is intentional - it breathes or it frames
+- Product placement follows visual weight principles
+- Camera angle implies relationship - hero angle elevates, eye-level connects
+- Edge treatment: seamless fade, sharp cut, or natural shadow - match the intent
+
+TECHNICAL PRECISION:
+- Focus: Tack sharp on hero details, natural falloff where specified
+- Color: Accurate to source, grade only as directed
+- Edges: Surgical extraction OR natural environmental blend - never between
+- Scale: Product proportions sacred - no distortion
+
+OUTPUT: Every image must be immediately publishable. No "almost there." This is the final frame."""
 
 
 # =============================================================================
@@ -111,13 +155,34 @@ def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatMod
 
 
 def _load_and_encode_image(image_path: str) -> tuple[str, str]:
-    """Load image, resize if needed, encode to base64 data URI."""
-    path = Path(image_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Image not found: {image_path}")
+    """Load image from storage_path/URL/local path, resize if needed, encode to base64.
+
+    Args:
+        image_path: storage_path, URL, or local file path
+    """
+    # Import here to avoid circular dependency
+    from autifyme_agents.core.storage_utils import build_storage_url, is_storage_path
+
+    # Convert storage_path to URL if needed
+    if is_storage_path(image_path):
+        image_path = build_storage_url(image_path)
+
+    # Handle URLs
+    img: Image.Image  # Type hint: resize/convert returns Image.Image, not ImageFile
+    if image_path.startswith(("http://", "https://")):
+        import httpx
+
+        response = httpx.get(image_path, timeout=60)
+        response.raise_for_status()
+        img = Image.open(io.BytesIO(response.content))
+    else:
+        path = Path(image_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Image not found: {image_path}")
+        img = Image.open(path)
 
     try:
-        with Image.open(path) as img:
+        with img:
             fmt = img.format or "JPEG"
             mime_type = f"image/{fmt.lower()}"
 
@@ -158,8 +223,21 @@ def _save_base64_image(
     operation: str,
     output_spec: OutputSpec,
     description: str | None = None,
-) -> tuple[Path, ImageMetadata]:
-    """Save base64 image data to temp file."""
+    thread_id: str | None = None,
+) -> tuple[Path, ImageMetadata, str | None]:
+    """Save base64 image data to temp file and optionally upload to pending.
+
+    Args:
+        base64_data: Base64-encoded image data (may include data URI prefix)
+        operation: Operation type for filename
+        output_spec: Output specification for format/size
+        description: Optional description for logging
+        thread_id: Optional thread ID for pending upload organization
+
+    Returns:
+        Tuple of (local_path, metadata, storage_path)
+        storage_path is None if upload not performed
+    """
     if "," in base64_data:
         base64_data = base64_data.split(",", 1)[1]
 
@@ -189,7 +267,55 @@ def _save_base64_image(
         extra={"width": width, "height": height, "size_bytes": len(image_bytes)},
     )
 
-    return file_path, metadata
+    # Upload to Supabase pending if storage and thread_id available
+    storage_path: str | None = None
+
+    if _storage_client is not None and thread_id is not None:
+        content_type_map = {
+            "png": "image/png",
+            "jpeg": "image/jpeg",
+            "jpg": "image/jpeg",
+            "webp": "image/webp",
+        }
+        content_type = content_type_map.get(extension, "image/png")
+
+        try:
+            try:
+                asyncio.get_running_loop()
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        asyncio.run,
+                        _storage_client.upload_to_pending(
+                            file_bytes=image_bytes,
+                            thread_id=thread_id,
+                            filename=filename,
+                            content_type=content_type,
+                        )
+                    )
+                    upload_result = future.result()
+            except RuntimeError:
+                upload_result = asyncio.run(
+                    _storage_client.upload_to_pending(
+                        file_bytes=image_bytes,
+                        thread_id=thread_id,
+                        filename=filename,
+                        content_type=content_type,
+                    )
+                )
+
+            storage_path = upload_result["storage_path"]
+            logger.info(
+                "Uploaded image to pending storage",
+                extra={"storage_path": storage_path, "thread_id": thread_id},
+            )
+        except Exception as upload_error:
+            logger.warning(
+                f"Failed to upload to pending storage: {upload_error}",
+                extra={"file_name": filename, "thread_id": thread_id},
+            )
+
+    return file_path, metadata, storage_path
 
 
 def _extract_image_from_response(response: Any) -> str | None:
@@ -393,19 +519,27 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
         )
 
     try:
-        image_uri, _ = _load_and_encode_image(input_spec.source_image)
         llm = _get_gemini3_image_llm(output_spec=input_spec.output)
         prompt = _build_edit_prompt(input_spec)
 
+        # Build content with source image first
+        source_uri, _ = _load_and_encode_image(input_spec.source_image)
+        content: list[dict[str, Any]] = [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": source_uri}},
+        ]
+
+        # Add reference images (limit to 14 to stay within API limits)
+        for ref_path in input_spec.reference_images[:14]:
+            try:
+                ref_uri, _ = _load_and_encode_image(ref_path)
+                content.append({"type": "image_url", "image_url": {"url": ref_uri}})
+            except Exception as e:
+                logger.warning("Failed to load reference image %s: %s", ref_path, e)
+
         messages = [
             {"role": "system", "content": TOOL_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": image_uri}},
-                ],
-            },
+            {"role": "user", "content": content},
         ]
 
         response = llm.invoke(messages)  # type: ignore[arg-type]
@@ -428,8 +562,8 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
         elif input_spec.background and input_spec.background.type in ("transparent", "remove"):
             description = "Background removed"
 
-        file_path, metadata = _save_base64_image(
-            image_data, "edit", input_spec.output, description
+        file_path, metadata, storage_path = _save_base64_image(
+            image_data, "edit", input_spec.output, description, input_spec.thread_id
         )
 
         output_variant = OutputVariant(
@@ -438,6 +572,7 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
             preview_path=str(file_path),
             metadata=metadata,
             description=description,
+            storage_path=storage_path,
         )
 
         return ImageStudioOutput(
@@ -510,8 +645,8 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
         if input_spec.scene:
             description = f"Lifestyle: {input_spec.scene.environment}"
 
-        file_path, metadata = _save_base64_image(
-            image_data, "generate", input_spec.output, description
+        file_path, metadata, storage_path = _save_base64_image(
+            image_data, "generate", input_spec.output, description, input_spec.thread_id
         )
 
         output_variant = OutputVariant(
@@ -520,6 +655,7 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
             preview_path=str(file_path),
             metadata=metadata,
             description=description,
+            storage_path=storage_path,
         )
 
         return ImageStudioOutput(
@@ -554,6 +690,7 @@ def _image_studio_impl(
     operation: str,
     source_image: str | None = None,
     reference_images: list[str] | None = None,
+    thread_id: str | None = None,
     custom_instruction: str | None = None,
     background: dict[str, Any] | None = None,
     lighting: dict[str, Any] | None = None,
@@ -564,8 +701,24 @@ def _image_studio_impl(
     extraction: dict[str, Any] | None = None,
     focus: dict[str, Any] | None = None,
     output: dict[str, Any] | None = None,
+    config: Annotated[RunnableConfig, InjectedToolArg] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
-    """Image Studio tool implementation."""
+    """Image Studio tool implementation.
+
+    thread_id is automatically injected from RunnableConfig via InjectedToolArg.
+    This enables automatic cloud storage persistence without requiring the
+    LLM to explicitly pass thread_id.
+    """
+    # Inject thread_id from config if not explicitly provided
+    if thread_id is None and config is not None:
+        configurable = config.get("configurable", {})
+        thread_id = configurable.get("thread_id")
+        if thread_id:
+            logger.debug(
+                "Injected thread_id from RunnableConfig",
+                extra={"thread_id": thread_id}
+            )
+
     try:
         def _maybe_convert(value: Any, model_class: type[T]) -> T | None:
             if value is None:
@@ -580,6 +733,7 @@ def _image_studio_impl(
             operation=ImageOperation(operation) if isinstance(operation, str) else operation,
             source_image=source_image,
             reference_images=reference_images or [],
+            thread_id=thread_id,
             custom_instruction=custom_instruction,
             background=_maybe_convert(background, BackgroundSpec),
             lighting=_maybe_convert(lighting, LightingSpec),
@@ -629,8 +783,11 @@ def _image_studio_impl(
         )
 
 
-def create_image_studio_tool() -> StructuredTool:
+def create_image_studio_tool(storage: StorageUploader | None = None) -> StructuredTool:
     """Create the Image Studio tool.
+
+    Args:
+        storage: Optional storage client for persisting images to Supabase pending/
 
     CAPABILITIES (Gemini 3 Pro Image):
 
@@ -644,7 +801,14 @@ def create_image_studio_tool() -> StructuredTool:
     - Lifestyle shots: Product in realistic scenes (kitchen, office, retail)
     - Studio shots: Clean professional backgrounds
     - Custom scenes: Describe any environment
+
+    STORAGE:
+    - Generated images are uploaded to pending/{thread_id}/ for persistence
+    - storage_path is included in output for write_data
     """
+    # Set module-level storage client
+    _set_storage_client(storage)
+
     return StructuredTool.from_function(
         func=_image_studio_impl,
         name="image_studio",

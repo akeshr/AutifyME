@@ -6,13 +6,20 @@ Domain Ownership ("How We Present"):
 - Multi-product extraction with professional isolation
 - Marketplace-ready hero shots (Amazon, Shopify, Instagram quality)
 - Lifestyle and contextual scene generation
+- Asset management (create asset records after processing)
 
 Architecture:
 - SubAgent spec dict for PM delegation
 - Owns image_studio tool (Gemini 3 Pro Image)
+- Has inspect_schema (scoped to assets/product_images) for schema discovery
+- Has write_data (scoped to assets) for persisting processed images
+- Has read_data (scoped to assets + product images) for reference
 - Uses MultimodalInjectionMiddleware to SEE images in delegation messages
-- Returns studio-grade processed images for catalog creation
-- Does NOT create database records (Catalog Specialist owns that)
+
+Storage Architecture:
+- Generated images are uploaded to pending/{thread_id}/ immediately
+- On write_data with HITL approval, images are moved to products/
+- All tools use storage_path (relative path) - URL is derived where needed
 
 Professional Standards:
 - Pure white backgrounds for hero shots
@@ -21,7 +28,7 @@ Professional Standards:
 - 70-85% product coverage, centered composition
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain.chat_models import BaseChatModel
 
@@ -31,12 +38,27 @@ from autifyme_agents.middleware import MultimodalInjectionMiddleware
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.image_studio import create_image_studio_tool
 
+if TYPE_CHECKING:
+    from autifyme_agents.core.ports import StorageInterface
+
 # Creative Specialist uses Gemini 3 Pro for multimodal reasoning (can see images)
 CREATIVE_SPECIALIST_MODEL = "gemini-3-pro-preview"
+
+# Tables accessible by Creative Specialist
+CREATIVE_READ_TABLES = [
+    "assets",           # Read existing assets
+    "product_assets",   # Read product-asset links
+    "product_images",   # Read product image records
+]
+
+CREATIVE_WRITE_TABLES = [
+    "assets",           # Create asset records for processed images
+]
 
 
 def create_creative_specialist(
     model: str | BaseChatModel | None = None,
+    storage: "StorageInterface | None" = None,
 ) -> dict[str, Any]:
     """Create Creative Specialist SubAgent spec.
 
@@ -46,6 +68,7 @@ def create_creative_specialist(
 
     Args:
         model: Optional LLM override. Defaults to Gemini 3 Pro (multimodal).
+        storage: Optional storage client for image persistence to Supabase.
 
     Returns:
         SubAgent spec dict: {name, description, tools, system_prompt, model, middleware}
@@ -54,17 +77,31 @@ def create_creative_specialist(
 
     tools: list[Any] = [
         create_view_image_tool(),  # Quick inspection without processing
-        create_image_studio_tool(),  # Professional image processing
+        create_image_studio_tool(storage=storage),  # Professional image processing with persistence
     ]
+
+    # Add scoped data tools if storage is provided
+    if storage is not None:
+        from autifyme_agents.tools.data_engine import (
+            create_inspect_schema_tool,
+            create_read_data_tool,
+            create_write_data_tool,
+        )
+        # Schema discovery for write_data - understand table structure before writing
+        tools.append(create_inspect_schema_tool(storage, tables=CREATIVE_READ_TABLES))
+        # Scoped read access to asset-related tables
+        tools.append(create_read_data_tool(storage, tables=CREATIVE_READ_TABLES))
+        # Scoped write access to assets table only
+        tools.append(create_write_data_tool(storage, tables=CREATIVE_WRITE_TABLES))
 
     description = (
         "Creative Specialist - professional product photographer creating studio-quality images. "
         "Produces: marketplace-ready hero shots (pure white background, studio lighting, color-accurate), "
         "multi-product extraction with clean isolation, lifestyle shots with contextual scenes. "
-        "Standards: 70-85% product coverage, proper framing, enhancement suite (sharpness, color correction, denoise). "
-        "Include image paths in task - specialist SEES and diagnoses images like a professional photographer. "
-        "Returns: processed image paths with professional assessment. "
-        "Does NOT handle: database operations, product records, pricing."
+        "Include storage_path (from inbox/) in task - specialist SEES images. "
+        "Returns: processed images with storage_path (in pending/). "
+        "Has inspect_schema for schema discovery before write_data. "
+        "Creates asset records via write_data (HITL approval required)."
     )
 
     # Use provided model or default to Gemini 3 Pro (multimodal)
@@ -83,7 +120,7 @@ def create_creative_specialist(
         "system_prompt": system_prompt,
         "model": specialist_model,
         "middleware": middleware,
-        "interrupt_on": {},  # No HITL - read-only operations
+        "interrupt_on": {"write_data": True},  # HITL approval before write_data execution
     }
 
     return spec

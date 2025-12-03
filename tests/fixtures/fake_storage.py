@@ -820,6 +820,139 @@ class FakeStorage(StorageInterface):
         """Get public URL for stored asset."""
         return f"https://fake-storage.test/{bucket}/{storage_path}"
 
+    async def upload_to_inbox(
+        self,
+        file_bytes: bytes,
+        thread_id: str,
+        filename: str,
+        content_type: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Upload user-provided media to inbox folder.
+
+        Simulates immediate persistence of WhatsApp-uploaded images.
+        """
+        # Sanitize thread_id for folder name
+        sanitized_thread_id = thread_id.replace(":", "_")
+        storage_path = f"inbox/{sanitized_thread_id}/{filename}"
+
+        # Store in in-memory storage
+        if not hasattr(self, "_file_storage"):
+            self._file_storage: dict[str, dict[str, Any]] = {}
+
+        bucket_key = f"{bucket}/{storage_path}"
+        self._file_storage[bucket_key] = {
+            "content": file_bytes,
+            "content_type": content_type,
+            "size_bytes": len(file_bytes),
+        }
+
+        public_url = f"https://fake-storage.test/{bucket}/{storage_path}"
+
+        return {
+            "success": True,
+            "storage_path": storage_path,
+            "bucket": bucket,
+            "public_url": public_url,
+            "size_bytes": len(file_bytes),
+            "content_type": content_type,
+        }
+
+    async def upload_to_pending(
+        self,
+        file_bytes: bytes,
+        thread_id: str,
+        filename: str,
+        content_type: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Upload AI-generated media to pending folder.
+
+        Simulates staging area for images awaiting HITL approval.
+        """
+        # Sanitize thread_id for folder name
+        sanitized_thread_id = thread_id.replace(":", "_")
+        storage_path = f"pending/{sanitized_thread_id}/{filename}"
+
+        # Store in in-memory storage
+        if not hasattr(self, "_file_storage"):
+            self._file_storage = {}
+
+        bucket_key = f"{bucket}/{storage_path}"
+        self._file_storage[bucket_key] = {
+            "content": file_bytes,
+            "content_type": content_type,
+            "size_bytes": len(file_bytes),
+        }
+
+        public_url = f"https://fake-storage.test/{bucket}/{storage_path}"
+
+        return {
+            "success": True,
+            "storage_path": storage_path,
+            "bucket": bucket,
+            "public_url": public_url,
+            "size_bytes": len(file_bytes),
+            "content_type": content_type,
+        }
+
+    async def move_asset(
+        self,
+        source_path: str,
+        target_folder: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Move asset from one folder to another.
+
+        Simulates moving from pending/ to products/ on approval.
+        """
+        import mimetypes
+        from pathlib import Path
+
+        if not hasattr(self, "_file_storage"):
+            self._file_storage = {}
+
+        source_key = f"{bucket}/{source_path}"
+
+        # Check source exists
+        if source_key not in self._file_storage:
+            raise FileNotFoundError(f"Source file not found: {source_path}")
+
+        # Get source data
+        source_data = self._file_storage[source_key]
+
+        # Generate new filename in target folder
+        source_filename = Path(source_path).name
+        extension = Path(source_filename).suffix.lower()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        new_filename = f"{timestamp}_{unique_id}{extension}"
+        target_path = f"{target_folder}/{new_filename}"
+
+        # Detect content type
+        content_type = source_data.get("content_type")
+        if not content_type:
+            content_type, _ = mimetypes.guess_type(source_filename)
+            content_type = content_type or "application/octet-stream"
+
+        # Move to target
+        target_key = f"{bucket}/{target_path}"
+        self._file_storage[target_key] = source_data.copy()
+
+        # Delete source
+        del self._file_storage[source_key]
+
+        public_url = f"https://fake-storage.test/{bucket}/{target_path}"
+
+        return {
+            "success": True,
+            "storage_path": target_path,
+            "bucket": bucket,
+            "public_url": public_url,
+            "size_bytes": source_data["size_bytes"],
+            "content_type": content_type,
+        }
+
     # ========================================================================
     # Lifecycle Management
     # ========================================================================

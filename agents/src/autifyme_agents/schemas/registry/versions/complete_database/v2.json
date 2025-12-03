@@ -2238,6 +2238,13 @@
           "nullable": true,
           "description": "AI generation prompt"
         },
+        "caption": {
+          "name": "caption",
+          "type": "varchar",
+          "max_length": 500,
+          "nullable": true,
+          "description": "Human-readable caption for HITL preview and alt text. Maps from AssetUpload.caption."
+        },
         "metadata": {
           "name": "metadata",
           "type": "jsonb",

@@ -86,8 +86,10 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
         if isinstance(content, str):
             return not content.strip()
 
-        # List content (multimodal format)
-        # Note: AIMessage.content is Union[str, list], so this must be list
+        # List content (multimodal format) - content is list at this point
+        if len(content) == 0:
+            return True
+
         # Check for any meaningful content in blocks
         for block in content:
             # String block with content
@@ -109,7 +111,7 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
                 if block.get("type") and block.get("type") != "text":
                     return False
 
-        # All blocks were empty or list was empty
+        # All blocks were empty
         return True
 
     def _get_retry_delay(self, attempt: int) -> float:

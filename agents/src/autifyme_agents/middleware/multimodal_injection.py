@@ -50,8 +50,12 @@ logger = logging.getLogger(__name__)
 # - Plain text: /tmp/file.jpg or C:\path\file.png
 # - JSON strings: "path": "/tmp/file.jpg" or "path": "C:\\path\\file.png"
 # - With escaped backslashes in JSON: C:\\\\Users\\\\...
+# - Storage URLs: https://....supabase.co/storage/...
 IMAGE_PATH_PATTERN = re.compile(
     r'(?:'
+    # Storage URLs (Supabase, S3, etc.)
+    r'(https?://[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))'
+    r'|'
     # Unix paths: /tmp/..., /var/...
     r'(/(?:tmp|var|home|Users)[/][^\s<>"\'\\]+\.(?:jpg|jpeg|png|gif|webp))'
     r'|'
@@ -71,21 +75,44 @@ MAX_IMAGE_DIMENSION = 1024  # Larger for specialist (higher detail for image_stu
 
 
 def _load_and_encode_image(image_path: str) -> tuple[str, dict[str, Any]] | None:
-    """Load image from path and encode as base64 data URI.
+    """Load image from storage_path/URL/local path and encode as base64 data URI.
 
     Args:
-        image_path: Path to image file
+        image_path: storage_path, URL, or local file path
 
     Returns:
         Tuple of (data_uri, metadata) or None if loading fails
     """
     try:
-        path = Path(image_path)
-        if not path.exists():
-            logger.warning("Image not found: %s", image_path)
-            return None
+        # Import here to avoid circular dependency
+        from autifyme_agents.core.storage_utils import build_storage_url, is_storage_path
 
-        with Image.open(path) as img:
+        # Convert storage_path to URL if needed
+        if is_storage_path(image_path):
+            try:
+                image_path = build_storage_url(image_path)
+            except ValueError:
+                logger.warning("Cannot build URL for storage_path: %s", image_path)
+                return None
+
+        # Handle URLs
+        img: Image.Image
+        if image_path.startswith(("http://", "https://")):
+            import httpx
+
+            response = httpx.get(image_path, timeout=30)
+            response.raise_for_status()
+            img = Image.open(io.BytesIO(response.content))
+            source_type = "url"
+        else:
+            path = Path(image_path)
+            if not path.exists():
+                logger.warning("Image not found: %s", image_path)
+                return None
+            img = Image.open(path)
+            source_type = "local"
+
+        with img:
             original_size = img.size
             original_format = img.format or "JPEG"
 
@@ -116,14 +143,15 @@ def _load_and_encode_image(image_path: str) -> tuple[str, dict[str, Any]] | None
             data_uri = f"data:image/jpeg;base64,{encoded}"
 
         metadata = {
-            "path": str(path),
+            "source": image_path,
+            "type": source_type,
             "original_size": f"{original_size[0]}x{original_size[1]}",
             "format": original_format,
         }
 
         logger.info(
             "Image loaded for multimodal injection",
-            extra={"path": image_path, "size": original_size}
+            extra={"source": image_path, "type": source_type, "size": original_size}
         )
 
         return data_uri, metadata
@@ -134,18 +162,19 @@ def _load_and_encode_image(image_path: str) -> tuple[str, dict[str, Any]] | None
 
 
 def _extract_image_paths(text: str) -> list[str]:
-    """Extract image file paths from text.
+    """Extract image file paths and URLs from text.
 
     Handles paths in various formats:
+    - Storage URLs (https://...supabase.co/...)
     - Plain text paths
     - JSON-embedded paths with escaped backslashes
     - Windows and Unix paths
 
     Args:
-        text: Text that may contain image paths
+        text: Text that may contain image paths or URLs
 
     Returns:
-        List of unique image paths found (normalized for filesystem access)
+        List of unique image paths/URLs found
     """
     matches = IMAGE_PATH_PATTERN.findall(text)
     # findall returns tuples when pattern has multiple groups
@@ -159,8 +188,12 @@ def _extract_image_paths(text: str) -> list[str]:
         if not path:
             continue
 
-        # Normalize escaped backslashes from JSON (\\\\  -> \\ and \\ -> \)
-        normalized = path.replace("\\\\", "\\").strip()
+        # URLs don't need normalization, only local paths
+        if path.startswith(("http://", "https://")):
+            normalized = path.strip()
+        else:
+            # Normalize escaped backslashes from JSON (\\\\  -> \\ and \\ -> \)
+            normalized = path.replace("\\\\", "\\").strip()
 
         if normalized not in seen:
             seen.add(normalized)
@@ -172,26 +205,25 @@ def _extract_image_paths(text: str) -> list[str]:
 def _extract_paths_from_dict(data: dict[str, Any]) -> list[str]:
     """Extract image paths from structured tool output (dict).
 
-    Recursively searches for 'path' keys in the tool output structure.
-    Handles image_studio output format: {"outputs": [{"path": "..."}]}
+    Recursively searches for 'storage_path' key in the tool output.
+    Handles:
+    - image_studio output: {"outputs": [{"storage_path": "pending/..."}]}
+    - download_media output: {"storage_path": "inbox/..."}
 
     Args:
         data: Structured tool output dictionary
 
     Returns:
-        List of image paths found
+        List of storage_paths found
     """
     paths: list[str] = []
 
     def _recurse(obj: Any) -> None:
         if isinstance(obj, dict):
-            # Check for 'path' key that looks like an image path
-            if "path" in obj:
-                path_val = obj["path"]
-                if isinstance(path_val, str) and any(
-                    path_val.lower().endswith(ext)
-                    for ext in (".jpg", ".jpeg", ".png", ".gif", ".webp")
-                ):
+            # Check for 'storage_path' key (primary - Supabase bucket path)
+            if "storage_path" in obj:
+                path_val = obj["storage_path"]
+                if isinstance(path_val, str) and path_val:
                     paths.append(path_val)
             # Recurse into all values
             for value in obj.values():
@@ -237,7 +269,7 @@ def _transform_to_multimodal(
             # Add metadata as text for context
             content_blocks.append({
                 "type": "text",
-                "text": f"[Above image: {metadata['path']} ({metadata['original_size']})]",
+                "text": f"[Above image: {metadata['source']} ({metadata['original_size']})]",
             })
 
     return content_blocks

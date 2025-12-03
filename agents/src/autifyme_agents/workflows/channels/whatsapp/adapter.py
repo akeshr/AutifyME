@@ -10,6 +10,9 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
+
+import httpx
 
 from autifyme_agents.core.logging_config import get_logger
 from autifyme_agents.integrations.communication import WhatsAppClient, WhatsAppMediaClient
@@ -199,20 +202,63 @@ class WhatsAppChannel:
                 original_error=exc,
             ) from exc
 
+    def download_media_with_bytes(self, media_id: str) -> tuple[Path, bytes, str]:
+        """Download media file via WhatsApp Graph API with bytes.
+
+        Returns path, bytes, and MIME type. Used by platform tools when
+        storage persistence is needed (upload to Supabase inbox).
+
+        Args:
+            media_id: WhatsApp media ID from message
+
+        Returns:
+            Tuple of (Path, bytes, MIME type)
+
+        Raises:
+            ChannelError: If download fails
+        """
+        try:
+            logger.debug("Downloading WhatsApp media with bytes", extra={"media_id": media_id})
+
+            media_path, media_bytes, mime_type = self.media.download_media(media_id)
+
+            logger.info(
+                "WhatsApp media downloaded with bytes",
+                extra={
+                    "media_id": media_id,
+                    "path": str(media_path),
+                    "size_bytes": len(media_bytes),
+                    "mime_type": mime_type,
+                },
+            )
+
+            return media_path, media_bytes, mime_type
+
+        except Exception as exc:
+            logger.exception("Failed to download WhatsApp media", exc_info=exc)
+            raise ChannelError(
+                f"Failed to download media: {str(exc)}",
+                channel="whatsapp",
+                original_error=exc,
+            ) from exc
+
     def send_image(
         self,
         recipient: str,
-        image_path: str,
+        image_source: str,
         caption: str | None = None,
     ) -> dict[str, Any]:
         """Send image with optional caption via WhatsApp.
 
-        Uploads local file to WhatsApp, then sends as image message.
+        Handles both URLs and local file paths:
+        - URL (http/https): Fetches bytes, uploads directly to WhatsApp
+        - Local path: Reads bytes, uploads to WhatsApp
+
         Used for HITL approval flow to show asset previews.
 
         Args:
             recipient: WhatsApp phone number (e.g., "919876543210")
-            image_path: Local file path to the image
+            image_source: URL (Supabase storage) or local file path
             caption: Optional caption text (max 1024 chars, auto-truncated)
 
         Returns:
@@ -222,26 +268,48 @@ class WhatsAppChannel:
             ChannelError: If upload or send fails
         """
         try:
+            is_url = image_source.startswith(("http://", "https://"))
+
             logger.debug(
                 "Sending WhatsApp image",
                 extra={
                     "recipient": recipient,
-                    "image_path": image_path,
+                    "image_source": image_source[:100],
+                    "is_url": is_url,
                     "has_caption": caption is not None,
                 },
             )
 
-            # Step 1: Upload media to WhatsApp
-            media_id = self.media.upload_media(image_path)
+            # Get bytes and metadata based on source type
+            if is_url:
+                # Fetch from URL
+                response = httpx.get(image_source, timeout=30)
+                response.raise_for_status()
+                file_bytes = response.content
 
-            # Step 2: Send image message with media_id
+                # Extract filename from URL path
+                parsed = urlparse(image_source)
+                filename = Path(parsed.path).name or "image.jpg"
+
+                # Get MIME type from Content-Type header or derive from filename
+                mime_type = response.headers.get("Content-Type", "").split(";")[0]
+                if not mime_type or mime_type == "application/octet-stream":
+                    mime_type = self.media.derive_mime_type(Path(filename).suffix.lower())
+
+                # Upload bytes directly to WhatsApp
+                media_id = self.media.upload_media_from_bytes(file_bytes, filename, mime_type)
+            else:
+                # Local file - use existing upload_media
+                media_id = self.media.upload_media(image_source)
+
+            # Send image message with media_id
             result = self.client.send_image(recipient, media_id, caption=caption)
 
             logger.info(
                 "WhatsApp image sent successfully",
                 extra={
                     "recipient": recipient,
-                    "image_path": image_path,
+                    "image_source": image_source[:100],
                     "media_id": media_id,
                     "message_id": result.get("message_id"),
                 },
@@ -252,10 +320,22 @@ class WhatsAppChannel:
         except FileNotFoundError as exc:
             logger.error(
                 "Image file not found for WhatsApp send",
-                extra={"recipient": recipient, "image_path": image_path}
+                extra={"recipient": recipient, "image_source": image_source}
             )
             raise ChannelError(
-                f"Image file not found: {image_path}",
+                f"Image file not found: {image_source}",
+                channel="whatsapp",
+                recipient=recipient,
+                original_error=exc,
+            ) from exc
+
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "Failed to fetch image from URL",
+                extra={"recipient": recipient, "url": image_source, "status": exc.response.status_code}
+            )
+            raise ChannelError(
+                f"Failed to fetch image from URL: {exc.response.status_code}",
                 channel="whatsapp",
                 recipient=recipient,
                 original_error=exc,
