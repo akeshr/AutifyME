@@ -161,10 +161,13 @@ async def create_project_manager(
     )
 
     # Domain Specialists (with storage for image persistence)
-    creative_specialist = create_creative_specialist(model=None, storage=storage)
-    catalog_specialist = create_catalog_specialist(
-        storage=storage,
+    creative_specialist = create_creative_specialist(
         model=specialist_llm,
+        storage=storage,
+    )
+    catalog_specialist = create_catalog_specialist(
+        model=specialist_llm,
+        storage=storage,
     )
 
     subagents: list[Any] = [creative_specialist, catalog_specialist]
