@@ -112,6 +112,7 @@ Framework for Claude to test, analyze, and improve the agentic system through hi
 | Document | Purpose |
 | --- | --- |
 | **[AUTONOMOUS_TESTING_FRAMEWORK.md](./testing/AUTONOMOUS_TESTING_FRAMEWORK.md)** | **[PRIMARY]** Complete framework - Claude as orchestrator, 5 essential tools, workflows |
+| **[WORKFLOW_EVALUATION_FRAMEWORK.md](./testing/WORKFLOW_EVALUATION_FRAMEWORK.md)** | **[NEW]** World-class framework for AI agents to evaluate and improve any agentic workflow |
 | **[TOOL_SPECIFICATIONS.md](./testing/TOOL_SPECIFICATIONS.md)** | Complete API reference for 5 observation tools |
 | **[HIERARCHICAL_TRACE_ANALYSIS.md](./testing/HIERARCHICAL_TRACE_ANALYSIS.md)** | 3-level lazy-loading trace analysis strategy (25x token reduction) |
 | **[QUICK_REFERENCE.md](./testing/QUICK_REFERENCE.md)** | Cheat sheet - common commands, decision trees, token budgets |
