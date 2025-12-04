@@ -1,27 +1,28 @@
 """Image Studio Tool - Gemini 3 Pro Image integration.
 
-Unified tool for product image operations:
-- edit: Background removal, enhancement, extraction, cleanup
-- generate: Lifestyle shots, scene placement
-
-Architecture: Single atomic tool with structured Pydantic schema.
+Intelligence-First architecture:
+- Labeled images: Each image has a label referenced in instructions
+- Structured specs: Guide completeness, accept any string value
+- Model reasons about what to do from specs and labels
 """
 
 from autifyme_agents.tools.image_studio.schemas import (
     BackgroundSpec,
+    CompositionSpec,
+    CustomSpec,
     EnhancementSpec,
     ExtractionSpec,
-    FocusRegionSpec,
-    FramingSpec,
+    FocusSpec,
+    ImageInput,
     ImageMetadata,
-    ImageOperation,
     ImageStudioErrorCode,
     ImageStudioInput,
     ImageStudioOutput,
     LightingSpec,
+    MaterialTreatmentSpec,
     OutputSpec,
     OutputVariant,
-    ProductPlacement,
+    ProductPlacementSpec,
     SceneSpec,
 )
 from autifyme_agents.tools.image_studio.tool import create_image_studio_tool
@@ -29,18 +30,22 @@ from autifyme_agents.tools.image_studio.tool import create_image_studio_tool
 __all__ = [
     # Tool factory
     "create_image_studio_tool",
-    # Input schemas
-    "ImageOperation",
+    # Input schemas - Images
+    "ImageInput",
+    "ImageStudioInput",
+    # Input schemas - Structured specs
     "BackgroundSpec",
     "LightingSpec",
-    "FramingSpec",
+    "CompositionSpec",
     "EnhancementSpec",
     "SceneSpec",
-    "ProductPlacement",
+    "ProductPlacementSpec",
     "ExtractionSpec",
-    "FocusRegionSpec",
+    "FocusSpec",
+    "MaterialTreatmentSpec",
+    "CustomSpec",
+    # Output configuration
     "OutputSpec",
-    "ImageStudioInput",
     # Output schemas
     "ImageMetadata",
     "OutputVariant",

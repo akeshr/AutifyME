@@ -2230,7 +2230,7 @@
           "name": "source_asset_ids",
           "type": "array",
           "nullable": true,
-          "description": "For AI-generated: source assets used (uuid[])"
+          "description": "Optional lineage tracking for AI-generated assets. If provided, must be non-empty uuid[]. NULL allowed for AI-generated from raw uploads."
         },
         "generation_prompt": {
           "name": "generation_prompt",

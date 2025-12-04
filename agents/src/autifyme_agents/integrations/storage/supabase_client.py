@@ -2551,7 +2551,7 @@ class SupabaseStorageClient(StorageInterface):
             bucket: Storage bucket name (default: "assets")
 
         Returns:
-            Dict with success, storage_path, bucket, public_url, size_bytes, content_type
+            Dict with success, storage_path, bucket, public_url, size_bytes, content_type, file_name
 
         Raises:
             StorageError: On move failure
@@ -2615,6 +2615,7 @@ class SupabaseStorageClient(StorageInterface):
                 "public_url": public_url,
                 "size_bytes": len(file_bytes),
                 "content_type": content_type,
+                "file_name": new_filename,
             }
 
         except FileNotFoundError:

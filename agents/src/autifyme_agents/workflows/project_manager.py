@@ -53,9 +53,8 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
         return model
     return get_llm(
         provider="google",
-        model="gemini-2.5-pro",
-        temperature=0.7,
-        thinking_budget=128,  # Pro minimum; PM orchestrates, specialists reason
+        model="gemini-2.5-flash",
+        temperature=0.7,  # PM orchestrates, specialists reason
         max_retries=5,  # Increase resilience against blank responses
     )
 
@@ -155,14 +154,14 @@ async def create_project_manager(
     # Specialist LLM configuration
     specialist_llm = get_llm(
         provider="google",
-        model="gemini-2.5-pro",
+        model="gemini-2.5-flash",
         temperature=0.7,
         max_retries=5,  # Match PM resilience for blank response handling
     )
 
     # Domain Specialists (with storage for image persistence)
     creative_specialist = create_creative_specialist(
-        model=specialist_llm,
+        model=None,
         storage=storage,
     )
     catalog_specialist = create_catalog_specialist(
