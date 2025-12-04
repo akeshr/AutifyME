@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from autifyme_agents.core.ports import StorageInterface
 
 # Creative Specialist uses Gemini 3 Pro for multimodal reasoning (can see images)
-CREATIVE_SPECIALIST_MODEL = "gemini-3-pro-preview"
+CREATIVE_SPECIALIST_MODEL = "gemini-2.5-flash"
 
 # Tables accessible by Creative Specialist
 CREATIVE_READ_TABLES = [
@@ -108,7 +108,7 @@ def create_creative_specialist(
     specialist_model = model if model is not None else get_llm(
         provider="google",
         model=CREATIVE_SPECIALIST_MODEL,
-        temperature=1.0,
+        temperature=0.8,
     )
 
     # Multimodal middleware injects images from paths in delegation message

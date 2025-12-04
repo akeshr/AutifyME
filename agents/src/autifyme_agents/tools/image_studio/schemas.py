@@ -590,6 +590,15 @@ class OutputSpec(BaseModel):
     format: Literal["PNG", "JPEG", "WEBP"] = "PNG"
     size: Literal["1K", "2K", "4K"] = "2K"
     aspect_ratio: Literal["1:1", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "original"] = "1:1"
+    filename: str | None = Field(
+        default=None,
+        description=(
+            "Output filename (without extension). IMPORTANT: Specify this to know the "
+            "exact path for view_image and write_data. "
+            "Examples: 'mug_hero', 'tumbler_v2', 'product_lifestyle'. "
+            "If not specified, auto-generated UUID is used."
+        )
+    )
 
 
 # =============================================================================

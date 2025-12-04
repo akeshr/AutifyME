@@ -223,10 +223,18 @@ def _save_base64_image(
 
     image_bytes = base64.b64decode(base64_data)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    unique_id = str(uuid.uuid4())[:8]
     extension = output_spec.format.lower()
-    filename = f"{timestamp}_studio_{unique_id}.{extension}"
+
+    # Use explicit filename if provided, otherwise generate unique name
+    if output_spec.filename:
+        # Sanitize filename (remove extension if accidentally included)
+        base_name = output_spec.filename.rsplit(".", 1)[0] if "." in output_spec.filename else output_spec.filename
+        filename = f"{base_name}.{extension}"
+    else:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        filename = f"{timestamp}_studio_{unique_id}.{extension}"
+
     file_path = MEDIA_DIR / filename
 
     file_path.write_bytes(image_bytes)
