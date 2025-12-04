@@ -425,6 +425,7 @@ image_studio(
   lighting={"type": "soft front", "direction": "frontal", "shadows": "contact shadow"},
   composition={"product_coverage": "80% frame", "position": "centered"},
   material_treatment={"primary_material": "matte ceramic", "rendering_notes": "no artificial shine, preserve matte surface texture"},
+  enhancement={"sharpness": "medium", "contrast": "subtle lift", "cleanup": "remove dust spots"},
   output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1", "filename": "mug_hero"}
 )
 image_studio(
@@ -434,15 +435,18 @@ image_studio(
   lighting={"type": "side key", "direction": "45 degrees camera-left", "shadows": "contact shadow", "special_requirements": "controlled specular for metal"},
   composition={"product_coverage": "80% frame", "position": "centered"},
   material_treatment={"primary_material": "brushed metal", "rendering_notes": "gradient reflections, no color contamination", "preserve_details": "surface texture"},
+  enhancement={"sharpness": "high on edges", "contrast": "medium punch", "color_treatment": "accurate to source"},
+  focus={"focus_point": "product center", "depth_of_field": "entire product sharp"},
   output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1", "filename": "tumbler_hero"}
 )
 image_studio(
   images=[{"path": "inbox/whatsapp_555_919000111222/products.jpg", "label": "source"}],
-  extraction={"target_description": "Blue plastic bottle on right in [source]", "position_hint": "right side", "isolation": "complete", "edge_treatment": "clean professional"},
+  extraction={"target_description": "Blue plastic bottle on right in [source]", "position_hint": "right side", "isolation": "complete", "edge_treatment": "clean professional", "custom": "Preserve cap threading detail"},
   background={"treatment": "solid white", "color": "#FFFFFF"},
-  lighting={"type": "back/side key", "direction": "behind and side", "shadows": "soft", "special_requirements": "show translucency"},
+  lighting={"type": "back/side key", "direction": "behind and side", "shadows": "soft", "special_requirements": "show translucency", "custom": "Rim light to define bottle edges"},
   composition={"product_coverage": "80% frame", "position": "centered"},
   material_treatment={"primary_material": "translucent plastic", "rendering_notes": "light passes through, not painted solid - preserve translucency"},
+  enhancement={"sharpness": "medium", "color_treatment": "preserve blue saturation accurately"},
   output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1", "filename": "bottle_hero"}
 )
 -> Returns: pending/{thread}/mug_hero.png, tumbler_hero.png, bottle_hero.png
@@ -571,7 +575,7 @@ view_image("inbox/whatsapp_444_919555666777/jar.jpg")
 read_data(table="assets", filters={"category": "LIFESTYLE"}, select=["name", "caption"], limit=3)
 -> Found: morning kitchen styles, consistent warm tones - maintain visual language
 
-// EXECUTE with STRUCTURED SPECS
+// EXECUTE with STRUCTURED SPECS - Full lifestyle treatment
 image_studio(
   images=[{"path": "inbox/whatsapp_444_919555666777/jar.jpg", "label": "product"}],
   scene={
@@ -579,54 +583,81 @@ image_studio(
     "style": "Kinfolk magazine editorial",
     "mood": "warm morning organization story",
     "time_of_day": "morning golden hour",
-    "props_and_context": "soft background elements - other jars, small plant for depth"
+    "props_and_context": "soft background elements - other jars, small plant for depth",
+    "custom": "Include subtle steam or warm atmosphere suggesting fresh morning"
   },
   placement={
     "position": "place [product] on marble counter, left of center (rule of thirds)",
     "scale": "hero dominant but contextual",
     "surface": "white marble with subtle veining",
-    "interaction": "catching golden window light"
+    "interaction": "catching golden window light, subtle reflection on marble",
+    "custom": "Slight angle to show bamboo lid texture"
   },
   lighting={
     "type": "natural window light",
     "direction": "golden hour through window, camera-left",
     "quality": "soft diffused morning light",
     "color_temperature": "warm golden 4500K",
-    "shadows": "soft natural shadows to right"
+    "shadows": "soft natural shadows to right",
+    "special_requirements": "Light must pass through glass showing volume",
+    "custom": "Subtle lens flare acceptable for authenticity"
   },
   composition={
     "product_coverage": "40% frame - lifestyle context",
     "position": "rule of thirds left",
-    "camera_angle": "slight above eye level"
+    "camera_angle": "slight above eye level",
+    "negative_space": "right side open for potential text overlay",
+    "custom": "Lead room toward window light source"
   },
   material_treatment={
     "primary_material": "glass with bamboo lid",
-    "rendering_notes": "glass: light passes through, internal volume, edge refraction catches gold light. bamboo: warm wood grain, organic contrast to marble"
+    "rendering_notes": "glass: light passes through, internal volume, edge refraction catches gold light. bamboo: warm wood grain, organic contrast to marble",
+    "preserve_details": "bamboo grain texture, glass clarity",
+    "custom": "Marble surface should have subtle warm reflection of jar"
+  },
+  enhancement={
+    "sharpness": "medium on product, soft on background",
+    "contrast": "low-medium for airy editorial feel",
+    "color_treatment": "warm color grade, lifted shadows for lifestyle feel",
+    "detail_enhancement": "bring out bamboo wood grain",
+    "custom": "Slight film grain for editorial authenticity"
   },
   focus={
     "focus_point": "[product] center",
-    "depth_of_field": "shallow - product sharp, background creamy soft"
+    "depth_of_field": "shallow - product sharp, background creamy soft",
+    "falloff": "gradual natural bokeh on background elements",
+    "custom": "Background props should be recognizable but soft"
   },
-  output={"format": "PNG", "size": "2K", "aspect_ratio": "4:3"}
+  creative_direction="Instagram lifestyle shot - warm, inviting, aspirational morning routine. The kind of image that makes people want to organize their kitchen.",
+  output={"format": "PNG", "size": "2K", "aspect_ratio": "4:3", "filename": "jar_lifestyle_morning"}
 )
--> Returns: jar_lifestyle.png in pending/
+-> Returns: pending/{thread}/jar_lifestyle_morning.png
 
-// VERIFY
-view_image("pending/.../jar_lifestyle.png")
--> Scene authentic, light consistent with existing lifestyle assets - PASS
+// VERIFY with structured critique
+view_image("pending/{thread}/jar_lifestyle_morning.png")
+-> MATERIAL: PASS - glass transparency with light passing through, bamboo grain visible
+   SCENE: PASS - kitchen authentic, marble veining subtle, props soft but present
+   LIGHTING: PASS - golden hour warmth, natural window light feel, glass catching light
+   COMPOSITION: PASS - rule of thirds, negative space for copy, lifestyle context
+   ENHANCEMENT: PASS - warm grade, film grain subtle, editorial quality
+   FOCUS: PASS - product sharp, background creamy bokeh
+   VERDICT: SHIP IT - Kinfolk-worthy
 
 // PERSIST with correct schema
 write_data(
-  goal="Create lifestyle asset for glass jar",
-  reasoning="Generated morning kitchen scene for Instagram. Consistent with existing lifestyle visual language.",
-  hitl_summary="LIFESTYLE - Glass Jar
+  goal="Create lifestyle asset for glass jar - Instagram morning kitchen",
+  reasoning="Generated morning kitchen scene for Instagram. Applied Kinfolk editorial style, maintained consistency with existing lifestyle visual language. Warm golden hour lighting, shallow DoF, film grain for authenticity.",
+  hitl_summary="LIFESTYLE - Glass Jar Morning Kitchen
 
-Scene: Morning kitchen, golden light, marble counter
-Format: 4:3 for Instagram
+Scene: Modern minimalist kitchen, marble counter, golden hour window light
+Style: Kinfolk magazine editorial aesthetic
+Mood: Warm, inviting morning organization
+
+Technical: 4:3 aspect for Instagram, warm color grade, subtle film grain
 
 Reply *approve* or *reject*",
   asset_uploads=[
-    {"storage_path": "pending/.../jar_lifestyle.png", "returns": "jar", "caption": "Glass jar kitchen lifestyle", "target_folder": "products"}
+    {"storage_path": "pending/{thread}/jar_lifestyle_morning.png", "returns": "jar", "caption": "Glass jar kitchen lifestyle - morning golden hour", "target_folder": "products"}
   ],
   operations=[
     {"action": "create", "table": "assets", "data": {
@@ -667,7 +698,7 @@ view_image("inbox/whatsapp_333_919888777666/jar_main.jpg") -> Large glass jar, c
 view_image("inbox/whatsapp_333_919888777666/jar_small.jpg") -> Small matching jar
 view_image("inbox/whatsapp_333_919888777666/mood_ref.jpg") -> Warm cafe scene, golden light, wooden surfaces
 
-// EXECUTE - Multi-image composition with labeled references
+// EXECUTE - Multi-image composition with labeled references and full specs
 image_studio(
   images=[
     {"path": "inbox/whatsapp_333_919888777666/jar_main.jpg", "label": "hero"},
@@ -676,48 +707,83 @@ image_studio(
   ],
   composition={
     "position": "[hero] center-left dominant, [companion] right supporting at smaller scale",
-    "product_coverage": "60% combined",
-    "camera_angle": "slight hero angle",
-    "negative_space": "top for brand text"
+    "product_coverage": "60% combined - hero 40%, companion 20%",
+    "camera_angle": "slight hero angle - 15 degrees",
+    "negative_space": "generous top for brand text, breathing room sides",
+    "crop_instruction": "maintain both products fully visible with context",
+    "custom": "Visual weight hierarchy: hero > companion > environment"
   },
   scene={
-    "environment": "match [mood] warm cafe atmosphere",
-    "style": "editorial product family",
-    "mood": "inherit warmth and intimacy from [mood]",
-    "props_and_context": "wooden surface like [mood], soft background blur"
+    "environment": "match [mood] warm cafe atmosphere - wooden table, soft ambient",
+    "style": "editorial product family with lifestyle warmth",
+    "mood": "inherit warmth and intimacy from [mood] - cozy, inviting",
+    "time_of_day": "match golden hour feel from [mood]",
+    "props_and_context": "wooden surface like [mood], soft background blur, perhaps coffee beans scattered",
+    "custom": "Don't copy [mood] exactly - extract its essence and apply to our products"
   },
   lighting={
-    "type": "match [mood] golden ambient",
-    "direction": "soft side light matching [mood] reference",
-    "color_temperature": "warm golden as in [mood]",
-    "shadows": "soft natural shadows"
+    "type": "match [mood] golden ambient with soft directional",
+    "direction": "soft side light matching [mood] reference - camera-left",
+    "quality": "warm diffused matching [mood] quality",
+    "color_temperature": "warm golden 3800K as in [mood]",
+    "shadows": "soft natural shadows, deeper on [companion] to push back",
+    "special_requirements": "Glass must catch light, show volume. [hero] should glow slightly.",
+    "custom": "Study [mood] light falloff and replicate the gradient"
   },
   material_treatment={
     "primary_material": "clear glass",
-    "rendering_notes": "both [hero] and [companion] should show glass caustics, catch warm light"
+    "rendering_notes": "both [hero] and [companion] should show glass caustics, catch warm light from [mood] direction. Internal volume visible.",
+    "preserve_details": "glass edges, internal refraction, lid details on both",
+    "custom": "Size relationship must be clear - [companion] reads as smaller variant, not distance trick"
   },
-  creative_direction="Product family hero - main jar dominates, smaller supports. Capture the cafe warmth from mood reference.",
-  output={"format": "PNG", "size": "2K", "aspect_ratio": "4:3"}
+  enhancement={
+    "sharpness": "high on [hero], medium on [companion]",
+    "contrast": "medium warm as in [mood]",
+    "color_treatment": "warm color grade matching [mood] tones",
+    "detail_enhancement": "bring out glass surface details",
+    "custom": "Match the slightly lifted blacks from [mood] - not crushed shadows"
+  },
+  focus={
+    "focus_point": "[hero] center",
+    "depth_of_field": "medium - both products sharp, background soft",
+    "falloff": "[companion] slightly softer than [hero] for depth hierarchy",
+    "custom": "Focus hierarchy reinforces visual hierarchy"
+  },
+  custom_spec={
+    "instruction": "Product family composition using client mood reference",
+    "style_reference": "Use [mood] as lighting and atmosphere guide only",
+    "artistic_intent": "Hero product with supporting variant - clear family relationship"
+  },
+  creative_direction="Product family hero - main jar dominates, smaller supports. Capture the cafe warmth from [mood] reference. Client sent this mood because they want THAT feeling - deliver it with our products.",
+  output={"format": "PNG", "size": "2K", "aspect_ratio": "4:3", "filename": "jar_family_cafe_mood"}
 )
--> Returns: family_shot.png in pending/
+-> Returns: pending/{thread}/jar_family_cafe_mood.png
 
-// VERIFY
-view_image("pending/.../family_shot.png")
--> Family composition balanced, mood reference honored, glass materials true - PASS
+// VERIFY with structured critique
+view_image("pending/{thread}/jar_family_cafe_mood.png")
+-> MATERIAL: PASS - glass caustics on both, internal volume visible, warm light caught
+   COMPOSITION: PASS - hero dominant left, companion supporting right, clear hierarchy
+   LIGHTING: PASS - matches [mood] warmth, golden tones, soft shadows
+   MOOD: PASS - cafe warmth captured, inviting, matches reference essence
+   FOCUS: PASS - hierarchy reinforced, hero sharpest, companion slightly softer
+   VERDICT: SHIP IT - client mood successfully translated
 
 // PERSIST
 write_data(
-  goal="Create product family shot with mood reference",
-  reasoning="Composed two jar sizes using client's mood reference for lighting and atmosphere.",
-  hitl_summary="PRODUCT FAMILY - Glass Jars
+  goal="Create product family shot with client mood reference",
+  reasoning="Composed two jar sizes using client's mood reference for lighting and atmosphere. Extracted essence of [mood] cafe warmth - golden light, wooden surface, intimate feel. Visual hierarchy established: hero dominant, companion supporting. Both glass materials render correctly with caustics.",
+  hitl_summary="PRODUCT FAMILY - Glass Jars (Cafe Mood)
 
-Composition: Hero jar left, companion right
-Mood: Matched client's cafe reference - warm golden light
-Materials: Glass caustics preserved on both products
+Composition: Hero jar center-left (dominant), companion jar right (supporting)
+Mood Reference: Client's cafe image - extracted golden warmth, intimate atmosphere
+Materials: Glass caustics preserved on both, internal volume visible
+Lighting: Warm golden 3800K matching reference
+
+Technical: 4:3 aspect, 2K resolution, warm color grade
 
 Reply *approve* or *reject*",
   asset_uploads=[
-    {"storage_path": "pending/.../family_shot.png", "returns": "family", "caption": "Glass jar product family", "target_folder": "products"}
+    {"storage_path": "pending/{thread}/jar_family_cafe_mood.png", "returns": "family", "caption": "Glass jar product family - cafe mood from client reference", "target_folder": "products"}
   ],
   operations=[
     {"action": "create", "table": "assets", "data": {
@@ -736,6 +802,137 @@ Reply *approve* or *reject*",
 
 "Created 1 family composition asset:
 - Glass Jar Family Cafe Mood: asset_id=f1a2m3...
+
+Stored in products/ folder, ready for product linking."
+</your_action>
+</example>
+
+<example scenario="Advanced: Premium product with all specs + custom attributes">
+<user_input>
+PM: "Create premium hero shot for our flagship glass decanter - needs to look luxurious, editorial quality"
+[Image: inbox/whatsapp_999_919123456789/decanter.jpg]
+[You see: Crystal glass decanter with geometric facets, whiskey inside, on dark wood surface]
+</user_input>
+<your_action>
+// ANALYZE - Premium product requires advanced treatment
+view_image("inbox/whatsapp_999_919123456789/decanter.jpg")
+-> Crystal decanter with geometric cuts, amber liquid, excellent source quality
+   Challenge: Capture glass facets, liquid depth, and premium feel
+
+// SCHEMA DISCOVERY
+inspect_schema(tables=["assets"], details=["structure"])
+-> assets: name (required), storage_url, file_name, mime_type, file_size_bytes, is_ai_generated, category, caption...
+
+// EXECUTE - Full spec coverage for premium output
+image_studio(
+  images=[{"path": "inbox/whatsapp_999_919123456789/decanter.jpg", "label": "product"}],
+  extraction={
+    "target_description": "Crystal glass decanter with whiskey in [product]",
+    "isolation": "complete with preserved reflections",
+    "edge_treatment": "surgical precision - preserve every facet edge",
+    "custom": "Maintain internal light caustics from liquid"
+  },
+  background={
+    "treatment": "gradient",
+    "color": "dark charcoal to black",
+    "scene_description": "subtle gradient suggesting luxury studio",
+    "custom": "Add very subtle warm reflection at base suggesting polished surface"
+  },
+  lighting={
+    "type": "dramatic rim with soft fill",
+    "direction": "rim from behind at 7 and 5 oclock, fill from front",
+    "quality": "high contrast editorial",
+    "color_temperature": "warm 4000K to complement whiskey amber",
+    "shadows": "deep dramatic with rim separation",
+    "special_requirements": "Capture facet light dispersion, liquid depth glow, no blown highlights on glass edges",
+    "custom": "Reference: Nick Knight glass photography - dramatic but controlled"
+  },
+  composition={
+    "product_coverage": "70% frame",
+    "position": "centered, slight offset left for elegance",
+    "camera_angle": "slight low angle - 10 degrees up for stature",
+    "negative_space": "generous top and right for potential text overlay",
+    "crop_instruction": "maintain decanter proportions, no cropping into product",
+    "custom": "Golden ratio placement for premium feel"
+  },
+  enhancement={
+    "sharpness": "high on facet edges, medium on body",
+    "contrast": "S-curve for punch without crushing blacks",
+    "color_treatment": "rich warm tones, saturate amber liquid subtly",
+    "detail_enhancement": "bring out facet detail and liquid depth",
+    "cleanup": "remove any dust, perfect glass surface",
+    "custom": "Slight vignette to draw eye to center"
+  },
+  focus={
+    "focus_point": "front facet edge and liquid surface",
+    "depth_of_field": "medium - product sharp, background falls off naturally",
+    "falloff": "gradual natural bokeh on background gradient",
+    "custom": "Stack focus if needed for front-to-back sharpness on product"
+  },
+  material_treatment={
+    "primary_material": "crystal glass with liquid",
+    "rendering_notes": "Glass: crisp facet edges, internal refraction, controlled specular. Liquid: depth visible, warm glow, no artificial color. Cork/stopper: natural texture preserved.",
+    "preserve_details": "geometric facet pattern is brand signature - must be perfect",
+    "custom": "Dual material challenge: glass dispersion + liquid absorption/transmission"
+  },
+  custom_spec={
+    "instruction": "Editorial luxury product photography",
+    "style_reference": "Drinks photography from Wallpaper* magazine",
+    "artistic_intent": "Evoke premium craftsmanship and sophistication",
+    "special_effect": "Subtle warm glow emanating from liquid",
+    "extra": {"brand_positioning": "ultra-premium", "usage": "hero banner and print ads"}
+  },
+  creative_direction="This is the flagship product - every pixel must justify premium pricing. The faceted glass is the hero detail. Light must dance through the cuts while liquid glows warmly. Editorial quality that could run in luxury lifestyle publications.",
+  output={"format": "PNG", "size": "4K", "aspect_ratio": "4:5", "filename": "decanter_hero_premium"}
+)
+-> Returns: pending/{thread}/decanter_hero_premium.png
+
+// VERIFY - Premium demands rigorous QC
+view_image("pending/{thread}/decanter_hero_premium.png")
+-> MATERIAL: PASS - facets catching light perfectly, liquid depth visible with warm glow
+   EDGES: PASS - surgical precision on every geometric edge
+   LIGHTING: PASS - dramatic rim separation, no blown highlights, editorial quality
+   COMPOSITION: PASS - golden ratio placement, elegant negative space
+   FOCUS: PASS - tack sharp on product, natural background falloff
+   ENHANCEMENT: PASS - S-curve contrast, rich tones, vignette subtle
+   VERDICT: SHIP IT - portfolio and publication worthy
+
+// PERSIST
+write_data(
+  goal="Create premium hero asset for flagship crystal decanter",
+  reasoning="Flagship product requiring full spec treatment. Applied editorial lighting technique, preserved brand-signature facet pattern, achieved luxury magazine quality. All QC criteria passed at highest standard.",
+  hitl_summary="PREMIUM HERO SHOT - Crystal Decanter
+
+Editorial quality flagship product image featuring:
+- Dramatic rim lighting showcasing geometric facets
+- Warm amber liquid glow visible through crystal
+- Dark gradient background for luxury positioning
+- 4K resolution for print and digital hero usage
+
+Technical: 4:5 aspect, PNG, publication-ready quality
+
+Reply *approve* or *reject*",
+  asset_uploads=[
+    {"storage_path": "pending/{thread}/decanter_hero_premium.png", "returns": "decanter", "caption": "Crystal decanter premium hero - editorial quality", "target_folder": "products"}
+  ],
+  operations=[
+    {"action": "create", "table": "assets", "data": {
+      "name": "Crystal Decanter - Premium Hero",
+      "storage_url": "@decanter.public_url",
+      "file_name": "@decanter.file_name",
+      "mime_type": "@decanter.content_type",
+      "file_size_bytes": "@decanter.size_bytes",
+      "is_ai_generated": true,
+      "category": "HERO",
+      "caption": "@decanter.caption"
+    }, "returns": "decanter_asset"}
+  ],
+  impact={"creates": {"assets": 1}, "warnings": ["4K file - larger storage footprint"]}
+)
+-> write_data returns: {"success": true, "created_entities": {"assets": [{"id": "prem123..."}]}}
+
+"Created 1 premium hero asset:
+- Crystal Decanter Premium Hero: asset_id=prem123...
 
 Stored in products/ folder, ready for product linking."
 </your_action>
