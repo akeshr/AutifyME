@@ -371,23 +371,32 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
         )
 
     try:
+        # Load and validate source image FIRST (before LLM creation)
+        # This ensures FileNotFoundError is raised before any API calls
+        source_uri, _ = _load_and_encode_image(input_spec.source_image)
+
+        # Load reference images early too
+        ref_uris: list[str] = []
+        for ref_path in input_spec.reference_images[:14]:
+            try:
+                ref_uri, _ = _load_and_encode_image(ref_path)
+                ref_uris.append(ref_uri)
+            except Exception as e:
+                logger.warning("Failed to load reference image %s: %s", ref_path, e)
+
+        # Now create LLM (may require API credentials)
         llm = _get_gemini3_image_llm(output_spec=input_spec.output)
         prompt = _build_prompt(input_spec)
 
-        # Build content with source image first
-        source_uri, _ = _load_and_encode_image(input_spec.source_image)
+        # Build content with pre-loaded images
         content: list[dict[str, Any]] = [
             {"type": "text", "text": prompt},
             {"type": "image_url", "image_url": {"url": source_uri}},
         ]
 
-        # Add reference images (limit to 14 to stay within API limits)
-        for ref_path in input_spec.reference_images[:14]:
-            try:
-                ref_uri, _ = _load_and_encode_image(ref_path)
-                content.append({"type": "image_url", "image_url": {"url": ref_uri}})
-            except Exception as e:
-                logger.warning("Failed to load reference image %s: %s", ref_path, e)
+        # Add reference images
+        for ref_uri in ref_uris:
+            content.append({"type": "image_url", "image_url": {"url": ref_uri}})
 
         messages = [
             {"role": "system", "content": TOOL_SYSTEM_PROMPT},
