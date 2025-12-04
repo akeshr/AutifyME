@@ -1,15 +1,11 @@
-"""Image Studio Tool - Image editing and generation with Gemini 3 Pro Image.
+"""Image Studio Tool - Image processing with Gemini 3 Pro Image.
 
-Operations:
-- edit: Background removal, extraction from groups, enhancement, reframing
-- generate: Lifestyle shots, studio shots, scene composites
+Intelligence-First Architecture:
+- Labeled images (specialist references by label in instructions)
+- Structured specs guide completeness, all accept free-form strings
+- Model reasons about what to do from specs and labels
 
-Architecture: Atomic tool with structured Pydantic input/output.
-
-Storage Architecture:
-    Generated images are uploaded to Supabase pending/ folder for persistence
-    across Vercel serverless invocations. Images await HITL approval before
-    being moved to products/ folder via WriteIntent.
+The fundamental operation: prompt + labeled images -> new image
 """
 
 from __future__ import annotations
@@ -36,13 +32,23 @@ from autifyme_agents.core.tool_error_handler import (
     build_success_response,
 )
 from autifyme_agents.tools.image_studio.schemas import (
+    BackgroundSpec,
+    CompositionSpec,
+    CustomSpec,
+    EnhancementSpec,
+    ExtractionSpec,
+    FocusSpec,
+    ImageInput,
     ImageMetadata,
-    ImageOperation,
     ImageStudioErrorCode,
     ImageStudioInput,
     ImageStudioOutput,
+    LightingSpec,
+    MaterialTreatmentSpec,
     OutputSpec,
     OutputVariant,
+    ProductPlacementSpec,
+    SceneSpec,
 )
 
 T = TypeVar("T")
@@ -72,6 +78,7 @@ def _set_storage_client(storage: StorageUploader | None) -> None:
     global _storage_client
     _storage_client = storage
 
+
 logger = logging.getLogger(__name__)
 
 # Use same temp directory as WhatsApp media downloads
@@ -85,16 +92,22 @@ MAX_DIMENSION = 2048
 JPEG_QUALITY = 85
 GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 
-# Professional product photography system prompt for the image generation model
+# Professional product photography system prompt
 TOOL_SYSTEM_PROMPT = """You are a master commercial photographer whose work appears in Vogue, Apple campaigns, and luxury brand catalogs.
 
 EXECUTE THE CREATIVE DIRECTION - The instruction is your brief. Honor it precisely.
+
+IMAGES ARE LABELED - Use the labels to understand each image's role:
+- [product] = the main product to feature
+- [style_ref] = lighting/mood reference
+- [background] = background/scene reference
+- [product_variant] = additional product for family shots
+- etc. - the specialist will explain how to use each
 
 LIGHT IS EVERYTHING:
 - Light reveals form, texture, and material truth
 - Specular highlights define surface quality - controlled, never blown
 - Shadows create dimension - density appropriate to mood
-- Rim light separates subject from background when needed
 - Color temperature serves the story - warm for organic, cool for tech
 
 MATERIAL TRUTH:
@@ -102,22 +115,19 @@ MATERIAL TRUTH:
 - Metal: Gradient reflections, micro-texture, controlled specularity
 - Fabric: Weave texture, drape shadows, fiber detail at edges
 - Plastic: Surface sheen gradient, translucency where present, no fake shine
-- Wood: Grain direction, tonal variation, natural matte quality
-- Ceramic/Stone: Subtle surface texture, weight impression, matte-to-satin range
 
 COMPOSITION MASTERY:
 - Negative space is intentional - it breathes or it frames
 - Product placement follows visual weight principles
-- Camera angle implies relationship - hero angle elevates, eye-level connects
-- Edge treatment: seamless fade, sharp cut, or natural shadow - match the intent
+- Camera angle implies relationship - hero angle elevates
 
 TECHNICAL PRECISION:
 - Focus: Tack sharp on hero details, natural falloff where specified
 - Color: Accurate to source, grade only as directed
-- Edges: Surgical extraction OR natural environmental blend - never between
+- Edges: Surgical extraction OR natural blend - never between
 - Scale: Product proportions sacred - no distortion
 
-OUTPUT: Every image must be immediately publishable. No "almost there." This is the final frame."""
+OUTPUT: Every image must be immediately publishable."""
 
 
 # =============================================================================
@@ -129,7 +139,7 @@ def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatMod
     """Get Gemini 3 Pro Image LLM with proper configuration."""
     aspect_ratio = output_spec.aspect_ratio if output_spec else "1:1"
     if aspect_ratio == "original":
-        aspect_ratio = "1:1"  # Fallback for generation
+        aspect_ratio = "1:1"
     image_size = output_spec.size if output_spec else "1K"
 
     return get_llm(
@@ -148,23 +158,15 @@ def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatMod
 
 
 def _load_and_encode_image(image_path: str) -> tuple[str, str]:
-    """Load image from storage_path/URL/local path, resize if needed, encode to base64.
-
-    Args:
-        image_path: storage_path, URL, or local file path
-    """
-    # Import here to avoid circular dependency
+    """Load image from storage_path/URL/local path, resize if needed, encode to base64."""
     from autifyme_agents.core.storage_utils import build_storage_url, is_storage_path
 
-    # Convert storage_path to URL if needed
     if is_storage_path(image_path):
         image_path = build_storage_url(image_path)
 
-    # Handle URLs
-    img: Image.Image  # Type hint: resize/convert returns Image.Image, not ImageFile
+    img: Image.Image
     if image_path.startswith(("http://", "https://")):
         import httpx
-
         response = httpx.get(image_path, timeout=60)
         response.raise_for_status()
         img = Image.open(io.BytesIO(response.content))
@@ -213,24 +215,10 @@ def _load_and_encode_image(image_path: str) -> tuple[str, str]:
 
 def _save_base64_image(
     base64_data: str,
-    operation: str,
     output_spec: OutputSpec,
-    description: str | None = None,
     thread_id: str | None = None,
 ) -> tuple[Path, ImageMetadata, str | None]:
-    """Save base64 image data to temp file and optionally upload to pending.
-
-    Args:
-        base64_data: Base64-encoded image data (may include data URI prefix)
-        operation: Operation type for filename
-        output_spec: Output specification for format/size
-        description: Optional description for logging
-        thread_id: Optional thread ID for pending upload organization
-
-    Returns:
-        Tuple of (local_path, metadata, storage_path)
-        storage_path is None if upload not performed
-    """
+    """Save base64 image data to temp file and optionally upload to pending."""
     if "," in base64_data:
         base64_data = base64_data.split(",", 1)[1]
 
@@ -239,7 +227,7 @@ def _save_base64_image(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = str(uuid.uuid4())[:8]
     extension = output_spec.format.lower()
-    filename = f"{timestamp}_{operation}_{unique_id}.{extension}"
+    filename = f"{timestamp}_studio_{unique_id}.{extension}"
     file_path = MEDIA_DIR / filename
 
     file_path.write_bytes(image_bytes)
@@ -254,22 +242,13 @@ def _save_base64_image(
             aspect_ratio=f"{width}:{height}",
         )
 
-    logger.info(
-        "Saved image to %s",
-        file_path,
-        extra={"width": width, "height": height, "size_bytes": len(image_bytes)},
-    )
+    logger.info("Saved image to %s", file_path, extra={"width": width, "height": height})
 
     # Upload to Supabase pending if storage and thread_id available
     storage_path: str | None = None
 
     if _storage_client is not None and thread_id is not None:
-        content_type_map = {
-            "png": "image/png",
-            "jpeg": "image/jpeg",
-            "jpg": "image/jpeg",
-            "webp": "image/webp",
-        }
+        content_type_map = {"png": "image/png", "jpeg": "image/jpeg", "webp": "image/webp"}
         content_type = content_type_map.get(extension, "image/png")
 
         try:
@@ -298,24 +277,15 @@ def _save_base64_image(
                 )
 
             storage_path = upload_result["storage_path"]
-            logger.info(
-                "Uploaded image to pending storage",
-                extra={"storage_path": storage_path, "thread_id": thread_id},
-            )
+            logger.info("Uploaded to pending", extra={"storage_path": storage_path})
         except Exception as upload_error:
-            logger.warning(
-                f"Failed to upload to pending storage: {upload_error}",
-                extra={"file_name": filename, "thread_id": thread_id},
-            )
+            logger.warning(f"Failed to upload: {upload_error}")
 
     return file_path, metadata, storage_path
 
 
 def _extract_image_from_response(response: Any) -> str | None:
-    """Extract base64 image data from Gemini response.
-
-    Gemini 3 returns images at response.content[0]["image_url"]["url"] as data URI.
-    """
+    """Extract base64 image data from Gemini response."""
     content = getattr(response, "content", None)
     if isinstance(content, list) and len(content) > 0:
         part = content[0]
@@ -324,79 +294,212 @@ def _extract_image_from_response(response: Any) -> str | None:
             if url.startswith("data:"):
                 return str(url)
 
-    logger.warning(
-        "No image in response. content_type=%s, content_len=%s",
-        type(content).__name__,
-        len(content) if isinstance(content, list) else "N/A",
-    )
+    logger.warning("No image in response")
     return None
 
 
 # =============================================================================
-# Prompt Builder
+# Prompt Builder - Includes labeled images
 # =============================================================================
 
 
 def _build_prompt(input_spec: ImageStudioInput) -> str:
-    """Build prompt from creative direction.
+    """Build comprehensive prompt from labeled images and structured specs.
 
-    The Creative Specialist has already crafted a complete creative brief.
-    We pass it directly - no translation, no enum conversion, no loss.
+    Architecture:
+    - Images listed first with labels (model knows which is which)
+    - Structured specs provide creative direction
+    - Free-form creative_direction for anything beyond structure
     """
-    # Creative direction is the primary instruction
-    prompt_parts = [input_spec.creative_direction]
+    sections: list[str] = []
 
-    # Add output specs as technical requirements
+    # List images with labels first
+    if input_spec.images:
+        image_labels = [f"[{img.label}]" for img in input_spec.images]
+        sections.append(f"IMAGES PROVIDED: {', '.join(image_labels)}")
+
+    # Extraction instructions
+    if input_spec.extraction:
+        ext = input_spec.extraction
+        parts = [f"EXTRACTION: {ext.target_description}"]
+        if ext.position_hint:
+            parts.append(f"Located: {ext.position_hint}")
+        parts.append(f"Isolation: {ext.isolation}")
+        parts.append(f"Edge treatment: {ext.edge_treatment}")
+        if ext.custom:
+            parts.append(f"Custom: {ext.custom}")
+        sections.append(" | ".join(parts))
+
+    # Background treatment
+    if input_spec.background:
+        bg = input_spec.background
+        parts = [f"BACKGROUND: {bg.treatment}"]
+        if bg.color:
+            parts.append(f"Color: {bg.color}")
+        if bg.scene_description:
+            parts.append(f"Scene: {bg.scene_description}")
+        if bg.custom:
+            parts.append(f"Custom: {bg.custom}")
+        sections.append(" | ".join(parts))
+
+    # Lighting
+    if input_spec.lighting:
+        lt = input_spec.lighting
+        parts = [
+            f"LIGHTING: {lt.type}",
+            f"Direction: {lt.direction}",
+            f"Quality: {lt.quality}",
+            f"Temperature: {lt.color_temperature}",
+            f"Shadows: {lt.shadows}",
+        ]
+        if lt.special_requirements:
+            parts.append(f"Special: {lt.special_requirements}")
+        if lt.custom:
+            parts.append(f"Custom: {lt.custom}")
+        sections.append(" | ".join(parts))
+
+    # Scene
+    if input_spec.scene:
+        sc = input_spec.scene
+        parts = [
+            f"SCENE: {sc.environment}",
+            f"Style: {sc.style}",
+            f"Mood: {sc.mood}",
+            f"Time: {sc.time_of_day}",
+        ]
+        if sc.props_and_context:
+            parts.append(f"Props: {sc.props_and_context}")
+        if sc.custom:
+            parts.append(f"Custom: {sc.custom}")
+        sections.append(" | ".join(parts))
+
+    # Placement
+    if input_spec.placement:
+        pl = input_spec.placement
+        parts = [f"PLACEMENT: {pl.position}", f"Scale: {pl.scale}"]
+        if pl.surface:
+            parts.append(f"Surface: {pl.surface}")
+        if pl.interaction:
+            parts.append(f"Interaction: {pl.interaction}")
+        if pl.custom:
+            parts.append(f"Custom: {pl.custom}")
+        sections.append(" | ".join(parts))
+
+    # Composition
+    if input_spec.composition:
+        comp = input_spec.composition
+        parts = [
+            f"COMPOSITION: {comp.product_coverage}",
+            f"Position: {comp.position}",
+            f"Angle: {comp.camera_angle}",
+        ]
+        if comp.negative_space:
+            parts.append(f"Negative space: {comp.negative_space}")
+        if comp.crop_instruction:
+            parts.append(f"Crop: {comp.crop_instruction}")
+        if comp.custom:
+            parts.append(f"Custom: {comp.custom}")
+        sections.append(" | ".join(parts))
+
+    # Material treatment
+    if input_spec.material_treatment:
+        mat = input_spec.material_treatment
+        parts = [f"MATERIAL: {mat.primary_material}", f"Treatment: {mat.rendering_notes}"]
+        if mat.preserve_details:
+            parts.append(f"Preserve: {mat.preserve_details}")
+        if mat.custom:
+            parts.append(f"Custom: {mat.custom}")
+        sections.append(" | ".join(parts))
+
+    # Focus
+    if input_spec.focus:
+        foc = input_spec.focus
+        parts = [f"FOCUS: {foc.focus_point}", f"Depth: {foc.depth_of_field}"]
+        if foc.falloff:
+            parts.append(f"Falloff: {foc.falloff}")
+        if foc.custom:
+            parts.append(f"Custom: {foc.custom}")
+        sections.append(" | ".join(parts))
+
+    # Enhancement
+    if input_spec.enhancement:
+        enh = input_spec.enhancement
+        parts = [
+            f"ENHANCEMENT: Sharpness={enh.sharpness}",
+            f"Contrast={enh.contrast}",
+            f"Color={enh.color_treatment}",
+        ]
+        if enh.detail_enhancement:
+            parts.append(f"Details: {enh.detail_enhancement}")
+        if enh.cleanup:
+            parts.append(f"Cleanup: {enh.cleanup}")
+        if enh.custom:
+            parts.append(f"Custom: {enh.custom}")
+        sections.append(" | ".join(parts))
+
+    # Custom spec
+    if input_spec.custom_spec:
+        cs = input_spec.custom_spec
+        parts = ["CUSTOM CREATIVE:"]
+        if cs.instruction:
+            parts.append(f"Instruction: {cs.instruction}")
+        if cs.style_reference:
+            parts.append(f"Style: {cs.style_reference}")
+        if cs.color_palette:
+            parts.append(f"Colors: {cs.color_palette}")
+        if cs.texture_overlay:
+            parts.append(f"Texture: {cs.texture_overlay}")
+        if cs.special_effect:
+            parts.append(f"Effect: {cs.special_effect}")
+        if cs.artistic_intent:
+            parts.append(f"Intent: {cs.artistic_intent}")
+        if cs.extra:
+            for key, value in cs.extra.items():
+                parts.append(f"{key}: {value}")
+        sections.append(" | ".join(parts))
+
+    # Creative direction
+    if input_spec.creative_direction:
+        sections.append(f"CREATIVE DIRECTION: {input_spec.creative_direction}")
+
+    # Technical output
     out = input_spec.output
-    prompt_parts.append(
-        f"\nTECHNICAL OUTPUT: {out.size} resolution, {out.aspect_ratio} aspect ratio, {out.format} format."
+    sections.append(
+        f"TECHNICAL OUTPUT: {out.size} resolution, {out.aspect_ratio} aspect ratio, {out.format} format."
     )
 
-    return "\n".join(prompt_parts)
+    return "\n\n".join(sections)
 
 
 # =============================================================================
-# Operation Handlers
+# Single Unified Handler
 # =============================================================================
 
 
-def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
-    """Handle edit operation - pass creative direction directly to Gemini."""
-    if not input_spec.source_image:
-        return ImageStudioOutput(
-            success=False,
-            operation=ImageOperation.EDIT,
-            error="source_image required for edit operation",
-            error_code=ImageStudioErrorCode.INVALID_INPUT,
-        )
+def _process_images(input_spec: ImageStudioInput) -> ImageStudioOutput:
+    """Process images with Gemini 3 Pro Image.
 
+    Model reasons about what to do from specs and image labels.
+    """
     try:
-        # Load and validate source image FIRST (before LLM creation)
-        # This ensures FileNotFoundError is raised before any API calls
-        source_uri, _ = _load_and_encode_image(input_spec.source_image)
-
-        # Load reference images early too
-        ref_uris: list[str] = []
-        for ref_path in input_spec.reference_images[:14]:
+        # Load and encode all labeled images
+        image_uris: list[tuple[str, str]] = []  # (label, uri)
+        for img_input in input_spec.images[:15]:  # Gemini limit
             try:
-                ref_uri, _ = _load_and_encode_image(ref_path)
-                ref_uris.append(ref_uri)
+                uri, _ = _load_and_encode_image(img_input.path)
+                image_uris.append((img_input.label, uri))
             except Exception as e:
-                logger.warning("Failed to load reference image %s: %s", ref_path, e)
+                logger.warning(f"Failed to load image [{img_input.label}]: {e}")
 
-        # Now create LLM (may require API credentials)
+        # Create LLM and prompt
         llm = _get_gemini3_image_llm(output_spec=input_spec.output)
         prompt = _build_prompt(input_spec)
 
-        # Build content with pre-loaded images
-        content: list[dict[str, Any]] = [
-            {"type": "text", "text": prompt},
-            {"type": "image_url", "image_url": {"url": source_uri}},
-        ]
+        # Build content: prompt first, then labeled images in order
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
 
-        # Add reference images
-        for ref_uri in ref_uris:
-            content.append({"type": "image_url", "image_url": {"url": ref_uri}})
+        for label, uri in image_uris:
+            content.append({"type": "image_url", "image_url": {"url": uri}})
 
         messages = [
             {"role": "system", "content": TOOL_SYSTEM_PROMPT},
@@ -405,22 +508,19 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
 
         response = llm.invoke(messages)  # type: ignore[arg-type]
 
-        # Extract image using helper function
+        # Extract image from response
         image_data = _extract_image_from_response(response)
 
         if not image_data:
             return ImageStudioOutput(
                 success=False,
-                operation=ImageOperation.EDIT,
-                error="No image returned from API - check logs for response structure",
+                error="No image returned from API",
                 error_code=ImageStudioErrorCode.API_ERROR,
             )
 
-        # Description is simply "Edited image" - creative_direction contains the details
-        description = "Edited image"
-
+        # Save result
         file_path, metadata, storage_path = _save_base64_image(
-            image_data, "edit", input_spec.output, description, input_spec.thread_id
+            image_data, input_spec.output, input_spec.thread_id
         )
 
         output_variant = OutputVariant(
@@ -428,112 +528,24 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
             path=str(file_path),
             preview_path=str(file_path),
             metadata=metadata,
-            description=description,
+            description="Generated image",
             storage_path=storage_path,
         )
 
-        return ImageStudioOutput(
-            success=True,
-            operation=ImageOperation.EDIT,
-            outputs=[output_variant],
-        )
+        return ImageStudioOutput(success=True, outputs=[output_variant])
 
     except FileNotFoundError as e:
         return ImageStudioOutput(
-            success=False,
-            operation=ImageOperation.EDIT,
-            error=str(e),
-            error_code=ImageStudioErrorCode.FILE_NOT_FOUND,
+            success=False, error=str(e), error_code=ImageStudioErrorCode.FILE_NOT_FOUND
         )
     except ValueError as e:
         return ImageStudioOutput(
-            success=False,
-            operation=ImageOperation.EDIT,
-            error=str(e),
-            error_code=ImageStudioErrorCode.CORRUPT_FILE,
+            success=False, error=str(e), error_code=ImageStudioErrorCode.CORRUPT_FILE
         )
     except Exception as e:
-        logger.exception("Edit operation failed")
+        logger.exception("Image processing failed")
         return ImageStudioOutput(
-            success=False,
-            operation=ImageOperation.EDIT,
-            error=str(e),
-            error_code=ImageStudioErrorCode.API_ERROR,
-        )
-
-
-def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
-    """Handle generate operation - pass creative direction directly to Gemini."""
-    try:
-        llm = _get_gemini3_image_llm(output_spec=input_spec.output)
-        prompt = _build_prompt(input_spec)
-
-        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
-
-        if input_spec.source_image:
-            image_uri, _ = _load_and_encode_image(input_spec.source_image)
-            content.append({"type": "image_url", "image_url": {"url": image_uri}})
-
-        for ref_path in input_spec.reference_images[:14]:
-            try:
-                ref_uri, _ = _load_and_encode_image(ref_path)
-                content.append({"type": "image_url", "image_url": {"url": ref_uri}})
-            except Exception as e:
-                logger.warning("Failed to load reference image %s: %s", ref_path, e)
-
-        messages = [
-            {"role": "system", "content": TOOL_SYSTEM_PROMPT},
-            {"role": "user", "content": content},
-        ]
-        response = llm.invoke(messages)  # type: ignore[arg-type]
-
-        # Extract image using helper function
-        image_data = _extract_image_from_response(response)
-
-        if not image_data:
-            return ImageStudioOutput(
-                success=False,
-                operation=ImageOperation.GENERATE,
-                error="No image returned from API - check logs for response structure",
-                error_code=ImageStudioErrorCode.API_ERROR,
-            )
-
-        # Description is simply "Generated image" - creative_direction contains the details
-        description = "Generated image"
-
-        file_path, metadata, storage_path = _save_base64_image(
-            image_data, "generate", input_spec.output, description, input_spec.thread_id
-        )
-
-        output_variant = OutputVariant(
-            variant="master",
-            path=str(file_path),
-            preview_path=str(file_path),
-            metadata=metadata,
-            description=description,
-            storage_path=storage_path,
-        )
-
-        return ImageStudioOutput(
-            success=True,
-            operation=ImageOperation.GENERATE,
-            outputs=[output_variant],
-        )
-
-    except FileNotFoundError as e:
-        return ImageStudioOutput(
-            success=False,
-            operation=ImageOperation.GENERATE,
-            error=str(e),
-            error_code=ImageStudioErrorCode.FILE_NOT_FOUND,
-        )
-    except Exception as e:
-        logger.exception("Generate operation failed")
-        return ImageStudioOutput(
-            success=False,
-            operation=ImageOperation.GENERATE,
-            error=str(e),
-            error_code=ImageStudioErrorCode.API_ERROR,
+            success=False, error=str(e), error_code=ImageStudioErrorCode.API_ERROR
         )
 
 
@@ -543,10 +555,18 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
 
 
 def _image_studio_impl(
-    operation: str,
-    creative_direction: str,
-    source_image: str | None = None,
-    reference_images: list[str] | None = None,
+    images: list[dict[str, str]] | None = None,
+    background: dict[str, Any] | BackgroundSpec | None = None,
+    lighting: dict[str, Any] | LightingSpec | None = None,
+    composition: dict[str, Any] | CompositionSpec | None = None,
+    enhancement: dict[str, Any] | EnhancementSpec | None = None,
+    scene: dict[str, Any] | SceneSpec | None = None,
+    placement: dict[str, Any] | ProductPlacementSpec | None = None,
+    extraction: dict[str, Any] | ExtractionSpec | None = None,
+    focus: dict[str, Any] | FocusSpec | None = None,
+    material_treatment: dict[str, Any] | MaterialTreatmentSpec | None = None,
+    custom_spec: dict[str, Any] | CustomSpec | None = None,
+    creative_direction: str | None = None,
     thread_id: str | None = None,
     output: dict[str, Any] | OutputSpec | None = None,
     config: Annotated[RunnableConfig, InjectedToolArg] = None,  # type: ignore[assignment]
@@ -554,53 +574,65 @@ def _image_studio_impl(
     """Image Studio tool implementation.
 
     Args:
-        operation: "edit" or "generate"
-        creative_direction: Complete creative brief from the specialist
-        source_image: Source image storage_path (required for edit)
-        reference_images: Additional reference images
+        images: Labeled images [{path, label}] - reference labels in your specs
+        background: Background treatment specification
+        lighting: Lighting configuration
+        composition: Framing and composition settings
+        enhancement: Image enhancement/retouching settings
+        scene: Lifestyle scene settings
+        placement: Product placement in scene
+        extraction: Product extraction settings
+        focus: Focus and depth of field settings
+        material_treatment: Material-specific rendering instructions
+        custom_spec: Fully open-ended creative spec for OOTB ideas
+        creative_direction: Additional creative notes
         thread_id: Auto-injected from RunnableConfig
         output: Output specs (format, size, aspect_ratio)
         config: Injected config for thread_id extraction
     """
-    # Inject thread_id from config if not explicitly provided
+    # Inject thread_id from config if not provided
     if thread_id is None and config is not None:
         configurable = config.get("configurable", {})
         thread_id = configurable.get("thread_id")
-        if thread_id:
-            logger.debug(
-                "Injected thread_id from RunnableConfig",
-                extra={"thread_id": thread_id}
-            )
 
     try:
-        # Convert output dict to OutputSpec if needed
-        output_spec = OutputSpec()
-        if output is not None:
-            if isinstance(output, OutputSpec):
-                output_spec = output
-            elif isinstance(output, dict):
-                output_spec = OutputSpec(**output)
+        # Convert dicts to spec objects
+        def _to_spec(val: Any, spec_class: type) -> Any:
+            if val is None:
+                return None
+            if isinstance(val, spec_class):
+                return val
+            if isinstance(val, dict):
+                return spec_class(**val)
+            return val
+
+        # Convert images list
+        image_inputs: list[ImageInput] = []
+        if images:
+            for img in images:
+                if isinstance(img, ImageInput):
+                    image_inputs.append(img)
+                elif isinstance(img, dict):
+                    image_inputs.append(ImageInput(**img))
 
         input_spec = ImageStudioInput(
-            operation=ImageOperation(operation) if isinstance(operation, str) else operation,
-            source_image=source_image,
-            reference_images=reference_images or [],
+            images=image_inputs,
+            background=_to_spec(background, BackgroundSpec),
+            lighting=_to_spec(lighting, LightingSpec),
+            composition=_to_spec(composition, CompositionSpec),
+            enhancement=_to_spec(enhancement, EnhancementSpec),
+            scene=_to_spec(scene, SceneSpec),
+            placement=_to_spec(placement, ProductPlacementSpec),
+            extraction=_to_spec(extraction, ExtractionSpec),
+            focus=_to_spec(focus, FocusSpec),
+            material_treatment=_to_spec(material_treatment, MaterialTreatmentSpec),
+            custom_spec=_to_spec(custom_spec, CustomSpec),
             creative_direction=creative_direction,
             thread_id=thread_id,
-            output=output_spec,
+            output=_to_spec(output, OutputSpec) or OutputSpec(),
         )
 
-        if input_spec.operation == ImageOperation.EDIT:
-            result = _handle_edit(input_spec)
-        elif input_spec.operation == ImageOperation.GENERATE:
-            result = _handle_generate(input_spec)
-        else:  # Defensive: future enum values
-            result = ImageStudioOutput(  # type: ignore[unreachable]
-                success=False,
-                operation=input_spec.operation,
-                error=f"Unknown operation: {input_spec.operation}",
-                error_code=ImageStudioErrorCode.INVALID_INPUT,
-            )
+        result = _process_images(input_spec)
 
         if result.success:
             return build_success_response(result.model_dump())
@@ -609,7 +641,6 @@ def _image_studio_impl(
                 "success": False,
                 "error": result.error,
                 "error_code": result.error_code,
-                "operation": result.operation.value,
                 "warnings": result.warnings,
                 "next_steps": result.next_steps,
             }
@@ -618,54 +649,81 @@ def _image_studio_impl(
         logger.exception("Image Studio tool failed")
         return build_agent_error_response(
             exception=e,
-            context={"operation": operation, "source_image": source_image},
+            context={"images": images},
             fallback_type="IMAGE_STUDIO_ERROR",
-            fallback_action=(
-                "Image processing failed. Retry once. If fails again, "
-                "continue without image processing and inform user."
-            ),
+            fallback_action="Image processing failed. Retry once. If fails again, continue without and inform user.",
         )
 
 
 def create_image_studio_tool(storage: StorageUploader | None = None) -> StructuredTool:
     """Create the Image Studio tool.
 
-    Args:
-        storage: Optional storage client for persisting images to Supabase pending/
-
-    Architecture:
-    - Creative Specialist writes natural language creative briefs
-    - Tool passes creative_direction directly to Gemini 3 Pro Image
-    - No enum restrictions, full creative expression
+    Intelligence-First Architecture:
+    - Labeled images: Each image has a label referenced in instructions
+    - Structured specs: Guide completeness, accept free-form strings
+    - Model reasons about what to do from specs and labels
 
     STORAGE:
-    - Generated images are uploaded to pending/{thread_id}/ for persistence
-    - storage_path is included in output for write_data
+    - Generated images uploaded to pending/{thread_id}/
+    - storage_path included in output for write_data
     """
-    # Set module-level storage client
     _set_storage_client(storage)
 
     return StructuredTool.from_function(
         func=_image_studio_impl,
         name="image_studio",
-        description="""Professional image editing and generation with Gemini 3 Pro Image.
+        description="""Professional image processing with Gemini 3 Pro Image.
 
-OPERATIONS:
-- edit: Modify existing image (background removal, extraction, enhancement, reframing)
-- generate: Create new lifestyle/studio shots from product image
+IMAGES - Labeled for flexible workflows:
+Provide images with labels. Reference labels in your specs/instructions.
+- images: [{path: "inbox/thread/photo.jpg", label: "product"}]
+- Use [label] in your specs: "extract [product] from background"
 
-KEY PARAMETER - creative_direction:
-Write a complete creative brief like a professional photographer would:
-- Lighting: direction, quality, temperature, shadows
-- Composition: framing, product placement, coverage
-- Background: type, color, scene description
-- Material treatment: how to handle glass, metal, fabric, etc.
-- Technical: sharpness, color accuracy, edge treatment
+STRUCTURED SPECS - Use what applies:
+- extraction: Target in multi-product (target_description, position_hint, isolation, edge_treatment)
+- background: Background treatment (treatment, color, scene_description)
+- lighting: Light setup (type, direction, quality, color_temperature, shadows, special_requirements)
+- composition: Framing (product_coverage, position, camera_angle, negative_space, crop_instruction)
+- enhancement: Post-processing (sharpness, contrast, color_treatment, detail_enhancement, cleanup)
+- scene: Environment (environment, style, mood, time_of_day, props_and_context)
+- placement: Product in scene (position, scale, surface, interaction)
+- focus: Depth of field (focus_point, depth_of_field, falloff)
+- material_treatment: Material rendering (primary_material, rendering_notes, preserve_details)
+- custom_spec: OOTB ideas (instruction, style_reference, color_palette, special_effect, extra)
+- creative_direction: Free-form notes
+
+NOTE: Every spec has a "custom" field for spec-specific OOTB ideas.
 
 EXAMPLES:
-- "Extract glass jar, pure white background, soft studio lighting from 45-degrees, rim light for glass edge definition, 80% frame coverage"
-- "Modern kitchen scene, morning light through window, product on marble counter with herbs, warm editorial feel"
-- "Isolate red 500ml variant from left side, transparent background, surgical edge treatment"
+
+1. Hero shot extraction:
+{
+  "images": [{"path": "inbox/thread/group.jpg", "label": "source"}],
+  "extraction": {"target_description": "glass jar on left in [source]", "isolation": "complete"},
+  "background": {"treatment": "transparent"},
+  "material_treatment": {"primary_material": "clear glass", "rendering_notes": "preserve caustics"}
+}
+
+2. Lifestyle with style reference:
+{
+  "images": [
+    {"path": "inbox/thread/product.jpg", "label": "product"},
+    {"path": "inbox/thread/mood.jpg", "label": "style_ref"}
+  ],
+  "scene": {"environment": "modern kitchen", "style": "match [style_ref] mood"},
+  "placement": {"position": "place [product] on marble counter"},
+  "lighting": {"type": "natural window matching [style_ref]"}
+}
+
+3. Multi-product composition:
+{
+  "images": [
+    {"path": "inbox/thread/jar1.jpg", "label": "main"},
+    {"path": "inbox/thread/jar2.jpg", "label": "variant"}
+  ],
+  "composition": {"position": "[main] center hero, [variant] supporting right"},
+  "creative_direction": "Family shot - main variant hero, second supporting"
+}
 
 OUTPUT: Returns storage_path in pending/ for write_data.""",
         args_schema=ImageStudioInput,
