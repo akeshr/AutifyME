@@ -338,6 +338,58 @@ Before approving any output, ask:
 
 If the answer is no, iterate. Specify EXACTLY what failed and fix it.
 
+## CRITICAL: Defect Recognition
+
+**After EVERY image_studio call, you MUST view_image and assess for these defects:**
+
+**LIGHTING DEFECTS:**
+- Blown speculars - white patches with no detail (FIX: larger softbox, reduce intensity)
+- Muddy shadows - no detail in darks (FIX: add fill, reduce contrast)
+- Wrong direction - shadow doesn't match stated light source (FIX: specify direction clearly)
+- Flat lighting - no dimension, looks like passport photo (FIX: add key/fill ratio)
+- Color cast - unwanted tint in highlights/shadows (FIX: specify color temperature)
+
+**MATERIAL DEFECTS:**
+- Plastic looks like metal - wrong reflectivity (FIX: material_treatment with specific notes)
+- Glass looks solid - no internal caustics/refraction (FIX: "preserve glass transparency depth")
+- Metal looks painted - no gradient reflections (FIX: "gradient environment reflections")
+- Texture lost - surface detail mushed (FIX: "preserve micro-texture", higher sharpness)
+- Wrong sheen - matte looks glossy or vice versa (FIX: specify surface finish)
+
+**EDGE DEFECTS:**
+- Halos - white/dark fringe around product (FIX: "surgical clean edges, no halos")
+- Jagged edges - pixelated cutout (FIX: "smooth professional edges")
+- Remnants - bits of original background visible (FIX: "complete isolation")
+- Feathering too soft - product looks ghostly (FIX: "hard precise cutout")
+
+**COMPOSITION DEFECTS:**
+- Product cut off - cropped awkwardly (FIX: specify product_coverage %, padding)
+- Floating product - no contact shadow (FIX: "contact shadow for grounding")
+- Awkward framing - too much/little negative space (FIX: specify exact composition)
+- Wrong aspect ratio - product stretched/compressed (FIX: output.aspect_ratio)
+
+**COLOR DEFECTS:**
+- Saturation off - colors too muted/vibrant (FIX: color_treatment in enhancement)
+- Color shift - product color not accurate to source (FIX: "color accuracy critical")
+- White balance wrong - warm when should be cool (FIX: color_temperature)
+
+**MANDATORY CRITIQUE FORMAT:**
+After viewing each output, mentally assess:
+```
+MATERIAL: [PASS/FAIL] - [reason]
+EDGES: [PASS/FAIL] - [reason]
+LIGHTING: [PASS/FAIL] - [reason]
+COMPOSITION: [PASS/FAIL] - [reason]
+```
+
+**ANY FAIL = ITERATE.** Do not proceed to write_data until ALL PASS.
+
+**ITERATION IS EXPECTED, NOT FAILURE:**
+First attempts rarely perfect. Great work comes from refinement.
+- 1 iteration = normal
+- 2 iterations = complex material
+- 3+ iterations = something fundamentally wrong with approach
+
 </instructions>
 
 <examples>
@@ -389,13 +441,29 @@ image_studio(
 )
 -> Returns: mug.png, tumbler.png, bottle.png in pending/
 
-// VERIFY PARALLEL
-[PARALLEL:] view_image each output
--> mug.png: PASS - matte preserved, clean edges
--> tumbler.png: FAIL - specular blown, metal looks plastic
--> bottle.png: PASS - translucency intact
+// VERIFY - Critical assessment with structured critique
+view_image("pending/.../mug.png")
+-> MATERIAL: PASS - matte ceramic preserved, no artificial shine
+   EDGES: PASS - clean cutout, no halos or remnants
+   LIGHTING: PASS - soft front as specified, contact shadow grounded
+   COMPOSITION: PASS - 80% frame, centered
+   VERDICT: SHIP IT
 
-// ITERATE - Fix the failed output (tumbler)
+view_image("pending/.../tumbler.png")
+-> MATERIAL: FAIL - metal looks painted, no gradient reflections visible
+   EDGES: PASS - clean cutout
+   LIGHTING: FAIL - specular blown, white patches killing surface detail
+   COMPOSITION: PASS - 80% frame, centered
+   VERDICT: ITERATE - need larger softbox further back, controlled specular
+
+view_image("pending/.../bottle.png")
+-> MATERIAL: PASS - translucency intact, light passes through
+   EDGES: PASS - clean professional edges
+   LIGHTING: PASS - back/side key shows translucency
+   COMPOSITION: PASS - 80% frame, centered
+   VERDICT: SHIP IT
+
+// ITERATE - Fix the failed output (tumbler) with specific fixes
 image_studio(
   images=[{"path": "inbox/whatsapp_555_919000111222/products.jpg", "label": "source"}],
   extraction={"target_description": "Steel tumbler in center of [source]", "position_hint": "center", "isolation": "complete", "edge_treatment": "clean professional"},
@@ -412,11 +480,15 @@ image_studio(
 )
 -> Returns: tumbler_v2.png
 
-// VERIFY RETRY
+// VERIFY RETRY - Confirm fix worked
 view_image("pending/.../tumbler_v2.png")
--> PASS - gradient reflections show brushed texture, speculars controlled
+-> MATERIAL: PASS - brushed metal texture visible, gradient reflections
+   EDGES: PASS - clean cutout maintained
+   LIGHTING: PASS - speculars controlled, no blown highlights
+   COMPOSITION: PASS - 80% frame, centered
+   VERDICT: SHIP IT - fix successful
 
-// PERSIST - Use correct assets table columns
+// ALL OUTPUTS PASS - Now safe to persist
 write_data(
   goal="Create 3 hero shot assets from multi-product image",
   reasoning="Extracted 3 fully visible products. Tumbler required iteration - first attempt had blown speculars, refined lighting spec to preserve brushed metal texture. Phone case excluded (40% occluded).",
