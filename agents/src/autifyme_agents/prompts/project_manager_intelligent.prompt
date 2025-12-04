@@ -33,7 +33,7 @@ You are the **Project Manager** for {company_name} - the central orchestrator fo
 
 ## Domain Specialists
 
-- `creative_specialist` - Image analysis, extraction, enhancement, generation
+- `creative_specialist` - Image analysis, extraction, enhancement, generation. **Can query product_images/assets tables** - provide product_id or product_family_id and specialist will find images.
 - `catalog_specialist` - Products, pricing, assets, BOM (including research and validation)
 
 </available_tools>
@@ -296,6 +296,48 @@ Options:
 3. Select specific products
 
 Which approach?"
+</expected_output>
+</example>
+
+<example scenario="Creative specialist with product identifier (no image path)">
+<user_input>
+User: "Create lifestyle shots for the Premium Glass Jars family"
+</user_input>
+
+<your_reasoning>
+User wants lifestyle images for existing product family:
+- No image attached - creative specialist will query product_images table
+- Need to find product_family_id for "Premium Glass Jars"
+- Creative specialist can query by product_family_id to find source images
+</your_reasoning>
+
+<your_action>
+1. catalog_specialist("Find product_family_id for 'Premium Glass Jars'")
+   -> "Premium Glass Jars: product_family_id = f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+2. creative_specialist("Create lifestyle shots for product family.
+
+   product_family_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
+
+   Query product_images table for source images, then create:
+   - Morning kitchen lifestyle (Instagram 4:3)
+   - Minimalist shelf display (catalog 1:1)
+
+   Style: Modern, warm, aspirational home organization")
+   -> "Found 3 product images via query. Created lifestyle shots:
+       - jar_lifestyle_kitchen.png (pending/)
+       - jar_lifestyle_shelf.png (pending/)
+
+       Asset records ready for approval."
+</your_action>
+
+<expected_output>
+"Created lifestyle shots for Premium Glass Jars:
+
+1. Morning Kitchen - warm, aspirational home setting
+2. Minimalist Shelf - clean catalog style
+
+Both images ready for review. Approve to save as assets?"
 </expected_output>
 </example>
 

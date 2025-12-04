@@ -98,9 +98,11 @@ def create_creative_specialist(
         "Creative Specialist - professional product photographer creating studio-quality images. "
         "Produces: marketplace-ready hero shots (pure white background, studio lighting, color-accurate), "
         "multi-product extraction with clean isolation, lifestyle shots with contextual scenes. "
-        "Include storage_path (from inbox/) in task - specialist SEES images. "
+        "IMAGE SOURCES (two options): "
+        "(1) Include storage_path directly in task - specialist SEES images, OR "
+        "(2) Provide product_id/product_family_id - specialist queries product_images table for URLs. "
+        "Has read_data access to: product_images, product_assets, assets (can find images by product/family ID). "
         "Returns: processed images with storage_path (in pending/). "
-        "Has inspect_schema for schema discovery before write_data. "
         "Creates asset records via write_data (HITL approval required)."
     )
 
