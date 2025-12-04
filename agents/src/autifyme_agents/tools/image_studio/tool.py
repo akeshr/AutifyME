@@ -563,8 +563,8 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
         name="image_studio",
         description="""Professional image processing with Gemini 3 Pro Image.
 
-IMAGES - Labeled for flexible workflows:
-Provide images with labels. Reference labels in your specs/instructions.
+IMAGES - REQUIRED (minimum 1):
+At least one labeled image required. Reference labels in your specs/instructions.
 - images: [{path: "inbox/thread/photo.jpg", label: "product"}]
 - Use [label] in your specs: "extract [product] from background"
 
