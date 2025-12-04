@@ -1,24 +1,29 @@
-"""Workflow Evaluation Framework.
+"""Workflow Evaluation Helpers.
 
-Scripts that provide context and data for intelligent agents to evaluate
-and improve agentic workflows. The agent provides intelligence; these
-scripts provide structured data access.
+Minimal scripts for REPL-based workflow evaluation.
+The agent provides intelligence; these provide data access.
 
-Core Scripts:
-- get_evaluation_context: Complete context for evaluating a single trace
-- get_batch_analysis: Pattern detection across multiple traces
-- compare_traces: Side-by-side trace comparison
-- verify_improvement: Closed-loop improvement verification
+Usage:
+    from tests.tools.evaluation.helpers import show_tree, show_llm_calls
+    show_tree("trace_id")
 """
 
-from .context import get_evaluation_context
-from .batch import get_batch_analysis
-from .compare import compare_traces
-from .verify import verify_improvement
+from .helpers import (
+    compare_traces,
+    list_failures,
+    list_recent,
+    show_context_flow,
+    show_llm_calls,
+    show_llm_detail,
+    show_tree,
+)
 
 __all__ = [
-    "get_evaluation_context",
-    "get_batch_analysis",
+    "show_tree",
+    "show_llm_calls",
+    "show_llm_detail",
+    "show_context_flow",
     "compare_traces",
-    "verify_improvement",
+    "list_failures",
+    "list_recent",
 ]
