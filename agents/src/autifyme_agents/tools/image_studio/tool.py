@@ -138,7 +138,7 @@ def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatMod
     aspect_ratio = output_spec.aspect_ratio if output_spec else "1:1"
     if aspect_ratio == "original":
         aspect_ratio = "1:1"  # Fallback for generation
-    image_size = output_spec.size if output_spec else "2K"
+    image_size = output_spec.size if output_spec else "1K"
 
     return get_llm(
         provider="google",
@@ -146,6 +146,7 @@ def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatMod
         response_modalities=["TEXT", "IMAGE"],
         image_aspect_ratio=aspect_ratio,
         image_size=image_size,
+        temperature=1.0,
     )
 
 
