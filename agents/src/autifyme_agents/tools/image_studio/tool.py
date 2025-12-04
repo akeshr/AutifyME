@@ -498,7 +498,7 @@ def _process_images(input_spec: ImageStudioInput) -> ImageStudioOutput:
         # Build content: prompt first, then labeled images in order
         content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
 
-        for label, uri in image_uris:
+        for _label, uri in image_uris:
             content.append({"type": "image_url", "image_url": {"url": uri}})
 
         messages = [
@@ -555,7 +555,7 @@ def _process_images(input_spec: ImageStudioInput) -> ImageStudioOutput:
 
 
 def _image_studio_impl(
-    images: list[dict[str, str]] | None = None,
+    images: list[dict[str, str] | ImageInput] | None = None,
     background: dict[str, Any] | BackgroundSpec | None = None,
     lighting: dict[str, Any] | LightingSpec | None = None,
     composition: dict[str, Any] | CompositionSpec | None = None,
