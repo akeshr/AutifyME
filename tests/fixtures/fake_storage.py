@@ -103,6 +103,20 @@ class FakeStorage(StorageInterface):
         self.workflow_outcomes.append(outcome_with_id)
         return outcome_id
 
+    def save_workflow_outcome_dict(self, payload: dict[str, Any]) -> str:
+        """Save workflow outcome from dict (bypasses Pydantic model).
+
+        Args:
+            payload: Dict matching workflow_outcomes table columns
+
+        Returns:
+            Generated outcome ID
+        """
+        outcome_id = str(uuid.uuid4())
+        outcome_with_id = {**payload, "id": outcome_id}
+        self.workflow_outcomes.append(outcome_with_id)
+        return outcome_id
+
     def get_workflow_outcomes(
         self,
         *,
@@ -722,6 +736,222 @@ class FakeStorage(StorageInterface):
         For in-memory storage, creates a snapshot of tables and rolls back on error.
         """
         return FakeTransaction(self)
+
+    # ========================================================================
+    # File Storage (FileStorageMixin Implementation)
+    # ========================================================================
+
+    async def upload_asset(
+        self,
+        file_path: str,
+        bucket: str = "assets",
+        folder: str = "products",
+        content_type: str | None = None,
+    ) -> dict[str, Any]:
+        """Upload file to in-memory storage.
+
+        Simulates Supabase Storage bucket upload for testing.
+        """
+        import mimetypes
+        from pathlib import Path
+
+        local_path = Path(file_path)
+        if not local_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        # Generate unique storage path
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        extension = local_path.suffix.lower()
+        storage_filename = f"{timestamp}_{unique_id}{extension}"
+        storage_path = f"{folder}/{storage_filename}"
+
+        # Auto-detect content type
+        if content_type is None:
+            content_type, _ = mimetypes.guess_type(str(local_path))
+            content_type = content_type or "application/octet-stream"
+
+        # Read file content
+        file_content = local_path.read_bytes()
+
+        # Store in in-memory storage
+        if not hasattr(self, "_file_storage"):
+            self._file_storage: dict[str, dict[str, Any]] = {}
+
+        bucket_key = f"{bucket}/{storage_path}"
+        self._file_storage[bucket_key] = {
+            "content": file_content,
+            "content_type": content_type,
+            "size_bytes": len(file_content),
+        }
+
+        # Generate fake public URL
+        public_url = f"https://fake-storage.test/{bucket}/{storage_path}"
+
+        return {
+            "success": True,
+            "storage_path": storage_path,
+            "bucket": bucket,
+            "public_url": public_url,
+            "size_bytes": len(file_content),
+            "content_type": content_type,
+        }
+
+    async def delete_asset(
+        self,
+        storage_path: str,
+        bucket: str = "assets",
+    ) -> bool:
+        """Delete file from in-memory storage."""
+        if not hasattr(self, "_file_storage"):
+            self._file_storage = {}
+
+        bucket_key = f"{bucket}/{storage_path}"
+        if bucket_key in self._file_storage:
+            del self._file_storage[bucket_key]
+            return True
+        return True  # Idempotent - return True even if not found
+
+    def get_asset_public_url(
+        self,
+        storage_path: str,
+        bucket: str = "assets",
+    ) -> str:
+        """Get public URL for stored asset."""
+        return f"https://fake-storage.test/{bucket}/{storage_path}"
+
+    async def upload_to_inbox(
+        self,
+        file_bytes: bytes,
+        thread_id: str,
+        filename: str,
+        content_type: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Upload user-provided media to inbox folder.
+
+        Simulates immediate persistence of WhatsApp-uploaded images.
+        """
+        # Sanitize thread_id for folder name
+        sanitized_thread_id = thread_id.replace(":", "_")
+        storage_path = f"inbox/{sanitized_thread_id}/{filename}"
+
+        # Store in in-memory storage
+        if not hasattr(self, "_file_storage"):
+            self._file_storage: dict[str, dict[str, Any]] = {}
+
+        bucket_key = f"{bucket}/{storage_path}"
+        self._file_storage[bucket_key] = {
+            "content": file_bytes,
+            "content_type": content_type,
+            "size_bytes": len(file_bytes),
+        }
+
+        public_url = f"https://fake-storage.test/{bucket}/{storage_path}"
+
+        return {
+            "success": True,
+            "storage_path": storage_path,
+            "bucket": bucket,
+            "public_url": public_url,
+            "size_bytes": len(file_bytes),
+            "content_type": content_type,
+        }
+
+    async def upload_to_pending(
+        self,
+        file_bytes: bytes,
+        thread_id: str,
+        filename: str,
+        content_type: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Upload AI-generated media to pending folder.
+
+        Simulates staging area for images awaiting HITL approval.
+        """
+        # Sanitize thread_id for folder name
+        sanitized_thread_id = thread_id.replace(":", "_")
+        storage_path = f"pending/{sanitized_thread_id}/{filename}"
+
+        # Store in in-memory storage
+        if not hasattr(self, "_file_storage"):
+            self._file_storage = {}
+
+        bucket_key = f"{bucket}/{storage_path}"
+        self._file_storage[bucket_key] = {
+            "content": file_bytes,
+            "content_type": content_type,
+            "size_bytes": len(file_bytes),
+        }
+
+        public_url = f"https://fake-storage.test/{bucket}/{storage_path}"
+
+        return {
+            "success": True,
+            "storage_path": storage_path,
+            "bucket": bucket,
+            "public_url": public_url,
+            "size_bytes": len(file_bytes),
+            "content_type": content_type,
+        }
+
+    async def move_asset(
+        self,
+        source_path: str,
+        target_folder: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Move asset from one folder to another.
+
+        Simulates moving from pending/ to products/ on approval.
+        """
+        import mimetypes
+        from pathlib import Path
+
+        if not hasattr(self, "_file_storage"):
+            self._file_storage = {}
+
+        source_key = f"{bucket}/{source_path}"
+
+        # Check source exists
+        if source_key not in self._file_storage:
+            raise FileNotFoundError(f"Source file not found: {source_path}")
+
+        # Get source data
+        source_data = self._file_storage[source_key]
+
+        # Generate new filename in target folder
+        source_filename = Path(source_path).name
+        extension = Path(source_filename).suffix.lower()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        new_filename = f"{timestamp}_{unique_id}{extension}"
+        target_path = f"{target_folder}/{new_filename}"
+
+        # Detect content type
+        content_type = source_data.get("content_type")
+        if not content_type:
+            content_type, _ = mimetypes.guess_type(source_filename)
+            content_type = content_type or "application/octet-stream"
+
+        # Move to target
+        target_key = f"{bucket}/{target_path}"
+        self._file_storage[target_key] = source_data.copy()
+
+        # Delete source
+        del self._file_storage[source_key]
+
+        public_url = f"https://fake-storage.test/{bucket}/{target_path}"
+
+        return {
+            "success": True,
+            "storage_path": target_path,
+            "bucket": bucket,
+            "public_url": public_url,
+            "size_bytes": source_data["size_bytes"],
+            "content_type": content_type,
+        }
 
     # ========================================================================
     # Lifecycle Management

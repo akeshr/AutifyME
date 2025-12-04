@@ -35,6 +35,7 @@ class ExecutionResult:
         created_entities: dict[str, list[dict[str, Any]]] | None = None,
         updated_entities: dict[str, int] | None = None,
         deleted_entities: dict[str, int] | None = None,
+        uploaded_assets: list[dict[str, Any]] | None = None,
         execution_time_ms: int = 0,
         error_message: str | None = None,
         error_operation: str | None = None,
@@ -46,6 +47,7 @@ class ExecutionResult:
         self.created_entities = created_entities or {}
         self.updated_entities = updated_entities or {}
         self.deleted_entities = deleted_entities or {}
+        self.uploaded_assets = uploaded_assets or []
         self.execution_time_ms = execution_time_ms
         self.error_message = error_message
         self.error_operation = error_operation
@@ -64,6 +66,10 @@ class ExecutionResult:
             result["updated_entities"] = self.updated_entities
             result["deleted_entities"] = self.deleted_entities
 
+            # Include uploaded assets if any
+            if self.uploaded_assets:
+                result["uploaded_assets"] = self.uploaded_assets
+
             # Summary counts (handle both list[dict] and int values)
             total_created = sum(
                 len(entities) if isinstance(entities, list) else entities
@@ -76,6 +82,7 @@ class ExecutionResult:
                 "total_created": total_created,
                 "total_updated": total_updated,
                 "total_deleted": total_deleted,
+                "assets_uploaded": len(self.uploaded_assets),
                 "tables_affected": len(
                     set(
                         list(self.created_entities.keys())
@@ -305,16 +312,97 @@ class MultiOperationExecutor:
         """
         Execute operations atomically with transaction.
 
-        All operations execute in single transaction. On any error,
-        transaction is rolled back automatically.
+        Execution order:
+        1. Upload assets (if any) - store results in context
+        2. Execute database operations in dependency order
+        3. On any error, rollback transaction AND delete uploaded assets
         """
+        uploaded_assets: list[dict[str, Any]] = []  # Track for rollback
+
         try:
             # Resolve dependencies (topological sort)
             sorted_operations = self._resolve_dependencies(intent.operations)
 
-            # Execute in transaction
+            # Phase 1: Process assets BEFORE transaction
+            # (uploads/moves are outside transaction since they're not DB ops)
+            context: dict[str, Any] = {}  # Stores results by name for @ref resolution
+
+            if intent.asset_uploads:
+                for asset_upload in intent.asset_uploads:
+                    # Two modes: storage_path (move) vs temp_path (upload)
+                    if asset_upload.storage_path is not None:
+                        # Mode 1: Move from pending/ to target folder (preferred)
+                        logger.info(
+                            f"Moving asset: {asset_upload.storage_path} -> {asset_upload.bucket}/{asset_upload.target_folder}",
+                            extra={
+                                "storage_path": asset_upload.storage_path,
+                                "bucket": asset_upload.bucket,
+                                "target_folder": asset_upload.target_folder,
+                                "returns": asset_upload.returns,
+                            },
+                        )
+
+                        move_result = await self.storage.move_asset(
+                            source_path=asset_upload.storage_path,
+                            target_folder=asset_upload.target_folder,
+                            bucket=asset_upload.bucket,
+                        )
+
+                        # Track for potential rollback
+                        uploaded_assets.append(move_result)
+
+                        # Store in context for reference resolution
+                        # Include caption from AssetUpload for @name.caption reference
+                        context[asset_upload.returns] = {
+                            **move_result,
+                            "caption": asset_upload.caption,
+                        }
+
+                        logger.info(
+                            f"Asset moved: {move_result['public_url']}",
+                            extra={"returns": asset_upload.returns, "public_url": move_result["public_url"]},
+                        )
+
+                    elif asset_upload.temp_path is not None:
+                        # Mode 2: Upload from local /tmp path (legacy, may fail on serverless)
+                        logger.info(
+                            f"Uploading asset: {asset_upload.temp_path} -> {asset_upload.bucket}/{asset_upload.folder}",
+                            extra={
+                                "temp_path": asset_upload.temp_path,
+                                "bucket": asset_upload.bucket,
+                                "folder": asset_upload.folder,
+                                "returns": asset_upload.returns,
+                            },
+                        )
+
+                        upload_result = await self.storage.upload_asset(
+                            file_path=asset_upload.temp_path,
+                            bucket=asset_upload.bucket,
+                            folder=asset_upload.folder,
+                        )
+
+                        # Track for potential rollback
+                        uploaded_assets.append(upload_result)
+
+                        # Store in context for reference resolution
+                        # Include caption from AssetUpload for @name.caption reference
+                        context[asset_upload.returns] = {
+                            **upload_result,
+                            "caption": asset_upload.caption,
+                        }
+
+                        logger.info(
+                            f"Asset uploaded: {upload_result['public_url']}",
+                            extra={"returns": asset_upload.returns, "public_url": upload_result["public_url"]},
+                        )
+                    else:
+                        # Validation should have caught this, but defensive
+                        raise ToolException(
+                            f"AssetUpload '{asset_upload.returns}' has neither storage_path nor temp_path"
+                        )
+
+            # Phase 2: Execute database operations in transaction
             async with self.storage.transaction():
-                context: dict[str, Any] = {}  # Stores results by name for @ref resolution
                 created_entities: dict[str, list[dict[str, Any]]] = {}
                 updated_entities: dict[str, int] = {}
                 deleted_entities: dict[str, int] = {}
@@ -419,6 +507,7 @@ class MultiOperationExecutor:
                     extra={
                         "goal": intent.goal,
                         "execution_time_ms": execution_time_ms,
+                        "assets_uploaded": len(uploaded_assets),
                         "created_count": sum(
                             len(entities) for entities in created_entities.values()
                         ),
@@ -432,6 +521,7 @@ class MultiOperationExecutor:
                     created_entities=created_entities,
                     updated_entities=updated_entities,
                     deleted_entities=deleted_entities,
+                    uploaded_assets=uploaded_assets,
                     execution_time_ms=execution_time_ms,
                     warnings=warnings,
                 )
@@ -441,6 +531,25 @@ class MultiOperationExecutor:
             execution_time_ms = int((time.time() - start_time) * 1000)
             error_msg = self._build_error_message(e)
 
+            # Rollback uploaded assets (delete from storage)
+            if uploaded_assets:
+                logger.warning(
+                    f"Rolling back {len(uploaded_assets)} uploaded assets due to error",
+                    extra={"asset_count": len(uploaded_assets)},
+                )
+                for asset in uploaded_assets:
+                    try:
+                        await self.storage.delete_asset(
+                            storage_path=asset["storage_path"],
+                            bucket=asset["bucket"],
+                        )
+                        logger.info(f"Rolled back asset: {asset['storage_path']}")
+                    except Exception as rollback_error:
+                        logger.error(
+                            f"Failed to rollback asset {asset['storage_path']}: {rollback_error}",
+                            exc_info=True,
+                        )
+
             logger.error(
                 "WriteIntent execution failed - transaction rolled back",
                 exc_info=True,
@@ -448,6 +557,7 @@ class MultiOperationExecutor:
                     "goal": intent.goal,
                     "error": str(e),
                     "execution_time_ms": execution_time_ms,
+                    "assets_rolled_back": len(uploaded_assets),
                 },
             )
 

@@ -16,9 +16,7 @@ from autifyme_agents.core.logging_config import get_logger, setup_logging
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
-from autifyme_agents.workflows.handlers.cataloging_handler import (
-    CatalogingWorkflowHandler,
-)
+from autifyme_agents.workflows.handlers.write_intent_handler import WriteIntentHandler
 from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
 
 # Initialize logging for serverless environment
@@ -72,29 +70,29 @@ def get_channel_dependency() -> WhatsAppChannel:
 
 def get_workflow_handler(
     channel: WhatsAppChannel = Depends(get_channel_dependency),  # noqa: B008
-) -> CatalogingWorkflowHandler:
-    """Get cataloging workflow handler with injected channel.
+) -> WriteIntentHandler:
+    """Get workflow handler with injected channel.
 
     Args:
         channel: WhatsApp channel (injected by FastAPI)
 
     Returns:
-        CatalogingWorkflowHandler instance
+        WriteIntentHandler instance
     """
-    return CatalogingWorkflowHandler(channel=channel)
+    return WriteIntentHandler(channel=channel)
 
 
 def get_runner(
     storage: StorageInterface = Depends(get_storage_dependency),  # noqa: B008
     channel: WhatsAppChannel = Depends(get_channel_dependency),  # noqa: B008
-    workflow_handler: CatalogingWorkflowHandler = Depends(get_workflow_handler),  # noqa: B008
+    workflow_handler: WriteIntentHandler = Depends(get_workflow_handler),  # noqa: B008
 ) -> WorkflowRunner:
     """Get workflow runner with all dependencies injected.
 
     Args:
         storage: Storage adapter (injected by FastAPI)
         channel: WhatsApp channel (injected by FastAPI)
-        workflow_handler: Cataloging workflow handler (injected by FastAPI)
+        workflow_handler: WriteIntent workflow handler (injected by FastAPI)
 
     Returns:
         WorkflowRunner instance with all dependencies

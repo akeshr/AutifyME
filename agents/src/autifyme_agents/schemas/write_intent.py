@@ -17,6 +17,114 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 
+class AssetUpload(BaseModel):
+    """
+    File upload specification for WriteIntent.
+
+    Processed BEFORE database operations. The uploaded file's public URL
+    can be referenced in operations using @name.public_url syntax.
+
+    Use storage_path from image_studio output. The HITL handler auto-derives
+    the full public URL for WhatsApp preview.
+
+    Example:
+        asset_uploads=[
+            AssetUpload(
+                storage_path="pending/whatsapp_123_919/20251130_edit_abc123.png",
+                returns="product_image",
+                caption="PET Jar 500ml Clear - product photo",
+                target_folder="products"
+            )
+        ]
+
+    Operations reference:
+        operations=[
+            Operation(
+                action="create",
+                table="assets",
+                data={
+                    "file_url": "@product_image.public_url",
+                    "file_type": "image/png",
+                    "file_size": "@product_image.size_bytes"
+                },
+                returns="asset"
+            )
+        ]
+    """
+
+    model_config = {"extra": "forbid"}
+
+    # Primary: Supabase storage path (from image_studio/download_media)
+    storage_path: str | None = Field(
+        default=None,
+        description=(
+            "Path within Supabase bucket (from image_studio/download_media outputs).\n"
+            "Example: 'pending/whatsapp_123_919/20251130_edit_abc123.png'\n"
+            "Executor MOVES file from pending/ to target_folder upon HITL approval.\n"
+            "HITL handler auto-derives full public URL for WhatsApp preview."
+        ),
+    )
+
+    # Fallback: Local file path (for external file uploads only)
+    temp_path: str | None = Field(
+        default=None,
+        description=(
+            "Local file path for external uploads not already in Supabase.\n"
+            "Use storage_path for image_studio/download_media outputs instead."
+        ),
+    )
+
+    returns: str = Field(
+        ...,
+        description=(
+            "Name to assign to upload result.\n"
+            "Operations can reference: @name.public_url, @name.storage_path, "
+            "@name.size_bytes, @name.content_type, @name.caption"
+        ),
+    )
+
+    caption: str = Field(
+        default="",
+        description=(
+            "Human-readable caption for HITL image preview.\n"
+            "Describe what this specific image shows.\n"
+            "Example: 'PET Jar 500ml Clear - product photo'\n"
+            "Keep under 200 chars. Sent with image in WhatsApp."
+        ),
+    )
+
+    bucket: str = Field(
+        default="assets",
+        description="Storage bucket name (default: 'assets')",
+    )
+
+    # For temp_path: folder to upload into
+    folder: str = Field(
+        default="products",
+        description="Folder within bucket for upload (default: 'products')",
+    )
+
+    # For storage_path: folder to move into
+    target_folder: str = Field(
+        default="products",
+        description="Target folder for move operation (default: 'products')",
+    )
+
+    @field_validator("storage_path", "temp_path", mode="after")
+    @classmethod
+    def validate_path_provided(cls, v: str | None, info: Any) -> str | None:
+        """Validate that at least one path is provided."""
+        # This runs for each field, actual validation in model_validator
+        return v
+
+    def model_post_init(self, __context: Any) -> None:
+        """Validate that exactly one of temp_path or storage_path is provided."""
+        if self.temp_path is None and self.storage_path is None:
+            raise ValueError("Either temp_path or storage_path must be provided")
+        if self.temp_path is not None and self.storage_path is not None:
+            raise ValueError("Cannot provide both temp_path and storage_path")
+
+
 class Operation(BaseModel):
     """
     Single operation within a WriteIntent.
@@ -135,6 +243,8 @@ class WriteIntent(BaseModel):
     - Auto-generated execution plan (not manual)
     - Unified @name.field reference syntax
     - Flat operations list (no ChangeSpecification nesting)
+    - Asset uploads processed before database operations
+    - LLM-generated hitl_summary for human approval
     """
 
     model_config = {"extra": "forbid"}
@@ -156,6 +266,37 @@ class WriteIntent(BaseModel):
         ),
     )
 
+    hitl_summary: str = Field(
+        default="",
+        description=(
+            "Human-readable approval summary for HITL messaging (<1500 chars).\n"
+            "Write this for the business user who will approve/reject.\n"
+            "Include: operation goal, key impacts, warnings, sample SKUs/names.\n"
+            "End with approval instructions.\n"
+            "If empty, system generates fallback from goal/impact.\n"
+            "Example:\n"
+            "'Creating PET Jars family with 2 size variants.\n"
+            "Impact: 1 family, 2 products. Uploading 2 images.\n"
+            "Warning: SKU count increases by 2.\n"
+            "Examples: JAR-PET-500ML, JAR-PET-1L.\n"
+            "Reply *approve* to proceed or *reject* to cancel.'"
+        ),
+    )
+
+    asset_uploads: list[AssetUpload] = Field(
+        default_factory=list,
+        description=(
+            "Files to upload BEFORE database operations.\n"
+            "Each upload's result can be referenced in operations:\n"
+            "- @name.public_url: Public URL of uploaded file\n"
+            "- @name.storage_path: Path within storage bucket\n"
+            "- @name.size_bytes: File size in bytes\n"
+            "- @name.content_type: MIME type\n"
+            "- @name.caption: Human-readable caption for alt text\n"
+            "Uploads execute atomically: if any fails, no DB operations run."
+        ),
+    )
+
     operations: list[Operation] = Field(
         ...,
         description=(
@@ -168,13 +309,12 @@ class WriteIntent(BaseModel):
     impact: dict[str, Any] = Field(
         ...,
         description=(
-            "Simplified impact analysis.\n"
+            "Simplified impact analysis for logging/analytics.\n"
             "Format: {\n"
             "  'creates': {'table_name': count, ...},\n"
             "  'updates': {'table_name': count, ...},\n"
             "  'deletes': {'table_name': count, ...},\n"
-            "  'warnings': ['warning1', 'warning2'],\n"
-            "  'examples': ['example SKU 1', 'example SKU 2']\n"
+            "  'warnings': ['warning1', 'warning2']\n"
             "}"
         ),
     )

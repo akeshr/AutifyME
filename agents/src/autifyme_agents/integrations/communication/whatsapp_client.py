@@ -100,3 +100,52 @@ class WhatsAppClient:
             },
         )
         return data
+
+    def send_image(self, recipient: str, media_id: str, *, caption: str | None = None) -> dict[str, Any]:
+        """Send image message using WhatsApp media_id.
+
+        Media must be uploaded first via WhatsAppMediaClient.upload_media().
+
+        Args:
+            recipient: WhatsApp phone number (e.g., "919876543210")
+            media_id: WhatsApp media ID from upload_media()
+            caption: Optional image caption (max 1024 chars)
+
+        Returns:
+            WhatsApp API response dict
+
+        Raises:
+            httpx.HTTPStatusError: If API call fails
+        """
+        image_payload: dict[str, Any] = {"id": media_id}
+        if caption:
+            # WhatsApp caption limit is 1024 chars
+            if len(caption) > 1024:
+                caption = caption[:1021] + "..."
+            image_payload["caption"] = caption
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": recipient,
+            "type": "image",
+            "image": image_payload,
+        }
+
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+        }
+
+        response = httpx.post(self._base_url, json=payload, headers=headers, timeout=10.0)
+        response.raise_for_status()
+        data: dict[str, Any] = response.json()
+        logger.debug(
+            "WhatsApp image sent",
+            extra={
+                "recipient": recipient,
+                "media_id": media_id,
+                "has_caption": caption is not None,
+                "message_id": (data.get("messages") or [{}])[0].get("id"),
+            },
+        )
+        return data

@@ -15,7 +15,7 @@ def load_prompt(file_name: str) -> str:
 
     Args:
         file_name: The name of the prompt file, relative to the `prompts` directory.
-                   e.g., "specialists/cataloging_specialist.prompt"
+                   e.g., "specialists/catalog_specialist.prompt"
 
     Returns:
         The string content of the prompt template.
@@ -26,8 +26,8 @@ def load_prompt(file_name: str) -> str:
     # Construct the full path to the prompt file using pathlib.
     # Path(__file__).parent gives the directory of the current script (core/).
     # We navigate up to parent and then down to prompts/.
-    base_path = Path(__file__).parent
-    prompt_path = base_path / '..' / 'prompts' / file_name
+    base_path = Path(__file__).parent.parent  # Go up from core/ to autifyme_agents/
+    prompt_path = (base_path / 'prompts' / file_name).resolve()
 
     if not prompt_path.exists():
         raise FileNotFoundError(f"Prompt file not found at: {prompt_path}")

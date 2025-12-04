@@ -204,16 +204,16 @@ class OutcomeTracker:
                 alternative_departments=alternatives or [],
             )
 
-        logger.info(
-            "Routing decision tracked",
-            extra={
-                "tracking_id": workflow.tracking_id,
-                "thread_id": workflow.thread_id,
-                "intent": intent,
-                "department": department,
-                "confidence": confidence,
-            },
-        )
+            logger.info(
+                "Routing decision tracked",
+                extra={
+                    "tracking_id": workflow.tracking_id,
+                    "thread_id": workflow.thread_id,
+                    "intent": intent,
+                    "department": department,
+                    "confidence": confidence,
+                },
+            )
 
     def set_trace_id(self, tracking_id: str, trace_id: str) -> None:
         """Set LangSmith trace ID for observability correlation.
@@ -232,14 +232,14 @@ class OutcomeTracker:
 
             workflow.trace_id = trace_id
 
-        logger.debug(
-            "Trace ID linked to workflow",
-            extra={
-                "tracking_id": workflow.tracking_id,
-                "thread_id": workflow.thread_id,
-                "trace_id": trace_id,
-            },
-        )
+            logger.debug(
+                "Trace ID linked to workflow",
+                extra={
+                    "tracking_id": workflow.tracking_id,
+                    "thread_id": workflow.thread_id,
+                    "trace_id": trace_id,
+                },
+            )
 
     def track_workflow_end(
         self,
@@ -277,26 +277,28 @@ class OutcomeTracker:
                 resolution_strategy=resolution_strategy,
             )
 
-        logger.info(
-            "Workflow completed",
-            extra={
+            # Capture values while still holding lock
+            log_extra = {
                 "tracking_id": workflow.tracking_id,
                 "thread_id": workflow.thread_id,
                 "success": success,
                 "duration_seconds": workflow.duration_seconds,
                 "error_type": workflow.result.error_type,
-            },
-        )
+            }
+            # Take a snapshot for persistence (workflow may be removed after lock release)
+            workflow_snapshot = workflow
+
+            # Cleanup - remove from active workflows before releasing lock
+            self._active_workflows.pop(tracking_id, None)
+
+        logger.info("Workflow completed", extra=log_extra)
 
         # Persist to storage (Phase 1.2 extension - needs database table)
-        self._persist_outcome(workflow)
+        # Safe to use snapshot - object won't be modified after removal from dict
+        self._persist_outcome(workflow_snapshot)
 
         # Trigger learning (Phase 2 - routing optimization)
-        # self._trigger_learning(workflow)
-
-        # Cleanup - remove from active workflows
-        with self._lock:
-            self._active_workflows.pop(tracking_id, None)
+        # self._trigger_learning(workflow_snapshot)
 
     def get_workflow_metrics(
         self,
@@ -332,41 +334,48 @@ class OutcomeTracker:
         Args:
             workflow: Complete workflow record
         """
-        # Extract business-relevant result data
+        # Extract result_data as JSONB
         result_data = None
         if workflow.result and workflow.result.result_data:
             result_data = self._make_json_serializable(workflow.result.result_data)
 
-        # Build lightweight business outcome payload
+        # Build outcome using WorkflowOutcome model (aligned with DB schema)
         outcome_payload: dict[str, Any] = {
+            # Required identifiers (NOT NULL in DB)
             "tracking_id": workflow.tracking_id,
             "thread_id": workflow.thread_id,
-            "trace_id": workflow.trace_id,  # LangSmith trace ID for observability correlation
-            # Business context
             "sender_id": workflow.message.sender_id,
-            "message_text": workflow.message.text or "",  # Required field
+            "message_hash": workflow.message_hash,
+            "received_at": workflow.message.received_at,
+            "started_at": workflow.started_at,
+            "success": workflow.result.success if workflow.result else False,
+            # Optional message info
+            "message_text": workflow.message.text or "",
+            "media_id": workflow.message.media_id,
+            "media_type": workflow.message.media_type,
             "platform": workflow.message.platform,
-            "message_hash": workflow.message_hash,  # For similarity matching
-            "received_at": workflow.message.received_at,  # Message timestamp
-            # Routing decision (business logic) - use defaults for direct responses
+            # Routing decision
             "intent": workflow.routing.intent if workflow.routing else "conversational",
             "department": workflow.routing.department if workflow.routing else "direct_response",
-            # Outcome (business success/failure)
-            "success": workflow.result.success if workflow.result else False,
-            "result_data": result_data,  # Cataloging result with product details
-            # Timestamps (reference for joining with LangSmith)
-            "started_at": workflow.started_at,
+            "routing_reasoning": workflow.routing.reasoning if workflow.routing else None,
+            "routing_confidence": workflow.routing.confidence if workflow.routing else None,
+            # Outcome
+            "error_type": workflow.result.error_type if workflow.result else None,
+            "error_message": workflow.result.error_message if workflow.result else None,
+            "resolution_strategy": workflow.result.resolution_strategy if workflow.result else None,
+            "result_data": result_data,
+            # Timing
+            "duration_seconds": workflow.duration_seconds,
             "ended_at": workflow.ended_at,
-            # Phase 2: Learning metadata
-            "learned_patterns": [],
-            "applied_strategies": [],
+            # LangSmith correlation
+            "trace_id": workflow.trace_id,
         }
 
         try:
-            # Convert dict to WorkflowOutcome model
+            # Use WorkflowOutcome model (now aligned with database schema)
             outcome_model = WorkflowOutcome.model_validate(outcome_payload)
             outcome_id = self.storage.save_workflow_outcome(outcome_model)
-            status = outcome_payload.get("result_data", {}).get("status") if isinstance(outcome_payload.get("result_data"), dict) else "completed"
+            status = result_data.get("status") if isinstance(result_data, dict) else "completed"
             logger.info(
                 "Workflow outcome persisted",
                 extra={

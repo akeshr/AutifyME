@@ -15,7 +15,7 @@ from autifyme_agents.core.tool_error_handler import (
     build_agent_error_response,
     build_success_response,
 )
-from autifyme_agents.schemas.write_intent import Operation, WriteIntent
+from autifyme_agents.schemas.write_intent import AssetUpload, Operation, WriteIntent
 from autifyme_agents.tools.data_engine._executor import MultiOperationExecutor
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,9 @@ class WriteDataInput(BaseModel):
 
     As per UNIVERSAL_DATA_ENGINE_DESIGN.md (lines 722-745).
     Streamlined multi-operation write intent with auto-dependency resolution.
+
+    Uses nested Pydantic models (Operation, AssetUpload) so specialists see
+    the exact schema with all required/optional fields and validation.
     """
 
     model_config = {"extra": "forbid"}
@@ -48,24 +51,41 @@ class WriteDataInput(BaseModel):
         ),
     )
 
-    operations: list[dict[str, Any]] = Field(
+    hitl_summary: str = Field(
+        ...,
+        description=(
+            "REQUIRED: Human-readable approval summary for HITL (<1500 chars).\n"
+            "Write for the BUSINESS USER who will approve/reject.\n\n"
+            "MUST include:\n"
+            "- What will be created/updated (plain language)\n"
+            "- Key impacts (counts, SKUs, prices)\n"
+            "- Any warnings or assumptions\n"
+            "- End with: 'Reply *approve* to proceed or *reject* to cancel'\n\n"
+            "Example:\n"
+            "'Creating PET Jars family with 2 size variants.\n\n"
+            "Products: JAR-PET-500ML (Rs 30), JAR-PET-1L (Rs 50)\n"
+            "Images: 2 product photos attached\n\n"
+            "This will add 1 product family and 2 new SKUs.\n\n"
+            "Reply *approve* to proceed or *reject* to cancel.'"
+        ),
+    )
+
+    asset_uploads: list[AssetUpload] = Field(
+        default_factory=list,
+        description=(
+            "Files to persist BEFORE database operations (atomically).\n"
+            "Use storage_path from image_studio/download_media output.\n"
+            "Example: AssetUpload(storage_path='pending/.../img.png', returns='hero', caption='Product photo')\n"
+            "Reference in operations: '@hero.public_url', '@hero.size_bytes', '@hero.caption'"
+        ),
+    )
+
+    operations: list[Operation] = Field(
         ...,
         description=(
             "List of operations to execute atomically.\n"
-            "Each operation has:\n"
-            "- action: 'create'|'update'|'delete'|'upsert'\n"
-            "- table: table name\n"
-            "- data: dict or list of dicts (for create/upsert)\n"
-            "- filters: dict (for update/delete)\n"
-            "- updates: dict (for update)\n"
-            "- dependencies: list of operation names (optional)\n"
-            "- returns: name for this operation's result (optional)\n"
-            "- on_conflict: 'error'|'skip'|'update' (optional)\n"
-            "- conflict_fields: list of fields (for upsert, optional)\n"
-            "- cascade: bool (for delete, optional)\n"
-            "- soft_delete: bool (for delete, default True)\n\n"
             "Engine automatically orders by dependencies (topological sort).\n"
-            "All operations execute in single transaction with automatic rollback.\n\n"
+            "All operations execute in single transaction with automatic rollback.\n"
             "Reference syntax: Use @name.field to reference previous operations.\n"
             "Example: 'family_id': '@family.id' references operation with returns='family'"
         ),
@@ -79,6 +99,7 @@ class WriteDataInput(BaseModel):
             "  'creates': {'table_name': count, ...},\n"
             "  'updates': {'table_name': count, ...},\n"
             "  'deletes': {'table_name': count, ...},\n"
+            "  'asset_uploads': count,\n"
             "  'warnings': ['warning1', 'warning2'],\n"
             "  'examples': ['example SKU 1', 'example SKU 2']\n"
             "}"
@@ -147,8 +168,10 @@ def create_write_data_tool(
     async def _write_data_impl(
         goal: str,
         reasoning: str,
-        operations: list[dict[str, Any]],
+        hitl_summary: str,
+        operations: list[Operation],
         impact: dict[str, Any],
+        asset_uploads: list[AssetUpload] | None = None,
         dry_run: bool = False,
         validate_only: bool = False,
     ) -> dict[str, Any]:
@@ -179,6 +202,7 @@ def create_write_data_tool(
             write_data(
                 goal="Create PET Food Jars family with Size and Color variants (6 SKUs)",
                 reasoning="Duplicate check: 0 matches. Web research (confidence 0.85): food-grade PET, transparent/amber common. Creating 2 axes (Size, Color), 4 variant values (500ml, 1L, Clear, Amber), 4 product combinations.",
+                hitl_summary="Creating PET Food Jars family with 4 product variants.\n\nProducts:\n- JAR-PET-500ML-CLEAR (Rs 30)\n- JAR-PET-500ML-AMBER (Rs 32)\n- JAR-PET-1L-CLEAR (Rs 45)\n- JAR-PET-1L-AMBER (Rs 48)\n\nThis will add 1 product family, 2 variant axes, and 4 new SKUs to your catalog.\n\nReply *approve* to proceed or *reject* to cancel.",
                 operations=[
                     {
                         "action": "create",
@@ -302,12 +326,14 @@ def create_write_data_tool(
             write_data(goal="...", reasoning="...", operations=[...], impact={...}, validate_only=True)
         """
         try:
-            # Parse WriteIntent from dict inputs
+            # Build WriteIntent from typed inputs (already validated by Pydantic)
             write_intent = WriteIntent(
                 goal=goal,
                 reasoning=reasoning,
-                operations=[Operation(**op) for op in operations],
-                impact=impact
+                hitl_summary=hitl_summary,
+                asset_uploads=asset_uploads or [],
+                operations=operations,
+                impact=impact,
             )
 
             # Access control: Verify all tables in operations
@@ -372,12 +398,27 @@ def create_write_data_tool(
         func=_write_data_impl,
         name="write_data",
         description=(
-            "Execute multi-operation write intent with atomic transactions and dependency resolution. "
-            "USE WHEN: Creating multi-table entities, operations with dependencies, cross-table references. "
-            "SUPPORTS: Atomic ACID transactions, topological dependency sorting, @name.field references, "
-            "validation and dry-run modes. "
-            "RETURNS: Execution result with created/updated/deleted entities, or errors with rollback. "
-            "NOT FOR: Reading data (use read_data) or schema inspection (use inspect_schema)."
+            "Execute atomic multi-table transactions with dependency resolution and cross-table references.\n\n"
+            "REQUIRED FIELDS:\n"
+            "- goal: Human-readable intent ('Create PET Bottles family with Size variants')\n"
+            "- reasoning: Investigation results, duplicate checks, research findings, assumptions\n"
+            "- hitl_summary: Business user approval message (<1500 chars) ending with 'Reply *approve* to proceed or *reject* to cancel'\n"
+            "- operations: List of {action, table, data, returns?, dependencies?, filters?, updates?}\n"
+            "- impact: {creates: {table: count}, updates: {table: count}, deletes: {table: count}, warnings: [], examples: []}\n\n"
+            "REFERENCE SYNTAX (@name.field):\n"
+            "- Single result: '@family.id' references operation with returns='family'\n"
+            "- Batch result: '@axes_batch[0].id' references first item from batch operation\n"
+            "- Engine auto-resolves dependencies via topological sort\n\n"
+            "SCENARIOS:\n"
+            "- Create product family with variants: operations=[{create product_families, returns='family'}, {create variant_axes with '@family.id', returns='axes'}, {create products with '@family.id'}]\n"
+            "- Tiered bulk price update: Multiple update operations with different filters for size-based pricing\n"
+            "- Soft delete with cleanup: Update products is_active=False, then update junction table, then variant_values\n"
+            "- Asset upload + DB: asset_uploads=[{storage_path='pending/...', returns='hero', caption='...'}] then '@hero.public_url' in operations\n\n"
+            "MODES:\n"
+            "- dry_run=True: Validate and show impact without executing\n"
+            "- validate_only=True: Schema/constraint checks only\n\n"
+            "RETURNS: {success, operations_executed, results_by_name, execution_time_ms, rollback_performed?}\n\n"
+            "NOT FOR: Reading data (use read_data) or schema discovery (use inspect_schema)."
         ),
         args_schema=WriteDataInput,
         coroutine=_write_data_impl,

@@ -65,39 +65,38 @@ Every change—whether design, architecture, or code—must meet this standard:
 
 ### LangChain & Agent Patterns
 - Default to LangChain v1 native patterns (structured outputs, ToolStrategy, middleware-based HITL)
-- Use `create_agent` for specialists, `create_deep_agent` for orchestrators, maintain `{messages}`/`{agent_scratchpad}` contract
-- HITL via DeepAgents `tool_configs` + HumanInTheLoopMiddleware (not interrupt_before/after)
-- Delegate cross-cutting concerns to middleware (tools stay focused, reusable, context-light)
-- Design specialists/tools for single responsibility and reuse across workflows
-- Use multimodal payloads, avoid brittle prompt hacks
+- Use `create_agent` for specialists, `create_deep_agent` for orchestrators
+- HITL via DeepAgents `tool_configs` + HumanInTheLoopMiddleware
+- Delegate cross-cutting concerns to middleware
+
+### Tool Development Standards
+- **[CRITICAL] ATOMIC + StructuredTool:** One thing powerfully, Pydantic schemas, structured returns
+
+### **[CRITICAL] Proactive Skill Usage**
+Invoke project skills automatically at the start of relevant work - do not wait to be told:
+
+- **`prompt-engineering`**: Creating, refactoring, or reviewing PM/specialist prompts
+- **`specialist-creation`**: Adding new specialists or modifying specialist architecture
+- **`tool-development`**: Building new tools, refactoring existing tools, reviewing tool implementations
+- **`autonomous-testing`**: Testing workflows, validating PM behavior, post-implementation verification
 
 ### Autonomous Behavior Standards
 - **Dynamic Planning:** Agents analyze context and plan adaptively, not follow rigid recipes
+- **Suggestive Agents:** Agents come to the user with details, options, and recommendations - not wait passively for everything to be specified
 - **Graceful Adaptation:** Handle missing data, tool failures, and edge cases with fallback strategies
 - **Self-Review:** Critique outputs before returning; iterate when confidence is low
 - **Transparent Communication:** Flag limitations, assumptions, and data gaps clearly
 - **Learning Orientation:** System should improve from past executions
 
 ### Prompt Engineering for Autonomy
-- **Version prompts alongside code** - avoid hardcoded instructions in agent logic
-- **Follow `PROMPT_ENGINEERING_STANDARDS.md`** - no Python code in prompts, use XML structure, canonical examples, right altitude for hierarchy level
-- **Design for autonomy, not recipes:** Prompts should enable dynamic decision-making, not prescribe rigid execution sequences
-- **PM prompts enable planning:** Analyze context first, then plan adaptively (not "Phase 1→2→3")
-- **Specialist prompts enable adaptation:** Handle missing data, self-review outputs, iterate when confidence is low
-- **Avoid hardcoded orchestration:** Let agents decide sequence based on available data and dependencies
-- **Enable transparent failures:** Agents should flag limitations and adapt, not silently fail or rigidly error
-
-### Documentation & Libraries
-- Update architectural docs in lockstep with major decisions
-- **Library verification priority**: (1) Official docs + source code, (2) Python REPL inspection (`uv run python -c`), (3) Local docs
-- Always verify APIs with `inspect`/`dir` before depending on them
-- Capture context-engineering strategies and extension points for reuse
+- **Version prompts alongside code** - no hardcoded instructions in agent logic
+- **XML structure, right altitude, canonical examples** - no Python code in prompts
 
 ### Documentation Strategy
-- **[CRITICAL]Check first, then decide**: Review existing docs before creating new ones; update rather than duplicate
-- **[CRITICAL]Create only when necessary**: Novel topics, complex specifications, long-term architectural impact
-- **Make scannable**: Date/status header, executive summary, tables/schemas/examples, implementation checklists
-- **Connect the dots**: Link related docs, mark open questions, align with architectural canon
+- **[CRITICAL] Check first, update rather than duplicate**: Review existing docs before creating new ones
+- **Create only when necessary**: Novel topics, complex specifications, long-term architectural impact
+- **Make scannable**: Date/status header, executive summary, tables/schemas/examples
+- Update architectural docs in lockstep with major decisions
 
 ### Quality Standards
 - Treat testing, observability, recovery as foundational (not optional)
@@ -144,27 +143,28 @@ uv run python -c "from dotenv import load_dotenv; load_dotenv('.env'); # test co
 
 **Prerequisites**: Python 3.12+, `uv`, PostgreSQL
 
-### Architectural Canon
-
-**Navigation hub**: `docs/architecture/README.md` - All docs categorized by concern
-
 ### Common Gotchas
 
-**LangChain v1**:
-- Prerelease stack (`langchain==1.0.0`, `langgraph==1.0.0`, `deepagents==0.1.4`)
-- APIs unstable; verify with `inspect`/`dir` before use
+**LangChain v1 Stack**:
+- Stable releases: `langchain>=1.1.0`, `langgraph>=1.0.4`, `deepagents>=0.2.8`
 
 **Windows**:
 - Use `.venv\Scripts\activate` (not `source`)
 - Git line endings: LF (`.gitattributes`)
 
 **Error Handling**:
-- Tools must raise `ToolException` (prevents infinite loops)
+- Tools NEVER raise exceptions - return structured dicts with `{"success": bool, "error": ...}`
+- Use `build_agent_error_response()` from `core.tool_error_handler` for consistent error handling
+- Error responses include actionable guidance enabling agents to reason and retry intelligently
+
+**Console Output**:
+- Always use `safe_print` instead of `print` for CLI/test output
+
+**Testing**:
+- Always use the autonomous testing framework for test scenarios (not manual scripts)
 
 ### Quick Navigation
 
 - **Project Status**: `README.md`
 - **Architecture Docs**: `docs/architecture/README.md` (navigation hub)
 - **LangSmith Traces**: https://smith.langchain.com
-- Always use `safe_print` instead of `print`
-- Always use testing framework for test scenarios

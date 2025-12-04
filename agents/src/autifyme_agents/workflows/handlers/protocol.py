@@ -6,22 +6,11 @@ from typing import Any, Protocol
 
 
 class WorkflowHandler(Protocol):
-    """Protocol for workflow-specific result extraction and interrupt handling.
+    """Protocol for workflow-specific message extraction and interrupt handling.
 
     Implementations handle domain-specific logic for different workflow types
     (cataloging, customer service, etc.).
     """
-
-    def extract_result(self, messages: list[Any]) -> Any | None:
-        """Extract workflow-specific result from PM messages.
-
-        Args:
-            messages: PM output messages
-
-        Returns:
-            Workflow-specific result object if found, None otherwise
-        """
-        ...
 
     def extract_summary(self, messages: list[Any]) -> str | None:
         """Extract AI summary for conversational responses.

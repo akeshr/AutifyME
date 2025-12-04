@@ -14,7 +14,6 @@ from typing import Any
 
 import pytest
 
-
 # =============================================================================
 # Disable LangChain/LangSmith tracing for tests
 # =============================================================================
@@ -212,7 +211,7 @@ def sample_messages():
             tool_calls=[
                 {
                     "id": "call_123",
-                    "name": "cataloging_specialist",
+                    "name": "catalog_specialist",
                     "args": {"user_message": "Please catalog a new t-shirt, price $29.99"},
                 }
             ],

@@ -91,45 +91,49 @@ class WorkflowOutcome(BaseModel):
     """
     Represents the outcome of a completed workflow for analytics and learning.
 
-    Used by outcome tracking middleware to record workflow execution results
-    for Phase 2 agentic evolution and similarity matching.
+    Schema matches database: database/migrations/001_workflow_outcomes.sql
+    Used by outcome tracking middleware to record workflow execution results.
     """
+    # Required identifiers (NOT NULL in DB)
     tracking_id: str = Field(..., description="Unique identifier for this outcome")
     thread_id: str = Field(..., description="LangGraph thread ID")
     sender_id: str = Field(..., description="User identifier (phone number, email, etc.)")
-    message_text: str = Field(..., description="User's original message")
     message_hash: str = Field(..., description="Content hash for similarity matching")
+    received_at: datetime = Field(..., description="When message was received")
+    started_at: datetime = Field(..., description="When workflow execution started")
+    success: bool = Field(..., description="Whether workflow completed successfully")
 
-    # Media info (optional)
+    # Message info (optional)
+    message_text: str | None = Field(None, description="User's original message")
     media_id: str | None = Field(None, description="Media identifier if present")
     media_type: str | None = Field(None, description="Media type (image, video, document)")
     platform: str | None = Field(None, description="Originating platform (whatsapp, web, etc.)")
 
-    # Timing
-    received_at: datetime = Field(..., description="When message was received")
-    completed_at: datetime | None = Field(None, description="When workflow completed")
-    duration_seconds: float | None = Field(None, description="Total execution time")
-
     # Routing decision
-    intent: str = Field(..., description="Detected user intent")
-    department: str = Field(..., description="Routed to department/workflow")
+    intent: str | None = Field(None, description="Detected user intent")
+    department: str | None = Field(None, description="Routed to department/workflow")
     routing_reasoning: str | None = Field(None, description="PM's routing reasoning")
+    routing_confidence: float | None = Field(None, description="Confidence score 0-1")
+    alternative_departments: list[str] | None = Field(None, description="Fallback options")
+    routed_at: datetime | None = Field(None, description="When routing decision was made")
 
     # Execution outcome
-    success: bool = Field(..., description="Whether workflow completed successfully")
-    result_summary: str | None = Field(None, description="Human-readable outcome summary")
-    error_message: str | None = Field(None, description="Error message if failed")
+    error_type: str | None = Field(None, description="Error class if failed")
+    error_message: str | None = Field(None, description="Error details if failed")
+    resolution_strategy: str | None = Field(None, description="How error was resolved")
+    result_data: dict[str, Any] | None = Field(None, description="Structured result (JSONB)")
 
-    # Specialist involvement
-    specialists_invoked: list[str] = Field(
-        default_factory=list,
-        description="List of specialists that were invoked"
-    )
-    tool_calls_count: int = Field(default=0, description="Total tool calls made")
+    # Timing
+    duration_seconds: float | None = Field(None, description="Total execution time")
+    ended_at: datetime | None = Field(None, description="When workflow completed")
 
-    # HITL
-    required_approval: bool = Field(default=False, description="Whether HITL approval was required")
-    approval_status: str | None = Field(None, description="approved, rejected, timeout")
+    # Learning metadata (Phase 2)
+    learned_patterns: list[dict[str, Any]] | None = Field(None, description="Success patterns")
+    failure_warnings: list[dict[str, Any]] | None = Field(None, description="Failure cases")
+    applied_strategies: list[str] | None = Field(None, description="Strategies applied")
+
+    # LangSmith correlation
+    trace_id: str | None = Field(None, description="LangSmith trace ID")
 
     model_config = ConfigDict(from_attributes=True)
 

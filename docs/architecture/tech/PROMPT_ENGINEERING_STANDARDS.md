@@ -332,25 +332,39 @@ Claude is trained on XML-tagged data. Use this structure:
 
 ## 4. Examples Strategy
 
-### 4.1 Canonical Examples > Edge Cases
+### 4.1 [CRITICAL] Complex Examples Over Simple
 
-**Anthropic Principle:** "For an LLM, examples are the 'pictures' worth a thousand words."
+**Core Principle:** Complex examples teach simple scenarios. Simple examples do NOT teach complex scenarios.
 
-**Do:**
-- Show 2-4 **diverse** scenarios covering common patterns
-- Include reasoning process (thought → action → output)
-- Use realistic inputs/outputs
-- Demonstrate decision-making principles
+An agent learning from a complex example (multi-table operation, edge cases, ambiguous input, deep research phase) can easily handle simple cases. But an agent learning only from simple examples will **FAIL** when encountering complexity.
 
-**Don't:**
-- List 20 edge cases
-- Show only happy path
-- Provide examples without reasoning
-- Use contrived/artificial scenarios
+**2-4 complex canonical examples** that:
+- Force multi-step reasoning and OOTB (out-of-the-box) thinking
+- Include edge cases and ambiguity
+- Show the full cognitive cycle: **Analyze -> Research -> Decide -> Execute -> Review**
+- Demonstrate handling ambiguity with **suggestions and options**, not questions
+- Show complete tool calls with ALL parameters (especially HITL fields)
+
+### 4.2 Agent Behavior in Examples
+
+**Suggestive, Not Passive:** Agents are proactive partners. When requests are incomplete:
+- Come with options and recommendations - don't just ask questions
+- Surface what's missing with proposed solutions
+- Use domain expertise to fill gaps intelligently
+
+**BAD:** "What price should I use?"
+**GOOD:** "Similar products are Rs 20-35. Based on [analysis], I recommend Rs 28. Options: 1) Rs 28 (recommended), 2) Specify your price, 3) Research market rates"
+
+**Deep Research:** Show thorough investigation (5+ queries) before acting:
+- Search with multiple term variations
+- Query related tables to understand context
+- Look at existing patterns before proposing changes
+
+**Self-Review:** Examples should show quality verification before returning
 
 ---
 
-### 4.2 Example Structure
+### 4.3 Example Structure
 
 ```xml
 <example scenario="New product with image">
@@ -383,7 +397,7 @@ Claude is trained on XML-tagged data. Use this structure:
 
 ---
 
-### 4.3 Coverage Matrix
+### 4.4 Coverage Matrix
 
 For PM prompts, ensure examples cover:
 - ✅ Single-domain workflows (delegate to one specialist)
@@ -584,12 +598,15 @@ Before committing any prompt, verify:
 - [ ] Simple, direct language (active voice, imperative)
 - [ ] Minimal tokens (no redundancy)
 
-### 6.3 Examples
-- [ ] 2-4 canonical examples (not edge cases)
-- [ ] Diverse scenarios covered
-- [ ] Includes reasoning process
-- [ ] Shows decision-making principles
-- [ ] Realistic inputs/outputs
+### 6.3 Examples (CRITICAL)
+- [ ] 2-4 COMPLEX examples (not simple happy-path)
+- [ ] Examples force multi-step reasoning and OOTB thinking
+- [ ] Examples show ambiguity handled with suggestions (not just questions)
+- [ ] Examples show deep research phase (5+ queries for specialists)
+- [ ] Examples show COMPLETE tool calls with ALL parameters (goal, reasoning, hitl_summary, asset_uploads, operations, impact)
+- [ ] Each example shows: Analyze -> Research -> Decide -> Execute -> Review
+- [ ] Includes edge cases that require domain expertise to resolve
+- [ ] Realistic inputs/outputs with realistic complexity
 
 ### 6.4 Alignment
 - [ ] Matches agent's role in `AGENTS_DESIGN.md`

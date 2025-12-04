@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from langsmith import Client
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langsmith import Client
 
 # Ensure .env is loaded
 load_dotenv()

@@ -56,11 +56,11 @@ class InspectSchemaToolConfig(BaseModel):
         description="Table restrictions (None = all tables accessible)"
     )
     version: str = Field(
-        default="v1",
+        default="v2",
         description="Schema version to use"
     )
     domain: str = Field(
-        default="product_catalog",
+        default="complete_database",
         description="Domain name (for multi-domain support)"
     )
 
@@ -68,8 +68,8 @@ class InspectSchemaToolConfig(BaseModel):
 def create_inspect_schema_tool(
     storage: StorageInterface,
     tables: list[str] | None = None,
-    version: str = "v1",
-    domain: str = "product_catalog",
+    version: str = "v2",
+    domain: str = "complete_database",
 ) -> StructuredTool:
     """
     Create inspect_schema tool with specialist-scoped access control.
@@ -80,8 +80,8 @@ def create_inspect_schema_tool(
     Args:
         storage: Storage interface for stats/samples
         tables: Allowed tables (None = all tables accessible)
-        version: Schema version (default: "v1")
-        domain: Domain name (default: "product_catalog")
+        version: Schema version (default: "v2")
+        domain: Domain name (default: "complete_database")
 
     Returns:
         StructuredTool configured for this specialist
@@ -366,13 +366,20 @@ def create_inspect_schema_tool(
         func=_inspect_schema_impl,
         name="inspect_schema",
         description=(
-            "Inspect database schema to understand data structure. "
-            "USE WHEN: Before complex operations, verifying table structure, understanding relationships, "
-            "checking valid enum values, validating input formats. "
-            "RETURNS: Schema metadata including columns, types, valid_values for enums, regex patterns, "
-            "computed columns (readonly), JSONB schemas, foreign keys, stats, samples. "
-            "TIP: Use details=['structure', 'constraints'] to get enum values and format patterns before insert/update. "
-            "CRITICAL: Returns STRUCTURE, not actual data - use read_data for fetching data."
+            "CALL FIRST before ANY database operation. Discovers table structure, relationships, constraints, and sample data.\n\n"
+            "SCENARIOS:\n"
+            "- Before creating product family: inspect tables=['product_families','variant_axes','variant_values','products'] with details=['structure','relationships'] to understand multi-table transaction structure\n"
+            "- Duplicate detection strategy: inspect tables=['product_families'] with details=['structure','samples'] sample_limit=10 to see naming patterns for fuzzy matching\n"
+            "- Understanding M:N relationships: inspect tables=['product_variant_values','variant_values','products'] with details=['relationships'] to see junction table structure\n"
+            "- Quick column check: inspect tables=['products'] with details=['structure'] for fastest response\n\n"
+            "DETAILS OPTIONS:\n"
+            "- 'structure': Columns, types, nullable, defaults, required_columns, unique_columns (DEFAULT)\n"
+            "- 'relationships': Foreign keys, cascade behavior, target tables (CRITICAL for multi-table ops)\n"
+            "- 'constraints': Enum valid_values, regex patterns, computed columns, JSONB schemas\n"
+            "- 'stats': Row counts, index info\n"
+            "- 'samples': Real data examples (use sample_limit to control count)\n\n"
+            "RETURNS: {tables: {table_name: {structure?, relationships?, constraints?, stats?, samples?}}}\n\n"
+            "NOT FOR: Fetching actual data (use read_data) or analytics (use aggregate_data)."
         ),
         args_schema=InspectSchemaInput,
         coroutine=_inspect_schema_impl,

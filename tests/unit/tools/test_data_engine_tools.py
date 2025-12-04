@@ -44,7 +44,6 @@ from autifyme_agents.tools.data_engine import (
     create_aggregate_data_tool,
     create_inspect_schema_tool,
     create_read_data_tool,
-    create_write_data_tool,
 )
 
 # =============================================================================
@@ -320,8 +319,8 @@ class TestToolFactoryAndAccessControl:
         assert "Access denied" in caplog.text
         assert "restricted_table" in caplog.text
 
-    def test_tool_factory_cataloging_specialist_config(self, mock_storage):
-        """Test creating tool with Cataloging Specialist configuration."""
+    def test_tool_factory_catalog_specialist_config(self, mock_storage):
+        """Test creating tool with Catalog Specialist configuration."""
         tool = create_inspect_schema_tool(
             mock_storage,
             tables=["product_families", "products", "variant_axes", "variant_values"]
@@ -329,8 +328,8 @@ class TestToolFactoryAndAccessControl:
 
         assert tool.name == "inspect_schema"
 
-    def test_tool_factory_market_intel_config(self, mock_storage):
-        """Test creating tool with Market Intelligence configuration (no restrictions)."""
+    def test_tool_factory_unrestricted_config(self, mock_storage):
+        """Test creating tool with unrestricted configuration (no table restrictions)."""
         tool = create_inspect_schema_tool(mock_storage)  # No table restrictions
 
         assert tool.name == "inspect_schema"
@@ -345,10 +344,11 @@ class TestToolFactoryAndAccessControl:
         assert tool.name == "inspect_schema"
 
     def test_tool_description_contains_use_when_guidance(self, mock_storage):
-        """Test that tool description includes USE WHEN guidance."""
+        """Test that tool description includes usage guidance."""
         tool = create_inspect_schema_tool(mock_storage)
 
-        assert "USE WHEN" in tool.description
+        # Tool descriptions follow SCENARIOS format
+        assert "SCENARIOS" in tool.description or "CALL FIRST" in tool.description
         assert "RETURNS" in tool.description
         assert "CRITICAL" in tool.description
 

@@ -5,9 +5,10 @@ Tests the operation-scoped tool factory and dynamic schema generation.
 Verifies that LLMs see correct JSON schemas for different operation types.
 """
 
-import pytest
-from pydantic import BaseModel, ValidationError
 from unittest.mock import Mock
+
+import pytest
+from pydantic import ValidationError
 
 from autifyme_agents.tools.universal_crud_tool import (
     _create_operation_input_schema,
@@ -15,7 +16,6 @@ from autifyme_agents.tools.universal_crud_tool import (
     _generate_tool_name,
     create_database_tool,
 )
-
 
 # =============================================================================
 # Dynamic Schema Generation Tests

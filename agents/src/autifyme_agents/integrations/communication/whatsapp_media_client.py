@@ -109,6 +109,122 @@ class WhatsAppMediaClient:
 
         return media_path, content_bytes, mime_type
 
+    def upload_media(self, file_path: str, mime_type: str | None = None) -> str:
+        """Upload local media file to WhatsApp and return media_id.
+
+        WhatsApp Cloud API requires media to be uploaded before sending.
+        The returned media_id can be used with send_image().
+
+        Args:
+            file_path: Local path to the media file
+            mime_type: Optional MIME type (auto-detected from extension if not provided)
+
+        Returns:
+            WhatsApp media_id for the uploaded file
+
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            httpx.HTTPStatusError: If upload fails
+        """
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Media file not found: {file_path}")
+
+        # Auto-detect MIME type from extension
+        if not mime_type:
+            mime_type = self.derive_mime_type(path.suffix.lower())
+
+        file_bytes = path.read_bytes()
+        return self.upload_media_from_bytes(file_bytes, path.name, mime_type)
+
+    def upload_media_from_bytes(
+        self,
+        file_bytes: bytes,
+        filename: str,
+        mime_type: str,
+    ) -> str:
+        """Upload media bytes to WhatsApp and return media_id.
+
+        Core upload method - accepts raw bytes directly.
+        Used by upload_media() and WhatsAppChannel.send_image() for URL sources.
+
+        Args:
+            file_bytes: Raw file content
+            filename: Filename for the upload (used by WhatsApp)
+            mime_type: MIME type of the content
+
+        Returns:
+            WhatsApp media_id for the uploaded file
+
+        Raises:
+            httpx.HTTPStatusError: If upload fails
+        """
+        logger.info(
+            "Uploading media to WhatsApp",
+            extra={"file_name": filename, "mime_type": mime_type, "size_bytes": len(file_bytes)}
+        )
+
+        # WhatsApp media upload endpoint
+        upload_url = f"https://graph.facebook.com/{self.api_version}/{settings.WHATSAPP_PHONE_NUMBER_ID}/media"
+
+        files = {
+            "file": (filename, file_bytes, mime_type),
+        }
+        data = {
+            "messaging_product": "whatsapp",
+            "type": mime_type,
+        }
+
+        response = httpx.post(
+            upload_url,
+            headers={"Authorization": f"Bearer {self.access_token}"},
+            files=files,
+            data=data,
+            timeout=60.0,  # Longer timeout for uploads
+        )
+
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError:
+            logger.error(
+                "Failed to upload media to WhatsApp",
+                extra={"status": response.status_code, "file_name": filename, "response": response.text}
+            )
+            raise
+
+        result: dict[str, Any] = response.json()
+        media_id: str = result["id"]
+
+        logger.info(
+            "Media uploaded to WhatsApp",
+            extra={"file_name": filename, "media_id": media_id}
+        )
+
+        return media_id
+
+    @staticmethod
+    def derive_mime_type(extension: str) -> str:
+        """Derive MIME type from file extension.
+
+        Public utility - used by WhatsAppChannel for URL-based uploads.
+
+        Args:
+            extension: File extension including dot (e.g., ".png", ".jpg")
+
+        Returns:
+            MIME type string (defaults to "application/octet-stream")
+        """
+        ext_map = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".webp": "image/webp",
+            ".gif": "image/gif",
+            ".mp4": "video/mp4",
+            ".pdf": "application/pdf",
+        }
+        return ext_map.get(extension, "application/octet-stream")
+
     @staticmethod
     def _derive_suffix(content_type: str | None) -> str:
         """Derive file extension from MIME type."""

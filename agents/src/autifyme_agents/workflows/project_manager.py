@@ -1,7 +1,12 @@
 """Project Manager - Central orchestrator for AutifyME workflows.
 
 Orchestrates domain specialists via SubAgent pattern. Detects intent, delegates
-to appropriate specialists, synthesizes results, and persists via HITL-enabled tools.
+to appropriate specialists, and communicates outcomes.
+
+Architecture:
+- PM is orchestrator (read-only tools)
+- Specialists are domain experts (creative + catalog)
+- DeepAgents handles specialist compilation and state
 """
 
 from __future__ import annotations
@@ -10,6 +15,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from deepagents import create_deep_agent
+from langchain.agents.structured_output import ToolStrategy
 from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
@@ -19,14 +25,14 @@ from autifyme_agents.integrations.storage import get_store
 from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
-from autifyme_agents.specialists.product_architecture_specialist import (
-    create_product_architecture_specialist,
-)
+from autifyme_agents.schemas.pm_output import PMOutput
+from autifyme_agents.specialists.catalog_specialist import create_catalog_specialist
+from autifyme_agents.specialists.creative_specialist import create_creative_specialist
+from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.data_engine import (
     create_inspect_schema_tool,
     create_read_data_tool,
 )
-from autifyme_agents.tools.image_analysis_tool import image_analysis_tool
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -35,10 +41,22 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
-    """Return configured LLM for PM. Defaults to gemini-2.5-flash for orchestration."""
+    """Return configured LLM for PM. Defaults to gemini-2.5-pro.
+
+    Configuration rationale:
+    - thinking_budget=128: Minimum for Pro models (cannot disable like Flash).
+      PM is orchestrator so minimal thinking suffices.
+    - max_retries=5: Production resilience against Gemini's occasional blank responses.
+    - temperature=0.7: Balanced creativity for user communication.
+    """
     if model is not None:
         return model
-    return get_llm(provider="google", model="gemini-2.5-flash", temperature=0.5)
+    return get_llm(
+        provider="google",
+        model="gemini-2.5-flash",
+        temperature=0.7,  # PM orchestrates, specialists reason
+        max_retries=5,  # Increase resilience against blank responses
+    )
 
 
 def _load_prompt(
@@ -46,18 +64,13 @@ def _load_prompt(
     base_context: Any,
     channel: MessagingChannel | None = None,
 ) -> str:
-    """Load and format PM prompt with company context and base context.
-
-    Base context is formatted into system prompt so LLM can see the actual data.
-    """
+    """Load and format PM prompt with company context."""
     prompt_template = load_prompt("project_manager_intelligent.prompt")
 
-    # Extract platform name from channel (same logic as platform_tools.py)
     platform_name = "unknown"
     if channel is not None:
         platform_name = channel.__class__.__name__.replace("Channel", "").lower()
 
-    # Format catalog summary for prompt
     catalog_summary_text = f"""
 **Your Catalog Summary (Loaded at Startup):**
 - Total Product Families: {base_context.catalog_summary.total_families}
@@ -66,7 +79,6 @@ def _load_prompt(
 - Top Categories: {', '.join(base_context.catalog_summary.top_categories)}
 """
 
-    # Format taxonomy tree (just root categories for now)
     root_categories = [cat.name for cat in base_context.taxonomy_tree.root_categories]
     taxonomy_text = f"""
 **Your Taxonomy Tree (Loaded at Startup):**
@@ -92,42 +104,27 @@ async def create_project_manager(
 ) -> Any:
     """Create Project Manager agent.
 
-    PM orchestrates domain specialists for business workflows. Uses SubAgent pattern
-    for specialist delegation and HITL-enabled persistence tools.
-
     Args:
         company_profile: Company context for brand voice and positioning
-        model: LLM for orchestration (defaults to gemini-2.5-flash-lite)
-        checkpointer: LangGraph checkpointer for PM state persistence
+        model: LLM for orchestration (defaults to gemini-2.5-flash)
+        checkpointer: LangGraph checkpointer for state persistence
         storage: Storage adapter for database operations
         channel: Messaging channel for platform-specific operations
 
     Returns:
         Compiled DeepAgent
-
-    Notes:
-        - DeepAgents SubAgentMiddleware handles specialist compilation
-        - Specialists use default_model and default_middleware from SubAgentMiddleware
-        - PM's checkpointer is passed to create_deep_agent
-        - Specialist state managed by DeepAgents internally
     """
     if checkpointer is None:
-        raise ValueError(
-            "checkpointer is required for Project Manager (DeepAgents requirement)"
-        )
+        raise ValueError("checkpointer is required for Project Manager")
 
     if storage is None:
-        raise ValueError(
-            "storage is required for Project Manager (tools dependency)"
-        )
+        raise ValueError("storage is required for Project Manager")
 
     llm = _resolve_model(model)
     store = get_store()
 
     # Load base context (catalog summary + taxonomy tree)
-    # Uses await since we're in async context
-    # Gracefully degrades to empty summaries if DB unavailable
-    logger.info("Loading base context for PM (catalog summary + taxonomy tree)")
+    logger.info("Loading base context for PM")
     base_context = await load_base_context(company_profile, storage)
     logger.info(
         "Base context loaded",
@@ -137,77 +134,56 @@ async def create_project_manager(
         }
     )
 
-    # Load intelligent prompt with company context
-    # base_context is available to PM via initial_state
     instructions = _load_prompt(company_profile, base_context, channel)
 
-    # PM Tools - Minimal orchestration-focused toolset
-    # PM is the orchestrator - delegates execution to domain specialists
+    # PM Tools - Read-only, orchestration-focused
     pm_tools: list[Any] = []
 
-    # Platform-specific tools (media download)
+    # Platform media download (with storage for inbox persistence)
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
-        pm_tools.extend(create_platform_media_tools(channel))
+        pm_tools.extend(create_platform_media_tools(channel, storage=storage))
 
-    # Schema inspection (understand data structure)
-    pm_tools.append(
-        create_inspect_schema_tool(
-            storage,
-            tables=None,  # PM can inspect all tables for routing decisions
-        )
-    )
-
-    # Image analysis tool (multimodal analysis before delegation)
-    pm_tools.append(image_analysis_tool)
-
-    # Universal Data Engine - Read operations only
-    # PM reads context, routes to specialists for mutations
+    # Schema inspection and read operations
+    pm_tools.append(create_inspect_schema_tool(storage, tables=None))
     pm_tools.append(create_read_data_tool(storage))
 
-    # NO write_data - PM delegates mutations to specialists
-    # NO save_campaign - future Campaign Specialist will handle
-    # NO context tools - redundant with read_data + inspect_schema
+    # Image viewing - universal tool for verifying images
+    pm_tools.append(create_view_image_tool())
 
-    # Product Architecture Specialist (SubAgent spec pattern)
-    # Returns dict spec that DeepAgents compiles automatically
-    # Standard pattern used by all specialists
-    #
-    # CRITICAL: Specialist needs deterministic model for structured OperationIntent
-    # - temperature=0.3: More deterministic for schema-driven operations
-    # - thinking_budget=0: No extended reasoning needed for structured outputs
-    # PM uses temperature=0.5 for orchestration; specialist needs more precision
+    # Specialist LLM configuration
     specialist_llm = get_llm(
         provider="google",
         model="gemini-2.5-flash",
-        temperature=0.3,
-        thinking_budget=0,
+        temperature=0.7,
+        max_retries=5,  # Match PM resilience for blank response handling
     )
-    product_architecture_specialist = create_product_architecture_specialist(
+
+    # Domain Specialists (with storage for image persistence)
+    creative_specialist = create_creative_specialist(
+        model=None,
         storage=storage,
-        model=specialist_llm  # Pass configured LLM instance
+    )
+    catalog_specialist = create_catalog_specialist(
+        model=specialist_llm,
+        storage=storage,
     )
 
-    # Add SubAgent spec to subagents list
-    # DeepAgents SubAgentMiddleware compiles specialist with default_model
-    subagents: list[Any] = [
-        product_architecture_specialist,  # SubAgent dict spec
-    ]
+    subagents: list[Any] = [creative_specialist, catalog_specialist]
 
-    # HITL configuration
-    # PM has no mutation tools - specialists handle HITL at domain level
-    interrupt_configs: dict[str, bool] = {}
-
-    # Note: create_deep_agent adds SummarizationMiddleware by default
-    # No need to pass custom middleware - use default configuration
-    # Default: triggers at ~170K tokens, keeps last 6 messages
+    # Structured output for multimodal responses (text + images)
+    response_format = ToolStrategy(
+        schema=PMOutput,
+        handle_errors=True,  # Retry on parse errors
+    )
 
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
         subagents=subagents,
-        interrupt_on=interrupt_configs,
+        response_format=response_format,
+        interrupt_on={},
         checkpointer=checkpointer,
         store=store,
         context_schema=CompanyContext,
@@ -216,7 +192,7 @@ async def create_project_manager(
     initial_state = {
         "company_profile": company_profile.model_dump(),
         "base_context": base_context.model_dump(),
-        "status": "product_architecture_integrated",
+        "status": "ready",
         "current_workflow": None,
         "specialist_results": {},
     }

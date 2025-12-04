@@ -6,33 +6,33 @@ authors = [{ name = "Abhi" }]
 requires-python = ">=3.12"
 dependencies = [
     # Core Agentic Framework (LangChain v1 stable)
-    "langchain>=1.0.2",
-    "langgraph>=1.0.1",
-    "langgraph-prebuilt>=1.0.1",
-    "langgraph-checkpoint>=3.0.0",
-    "langgraph-checkpoint-postgres>=3.0.0",
-    "langsmith",
+    "langchain>=1.1.0",
+    "langgraph>=1.0.4",
+    "langgraph-prebuilt>=1.0.5",
+    "langgraph-checkpoint>=3.0.1",
+    "langgraph-checkpoint-postgres>=3.0.1",
+    "langsmith>=0.4.49",
     # Advanced Agent Implementation
-    "deepagents>=0.2.0",  # Latest stable release (Oct 28, 2025) - OpenAI schema fixes
+    "deepagents>=0.2.8",  # Latest stable release (Nov 24, 2025)
     # LLM Providers (v1 stable)
-    "langchain-openai>=1.0.0",
-    "langchain-anthropic>=1.0.0",
-    "langchain-google-genai",
+    "langchain-openai>=1.1.0",
+    "langchain-anthropic>=1.2.0",
+    "langchain-google-genai>=3.2.0",
     # Research & Web Tools
-    "langchain-tavily>=0.2.11",
+    "langchain-tavily>=0.2.13",
     # Database & Storage
-    "supabase",
-    "psycopg[binary]>=3.2.10",  # Required for LangGraph PostgreSQL checkpointer
+    "supabase>=2.24.0",
+    "psycopg[binary]>=3.2.13",  # Required for LangGraph PostgreSQL checkpointer
     # Data Validation & Settings
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.12.0",
     # Utilities
-    "python-dotenv>=1.0.0",
-    "tenacity>=8.0.0",
-    "pillow>=10.0.0",  # Image processing for Vision API optimization
+    "python-dotenv>=1.2.1",
+    "tenacity>=9.1.2",
+    "pillow>=12.0.0",  # Image processing for Vision API optimization
     # Webhook stack
-    "fastapi>=0.118.0",
-    "uvicorn>=0.37.0",
+    "fastapi>=0.123.0",
+    "uvicorn>=0.38.0",
 ]
 
 [tool.uv]

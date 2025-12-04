@@ -461,7 +461,8 @@ class SupabaseStorageClient(StorageInterface):
         outcome_dict = outcome.model_dump(mode="json")
 
         # Validate required fields before attempting insert
-        required_fields = ["tracking_id", "thread_id", "sender_id", "message_hash", "success", "started_at"]
+        # Must match NOT NULL columns in workflow_outcomes table
+        required_fields = ["tracking_id", "thread_id", "sender_id", "message_hash", "success", "received_at", "started_at"]
         missing_fields = [field for field in required_fields if field not in outcome_dict or outcome_dict[field] is None]
 
         if missing_fields:
@@ -491,6 +492,15 @@ class SupabaseStorageClient(StorageInterface):
                     "Check table schema and permissions."
                 )
 
+            # Validate response structure before accessing
+            first_row = response.data[0]
+            if "id" not in first_row:
+                raise RuntimeError(
+                    f"Supabase response missing 'id' field. Got keys: {list(first_row.keys())}"
+                )
+
+            outcome_id: str = first_row["id"]
+
             logger.info(
                 "Persisted workflow outcome",
                 extra={
@@ -498,10 +508,10 @@ class SupabaseStorageClient(StorageInterface):
                     "success": outcome_dict.get("success"),
                     "intent": outcome_dict.get("intent"),
                     "department": outcome_dict.get("department"),
+                    "outcome_id": outcome_id,
                 },
             )
 
-            outcome_id: str = response.data[0]["id"]
             return outcome_id
 
         except Exception as e:
@@ -975,7 +985,14 @@ class SupabaseStorageClient(StorageInterface):
                         if isinstance(condition, dict):
                             # Handle operators: {"gt": 10}, {"lt": 100}, etc.
                             for op, threshold in condition.items():
-                                if op == "gt" and not (value > threshold) or op == "gte" and not (value >= threshold) or op == "lt" and not (value < threshold) or op == "lte" and not (value <= threshold) or op == "eq" and value != threshold or op == "neq" and value == threshold:
+                                if (
+                                    (op == "gt" and not (value > threshold))
+                                    or (op == "gte" and not (value >= threshold))
+                                    or (op == "lt" and not (value < threshold))
+                                    or (op == "lte" and not (value <= threshold))
+                                    or (op == "eq" and value != threshold)
+                                    or (op == "neq" and value == threshold)
+                                ):
                                     include = False
                         else:
                             # Direct comparison
@@ -1601,7 +1618,7 @@ class SupabaseStorageClient(StorageInterface):
                 normalized_data,
                 on_conflict=on_conflict,
                 ignore_duplicates=False,  # DO UPDATE on conflict
-                returning="representation",  # Return full record
+                returning="representation",
             ).execute()
 
             if not response.data or len(response.data) == 0:
@@ -1610,7 +1627,7 @@ class SupabaseStorageClient(StorageInterface):
                     operation="upsert_entity",
                 )
 
-            upserted: dict[str, Any] = response.data[0]
+            upserted = response.data[0]
 
             # Track operation for transaction
             if self._current_transaction is not None:
@@ -1673,7 +1690,7 @@ class SupabaseStorageClient(StorageInterface):
                 normalized_data,
                 on_conflict=on_conflict,
                 ignore_duplicates=False,  # DO UPDATE on conflict
-                returning="representation",  # Return full records
+                returning="representation",
                 default_to_null=True,  # Missing fields default to NULL on INSERT
             ).execute()
 
@@ -1683,7 +1700,7 @@ class SupabaseStorageClient(StorageInterface):
                     operation="bulk_upsert",
                 )
 
-            upserted: list[dict[str, Any]] = response.data
+            upserted = response.data
             entity_ids = [entity.get("id") for entity in upserted if entity.get("id")]
 
             # Track operation for transaction
@@ -1746,7 +1763,7 @@ class SupabaseStorageClient(StorageInterface):
             if not response.data or len(response.data) == 0:
                 raise ValueError(f"Entity with id '{id}' not found in {table}")
 
-            patched: dict[str, Any] = response.data[0]
+            patched = response.data[0]
 
             # Track operation for transaction
             if self._current_transaction is not None:
@@ -2204,6 +2221,420 @@ class SupabaseStorageClient(StorageInterface):
         implementing transaction-aware operations at application level.
         """
         return SupabaseTransaction(self)
+
+    # ========================================================================
+    # File Storage (Supabase Storage Buckets)
+    # ========================================================================
+
+    async def upload_asset(
+        self,
+        file_path: str,
+        bucket: str = "assets",
+        folder: str = "products",
+        content_type: str | None = None,
+    ) -> dict[str, Any]:
+        """Upload file to Supabase Storage bucket.
+
+        Used for persisting processed images after HITL approval.
+        Follows pattern: bucket/folder/timestamp_uuid.ext
+
+        Args:
+            file_path: Local file path to upload
+            bucket: Storage bucket name (default: "assets")
+            folder: Folder within bucket (default: "products")
+            content_type: MIME type (auto-detected if None)
+
+        Returns:
+            Dict with storage_path, public_url, size_bytes
+
+        Raises:
+            StorageError: On upload failure
+            FileNotFoundError: If local file doesn't exist
+        """
+        import mimetypes
+        import uuid
+        from datetime import datetime
+        from pathlib import Path
+
+        try:
+            local_path = Path(file_path)
+            if not local_path.exists():
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            # Generate unique storage path
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_id = str(uuid.uuid4())[:8]
+            extension = local_path.suffix.lower()
+            storage_filename = f"{timestamp}_{unique_id}{extension}"
+            storage_path = f"{folder}/{storage_filename}"
+
+            # Auto-detect content type
+            if content_type is None:
+                content_type, _ = mimetypes.guess_type(str(local_path))
+                content_type = content_type or "application/octet-stream"
+
+            # Read file content
+            file_content = local_path.read_bytes()
+
+            # Upload to Supabase Storage
+            client = self._ensure_client()
+            client.storage.from_(bucket).upload(
+                path=storage_path,
+                file=file_content,
+                file_options={"content-type": content_type},
+            )
+
+            # Get public URL
+            public_url = client.storage.from_(bucket).get_public_url(storage_path)
+
+            logger.info(
+                f"Uploaded asset to {bucket}/{storage_path}",
+                extra={
+                    "bucket": bucket,
+                    "storage_path": storage_path,
+                    "size_bytes": len(file_content),
+                    "content_type": content_type,
+                }
+            )
+
+            return {
+                "success": True,
+                "storage_path": storage_path,
+                "bucket": bucket,
+                "public_url": public_url,
+                "size_bytes": len(file_content),
+                "content_type": content_type,
+            }
+
+        except FileNotFoundError:
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to upload asset to {bucket}/{folder}",
+                exc_info=True,
+                extra={"file_path": file_path, "bucket": bucket, "folder": folder}
+            )
+            raise StorageError(
+                message=f"Asset upload failed: {str(e)}",
+                operation="upload_asset",
+                original_error=e,
+            ) from e
+
+    async def delete_asset(
+        self,
+        storage_path: str,
+        bucket: str = "assets",
+    ) -> bool:
+        """Delete file from Supabase Storage bucket.
+
+        Used for cleanup on HITL rejection or error recovery.
+
+        Args:
+            storage_path: Path within bucket (e.g., "products/20251130_abc123.png")
+            bucket: Storage bucket name (default: "assets")
+
+        Returns:
+            True if deleted successfully
+
+        Raises:
+            StorageError: On delete failure
+        """
+        try:
+            client = self._ensure_client()
+            client.storage.from_(bucket).remove([storage_path])
+
+            logger.info(
+                f"Deleted asset from {bucket}/{storage_path}",
+                extra={"bucket": bucket, "storage_path": storage_path}
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Failed to delete asset from {bucket}/{storage_path}",
+                exc_info=True,
+                extra={"storage_path": storage_path, "bucket": bucket}
+            )
+            raise StorageError(
+                message=f"Asset delete failed: {str(e)}",
+                operation="delete_asset",
+                original_error=e,
+            ) from e
+
+    def get_asset_public_url(
+        self,
+        storage_path: str,
+        bucket: str = "assets",
+    ) -> str:
+        """Get public URL for stored asset.
+
+        Args:
+            storage_path: Path within bucket
+            bucket: Storage bucket name
+
+        Returns:
+            Public URL for the asset
+        """
+        client = self._ensure_client()
+        return client.storage.from_(bucket).get_public_url(storage_path)
+
+    async def upload_to_inbox(
+        self,
+        file_bytes: bytes,
+        thread_id: str,
+        filename: str,
+        content_type: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Upload user-provided media to inbox folder.
+
+        Used by WhatsApp channel for immediate persistence of user-uploaded images.
+        No HITL required - user provided the image.
+
+        Storage path: inbox/{sanitized_thread_id}/{filename}
+
+        Args:
+            file_bytes: Raw file content
+            thread_id: Conversation thread ID (e.g., "whatsapp:123:919...")
+            filename: Original or generated filename with extension
+            content_type: MIME type (e.g., "image/jpeg")
+            bucket: Storage bucket name (default: "assets")
+
+        Returns:
+            Dict with success, storage_path, bucket, public_url, size_bytes, content_type
+
+        Raises:
+            StorageError: On upload failure
+        """
+        return await self._upload_to_zone(
+            zone="inbox",
+            file_bytes=file_bytes,
+            thread_id=thread_id,
+            filename=filename,
+            content_type=content_type,
+            bucket=bucket,
+        )
+
+    async def upload_to_pending(
+        self,
+        file_bytes: bytes,
+        thread_id: str,
+        filename: str,
+        content_type: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Upload AI-generated media to pending folder.
+
+        Used by Image Studio for generated/edited images awaiting HITL approval.
+        Images in pending/ are moved to products/ on approval or deleted on rejection.
+
+        Storage path: pending/{sanitized_thread_id}/{filename}
+
+        Args:
+            file_bytes: Raw file content
+            thread_id: Conversation thread ID (e.g., "whatsapp:123:919...")
+            filename: Generated filename with extension
+            content_type: MIME type (e.g., "image/png")
+            bucket: Storage bucket name (default: "assets")
+
+        Returns:
+            Dict with success, storage_path, bucket, public_url, size_bytes, content_type
+
+        Raises:
+            StorageError: On upload failure
+        """
+        return await self._upload_to_zone(
+            zone="pending",
+            file_bytes=file_bytes,
+            thread_id=thread_id,
+            filename=filename,
+            content_type=content_type,
+            bucket=bucket,
+        )
+
+    async def _upload_to_zone(
+        self,
+        zone: str,
+        file_bytes: bytes,
+        thread_id: str,
+        filename: str,
+        content_type: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Internal helper to upload to a specific zone (inbox or pending).
+
+        Args:
+            zone: Storage zone ("inbox" or "pending")
+            file_bytes: Raw file content
+            thread_id: Conversation thread ID
+            filename: Filename with extension
+            content_type: MIME type
+            bucket: Storage bucket name
+
+        Returns:
+            Dict with upload result
+
+        Raises:
+            StorageError: On upload failure
+        """
+        try:
+            # Sanitize thread_id for use as folder name (replace colons with underscores)
+            sanitized_thread_id = thread_id.replace(":", "_")
+            storage_path = f"{zone}/{sanitized_thread_id}/{filename}"
+
+            # Upload to Supabase Storage
+            client = self._ensure_client()
+            client.storage.from_(bucket).upload(
+                path=storage_path,
+                file=file_bytes,
+                file_options={"content-type": content_type},
+            )
+
+            # Get public URL
+            public_url = client.storage.from_(bucket).get_public_url(storage_path)
+
+            logger.info(
+                f"Uploaded to {zone}: {bucket}/{storage_path}",
+                extra={
+                    "zone": zone,
+                    "bucket": bucket,
+                    "storage_path": storage_path,
+                    "thread_id": thread_id,
+                    "size_bytes": len(file_bytes),
+                    "content_type": content_type,
+                }
+            )
+
+            return {
+                "success": True,
+                "storage_path": storage_path,
+                "bucket": bucket,
+                "public_url": public_url,
+                "size_bytes": len(file_bytes),
+                "content_type": content_type,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Failed to upload to {zone}: {bucket}/{zone}/{thread_id}",
+                exc_info=True,
+                extra={
+                    "zone": zone,
+                    "thread_id": thread_id,
+                    "file_name": filename,  # Renamed: 'filename' conflicts with LogRecord
+                    "bucket": bucket,
+                }
+            )
+            raise StorageError(
+                message=f"Upload to {zone} failed: {str(e)}",
+                operation=f"upload_to_{zone}",
+                original_error=e,
+            ) from e
+
+    async def move_asset(
+        self,
+        source_path: str,
+        target_folder: str,
+        bucket: str = "assets",
+    ) -> dict[str, Any]:
+        """Move asset from one folder to another within same bucket.
+
+        Used by WriteIntent executor to move approved images:
+        - pending/{thread_id}/file.png -> products/file.png
+
+        Implementation: Download + Upload + Delete (Supabase doesn't have native move)
+
+        Args:
+            source_path: Current path within bucket (e.g., "pending/thread/file.png")
+            target_folder: Target folder (e.g., "products")
+            bucket: Storage bucket name (default: "assets")
+
+        Returns:
+            Dict with success, storage_path, bucket, public_url, size_bytes, content_type, file_name
+
+        Raises:
+            StorageError: On move failure
+            FileNotFoundError: If source doesn't exist
+        """
+        import mimetypes
+        import uuid
+        from datetime import datetime
+        from pathlib import Path
+
+        try:
+            client = self._ensure_client()
+
+            # Download the source file
+            try:
+                file_bytes = client.storage.from_(bucket).download(source_path)
+            except Exception as download_error:
+                if "not found" in str(download_error).lower():
+                    raise FileNotFoundError(f"Source file not found: {source_path}") from download_error
+                raise
+
+            # Generate new filename in target folder
+            source_filename = Path(source_path).name
+            extension = Path(source_filename).suffix.lower()
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_id = str(uuid.uuid4())[:8]
+            new_filename = f"{timestamp}_{unique_id}{extension}"
+            target_path = f"{target_folder}/{new_filename}"
+
+            # Detect content type
+            content_type, _ = mimetypes.guess_type(source_filename)
+            content_type = content_type or "application/octet-stream"
+
+            # Upload to target location
+            client.storage.from_(bucket).upload(
+                path=target_path,
+                file=file_bytes,
+                file_options={"content-type": content_type},
+            )
+
+            # Delete source file
+            client.storage.from_(bucket).remove([source_path])
+
+            # Get public URL
+            public_url = client.storage.from_(bucket).get_public_url(target_path)
+
+            logger.info(
+                f"Moved asset: {source_path} -> {target_path}",
+                extra={
+                    "source_path": source_path,
+                    "target_path": target_path,
+                    "bucket": bucket,
+                    "size_bytes": len(file_bytes),
+                }
+            )
+
+            return {
+                "success": True,
+                "storage_path": target_path,
+                "bucket": bucket,
+                "public_url": public_url,
+                "size_bytes": len(file_bytes),
+                "content_type": content_type,
+                "file_name": new_filename,
+            }
+
+        except FileNotFoundError:
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to move asset: {source_path} -> {target_folder}",
+                exc_info=True,
+                extra={
+                    "source_path": source_path,
+                    "target_folder": target_folder,
+                    "bucket": bucket,
+                }
+            )
+            raise StorageError(
+                message=f"Asset move failed: {str(e)}",
+                operation="move_asset",
+                original_error=e,
+            ) from e
 
     # ========================================================================
     # Lifecycle Management

@@ -60,8 +60,20 @@ class ReadDataInput(BaseModel):
     relations: list[str] | None = Field(
         None,
         description=(
-            "Related tables to include. Use PostgREST syntax. "
-            "Examples: ['category(id,name)', 'product_family(*)']"
+            "Related tables to include (PostgREST syntax).\n"
+            "SYNTAX:\n"
+            "- Basic: 'table(col1,col2)' or 'table(*)' for all columns\n"
+            "- Nested: 'parent(*,child(*))' - parent with nested child (CORRECT)\n"
+            "- WRONG: 'parent.child(*)' - dot notation does NOT work\n"
+            "EXAMPLES:\n"
+            "- ['product_family(name,sku_prefix)'] - family name and prefix\n"
+            "- ['product_family(*)', 'product_images(image_url,display_order)'] - multiple relations\n"
+            "- ['variant_axes(*,variant_values(*))'] - axes with nested values (CORRECT)\n"
+            "- ['product_variant_values(variant_value(name,variant_axis(name)))'] - deep nesting\n"
+            "CRITICAL:\n"
+            "- Nested relations: wrap child inside parent parentheses, NOT dot notation\n"
+            "- Table names MUST be exact (e.g., 'price_lists' not 'price_list')\n"
+            "- Use inspect_schema with details=['relationships'] to verify foreign key targets"
         )
     )
     ids: list[str] | None = Field(
@@ -404,10 +416,21 @@ def create_read_data_tool(
         func=_read_data_impl,
         name="read_data",
         description=(
-            "Unified read operations: query with filters, search patterns, joins, batch fetch by IDs, pagination, and counting. "
-            "USE WHEN: Fetching records, searching data, loading related entities, paginating results, counting. "
-            "RETURNS: Records matching criteria with optional relations and pagination metadata. "
-            "NOT FOR: Aggregations (use aggregate_data) or writing data (use write_data)."
+            "Fetch records with filters, search patterns, joins, batch IDs, pagination, and counting.\n\n"
+            "CRITICAL - filters vs search_patterns:\n"
+            "- filters = EXACT MATCH (case-sensitive): {'is_active': True}, {'id': 'uuid-123'}, {'status': ['draft','published']}\n"
+            "- search_patterns = FUZZY MATCH (case-insensitive ILIKE): {'name': '%PET%'}, {'sku': 'JAR-%'}, {'name': '%bottle%jar%'}\n"
+            "- COMMON MISTAKE: filters={'name': 'PET Bottles'} returns NOTHING if exact name doesn't exist. Use search_patterns={'name': '%PET%'} instead!\n\n"
+            "SCENARIOS:\n"
+            "- Find products by name: search_patterns={'name': '%jar%'} (NOT filters)\n"
+            "- Duplicate check: search_patterns={'name': '%PET%bottle%'} to find potential matches\n"
+            "- Batch fetch by IDs: ids=['uuid-1','uuid-2','uuid-3'] for bulk operations\n"
+            "- Paginated catalog: filters={'is_active': True}, limit=25, offset=50 for page 3\n"
+            "- Load with relations: relations=['product_family(name,sku_prefix)','product_images(image_url)']\n"
+            "- Nested relations: relations=['variant_axes(*,variant_values(*))'] for hierarchy (NOT variant_axes.variant_values)\n"
+            "- Count only: count_only=True for efficient counting without fetching records\n\n"
+            "RETURNS: {results: [...], count: N, pagination?: {limit, offset, has_more}}\n\n"
+            "NOT FOR: Aggregations with GROUP BY (use aggregate_data) or writes (use write_data)."
         ),
         args_schema=ReadDataInput,
         coroutine=_read_data_impl,

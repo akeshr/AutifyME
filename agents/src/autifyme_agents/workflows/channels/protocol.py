@@ -11,8 +11,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from autifyme_agents.schemas.models import CatalogingResult, Product
-
 
 class MessagingChannel(Protocol):
     """Abstract protocol for messaging channel implementations.
@@ -46,53 +44,6 @@ class MessagingChannel(Protocol):
 
         Raises:
             ChannelError: If message sending fails
-        """
-        ...
-
-    def send_approval_request(
-        self,
-        recipient: str,
-        draft: Product,
-    ) -> dict[str, Any]:
-        """Send HITL approval request formatted for this channel.
-
-        Args:
-            recipient: Channel-specific recipient ID
-            draft: Product draft requiring approval
-
-        Returns:
-            Channel-specific response dict
-
-        Raises:
-            ChannelError: If message sending fails
-
-        Notes:
-            - Formatting is channel-specific (e.g., WhatsApp markdown, SMS plain text)
-            - Should include all relevant product details
-            - Should prompt for approve/reject response
-        """
-        ...
-
-    def send_completion(
-        self,
-        recipient: str,
-        result: CatalogingResult,
-    ) -> dict[str, Any]:
-        """Send workflow completion message.
-
-        Args:
-            recipient: Channel-specific recipient ID
-            result: Cataloging result to communicate
-
-        Returns:
-            Channel-specific response dict
-
-        Raises:
-            ChannelError: If message sending fails
-
-        Notes:
-            - Message should be success-focused and user-friendly
-            - Include product name and confirmation
         """
         ...
 
@@ -137,6 +88,34 @@ class MessagingChannel(Protocol):
             - File should be temporary (caller is responsible for cleanup)
             - Should handle authentication/authorization internally
             - None return indicates graceful failure (not an error)
+        """
+        ...
+
+    def send_image(
+        self,
+        recipient: str,
+        image_path: str,
+        caption: str | None = None,
+    ) -> dict[str, Any]:
+        """Send an image with optional caption.
+
+        Used for HITL approval flow to show asset previews to user.
+
+        Args:
+            recipient: Channel-specific recipient ID
+            image_path: Local file path to the image
+            caption: Optional caption text (channel-specific limits apply)
+
+        Returns:
+            Channel-specific response dict
+
+        Raises:
+            ChannelError: If image sending fails
+
+        Notes:
+            - WhatsApp caption limit: 1024 chars
+            - If image_path doesn't exist, should raise ChannelError
+            - Supports common formats: PNG, JPG, WEBP
         """
         ...
 

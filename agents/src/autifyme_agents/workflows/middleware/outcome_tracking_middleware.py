@@ -121,17 +121,7 @@ class OutcomeTrackingMiddleware:
 
         messages = result.get("messages", [])
 
-        # Case 3: Cataloging/workflow-specific result
-        workflow_result = self.workflow_handler.extract_result(messages)
-        if workflow_result:
-            self.tracker.track_workflow_end(
-                tracking_id=tracking_id,
-                success=True,
-                result=workflow_result.model_dump() if hasattr(workflow_result, 'model_dump') else workflow_result,
-            )
-            return
-
-        # Case 4: Resume flow completion (string content tool message)
+        # Case 3: Resume flow completion (string content tool message)
         if self._is_resume_completion(messages):
             self.tracker.track_workflow_end(
                 tracking_id=tracking_id,
@@ -140,7 +130,7 @@ class OutcomeTrackingMiddleware:
             )
             return
 
-        # Case 5: Conversational response
+        # Case 4: Conversational response (includes PM completion messages)
         summary = self.workflow_handler.extract_summary(messages)
         if summary:
             self.tracker.track_workflow_end(
