@@ -1,14 +1,13 @@
 """
 Comprehensive tests for Image Studio tool.
 
-Tests the Gemini 3 Pro Image integration with simplified creative_direction schema:
-- Schema validation (inputs and outputs)
-- Operation handlers (edit, generate)
-- Image utilities (load, encode, save)
+Tests the Gemini 3 Pro Image integration with labeled images architecture:
+- Schema validation (ImageInput, structured specs, outputs)
+- Image processing with labeled images
 - Error handling and edge cases
 - Tool factory
 
-Updated: 2025-12-04 - Simplified schema with creative_direction
+Updated: 2025-12-04 - Labeled images architecture (no operation distinction)
 """
 
 import base64
@@ -19,11 +18,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from autifyme_agents.tools.image_studio import (
+    BackgroundSpec,
+    CompositionSpec,
+    ExtractionSpec,
+    ImageInput,
     ImageMetadata,
-    ImageOperation,
     ImageStudioErrorCode,
     ImageStudioInput,
     ImageStudioOutput,
+    LightingSpec,
+    MaterialTreatmentSpec,
     OutputSpec,
     OutputVariant,
     create_image_studio_tool,
@@ -61,17 +65,25 @@ def mock_gemini_response_with_image():
 
 
 # =============================================================================
-# Group 1: Schema Tests (Simplified)
+# Group 1: Schema Tests (Labeled Images Architecture)
 # =============================================================================
 
 
 class TestImageStudioSchemas:
     """Test Pydantic schemas for Image Studio."""
 
-    def test_image_operation_enum_values(self):
-        """Test ImageOperation enum has correct values."""
-        assert ImageOperation.GENERATE.value == "generate"
-        assert ImageOperation.EDIT.value == "edit"
+    def test_image_input_structure(self):
+        """Test ImageInput schema."""
+        img = ImageInput(path="inbox/thread/photo.jpg", label="product")
+        assert img.path == "inbox/thread/photo.jpg"
+        assert img.label == "product"
+
+    def test_image_input_various_labels(self):
+        """Test ImageInput with various label types."""
+        labels = ["product", "style_ref", "mood", "background", "hero", "variant"]
+        for label in labels:
+            img = ImageInput(path="inbox/test/img.jpg", label=label)
+            assert img.label == label
 
     def test_output_spec_defaults(self):
         """Test OutputSpec defaults."""
@@ -91,37 +103,52 @@ class TestImageStudioSchemas:
         with pytest.raises(ValueError):
             OutputSpec(format="GIF")  # Not supported
 
-    def test_image_studio_input_with_creative_direction(self):
-        """Test ImageStudioInput with creative_direction."""
+    def test_image_studio_input_with_labeled_images(self):
+        """Test ImageStudioInput with labeled images."""
         input_spec = ImageStudioInput(
-            operation=ImageOperation.EDIT,
-            source_image="inbox/test/image.png",
-            creative_direction="Extract product, pure white background, studio lighting",
+            images=[
+                ImageInput(path="inbox/test/product.jpg", label="product"),
+                ImageInput(path="inbox/test/style.jpg", label="style_ref"),
+            ],
+            extraction=ExtractionSpec(
+                target_description="Extract [product] from background",
+                isolation="complete",
+            ),
+            background=BackgroundSpec(treatment="pure white"),
         )
-        assert input_spec.operation == ImageOperation.EDIT
-        assert input_spec.creative_direction == "Extract product, pure white background, studio lighting"
-        assert input_spec.source_image == "inbox/test/image.png"
+        assert len(input_spec.images) == 2
+        assert input_spec.images[0].label == "product"
+        assert input_spec.extraction.target_description == "Extract [product] from background"
 
-    def test_image_studio_input_generate_operation(self):
-        """Test ImageStudioInput for generate operation."""
+    def test_image_studio_input_with_all_specs(self):
+        """Test ImageStudioInput with multiple specs."""
         input_spec = ImageStudioInput(
-            operation=ImageOperation.GENERATE,
-            source_image="inbox/test/product.png",
-            creative_direction="Modern kitchen scene, morning golden hour light through window, product on marble counter",
-            output=OutputSpec(size="2K", aspect_ratio="4:3"),
+            images=[ImageInput(path="inbox/test/jar.jpg", label="product")],
+            extraction=ExtractionSpec(target_description="Glass jar [product]"),
+            background=BackgroundSpec(treatment="solid white", color="#FFFFFF"),
+            lighting=LightingSpec(
+                type="soft studio",
+                direction="45 degrees camera-left",
+                shadows="contact shadow",
+            ),
+            composition=CompositionSpec(product_coverage="80% frame", position="centered"),
+            material_treatment=MaterialTreatmentSpec(
+                primary_material="clear glass",
+                rendering_notes="preserve caustics and refraction",
+            ),
+            creative_direction="Premium hero shot",
+            output=OutputSpec(size="2K", aspect_ratio="1:1"),
         )
-        assert input_spec.operation == ImageOperation.GENERATE
-        assert "kitchen" in input_spec.creative_direction
-        assert input_spec.output.aspect_ratio == "4:3"
+        assert input_spec.lighting.type == "soft studio"
+        assert input_spec.material_treatment.primary_material == "clear glass"
 
-    def test_image_studio_input_reference_images(self):
-        """Test ImageStudioInput with reference images."""
+    def test_image_studio_input_empty_images_for_generation(self):
+        """Test ImageStudioInput with no images (pure generation)."""
         input_spec = ImageStudioInput(
-            operation=ImageOperation.GENERATE,
-            creative_direction="Create lifestyle shot matching style of reference images",
-            reference_images=["ref1.png", "ref2.png"],
+            images=[],
+            creative_direction="Generate luxury bathroom scene",
         )
-        assert len(input_spec.reference_images) == 2
+        assert len(input_spec.images) == 0
 
     def test_image_metadata_structure(self):
         """Test ImageMetadata schema."""
@@ -145,7 +172,7 @@ class TestImageStudioSchemas:
             metadata=ImageMetadata(
                 width=2048, height=2048, format="PNG", size_bytes=500000, aspect_ratio="1:1"
             ),
-            description="Edited image",
+            description="Processed image",
             storage_path="pending/test/output.png",
         )
         assert variant.variant == "master"
@@ -155,7 +182,6 @@ class TestImageStudioSchemas:
         """Test ImageStudioOutput success structure."""
         output = ImageStudioOutput(
             success=True,
-            operation=ImageOperation.EDIT,
             outputs=[
                 OutputVariant(
                     variant="master",
@@ -174,8 +200,7 @@ class TestImageStudioSchemas:
         """Test ImageStudioOutput failure structure."""
         output = ImageStudioOutput(
             success=False,
-            operation=ImageOperation.EDIT,
-            error="Source image not found",
+            error="Image not found",
             error_code=ImageStudioErrorCode.FILE_NOT_FOUND,
         )
         assert output.success is False
@@ -195,18 +220,16 @@ class TestImageStudioToolFactory:
         tool = create_image_studio_tool()
         assert tool.name == "image_studio"
         assert "Gemini 3 Pro Image" in tool.description
-        assert "edit" in tool.description.lower()
-        assert "generate" in tool.description.lower()
 
     def test_tool_has_structured_input(self):
         """Test tool uses structured Pydantic input."""
         tool = create_image_studio_tool()
         assert tool.args_schema is not None
 
-    def test_tool_description_includes_creative_direction(self):
-        """Test tool description mentions creative_direction."""
+    def test_tool_description_includes_labeled_images(self):
+        """Test tool description mentions labeled images."""
         tool = create_image_studio_tool()
-        assert "creative_direction" in tool.description.lower()
+        assert "label" in tool.description.lower()
 
     def test_tool_is_callable(self):
         """Test tool can be called (sync wrapper)."""
@@ -238,31 +261,19 @@ class TestImageStudioToolFactory:
 
 
 # =============================================================================
-# Group 3: Edit Operation Tests
+# Group 3: Image Processing Tests (Labeled Images)
 # =============================================================================
 
 
-class TestEditOperation:
-    """Test edit operation with creative_direction."""
-
-    def test_edit_requires_source_image(self):
-        """Test edit fails without source_image."""
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "edit",
-            "creative_direction": "Remove background, pure white",
-            # Missing source_image
-        })
-
-        assert result["success"] is False
-        assert "source_image required" in result["error"]
+class TestImageProcessing:
+    """Test image processing with labeled images architecture."""
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_edit_with_creative_direction(
+    def test_process_with_labeled_images(
         self, mock_load, mock_llm_factory, mock_gemini_response_with_image
     ):
-        """Test edit with creative_direction."""
+        """Test processing with labeled images."""
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
 
         mock_llm = MagicMock()
@@ -271,9 +282,9 @@ class TestEditOperation:
 
         tool = create_image_studio_tool()
         tool.invoke({
-            "operation": "edit",
-            "source_image": "/tmp/test.png",
-            "creative_direction": "Extract glass jar, preserve caustics and refraction, pure white #FFFFFF background, soft studio lighting from 45 degrees",
+            "images": [{"path": "/tmp/test.png", "label": "product"}],
+            "extraction": {"target_description": "Extract [product]", "isolation": "complete"},
+            "background": {"treatment": "pure white"},
         })
 
         # Should attempt to invoke the LLM
@@ -281,8 +292,8 @@ class TestEditOperation:
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_edit_prompt_contains_creative_direction(self, mock_load, mock_llm_factory):
-        """Test that the prompt sent to LLM contains creative_direction."""
+    def test_prompt_contains_image_labels(self, mock_load, mock_llm_factory):
+        """Test that the prompt sent to LLM contains image labels."""
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
 
         mock_llm = MagicMock()
@@ -293,38 +304,48 @@ class TestEditOperation:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        creative_brief = "HERO SHOT: Ceramic mug on pure white, matte surface preserved, studio front lighting"
         tool.invoke({
-            "operation": "edit",
-            "source_image": "/tmp/test.png",
-            "creative_direction": creative_brief,
+            "images": [
+                {"path": "/tmp/product.png", "label": "hero"},
+                {"path": "/tmp/style.png", "label": "mood_ref"},
+            ],
+            "lighting": {"type": "match [mood_ref] lighting"},
+            "creative_direction": "Place [hero] in warm scene",
         })
 
-        # Check the prompt sent to LLM contains our creative direction
+        # Check the prompt sent to LLM contains labels
         call_args = mock_llm.invoke.call_args[0][0]
         user_content = call_args[1]["content"]
         prompt_text = user_content[0]["text"]
-        assert "HERO SHOT" in prompt_text
-        assert "Ceramic mug" in prompt_text
+        assert "[hero]" in prompt_text
+        assert "[mood_ref]" in prompt_text
 
-    def test_edit_file_not_found(self):
-        """Test edit with non-existent file."""
+    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
+    def test_file_not_found(self, mock_llm_factory):
+        """Test with non-existent file - graceful degradation logs warning, continues."""
+        # LLM returns no image, so tool fails after image load warning
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = "I cannot process without an image."
+        mock_llm.invoke = MagicMock(return_value=mock_response)
+        mock_llm_factory.return_value = mock_llm
+
         tool = create_image_studio_tool()
         result = tool.invoke({
-            "operation": "edit",
-            "source_image": "/nonexistent/image.png",
-            "creative_direction": "Remove background",
+            "images": [{"path": "/nonexistent/image.png", "label": "product"}],
+            "background": {"treatment": "white"},
         })
 
+        # Graceful degradation: image load fails with warning, LLM returns no image
         assert result["success"] is False
-        assert result["error_code"] == ImageStudioErrorCode.FILE_NOT_FOUND
+        assert result["error_code"] == ImageStudioErrorCode.API_ERROR
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_edit_output_spec_applied(
+    def test_output_spec_applied(
         self, mock_load, mock_llm_factory, mock_gemini_response_with_image
     ):
-        """Test edit applies output specifications."""
+        """Test output specifications are applied."""
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
 
         mock_llm = MagicMock()
@@ -333,9 +354,8 @@ class TestEditOperation:
 
         tool = create_image_studio_tool()
         tool.invoke({
-            "operation": "edit",
-            "source_image": "/tmp/test.png",
-            "creative_direction": "Enhance colors and sharpen",
+            "images": [{"path": "/tmp/test.png", "label": "source"}],
+            "creative_direction": "Enhance colors",
             "output": {"size": "4K", "aspect_ratio": "16:9", "format": "JPEG"},
         })
 
@@ -348,9 +368,8 @@ class TestEditOperation:
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_edit_with_reference_images(self, mock_load, mock_llm_factory):
-        """Test edit with reference images."""
-        # Return different data for source vs reference
+    def test_multiple_images_loaded(self, mock_load, mock_llm_factory):
+        """Test multiple labeled images are loaded."""
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
 
         mock_llm = MagicMock()
@@ -362,19 +381,21 @@ class TestEditOperation:
 
         tool = create_image_studio_tool()
         tool.invoke({
-            "operation": "edit",
-            "source_image": "/tmp/test.png",
-            "creative_direction": "Match the color grading of the reference images",
-            "reference_images": ["/tmp/ref1.png", "/tmp/ref2.png"],
+            "images": [
+                {"path": "/tmp/img1.png", "label": "product"},
+                {"path": "/tmp/img2.png", "label": "style_ref"},
+                {"path": "/tmp/img3.png", "label": "background"},
+            ],
+            "creative_direction": "Compose [product] with [style_ref] lighting on [background]",
         })
 
-        # Should load source + 2 reference images (3 calls total)
+        # Should load all 3 images
         assert mock_load.call_count == 3
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_edit_no_image_in_response(self, mock_load, mock_llm_factory):
-        """Test edit handles missing image in response."""
+    def test_no_image_in_response(self, mock_load, mock_llm_factory):
+        """Test handles missing image in response."""
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
 
         mock_llm = MagicMock()
@@ -385,9 +406,8 @@ class TestEditOperation:
 
         tool = create_image_studio_tool()
         result = tool.invoke({
-            "operation": "edit",
-            "source_image": "/tmp/test.png",
-            "creative_direction": "Remove background",
+            "images": [{"path": "/tmp/test.png", "label": "source"}],
+            "background": {"treatment": "white"},
         })
 
         assert result["success"] is False
@@ -395,63 +415,39 @@ class TestEditOperation:
 
 
 # =============================================================================
-# Group 4: Generate Operation Tests
+# Group 4: Pure Generation Tests (No Source Images)
 # =============================================================================
 
 
-class TestGenerateOperation:
-    """Test generate operation with creative_direction."""
+class TestPureGeneration:
+    """Test pure generation (no source images)."""
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    def test_generate_with_creative_direction(
+    def test_generate_without_images(
         self, mock_llm_factory, mock_gemini_response_with_image
     ):
-        """Test generate with creative_direction."""
+        """Test generation with no source images."""
         mock_llm = MagicMock()
         mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
         tool.invoke({
-            "operation": "generate",
-            "creative_direction": "Modern minimalist kitchen scene, morning golden hour through window, marble counter, product on left third",
+            "images": [],
+            "creative_direction": "Generate luxury bathroom vanity scene, morning light",
         })
 
         mock_llm.invoke.assert_called_once()
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_generate_with_source_reference(
-        self, mock_load, mock_llm_factory, mock_gemini_response_with_image
-    ):
-        """Test generate with source image as reference."""
-        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-
-        mock_llm = MagicMock()
-        mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        tool.invoke({
-            "operation": "generate",
-            "source_image": "/tmp/product.png",
-            "creative_direction": "Place product in cozy living room scene, warm afternoon light, product on coffee table",
-        })
-
-        mock_llm.invoke.assert_called_once()
-        # Source image should be loaded
-        mock_load.assert_called_once()
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     def test_generate_output_specs(self, mock_llm_factory, mock_gemini_response_with_image):
-        """Test generate respects output specifications."""
+        """Test generation respects output specifications."""
         mock_llm = MagicMock()
         mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
         tool.invoke({
-            "operation": "generate",
             "creative_direction": "Studio shot with dramatic lighting",
             "output": {
                 "size": "4K",
@@ -470,9 +466,7 @@ class TestGenerateOperation:
     @patch("autifyme_agents.tools.image_studio.tool._save_base64_image")
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     def test_generate_returns_outputs(self, mock_llm_factory, mock_save, mock_gemini_response_with_image):
-        """Test generate returns output variants."""
-        from pathlib import Path
-        # Mock save to return valid data
+        """Test generation returns output variants."""
         mock_save.return_value = (
             Path("/tmp/output.png"),
             ImageMetadata(width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"),
@@ -485,72 +479,27 @@ class TestGenerateOperation:
 
         tool = create_image_studio_tool()
         result = tool.invoke({
-            "operation": "generate",
-            "creative_direction": "Office desk scene with product",
+            "creative_direction": "Office desk scene",
         })
 
         assert result["success"] is True
-        # The response structure wraps the output model in 'data' from build_success_response
         data = result.get("data", result)
         assert "outputs" in data
-        assert data["operation"] == "generate"
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     def test_generate_api_error(self, mock_llm_factory):
-        """Test generate handles API errors."""
+        """Test generation handles API errors."""
         mock_llm = MagicMock()
         mock_llm.invoke = MagicMock(side_effect=Exception("Generation failed"))
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
         result = tool.invoke({
-            "operation": "generate",
             "creative_direction": "Kitchen scene",
         })
 
         assert result["success"] is False
         assert result["error_code"] == ImageStudioErrorCode.API_ERROR
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    def test_generate_no_image_in_response(self, mock_llm_factory):
-        """Test generate handles missing image in response."""
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = []  # Empty list - no image
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "generate",
-            "creative_direction": "Kitchen scene",
-        })
-
-        assert result["success"] is False
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    def test_generate_prompt_includes_output_specs(self, mock_llm_factory):
-        """Test generate prompt includes technical output specs."""
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        fake_image = base64.b64encode(b"fake").decode()
-        mock_response.content = [{"image_url": {"url": f"data:image/png;base64,{fake_image}"}}]
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        tool.invoke({
-            "operation": "generate",
-            "creative_direction": "Product on marble surface",
-            "output": {"size": "4K", "aspect_ratio": "1:1", "format": "PNG"},
-        })
-
-        # Check prompt includes output specs
-        call_args = mock_llm.invoke.call_args[0][0]
-        user_content = call_args[1]["content"]
-        prompt_text = user_content[0]["text"]
-        assert "4K" in prompt_text
-        assert "1:1" in prompt_text
 
 
 # =============================================================================
@@ -561,35 +510,16 @@ class TestGenerateOperation:
 class TestErrorHandling:
     """Test error handling across all operations."""
 
-    def test_invalid_operation(self):
-        """Test invalid operation type."""
-        from pydantic import ValidationError
+    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
+    def test_corrupt_image_handling(self, mock_llm_factory):
+        """Test handling of corrupt image file - graceful degradation logs warning."""
+        # LLM returns no image after corrupt image is skipped
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = "Unable to generate."
+        mock_llm.invoke = MagicMock(return_value=mock_response)
+        mock_llm_factory.return_value = mock_llm
 
-        tool = create_image_studio_tool()
-
-        # Pydantic should catch invalid enum value
-        with pytest.raises((ValidationError, ValueError)):
-            tool.invoke({
-                "operation": "invalid_op",
-                "creative_direction": "Do something",
-                "source_image": "/tmp/test.png",
-            })
-
-    def test_missing_creative_direction(self):
-        """Test missing creative_direction field."""
-        from pydantic import ValidationError
-
-        tool = create_image_studio_tool()
-
-        # Missing creative_direction
-        with pytest.raises((ValidationError, TypeError)):
-            tool.invoke({
-                "operation": "edit",
-                "source_image": "/tmp/test.png",
-            })
-
-    def test_corrupt_image_handling(self):
-        """Test handling of corrupt image file."""
         # Create a corrupt "image" file
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False, mode="wb") as f:
             f.write(b"not a valid image content")
@@ -598,29 +528,15 @@ class TestErrorHandling:
         try:
             tool = create_image_studio_tool()
             result = tool.invoke({
-                "operation": "edit",
-                "source_image": corrupt_path,
-                "creative_direction": "Remove background",
+                "images": [{"path": corrupt_path, "label": "source"}],
+                "background": {"treatment": "white"},
             })
 
-            # Should handle gracefully
+            # Graceful degradation: corrupt image skipped with warning, LLM returns no image
             assert result["success"] is False
             assert "error" in result
         finally:
             Path(corrupt_path).unlink(missing_ok=True)
-
-    def test_missing_required_fields(self):
-        """Test missing required fields in input."""
-        from pydantic import ValidationError
-
-        tool = create_image_studio_tool()
-
-        # Missing 'operation' field
-        with pytest.raises((ValidationError, TypeError)):
-            tool.invoke({
-                "source_image": "/tmp/test.png",
-                "creative_direction": "Edit image",
-            })
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
@@ -634,28 +550,15 @@ class TestErrorHandling:
 
         tool = create_image_studio_tool()
         result = tool.invoke({
-            "operation": "edit",
-            "source_image": "/tmp/test.png",
+            "images": [{"path": "/tmp/test.png", "label": "source"}],
             "creative_direction": "Enhance image",
         })
 
         assert result["success"] is False
         assert "error" in result
 
-    def test_empty_source_image_path(self):
-        """Test empty source_image path."""
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "edit",
-            "source_image": "",
-            "creative_direction": "Edit something",
-        })
-
-        assert result["success"] is False
-
     def test_error_codes_are_valid(self):
         """Test all error codes are valid class attributes."""
-        # ImageStudioErrorCode is a class with string constants
         assert hasattr(ImageStudioErrorCode, "FILE_NOT_FOUND")
         assert hasattr(ImageStudioErrorCode, "CORRUPT_FILE")
         assert hasattr(ImageStudioErrorCode, "INVALID_INPUT")
@@ -666,23 +569,29 @@ class TestErrorHandling:
         assert isinstance(ImageStudioErrorCode.FILE_NOT_FOUND, str)
         assert isinstance(ImageStudioErrorCode.API_ERROR, str)
 
-    def test_error_response_structure(self):
+    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
+    def test_error_response_structure(self, mock_llm_factory):
         """Test error responses have consistent structure."""
+        # LLM returns no image to trigger error response
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = "Cannot process request."
+        mock_llm.invoke = MagicMock(return_value=mock_response)
+        mock_llm_factory.return_value = mock_llm
+
         tool = create_image_studio_tool()
         result = tool.invoke({
-            "operation": "edit",
-            "source_image": "/nonexistent/path.png",
+            "images": [{"path": "/nonexistent/path.png", "label": "source"}],
             "creative_direction": "Do something",
         })
 
         assert result["success"] is False
         assert "error" in result
         assert "error_code" in result
-        assert result["operation"] == "edit"
 
 
 # =============================================================================
-# Group 6: Integration Tests (Thread ID Injection)
+# Group 6: Thread ID Injection Tests
 # =============================================================================
 
 
@@ -696,7 +605,6 @@ class TestThreadIdInjection:
         self, mock_load, mock_llm_factory, mock_save, mock_gemini_response_with_image
     ):
         """Test thread_id is injected from RunnableConfig."""
-        from pathlib import Path
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
         mock_save.return_value = (
             Path("/tmp/output.png"),
@@ -713,9 +621,8 @@ class TestThreadIdInjection:
         # Invoke with config containing thread_id
         result = tool.invoke(
             {
-                "operation": "edit",
-                "source_image": "/tmp/test.png",
-                "creative_direction": "Remove background",
+                "images": [{"path": "/tmp/test.png", "label": "source"}],
+                "creative_direction": "Process image",
             },
             config={"configurable": {"thread_id": "whatsapp_123_456"}},
         )
@@ -728,7 +635,6 @@ class TestThreadIdInjection:
         self, mock_llm_factory, mock_save, mock_gemini_response_with_image
     ):
         """Test explicit thread_id takes precedence over config."""
-        from pathlib import Path
         mock_save.return_value = (
             Path("/tmp/output.png"),
             ImageMetadata(width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"),
@@ -744,7 +650,6 @@ class TestThreadIdInjection:
         # Both explicit and config thread_id
         result = tool.invoke(
             {
-                "operation": "generate",
                 "creative_direction": "Create scene",
                 "thread_id": "explicit_thread",
             },
