@@ -168,6 +168,7 @@ class FileStorageMixin(ABC):
                 - public_url: New public URL
                 - size_bytes: File size
                 - content_type: MIME type
+                - file_name: Generated filename (for @ref.file_name in write_data)
 
         Raises:
             StorageError: On move failure

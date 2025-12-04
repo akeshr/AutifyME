@@ -108,7 +108,7 @@ def create_creative_specialist(
     specialist_model = model if model is not None else get_llm(
         provider="google",
         model=CREATIVE_SPECIALIST_MODEL,
-        temperature=0.8,
+        temperature=1.0,
     )
 
     # Multimodal middleware injects images from paths in delegation message
