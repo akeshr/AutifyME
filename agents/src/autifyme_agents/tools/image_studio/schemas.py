@@ -1,7 +1,12 @@
 """Image Studio Tool - Pydantic Schemas.
 
-Comprehensive input/output schemas for Gemini 3 Pro Image operations.
-Supports: edit, generate with full multi-product handling.
+Simplified schema: Creative Specialist writes natural language creative briefs.
+The tool passes these directly to Gemini 3 Pro Image.
+
+Architecture Philosophy:
+- Trust the Creative Specialist's reasoning and creative vision
+- No enum restrictions - full creative expression
+- Minimal structure: operation type, images, creative direction, output mechanics
 """
 
 from __future__ import annotations
@@ -19,153 +24,21 @@ from pydantic import BaseModel, Field
 class ImageOperation(str, Enum):
     """Supported image operations."""
 
-    EDIT = "edit"          # Modify image: background, enhance, extract, crop
-    GENERATE = "generate"  # Create new image: lifestyle, studio, composite
+    EDIT = "edit"          # Modify existing image
+    GENERATE = "generate"  # Create new image from product
 
 
 # =============================================================================
-# Input Specification Models
+# Output Specification (API mechanics, not creative decisions)
 # =============================================================================
-
-
-class BackgroundSpec(BaseModel):
-    """Background configuration for edit/generate operations."""
-
-    type: Literal["solid", "gradient", "transparent", "blur", "scene", "remove"] = "solid"
-    color: str = Field(default="#FFFFFF", description="Primary color (hex)")
-    gradient_end: str | None = Field(default=None, description="End color for gradients")
-    blur_strength: Literal["light", "medium", "heavy"] | None = None
-    scene_description: str | None = Field(
-        default=None,
-        description="For type='scene': describe the background scene to generate"
-    )
-
-
-class LightingSpec(BaseModel):
-    """Lighting configuration for professional product photography."""
-
-    type: Literal["studio", "natural", "dramatic", "soft", "hard", "rim", "split"] = "studio"
-    direction: Literal["front", "side", "back", "top", "ambient", "45deg"] = "front"
-    intensity: Literal["low", "medium", "high"] = "medium"
-    color_temperature: Literal["warm", "neutral", "cool"] = "neutral"
-    shadows: Literal["none", "soft", "hard"] = "soft"
-
-
-class FramingSpec(BaseModel):
-    """Product framing and composition settings."""
-
-    product_coverage_percent: int = Field(
-        default=80,
-        ge=20,
-        le=100,
-        description="How much of frame product should occupy (20-100%)",
-    )
-    padding_percent: int = Field(
-        default=10,
-        ge=0,
-        le=50,
-        description="Padding around product",
-    )
-    alignment: Literal["center", "bottom", "top", "left", "right", "bottom-left", "bottom-right", "top-left", "top-right"] = "center"
-    angle: Literal["front", "45deg", "side", "top-down", "hero", "low-angle", "eye-level"] = "front"
-    crop_to_product: bool = Field(
-        default=False,
-        description="Crop image to focus on product, removing excess background"
-    )
-
-
-class EnhancementSpec(BaseModel):
-    """Image enhancement settings."""
-
-    sharpness: Literal["none", "subtle", "medium", "high"] = "medium"
-    contrast: Literal["none", "subtle", "medium", "high"] = "subtle"
-    saturation: Literal["none", "subtle", "medium", "high"] = "none"
-    brightness: Literal["none", "subtle", "medium", "high"] = "none"
-    denoise: bool = Field(default=False, description="Apply noise reduction")
-    upscale: Literal["none", "2x", "4x"] = "none"
-    color_correction: bool = Field(default=True, description="Auto color correction")
-    remove_blemishes: bool = Field(default=False, description="Remove dust, scratches, imperfections")
-    restore_details: bool = Field(default=False, description="AI-enhance fine details")
-
-
-class SceneSpec(BaseModel):
-    """Lifestyle scene settings for generate operation."""
-
-    environment: Literal[
-        "kitchen", "living_room", "office", "outdoor", "restaurant",
-        "retail", "warehouse", "studio", "bathroom", "garden",
-        "cafe", "gym", "bedroom", "dining_room", "custom"
-    ]
-    style: Literal["modern", "traditional", "minimalist", "rustic", "industrial", "luxury", "casual", "professional"] = "modern"
-    mood: Literal["professional", "cozy", "vibrant", "elegant", "casual", "warm", "cool", "dramatic"] = "professional"
-    time_of_day: Literal["morning", "afternoon", "evening", "night", "golden_hour"] = "afternoon"
-    custom_description: str | None = Field(
-        default=None,
-        description="For environment='custom': describe the scene in detail"
-    )
-
-
-class ProductPlacement(BaseModel):
-    """Product placement in generated scenes."""
-
-    position: Literal["center", "foreground", "left", "right", "table", "shelf", "counter", "floor", "floating", "hand"] = "center"
-    scale: Literal["dominant", "balanced", "subtle", "actual_size"] = "balanced"
-    surface: Literal["table", "counter", "floor", "shelf", "hand", "floating", "pedestal", "fabric"] | None = None
-    angle: Literal["straight", "tilted", "laying", "standing"] = "straight"
-    shadow: bool = Field(default=True, description="Add realistic shadow under product")
-
-
-class ExtractionSpec(BaseModel):
-    """Extract specific product(s) from multi-product image.
-
-    Use this when working with group photos containing multiple products/variants.
-    """
-
-    target_description: str = Field(
-        description="Description of product to extract: 'the red variant', 'the 500ml jar', 'product on the left'"
-    )
-    position_hint: Literal["left", "center", "right", "top", "bottom", "foreground", "background", "largest", "smallest"] | None = Field(
-        default=None,
-        description="Hint about product position in image"
-    )
-    isolate: bool = Field(
-        default=True,
-        description="Remove all other products, keep only target"
-    )
-    clean_edges: bool = Field(
-        default=True,
-        description="Clean up edges after extraction"
-    )
-
-
-class FocusRegionSpec(BaseModel):
-    """Specify region to focus on or crop to."""
-
-    type: Literal["center", "product", "custom", "face", "label", "detail"] = "product"
-    position: Literal["left", "center", "right", "top", "bottom", "top-left", "top-right", "bottom-left", "bottom-right"] | None = None
-    zoom_level: float = Field(
-        default=1.0,
-        ge=0.5,
-        le=4.0,
-        description="Zoom level: 1.0=no zoom, 2.0=2x zoom"
-    )
-    custom_focus: str | None = Field(
-        default=None,
-        description="For type='custom': describe what to focus on"
-    )
 
 
 class OutputSpec(BaseModel):
-    """Output configuration for generated/edited images."""
+    """Output configuration - these are API parameters, not creative decisions."""
 
     format: Literal["PNG", "JPEG", "WEBP"] = "PNG"
     size: Literal["1K", "2K", "4K"] = "2K"
     aspect_ratio: Literal["1:1", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "original"] = "1:1"
-    quality: int = Field(default=90, ge=1, le=100, description="JPEG quality")
-    variants: list[Literal["master", "thumbnail", "social", "square", "portrait", "landscape"]] = Field(
-        default_factory=lambda: ["master"],  # type: ignore[arg-type]
-        description="Output variants to generate",
-    )
 
 
 # =============================================================================
@@ -174,130 +47,120 @@ class OutputSpec(BaseModel):
 
 
 class ImageStudioInput(BaseModel):
-    """Unified input schema for Image Studio tool.
+    """Image Studio input - trusts Creative Specialist's creative vision.
 
-    CAPABILITIES (Gemini 3 Pro Image):
+    Architecture:
+    - Creative Specialist reasons about the image task
+    - Writes a complete creative brief in natural language
+    - Image Studio passes this directly to Gemini 3 Pro Image
+    - No enum bottlenecks, no translation loss
 
-    EDIT:
-    - Background: Remove, replace solid/gradient, blur, or generate scene
-    - Extract product: Isolate specific product from group photo
-    - Enhance: Sharpen, denoise, upscale, color correct, restore details
-    - Reframe: Crop, zoom, change composition
-    - Lighting: Adjust studio/natural/dramatic lighting
-
-    GENERATE:
-    - Lifestyle shots: Product in realistic scenes (kitchen, office, etc.)
-    - Studio shots: Clean professional backgrounds
-    - Composites: Combine products with generated backgrounds
-    - Variations: Same product in different scenes/angles
+    The creative_direction field is where the magic happens. Write it like
+    a professional photographer's brief: lighting, composition, mood,
+    material treatment, technical requirements.
 
     EXAMPLES:
 
-    1. Extract single product from group:
+    1. Hero shot with background removal:
     ```python
     ImageStudioInput(
         operation="edit",
-        source_image="/tmp/group.jpg",
-        extraction=ExtractionSpec(
-            target_description="the red 500ml variant",
-            position_hint="left",
-            isolate=True
+        source_image="inbox/thread/product.jpg",
+        creative_direction=(
+            "Extract the glass jar from background. "
+            "Pure white (#FFFFFF) studio background. "
+            "Soft studio lighting from 45-degrees camera-left, "
+            "rim light for glass edge definition. "
+            "Honor the glass: internal caustics, edge refraction, transparency. "
+            "Product centered, 75% frame coverage. "
+            "Sharp focus on label, natural falloff on edges."
         ),
-        background=BackgroundSpec(type="transparent"),
-        output=OutputSpec(format="PNG")
+        output=OutputSpec(format="PNG", size="2K", aspect_ratio="1:1")
     )
     ```
 
-    2. Remove background and enhance:
-    ```python
-    ImageStudioInput(
-        operation="edit",
-        source_image="/tmp/product.jpg",
-        background=BackgroundSpec(type="transparent"),
-        enhancement=EnhancementSpec(
-            sharpness="medium",
-            denoise=True,
-            upscale="2x"
-        ),
-        output=OutputSpec(format="PNG", size="4K")
-    )
-    ```
-
-    3. Generate lifestyle shot:
+    2. Lifestyle scene generation:
     ```python
     ImageStudioInput(
         operation="generate",
-        source_image="/tmp/product.jpg",
-        scene=SceneSpec(
-            environment="kitchen",
-            style="modern",
-            mood="warm",
-            time_of_day="morning"
-        ),
-        placement=ProductPlacement(
-            position="counter",
-            scale="dominant",
-            shadow=True
+        source_image="inbox/thread/product.jpg",
+        creative_direction=(
+            "Modern kitchen scene, morning light streaming through window. "
+            "Product on white marble countertop with fresh herbs nearby. "
+            "Warm color temperature, lifestyle editorial feel. "
+            "Product hero position but not isolated - contextual storytelling. "
+            "Shallow depth of field, product tack sharp, background soft."
         ),
         output=OutputSpec(aspect_ratio="4:3")
     )
     ```
 
-    4. Complex edit with custom instruction:
+    3. Multi-product extraction:
     ```python
     ImageStudioInput(
         operation="edit",
-        source_image="/tmp/group.jpg",
-        custom_instruction="Extract each of the 3 jar variants separately",
+        source_image="inbox/thread/group.jpg",
+        creative_direction=(
+            "Extract the red 500ml variant (left side of image). "
+            "Isolate completely from other products. "
+            "Clean surgical extraction with professional edge treatment. "
+            "Transparent background for compositing flexibility. "
+            "Preserve exact color accuracy - this is the hero product."
+        ),
         output=OutputSpec(format="PNG")
+    )
+    ```
+
+    4. Enhancement and reframing:
+    ```python
+    ImageStudioInput(
+        operation="edit",
+        source_image="inbox/thread/photo.jpg",
+        creative_direction=(
+            "Enhance this product photo for e-commerce. "
+            "Clean up the cluttered background - solid white. "
+            "Boost sharpness on product details, especially the label. "
+            "Color correct for accurate product representation. "
+            "Crop tighter - product should dominate frame at 80% coverage. "
+            "Professional studio quality output."
+        )
     )
     ```
     """
 
     operation: ImageOperation = Field(description="Operation: edit or generate")
+
     source_image: str | None = Field(
         default=None,
         description=(
-            "Source image: storage_path (from download_media/image_studio). "
+            "Source image storage_path (e.g., 'inbox/thread_id/photo.jpg'). "
             "Required for edit, optional for generate."
         )
     )
+
     reference_images: list[str] = Field(
         default_factory=list,
-        description="Additional reference images (storage_path) for style/context (up to 14)"
+        description="Reference images for style/context (storage_paths, up to 14)"
+    )
+
+    creative_direction: str = Field(
+        description=(
+            "Complete creative brief in natural language. "
+            "Write like a professional photographer: lighting, composition, mood, "
+            "material treatment, background, technical requirements. "
+            "Be specific and professional. This is passed directly to the image model."
+        )
     )
 
     # Thread ID for cloud storage persistence (auto-injected from RunnableConfig)
     thread_id: str | None = Field(
         default=None,
         description=(
-            "Conversation thread ID for organizing pending uploads. "
-            "Auto-injected from session context - do not pass explicitly. "
-            "Format: 'whatsapp:{phone_number_id}:{sender}'"
+            "Auto-injected from session context - do not pass explicitly."
         )
     )
 
-    # Custom instruction for complex operations
-    custom_instruction: str | None = Field(
-        default=None,
-        description=(
-            "Free-form instruction for complex operations beyond structured parameters. "
-            "Examples: 'Extract each product variant and create separate images', "
-            "'Combine these 3 products into a family shot', "
-            "'Create a before/after comparison'"
-        )
-    )
-
-    # Structured operation specs (provide based on operation type)
-    background: BackgroundSpec | None = None
-    lighting: LightingSpec | None = None
-    framing: FramingSpec | None = None
-    enhancement: EnhancementSpec | None = None
-    scene: SceneSpec | None = None
-    placement: ProductPlacement | None = None
-    extraction: ExtractionSpec | None = None
-    focus: FocusRegionSpec | None = None
-
+    # Output mechanics (API parameters, not creative decisions)
     output: OutputSpec = Field(default_factory=OutputSpec)
 
 

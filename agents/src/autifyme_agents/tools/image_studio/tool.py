@@ -36,21 +36,13 @@ from autifyme_agents.core.tool_error_handler import (
     build_success_response,
 )
 from autifyme_agents.tools.image_studio.schemas import (
-    BackgroundSpec,
-    EnhancementSpec,
-    ExtractionSpec,
-    FocusRegionSpec,
-    FramingSpec,
     ImageMetadata,
     ImageOperation,
     ImageStudioErrorCode,
     ImageStudioInput,
     ImageStudioOutput,
-    LightingSpec,
     OutputSpec,
     OutputVariant,
-    ProductPlacement,
-    SceneSpec,
 )
 
 T = TypeVar("T")
@@ -341,167 +333,26 @@ def _extract_image_from_response(response: Any) -> str | None:
 
 
 # =============================================================================
-# Prompt Builders
+# Prompt Builder
 # =============================================================================
 
 
-def _build_edit_prompt(input_spec: ImageStudioInput) -> str:
-    """Build comprehensive edit prompt."""
-    instructions = ["Edit this product image with the following specifications:"]
+def _build_prompt(input_spec: ImageStudioInput) -> str:
+    """Build prompt from creative direction.
 
-    # Custom instruction takes priority
-    if input_spec.custom_instruction:
-        instructions.append(f"\nCUSTOM INSTRUCTION: {input_spec.custom_instruction}")
+    The Creative Specialist has already crafted a complete creative brief.
+    We pass it directly - no translation, no enum conversion, no loss.
+    """
+    # Creative direction is the primary instruction
+    prompt_parts = [input_spec.creative_direction]
 
-    # Extraction from group photo
-    if input_spec.extraction:
-        ex = input_spec.extraction
-        extraction_inst = f"EXTRACT PRODUCT: Isolate and extract '{ex.target_description}'"
-        if ex.position_hint:
-            extraction_inst += f" (hint: {ex.position_hint} side of image)"
-        if ex.isolate:
-            extraction_inst += ". Remove ALL other products from the image."
-        if ex.clean_edges:
-            extraction_inst += " Clean up edges for professional appearance."
-        instructions.append(extraction_inst)
-
-    # Focus/crop region
-    if input_spec.focus:
-        fo = input_spec.focus
-        if fo.type == "custom" and fo.custom_focus:
-            instructions.append(f"FOCUS: Crop/zoom to focus on {fo.custom_focus}")
-        elif fo.type == "product":
-            instructions.append("FOCUS: Crop to focus on the main product, remove excess background")
-        elif fo.type == "label":
-            instructions.append("FOCUS: Crop to focus on product label/branding")
-        if fo.zoom_level != 1.0:
-            instructions.append(f"ZOOM: Apply {fo.zoom_level}x zoom")
-        if fo.position:
-            instructions.append(f"FOCUS POSITION: Emphasize {fo.position} area of image")
-
-    # Background
-    if input_spec.background:
-        bg = input_spec.background
-        if bg.type == "remove" or bg.type == "transparent":
-            instructions.append("BACKGROUND: Remove background completely (transparent PNG)")
-        elif bg.type == "solid":
-            instructions.append(f"BACKGROUND: Replace with solid {bg.color} color")
-        elif bg.type == "gradient":
-            instructions.append(f"BACKGROUND: Apply gradient from {bg.color} to {bg.gradient_end}")
-        elif bg.type == "blur":
-            instructions.append(f"BACKGROUND: Blur background ({bg.blur_strength} strength)")
-        elif bg.type == "scene" and bg.scene_description:
-            instructions.append(f"BACKGROUND: Generate new background scene: {bg.scene_description}")
-
-    # Lighting
-    if input_spec.lighting:
-        lt = input_spec.lighting
-        instructions.append(
-            f"LIGHTING: Apply {lt.type} lighting from {lt.direction}, "
-            f"intensity={lt.intensity}, temperature={lt.color_temperature}, shadows={lt.shadows}"
-        )
-
-    # Framing
-    if input_spec.framing:
-        fr = input_spec.framing
-        framing_inst = f"FRAMING: Product coverage {fr.product_coverage_percent}%, aligned {fr.alignment}"
-        if fr.angle != "front":
-            framing_inst += f", angle={fr.angle}"
-        if fr.padding_percent > 0:
-            framing_inst += f", padding={fr.padding_percent}%"
-        if fr.crop_to_product:
-            framing_inst += ", crop tightly to product"
-        instructions.append(framing_inst)
-
-    # Enhancement
-    if input_spec.enhancement:
-        en = input_spec.enhancement
-        enhancements = []
-        if en.sharpness != "none":
-            enhancements.append(f"sharpness={en.sharpness}")
-        if en.contrast != "none":
-            enhancements.append(f"contrast={en.contrast}")
-        if en.saturation != "none":
-            enhancements.append(f"saturation={en.saturation}")
-        if en.brightness != "none":
-            enhancements.append(f"brightness={en.brightness}")
-        if en.denoise:
-            enhancements.append("denoise")
-        if en.upscale != "none":
-            enhancements.append(f"upscale={en.upscale}")
-        if en.color_correction:
-            enhancements.append("auto_color_correction")
-        if en.remove_blemishes:
-            enhancements.append("remove_blemishes")
-        if en.restore_details:
-            enhancements.append("AI_restore_details")
-        if enhancements:
-            instructions.append(f"ENHANCE: Apply {', '.join(enhancements)}")
-
-    # Output specs
+    # Add output specs as technical requirements
     out = input_spec.output
-    instructions.append(
-        f"OUTPUT: {out.size} image, aspect ratio {out.aspect_ratio}, format {out.format}"
+    prompt_parts.append(
+        f"\nTECHNICAL OUTPUT: {out.size} resolution, {out.aspect_ratio} aspect ratio, {out.format} format."
     )
 
-    return "\n".join(instructions)
-
-
-def _build_generate_prompt(input_spec: ImageStudioInput) -> str:
-    """Build comprehensive generation prompt."""
-    instructions = []
-
-    # Custom instruction
-    if input_spec.custom_instruction:
-        instructions.append(f"INSTRUCTION: {input_spec.custom_instruction}")
-
-    # Scene specification
-    if input_spec.scene:
-        sc = input_spec.scene
-        if sc.environment == "custom" and sc.custom_description:
-            instructions.append(f"SCENE: {sc.custom_description}")
-        else:
-            instructions.append(f"""SCENE:
-- Environment: {sc.environment}
-- Style: {sc.style}
-- Mood: {sc.mood}
-- Time of day: {sc.time_of_day}""")
-
-    # Product placement
-    if input_spec.placement:
-        pl = input_spec.placement
-        instructions.append(f"""PRODUCT PLACEMENT:
-- Position: {pl.position}
-- Scale: {pl.scale}
-- Surface: {pl.surface or 'appropriate for scene'}
-- Angle: {pl.angle}
-- Shadow: {'realistic shadow' if pl.shadow else 'no shadow'}""")
-
-    # Lighting
-    if input_spec.lighting:
-        lt = input_spec.lighting
-        instructions.append(
-            f"LIGHTING: {lt.type} from {lt.direction}, {lt.intensity} intensity, "
-            f"{lt.color_temperature} temperature, {lt.shadows} shadows"
-        )
-
-    # Default if no scene specified
-    if not instructions:
-        instructions.append(
-            "Generate a professional product photograph with clean, well-lit studio background."
-        )
-
-    # Core requirement
-    instructions.append(
-        "\nThe product from the source image must be seamlessly integrated. "
-        "Maintain exact product details, proportions, and quality."
-    )
-
-    # Output specs
-    out = input_spec.output
-    instructions.append(f"\nOUTPUT: {out.size}, {out.aspect_ratio} aspect ratio, {out.format}")
-
-    return "\n".join(instructions)
+    return "\n".join(prompt_parts)
 
 
 # =============================================================================
@@ -510,7 +361,7 @@ def _build_generate_prompt(input_spec: ImageStudioInput) -> str:
 
 
 def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
-    """Handle edit operation including extraction and enhancement."""
+    """Handle edit operation - pass creative direction directly to Gemini."""
     if not input_spec.source_image:
         return ImageStudioOutput(
             success=False,
@@ -521,7 +372,7 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
 
     try:
         llm = _get_gemini3_image_llm(output_spec=input_spec.output)
-        prompt = _build_edit_prompt(input_spec)
+        prompt = _build_prompt(input_spec)
 
         # Build content with source image first
         source_uri, _ = _load_and_encode_image(input_spec.source_image)
@@ -556,12 +407,8 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
                 error_code=ImageStudioErrorCode.API_ERROR,
             )
 
-        # Generate description based on operation
+        # Description is simply "Edited image" - creative_direction contains the details
         description = "Edited image"
-        if input_spec.extraction:
-            description = f"Extracted: {input_spec.extraction.target_description}"
-        elif input_spec.background and input_spec.background.type in ("transparent", "remove"):
-            description = "Background removed"
 
         file_path, metadata, storage_path = _save_base64_image(
             image_data, "edit", input_spec.output, description, input_spec.thread_id
@@ -607,10 +454,10 @@ def _handle_edit(input_spec: ImageStudioInput) -> ImageStudioOutput:
 
 
 def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
-    """Handle generate operation for lifestyle and studio shots."""
+    """Handle generate operation - pass creative direction directly to Gemini."""
     try:
         llm = _get_gemini3_image_llm(output_spec=input_spec.output)
-        prompt = _build_generate_prompt(input_spec)
+        prompt = _build_prompt(input_spec)
 
         content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
 
@@ -642,9 +489,8 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
                 error_code=ImageStudioErrorCode.API_ERROR,
             )
 
+        # Description is simply "Generated image" - creative_direction contains the details
         description = "Generated image"
-        if input_spec.scene:
-            description = f"Lifestyle: {input_spec.scene.environment}"
 
         file_path, metadata, storage_path = _save_base64_image(
             image_data, "generate", input_spec.output, description, input_spec.thread_id
@@ -689,26 +535,23 @@ def _handle_generate(input_spec: ImageStudioInput) -> ImageStudioOutput:
 
 def _image_studio_impl(
     operation: str,
+    creative_direction: str,
     source_image: str | None = None,
     reference_images: list[str] | None = None,
     thread_id: str | None = None,
-    custom_instruction: str | None = None,
-    background: dict[str, Any] | None = None,
-    lighting: dict[str, Any] | None = None,
-    framing: dict[str, Any] | None = None,
-    enhancement: dict[str, Any] | None = None,
-    scene: dict[str, Any] | None = None,
-    placement: dict[str, Any] | None = None,
-    extraction: dict[str, Any] | None = None,
-    focus: dict[str, Any] | None = None,
-    output: dict[str, Any] | None = None,
+    output: dict[str, Any] | OutputSpec | None = None,
     config: Annotated[RunnableConfig, InjectedToolArg] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """Image Studio tool implementation.
 
-    thread_id is automatically injected from RunnableConfig via InjectedToolArg.
-    This enables automatic cloud storage persistence without requiring the
-    LLM to explicitly pass thread_id.
+    Args:
+        operation: "edit" or "generate"
+        creative_direction: Complete creative brief from the specialist
+        source_image: Source image storage_path (required for edit)
+        reference_images: Additional reference images
+        thread_id: Auto-injected from RunnableConfig
+        output: Output specs (format, size, aspect_ratio)
+        config: Injected config for thread_id extraction
     """
     # Inject thread_id from config if not explicitly provided
     if thread_id is None and config is not None:
@@ -721,30 +564,21 @@ def _image_studio_impl(
             )
 
     try:
-        def _maybe_convert(value: Any, model_class: type[T]) -> T | None:
-            if value is None:
-                return None
-            if isinstance(value, model_class):
-                return value
-            if isinstance(value, dict):
-                return model_class(**value)
-            return value  # type: ignore[no-any-return]
+        # Convert output dict to OutputSpec if needed
+        output_spec = OutputSpec()
+        if output is not None:
+            if isinstance(output, OutputSpec):
+                output_spec = output
+            elif isinstance(output, dict):
+                output_spec = OutputSpec(**output)
 
         input_spec = ImageStudioInput(
             operation=ImageOperation(operation) if isinstance(operation, str) else operation,
             source_image=source_image,
             reference_images=reference_images or [],
+            creative_direction=creative_direction,
             thread_id=thread_id,
-            custom_instruction=custom_instruction,
-            background=_maybe_convert(background, BackgroundSpec),
-            lighting=_maybe_convert(lighting, LightingSpec),
-            framing=_maybe_convert(framing, FramingSpec),
-            enhancement=_maybe_convert(enhancement, EnhancementSpec),
-            scene=_maybe_convert(scene, SceneSpec),
-            placement=_maybe_convert(placement, ProductPlacement),
-            extraction=_maybe_convert(extraction, ExtractionSpec),
-            focus=_maybe_convert(focus, FocusRegionSpec),
-            output=_maybe_convert(output, OutputSpec) or OutputSpec(),
+            output=output_spec,
         )
 
         if input_spec.operation == ImageOperation.EDIT:
@@ -790,18 +624,10 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
     Args:
         storage: Optional storage client for persisting images to Supabase pending/
 
-    CAPABILITIES (Gemini 3 Pro Image):
-
-    EDIT:
-    - Background: Remove (transparent), solid color, gradient, blur, generate scene
-    - Extract product: Isolate specific product from group photo
-    - Enhance: Sharpen, denoise, upscale 2x/4x, color correct, remove blemishes
-    - Reframe: Crop, zoom, change composition, adjust padding
-
-    GENERATE:
-    - Lifestyle shots: Product in realistic scenes (kitchen, office, retail)
-    - Studio shots: Clean professional backgrounds
-    - Custom scenes: Describe any environment
+    Architecture:
+    - Creative Specialist writes natural language creative briefs
+    - Tool passes creative_direction directly to Gemini 3 Pro Image
+    - No enum restrictions, full creative expression
 
     STORAGE:
     - Generated images are uploaded to pending/{thread_id}/ for persistence
@@ -813,27 +639,26 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
     return StructuredTool.from_function(
         func=_image_studio_impl,
         name="image_studio",
-        description="""Edit and generate product images with Gemini 3 Pro Image.
+        description="""Professional image editing and generation with Gemini 3 Pro Image.
 
 OPERATIONS:
+- edit: Modify existing image (background removal, extraction, enhancement, reframing)
+- generate: Create new lifestyle/studio shots from product image
 
-1. EDIT - Modify image: extract, background, enhance
-   - EXTRACT: Isolate specific product from group ("the red jar on left")
-   - BACKGROUND: Remove (transparent), solid, gradient, blur, scene
-   - ENHANCE: Sharpen, denoise, upscale 2x/4x, color correct
-   - REFRAME: Crop, zoom, adjust composition
+KEY PARAMETER - creative_direction:
+Write a complete creative brief like a professional photographer would:
+- Lighting: direction, quality, temperature, shadows
+- Composition: framing, product placement, coverage
+- Background: type, color, scene description
+- Material treatment: how to handle glass, metal, fabric, etc.
+- Technical: sharpness, color accuracy, edge treatment
 
-2. GENERATE - Create new images
-   - LIFESTYLE: Product in scenes (kitchen, office, outdoor)
-   - STUDIO: Clean professional backgrounds
-   - CUSTOM: Any scene via custom_instruction
+EXAMPLES:
+- "Extract glass jar, pure white background, soft studio lighting from 45-degrees, rim light for glass edge definition, 80% frame coverage"
+- "Modern kitchen scene, morning light through window, product on marble counter with herbs, warm editorial feel"
+- "Isolate red 500ml variant from left side, transparent background, surgical edge treatment"
 
-KEY PARAMETERS:
-- custom_instruction: Free-form text for complex operations
-- extraction: {target_description, position_hint, isolate}
-- background: {type: transparent|solid|gradient|blur|scene}
-- enhancement: {sharpness, denoise, upscale, color_correction}
-- scene: {environment, style, mood} for lifestyle generation""",
+OUTPUT: Returns storage_path in pending/ for write_data.""",
         args_schema=ImageStudioInput,
         return_direct=False,
     )

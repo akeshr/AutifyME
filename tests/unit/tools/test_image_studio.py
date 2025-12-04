@@ -1,18 +1,17 @@
 """
 Comprehensive tests for Image Studio tool.
 
-Tests the Gemini 3 Pro Image (Nano Banana Pro) integration:
+Tests the Gemini 3 Pro Image integration with simplified creative_direction schema:
 - Schema validation (inputs and outputs)
-- Operation handlers (analyze, edit, generate)
+- Operation handlers (edit, generate)
 - Image utilities (load, encode, save)
 - Error handling and edge cases
 - Tool factory
 
-Created: 2025-11-30
+Updated: 2025-12-04 - Simplified schema with creative_direction
 """
 
 import base64
-import json
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -20,16 +19,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from autifyme_agents.tools.image_studio import (
-    BackgroundSpec,
-    EnhancementSpec,
-    FramingSpec,
+    ImageMetadata,
     ImageOperation,
     ImageStudioErrorCode,
     ImageStudioInput,
-    LightingSpec,
+    ImageStudioOutput,
     OutputSpec,
-    ProductPlacement,
-    SceneSpec,
+    OutputVariant,
     create_image_studio_tool,
 )
 
@@ -53,24 +49,19 @@ def temp_image_file():
 
 
 @pytest.fixture
-def mock_gemini_llm():
-    """Mock Gemini 3 Pro Image LLM."""
-    mock_llm = MagicMock()
+def mock_gemini_response_with_image():
+    """Mock Gemini response with image data."""
     mock_response = MagicMock()
-    mock_response.content = json.dumps({
-        "colors": ["red", "blue"],
-        "materials": ["plastic"],
-        "product_category": "container",
-        "quality_score": 0.85,
-        "confidence": 0.9,
-        "product_count": 1,
-    })
-    mock_llm.invoke = MagicMock(return_value=mock_response)
-    return mock_llm
+    # Gemini 3 returns images in content[0]["image_url"]["url"] as data URI
+    fake_image_data = base64.b64encode(b"fake_image_data").decode()
+    mock_response.content = [
+        {"image_url": {"url": f"data:image/png;base64,{fake_image_data}"}}
+    ]
+    return mock_response
 
 
 # =============================================================================
-# Group 1: Schema Tests (15 tests)
+# Group 1: Schema Tests (Simplified)
 # =============================================================================
 
 
@@ -82,116 +73,117 @@ class TestImageStudioSchemas:
         assert ImageOperation.GENERATE.value == "generate"
         assert ImageOperation.EDIT.value == "edit"
 
-    def test_background_spec_defaults(self):
-        """Test BackgroundSpec default values."""
-        spec = BackgroundSpec()
-        assert spec.type == "solid"
-        assert spec.color == "#FFFFFF"
-        assert spec.gradient_end is None
-        assert spec.blur_strength is None
-
-    def test_background_spec_gradient(self):
-        """Test BackgroundSpec gradient configuration."""
-        spec = BackgroundSpec(type="gradient", color="#FFFFFF", gradient_end="#000000")
-        assert spec.type == "gradient"
-        assert spec.gradient_end == "#000000"
-
-    def test_lighting_spec_defaults(self):
-        """Test LightingSpec default values."""
-        spec = LightingSpec()
-        assert spec.type == "studio"
-        assert spec.direction == "front"
-        assert spec.intensity == "medium"
-        assert spec.color_temperature == "neutral"
-
-    def test_framing_spec_validation(self):
-        """Test FramingSpec field validation."""
-        # Valid values
-        spec = FramingSpec(product_coverage_percent=80, padding_percent=10)
-        assert spec.product_coverage_percent == 80
-
-        # Invalid - out of range (must be 20-100)
-        with pytest.raises(ValueError):
-            FramingSpec(product_coverage_percent=120)  # > 100
-
-        with pytest.raises(ValueError):
-            FramingSpec(padding_percent=60)  # > 50
-
-    def test_enhancement_spec_defaults(self):
-        """Test EnhancementSpec defaults."""
-        spec = EnhancementSpec()
-        assert spec.sharpness == "medium"
-        assert spec.contrast == "subtle"
-        assert spec.denoise is False
-        assert spec.upscale == "none"
-        assert spec.color_correction is True
-
-    def test_scene_spec_environments(self):
-        """Test SceneSpec environment options."""
-        valid_environments = [
-            "kitchen", "living_room", "office", "outdoor",
-            "restaurant", "retail", "warehouse", "studio"
-        ]
-        for env in valid_environments:
-            spec = SceneSpec(environment=env)
-            assert spec.environment == env
-
-    def test_product_placement_options(self):
-        """Test ProductPlacement position options."""
-        spec = ProductPlacement(position="foreground", scale="dominant", surface="table")
-        assert spec.position == "foreground"
-        assert spec.scale == "dominant"
-        assert spec.surface == "table"
-
     def test_output_spec_defaults(self):
         """Test OutputSpec defaults."""
         spec = OutputSpec()
         assert spec.format == "PNG"
         assert spec.size == "2K"
         assert spec.aspect_ratio == "1:1"
-        assert spec.quality == 90
-        assert spec.variants == ["master"]
 
-    def test_output_spec_quality_validation(self):
-        """Test OutputSpec quality range validation."""
-        # Valid
-        spec = OutputSpec(quality=50)
-        assert spec.quality == 50
+    def test_output_spec_format_validation(self):
+        """Test OutputSpec format validation."""
+        # Valid formats
+        for fmt in ["PNG", "JPEG", "WEBP"]:
+            spec = OutputSpec(format=fmt)
+            assert spec.format == fmt
 
-        # Invalid
+        # Invalid format
         with pytest.raises(ValueError):
-            OutputSpec(quality=0)  # < 1
+            OutputSpec(format="GIF")  # Not supported
 
-        with pytest.raises(ValueError):
-            OutputSpec(quality=101)  # > 100
-
-    def test_image_studio_input_edit(self):
-        """Test ImageStudioInput for edit operation."""
+    def test_image_studio_input_with_creative_direction(self):
+        """Test ImageStudioInput with creative_direction."""
         input_spec = ImageStudioInput(
             operation=ImageOperation.EDIT,
-            source_image="/path/to/image.png",
-            background=BackgroundSpec(type="solid", color="#FFFFFF"),
-            enhancement=EnhancementSpec(sharpness="high"),
+            source_image="inbox/test/image.png",
+            creative_direction="Extract product, pure white background, studio lighting",
         )
         assert input_spec.operation == ImageOperation.EDIT
-        assert input_spec.background is not None
-        assert input_spec.enhancement is not None
+        assert input_spec.creative_direction == "Extract product, pure white background, studio lighting"
+        assert input_spec.source_image == "inbox/test/image.png"
 
-    def test_image_studio_input_generate(self):
+    def test_image_studio_input_generate_operation(self):
         """Test ImageStudioInput for generate operation."""
         input_spec = ImageStudioInput(
             operation=ImageOperation.GENERATE,
-            source_image="/path/to/product.png",
-            scene=SceneSpec(environment="kitchen", style="modern"),
-            placement=ProductPlacement(position="center"),
-            output=OutputSpec(size="2K", aspect_ratio="1:1"),
+            source_image="inbox/test/product.png",
+            creative_direction="Modern kitchen scene, morning golden hour light through window, product on marble counter",
+            output=OutputSpec(size="2K", aspect_ratio="4:3"),
         )
         assert input_spec.operation == ImageOperation.GENERATE
-        assert input_spec.scene is not None
-        assert input_spec.placement is not None
+        assert "kitchen" in input_spec.creative_direction
+        assert input_spec.output.aspect_ratio == "4:3"
+
+    def test_image_studio_input_reference_images(self):
+        """Test ImageStudioInput with reference images."""
+        input_spec = ImageStudioInput(
+            operation=ImageOperation.GENERATE,
+            creative_direction="Create lifestyle shot matching style of reference images",
+            reference_images=["ref1.png", "ref2.png"],
+        )
+        assert len(input_spec.reference_images) == 2
+
+    def test_image_metadata_structure(self):
+        """Test ImageMetadata schema."""
+        metadata = ImageMetadata(
+            width=1920,
+            height=1080,
+            format="PNG",
+            size_bytes=1024000,
+            aspect_ratio="16:9",
+        )
+        assert metadata.width == 1920
+        assert metadata.height == 1080
+        assert metadata.format == "PNG"
+
+    def test_output_variant_structure(self):
+        """Test OutputVariant schema."""
+        variant = OutputVariant(
+            variant="master",
+            path="/tmp/output.png",
+            preview_path="/tmp/output_preview.png",
+            metadata=ImageMetadata(
+                width=2048, height=2048, format="PNG", size_bytes=500000, aspect_ratio="1:1"
+            ),
+            description="Edited image",
+            storage_path="pending/test/output.png",
+        )
+        assert variant.variant == "master"
+        assert variant.storage_path == "pending/test/output.png"
+
+    def test_image_studio_output_success(self):
+        """Test ImageStudioOutput success structure."""
+        output = ImageStudioOutput(
+            success=True,
+            operation=ImageOperation.EDIT,
+            outputs=[
+                OutputVariant(
+                    variant="master",
+                    path="/tmp/out.png",
+                    preview_path="/tmp/out.png",
+                    metadata=ImageMetadata(
+                        width=1024, height=1024, format="PNG", size_bytes=100000, aspect_ratio="1:1"
+                    ),
+                )
+            ],
+        )
+        assert output.success is True
+        assert len(output.outputs) == 1
+
+    def test_image_studio_output_failure(self):
+        """Test ImageStudioOutput failure structure."""
+        output = ImageStudioOutput(
+            success=False,
+            operation=ImageOperation.EDIT,
+            error="Source image not found",
+            error_code=ImageStudioErrorCode.FILE_NOT_FOUND,
+        )
+        assert output.success is False
+        assert output.error_code == ImageStudioErrorCode.FILE_NOT_FOUND
+
 
 # =============================================================================
-# Group 2: Tool Factory Tests (8 tests)
+# Group 2: Tool Factory Tests
 # =============================================================================
 
 
@@ -211,16 +203,14 @@ class TestImageStudioToolFactory:
         tool = create_image_studio_tool()
         assert tool.args_schema is not None
 
-    def test_tool_description_includes_operations(self):
-        """Test tool description lists all operations."""
+    def test_tool_description_includes_creative_direction(self):
+        """Test tool description mentions creative_direction."""
         tool = create_image_studio_tool()
-        assert "edit" in tool.description.lower()
-        assert "generate" in tool.description.lower()
+        assert "creative_direction" in tool.description.lower()
 
     def test_tool_is_callable(self):
         """Test tool can be called (sync wrapper)."""
         tool = create_image_studio_tool()
-        # Tool should be callable (though it will fail without valid input)
         assert callable(tool.invoke)
 
     def test_tool_has_async_invoke(self):
@@ -240,251 +230,28 @@ class TestImageStudioToolFactory:
         tool = create_image_studio_tool()
         assert tool.func is not None or tool.coroutine is not None
 
-    def test_tool_metadata(self):
-        """Test tool has proper metadata."""
-        tool = create_image_studio_tool()
+    def test_tool_with_storage_client(self):
+        """Test tool creation with storage client."""
+        mock_storage = MagicMock()
+        tool = create_image_studio_tool(storage=mock_storage)
         assert tool.name == "image_studio"
 
 
 # =============================================================================
-# Group 3: Analyze Operation Tests (10 tests)
+# Group 3: Edit Operation Tests
 # =============================================================================
 
 
-@pytest.mark.skip(reason="Requires Gemini API integration - tool handlers not fully implemented")
-class TestAnalyzeOperation:
-    """Test analyze operation.
-
-    NOTE: These tests require full Gemini API integration.
-    Skipped until _handle_analyze is fully implemented.
-    """
-
-    def test_analyze_requires_source_image(self):
-        """Test analyze fails without source_image."""
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "analyze",
-            # Missing source_image
-            "analysis": {"colors": True},
-        })
-        assert result["success"] is False
-        assert "source_image required" in result["error"]
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_analyze_with_valid_image(self, mock_load, mock_llm_factory, temp_image_file):
-        """Test analyze with valid image."""
-        # Mock image loading
-        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-
-        # Mock LLM response
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = json.dumps({
-            "colors": ["red"],
-            "materials": ["plastic"],
-            "product_category": "container",
-            "quality_score": 0.85,
-            "confidence": 0.9,
-            "product_count": 1,
-        })
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "analyze",
-            "source_image": temp_image_file,
-            "analysis": {"colors": True, "materials": True},
-        })
-
-        assert result["success"] is True
-        assert result["operation"] == "analyze"
-        assert "analysis" in result
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_analyze_extracts_colors(self, mock_load, mock_llm_factory):
-        """Test analyze extracts color information."""
-        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = json.dumps({
-            "colors": ["red", "blue", "white"],
-            "quality_score": 0.8,
-            "confidence": 0.9,
-            "product_count": 1,
-        })
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "analyze",
-            "source_image": "/tmp/test.png",
-            "analysis": {"colors": True},
-        })
-
-        assert result["success"] is True
-        assert "colors" in result.get("analysis", {})
-
-    def test_analyze_file_not_found(self):
-        """Test analyze with non-existent file."""
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "analyze",
-            "source_image": "/nonexistent/path/image.png",
-        })
-
-        assert result["success"] is False
-        assert result["error_code"] == ImageStudioErrorCode.FILE_NOT_FOUND.value
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_analyze_custom_attributes(self, mock_load, mock_llm_factory):
-        """Test analyze with custom attributes."""
-        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = json.dumps({
-            "quality_score": 0.8,
-            "confidence": 0.9,
-            "product_count": 1,
-            "custom_attributes": {"brand_visible": True, "text_readable": True},
-        })
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "analyze",
-            "source_image": "/tmp/test.png",
-            "analysis": {"custom_attributes": ["brand_visible", "text_readable"]},
-        })
-
-        assert result["success"] is True
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_analyze_multi_product_detection(self, mock_load, mock_llm_factory):
-        """Test analyze detects multiple products."""
-        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = json.dumps({
-            "quality_score": 0.7,
-            "confidence": 0.85,
-            "product_count": 3,
-            "multi_product_warning": "Multiple products detected in frame",
-        })
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "analyze",
-            "source_image": "/tmp/test.png",
-        })
-
-        assert result["success"] is True
-        analysis = result.get("analysis", {})
-        assert analysis.get("product_count", 1) == 3
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_analyze_quality_score_range(self, mock_load, mock_llm_factory):
-        """Test analyze returns quality score in valid range."""
-        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = json.dumps({
-            "quality_score": 0.75,
-            "confidence": 0.9,
-            "product_count": 1,
-        })
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "analyze",
-            "source_image": "/tmp/test.png",
-        })
-
-        assert result["success"] is True
-        quality = result.get("analysis", {}).get("quality_score", 0)
-        assert 0.0 <= quality <= 1.0
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_analyze_uses_gemini3_model(self, mock_load, mock_llm_factory):
-        """Test analyze uses Gemini 3 Pro Image model."""
-        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = json.dumps({
-            "quality_score": 0.8,
-            "confidence": 0.9,
-            "product_count": 1,
-        })
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        tool.invoke({
-            "operation": "analyze",
-            "source_image": "/tmp/test.png",
-        })
-
-        # Verify LLM factory was called with for_analysis=True
-        mock_llm_factory.assert_called_once()
-        call_kwargs = mock_llm_factory.call_args[1]
-        assert call_kwargs.get("for_analysis") is True
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_analyze_api_error_handling(self, mock_load, mock_llm_factory):
-        """Test analyze handles API errors gracefully."""
-        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-
-        mock_llm = MagicMock()
-        mock_llm.invoke = MagicMock(side_effect=Exception("API rate limit exceeded"))
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "analyze",
-            "source_image": "/tmp/test.png",
-        })
-
-        assert result["success"] is False
-        assert result["error_code"] == ImageStudioErrorCode.API_ERROR.value
-
-
-# =============================================================================
-# Group 4: Edit Operation Tests (10 tests)
-# =============================================================================
-
-
-@pytest.mark.skip(reason="Requires Gemini API integration - tool handlers not fully implemented")
 class TestEditOperation:
-    """Test edit operation.
-
-    NOTE: These tests require full Gemini API integration.
-    Skipped until _handle_edit is fully implemented.
-    """
+    """Test edit operation with creative_direction."""
 
     def test_edit_requires_source_image(self):
         """Test edit fails without source_image."""
         tool = create_image_studio_tool()
         result = tool.invoke({
             "operation": "edit",
-            "background": {"type": "solid", "color": "#FFFFFF"},
+            "creative_direction": "Remove background, pure white",
+            # Missing source_image
         })
 
         assert result["success"] is False
@@ -492,24 +259,21 @@ class TestEditOperation:
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_edit_background_removal(self, mock_save, mock_load, mock_llm_factory):
-        """Test edit with background removal."""
+    def test_edit_with_creative_direction(
+        self, mock_load, mock_llm_factory, mock_gemini_response_with_image
+    ):
+        """Test edit with creative_direction."""
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-        mock_save.return_value = "/tmp/output.png"
 
         mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake_image").decode()}
-        mock_response.content = "Image edited successfully"
-        mock_llm.invoke = MagicMock(return_value=mock_response)
+        mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
+        tool.invoke({
             "operation": "edit",
             "source_image": "/tmp/test.png",
-            "background": {"type": "transparent"},
+            "creative_direction": "Extract glass jar, preserve caustics and refraction, pure white #FFFFFF background, soft studio lighting from 45 degrees",
         })
 
         # Should attempt to invoke the LLM
@@ -517,96 +281,61 @@ class TestEditOperation:
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_edit_with_enhancement(self, mock_save, mock_load, mock_llm_factory):
-        """Test edit with image enhancement."""
+    def test_edit_prompt_contains_creative_direction(self, mock_load, mock_llm_factory):
+        """Test that the prompt sent to LLM contains creative_direction."""
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-        mock_save.return_value = "/tmp/output.png"
 
         mock_llm = MagicMock()
         mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake_image").decode()}
-        mock_response.content = "Enhanced"
+        fake_image = base64.b64encode(b"fake").decode()
+        mock_response.content = [{"image_url": {"url": f"data:image/png;base64,{fake_image}"}}]
         mock_llm.invoke = MagicMock(return_value=mock_response)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
+        creative_brief = "HERO SHOT: Ceramic mug on pure white, matte surface preserved, studio front lighting"
+        tool.invoke({
             "operation": "edit",
             "source_image": "/tmp/test.png",
-            "enhancement": {
-                "sharpness": "high",
-                "contrast": "medium",
-                "denoise": True,
-            },
+            "creative_direction": creative_brief,
         })
 
-        mock_llm.invoke.assert_called_once()
+        # Check the prompt sent to LLM contains our creative direction
+        call_args = mock_llm.invoke.call_args[0][0]
+        user_content = call_args[1]["content"]
+        prompt_text = user_content[0]["text"]
+        assert "HERO SHOT" in prompt_text
+        assert "Ceramic mug" in prompt_text
 
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_edit_with_lighting(self, mock_save, mock_load, mock_llm_factory):
-        """Test edit with lighting adjustment."""
-        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-        mock_save.return_value = "/tmp/output.png"
-
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake_image").decode()}
-        mock_response.content = "Lighting adjusted"
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "edit",
-            "source_image": "/tmp/test.png",
-            "lighting": {
-                "type": "studio",
-                "direction": "front",
-                "intensity": "high",
-            },
-        })
-
-        mock_llm.invoke.assert_called_once()
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_edit_file_not_found(self, mock_load, mock_llm_factory):
+    def test_edit_file_not_found(self):
         """Test edit with non-existent file."""
-        mock_load.side_effect = FileNotFoundError("File not found")
-
         tool = create_image_studio_tool()
         result = tool.invoke({
             "operation": "edit",
             "source_image": "/nonexistent/image.png",
-            "background": {"type": "solid"},
+            "creative_direction": "Remove background",
         })
 
         assert result["success"] is False
-        assert result["error_code"] == ImageStudioErrorCode.FILE_NOT_FOUND.value
+        assert result["error_code"] == ImageStudioErrorCode.FILE_NOT_FOUND
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_edit_output_spec_applied(self, mock_save, mock_load, mock_llm_factory):
+    def test_edit_output_spec_applied(
+        self, mock_load, mock_llm_factory, mock_gemini_response_with_image
+    ):
         """Test edit applies output specifications."""
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-        mock_save.return_value = "/tmp/output.png"
 
         mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake_image").decode()}
-        mock_response.content = "Edited"
-        mock_llm.invoke = MagicMock(return_value=mock_response)
+        mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
+        tool.invoke({
             "operation": "edit",
             "source_image": "/tmp/test.png",
-            "background": {"type": "solid"},
+            "creative_direction": "Enhance colors and sharpen",
             "output": {"size": "4K", "aspect_ratio": "16:9", "format": "JPEG"},
         })
 
@@ -615,32 +344,32 @@ class TestEditOperation:
         call_kwargs = mock_llm_factory.call_args[1]
         output_spec = call_kwargs.get("output_spec")
         assert output_spec is not None
+        assert output_spec.size == "4K"
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_edit_returns_output_path(self, mock_save, mock_load, mock_llm_factory):
-        """Test edit returns output file path."""
+    def test_edit_with_reference_images(self, mock_load, mock_llm_factory):
+        """Test edit with reference images."""
+        # Return different data for source vs reference
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-        mock_save.return_value = "/tmp/media_downloads/20251130_edit_abc123.png"
 
         mock_llm = MagicMock()
         mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake_image").decode()}
-        mock_response.content = "Edited"
+        fake_image = base64.b64encode(b"fake").decode()
+        mock_response.content = [{"image_url": {"url": f"data:image/png;base64,{fake_image}"}}]
         mock_llm.invoke = MagicMock(return_value=mock_response)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
+        tool.invoke({
             "operation": "edit",
             "source_image": "/tmp/test.png",
-            "background": {"type": "solid"},
+            "creative_direction": "Match the color grading of the reference images",
+            "reference_images": ["/tmp/ref1.png", "/tmp/ref2.png"],
         })
 
-        assert result["success"] is True
-        assert "outputs" in result
-        assert len(result["outputs"]) > 0
+        # Should load source + 2 reference images (3 calls total)
+        assert mock_load.call_count == 3
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
@@ -650,8 +379,7 @@ class TestEditOperation:
 
         mock_llm = MagicMock()
         mock_response = MagicMock()
-        mock_response.additional_kwargs = {}  # No image!
-        mock_response.content = "No image generated"
+        mock_response.content = "No image generated"  # String, not list with image
         mock_llm.invoke = MagicMock(return_value=mock_response)
         mock_llm_factory.return_value = mock_llm
 
@@ -659,167 +387,72 @@ class TestEditOperation:
         result = tool.invoke({
             "operation": "edit",
             "source_image": "/tmp/test.png",
-            "background": {"type": "solid"},
+            "creative_direction": "Remove background",
         })
 
         assert result["success"] is False
         assert "error" in result
 
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_edit_uses_gemini3_with_image_modality(self, mock_load, mock_llm_factory):
-        """Test edit uses Gemini 3 with IMAGE modality."""
-        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
 
+# =============================================================================
+# Group 4: Generate Operation Tests
+# =============================================================================
+
+
+class TestGenerateOperation:
+    """Test generate operation with creative_direction."""
+
+    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
+    def test_generate_with_creative_direction(
+        self, mock_llm_factory, mock_gemini_response_with_image
+    ):
+        """Test generate with creative_direction."""
         mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake").decode()}
-        mock_response.content = "OK"
-        mock_llm.invoke = MagicMock(return_value=mock_response)
+        mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
         tool.invoke({
-            "operation": "edit",
-            "source_image": "/tmp/test.png",
-            "background": {"type": "solid"},
-        })
-
-        # Verify LLM factory was called WITHOUT for_analysis (means IMAGE modality)
-        mock_llm_factory.assert_called_once()
-        call_kwargs = mock_llm_factory.call_args[1]
-        assert call_kwargs.get("for_analysis") is not True
-
-
-# =============================================================================
-# Group 5: Generate Operation Tests (10 tests)
-# =============================================================================
-
-
-@pytest.mark.skip(reason="Requires Gemini API integration - tool handlers not fully implemented")
-class TestGenerateOperation:
-    """Test generate operation (lifestyle shots).
-
-    NOTE: These tests require full Gemini API integration.
-    Skipped until _handle_generate is fully implemented.
-    """
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_generate_without_source_image(self, mock_save, mock_llm_factory):
-        """Test generate can work without source image."""
-        mock_save.return_value = "/tmp/output.png"
-
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake").decode()}
-        mock_response.content = "Generated"
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
             "operation": "generate",
-            "scene": {"environment": "kitchen", "style": "modern"},
+            "creative_direction": "Modern minimalist kitchen scene, morning golden hour through window, marble counter, product on left third",
         })
 
-        # Generate should work without source_image
         mock_llm.invoke.assert_called_once()
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_generate_with_source_reference(self, mock_save, mock_load, mock_llm_factory):
+    def test_generate_with_source_reference(
+        self, mock_load, mock_llm_factory, mock_gemini_response_with_image
+    ):
         """Test generate with source image as reference."""
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-        mock_save.return_value = "/tmp/output.png"
 
         mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake").decode()}
-        mock_response.content = "Generated with reference"
-        mock_llm.invoke = MagicMock(return_value=mock_response)
+        mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
+        tool.invoke({
             "operation": "generate",
             "source_image": "/tmp/product.png",
-            "scene": {"environment": "living_room"},
-            "placement": {"position": "center", "scale": "balanced"},
+            "creative_direction": "Place product in cozy living room scene, warm afternoon light, product on coffee table",
         })
 
         mock_llm.invoke.assert_called_once()
+        # Source image should be loaded
+        mock_load.assert_called_once()
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_generate_kitchen_scene(self, mock_save, mock_llm_factory):
-        """Test generate kitchen lifestyle scene."""
-        mock_save.return_value = "/tmp/output.png"
-
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake").decode()}
-        mock_response.content = "Kitchen scene generated"
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "generate",
-            "scene": {
-                "environment": "kitchen",
-                "style": "modern",
-                "mood": "professional",
-                "time_of_day": "morning",
-            },
-        })
-
-        mock_llm.invoke.assert_called_once()
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_generate_with_placement(self, mock_save, mock_llm_factory):
-        """Test generate with product placement."""
-        mock_save.return_value = "/tmp/output.png"
-
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake").decode()}
-        mock_response.content = "Placed"
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "generate",
-            "scene": {"environment": "restaurant"},
-            "placement": {
-                "position": "table",
-                "scale": "dominant",
-                "surface": "table",
-            },
-        })
-
-        mock_llm.invoke.assert_called_once()
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_generate_output_specs(self, mock_save, mock_llm_factory):
+    def test_generate_output_specs(self, mock_llm_factory, mock_gemini_response_with_image):
         """Test generate respects output specifications."""
-        mock_save.return_value = "/tmp/output.png"
-
         mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake").decode()}
-        mock_response.content = "4K generated"
-        mock_llm.invoke = MagicMock(return_value=mock_response)
+        mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
+        tool.invoke({
             "operation": "generate",
-            "scene": {"environment": "studio"},
+            "creative_direction": "Studio shot with dramatic lighting",
             "output": {
                 "size": "4K",
                 "aspect_ratio": "16:9",
@@ -831,29 +464,36 @@ class TestGenerateOperation:
         call_kwargs = mock_llm_factory.call_args[1]
         output_spec = call_kwargs.get("output_spec")
         assert output_spec is not None
+        assert output_spec.size == "4K"
+        assert output_spec.aspect_ratio == "16:9"
 
+    @patch("autifyme_agents.tools.image_studio.tool._save_base64_image")
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_generate_returns_outputs(self, mock_save, mock_llm_factory):
+    def test_generate_returns_outputs(self, mock_llm_factory, mock_save, mock_gemini_response_with_image):
         """Test generate returns output variants."""
-        mock_save.return_value = "/tmp/media_downloads/20251130_generate_xyz.png"
+        from pathlib import Path
+        # Mock save to return valid data
+        mock_save.return_value = (
+            Path("/tmp/output.png"),
+            ImageMetadata(width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"),
+            "pending/test/output.png"
+        )
 
         mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake").decode()}
-        mock_response.content = "Generated"
-        mock_llm.invoke = MagicMock(return_value=mock_response)
+        mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
         result = tool.invoke({
             "operation": "generate",
-            "scene": {"environment": "office"},
+            "creative_direction": "Office desk scene with product",
         })
 
         assert result["success"] is True
-        assert "outputs" in result
-        assert result["operation"] == "generate"
+        # The response structure wraps the output model in 'data' from build_success_response
+        data = result.get("data", result)
+        assert "outputs" in data
+        assert data["operation"] == "generate"
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     def test_generate_api_error(self, mock_llm_factory):
@@ -865,81 +505,56 @@ class TestGenerateOperation:
         tool = create_image_studio_tool()
         result = tool.invoke({
             "operation": "generate",
-            "scene": {"environment": "kitchen"},
+            "creative_direction": "Kitchen scene",
         })
 
         assert result["success"] is False
-        assert result["error_code"] == ImageStudioErrorCode.API_ERROR.value
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_generate_all_environments(self, mock_save, mock_llm_factory):
-        """Test generate works with all environment types."""
-        mock_save.return_value = "/tmp/output.png"
-
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake").decode()}
-        mock_response.content = "OK"
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-
-        environments = ["kitchen", "living_room", "office", "outdoor",
-                       "restaurant", "retail", "warehouse", "studio"]
-
-        for env in environments:
-            result = tool.invoke({
-                "operation": "generate",
-                "scene": {"environment": env},
-            })
-            # All should invoke the LLM
-            assert mock_llm.invoke.called
+        assert result["error_code"] == ImageStudioErrorCode.API_ERROR
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     def test_generate_no_image_in_response(self, mock_llm_factory):
         """Test generate handles missing image in response."""
         mock_llm = MagicMock()
         mock_response = MagicMock()
-        mock_response.additional_kwargs = {}  # No image
-        mock_response.content = "Failed to generate"
+        mock_response.content = []  # Empty list - no image
         mock_llm.invoke = MagicMock(return_value=mock_response)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
         result = tool.invoke({
             "operation": "generate",
-            "scene": {"environment": "kitchen"},
+            "creative_direction": "Kitchen scene",
         })
 
         assert result["success"] is False
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._save_generated_image")
-    def test_generate_uses_gemini3_model(self, mock_save, mock_llm_factory):
-        """Test generate uses Gemini 3 Pro Image model."""
-        mock_save.return_value = "/tmp/output.png"
-
+    def test_generate_prompt_includes_output_specs(self, mock_llm_factory):
+        """Test generate prompt includes technical output specs."""
         mock_llm = MagicMock()
         mock_response = MagicMock()
-        mock_response.additional_kwargs = {"image": base64.b64encode(b"fake").decode()}
-        mock_response.content = "OK"
+        fake_image = base64.b64encode(b"fake").decode()
+        mock_response.content = [{"image_url": {"url": f"data:image/png;base64,{fake_image}"}}]
         mock_llm.invoke = MagicMock(return_value=mock_response)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
         tool.invoke({
             "operation": "generate",
-            "scene": {"environment": "kitchen"},
+            "creative_direction": "Product on marble surface",
+            "output": {"size": "4K", "aspect_ratio": "1:1", "format": "PNG"},
         })
 
-        # Verify LLM factory was called
-        mock_llm_factory.assert_called()
+        # Check prompt includes output specs
+        call_args = mock_llm.invoke.call_args[0][0]
+        user_content = call_args[1]["content"]
+        prompt_text = user_content[0]["text"]
+        assert "4K" in prompt_text
+        assert "1:1" in prompt_text
 
 
 # =============================================================================
-# Group 6: Error Handling Tests (8 tests)
+# Group 5: Error Handling Tests
 # =============================================================================
 
 
@@ -948,16 +563,32 @@ class TestErrorHandling:
 
     def test_invalid_operation(self):
         """Test invalid operation type."""
+        from pydantic import ValidationError
+
         tool = create_image_studio_tool()
 
         # Pydantic should catch invalid enum value
-        with pytest.raises(Exception):
+        with pytest.raises((ValidationError, ValueError)):
             tool.invoke({
                 "operation": "invalid_op",
+                "creative_direction": "Do something",
                 "source_image": "/tmp/test.png",
             })
 
-    def test_corrupt_image_handling(self, temp_image_file):
+    def test_missing_creative_direction(self):
+        """Test missing creative_direction field."""
+        from pydantic import ValidationError
+
+        tool = create_image_studio_tool()
+
+        # Missing creative_direction
+        with pytest.raises((ValidationError, TypeError)):
+            tool.invoke({
+                "operation": "edit",
+                "source_image": "/tmp/test.png",
+            })
+
+    def test_corrupt_image_handling(self):
         """Test handling of corrupt image file."""
         # Create a corrupt "image" file
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False, mode="wb") as f:
@@ -969,6 +600,7 @@ class TestErrorHandling:
             result = tool.invoke({
                 "operation": "edit",
                 "source_image": corrupt_path,
+                "creative_direction": "Remove background",
             })
 
             # Should handle gracefully
@@ -979,12 +611,15 @@ class TestErrorHandling:
 
     def test_missing_required_fields(self):
         """Test missing required fields in input."""
+        from pydantic import ValidationError
+
         tool = create_image_studio_tool()
 
         # Missing 'operation' field
-        with pytest.raises(Exception):
+        with pytest.raises((ValidationError, TypeError)):
             tool.invoke({
                 "source_image": "/tmp/test.png",
+                "creative_direction": "Edit image",
             })
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
@@ -1001,6 +636,7 @@ class TestErrorHandling:
         result = tool.invoke({
             "operation": "edit",
             "source_image": "/tmp/test.png",
+            "creative_direction": "Enhance image",
         })
 
         assert result["success"] is False
@@ -1012,30 +648,10 @@ class TestErrorHandling:
         result = tool.invoke({
             "operation": "edit",
             "source_image": "",
+            "creative_direction": "Edit something",
         })
 
         assert result["success"] is False
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
-    def test_malformed_llm_response(self, mock_load, mock_llm_factory):
-        """Test handling of malformed LLM response."""
-        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
-
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = "not valid json {{{{"  # Invalid JSON
-        mock_llm.invoke = MagicMock(return_value=mock_response)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        result = tool.invoke({
-            "operation": "edit",
-            "source_image": "/tmp/test.png",
-        })
-
-        # Should handle JSON parse error gracefully
-        assert result["success"] is False or "output_variants" in result
 
     def test_error_codes_are_valid(self):
         """Test all error codes are valid class attributes."""
@@ -1056,9 +672,83 @@ class TestErrorHandling:
         result = tool.invoke({
             "operation": "edit",
             "source_image": "/nonexistent/path.png",
+            "creative_direction": "Do something",
         })
 
         assert result["success"] is False
         assert "error" in result
         assert "error_code" in result
         assert result["operation"] == "edit"
+
+
+# =============================================================================
+# Group 6: Integration Tests (Thread ID Injection)
+# =============================================================================
+
+
+class TestThreadIdInjection:
+    """Test thread_id injection from RunnableConfig."""
+
+    @patch("autifyme_agents.tools.image_studio.tool._save_base64_image")
+    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
+    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
+    def test_thread_id_injected_from_config(
+        self, mock_load, mock_llm_factory, mock_save, mock_gemini_response_with_image
+    ):
+        """Test thread_id is injected from RunnableConfig."""
+        from pathlib import Path
+        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
+        mock_save.return_value = (
+            Path("/tmp/output.png"),
+            ImageMetadata(width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"),
+            "pending/test/output.png"
+        )
+
+        mock_llm = MagicMock()
+        mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
+        mock_llm_factory.return_value = mock_llm
+
+        tool = create_image_studio_tool()
+
+        # Invoke with config containing thread_id
+        result = tool.invoke(
+            {
+                "operation": "edit",
+                "source_image": "/tmp/test.png",
+                "creative_direction": "Remove background",
+            },
+            config={"configurable": {"thread_id": "whatsapp_123_456"}},
+        )
+
+        assert result["success"] is True
+
+    @patch("autifyme_agents.tools.image_studio.tool._save_base64_image")
+    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
+    def test_explicit_thread_id_takes_precedence(
+        self, mock_llm_factory, mock_save, mock_gemini_response_with_image
+    ):
+        """Test explicit thread_id takes precedence over config."""
+        from pathlib import Path
+        mock_save.return_value = (
+            Path("/tmp/output.png"),
+            ImageMetadata(width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"),
+            "pending/test/output.png"
+        )
+
+        mock_llm = MagicMock()
+        mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
+        mock_llm_factory.return_value = mock_llm
+
+        tool = create_image_studio_tool()
+
+        # Both explicit and config thread_id
+        result = tool.invoke(
+            {
+                "operation": "generate",
+                "creative_direction": "Create scene",
+                "thread_id": "explicit_thread",
+            },
+            config={"configurable": {"thread_id": "config_thread"}},
+        )
+
+        assert result["success"] is True

@@ -1,28 +1,20 @@
 """Image Studio Tool - Gemini 3 Pro Image integration.
 
-Unified tool for product image operations:
-- edit: Background removal, enhancement, extraction, cleanup
-- generate: Lifestyle shots, scene placement
+Simplified architecture: Creative Specialist writes natural language briefs.
+- edit: Modify existing images (background, extraction, enhancement)
+- generate: Create new scenes from product images
 
-Architecture: Single atomic tool with structured Pydantic schema.
+Architecture: Single atomic tool with creative_direction as primary input.
 """
 
 from autifyme_agents.tools.image_studio.schemas import (
-    BackgroundSpec,
-    EnhancementSpec,
-    ExtractionSpec,
-    FocusRegionSpec,
-    FramingSpec,
     ImageMetadata,
     ImageOperation,
     ImageStudioErrorCode,
     ImageStudioInput,
     ImageStudioOutput,
-    LightingSpec,
     OutputSpec,
     OutputVariant,
-    ProductPlacement,
-    SceneSpec,
 )
 from autifyme_agents.tools.image_studio.tool import create_image_studio_tool
 
@@ -31,14 +23,6 @@ __all__ = [
     "create_image_studio_tool",
     # Input schemas
     "ImageOperation",
-    "BackgroundSpec",
-    "LightingSpec",
-    "FramingSpec",
-    "EnhancementSpec",
-    "SceneSpec",
-    "ProductPlacement",
-    "ExtractionSpec",
-    "FocusRegionSpec",
     "OutputSpec",
     "ImageStudioInput",
     # Output schemas
