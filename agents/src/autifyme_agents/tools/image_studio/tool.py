@@ -304,171 +304,53 @@ def _extract_image_from_response(response: Any) -> str | None:
 
 
 def _build_prompt(input_spec: ImageStudioInput) -> str:
-    """Build comprehensive prompt from labeled images and structured specs.
+    """Build JSON prompt from labeled images and structured specs.
 
-    Architecture:
-    - Images listed first with labels (model knows which is which)
-    - Structured specs provide creative direction
-    - Free-form creative_direction for anything beyond structure
+    Architecture: Send raw JSON - LLMs parse structured data natively.
+    - Images listed with labels (model knows which is which)
+    - Structured specs as JSON objects
+    - Only include non-None specs (clean, minimal payload)
     """
-    sections: list[str] = []
+    import json
 
-    # List images with labels first
+    # Build spec dict with only non-None values
+    spec_dict: dict[str, Any] = {}
+
+    # Images with labels
     if input_spec.images:
-        image_labels = [f"[{img.label}]" for img in input_spec.images]
-        sections.append(f"IMAGES PROVIDED: {', '.join(image_labels)}")
+        spec_dict["images"] = [
+            {"label": img.label, "index": i}
+            for i, img in enumerate(input_spec.images)
+        ]
 
-    # Extraction instructions
+    # Add each spec if present (exclude_none removes empty fields)
     if input_spec.extraction:
-        ext = input_spec.extraction
-        parts = [f"EXTRACTION: {ext.target_description}"]
-        if ext.position_hint:
-            parts.append(f"Located: {ext.position_hint}")
-        parts.append(f"Isolation: {ext.isolation}")
-        parts.append(f"Edge treatment: {ext.edge_treatment}")
-        if ext.custom:
-            parts.append(f"Custom: {ext.custom}")
-        sections.append(" | ".join(parts))
-
-    # Background treatment
+        spec_dict["extraction"] = input_spec.extraction.model_dump(exclude_none=True)
     if input_spec.background:
-        bg = input_spec.background
-        parts = [f"BACKGROUND: {bg.treatment}"]
-        if bg.color:
-            parts.append(f"Color: {bg.color}")
-        if bg.scene_description:
-            parts.append(f"Scene: {bg.scene_description}")
-        if bg.custom:
-            parts.append(f"Custom: {bg.custom}")
-        sections.append(" | ".join(parts))
-
-    # Lighting
+        spec_dict["background"] = input_spec.background.model_dump(exclude_none=True)
     if input_spec.lighting:
-        lt = input_spec.lighting
-        parts = [
-            f"LIGHTING: {lt.type}",
-            f"Direction: {lt.direction}",
-            f"Quality: {lt.quality}",
-            f"Temperature: {lt.color_temperature}",
-            f"Shadows: {lt.shadows}",
-        ]
-        if lt.special_requirements:
-            parts.append(f"Special: {lt.special_requirements}")
-        if lt.custom:
-            parts.append(f"Custom: {lt.custom}")
-        sections.append(" | ".join(parts))
-
-    # Scene
+        spec_dict["lighting"] = input_spec.lighting.model_dump(exclude_none=True)
     if input_spec.scene:
-        sc = input_spec.scene
-        parts = [
-            f"SCENE: {sc.environment}",
-            f"Style: {sc.style}",
-            f"Mood: {sc.mood}",
-            f"Time: {sc.time_of_day}",
-        ]
-        if sc.props_and_context:
-            parts.append(f"Props: {sc.props_and_context}")
-        if sc.custom:
-            parts.append(f"Custom: {sc.custom}")
-        sections.append(" | ".join(parts))
-
-    # Placement
+        spec_dict["scene"] = input_spec.scene.model_dump(exclude_none=True)
     if input_spec.placement:
-        pl = input_spec.placement
-        parts = [f"PLACEMENT: {pl.position}", f"Scale: {pl.scale}"]
-        if pl.surface:
-            parts.append(f"Surface: {pl.surface}")
-        if pl.interaction:
-            parts.append(f"Interaction: {pl.interaction}")
-        if pl.custom:
-            parts.append(f"Custom: {pl.custom}")
-        sections.append(" | ".join(parts))
-
-    # Composition
+        spec_dict["placement"] = input_spec.placement.model_dump(exclude_none=True)
     if input_spec.composition:
-        comp = input_spec.composition
-        parts = [
-            f"COMPOSITION: {comp.product_coverage}",
-            f"Position: {comp.position}",
-            f"Angle: {comp.camera_angle}",
-        ]
-        if comp.negative_space:
-            parts.append(f"Negative space: {comp.negative_space}")
-        if comp.crop_instruction:
-            parts.append(f"Crop: {comp.crop_instruction}")
-        if comp.custom:
-            parts.append(f"Custom: {comp.custom}")
-        sections.append(" | ".join(parts))
-
-    # Material treatment
+        spec_dict["composition"] = input_spec.composition.model_dump(exclude_none=True)
     if input_spec.material_treatment:
-        mat = input_spec.material_treatment
-        parts = [f"MATERIAL: {mat.primary_material}", f"Treatment: {mat.rendering_notes}"]
-        if mat.preserve_details:
-            parts.append(f"Preserve: {mat.preserve_details}")
-        if mat.custom:
-            parts.append(f"Custom: {mat.custom}")
-        sections.append(" | ".join(parts))
-
-    # Focus
+        spec_dict["material_treatment"] = input_spec.material_treatment.model_dump(exclude_none=True)
     if input_spec.focus:
-        foc = input_spec.focus
-        parts = [f"FOCUS: {foc.focus_point}", f"Depth: {foc.depth_of_field}"]
-        if foc.falloff:
-            parts.append(f"Falloff: {foc.falloff}")
-        if foc.custom:
-            parts.append(f"Custom: {foc.custom}")
-        sections.append(" | ".join(parts))
-
-    # Enhancement
+        spec_dict["focus"] = input_spec.focus.model_dump(exclude_none=True)
     if input_spec.enhancement:
-        enh = input_spec.enhancement
-        parts = [
-            f"ENHANCEMENT: Sharpness={enh.sharpness}",
-            f"Contrast={enh.contrast}",
-            f"Color={enh.color_treatment}",
-        ]
-        if enh.detail_enhancement:
-            parts.append(f"Details: {enh.detail_enhancement}")
-        if enh.cleanup:
-            parts.append(f"Cleanup: {enh.cleanup}")
-        if enh.custom:
-            parts.append(f"Custom: {enh.custom}")
-        sections.append(" | ".join(parts))
-
-    # Custom spec
+        spec_dict["enhancement"] = input_spec.enhancement.model_dump(exclude_none=True)
     if input_spec.custom_spec:
-        cs = input_spec.custom_spec
-        parts = ["CUSTOM CREATIVE:"]
-        if cs.instruction:
-            parts.append(f"Instruction: {cs.instruction}")
-        if cs.style_reference:
-            parts.append(f"Style: {cs.style_reference}")
-        if cs.color_palette:
-            parts.append(f"Colors: {cs.color_palette}")
-        if cs.texture_overlay:
-            parts.append(f"Texture: {cs.texture_overlay}")
-        if cs.special_effect:
-            parts.append(f"Effect: {cs.special_effect}")
-        if cs.artistic_intent:
-            parts.append(f"Intent: {cs.artistic_intent}")
-        if cs.extra:
-            for key, value in cs.extra.items():
-                parts.append(f"{key}: {value}")
-        sections.append(" | ".join(parts))
-
-    # Creative direction
+        spec_dict["custom_spec"] = input_spec.custom_spec.model_dump(exclude_none=True)
     if input_spec.creative_direction:
-        sections.append(f"CREATIVE DIRECTION: {input_spec.creative_direction}")
+        spec_dict["creative_direction"] = input_spec.creative_direction
 
-    # Technical output
-    out = input_spec.output
-    sections.append(
-        f"TECHNICAL OUTPUT: {out.size} resolution, {out.aspect_ratio} aspect ratio, {out.format} format."
-    )
+    # Output spec - tells LLM the target format/size/aspect
+    spec_dict["output"] = input_spec.output.model_dump(exclude_none=True)
 
-    return "\n\n".join(sections)
+    return json.dumps(spec_dict, indent=2)
 
 
 # =============================================================================
