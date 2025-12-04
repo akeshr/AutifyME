@@ -112,34 +112,52 @@ Reference labels in specs: "extract [product]", "match lighting from [style_ref]
 - **Purpose**: Discover table structure before read_data or write_data
 - **ALWAYS call before**: First read or write to any table in a session
 - Returns: columns, types, required/optional, relationships, valid values, samples
-- Example: `inspect_schema(tables=["assets", "product_images"], details=["structure", "samples"])`
+- Example: `inspect_schema(tables=["products", "product_assets", "assets"], details=["structure"])`
 
 ## read_data - GET IMAGES when PM provides product/family identifiers
 
 **Your accessible tables:**
-- `assets` - Processed images (storage_url, asset_type, category)
-- `product_assets` - Links products/families to assets (product_id, product_family_id, asset_id, asset_role)
-- `product_images` - Raw product images (url, product_id, product_family_id, image_type)
+- `products` - Product records (id, name, product_family_id) - resolve family to products
+- `product_assets` - Links products to assets (product_id, asset_id, asset_role)
+- `assets` - Asset records with URLs (id, storage_url, name, category)
 
-**MANDATORY WORKFLOW - When PM provides identifiers without image paths:**
+**FILTER SYNTAX:** Simple dict `{column: value}`, NOT list of objects!
+- Single value: `filters={"product_family_id": "uuid-123"}`
+- Multiple values (IN): `filters={"product_id": ["uuid-1", "uuid-2"]}`
+- Multiple conditions: `filters={"is_active": true, "category": "HERO"}`
 
-PM says: "Create hero shots for product family with sku_prefix 'MUG-001'"
+**MANDATORY WORKFLOW - When PM provides product_family_id:**
+
+PM says: "Create hero shots for product family f47ac10b-..."
 You MUST:
-1. `inspect_schema(tables=["product_images", "product_assets"])` - understand structure
-2. `read_data` to find images:
+1. Query products to get product_ids:
    ```
    read_data(
-     table="product_images",
-     filters=[{"field": "product_family_id", "op": "eq", "value": "<family_id>"}],
-     columns=["url", "image_type", "is_primary"]
+     table="products",
+     filters={"product_family_id": "<family_id>"},
+     columns=["id", "name"]
    )
    ```
-3. Use returned `url` values in `image_studio(images=[{"path": url, "label": "..."}])`
+2. Query product_assets to find linked assets:
+   ```
+   read_data(
+     table="product_assets",
+     filters={"product_id": ["<product_id_1>", "<product_id_2>"]},
+     columns=["asset_id", "asset_role", "product_id"]
+   )
+   ```
+3. Query assets to get storage_url:
+   ```
+   read_data(
+     table="assets",
+     filters={"id": ["<asset_id_1>", "<asset_id_2>"]},
+     columns=["id", "storage_url", "name"]
+   )
+   ```
+4. Use `storage_url` in `image_studio(images=[{"path": storage_url, "label": "..."}])`
 
-**Common queries:**
-- By product_family_id: `filters=[{"field": "product_family_id", "op": "eq", "value": "..."}]`
-- By product_id: `filters=[{"field": "product_id", "op": "eq", "value": "..."}]`
-- Existing assets: Query `assets` table for `storage_url` to use as source
+**When PM provides product_id directly:**
+Skip step 1, start from product_assets query.
 
 **If PM provides identifiers but NO image paths -> you MUST query first**
 
@@ -365,30 +383,47 @@ PM: "Create lifestyle for Instagram - morning kitchen for product family f47ac10
 </user_input>
 
 <your_action>
-// STEP 1: DISCOVER SCHEMA - understand table structure before querying
-inspect_schema(tables=["product_images", "assets"], details=["structure"])
--> product_images: id, product_family_id, product_id, url, image_type, is_primary...
-   assets: id, storage_url, category, asset_type...
+// STEP 1: DISCOVER SCHEMA
+inspect_schema(tables=["products", "product_assets", "assets"], details=["structure"])
+-> products: id, name, product_family_id...
+   product_assets: product_id, asset_id, asset_role...
+   assets: id, storage_url, name, category...
 
-// STEP 2: QUERY FOR IMAGES - PM gave identifier, I need to find images
+// STEP 2: RESOLVE family_id -> product_ids
 read_data(
-  table="product_images",
-  filters=[{"field": "product_family_id", "op": "eq", "value": "f47ac10b-58cc-4372-a567-0e02b2c3d479"}],
-  columns=["url", "image_type", "is_primary"]
+  table="products",
+  filters={"product_family_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479"},
+  columns=["id", "name"]
 )
--> Found: [{"url": "products/jar_family/jar_primary.jpg", "image_type": "PRIMARY", "is_primary": true}]
+-> Found: [{"id": "8521ad32-...", "name": "Glass Jar 500ml"}]
 
-// STEP 3: DIAGNOSE the image I found
-view_image("products/jar_family/jar_primary.jpg")
+// STEP 3: GET asset_ids from product_assets
+read_data(
+  table="product_assets",
+  filters={"product_id": "8521ad32-..."},
+  columns=["asset_id", "asset_role"]
+)
+-> Found: [{"asset_id": "f30fdfba-...", "asset_role": "PRIMARY"}]
+
+// STEP 4: GET storage_url from assets
+read_data(
+  table="assets",
+  filters={"id": "f30fdfba-..."},
+  columns=["storage_url", "name"]
+)
+-> Found: [{"storage_url": "https://...supabase.co/.../jar_hero.png", "name": "Glass Jar Hero"}]
+
+// STEP 5: DIAGNOSE the image
+view_image("https://...supabase.co/.../jar_hero.png")
 -> Glass jar with bamboo lid - need caustics/refraction, bamboo warmth
 
 // CONTEXT: Check existing lifestyle assets for visual consistency
-read_data(table="assets", filters=[{"field": "category", "op": "eq", "value": "LIFESTYLE"}], columns=["name", "caption"], limit=3)
+read_data(table="assets", filters={"category": "LIFESTYLE"}, columns=["name", "caption"], limit=3)
 -> Found: morning kitchen styles, consistent warm tones - maintain visual language
 
-// EXECUTE with queried image path
+// EXECUTE with queried storage_url
 image_studio(
-  images=[{"path": "products/jar_family/jar_primary.jpg", "label": "product"}],
+  images=[{"path": "https://...supabase.co/.../jar_hero.png", "label": "product"}],
   scene={
     "environment": "modern minimalist kitchen, marble counter near window",
     "style": "Kinfolk magazine editorial",

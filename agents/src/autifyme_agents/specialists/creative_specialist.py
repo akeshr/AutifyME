@@ -47,8 +47,8 @@ CREATIVE_SPECIALIST_MODEL = "gemini-2.5-flash"
 # Tables accessible by Creative Specialist
 CREATIVE_READ_TABLES = [
     "assets",           # Read existing assets
-    "product_assets",   # Read product-asset links
-    "product_images",   # Read product image records
+    "product_assets",   # Read product-asset links (product_id -> asset_id)
+    "products",         # Read products to resolve family_id -> product_ids
 ]
 
 CREATIVE_WRITE_TABLES = [
@@ -100,8 +100,8 @@ def create_creative_specialist(
         "multi-product extraction with clean isolation, lifestyle shots with contextual scenes. "
         "IMAGE SOURCES (two options): "
         "(1) Include storage_path directly in task - specialist SEES images, OR "
-        "(2) Provide product_id/product_family_id - specialist queries product_images table for URLs. "
-        "Has read_data access to: product_images, product_assets, assets (can find images by product/family ID). "
+        "(2) Provide product_id or product_family_id - specialist queries to find asset URLs. "
+        "Has read_data access to: products (resolve family->products), product_assets (product->asset links), assets (get storage_url). "
         "Returns: processed images with storage_path (in pending/). "
         "Creates asset records via write_data (HITL approval required)."
     )
