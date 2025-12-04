@@ -53,9 +53,8 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
         return model
     return get_llm(
         provider="google",
-        model="gemini-2.5-pro",
-        temperature=0.7,
-        thinking_budget=128,  # Pro minimum; PM orchestrates, specialists reason
+        model="gemini-2.5-flash",
+        temperature=0.7,  # PM orchestrates, specialists reason
         max_retries=5,  # Increase resilience against blank responses
     )
 

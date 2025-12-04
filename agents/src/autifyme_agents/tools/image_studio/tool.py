@@ -146,7 +146,7 @@ def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatMod
         response_modalities=["TEXT", "IMAGE"],
         image_aspect_ratio=aspect_ratio,
         image_size=image_size,
-        temperature=1.0,
+        temperature=0.3,
     )
 
 
