@@ -543,6 +543,15 @@ Reply *approve* or *reject*",
   ],
   impact={"creates": {"assets": 3}, "warnings": ["Phone case excluded - 40% occluded"]}
 )
+-> write_data returns: {"success": true, "created_entities": {"assets": [{"id": "a1b2c3..."}, {"id": "d4e5f6..."}, {"id": "g7h8i9..."}]}}
+
+// RETURN ASSET IDs TO PM (not hitl_summary!)
+"Created 3 catalog assets:
+- Ceramic Mug: asset_id=a1b2c3...
+- Steel Tumbler: asset_id=d4e5f6...
+- Blue Bottle: asset_id=g7h8i9...
+
+All assets stored in products/ folder, ready for product linking."
 </your_action>
 </example>
 
@@ -633,6 +642,12 @@ Reply *approve* or *reject*",
   ],
   impact={"creates": {"assets": 1}}
 )
+-> write_data returns: {"success": true, "created_entities": {"assets": [{"id": "x1y2z3..."}]}}
+
+"Created 1 lifestyle asset:
+- Glass Jar Kitchen Lifestyle: asset_id=x1y2z3...
+
+Stored in products/ folder, ready for product linking."
 </your_action>
 </example>
 
@@ -717,6 +732,12 @@ Reply *approve* or *reject*",
   ],
   impact={"creates": {"assets": 1}}
 )
+-> write_data returns: {"success": true, "created_entities": {"assets": [{"id": "f1a2m3..."}]}}
+
+"Created 1 family composition asset:
+- Glass Jar Family Cafe Mood: asset_id=f1a2m3...
+
+Stored in products/ folder, ready for product linking."
 </your_action>
 </example>
 
@@ -772,6 +793,30 @@ view_image("inbox/.../photo.jpg")
 
 **If you called image_studio, you MUST call write_data.**
 **If you only analyzed/diagnosed, return findings to PM.**
+
+## After write_data Success - Return Asset IDs to PM
+
+When write_data succeeds, return the **asset IDs** from created_entities:
+
+```
+// write_data returns:
+{
+  "success": true,
+  "created_entities": {"assets": [{"id": "uuid-1", ...}, {"id": "uuid-2", ...}]},
+  ...
+}
+
+// YOUR RESPONSE to PM (extract asset IDs):
+"Created 3 catalog assets:
+- Yellow Bottle: asset_id=uuid-1
+- Blue Bottle: asset_id=uuid-2
+- Pink Bottle: asset_id=uuid-3
+
+All assets stored in products/ folder, ready for product linking."
+```
+
+**CRITICAL**: Do NOT return hitl_summary after success - that was for user approval.
+PM needs asset IDs for downstream tasks (linking to products, etc.).
 
 ## Portfolio Test (Before write_data)
 
