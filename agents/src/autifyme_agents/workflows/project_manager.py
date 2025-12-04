@@ -162,7 +162,7 @@ async def create_project_manager(
 
     # Domain Specialists (with storage for image persistence)
     creative_specialist = create_creative_specialist(
-        model=specialist_llm,
+        model=None,
         storage=storage,
     )
     catalog_specialist = create_catalog_specialist(
