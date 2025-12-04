@@ -213,32 +213,47 @@ ROOT CAUSE: CatalogingDept delegation didn't include image_url
 
 ## Phase 5: Fix It
 
-### Prompt Changes
+### CRITICAL: For Prompt Changes, Invoke prompt-engineering Skill First
 
-```python
-# Read current prompt
-from pathlib import Path
-prompt_path = Path("agents/src/autifyme_agents/prompts/specialists/catalog_specialist.prompt")
-print(prompt_path.read_text()[:1000])
-
-# Use Edit tool to fix
-# (You do this directly, no helper needed)
+```
+skill: prompt-engineering
 ```
 
-### Code Changes
+**Always invoke `prompt-engineering` skill before editing any prompt file.** This ensures:
+- Proper prompt structure (XML, right altitude, canonical examples)
+- Domain expert voice (not AI assistant voice)
+- Versioning alongside code
 
-```python
-# Find the delegation code
-# Use Grep/Read to locate
-# Use Edit to fix
+### Prompt Locations
+
+```
+agents/src/autifyme_agents/prompts/
+  |-- project_manager_intelligent.prompt   <- PM orchestrator
+  |-- approval_analyzer.prompt             <- HITL analyzer
+  |-- specialists/
+      |-- catalog_specialist.prompt        <- Cataloging specialist
+      |-- creative_specialist.prompt       <- Creative specialist
+```
+
+### Code Locations
+
+```
+agents/src/autifyme_agents/
+  |-- workflows/
+      |-- project_manager.py               <- PM implementation
+      |-- approval_analyzer.py             <- HITL implementation
+  |-- specialists/
+      |-- catalog_specialist.py            <- Cataloging implementation
+      |-- creative_specialist.py           <- Creative implementation
+  |-- tools/                               <- Tool definitions
 ```
 
 ### Tool Changes
 
 ```python
-# Find tool definition
-# Check schema, description
-# Edit to clarify
+# Find tool definition in agents/src/autifyme_agents/tools/
+# Check schema, description, examples
+# Use Edit to clarify
 ```
 
 ---
@@ -343,9 +358,38 @@ Before declaring "done":
 
 ---
 
+## Related Skills
+
+Invoke these when needed:
+
+| Skill | When to Use |
+|-------|-------------|
+| `prompt-engineering` | **ALWAYS** before editing any prompt file |
+| `tool-development` | When fixing/improving tool definitions |
+| `specialist-creation` | When adding new specialists |
+| `autonomous-testing` | When re-running scenarios to verify fixes |
+
+---
+
+## Project Context
+
+**Architecture**: 2-level hierarchy (PM -> Specialists -> Tools)
+- PM orchestrates, delegates to specialists
+- Specialists use tools to accomplish tasks
+- HITL middleware for human approval
+
+**LangSmith Project**: `autifyme-dev`
+
+**Key Workflows**:
+- Product cataloging (image -> extraction -> HITL -> save)
+- Campaign creation (brief -> creative -> HITL -> publish)
+
+---
+
 ## References
 
 - **Framework Design**: `docs/architecture/testing/WORKFLOW_EVALUATION_FRAMEWORK.md`
 - **Trace Analysis**: `tests/tools/trace_analysis.py`
 - **Prompts**: `agents/src/autifyme_agents/prompts/`
+- **Architecture**: `docs/architecture/core/AGENTS_DESIGN.md`
 - **LangSmith**: https://smith.langchain.com
