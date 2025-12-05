@@ -32,27 +32,35 @@ def _get_client() -> Client:
 # =============================================================================
 
 
-def show_tree(trace_id: str) -> None:
-    """Print hierarchical tree of trace execution.
+def show_tree(trace_id: str) -> dict[str, str]:
+    """Print hierarchical tree of trace execution with full context.
 
-    Shows who called whom, run types, and timing.
-    LLM calls marked with * (where reasoning happens).
+    Shows: run IDs, names, types, timing, tokens, models, tool args, errors.
+    Returns a lookup dict mapping short IDs to full IDs for drilling down.
 
     Args:
         trace_id: LangSmith trace ID
+
+    Returns:
+        Dict mapping 8-char short IDs to full UUIDs for use with show_llm_detail()
     """
     client = _get_client()
     runs = list(client.list_runs(trace_id=trace_id))
 
     if not runs:
         print(f"No runs found for trace: {trace_id}")
-        return
+        return {}
 
-    # Build lookup
+    # Build lookup for short ID -> full ID
+    id_lookup: dict[str, str] = {}
+    for r in runs:
+        short_id = str(r.id)[:8]
+        id_lookup[short_id] = str(r.id)
+
+    # Build parent-child relationships
     by_id = {str(r.id): r for r in runs}
     children: dict[str, list] = {str(r.id): [] for r in runs}
 
-    # Find root and build children lists
     root = None
     for r in runs:
         if r.parent_run_id:
@@ -64,42 +72,134 @@ def show_tree(trace_id: str) -> None:
 
     if not root:
         print("No root run found")
-        return
+        return id_lookup
 
     # Calculate totals
     total_cost = sum(r.total_cost or 0 for r in runs)
+    total_tokens = sum(r.total_tokens or 0 for r in runs)
+    llm_count = sum(1 for r in runs if r.run_type == "llm")
+    tool_count = sum(1 for r in runs if r.run_type == "tool")
     total_ms = 0
     if root.end_time and root.start_time:
         total_ms = int((root.end_time - root.start_time).total_seconds() * 1000)
 
-    print(f"\nTRACE: {trace_id[:12]}... | {root.status} | ${total_cost:.4f} | {total_ms/1000:.1f}s")
-    print("=" * 60)
+    # Header
+    print(f"\nTRACE: {trace_id}")
+    print(f"Status: {root.status} | Cost: ${total_cost:.4f} | Time: {total_ms/1000:.1f}s | Tokens: {total_tokens:,}")
+    print(f"LLM calls: {llm_count} | Tool calls: {tool_count} | Total nodes: {len(runs)}")
+    print("=" * 90)
+
+    def extract_model(run) -> str:
+        """Extract model name from LLM run."""
+        if not run.extra:
+            return ""
+        model = run.extra.get("invocation_params", {}).get("model", "")
+        if not model:
+            model = run.extra.get("model", "")
+        if not model:
+            return ""
+        # Clean up model names for readability
+        # "models/gemini-2.5-flash-preview-05-20" -> "gemini-2.5-flash"
+        model = model.replace("models/", "")
+        model = model.replace("-preview", "").replace("-latest", "")
+        # Remove date suffixes like "-05-20"
+        parts = model.split("-")
+        # Keep parts that aren't just digits
+        clean_parts = [p for p in parts if not (len(p) == 2 and p.isdigit())]
+        return "-".join(clean_parts)[:20]
+
+    def extract_tool_decision(run) -> str:
+        """Extract tool call decision from LLM output."""
+        if not run.outputs:
+            return ""
+        try:
+            generations = run.outputs.get("generations", [[]])
+            if generations and generations[0]:
+                gen = generations[0][0]
+                msg = gen.get("message", {})
+                tool_calls = msg.get("kwargs", {}).get("tool_calls", [])
+                if tool_calls:
+                    names = [tc.get("name", "?") for tc in tool_calls[:2]]
+                    return " -> " + ", ".join(names)
+        except Exception:
+            pass
+        return ""
+
+    def extract_tool_args(run) -> str:
+        """Extract key arguments from tool inputs."""
+        if not run.inputs:
+            return ""
+        try:
+            # Common delegation patterns
+            if "specialist" in run.inputs:
+                return f" -> {run.inputs['specialist']}"
+            if "department" in run.inputs:
+                return f" -> {run.inputs['department']}"
+            if "agent" in run.inputs:
+                return f" -> {run.inputs['agent']}"
+            if "action" in run.inputs:
+                return f" [{run.inputs['action']}]"
+            # For other tools, show first string arg
+            for k, v in run.inputs.items():
+                if isinstance(v, str) and len(v) < 30 and k not in ("input", "query"):
+                    return f" [{k}={v}]"
+        except Exception:
+            pass
+        return ""
 
     def print_node(run, indent=0):
         prefix = "  " * indent + ("+-- " if indent > 0 else "")
+        short_id = str(run.id)[:8]
 
-        # Calculate duration
+        # Duration
         duration = ""
         if run.end_time and run.start_time:
             ms = int((run.end_time - run.start_time).total_seconds() * 1000)
-            duration = f" [{ms/1000:.1f}s]"
+            duration = f"{ms/1000:.1f}s"
 
-        # Mark LLM calls
-        marker = " *" if run.run_type == "llm" else ""
+        # Status marker
+        status = ""
+        if run.status == "error":
+            status = " X"
+        elif run.run_type == "llm":
+            status = " *"
 
-        # Shorten name if needed
-        name = run.name[:40]
+        # Type-specific extras
+        extras = ""
+        if run.run_type == "llm":
+            model = extract_model(run)
+            tokens = f"{run.total_tokens:,}tok" if run.total_tokens else ""
+            decision = extract_tool_decision(run)
+            extras = f" | {model} | {tokens}{decision}" if model or tokens else ""
+        elif run.run_type == "tool":
+            extras = extract_tool_args(run)
 
-        print(f"{prefix}{name} ({run.run_type}){duration}{marker}")
+        # Build line
+        name = run.name[:30]
+        line = f"{prefix}[{short_id}] {name} ({run.run_type})"
+        if duration:
+            line += f" | {duration}"
+        line += extras
+        line += status
 
-        # Print children sorted by start time
+        print(line)
+
+        # Error details
+        if run.status == "error" and run.error:
+            error_snippet = run.error[:70].replace("\n", " ")
+            print(f"{'  ' * (indent + 1)}    ERROR: {error_snippet}...")
+
+        # Children
         child_runs = children.get(str(run.id), [])
         child_runs.sort(key=lambda x: x.start_time or datetime.min)
         for child in child_runs:
             print_node(child, indent + 1)
 
     print_node(root)
-    print("\n* = LLM calls (where reasoning happens)")
+    print("\nLegend: * = LLM | X = Error | -> = delegates/calls")
+    print("Usage: ids = show_tree('...'); show_llm_detail(ids['<short_id>'])")
+
+    return id_lookup
 
 
 # =============================================================================
