@@ -90,6 +90,23 @@ def create_[domain]_specialist(storage: StorageInterface) -> dict[str, Any]:
 
 ---
 
+## Specialist Description Pattern
+
+**PM routes based on description. For 50+ specialists, descriptions must be unambiguous.**
+
+**Structure:** `[Domain ownership]. [Key capabilities]. [What it returns to PM].`
+
+| Quality | Example | Problem |
+|---------|---------|---------|
+| Bad | "Handles images" | Too vague - PM can't distinguish specialists |
+| Bad | "Does product stuff" | Overlaps with multiple domains |
+| Good | "Owns visual asset creation. Has image_studio, view_image. Returns asset IDs and storage paths." | Clear domain, tools, output |
+| Good | "Owns entity relationships and hierarchy. Has read_data, write_data scoped to X tables. Returns structured operation results." | Specific scope |
+
+**Test:** If PM could confuse this specialist with another, the description is too vague.
+
+---
+
 ## Prompt File Structure
 
 Location: `agents/src/autifyme_agents/prompts/specialists/[domain]_specialist.prompt`
@@ -204,14 +221,57 @@ def create_project_manager(storage: StorageInterface):
 
 ---
 
+## Domain Coherence Assessment
+
+**Before creating a new specialist or extending an existing one, apply the Domain Coherence Principle.**
+
+### The Core Question
+
+> Does this responsibility share reasoning patterns with existing specialists, or does it require a different mental model?
+
+### Decision Framework
+
+| Question | If YES | If NO |
+|----------|--------|-------|
+| Does this share vocabulary with an existing specialist? | Consider extending | Create new specialist |
+| Do examples for this compose naturally with existing examples? | Extend existing | Create new (permutation explosion) |
+| Would a domain expert naturally handle both? | Keep together | Split by expertise boundary |
+| Does adding this create O(2^n) example complexity? | Split out | Safe to extend |
+
+### Signs You Need a NEW Specialist
+
+- **Different mental model:** Assembly thinking vs. taxonomy thinking vs. analytics thinking
+- **Different vocabulary:** Components/quantities vs. entities/relationships vs. metrics/trends
+- **Example permutations explode:** Adding responsibility D to A,B,C requires A+D, B+D, C+D examples
+- **Distinct expertise:** Different human experts would handle each domain
+
+### Signs You Should EXTEND an Existing Specialist
+
+- **Shared reasoning:** Both responsibilities answer the same fundamental question
+- **Examples reinforce:** Examples for A naturally illustrate patterns useful for B
+- **Natural workflow:** User flows through A -> B -> C without context switching
+
+### The Permutation Test
+
+If adding responsibility D to a specialist with A, B, C:
+- Will you need examples for A+D, B+D, C+D combinations?
+- Will the prompt grow by O(n) or O(2^n)?
+
+**O(n) growth = safe to extend.** Examples add linearly, concepts reinforce.
+**O(2^n) growth = split required.** Each combination needs its own example.
+
+---
+
 ## Design Checklist
 
 Before implementing:
 
+- [ ] **Domain coherence:** Does this pass the Domain Coherence Assessment above?
 - [ ] **Domain clarity:** What single domain does this specialist own?
 - [ ] **Reusability:** Will multiple workflows use this specialist?
 - [ ] **Tool scoping:** What tables/APIs does it need? Minimum necessary.
 - [ ] **HITL boundary:** Does it write/modify data? External actions?
+- [ ] **Example complexity:** Will examples grow O(n) or O(2^n)?
 
 Implementation:
 
@@ -223,10 +283,8 @@ Implementation:
 
 ---
 
-## Reference Implementations
+## Reference
 
-- **Cataloging:** `specialists/cataloging_specialist.py` - Image analysis + read-only
-- **Market Intelligence:** `specialists/market_intelligence_specialist.py` - Analytics + web search
-- **Content SEO:** `specialists/content_seo_specialist.py` - Content generation
-
-Prompts: `agents/src/autifyme_agents/prompts/specialists/`
+- **Specialists:** `agents/src/autifyme_agents/specialists/`
+- **Prompts:** `agents/src/autifyme_agents/prompts/specialists/`
+- **Prompt Engineering:** See `prompt-engineering` skill for prompt structure

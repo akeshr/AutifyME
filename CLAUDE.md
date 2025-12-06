@@ -13,6 +13,22 @@ Project-specific guidance for AutifyME codebase. Communication style is defined 
 - PM composes specialists dynamically based on workflow needs
 - Ask before building: "Which domains/workflows will reuse this specialist?"
 
+### **[CRITICAL] Agent Granularity Principle: Domain Coherence**
+
+**The right agent size is determined by domain coherence, not arbitrary count.**
+
+| Keep Together | Split Apart |
+|---------------|-------------|
+| Shared vocabulary/reasoning patterns | Different mental models |
+| Examples for A help illustrate B | O(2^n) example permutations |
+| Human expert would naturally do both | Distinct expertise domains |
+
+**Key Insight:** 50+ agents in catalog is fine - only 10-15 active per workflow. PM routing is O(1) lookup.
+
+**Test:** If adding responsibility D requires examples for A+D, B+D, C+D combinations, split by domain boundary.
+
+**Full framework:** See `specialist-creation` skill for Domain Coherence Assessment.
+
 ### **[CRITICAL] Intelligence-First Design Principle**
 Modern LLMs are highly capable: massive context windows (200K+ tokens), strong reasoning, autonomous problem-solving. This fundamentally shapes our architecture:
 
