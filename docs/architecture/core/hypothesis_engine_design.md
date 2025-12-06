@@ -1,21 +1,18 @@
-# Hypothesis Engine: Intent Detection from Minimal Input
+# Hypothesis Engine: Research-First Intent Detection
 
-**Status**: Design Proposal
+**Status**: Design Proposal (Refinement Phase)
 **Date**: 2025-12-06
-**Author**: Jarvis + Human Architect
+**Authors**: Jarvis + Human Architect
 
 ---
 
 ## Executive Summary
 
-The Hypothesis Engine is a pre-reasoning layer that transforms minimal user input (single image, vague message) into ranked intent hypotheses with confidence scores. Instead of asking clarifying questions, the system demonstrates intelligence by:
+The Hypothesis Engine transforms minimal user input (single image, vague message) into evidence-backed intent hypotheses. Unlike inference-only approaches, this architecture performs **actual research** before presenting options.
 
-1. **Observing** - Extracting rich features from limited input
-2. **Inferring** - Generating plausible intent hypotheses
-3. **Researching** - Gathering context to rank hypotheses
-4. **Suggesting** - Presenting options that show understanding
+**Core Philosophy**: Intelligence demonstrated through research, not interrogation.
 
-**Core Philosophy**: Intelligence is demonstrated through inference, not interrogation.
+**Key Architectural Decision**: PM handles user context (has conversation history), domain researchers handle domain-specific knowledge, PM synthesizes both into hypotheses.
 
 ---
 
@@ -25,22 +22,34 @@ The Hypothesis Engine is a pre-reasoning layer that transforms minimal user inpu
 
 ```
 User: [sends single product image]
-Current PM: "What would you like to do with this image?"
+PM: "What would you like to do with this image?"
 ```
 
-The system has information (image features, user history, business context) but doesn't use it proactively.
+PM has access to rich context but doesn't leverage it proactively.
 
 ### Desired Behavior
 
 ```
 User: [sends single product image]
-Hypothesis Engine: Extracts features, generates hypotheses, researches context
-PM Response: "I see a vintage brass door handle, Art Deco style, ~1930s.
 
-Based on your recent activity (3 antique hardware listings this week):
-1. **Catalog for sale** - Similar handles in your catalog: Rs 450-650 range
-2. **Get appraisal** - I can pull auction records for valuation
-3. **Add to existing family** - Matches your 'Vintage Hardware' collection
+[Research Phase - parallel, ~300ms]:
+- visual_researcher: "Brass door handle, Art Deco, 1930s, good condition"
+- catalog_researcher: "3 similar in 'Vintage Hardware' at Rs 450-650"
+- PM (user context): "User cataloged 2 handles this week"
+
+[Synthesis Phase]:
+PM combines findings into evidence-backed hypotheses
+
+[Response]:
+"Brass door handle, Art Deco style (~1930s), good condition with natural patina.
+
+Your catalog has 3 similar handles at Rs 450-650. You've added 2 handles this week.
+
+Recommendation: Add at Rs 550 (matches your pattern)
+
+Or:
+- Get detailed appraisal
+- Different approach
 
 Which direction?"
 ```
@@ -50,482 +59,475 @@ Which direction?"
 ## Architecture Overview
 
 ```
-                    +-------------------+
-                    |   User Input      |
-                    | (image/text/both) |
-                    +--------+----------+
-                             |
-                             v
-+----------------+   +-------+--------+   +------------------+
-| Feature        |   | Hypothesis     |   | Context          |
-| Extractor      |-->| Generator      |<--| Aggregator       |
-| (Multi-Modal)  |   | (LLM-based)    |   | (User + Business)|
-+----------------+   +-------+--------+   +------------------+
-                             |
-                             v
-                    +--------+----------+
-                    | Hypothesis        |
-                    | Ranker            |
-                    | (Evidence-based)  |
-                    +--------+----------+
-                             |
-                             v
-                    +--------+----------+
-                    | Response          |
-                    | Formatter         |
-                    | (Confidence-aware)|
-                    +--------+----------+
-                             |
-                             v
-                    +--------+----------+
-                    |   PM Orchestrator |
-                    | (Enriched Input)  |
-                    +-------------------+
+User: [minimal input]
+         |
+         v
++--------+--------+
+|       PM        |  <-- Has full conversation history
++--------+--------+
+         |
+   [1] PM analyzes user context (no delegation needed)
+         |
+   [2] PM determines relevant domains (lightweight routing)
+         |
+         +---> visual_researcher (if image present)
+         |           |
+         +---> catalog_researcher (if product-related)
+         |           |
+         +---> marketing_researcher (if campaign-related)
+         |           |
+         +---> [other domain researchers as relevant]
+         |
+         v (PARALLEL - DeepAgents supports this)
++--------+---------+
+| Domain Findings  |
+| (Structured)     |
++--------+---------+
+         |
+   [3] PM synthesizes: User Context + Domain Findings --> Hypotheses
+         |
+         v
++--------+---------+
+| Evidence-Backed  |
+| Options          |
++------------------+
+         |
+         v
+   User selects option
+         |
+         v
+   [4] PM delegates to EXECUTION specialist
+         |
+         +---> creative_specialist (image work)
+         +---> catalog_specialist (product work)
+         +---> [other execution specialists]
 ```
 
 ---
 
-## Component Design
+## Core Design Principles
 
-### 1. Feature Extractor (Multi-Modal)
+### 1. PM Handles User Context
 
-Extracts structured signals from raw input in parallel.
+PM has what no specialist has:
+- **Full conversation history** across sessions
+- **Cross-domain visibility** of all specialists
+- **Orchestration intelligence** for routing
 
-#### Visual Feature Extraction
+**Therefore**: PM analyzes user context directly. No delegation needed for user research.
+
+### 2. Domain Research Delegated to Specialists
+
+Domain-specific knowledge requires domain expertise:
+- Catalog pricing patterns need catalog knowledge
+- Marketing campaign context needs marketing knowledge
+- Visual analysis needs creative expertise
+
+**Therefore**: Domain researchers handle domain-specific research in parallel.
+
+### 3. Not All Domains Every Time
+
+With 10-15 domains at scale, querying all researchers for every message is wasteful.
+
+**Therefore**: PM uses lightweight routing to determine relevant domains.
+
+### 4. Research vs. Execution Separation
+
+| Type | Purpose | Speed | Mutations |
+|------|---------|-------|-----------|
+| **Researchers** | Gather evidence, return findings | Fast (<300ms) | None (read-only) |
+| **Executors** | Perform actions, create/update | Careful | Yes (with HITL) |
+
+---
+
+## Specialist Design
+
+### Research Specialists (NEW)
+
+Lightweight, fast, read-only. Return structured findings, not hypotheses.
+
+| Researcher | Domain | Read Access | Purpose |
+|------------|--------|-------------|---------|
+| `visual_researcher` | Images | view_image | Object, material, style, condition analysis |
+| `catalog_researcher` | Products | products, families, pricing, assets | Similar items, pricing patterns |
+| `marketing_researcher` | Campaigns | campaigns, posts, templates | Active campaigns, brand alignment |
+| `finance_researcher` | Billing | invoices, expenses | Outstanding items, patterns |
+| `hr_researcher` | People | employees, contracts | Team context, availability |
+| `inventory_researcher` | Stock | inventory, batches, suppliers | Stock levels, reorder needs |
+| `customer_researcher` | CRM | customers, leads, tickets | Customer context, history |
+
+### Execution Specialists (EXISTING + FUTURE)
+
+Domain experts that create, update, mutate. Slower, more careful, HITL-gated.
+
+| Executor | Domain | Write Access | Purpose |
+|----------|--------|--------------|---------|
+| `creative_specialist` | Assets | assets, image_studio | Create/edit images |
+| `catalog_specialist` | Products | products, families, pricing | Manage catalog |
+| `marketing_specialist` | Campaigns | campaigns, posts | Run campaigns |
+| `finance_specialist` | Billing | invoices, expenses | Handle finances |
+| `hr_specialist` | People | employees, contracts | Manage HR |
+| `inventory_specialist` | Stock | inventory, batches | Manage stock |
+
+### Researcher Prompt Pattern
+
+```xml
+<role>
+You are a {domain} research specialist. Your ONLY job is to gather relevant information.
+</role>
+
+<responsibilities>
+## You Do
+- Query relevant tables for the given context
+- Identify patterns and anomalies in the data
+- Return factual observations with confidence scores
+
+## You Do NOT
+- Make decisions or recommendations
+- Generate hypotheses about user intent
+- Suggest actions to take
+- Mutate any data (read-only access)
+</responsibilities>
+
+<output>
+Return {Domain}Findings schema with:
+- relevant_items: What you found
+- patterns: Notable patterns observed
+- anomalies: Anything unusual
+- confidence: How complete/reliable is this picture (0.0-1.0)
+</output>
+```
+
+---
+
+## Findings Schemas
+
+### Visual Findings
 
 ```python
-class VisualFeatures(BaseModel):
-    """Structured features extracted from image."""
+class VisualFindings(BaseModel):
+    """Structured output from visual_researcher."""
 
-    # Object Detection
-    primary_object: str  # "brass door handle"
+    # Object identification
+    primary_object: str  # "door handle"
     secondary_objects: list[str]  # ["mounting plate", "screws"]
-    object_count: int  # 1
+    object_count: int
 
-    # Material Analysis
+    # Material analysis
     materials: list[str]  # ["brass", "metal"]
-    material_confidence: float  # 0.85
+    material_confidence: float
 
-    # Style/Era Detection
+    # Style/Era detection
     style_period: str | None  # "Art Deco"
     estimated_era: str | None  # "1920s-1940s"
-    style_confidence: float  # 0.7
 
-    # Condition Assessment
+    # Condition assessment
     condition: str  # "good", "fair", "excellent"
     condition_notes: list[str]  # ["patina present", "minor wear"]
 
-    # Technical Details
+    # Technical details
     estimated_dimensions: str | None  # "~15cm length"
-    color_palette: list[str]  # ["gold", "brown", "oxidized"]
+    color_palette: list[str]  # ["gold", "brown"]
 
-    # Visual Quality
-    image_quality: str  # "high", "medium", "low"
-    lighting_quality: str  # "good", "poor"
-    background_type: str  # "plain", "contextual", "cluttered"
+    # Notable features
+    notable_features: list[str]  # ["hand-forged", "original finish"]
+
+    # Confidence
+    confidence: float  # Overall confidence in analysis
 ```
 
-#### Text Feature Extraction
+### Catalog Findings
 
 ```python
-class TextFeatures(BaseModel):
-    """Structured features extracted from text."""
+class SimilarItem(BaseModel):
+    """Similar item found in catalog."""
+    sku: str
+    name: str
+    family: str
+    price: float
+    similarity_score: float
 
-    # Intent Signals
-    action_verbs: list[str]  # ["catalog", "add", "price"]
-    question_type: str | None  # "how_much", "what_is", "can_you"
-    urgency_level: str  # "normal", "urgent", "casual"
 
-    # Entity Extraction
-    mentioned_prices: list[str]  # ["Rs 450"]
-    mentioned_quantities: list[int]  # [5]
-    mentioned_products: list[str]  # ["door handle"]
-    mentioned_categories: list[str]  # ["hardware"]
+class PricingPattern(BaseModel):
+    """Pricing patterns observed."""
+    min_price: float
+    max_price: float
+    avg_price: float
+    price_trend: str  # "stable", "increasing", "decreasing"
 
-    # Sentiment/Tone
-    sentiment: str  # "neutral", "positive", "frustrated"
-    formality: str  # "casual", "formal"
 
-    # Completeness
-    has_explicit_intent: bool  # False for "help with this"
-    missing_info: list[str]  # ["price", "quantity", "category"]
+class CatalogFindings(BaseModel):
+    """Structured output from catalog_researcher."""
+
+    # Similar items
+    similar_items: list[SimilarItem]
+
+    # Pricing analysis
+    pricing_patterns: PricingPattern
+
+    # Categorization
+    relevant_families: list[str]
+    suggested_category: str | None
+
+    # Gaps/opportunities
+    gaps_identified: list[str]  # "No blue variant exists"
+
+    # Confidence
+    confidence: float
 ```
 
-#### Implementation Strategy
-
-**Option A: Dedicated Vision Model (Fast, Limited)**
-- Use lightweight vision model (e.g., CLIP, ViT) for object/material detection
-- Pros: Fast (<100ms), consistent
-- Cons: Limited to trained categories
-
-**Option B: LLM Vision (Flexible, Slower)**
-- Use multi-modal LLM (GPT-4V, Gemini) with structured output
-- Pros: Flexible, understands context
-- Cons: Slower (~500ms), more expensive
-
-**Recommendation: Hybrid Approach**
-- Fast classifier for common categories (product types, materials)
-- LLM fallback for unusual/complex images
-- Parallel execution - use whichever returns first with confidence > threshold
+### Marketing Findings
 
 ```python
-async def extract_visual_features(image: bytes) -> VisualFeatures:
-    """Extract visual features using hybrid approach."""
+class CampaignSummary(BaseModel):
+    """Active campaign summary."""
+    id: str
+    name: str
+    status: str
+    channels: list[str]
+    relevance_score: float
 
-    # Launch both in parallel
-    classifier_task = asyncio.create_task(fast_classifier(image))
-    llm_task = asyncio.create_task(llm_vision_analysis(image))
 
-    # Use fast classifier if confident
-    classifier_result = await classifier_task
-    if classifier_result.confidence > 0.8:
-        llm_task.cancel()
-        return classifier_result
+class MarketingFindings(BaseModel):
+    """Structured output from marketing_researcher."""
 
-    # Fall back to LLM for complex cases
-    return await llm_task
+    # Active campaigns
+    active_campaigns: list[CampaignSummary]
+
+    # Templates
+    relevant_templates: list[str]
+
+    # Brand context
+    brand_alignment_notes: list[str]
+
+    # Channel recommendations
+    suggested_channels: list[str]
+
+    # Confidence
+    confidence: float
+```
+
+### Generic Pattern for Other Domains
+
+```python
+class DomainFindings(BaseModel):
+    """Generic findings pattern for any domain."""
+
+    # What was found
+    relevant_items: list[dict]
+
+    # Patterns observed
+    patterns: list[str]
+
+    # Anomalies/concerns
+    anomalies: list[str]
+
+    # Domain-specific context
+    context_notes: list[str]
+
+    # Confidence
+    confidence: float
 ```
 
 ---
 
-### 2. Context Aggregator
+## PM Routing Logic
 
-Gathers all available context to inform hypothesis generation.
+PM determines which researchers to spawn based on input signals and user context.
 
-#### Context Sources
-
-```python
-class AggregatedContext(BaseModel):
-    """All available context for hypothesis generation."""
-
-    # Business Context (from PMBaseContext)
-    company_profile: CompanyProfile
-    catalog_summary: CatalogSummary
-    taxonomy_tree: TaxonomyTree
-
-    # User Context (NEW - needs implementation)
-    user_profile: UserProfile | None
-    recent_interactions: list[InteractionSummary]
-    user_patterns: UserPatterns | None
-
-    # Conversation Context
-    conversation_history: list[MessageSummary]
-    pending_workflows: list[str]
-
-    # Temporal Context
-    time_of_day: str  # "morning", "afternoon", "evening"
-    day_of_week: str
-    is_business_hours: bool
-
-    # Platform Context
-    platform: str  # "whatsapp"
-    message_type: str  # "text", "image", "voice"
-```
-
-#### User Profile & Patterns (New Schema)
+### Routing Heuristics
 
 ```python
-class UserProfile(BaseModel):
-    """User-specific context learned over time."""
+def determine_relevant_researchers(
+    input: UserInput,
+    user_context: UserContext,
+) -> list[str]:
+    """PM determines which domain researchers are relevant."""
 
-    user_id: str
-    first_interaction: datetime
-    total_interactions: int
+    researchers = []
 
-    # Preferences (learned)
-    preferred_response_style: str  # "detailed", "brief"
-    preferred_categories: list[str]  # ["hardware", "furniture"]
-    typical_price_range: tuple[float, float] | None
+    # Visual input --> always need visual research
+    if input.has_image:
+        researchers.append("visual_researcher")
 
-    # Behavioral Patterns
-    typical_request_types: list[str]  # ["catalog", "pricing"]
-    avg_images_per_session: float
-    approval_rate: float  # How often they approve vs reject
+    # Product signals
+    if any([
+        input.mentions_terms(["catalog", "product", "SKU", "price", "add"]),
+        input.has_image,  # Images often product-related
+        user_context.recent_domain == "catalog",
+    ]):
+        researchers.append("catalog_researcher")
 
-    # Communication Style
-    uses_voice_notes: bool
-    typical_message_length: str  # "brief", "detailed"
-    language_preference: str  # "en", "hi", "mixed"
+    # Marketing signals
+    if any([
+        input.mentions_terms(["campaign", "post", "social", "marketing"]),
+        user_context.recent_domain == "marketing",
+    ]):
+        researchers.append("marketing_researcher")
 
+    # Finance signals
+    if any([
+        input.mentions_terms(["invoice", "payment", "bill", "expense"]),
+        input.has_invoice_image,
+    ]):
+        researchers.append("finance_researcher")
 
-class UserPatterns(BaseModel):
-    """Patterns detected from user history."""
+    # HR signals
+    if any([
+        input.mentions_terms(["employee", "hire", "payroll", "leave"]),
+    ]):
+        researchers.append("hr_researcher")
 
-    # Recent Activity
-    recent_categories: list[str]  # Last 7 days
-    recent_actions: list[str]  # ["cataloged", "priced", "exported"]
+    # Inventory signals
+    if any([
+        input.mentions_terms(["stock", "inventory", "reorder", "warehouse"]),
+    ]):
+        researchers.append("inventory_researcher")
 
-    # Sequence Patterns
-    common_workflows: list[str]  # ["image -> catalog -> price"]
-    time_between_actions: float  # avg minutes
+    # Customer/CRM signals
+    if any([
+        input.mentions_terms(["customer", "lead", "ticket", "support"]),
+    ]):
+        researchers.append("customer_researcher")
 
-    # Interaction Patterns
-    correction_rate: float  # How often they correct system
-    common_corrections: list[str]  # ["wrong category", "wrong price"]
+    # Fallback: If truly ambiguous, use user's most common domain
+    if not researchers:
+        primary = user_context.primary_domain
+        if primary:
+            researchers.append(f"{primary}_researcher")
+
+    return researchers
 ```
 
-#### Context Loading Strategy
+### Routing Decision Matrix
 
-```python
-async def aggregate_context(
-    user_id: str,
-    thread_id: str,
-    company_id: str,
-) -> AggregatedContext:
-    """Load all context in parallel."""
+| Input Signal | Researchers Spawned |
+|--------------|---------------------|
+| Product image | visual, catalog |
+| Product image + price mention | visual, catalog |
+| "Help with prices" | catalog (+ finance if billing context) |
+| Invoice image | visual, finance |
+| "Update campaign" | marketing |
+| "Stock running low" | inventory, procurement |
+| "New employee" | hr |
+| Vague "help me" | Based on user's primary domain |
 
-    # Parallel loading - all independent
-    business_ctx, user_ctx, conv_ctx = await asyncio.gather(
-        load_business_context(company_id),  # ~50ms (cached)
-        load_user_context(user_id),          # ~100ms (DB query)
-        load_conversation_context(thread_id), # ~50ms (checkpointer)
-    )
-
-    return AggregatedContext(
-        **business_ctx,
-        **user_ctx,
-        **conv_ctx,
-        time_of_day=get_time_of_day(),
-        platform="whatsapp",
-    )
-```
+**Key**: This routing is LIGHTWEIGHT - keyword matching + user context. Not a full LLM call.
 
 ---
 
-### 3. Hypothesis Generator
+## PM Synthesis: Findings to Hypotheses
 
-Generates ranked intent hypotheses from features + context.
-
-#### Hypothesis Schema
+### Hypothesis Schema
 
 ```python
 class IntentHypothesis(BaseModel):
     """Single intent hypothesis with evidence."""
 
     # Core
-    intent_type: str  # "catalog_product", "get_appraisal", "ask_question"
+    intent_type: str  # "catalog_product", "get_appraisal"
     intent_description: str  # Human-readable description
 
     # Confidence
     confidence: float  # 0.0 to 1.0
-    confidence_reasoning: str  # Why this confidence level
+    confidence_reasoning: str
 
     # Evidence
-    supporting_evidence: list[str]  # ["user cataloged 3 similar items this week"]
-    contradicting_evidence: list[str]  # ["no price mentioned"]
+    supporting_evidence: list[str]
+    contradicting_evidence: list[str]
 
     # Action
     suggested_specialist: str | None  # "catalog_specialist"
-    suggested_action: str  # "Extract and catalog with pricing research"
+    suggested_action: str
 
-    # Follow-up (if needed)
-    clarification_needed: list[str]  # ["price", "quantity"]
+    # Clarification (if needed)
+    clarification_needed: list[str]
     clarification_priority: str  # "optional", "recommended", "required"
 
 
 class HypothesisSet(BaseModel):
-    """Ranked set of hypotheses."""
+    """Ranked set of hypotheses from PM synthesis."""
 
     hypotheses: list[IntentHypothesis]  # Sorted by confidence
 
-    # Meta
-    total_confidence: float  # Sum of all confidences (should be ~1.0)
-    dominant_hypothesis: bool  # True if top hypothesis >> others
+    # Key observations (what system noticed)
+    key_observations: list[str]
+
+    # Ambiguity assessment
     ambiguity_level: str  # "low", "medium", "high"
+    dominant_hypothesis: bool  # True if top >> others
 
-    # Observations (what system noticed)
-    key_observations: list[str]  # ["vintage brass handle", "Art Deco style"]
-
-    # Generation metadata
-    features_used: list[str]  # ["visual", "text", "user_history"]
-    generation_time_ms: int
+    # Response strategy
+    response_strategy: ResponseStrategy
 ```
 
-#### Generation Strategy
-
-**Approach: LLM with Structured Output**
-
-The hypothesis generation is fundamentally a reasoning task - perfect for LLM.
+### Synthesis Process
 
 ```python
-HYPOTHESIS_GENERATION_PROMPT = """
-You are an intent detection specialist. Given minimal user input, generate
-ranked hypotheses about what the user likely wants.
-
-## Input Features
-{features}
-
-## Available Context
-{context}
-
-## Your Task
-1. Analyze all available signals (visual, text, history, business)
-2. Generate 3-5 plausible intent hypotheses
-3. Rank by confidence based on evidence
-4. For each hypothesis, explain supporting/contradicting evidence
-5. Suggest what specialist/action would handle each intent
-
-## Confidence Calibration Guidelines
-- 85%+: Strong evidence from multiple sources (history + explicit signals)
-- 60-85%: Good evidence from one source (clear visual OR explicit text)
-- 30-60%: Reasonable inference with limited evidence
-- <30%: Speculation - should ask before proceeding
-
-## Output Format
-Return structured HypothesisSet following the schema.
-"""
-
-async def generate_hypotheses(
-    features: CombinedFeatures,
-    context: AggregatedContext,
+async def synthesize_hypotheses(
+    user_input: UserInput,
+    user_context: UserContext,  # PM's own analysis from history
+    domain_findings: dict[str, Findings],  # From researchers
 ) -> HypothesisSet:
-    """Generate intent hypotheses using LLM reasoning."""
+    """PM synthesizes all evidence into ranked hypotheses."""
 
-    llm = get_hypothesis_llm()  # Fast model (Gemini Flash, GPT-4o-mini)
-
-    response = await llm.with_structured_output(HypothesisSet).ainvoke(
-        HYPOTHESIS_GENERATION_PROMPT.format(
-            features=features.model_dump_json(),
-            context=context.model_dump_json(),
-        )
+    # Build unified evidence picture
+    evidence = UnifiedEvidence(
+        user_signals=user_context.extract_signals(),
+        conversation_context=user_context.recent_topics,
+        visual=domain_findings.get("visual"),
+        catalog=domain_findings.get("catalog"),
+        marketing=domain_findings.get("marketing"),
+        finance=domain_findings.get("finance"),
+        # ... other domains
     )
 
-    return response
-```
+    # Generate hypotheses (PM reasoning with evidence)
+    hypotheses = await pm_generate_hypotheses(evidence)
 
-#### Hypothesis Templates (Domain-Specific)
+    # Rank by evidence strength
+    ranked = rank_by_evidence(hypotheses)
 
-Pre-defined hypothesis templates for common AutifyME intents:
+    # Determine response strategy
+    strategy = determine_response_strategy(ranked)
 
-```python
-INTENT_TEMPLATES = {
-    "catalog_product": {
-        "triggers": ["image with product", "text mentions 'add'/'catalog'"],
-        "specialist": "catalog_specialist",
-        "typical_workflow": "extract -> catalog -> price",
-    },
-    "get_pricing": {
-        "triggers": ["mentions price/cost/rate", "existing product reference"],
-        "specialist": "catalog_specialist",
-        "typical_workflow": "lookup -> compare -> suggest",
-    },
-    "image_editing": {
-        "triggers": ["mentions edit/enhance/background", "image quality issues"],
-        "specialist": "creative_specialist",
-        "typical_workflow": "analyze -> enhance -> preview",
-    },
-    "bulk_operation": {
-        "triggers": ["mentions 'all'/'bulk'/'batch'", "multiple items visible"],
-        "specialist": "catalog_specialist",
-        "typical_workflow": "scope -> preview -> execute",
-    },
-    "information_query": {
-        "triggers": ["question words", "no actionable intent"],
-        "specialist": None,  # PM handles directly
-        "typical_workflow": "lookup -> respond",
-    },
-    "appraisal": {
-        "triggers": ["vintage/antique items", "value/worth mentions"],
-        "specialist": "catalog_specialist",
-        "typical_workflow": "research -> compare -> estimate",
-    },
-}
+    return HypothesisSet(
+        hypotheses=ranked,
+        key_observations=extract_observations(evidence),
+        ambiguity_level=assess_ambiguity(ranked),
+        dominant_hypothesis=ranked[0].confidence > 0.7,
+        response_strategy=strategy,
+    )
 ```
 
 ---
 
-### 4. Hypothesis Ranker
+## Response Strategy
 
-Refines confidence scores using evidence and business rules.
-
-#### Ranking Factors
-
-```python
-class RankingFactors(BaseModel):
-    """Factors that influence hypothesis ranking."""
-
-    # Evidence Strength
-    visual_evidence_score: float  # How clearly image supports this intent
-    text_evidence_score: float  # How clearly text supports this intent
-    history_evidence_score: float  # How consistent with user patterns
-
-    # Business Alignment
-    business_relevance: float  # How relevant to company's catalog
-    specialist_availability: float  # Is required specialist available
-
-    # Practical Factors
-    action_complexity: float  # Simpler actions rank higher when uncertain
-    clarification_cost: float  # How disruptive would asking be
-
-    # Learned Adjustments (Phase 2)
-    historical_accuracy: float  # How accurate this intent type has been
-    user_preference_alignment: float  # Does user typically want this
-
-
-def rank_hypotheses(
-    hypotheses: list[IntentHypothesis],
-    factors: RankingFactors,
-) -> list[IntentHypothesis]:
-    """Re-rank hypotheses using evidence and business factors."""
-
-    for h in hypotheses:
-        # Compute composite score
-        h.confidence = compute_composite_score(h, factors)
-
-    # Sort by confidence descending
-    return sorted(hypotheses, key=lambda h: h.confidence, reverse=True)
-```
-
-#### Confidence Calibration Rules
-
-```python
-CONFIDENCE_RULES = {
-    # Boost conditions
-    "user_did_this_recently": +0.15,  # User cataloged similar item this week
-    "explicit_action_word": +0.20,    # User said "catalog", "add", "price"
-    "matches_company_catalog": +0.10, # Product type exists in catalog
-    "high_image_quality": +0.05,      # Clear, well-lit image
-
-    # Penalty conditions
-    "contradicts_recent_action": -0.15,  # User just did opposite
-    "unusual_for_user": -0.10,           # User never does this
-    "missing_critical_info": -0.20,      # Can't proceed without asking
-    "ambiguous_image": -0.10,            # Multiple interpretations possible
-}
-```
-
----
-
-### 5. Response Formatter
-
-Transforms hypotheses into user-facing response with appropriate confidence handling.
-
-#### Response Strategies by Confidence
+### Confidence-Based Strategies
 
 ```python
 class ResponseStrategy(Enum):
     """How to respond based on confidence distribution."""
 
-    DIRECT_ACTION = "direct"      # >85% confidence - proceed with explanation
-    LEAD_WITH_TOP = "lead"        # 60-85% - present top option, mention alternatives
-    PRESENT_OPTIONS = "options"   # 30-60% - equal presentation of top 2-3
-    OBSERVE_AND_ASK = "observe"   # <30% - show observations, ask for direction
+    DIRECT_ACTION = "direct"      # >85% - proceed with explanation
+    LEAD_WITH_TOP = "lead"        # 60-85% - present top, mention alternatives
+    PRESENT_OPTIONS = "options"   # 30-60% - show 2-3 options equally
+    OBSERVE_AND_ASK = "observe"   # <30% - show observations, ask direction
 
 
-def determine_strategy(hypotheses: HypothesisSet) -> ResponseStrategy:
-    """Determine response strategy based on confidence distribution."""
+def determine_response_strategy(hypotheses: list[IntentHypothesis]) -> ResponseStrategy:
+    """Determine strategy based on confidence distribution."""
 
-    top = hypotheses.hypotheses[0]
+    if not hypotheses:
+        return ResponseStrategy.OBSERVE_AND_ASK
+
+    top = hypotheses[0]
 
     if top.confidence > 0.85:
         return ResponseStrategy.DIRECT_ACTION
 
     if top.confidence > 0.60:
-        # Check if there's a clear winner
-        if len(hypotheses.hypotheses) > 1:
-            gap = top.confidence - hypotheses.hypotheses[1].confidence
-            if gap > 0.25:
-                return ResponseStrategy.LEAD_WITH_TOP
         return ResponseStrategy.LEAD_WITH_TOP
 
     if top.confidence > 0.30:
@@ -534,484 +536,237 @@ def determine_strategy(hypotheses: HypothesisSet) -> ResponseStrategy:
     return ResponseStrategy.OBSERVE_AND_ASK
 ```
 
-#### Response Templates
+### Response Templates
 
-```python
-RESPONSE_TEMPLATES = {
-    ResponseStrategy.DIRECT_ACTION: """
+**DIRECT_ACTION (>85% confidence)**
+```
 {observations}
 
 {action_statement}
 
 {details}
 
-{confirmation_prompt}
-""",
-
-    ResponseStrategy.LEAD_WITH_TOP: """
-{observations}
-
-{primary_suggestion}
-
-Alternatively:
-{alternatives}
-
-{selection_prompt}
-""",
-
-    ResponseStrategy.PRESENT_OPTIONS: """
-{observations}
-
-I see a few directions here:
-{numbered_options}
-
-{selection_prompt}
-""",
-
-    ResponseStrategy.OBSERVE_AND_ASK: """
-{observations}
-
-What would you like to do with this?
-""",
-}
-```
-
-#### Example Formatted Responses
-
-**DIRECT_ACTION (>85% confidence)**
-```
-I see a brass door handle, Art Deco style (~1930s), good condition with natural patina.
-
-Adding to your 'Vintage Hardware' family at Rs 550 (matches your similar handles).
-
-SKU: HANDLE-BRASS-DECO-001
-Category: Hardware > Door Hardware > Handles
-Price: Rs 550 (based on your catalog average)
-
 Shall I proceed?
 ```
 
 **LEAD_WITH_TOP (60-85% confidence)**
 ```
-I see a brass door handle, Art Deco style (~1930s), good condition.
+{observations}
 
-Based on your recent listings, I'm guessing you want to catalog this.
-- Suggested family: 'Vintage Hardware'
-- Suggested price: Rs 500-600 (based on similar items)
+{primary_recommendation}
 
-Alternatively:
-- Get appraisal (I can pull auction records)
-- Just analyze (detailed condition report)
+Or:
+- {alternative_1}
+- {alternative_2}
 
 Which direction?
 ```
 
 **PRESENT_OPTIONS (30-60% confidence)**
 ```
-I see a brass door handle, Art Deco style (~1930s).
+{observations}
 
-I see a few directions here:
-1. **Catalog for sale** - Add to your hardware collection
-2. **Get appraisal** - Research market value
-3. **Image enhancement** - Improve photo for listing
+I see a few directions:
+1. {option_1}
+2. {option_2}
+3. {option_3}
 
 Which would you like?
 ```
 
 **OBSERVE_AND_ASK (<30% confidence)**
 ```
-Interesting piece - brass hardware, appears vintage, Art Deco styling.
+{observations}
 
 What would you like to do with this?
 ```
 
 ---
 
-### 6. Integration with PM
+## Example Flow: Complete Walkthrough
 
-The Hypothesis Engine sits **before** PM, enriching the input.
+### Input
+User sends image of brass handle, no text.
 
-#### Updated Message Flow
-
+### Step 1: PM Analyzes User Context
 ```
-User Message
-    |
-    v
-[Hypothesis Engine]
-    |-- Feature Extraction (parallel)
-    |-- Context Aggregation (parallel)
-    |-- Hypothesis Generation
-    |-- Response Strategy Selection
-    |
-    v
-[Enriched Input to PM]
-    |-- Original message
-    |-- HypothesisSet
-    |-- ResponseStrategy
-    |-- Key observations
-    |
-    v
-[PM Orchestrator]
-    |-- Uses hypotheses to inform routing
-    |-- Uses observations in response
-    |-- Uses strategy to format output
+PM (from conversation history):
+- User cataloged 2 handles this week
+- User's primary domain: catalog
+- User's typical intent: catalog at competitive prices
+- User prefers brief responses
+- Last discussed: vintage hardware pricing
 ```
 
-#### PM Prompt Enhancement
+### Step 2: PM Routes to Researchers
+```
+PM routing decision:
+- Has image --> visual_researcher
+- Likely product (image + user's domain) --> catalog_researcher
+- No marketing signals --> skip marketing_researcher
+- No finance signals --> skip finance_researcher
 
-Add to PM prompt:
-
-```xml
-<hypothesis_context>
-
-## Pre-Analyzed Input
-
-The Hypothesis Engine has analyzed this message:
-
-### Key Observations
-{observations}
-
-### Intent Hypotheses (ranked by confidence)
-{hypotheses_formatted}
-
-### Recommended Response Strategy
-{strategy}: {strategy_explanation}
-
-## Using This Context
-
-1. **Observations**: Include these in your response - they show you understood
-2. **Top Hypothesis**: If confidence >60%, proceed in that direction
-3. **Strategy**: Follow the recommended presentation style
-4. **Don't Re-Ask**: The hypothesis engine already considered whether to ask
-
-</hypothesis_context>
+Spawning: [visual_researcher, catalog_researcher] in parallel
 ```
 
-#### Schema Updates
-
-```python
-class EnrichedMessage(BaseModel):
-    """Message enriched with hypothesis analysis."""
-
-    # Original
-    raw_text: str | None
-    media_id: str | None
-    sender_id: str
-
-    # Hypothesis Engine Output
-    hypotheses: HypothesisSet
-    response_strategy: ResponseStrategy
-    key_observations: list[str]
-    extracted_features: CombinedFeatures
-
-    # Confidence Summary
-    top_intent: str
-    top_confidence: float
-    needs_clarification: bool
-    suggested_clarifications: list[str]
+### Step 3: Researchers Execute (Parallel, ~300ms)
 ```
-
----
-
-## User Context & Learning
-
-### User Profile Storage
-
-New database table for user context:
-
-```sql
-CREATE TABLE user_profiles (
-    user_id TEXT PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id),
-
-    -- Interaction Stats
-    first_interaction TIMESTAMPTZ NOT NULL,
-    last_interaction TIMESTAMPTZ NOT NULL,
-    total_interactions INTEGER DEFAULT 0,
-
-    -- Learned Preferences (JSONB for flexibility)
-    preferences JSONB DEFAULT '{}',
-    -- {
-    --   "response_style": "brief",
-    --   "typical_categories": ["hardware", "furniture"],
-    --   "price_range": [100, 1000],
-    --   "language": "en"
-    -- }
-
-    -- Behavioral Patterns (JSONB)
-    patterns JSONB DEFAULT '{}',
-    -- {
-    --   "common_intents": ["catalog", "pricing"],
-    --   "approval_rate": 0.85,
-    --   "correction_rate": 0.12,
-    --   "common_corrections": ["wrong category"]
-    -- }
-
-    -- Recent Activity Cache (updated on each interaction)
-    recent_activity JSONB DEFAULT '[]',
-    -- [
-    --   {"action": "cataloged", "category": "hardware", "timestamp": "..."},
-    --   {"action": "priced", "sku": "HANDLE-001", "timestamp": "..."}
-    -- ]
-
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Index for fast lookup
-CREATE INDEX idx_user_profiles_company ON user_profiles(company_id);
-```
-
-### Learning Loop
-
-```python
-async def update_user_profile(
-    user_id: str,
-    interaction: InteractionOutcome,
-) -> None:
-    """Update user profile based on interaction outcome."""
-
-    profile = await load_user_profile(user_id)
-
-    # Update stats
-    profile.total_interactions += 1
-    profile.last_interaction = datetime.now()
-
-    # Update patterns based on outcome
-    if interaction.hypothesis_was_correct:
-        # Reinforce pattern
-        profile.patterns["common_intents"].append(interaction.intent)
-    else:
-        # Record correction
-        profile.patterns["corrections"].append({
-            "predicted": interaction.predicted_intent,
-            "actual": interaction.actual_intent,
-            "timestamp": datetime.now(),
-        })
-
-    # Update recent activity (keep last 20)
-    profile.recent_activity.insert(0, {
-        "action": interaction.action_taken,
-        "category": interaction.category,
-        "timestamp": datetime.now(),
-    })
-    profile.recent_activity = profile.recent_activity[:20]
-
-    await save_user_profile(profile)
-```
-
----
-
-## Performance Considerations
-
-### Latency Budget
-
-| Component | Target | Parallel? |
-|-----------|--------|-----------|
-| Feature Extraction | 200ms | Yes (visual + text) |
-| Context Loading | 100ms | Yes (all sources) |
-| Hypothesis Generation | 300ms | No (depends on features) |
-| Ranking | 50ms | No (lightweight) |
-| **Total** | **<500ms** | |
-
-### Optimization Strategies
-
-1. **Aggressive Caching**
-   - User profiles: Cache for 5 minutes
-   - Company context: Cache for 15 minutes
-   - Feature extraction models: Keep warm
-
-2. **Parallel Execution**
-   - Feature extraction runs parallel with context loading
-   - Cancel slower path if faster path returns confident result
-
-3. **Early Exit**
-   - If text has explicit intent ("catalog this"), skip deep visual analysis
-   - If high-confidence hypothesis found, skip lower-priority checks
-
-4. **Lightweight First**
-   - Fast classifier before LLM vision
-   - Template matching before generative hypothesis
-
----
-
-## Phase 1 Implementation Plan
-
-### Scope
-
-1. **Feature Extraction** - Visual + Text (LLM-based, optimize later)
-2. **Context Aggregation** - Business context only (user profiles Phase 2)
-3. **Hypothesis Generation** - LLM with structured output
-4. **Response Formatting** - Confidence-based templates
-5. **PM Integration** - Enriched message schema
-
-### Out of Scope (Phase 2)
-
-- User profile learning
-- Fast classifier for common categories
-- Historical accuracy tracking
-- Adaptive confidence calibration
-
-### Success Metrics
-
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| User clarification rate | <30% | % of messages requiring follow-up questions |
-| Hypothesis accuracy (top-1) | >70% | % where top hypothesis = actual intent |
-| Latency | <500ms | P95 processing time |
-| User satisfaction | Qualitative | "System understood me" feedback |
-
----
-
-## Open Questions
-
-1. **Cold Start**: How intelligent can we be on first interaction with new user?
-   - Proposal: Lean heavily on business context + visual features
-
-2. **Confidence Threshold Tuning**: What's the right threshold for each strategy?
-   - Proposal: Start conservative (higher thresholds), tune based on correction rates
-
-3. **Multi-Intent Messages**: What if user wants multiple things?
-   - Proposal: Generate hypotheses for each detected intent, present sequentially
-
-4. **Voice Notes**: How do we handle audio input?
-   - Proposal: Transcribe first, then treat as text (Phase 2: tone analysis)
-
-5. **Recovery from Wrong Hypothesis**: How graceful is the correction flow?
-   - Proposal: Design specific recovery patterns that don't feel like failure
-
----
-
-## Appendix: Example Scenarios
-
-### Scenario 1: Single Image, No Text
-
-**Input**: [Image of ornate wooden chair]
-
-**Feature Extraction**:
-```json
+visual_researcher returns VisualFindings:
 {
-  "visual": {
-    "primary_object": "wooden chair",
-    "materials": ["wood", "possibly mahogany"],
-    "style_period": "Victorian",
-    "estimated_era": "1870-1900",
-    "condition": "good",
-    "condition_notes": ["some wear on armrests", "original upholstery faded"]
-  },
-  "text": null
+  "primary_object": "door handle",
+  "materials": ["brass"],
+  "style_period": "Art Deco",
+  "estimated_era": "1920s-1940s",
+  "condition": "good",
+  "condition_notes": ["natural patina", "original finish"],
+  "notable_features": ["hand-forged details"],
+  "confidence": 0.85
+}
+
+catalog_researcher returns CatalogFindings:
+{
+  "similar_items": [
+    {"sku": "HANDLE-BRASS-001", "name": "Vintage Brass Handle", "price": 450, "family": "Vintage Hardware"},
+    {"sku": "HANDLE-BRASS-002", "name": "Art Deco Handle", "price": 600, "family": "Vintage Hardware"},
+    {"sku": "HANDLE-BRASS-003", "name": "Antique Door Handle", "price": 550, "family": "Vintage Hardware"}
+  ],
+  "pricing_patterns": {"min": 450, "max": 650, "avg": 533, "trend": "stable"},
+  "relevant_families": ["Vintage Hardware"],
+  "gaps_identified": ["No Art Deco specific variant"],
+  "confidence": 0.90
 }
 ```
 
-**Context**:
-```json
-{
-  "user_recent_activity": ["cataloged antique table", "priced Victorian lamp"],
-  "company_catalog": ["Antique Furniture", "Vintage Decor"],
-  "user_patterns": {"common_intents": ["catalog", "appraisal"]}
-}
+### Step 4: PM Synthesizes Hypotheses
+```
+Evidence combined:
+- User: Cataloged 2 handles this week, prefers competitive pricing
+- Visual: Brass Art Deco handle, 1930s, good condition
+- Catalog: 3 similar at Rs 450-650, avg Rs 533, "Vintage Hardware" family
+
+Generated hypotheses:
+1. catalog_product (confidence: 0.82)
+   - Supporting: User pattern (2 handles this week), similar items exist, price range clear
+   - Contradicting: None significant
+   - Suggested action: Add to "Vintage Hardware" at Rs 550
+
+2. get_appraisal (confidence: 0.45)
+   - Supporting: Art Deco pieces can have collector value
+   - Contradicting: User typically catalogs, doesn't appraise
+
+3. image_enhancement (confidence: 0.25)
+   - Supporting: Could improve photo for listing
+   - Contradicting: Image quality seems adequate
+
+Response strategy: LEAD_WITH_TOP (0.82 confidence)
 ```
 
-**Generated Hypotheses**:
-```json
-[
-  {
-    "intent_type": "catalog_product",
-    "confidence": 0.75,
-    "supporting_evidence": ["user cataloged antique table recently", "matches company catalog"],
-    "suggested_action": "Catalog Victorian chair with pricing research"
-  },
-  {
-    "intent_type": "get_appraisal",
-    "confidence": 0.55,
-    "supporting_evidence": ["Victorian piece may have significant value", "user did appraisal before"],
-    "suggested_action": "Research auction records for valuation"
-  }
-]
+### Step 5: PM Presents Response
+```
+"Brass door handle, Art Deco style (~1930s), good condition with natural patina.
+
+Your catalog has 3 similar handles in 'Vintage Hardware' at Rs 450-650.
+You've added 2 handles this week.
+
+Recommendation: Add at Rs 550 (matches your pricing pattern)
+
+Or:
+- Get detailed appraisal (Art Deco pieces can have collector value)
+- Different approach
+
+Which direction?"
 ```
 
-**Response Strategy**: LEAD_WITH_TOP (top confidence 0.75)
-
-**Output**:
+### Step 6: User Selects, PM Delegates to Executor
 ```
-I see a Victorian-era wooden chair, possibly mahogany, good condition
-with original upholstery showing age-appropriate wear.
+User: "Yes, add it"
 
-Based on your recent antique listings, I'm guessing you want to catalog this.
-- Suggested family: 'Antique Furniture'
-- Estimated value: Rs 8,000-12,000 (based on similar Victorian pieces)
-
-Alternatively:
-- Get detailed appraisal (auction records, maker identification)
-- Just analyze (condition report, era verification)
-
-Which direction?
+PM delegates to catalog_specialist:
+"Create product in 'Vintage Hardware' family:
+- Type: Door handle
+- Material: Brass
+- Style: Art Deco (~1930s)
+- Condition: Good, natural patina
+- Price: Rs 550
+- Image: [attached]"
 ```
 
-### Scenario 2: Vague Text, No Image
+---
 
-**Input**: "help me with the prices"
+## Scaling: 10-15 Domains
 
-**Feature Extraction**:
-```json
-{
-  "visual": null,
-  "text": {
-    "action_verbs": ["help"],
-    "mentioned_products": [],
-    "has_explicit_intent": false,
-    "missing_info": ["which products", "what kind of help"]
-  }
-}
-```
+### Domain Growth Plan
 
-**Context**:
-```json
-{
-  "user_recent_activity": ["cataloged 5 jars yesterday", "asked about bulk pricing last week"],
-  "pending_workflows": [],
-  "conversation_history": ["last discussed: jar pricing update"]
-}
-```
+| Phase | Domains | Researchers | Executors |
+|-------|---------|-------------|-----------|
+| Current | Products, Assets | 2 | 2 |
+| Phase 2 | + Marketing, Website | 4 | 4 |
+| Phase 3 | + Finance, CRM | 6 | 6 |
+| Phase 4 | + HR, Inventory, Procurement | 9 | 9 |
+| Phase 5 | + Production, QC, Forecasting | 12 | 12 |
 
-**Generated Hypotheses**:
-```json
-[
-  {
-    "intent_type": "bulk_pricing_update",
-    "confidence": 0.65,
-    "supporting_evidence": ["discussed jar pricing recently", "plural 'prices' suggests multiple"],
-    "suggested_action": "Review and update pricing for recent jar products"
-  },
-  {
-    "intent_type": "pricing_query",
-    "confidence": 0.45,
-    "supporting_evidence": ["help could mean information need"],
-    "suggested_action": "Show current pricing structure"
-  }
-]
-```
+### Why This Scales
 
-**Response Strategy**: LEAD_WITH_TOP
+1. **PM routing limits researchers per message** - Only 2-3 researchers run, not all 12
+2. **Parallel execution** - Researchers run simultaneously via DeepAgents
+3. **Lightweight researchers** - Read-only, fast, focused
+4. **Domain coherence** - Each researcher is expert in one domain
+5. **Structured outputs** - Consistent schemas enable reliable synthesis
 
-**Output**:
-```
-I recall we discussed jar pricing recently, and you cataloged 5 jars yesterday.
+---
 
-Are you looking to:
-1. **Update prices** for those jars (I can analyze and suggest adjustments)
-2. **View current pricing** across your catalog
-3. **Something else** with prices
+## Performance Targets
 
-Which one?
-```
+| Metric | Target | Notes |
+|--------|--------|-------|
+| Research latency | <300ms | Parallel researcher execution |
+| Synthesis latency | <200ms | PM reasoning with structured evidence |
+| Total latency | <500ms | Before user sees response |
+| Hypothesis accuracy (top-1) | >70% | Correct intent in top hypothesis |
+| Clarification rate | <30% | Messages needing follow-up questions |
+
+---
+
+## Implementation Priority
+
+### Phase 1 (Immediate)
+1. `visual_researcher` - Image analysis specialist
+2. `catalog_researcher` - Product/pricing lookup specialist
+3. PM routing logic - Keyword + context based
+4. PM synthesis prompt - Evidence to hypotheses
+5. Response formatting - Confidence-based templates
+
+### Phase 2 (With Marketing Domain)
+6. `marketing_researcher`
+7. `marketing_specialist` (executor)
+
+### Phase 3+ (As Domains Added)
+- Add researcher + executor pair for each new domain
+- Extend PM routing heuristics
+- Update synthesis prompt with new evidence types
+
+---
+
+## Open Questions for Refinement
+
+1. **Researcher granularity**: Should `visual_researcher` be separate from `creative_specialist` in research mode, or reuse same specialist with different prompt?
+
+2. **Routing sophistication**: Is keyword matching sufficient, or do we need lightweight classifier?
+
+3. **Confidence calibration**: How do we tune thresholds based on actual accuracy?
+
+4. **Cross-domain queries**: What if user query spans multiple domains equally? (e.g., "Update product and post to social")
+
+5. **Cold start**: First message from new user - how do we handle no history?
+
+6. **Researcher tool access**: Should researchers have access to all read tools, or scoped to their domain only?
 
 ---
 
 ## Next Steps
 
-1. Review design with human architect
-2. Finalize Phase 1 scope
-3. Create implementation tasks
-4. Build feature extraction first (unblocks everything else)
-5. Iterate on prompt engineering for hypothesis generation
+1. Review and refine through Q&A session
+2. Finalize researcher schemas
+3. Design PM synthesis prompt
+4. Implement Phase 1 researchers
+5. Integration testing with real scenarios
