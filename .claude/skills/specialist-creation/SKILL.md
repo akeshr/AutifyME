@@ -90,6 +90,23 @@ def create_[domain]_specialist(storage: StorageInterface) -> dict[str, Any]:
 
 ---
 
+## Specialist Description Pattern
+
+**PM routes based on description. For 50+ specialists, descriptions must be unambiguous.**
+
+**Structure:** `[Domain ownership]. [Key capabilities]. [What it returns to PM].`
+
+| Quality | Example | Problem |
+|---------|---------|---------|
+| Bad | "Handles images" | Too vague - PM can't distinguish specialists |
+| Bad | "Does product stuff" | Overlaps with multiple domains |
+| Good | "Owns visual asset creation. Has image_studio, view_image. Returns asset IDs and storage paths." | Clear domain, tools, output |
+| Good | "Owns entity relationships and hierarchy. Has read_data, write_data scoped to X tables. Returns structured operation results." | Specific scope |
+
+**Test:** If PM could confuse this specialist with another, the description is too vague.
+
+---
+
 ## Prompt File Structure
 
 Location: `agents/src/autifyme_agents/prompts/specialists/[domain]_specialist.prompt`
@@ -266,10 +283,8 @@ Implementation:
 
 ---
 
-## Reference Implementations
+## Reference
 
-- **Cataloging:** `specialists/cataloging_specialist.py` - Image analysis + read-only
-- **Market Intelligence:** `specialists/market_intelligence_specialist.py` - Analytics + web search
-- **Content SEO:** `specialists/content_seo_specialist.py` - Content generation
-
-Prompts: `agents/src/autifyme_agents/prompts/specialists/`
+- **Specialists:** `agents/src/autifyme_agents/specialists/`
+- **Prompts:** `agents/src/autifyme_agents/prompts/specialists/`
+- **Prompt Engineering:** See `prompt-engineering` skill for prompt structure

@@ -16,6 +16,27 @@ description: Build ATOMIC tools using StructuredTool with Pydantic schemas. Use 
 
 ---
 
+## Tool Granularity Principle
+
+**Same logic as agents - tools should be coherent, not arbitrary.**
+
+| Keep as One Tool | Split into Multiple |
+|------------------|---------------------|
+| Operations share parameter shape | Different parameter structures |
+| Single mental model for agent | Different decision patterns |
+| Common error handling | Distinct failure modes |
+| One clear "what" | Multiple distinct outcomes |
+
+**Example - Keep Together:**
+`read_data` handles query, search, pagination - all "fetch records" with same parameters.
+
+**Example - Split:**
+`read_data` vs `aggregate_data` - different mental models (records vs metrics), different parameters (filters vs group_by).
+
+**Test:** If adding operation B to tool A requires different parameters or error handling, split.
+
+---
+
 ## Tool Template
 
 ```python
@@ -154,6 +175,37 @@ return build_agent_error_response(
 - `CONSTRAINT_VIOLATION`, `MISSING_REFERENCE` - Data integrity
 - `CONNECTION_ERROR`, `RATE_LIMIT_ERROR` - Network/API issues
 - `NOT_FOUND`, `INVALID_INPUT`, `INVALID_FILE` - Input issues
+
+---
+
+## Intelligence-First Returns
+
+**Tools should return context that enables agent reasoning, not just raw data.**
+
+```python
+# Weak - agent must infer everything
+return {"data": results, "count": len(results)}
+
+# Strong - agent has context to reason
+return build_success_response({
+    "data": results,
+    "count": len(results),
+    "context": {
+        "total_available": total_count,
+        "filters_applied": filters,
+        "has_more": total_count > len(results),
+    },
+    "suggestions": suggestions_if_applicable,
+})
+```
+
+**Principle:** If the agent will need to make a decision after this tool call, return the context it needs to decide.
+
+| Scenario | Weak Return | Strong Return |
+|----------|-------------|---------------|
+| Query returns partial results | `{data, count}` | `{data, count, total_available, has_more}` |
+| Operation has warnings | `{success: true}` | `{success: true, warnings: [...]}` |
+| Multiple options exist | `{result}` | `{result, alternatives: [...]}` |
 
 ---
 
