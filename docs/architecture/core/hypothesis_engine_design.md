@@ -510,10 +510,10 @@ async def synthesize_hypotheses(
 class ResponseStrategy(Enum):
     """How to respond based on confidence distribution."""
 
-    DIRECT_ACTION = "direct"      # >85% - proceed with explanation
-    LEAD_WITH_TOP = "lead"        # 60-85% - present top, mention alternatives
-    PRESENT_OPTIONS = "options"   # 30-60% - show 2-3 options equally
-    OBSERVE_AND_ASK = "observe"   # <30% - show observations, ask direction
+    DIRECT_ACTION = "direct"      # >90% - proceed with explanation
+    LEAD_WITH_TOP = "lead"        # 70-90% - present top, mention alternatives
+    PRESENT_OPTIONS = "options"   # 40-70% - show 2-3 options equally
+    OBSERVE_AND_ASK = "observe"   # <40% - show observations, ask direction
 
 
 def determine_response_strategy(hypotheses: list[IntentHypothesis]) -> ResponseStrategy:
@@ -524,13 +524,14 @@ def determine_response_strategy(hypotheses: list[IntentHypothesis]) -> ResponseS
 
     top = hypotheses[0]
 
-    if top.confidence > 0.85:
+    # Conservative thresholds - avoid trust damage from wrong assumptions
+    if top.confidence > 0.90:
         return ResponseStrategy.DIRECT_ACTION
 
-    if top.confidence > 0.60:
+    if top.confidence > 0.70:
         return ResponseStrategy.LEAD_WITH_TOP
 
-    if top.confidence > 0.30:
+    if top.confidence > 0.40:
         return ResponseStrategy.PRESENT_OPTIONS
 
     return ResponseStrategy.OBSERVE_AND_ASK
@@ -538,7 +539,7 @@ def determine_response_strategy(hypotheses: list[IntentHypothesis]) -> ResponseS
 
 ### Response Templates
 
-**DIRECT_ACTION (>85% confidence)**
+**DIRECT_ACTION (>90% confidence)**
 ```
 {observations}
 
@@ -549,7 +550,7 @@ def determine_response_strategy(hypotheses: list[IntentHypothesis]) -> ResponseS
 Shall I proceed?
 ```
 
-**LEAD_WITH_TOP (60-85% confidence)**
+**LEAD_WITH_TOP (70-90% confidence)**
 ```
 {observations}
 
@@ -562,7 +563,7 @@ Or:
 Which direction?
 ```
 
-**PRESENT_OPTIONS (30-60% confidence)**
+**PRESENT_OPTIONS (40-70% confidence)**
 ```
 {observations}
 
@@ -574,7 +575,7 @@ I see a few directions:
 Which would you like?
 ```
 
-**OBSERVE_AND_ASK (<30% confidence)**
+**OBSERVE_AND_ASK (<40% confidence)**
 ```
 {observations}
 
@@ -747,26 +748,375 @@ PM delegates to catalog_specialist:
 
 ---
 
-## Open Questions for Refinement
+## Design Decisions (Finalized)
 
-1. **Researcher granularity**: Should `visual_researcher` be separate from `creative_specialist` in research mode, or reuse same specialist with different prompt?
+### Decision 1: Researcher Granularity
 
-2. **Routing sophistication**: Is keyword matching sufficient, or do we need lightweight classifier?
+**Question**: Should `visual_researcher` be separate from `creative_specialist` in research mode, or reuse same specialist with different prompt?
 
-3. **Confidence calibration**: How do we tune thresholds based on actual accuracy?
+**Decision**: **Separate Specialists**
 
-4. **Cross-domain queries**: What if user query spans multiple domains equally? (e.g., "Update product and post to social")
+**Rationale**:
+- **Different optimization targets**: Research optimizes for speed (small, fast model), execution optimizes for quality (larger model)
+- **Cleaner tool scoping**: Researchers get read-only tools only, no mutation risk
+- **Smaller prompts**: Each specialist focused, not overloaded with dual responsibilities
+- **Domain knowledge sync**: Extract shared domain knowledge to common reference doc
 
-5. **Cold start**: First message from new user - how do we handle no history?
+**Implementation**:
+```
+visual_researcher
+  - Model: Fast (Gemini Flash, GPT-4o-mini)
+  - Tools: view_image (read-only)
+  - Prompt: ~200 lines (analysis focused)
 
-6. **Researcher tool access**: Should researchers have access to all read tools, or scoped to their domain only?
+creative_specialist
+  - Model: Quality (Gemini Pro, GPT-4)
+  - Tools: view_image, image_studio, write_data
+  - Prompt: ~800 lines (execution focused)
+
+Shared: domain_knowledge/visual_analysis.md (both prompts reference)
+```
 
 ---
 
-## Next Steps
+### Decision 2: Routing Sophistication
 
-1. Review and refine through Q&A session
-2. Finalize researcher schemas
-3. Design PM synthesis prompt
-4. Implement Phase 1 researchers
-5. Integration testing with real scenarios
+**Question**: Is keyword matching sufficient, or do we need lightweight classifier?
+
+**Decision**: **Hybrid - Keywords + User Context + LLM Fallback**
+
+**Rationale**:
+- Keywords handle ~80% of cases instantly (<10ms)
+- User context (primary domain) handles ambiguous cases
+- LLM fallback only for truly unclear cases (<5%)
+- No training data overhead of classifier
+
+**Implementation**:
+```python
+def route_to_researchers(input: UserInput, user_context: UserContext) -> list[str]:
+    researchers = []
+
+    # Rule 1: Explicit signals (keywords) - fast path
+    if input.has_image:
+        researchers.append("visual_researcher")
+
+    keyword_matches = match_domain_keywords(input.text)
+    researchers.extend(keyword_matches)
+
+    # Rule 2: If keywords found, use them
+    if researchers:
+        return deduplicate(researchers)
+
+    # Rule 3: User context fallback
+    if user_context.primary_domain:
+        return [f"{user_context.primary_domain}_researcher"]
+
+    # Rule 4: LLM fallback (rare, <5% of cases)
+    return await llm_determine_domains(input)
+```
+
+**Keyword Matching Limitations** (handled by fallback):
+- Synonyms: "Stock running low" vs "We're out of inventory"
+- Implicit intent: "The blue ones" (context-dependent)
+- Negation: "Don't update the campaign"
+
+---
+
+### Decision 3: Confidence Calibration
+
+**Question**: How do we tune thresholds based on actual accuracy?
+
+**Decision**: **Conservative Start + Outcome Tracking + Periodic Calibration**
+
+**Phase 1 - Launch (Conservative)**:
+```python
+CONFIDENCE_THRESHOLDS = {
+    "direct_action": 0.90,    # Was 0.85 - more conservative
+    "lead_with_top": 0.70,    # Was 0.60 - more conservative
+    "present_options": 0.40,  # Was 0.30 - more conservative
+}
+```
+
+**Phase 2 - Measure Accuracy**:
+
+Track in `workflow_outcomes` table:
+```python
+class HypothesisOutcome(BaseModel):
+    """Track hypothesis accuracy for calibration."""
+
+    tracking_id: str
+    top_hypothesis_intent: str
+    top_hypothesis_confidence: float
+    actual_intent: str  # What user actually wanted
+    was_correct: bool
+    user_corrected: bool
+    correction_friction: str  # "smooth", "frustrating"
+```
+
+**Phase 3 - Build Calibration Curve** (after 500+ interactions):
+```
+Confidence Band | Predicted | Actual | Action
+90-100%         | 95%       | 88%    | Lower threshold or improve model
+80-90%          | 85%       | 82%    | Well calibrated
+70-80%          | 75%       | 71%    | Well calibrated
+60-70%          | 65%       | 58%    | Slightly overconfident
+```
+
+**Phase 4 - Dynamic Adjustment**:
+```python
+def get_strategy_thresholds() -> dict:
+    calibration = load_calibration_metrics()
+
+    if calibration.sample_size < 500:
+        return CONSERVATIVE_DEFAULTS
+
+    return {
+        "direct_action": calibration.threshold_for_accuracy(0.85),
+        "lead_with_top": calibration.threshold_for_accuracy(0.70),
+        "present_options": calibration.threshold_for_accuracy(0.50),
+    }
+```
+
+---
+
+### Decision 4: Cross-Domain Queries
+
+**Question**: What if user query spans multiple domains equally? (e.g., "Update product and post to social")
+
+**Decision**: **Parallel Research, Sequential Execution**
+
+**Rationale**:
+- Research is read-only, no dependency issues - parallelize
+- Execution has dependencies - PM orchestrates order
+- User sees holistic response, not fragmented tasks
+
+**Implementation**:
+```python
+async def handle_multi_domain(
+    input: UserInput,
+    domains: list[str],  # ["catalog", "marketing"]
+) -> HypothesisSet:
+
+    # Research in parallel (no dependencies)
+    findings = await asyncio.gather(*[
+        get_researcher(domain).research(input)
+        for domain in domains
+    ])
+
+    # Synthesize with dependency awareness
+    hypotheses = await pm_synthesize(
+        input=input,
+        findings=findings,
+        detect_dependencies=True,
+    )
+
+    return hypotheses
+```
+
+**Response Pattern for Multi-Domain**:
+```
+"I see you want to update the product AND post to social.
+
+Here's what I found:
+- Product: 'Blue Widget' - current price Rs 450
+- Marketing: No active campaigns for this product
+
+Plan:
+1. First: Update product details (what changes?)
+2. Then: Create social post with updated info
+
+What would you like to change in the product?"
+```
+
+**Dependency Detection**:
+- Marketing needs product data - catalog first
+- Invoice needs customer - CRM first
+- Campaign needs assets - creative first
+
+---
+
+### Decision 5: Cold Start Handling
+
+**Question**: First message from new user - how do we handle no history?
+
+**Decision**: **Company Patterns + Visual Heavy + Explicit Uncertainty**
+
+**Strategy Layers**:
+
+**Layer 1 - Lean on Visual + Company Context**:
+```python
+if user_context.is_new_user:
+    # Weight visual findings heavily
+    visual_weight = 0.5  # (normally 0.3)
+
+    # Use company's common patterns
+    company_patterns = load_company_patterns(company_id)
+
+    # Lower confidence (acknowledge uncertainty)
+    confidence_penalty = 0.15
+```
+
+**Layer 2 - Company-Level Patterns**:
+```python
+class CompanyPatterns(BaseModel):
+    """What do users of THIS company typically want?"""
+
+    common_intents: list[str]  # ["catalog", "pricing"]
+    common_categories: list[str]  # ["PET bottles", "jars"]
+    typical_price_range: tuple[float, float]
+    common_workflows: list[str]
+```
+
+**Layer 3 - Explicit Uncertainty in Response**:
+```
+"I see a brass door handle, Art Deco style (~1930s).
+
+Since this is our first interaction, I'm not sure what you'd like to do.
+Common options:
+1. Catalog for sale
+2. Get appraisal
+3. Something else
+
+What would you like?"
+```
+
+**Layer 4 - Fast Learning**:
+```python
+async def update_user_profile(user_id: str, outcome: Outcome):
+    profile = await load_or_create_profile(user_id)
+
+    # New users: weight recent interactions heavily
+    if profile.interaction_count < 10:
+        recency_weight = 0.8  # Recent interactions dominate
+    else:
+        recency_weight = 0.3  # Blend with history
+
+    profile.update_patterns(outcome, recency_weight)
+```
+
+**Cold Start Confidence Formula**:
+```
+confidence =
+    (visual_confidence * 0.5) +
+    (company_pattern_match * 0.3) +
+    (domain_keyword_match * 0.2) -
+    (new_user_penalty: 0.15)
+```
+
+**Default Strategy**: `PRESENT_OPTIONS` for first 3-5 interactions until patterns emerge.
+
+---
+
+### Decision 6: Researcher Tool Access
+
+**Question**: Should researchers have access to all read tools, or scoped to their domain only?
+
+**Decision**: **Domain-Scoped Primary + Explicit Cross-Domain Protocol**
+
+**Rationale**:
+- Researchers should be domain experts, not generalists
+- Cross-domain insights are PM's job (sees all findings)
+- Scoped tools = faster, cheaper, less confusion
+- Prevents scope creep and token waste
+
+**Implementation - Scoped Tools**:
+```python
+# catalog_researcher tools (scoped)
+catalog_researcher_tools = [
+    create_scoped_read_data(["products", "product_families", "pricing", "assets"]),
+    create_scoped_aggregate_data(["products", "product_families", "pricing"]),
+    create_scoped_inspect_schema(["products", "product_families", "pricing", "assets"]),
+]
+
+# marketing_researcher tools (scoped)
+marketing_researcher_tools = [
+    create_scoped_read_data(["campaigns", "posts", "templates"]),
+    create_scoped_aggregate_data(["campaigns", "posts"]),
+    create_scoped_inspect_schema(["campaigns", "posts", "templates"]),
+]
+```
+
+**Tool Scoping Implementation**:
+```python
+def create_scoped_read_data(allowed_tables: list[str]) -> StructuredTool:
+    """Create read_data tool scoped to specific tables."""
+
+    async def scoped_read(query: str, table: str) -> dict:
+        if table not in allowed_tables:
+            return {
+                "success": False,
+                "error": f"Table '{table}' outside scope. Allowed: {allowed_tables}"
+            }
+        return await read_data(query, table)
+
+    return StructuredTool.from_function(scoped_read, ...)
+```
+
+**Cross-Domain Protocol** (rare cases):
+
+If researcher needs cross-domain data, return a request (not fetch directly):
+```python
+class CatalogFindings(BaseModel):
+    # ... normal findings ...
+
+    cross_domain_requests: list[CrossDomainRequest] = []
+    # e.g., [{"domain": "marketing", "query": "active promotions for SKU-123"}]
+```
+
+PM evaluates cross-domain requests and spawns additional researchers if warranted.
+
+---
+
+## Decision Summary
+
+| Question | Decision | Key Rationale |
+|----------|----------|---------------|
+| Researcher granularity | Separate specialists | Different optimization targets, cleaner scoping |
+| Routing sophistication | Hybrid (keywords + context + LLM fallback) | 95%+ coverage, no training overhead |
+| Confidence calibration | Conservative start + outcome tracking | Avoid trust damage, data-driven tuning |
+| Cross-domain queries | Parallel research, sequential execution | Fast research, correct dependencies |
+| Cold start | Company patterns + visual heavy + explicit uncertainty | Graceful degradation, fast learning |
+| Tool access | Domain-scoped with cross-domain protocol | Focused, fast, prevents scope creep |
+
+---
+
+## Implementation Roadmap
+
+### Phase 1: Core Infrastructure (Week 1-2)
+1. Create `visual_researcher` specialist (separate from creative_specialist)
+2. Create `catalog_researcher` specialist
+3. Implement PM routing logic (keyword + context + fallback)
+4. Implement PM synthesis prompt
+5. Add confidence-based response formatting
+6. Create scoped tool factory
+
+### Phase 2: Calibration & Learning (Week 3-4)
+7. Add `HypothesisOutcome` tracking to workflow_outcomes
+8. Implement user profile creation/update
+9. Add company patterns schema and loading
+10. Implement cold start handling
+
+### Phase 3: Testing & Tuning (Week 5-6)
+11. Integration testing with real scenarios
+12. Calibration curve analysis (if enough data)
+13. Threshold tuning based on accuracy
+14. Cross-domain scenario testing
+
+### Phase 4: Domain Expansion (Ongoing)
+- Add researcher + executor pair for each new domain
+- Extend PM routing heuristics
+- Update synthesis prompt with new evidence types
+- Maintain domain knowledge docs
+
+---
+
+## Success Metrics
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Research latency | <300ms | P95 parallel researcher execution |
+| Total latency | <500ms | P95 before user sees response |
+| Hypothesis accuracy (top-1) | >70% | Correct intent in top hypothesis |
+| Clarification rate | <30% | Messages needing follow-up questions |
+| User correction rate | <15% | Users correcting system's assumption |
+| Cold start recovery | <5 interactions | Interactions until accuracy matches warm users |
