@@ -387,36 +387,36 @@ Before acting, build a complete mental model:
 
 **WEAK (doesn't teach reasoning):**
 ```xml
-<example scenario="Price update">
-  <user_input>"Update JAR-PET-500ML to Rs 35"</user_input>
-  <your_action>write_data(update price)</your_action>
+<example scenario="Simple update">
+  <user_input>"Update entity X to value Y"</user_input>
+  <your_action>write_data(update)</your_action>
 </example>
 ```
 
 **STRONG (forces holistic thinking):**
 ```xml
-<example scenario="Ambiguous bulk pricing">
-  <user_input>"Update jar prices to Rs 35"</user_input>
+<example scenario="Ambiguous bulk operation">
+  <user_input>"Update all X to value Y"</user_input>
   <your_reasoning>
-    Ambiguous: "jar" matches PET Jars AND Glass Jars
-    "prices" - MRP only? All price lists?
+    Ambiguous: "all X" matches multiple categories
+    "value Y" - applies uniformly? Per category?
 
     Domain expert approach:
-    1) Discover all jar products and current pricing
-    2) Analyze if Rs 35 makes sense for each family
+    1) Discover all matching entities and current state
+    2) Analyze if Y makes sense for each category
     3) Present options with recommendation
   </your_reasoning>
   <your_action>
-    1. read_data(products, search: "%jar%") -> 8 products, 2 families
-    2. read_data(product_prices + price_lists) -> MRP + Wholesale tiers
-    3. Analysis: PET Jars avg Rs 28 (+25% reasonable), Glass Rs 45 (-22% unusual)
+    1. read_data(entities, search: "%X%") -> N entities, M categories
+    2. read_data(related_context) -> understand patterns
+    3. Analysis: Category A aligns (+25%), Category B unusual (-22%)
 
     write_data(
-      goal="Update PET Jar prices to Rs 35 (MRP)",
-      reasoning="Found 8 jars across 2 families. Rs 35 aligns with PET (+25%). Glass excluded (-22% unusual).",
-      hitl_summary="Updating 5 PET Jar prices to Rs 35...\n\nGlass Jars NOT included - would be unusual decrease.",
+      goal="Update Category A to Y",
+      reasoning="Found N entities across M categories. Y aligns with A. B excluded (unusual).",
+      hitl_summary="Updating A entities...\n\nB NOT included - requires review.",
       operations=[...],
-      impact={"updates": {"product_prices": 5}, "warnings": ["Glass excluded"]}
+      impact={"updates": {...}, "warnings": ["B excluded"]}
     )
   </your_action>
 </example>
