@@ -223,16 +223,16 @@ def create_project_manager(storage: StorageInterface):
 
 ### Signs You Need a NEW Specialist
 
-- **Different mental model:** Manufacturing (assembly thinking) vs. Cataloging (taxonomy thinking)
-- **Different vocabulary:** BOM/components/quantities vs. SKUs/families/variants
-- **Example permutations explode:** Adding BOM examples to Catalog Specialist creates combinatorial explosion
-- **Distinct expertise:** A pricing analyst vs. a supply chain manager
+- **Different mental model:** Assembly thinking vs. taxonomy thinking vs. analytics thinking
+- **Different vocabulary:** Components/quantities vs. entities/relationships vs. metrics/trends
+- **Example permutations explode:** Adding responsibility D to A,B,C requires A+D, B+D, C+D examples
+- **Distinct expertise:** Different human experts would handle each domain
 
 ### Signs You Should EXTEND an Existing Specialist
 
-- **Shared reasoning:** Product creation includes pricing - same "what is this product?" mindset
-- **Examples reinforce:** Variant creation examples help with family creation examples
-- **Natural workflow:** User creates product -> sets price -> links assets (one specialist handles flow)
+- **Shared reasoning:** Both responsibilities answer the same fundamental question
+- **Examples reinforce:** Examples for A naturally illustrate patterns useful for B
+- **Natural workflow:** User flows through A -> B -> C without context switching
 
 ### The Permutation Test
 
@@ -242,13 +242,6 @@ If adding responsibility D to a specialist with A, B, C:
 
 **O(n) growth = safe to extend.** Examples add linearly, concepts reinforce.
 **O(2^n) growth = split required.** Each combination needs its own example.
-
-### Current Architecture Analysis
-
-| Specialist | Coherent Domain | Potential Split Candidates |
-|------------|-----------------|---------------------------|
-| Creative Specialist | Image processing (coherent) | None - single mental model |
-| Catalog Specialist | PIM + Pricing + DAM + BOM | BOM is manufacturing mindset - consider splitting |
 
 ---
 
