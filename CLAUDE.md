@@ -13,6 +13,45 @@ Project-specific guidance for AutifyME codebase. Communication style is defined 
 - PM composes specialists dynamically based on workflow needs
 - Ask before building: "Which domains/workflows will reuse this specialist?"
 
+### **[CRITICAL] Agent Granularity Principle: Domain Coherence**
+
+**The right agent size is determined by domain coherence, not arbitrary count.**
+
+A coherent domain has:
+- **Shared vocabulary:** Concepts reinforce each other
+- **Unified reasoning patterns:** Similar decision-making logic across responsibilities
+- **Natural example composition:** Examples for A often illustrate B; they don't create combinatorial explosion
+
+**Sizing Rules:**
+
+| Signal | Action |
+|--------|--------|
+| Responsibilities share reasoning patterns | Keep together |
+| Examples for A help illustrate B | Keep together |
+| A human expert would naturally do both | Keep together |
+| PM needs to track state between them | Split creates overhead |
+| Different vocabulary/mental models | Split into separate specialists |
+| Example permutations explode combinatorially | Split by domain boundary |
+
+**The Catalog vs Active Set Distinction:**
+- **Total agent catalog:** Can be 50+ specialists - this is just a lookup table
+- **Active per workflow:** Typically 10-15 specialists engaged for a given workflow
+- **PM's routing burden:** O(1) per decision - PM identifies domain, routes to specialist
+- **Coordination complexity:** Only among active specialists, typically sequential
+
+**The Permutation Problem:**
+If an agent handles responsibilities A, B, C, D with different reasoning patterns:
+- Examples needed: A, B, C, D (individual) + A->B, A->C... (transitions) + combinations
+- This is O(2^n) example complexity - prompts become unmanageable
+
+**Solution:** Fragment by domain coherence. Each specialist owns a coherent domain with focused examples that reinforce each other. The count of specialists doesn't matter - PM's routing is a lookup, not coordination.
+
+**Test Before Creating/Extending a Specialist:**
+1. Does this responsibility share reasoning patterns with existing ones?
+2. Do examples compose naturally or create permutation explosion?
+3. Would a domain expert naturally handle both?
+4. Is PM tracking cross-specialist state that could live in one specialist?
+
 ### **[CRITICAL] Intelligence-First Design Principle**
 Modern LLMs are highly capable: massive context windows (200K+ tokens), strong reasoning, autonomous problem-solving. This fundamentally shapes our architecture:
 

@@ -204,14 +204,64 @@ def create_project_manager(storage: StorageInterface):
 
 ---
 
+## Domain Coherence Assessment
+
+**Before creating a new specialist or extending an existing one, apply the Domain Coherence Principle.**
+
+### The Core Question
+
+> Does this responsibility share reasoning patterns with existing specialists, or does it require a different mental model?
+
+### Decision Framework
+
+| Question | If YES | If NO |
+|----------|--------|-------|
+| Does this share vocabulary with an existing specialist? | Consider extending | Create new specialist |
+| Do examples for this compose naturally with existing examples? | Extend existing | Create new (permutation explosion) |
+| Would a domain expert naturally handle both? | Keep together | Split by expertise boundary |
+| Does adding this create O(2^n) example complexity? | Split out | Safe to extend |
+
+### Signs You Need a NEW Specialist
+
+- **Different mental model:** Manufacturing (assembly thinking) vs. Cataloging (taxonomy thinking)
+- **Different vocabulary:** BOM/components/quantities vs. SKUs/families/variants
+- **Example permutations explode:** Adding BOM examples to Catalog Specialist creates combinatorial explosion
+- **Distinct expertise:** A pricing analyst vs. a supply chain manager
+
+### Signs You Should EXTEND an Existing Specialist
+
+- **Shared reasoning:** Product creation includes pricing - same "what is this product?" mindset
+- **Examples reinforce:** Variant creation examples help with family creation examples
+- **Natural workflow:** User creates product -> sets price -> links assets (one specialist handles flow)
+
+### The Permutation Test
+
+If adding responsibility D to a specialist with A, B, C:
+- Will you need examples for A+D, B+D, C+D combinations?
+- Will the prompt grow by O(n) or O(2^n)?
+
+**O(n) growth = safe to extend.** Examples add linearly, concepts reinforce.
+**O(2^n) growth = split required.** Each combination needs its own example.
+
+### Current Architecture Analysis
+
+| Specialist | Coherent Domain | Potential Split Candidates |
+|------------|-----------------|---------------------------|
+| Creative Specialist | Image processing (coherent) | None - single mental model |
+| Catalog Specialist | PIM + Pricing + DAM + BOM | BOM is manufacturing mindset - consider splitting |
+
+---
+
 ## Design Checklist
 
 Before implementing:
 
+- [ ] **Domain coherence:** Does this pass the Domain Coherence Assessment above?
 - [ ] **Domain clarity:** What single domain does this specialist own?
 - [ ] **Reusability:** Will multiple workflows use this specialist?
 - [ ] **Tool scoping:** What tables/APIs does it need? Minimum necessary.
 - [ ] **HITL boundary:** Does it write/modify data? External actions?
+- [ ] **Example complexity:** Will examples grow O(n) or O(2^n)?
 
 Implementation:
 
