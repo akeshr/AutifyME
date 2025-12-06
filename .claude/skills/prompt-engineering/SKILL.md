@@ -368,6 +368,21 @@ Before acting, build a complete mental model:
 - Handle ambiguity with **suggestions**, not questions
 - Show COMPLETE tool calls with ALL parameters
 
+### Example Count as Design Signal
+
+**If you can't cover the agent's scope in 2-4 examples, the agent is probably too broad.**
+
+| Symptom | Diagnosis | Fix |
+|---------|-----------|-----|
+| Need 6+ examples to cover responsibilities | Incoherent domains bundled together | Split by domain coherence |
+| Examples for A don't help with B | Different reasoning patterns | Separate specialists |
+| Need A+B, A+C, B+C combination examples | O(2^n) permutation explosion | Split immediately |
+| Examples feel repetitive with minor variations | Coherent domain, good sign | Keep together, reduce to 2-4 |
+
+**The test:** If adding responsibility D requires new examples for A+D, B+D, C+D combinations (not just D alone), you have a domain coherence problem - not a prompt engineering problem.
+
+**See:** `specialist-creation` skill for Domain Coherence Assessment.
+
 ### Example Quality Comparison
 
 **WEAK (doesn't teach reasoning):**
