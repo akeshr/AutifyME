@@ -1,0 +1,107 @@
+"""Catalog Analyst - Internal catalog data research specialist.
+
+Read-only analyst that queries the product catalog for patterns and similar items.
+Answers "What do we HAVE?" - existing products, pricing patterns, family structures.
+
+Cross-domain reuse:
+- Catalog: Duplicate detection, pricing alignment, family selection
+- Marketing: Product availability, variant options
+- Operations: Inventory context, product relationships
+"""
+
+from typing import Any
+
+from langchain.chat_models import BaseChatModel
+
+from autifyme_agents.core.llm_factory import get_llm
+from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.core.prompt_loader import load_prompt
+
+# Tables catalog_analyst can read (no write access)
+CATALOG_ANALYST_TABLES = [
+    # PIM (Product Information Management)
+    "product_families",
+    "products",
+    "variant_axes",
+    "variant_values",
+    "product_variant_values",
+    # Pricing
+    "price_lists",
+    "product_prices",
+    # DAM (Digital Asset Management) - read only
+    "assets",
+    "product_assets",
+    # Master Data
+    "uom",
+]
+
+
+def _get_analyst_llm() -> BaseChatModel:
+    """Get fast, cheap LLM for analyst tasks.
+
+    Uses Gemini 2.5 Flash with minimal thinking for speed.
+    Analysts are latency-sensitive (target <200ms for DB queries).
+    """
+    return get_llm(
+        provider="google",
+        model="gemini-2.5-flash",
+        temperature=0.3,  # Lower temperature for consistent analysis
+        max_retries=3,
+    )
+
+
+def create_catalog_analyst(
+    storage: StorageInterface,
+    model: BaseChatModel | None = None,
+) -> dict[str, Any]:
+    """Create Catalog Analyst SubAgent spec.
+
+    Args:
+        storage: Storage interface for catalog queries (read-only)
+        model: Optional LLM override. Defaults to Gemini 2.5 Flash.
+
+    Returns:
+        SubAgent spec dict for PM's subagents list.
+
+    Example:
+        >>> analyst = create_catalog_analyst(storage)
+        >>> # Add to PM subagents
+        >>> subagents = [visual_analyst, product_analyst, analyst, ...]
+    """
+    if storage is None:
+        raise ValueError("storage is required for Catalog Analyst")
+
+    system_prompt = load_prompt("analysts/catalog_analyst.prompt")
+
+    description = (
+        "Catalog Analyst - queries internal catalog for similar items and patterns. "
+        "Reports: existing products, pricing patterns, family matches, gaps. "
+        "Cross-domain reuse: serves catalog, marketing, operations workflows. "
+        "Read-only - does NOT modify data or suggest actions."
+    )
+
+    # Import here to avoid circular imports
+    from autifyme_agents.tools.data_engine import (
+        create_aggregate_data_tool,
+        create_read_data_tool,
+    )
+
+    tools: list[Any] = [
+        create_read_data_tool(storage, tables=CATALOG_ANALYST_TABLES),
+        create_aggregate_data_tool(storage, tables=CATALOG_ANALYST_TABLES),
+    ]
+
+    spec: dict[str, Any] = {
+        "name": "catalog_analyst",
+        "description": description,
+        "tools": tools,
+        "system_prompt": system_prompt,
+        # No interrupt_on - analysts are read-only
+    }
+
+    if model is not None:
+        spec["model"] = model
+    else:
+        spec["model"] = _get_analyst_llm()
+
+    return spec

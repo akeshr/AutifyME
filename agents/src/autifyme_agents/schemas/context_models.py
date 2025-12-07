@@ -94,23 +94,60 @@ class CatalogSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CompanyPatterns(BaseModel):
+    """Common patterns observed from this company's users.
+
+    Derived from catalog analysis and user behavior.
+    Helps PM with cold-start handling and intent inference.
+    """
+
+    primary_workflow: str = Field(
+        default="catalog",
+        description="Most common workflow type: 'catalog', 'marketing', 'operations'"
+    )
+    typical_price_range: tuple[float, float] = Field(
+        default=(0.0, 1000.0),
+        description="Common price range (min, max) for products in this company"
+    )
+    common_product_types: list[str] = Field(
+        default_factory=list,
+        description="Most common product types: ['FINISHED_GOOD', 'RAW_MATERIAL', etc.]"
+    )
+    naming_conventions: dict[str, str] = Field(
+        default_factory=dict,
+        description="Observed naming patterns, e.g., {'sku_pattern': 'FAMILY-SIZE-VARIANT'}"
+    )
+    recent_actions: list[str] = Field(
+        default_factory=list,
+        description="Recent user actions for pattern inference (last 10)"
+    )
+    last_analyzed: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="When patterns were last analyzed from catalog"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PMBaseContext(BaseModel):
     """Complete base context injected into PM at startup.
 
-    Combines company profile, catalog summary, and taxonomy tree into single
-    context object loaded once and refreshed periodically (every 15 minutes).
+    Combines company profile, catalog summary, taxonomy tree, and company patterns
+    into single context object loaded once and refreshed periodically (every 15 minutes).
 
     This enables Intelligent PM paradigm:
     - PM knows company context from message 1
     - PM knows what products exist (summary level)
     - PM knows category structure
+    - PM knows common patterns for cold-start handling
     - PM can have intelligent discussions before delegating
     - PM queries details only when needed (not every message)
 
-    Token cost target: <2K tokens total
+    Token cost target: <2.5K tokens total
     - Company profile: ~200-500 tokens
     - Catalog summary: ~500-1000 tokens
     - Taxonomy tree: ~500-1000 tokens
+    - Company patterns: ~200-400 tokens
     """
 
     company_profile: CompanyProfile = Field(
@@ -124,6 +161,10 @@ class PMBaseContext(BaseModel):
     taxonomy_tree: TaxonomyTree = Field(
         ...,
         description="Hierarchical category structure"
+    )
+    company_patterns: CompanyPatterns = Field(
+        default_factory=CompanyPatterns,
+        description="Common patterns for cold-start handling and intent inference"
     )
     recent_activity: list[str] = Field(
         default_factory=list,

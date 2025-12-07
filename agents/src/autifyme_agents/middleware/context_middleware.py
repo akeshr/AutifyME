@@ -14,6 +14,7 @@ from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.context_models import (
     CatalogSummary,
     CategoryNode,
+    CompanyPatterns,
     PMBaseContext,
     TaxonomyTree,
 )
@@ -180,6 +181,107 @@ async def load_taxonomy_tree(storage: StorageInterface) -> TaxonomyTree:
         raise
 
 
+async def load_company_patterns(storage: StorageInterface) -> CompanyPatterns:
+    """Derive company patterns from catalog analysis.
+
+    Analyzes existing catalog to extract patterns useful for cold-start handling:
+    - Primary workflow type (based on product distribution)
+    - Typical price range (min/max from existing prices)
+    - Common product types
+    - Naming conventions (SKU patterns)
+
+    Args:
+        storage: Storage adapter with DB access
+
+    Returns:
+        CompanyPatterns derived from catalog analysis
+
+    Raises:
+        Exception: If DB query fails (caller handles graceful degradation)
+    """
+    try:
+        # Query 1: Product type distribution
+        products = await storage.query_entities(
+            table="products",
+            columns=["product_type", "sku", "status"]
+        )
+
+        # Count product types
+        type_counts: dict[str, int] = defaultdict(int)
+        for p in products:
+            if p.get("status") == "ACTIVE":
+                type_counts[p.get("product_type", "UNKNOWN")] += 1
+
+        # Sort by count and get top types
+        common_product_types = sorted(
+            type_counts.keys(),
+            key=lambda x: type_counts[x],
+            reverse=True
+        )[:5]
+
+        # Determine primary workflow based on product mix
+        if type_counts.get("FINISHED_GOOD", 0) > type_counts.get("RAW_MATERIAL", 0):
+            primary_workflow = "catalog"
+        else:
+            primary_workflow = "operations"
+
+        # Query 2: Price range
+        prices = await storage.query_entities(
+            table="product_prices",
+            columns=["price"]
+        )
+
+        if prices:
+            price_values = [float(p["price"]) for p in prices if p.get("price")]
+            if price_values:
+                typical_price_range = (min(price_values), max(price_values))
+            else:
+                typical_price_range = (0.0, 1000.0)
+        else:
+            typical_price_range = (0.0, 1000.0)
+
+        # Query 3: SKU patterns (derive from existing SKUs)
+        naming_conventions: dict[str, str] = {}
+        if products:
+            # Analyze SKU patterns
+            skus = [p.get("sku", "") for p in products if p.get("sku")]
+            if skus:
+                # Check for common pattern: FAMILY-SIZE or FAMILY-SIZE-VARIANT
+                sample_sku = skus[0] if skus else ""
+                parts = sample_sku.split("-")
+                if len(parts) >= 2:
+                    naming_conventions["sku_pattern"] = "-".join(
+                        ["FAMILY"] + ["PART"] * (len(parts) - 1)
+                    )
+
+        logger.info(
+            "Loaded company patterns",
+            extra={
+                "primary_workflow": primary_workflow,
+                "price_range": typical_price_range,
+                "common_types_count": len(common_product_types),
+            }
+        )
+
+        return CompanyPatterns(
+            primary_workflow=primary_workflow,
+            typical_price_range=typical_price_range,
+            common_product_types=common_product_types,
+            naming_conventions=naming_conventions,
+            recent_actions=[],  # FUTURE: Load from activity log
+            last_analyzed=datetime.now(UTC),
+        )
+
+    except Exception as e:
+        logger.error(
+            "Failed to load company patterns from database",
+            exc_info=True,
+            extra={"error_type": type(e).__name__, "error_msg": str(e)}
+        )
+        # Re-raise for caller to handle graceful degradation
+        raise
+
+
 async def load_base_context(
     company_profile: CompanyProfile,
     storage: StorageInterface,
@@ -209,15 +311,17 @@ async def load_base_context(
         - Caller should check last_updated timestamps for staleness
     """
     try:
-        # Load catalog and taxonomy (may raise exceptions)
+        # Load catalog, taxonomy, and patterns (may raise exceptions)
         catalog_summary = await load_catalog_summary(storage)
         taxonomy_tree = await load_taxonomy_tree(storage)
+        company_patterns = await load_company_patterns(storage)
 
         logger.info(
             "Base context loaded successfully",
             extra={
                 "catalog_families": catalog_summary.total_families,
                 "taxonomy_categories": taxonomy_tree.total_categories,
+                "primary_workflow": company_patterns.primary_workflow,
             }
         )
 
@@ -225,6 +329,7 @@ async def load_base_context(
             company_profile=company_profile,
             catalog_summary=catalog_summary,
             taxonomy_tree=taxonomy_tree,
+            company_patterns=company_patterns,
             recent_activity=[],  # FUTURE: Load from activity log
             loaded_at=datetime.now(UTC),
         )
@@ -255,6 +360,14 @@ async def load_base_context(
                 root_categories=[],
                 total_categories=0,
                 last_updated=datetime.now(UTC),
+            ),
+            company_patterns=CompanyPatterns(
+                primary_workflow="catalog",
+                typical_price_range=(0.0, 1000.0),
+                common_product_types=[],
+                naming_conventions={},
+                recent_actions=[],
+                last_analyzed=datetime.now(UTC),
             ),
             recent_activity=[],
             loaded_at=datetime.now(UTC),
