@@ -61,21 +61,29 @@ User: [minimal input]
 +--------+--------+
          |
    PM REASONS (via prompt guidance):
+   - "Is this input clear or ambiguous?"
    - "What patterns do I see in this user's history?"
    - "Which domain researchers would help here?"
-   - "How confident am I about their intent?"
          |
-   PM DELEGATES (existing SubAgent capability):
-   - visual_researcher
-   - catalog_researcher
-   - [others as PM decides]
+   [If clear intent: Skip to synthesis]
+   [If ambiguous: Research first]
          |
-         v (PARALLEL)
-+--------+---------+
-| Researcher       |
-| Findings         |
-| (Natural Language)|
-+--------+---------+
+   PM DELEGATES (CHAINED for product queries):
+         |
+         v
+   +-----------------+
+   | visual_researcher|  (if image present)
+   +-----------------+
+         |
+         v (findings passed as context)
+   +-----------------+
+   | catalog_researcher| (with visual context)
+   +-----------------+
+         |
+         v (parallel for independent domains)
+   +-----------------+
+   | other_researchers| (marketing, finance, etc.)
+   +-----------------+
          |
    PM SYNTHESIZES (via prompt guidance):
    - Combine findings + user patterns
@@ -88,6 +96,9 @@ User: [minimal input]
 | Response         |
 +------------------+
 ```
+
+**Key**: Visual → Catalog is CHAINED (visual findings inform catalog search).
+Other domain researchers can run in parallel if independent.
 
 ---
 
@@ -102,6 +113,23 @@ User: [minimal input]
 | Company patterns | Cold start baseline for new users | Need data source |
 | User essence storage | Persist compressed user patterns across sessions | Context window limits |
 | Anticipatory cache | Store pre-fetched research for follow-ups | Performance optimization |
+
+### Researcher Model Specifications
+
+| Researcher | Model | Why |
+|------------|-------|-----|
+| visual_researcher | Gemini Flash 2.0 | Fast, cheap, excellent vision |
+| catalog_researcher | Gemini Flash 2.0 | Fast DB queries, structured reasoning |
+| [future]_researcher | Gemini Flash 2.0 | Default for all researchers |
+
+**Rationale**: Researchers are focused, single-domain agents. They don't need Sonnet-level reasoning. Flash is 10x cheaper, 5x faster, sufficient for scoped research tasks.
+
+**PM remains**: Claude Sonnet (orchestration, synthesis, user-facing communication)
+
+**Latency targets**:
+- Visual analysis: <300ms
+- Catalog lookup: <200ms
+- Chained visual->catalog: <500ms total
 
 ### Prompts We Write
 
@@ -152,7 +180,21 @@ For NEW users (no history):
 - Be more explicit about uncertainty
 - Present options rather than assuming
 
-### 2. Research Before Responding
+### 2. When to Research (vs. Act Directly)
+
+Research adds latency. Skip it when intent is clear:
+
+**SKIP RESEARCH (act directly):**
+- Explicit command: "catalog this at Rs 500" (clear intent + price)
+- Follow-up to previous: "yes, approve it" (continuing workflow)
+- Simple query: "how many products do I have?" (quick tool call)
+- User history + input strongly align (>95% pattern match)
+
+**DO RESEARCH:**
+- Minimal input: Just an image, no text
+- Ambiguous intent: "what do you think?" or "add this"
+- New user: No history to infer from
+- Mixed signals: Image + text don't clearly align
 
 When input is minimal or ambiguous, spawn domain researchers to gather evidence:
 
@@ -161,7 +203,7 @@ When input is minimal or ambiguous, spawn domain researchers to gather evidence:
 - Spawn `marketing_researcher` if likely campaign-related
 - Spawn other domain researchers based on your judgment
 
-Delegate to researchers in PARALLEL - they return findings, you synthesize.
+Delegate to researchers in CHAINED order for product queries (visual -> catalog).
 
 ### 3. Confidence Assessment
 
@@ -236,6 +278,59 @@ Recommendation: Add at Rs 550 (matches your pattern)
 
 </research_first_behavior>
 ```
+
+### 6. Error Handling (Researcher Failures)
+
+Researchers may fail or return empty results. Handle gracefully:
+
+**Researcher returns error:**
+- Log for debugging, but don't crash
+- Proceed with available evidence
+- Reduce confidence proportionally
+- Example: "I couldn't analyze the image in detail (low quality), but based on the text..."
+
+**Researcher returns no results:**
+- Distinguish "no data" from "error"
+- "No similar items in catalog" is useful information
+- Factor into response: "This appears to be a new category for your catalog"
+
+**Chained researcher can't proceed:**
+- If visual_researcher fails, catalog_researcher gets no context
+- Fall back to generic catalog search using user's text
+- Or ask user for more description (acknowledge limitation)
+
+**Multiple researchers fail:**
+- Fall back to OBSERVE_AND_ASK
+- Be honest: "I'm having trouble analyzing this. Can you describe what you'd like to do?"
+
+**Pattern:**
+```
+"I could see [what worked], but had trouble with [what failed].
+Based on what I have: [best effort recommendation]
+Or: can you tell me more about [what would help]?"
+```
+
+### 7. Multi-Image Handling
+
+When user sends multiple images:
+
+**Batch detection:**
+- Related items (5 jars from same family) -> Process as collection
+- Unrelated items (jar + marketing flyer) -> Process separately
+
+**Collection handling:**
+- Visual researcher: Identify common elements + variations
+- Catalog researcher: Find family matches, suggest structure
+- Response: "I see 5 related items... [collective recommendation]"
+
+**Mixed handling:**
+- Route each image to appropriate domain researcher
+- Synthesize findings per domain
+- Present organized by domain
+
+**Limit handling:**
+- More than 10 images: Process first 10, acknowledge remainder
+- "I'll start with these 10 items. Send the rest after?"
 
 ---
 
@@ -783,8 +878,28 @@ Every ~10 interactions, synthesize user patterns into compressed essence:
 - Helps with long conversations where early patterns scroll out
 - Informs cold-start for returning users
 
-**Update trigger:**
-After significant correction or every 10 interactions, update essence.
+**Update Trigger Mechanism:**
+
+Essence updates are triggered by the UserEssenceManager (code component):
+
+1. **Interaction counter**: Incremented on each workflow completion
+   - Every 10 interactions: Queue essence regeneration
+
+2. **Significant correction detection**: PM sets flag in outcome tracking
+   - User explicitly corrects intent: "No, I wanted X not Y"
+   - Category/pricing correction with impact on patterns
+   - Flag triggers immediate essence update
+
+3. **Session boundary**: On session end (inactivity timeout)
+   - Synthesize any pending changes
+   - Ensures essence is fresh for next session
+
+4. **Update process**:
+   - PM generates essence using prompt (no code logic)
+   - UserEssenceManager persists to user_essence table
+   - Next session loads fresh essence into PM context
+
+**Implementation note**: PM generates the essence text via prompt. The code only handles when to trigger and where to store.
 
 </user_essence>
 ```
