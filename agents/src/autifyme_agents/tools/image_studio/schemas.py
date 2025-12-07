@@ -616,8 +616,8 @@ class ImageStudioInput(BaseModel):
     - Model reasons about what to do from specs and labels
     - Creative freedom: custom fields + creative_direction for OOTB ideas
 
-    IMAGES:
-    Provide labeled images. Reference labels in your specs/instructions.
+    IMAGES (REQUIRED - minimum 1):
+    At least one labeled image required. Reference labels in your specs/instructions.
     The model sees all images and uses labels to understand their role.
 
     SPECS - Use what applies:
@@ -703,19 +703,6 @@ class ImageStudioInput(BaseModel):
         creative_direction="Family product shot - main variant hero, second variant supporting"
     )
     ```
-
-    4. Pure generation (no input images):
-    ```python
-    ImageStudioInput(
-        images=[],  # No source images - pure generation
-        scene=SceneSpec(
-            environment="luxury bathroom vanity",
-            style="editorial magazine",
-            mood="spa-like calm"
-        ),
-        creative_direction="Generate empty scene for later product compositing"
-    )
-    ```
     """
 
     # ==========================================================================
@@ -723,9 +710,9 @@ class ImageStudioInput(BaseModel):
     # ==========================================================================
 
     images: list[ImageInput] = Field(
-        default_factory=list,
+        min_length=1,
         description=(
-            "Labeled images for this task (max 15). Each image has a label "
+            "REQUIRED: At least 1 labeled image (max 15). Each image has a label "
             "you reference in your specs/instructions. "
             "Example: [ImageInput(path='inbox/thread/photo.jpg', label='product')]"
         )

@@ -66,7 +66,8 @@
       "Bash(sort:*)",
       "Bash(python3:*)",
       "Bash(gh pr view:*)",
-      "Bash(gh pr diff:*)"
+      "Bash(gh pr diff:*)",
+      "Skill(workflow-evaluation)"
     ],
     "deny": [],
     "ask": []

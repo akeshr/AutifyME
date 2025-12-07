@@ -44,33 +44,43 @@ trace_runs = list(client.list_runs(trace_id=trace_id))
 
 ```python
 from tests.tools.evaluation.helpers import show_tree
-show_tree(trace_id)
+ids = show_tree(trace_id)  # Returns dict mapping short_id -> full_id
 ```
 
 Output:
 ```
-TRACE: abc123 | success | $0.04 | 12.3s
-========================================
-ROOT LangGraph
-  +-- PM (chain) [2.1s]
-      +-- delegate_to_department (tool) [0.1s]
-          +-- CatalogingDept (chain) [8.2s]
-              +-- ImageAnalysisSpecialist (chain) [6.1s]
-                  +-- GeminiWithRetry (llm) [3.2s] *
-                  +-- image_studio (tool) [2.8s]
-              +-- GeminiWithRetry (llm) [1.9s] *
-      +-- GeminiWithRetry (llm) [1.8s] *
-  +-- save_product_family (tool) [0.3s]
+TRACE: 2d421f5e-aeff-41c7-aff2-bbf57739a75c
+Status: success | Cost: $0.04 | Time: 12.3s | Tokens: 28,644
+LLM calls: 3 | Tool calls: 4 | Total nodes: 12
+==========================================================================================
+[2d421f5e] LangGraph (chain) | 12.3s
+  +-- [1201ef22] tools (chain) | 11.2s
+    +-- [a393449a] task (tool) | 11.1s -> cataloging
+      +-- [d65ec38a] LangGraph (chain) | 11.0s
+        +-- [67ab4efa] tools (chain) | 8.2s
+          +-- [641d7533] image_studio (tool) | 8.1s [action=analyze]
+            +-- [47343c3b] GeminiWithRetry (llm) | 6.2s | gemini-3-pro-image | 3,834tok *
+        +-- [dd8f0256] model (chain) | 2.1s
+          +-- [96aba441] GeminiWithRetry (llm) | 1.9s | gemini-2.5-flash | 8,234tok -> image_studio *
+  +-- [bf173a71] GeminiWithRetry (llm) | 0.8s | gemini-2.5-flash | 4,521tok -> task *
 
-* = LLM calls (where reasoning happens)
+Legend: * = LLM | X = Error | -> = delegates/calls
+Usage: ids = show_tree('...'); show_llm_detail(ids['<short_id>'])
 ```
+
+**Key info per node:**
+- `[8-char-id]` - Use with `show_llm_detail(ids['8-char-id'])` to drill down
+- Model name and token count for LLM calls
+- `-> tool_name` shows what the LLM decided to call
+- `-> specialist` shows delegation target for task tools
+- `X` marker and error snippet for failed nodes
 
 ### What to Look For
 
 - **Missing nodes**: Expected tool wasn't called
 - **Wrong routing**: Went to wrong department/specialist
 - **Excessive depth**: Too many delegation layers
-- **Error nodes**: Any node with status=error
+- **Error nodes**: Any node with `X` marker and error snippet
 
 ---
 
@@ -108,7 +118,9 @@ LLM CALLS: 3 total | 28,644 tokens | $0.04
 
 ```python
 from tests.tools.evaluation.helpers import show_llm_detail
-show_llm_detail(run_id)
+
+# Use the short ID from show_tree output
+show_llm_detail(ids['96aba441'])  # ids dict from show_tree()
 ```
 
 Output:
@@ -294,14 +306,21 @@ VERDICT: Fix successful
 
 All helpers in `tests/tools/evaluation/helpers.py`:
 
-| Function | Purpose | Tokens |
-|----------|---------|--------|
-| `show_tree(trace_id)` | Hierarchical tree view | ~200 |
-| `show_llm_calls(trace_id)` | All LLM calls with summaries | ~500 |
-| `show_llm_detail(run_id)` | Full prompt/output for one call | ~2K |
-| `show_context_flow(trace_id, agent)` | Track context to specific agent | ~300 |
-| `compare_traces(id1, id2)` | Before/after comparison | ~200 |
-| `list_failures(hours=24)` | Recent failed traces | ~100 |
+| Function | Purpose | Returns |
+|----------|---------|---------|
+| `show_tree(trace_id)` | Full tree with IDs, models, tokens, decisions | `dict[short_id, full_id]` |
+| `show_llm_calls(trace_id)` | All LLM calls with summaries | `None` |
+| `show_llm_detail(run_id)` | Full prompt/output for one call | `None` |
+| `show_context_flow(trace_id, agent)` | Track context to specific agent | `None` |
+| `compare_traces(id1, id2)` | Before/after comparison | `None` |
+| `list_failures(hours=24)` | Recent failed traces | `None` |
+| `list_recent(hours=24)` | Recent traces (any status) | `None` |
+
+**Typical workflow:**
+```python
+ids = show_tree(trace_id)           # See structure, get ID lookup
+show_llm_detail(ids['bf173a71'])    # Drill into specific LLM call
+```
 
 ---
 
@@ -350,11 +369,23 @@ Before declaring "done":
 
 ## Mindset
 
-1. **Evidence over opinion**: Every finding cites specific trace data
-2. **Root cause over symptom**: The error message is not the cause
-3. **Minimal fix**: Change as little as possible
-4. **Verify always**: Never assume fix worked
-5. **Learn continuously**: Each evaluation makes you better
+1. **Verify before assuming**: NEVER assume what an agent/specialist does based on its name. ALWAYS read the actual prompt file and code to understand its role, responsibilities, and expected behavior before evaluating.
+2. **Evidence over opinion**: Every finding cites specific trace data
+3. **Root cause over symptom**: The error message is not the cause
+4. **Minimal fix**: Change as little as possible
+5. **Verify always**: Never assume fix worked
+6. **Learn continuously**: Each evaluation makes you better
+
+**CRITICAL**: Before evaluating any agent's behavior:
+```python
+# 1. Read the agent's prompt to understand its role
+Read("agents/src/autifyme_agents/prompts/specialists/catalog_specialist.prompt")
+
+# 2. Read the agent's implementation to understand its tools and flow
+Read("agents/src/autifyme_agents/specialists/catalog_specialist.py")
+
+# 3. THEN evaluate if behavior matches expected responsibilities
+```
 
 ---
 
