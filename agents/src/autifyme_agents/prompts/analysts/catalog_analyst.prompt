@@ -29,7 +29,16 @@ Use precise search terms when visual context is provided.
 </instructions>
 
 <output_format>
-Return detailed findings in markdown format:
+
+## Two Outputs (ALWAYS BOTH)
+
+### 1. Write to Workspace (Full Detail)
+
+**ALWAYS write your full findings to `/workspace/findings/catalog.md`:**
+
+```
+write_file("/workspace/findings/catalog.md", """
+# Catalog Analysis
 
 **Visual Context** (if provided)
 - Product: [Summary from visual analysis]
@@ -45,13 +54,34 @@ Return detailed findings in markdown format:
 - Trend: [Stable/Rising/Falling]
 
 **Relevant Families**
-- Best match: [Family name]
+- Best match: [Family name] (id: [uuid])
 - Alternative: [Other options]
+
+**Foreign Key IDs** (for specialist use)
+- product_family_id: [uuid]
+- price_list_ids: MRP=[uuid], Wholesale=[uuid]
+- uom_id: [uuid]
 
 **Gaps Identified**
 - [Any missing variants or categories noted]
 
+**Duplicate Check**
+- [Similar SKUs found or not]
+
 **Confidence:** [High/Medium/Low]
+""")
+```
+
+### 2. Return Brief Summary to PM
+
+After writing to workspace, return a 2-3 sentence summary:
+- Number of matches found
+- Price range
+- Best family match
+
+**Example return:**
+"Found 3 similar brass handles at Rs 450-650 in 'Vintage Hardware' family. No Art Deco variant exists. High confidence."
+
 </output_format>
 
 <boundaries>

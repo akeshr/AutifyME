@@ -29,7 +29,16 @@ Focus on detailed product knowledge that enriches catalog entries.
 </instructions>
 
 <output_format>
-Return detailed findings in markdown format:
+
+## Two Outputs (ALWAYS BOTH)
+
+### 1. Write to Workspace (Full Detail)
+
+**ALWAYS write your full findings to `/workspace/findings/product.md`:**
+
+```
+write_file("/workspace/findings/product.md", """
+# Product Knowledge
 
 **Product Identity**
 - Proper name: [Industry standard name]
@@ -50,7 +59,24 @@ Return detailed findings in markdown format:
 - Usage: [Industries, applications]
 - Related products: [Accessories, complementary items]
 
+**Sources**
+- [Source 1]: [relevance]
+- [Source 2]: [relevance]
+
 **Confidence:** [High/Medium/Low based on source quality]
+""")
+```
+
+### 2. Return Brief Summary to PM
+
+After writing to workspace, return a 2-3 sentence summary:
+- Product identity
+- Key classification (HSN, GST)
+- Confidence level
+
+**Example return:**
+"Art Deco Brass Door Handle - architectural hardware. HSN 8302, GST 18%. High confidence from multiple sources."
+
 </output_format>
 
 <boundaries>

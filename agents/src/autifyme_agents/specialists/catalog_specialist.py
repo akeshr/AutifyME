@@ -120,6 +120,7 @@ def create_catalog_specialist(
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
+        # FilesystemMiddleware (read_file for workspace) is provided by default via DeepAgents
         "interrupt_on": {"write_data": True},
     }
 

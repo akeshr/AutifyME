@@ -96,6 +96,7 @@ def create_catalog_analyst(
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
+        # FilesystemMiddleware (write_file, read_file) is provided by default via DeepAgents
         # No interrupt_on - analysts are read-only
     }
 
