@@ -1,8 +1,9 @@
 # Hypothesis Engine: Intelligence-First Intent Detection
 
-**Status**: Design Complete
-**Date**: 2025-12-06
+**Status**: Design Complete - Revised v3.0
+**Date**: 2025-12-07
 **Authors**: Jarvis + Human Architect
+**Revision**: v3.0 - Final Architecture (Post-Debates)
 
 ---
 
@@ -12,7 +13,11 @@ The Hypothesis Engine transforms minimal user input (single image, vague message
 
 **Core Philosophy**: Trust LLM intelligence. Guide through prompts, not code.
 
-**Key Insight**: PM already has everything it needs - conversation history, tool access, reasoning capability. We don't need routing code, user profile databases, or confidence calculations. We need good prompts.
+**Key Insight**: Separate RESEARCH (understanding) from EXECUTION (acting). This enables focused prompts, cross-domain reuse, and linear scaling.
+
+**Architectural Decision**: Two-layer agent model within the existing 2-level hierarchy:
+- **Analysts** (research layer): Fast, cheap, read-only, cross-domain reusable
+- **Specialists** (execution layer): Careful, HITL-enabled, domain-specific
 
 ---
 
@@ -23,12 +28,29 @@ The Hypothesis Engine transforms minimal user input (single image, vague message
 > "If an LLM with full context can figure it out, don't hardcode the logic."
 
 PM is an LLM. It can:
-- Reason about which researchers to spawn (no routing code needed)
+- Reason about which analysts to spawn (no routing code needed)
 - Infer user patterns from conversation history (no profile database needed)
 - Assess its own confidence (no calculation code needed)
 - Synthesize findings naturally (no rigid schemas needed)
 
-### 2. Prompt-Driven Architecture
+### 2. Separation of Concerns: Research vs Execution
+
+| Characteristic | Research (Analysts) | Execution (Specialists) |
+|----------------|---------------------|------------------------|
+| Purpose | Gather information, find patterns | Create, update, delete records |
+| Speed | Fast (latency-sensitive) | Careful (accuracy-sensitive) |
+| Cost | Cheap (Flash models) | Moderate (capable models) |
+| Parallelism | Can run multiple in parallel | Usually sequential |
+| HITL | Not needed | Required for writes |
+| Scope | Often cross-domain | Domain-specific |
+| Prompt Size | ~250-400 lines (focused) | ~500-700 lines (execution patterns) |
+
+**Why separate?**
+- Research is REUSABLE: visual_analyst serves catalog, marketing, operations, quality
+- Execution is DOMAIN-SPECIFIC: catalog_specialist only handles catalog mutations
+- Prompt bloat prevention: Each agent stays focused, no duplication
+
+### 3. Prompt-Driven Architecture
 
 | Traditional Approach | Our Approach |
 |---------------------|--------------|
@@ -36,15 +58,15 @@ PM is an LLM. It can:
 | User profile database | PM infers from conversation history |
 | Confidence scoring functions | PM assesses and responds accordingly |
 | Rigid findings schemas | Natural language findings |
-| Cross-domain protocol code | PM synthesizes all findings |
+| Research + execution merged | Separated into analyst + specialist layers |
 
-### 3. Research Before Asking
+### 4. Research Before Asking
 
 Instead of asking clarifying questions, PM:
-1. Spawns relevant researchers in parallel
+1. Spawns relevant analysts in parallel
 2. Gathers evidence from domain experts
 3. Synthesizes findings with user context
-4. Presents evidence-backed options
+4. Either responds directly (high confidence) or delegates to specialist (action needed)
 
 User feels: "This system understood me."
 
@@ -53,104 +75,141 @@ User feels: "This system understood me."
 ## Architecture Overview
 
 ```
-User: [minimal input]
-         |
-         v
-+--------+--------+
-|       PM        |  <-- Full context: conversation history, company, tools
-+--------+--------+
-         |
-   PM REASONS (via prompt guidance):
-   - "Is this input clear or ambiguous?"
-   - "What patterns do I see in this user's history?"
-   - "Which domain researchers would help here?"
-         |
-   [If clear intent: Skip to synthesis]
-   [If ambiguous: Research first]
-         |
-   PM DELEGATES (CHAINED for product queries):
-         |
-         v
-   +-----------------+
-   | visual_researcher|  (if image present)
-   +-----------------+
-         |
-         v (findings passed as context)
-   +-----------------+
-   | catalog_researcher| (with visual context)
-   +-----------------+
-         |
-         v (parallel for independent domains)
-   +-----------------+
-   | other_researchers| (marketing, finance, etc.)
-   +-----------------+
-         |
-   PM SYNTHESIZES (via prompt guidance):
-   - Combine findings + user patterns
-   - Assess confidence level
-   - Apply response strategy
-         |
-         v
-+--------+---------+
-| Evidence-Backed  |
-| Response         |
-+------------------+
++-------------------------------------------------------------------------+
+|                              PM                                          |
+|  Orchestration | User Communication | Confidence Synthesis              |
+|  Research-First Behavior | User Pattern Inference                       |
++-------------------------------------------------------------------------+
+                                 |
+         +-----------------------+------------------------+
+         |                                                |
+         v                                                v
++------------------------+                    +------------------------+
+|    ANALYST LAYER       |                    |   SPECIALIST LAYER     |
+|    (Research)          |                    |   (Execution)          |
++------------------------+                    +------------------------+
+| visual_analyst         |                    | catalog_specialist     |
+| product_analyst        |                    | creative_specialist    |
+| catalog_analyst        |                    | marketing_specialist   |
++------------------------+                    +------------------------+
+         |                                                |
+         | Fast, Gemini Flash                            | Careful, HITL
+         | Read-only, Parallel                           | Write-enabled
+         | Cross-domain reuse                            | Domain-specific
+         +------------------------------------------------+
 ```
 
-**Key**: Visual → Catalog is CHAINED (visual findings inform catalog search).
-Other domain researchers can run in parallel if independent.
+**Key Flow**:
+1. PM receives minimal input
+2. PM reasons: "Is this clear or ambiguous?"
+3. If ambiguous: PM spawns relevant analysts (chained or parallel)
+4. Analysts return findings (read-only, no suggestions)
+5. PM synthesizes findings + user patterns -> assesses confidence
+6. PM responds based on confidence level
+7. If action needed: PM delegates to specialist WITH research context
+
+---
+
+## Naming Convention
+
+| Term | Purpose | Model | Access | Prompt Size |
+|------|---------|-------|--------|-------------|
+| **Analyst** | Research, understand, find patterns | Gemini Flash | Read-only | ~250-400 lines |
+| **Specialist** | Execute, create, modify | Gemini Flash/Pro | Write (HITL) | ~500-700 lines |
+
+Both are SubAgents under PM, but with different roles.
+
+---
+
+## Token Economics
+
+### Per-Workflow Comparison
+
+| Workflow Type | Merged Approach | Two-Layer Approach | Savings |
+|--------------|-----------------|-------------------|---------|
+| Research only (common) | PM (3K) + Specialist (6K) = **9K** | PM (3K) + Analysts (2K) = **5K** | **44%** |
+| Research + Execute | PM (3K) + Specialist (6K) = **9K** | PM (3K) + Analysts (2K) + Specialist (4K) = **9K** | 0% |
+| Multi-domain research | PM (3K) + 2 Specialists (12K) = **15K** | PM (3K) + Shared Analysts (3K) = **6K** | **60%** |
+
+**Key insight**: Research-only queries are COMMON. Users often ask "what is this?", "how much?", "what do you think?" before deciding to act.
+
+### At Scale (10+ Domains)
+
+**Merged Approach:**
+```
+10 specialists x 1000+ lines = 10,000+ lines
+- Visual analysis duplicated 5x
+- Pattern lookup duplicated 10x
+```
+
+**Two-Layer Approach:**
+```
+Analysts (~5 core): ~1,600 lines total
+Specialists (~10): ~6,000 lines total
+Total: ~7,600 lines (24% reduction)
+```
+
+Plus: Adding new domain = add analyst + specialist pair. No bloat on existing agents.
+
+---
+
+## Cross-Domain Reuse Analysis
+
+### 3-Analyst Model (Core)
+
+| Analyst | Question | Domains Served | Capability |
+|---------|----------|---------------|------------|
+| visual_analyst | "What do I SEE?" | Catalog, Marketing, Operations, Quality, CRM | Image observation |
+| product_analyst | "What IS this?" | Catalog, Marketing, Quality, Procurement | External product knowledge |
+| catalog_analyst | "What do we HAVE?" | Catalog, Marketing, Operations | Internal data lookup |
+
+### product_analyst Scope (Renamed from market_analyst)
+
+The product_analyst focuses on **detailed product knowledge** from external sources:
+- Proper industry naming conventions
+- Standard sizes, dimensions, capacities
+- Material specifications and variants
+- Industry classifications (HSN, categories)
+- Usage patterns and applications
+- Related products and accessories
+
+**Why "product" not "market"**: "Market" implied competition/pricing only. "Product" captures the full research need - what this product IS in the world.
+
+**visual_analyst alone** is reused 5x, saving ~800 lines of duplicated prompts.
 
 ---
 
 ## What We Build
 
+### Agents We Create
+
+| Agent | Type | Model | Tools | Prompt Size |
+|-------|------|-------|-------|-------------|
+| visual_analyst | Analyst | Gemini Flash 2.0 | view_image | ~250 lines |
+| product_analyst | Analyst | Gemini Flash 2.0 | web_search, hsn_lookup | ~300 lines |
+| catalog_analyst | Analyst | Gemini Flash 2.0 | read_data, aggregate_data | ~350 lines |
+| catalog_specialist | Specialist | Gemini Flash 2.0 | write_data, create_record | ~600 lines (slimmed) |
+| creative_specialist | Specialist | Gemini Flash 2.0 | image_studio | ~500 lines (slimmed) |
+
 ### Code We Write
 
 | Component | Purpose | Why Code Needed |
 |-----------|---------|-----------------|
-| Researcher specialists | Separate agents with focused prompts, fast models | Optimization (speed, cost) |
+| Analyst agent configs | Separate agents with focused prompts | Optimization (speed, cost) |
+| Specialist slimdown | Remove research patterns, add context receiving | Separation of concerns |
 | Outcome tracking | Persist whether hypothesis was correct | Can't infer across sessions |
 | Company patterns | Cold start baseline for new users | Need data source |
-| User essence storage | Persist compressed user patterns across sessions | Context window limits |
+| User essence storage | Persist compressed user patterns | Context window limits |
 
-### Researcher Model Specifications
+### Latency Targets
 
-| Researcher | Model | Why |
-|------------|-------|-----|
-| visual_researcher | Gemini Flash 2.0 | Fast, cheap, excellent vision |
-| catalog_researcher | Gemini Flash 2.0 | Fast DB queries, structured reasoning |
-| [future]_researcher | Gemini Flash 2.0 | Default for all researchers |
-
-**Rationale**: Researchers are focused, single-domain agents. They don't need Sonnet-level reasoning. Flash is 10x cheaper, 5x faster, sufficient for scoped research tasks.
-
-**PM remains**: Claude Sonnet (orchestration, synthesis, user-facing communication)
-
-**Latency targets**:
-- Visual analysis: <300ms
-- Catalog lookup: <200ms
-- Chained visual->catalog: <500ms total
-
-### Prompts We Write
-
-| Prompt | Purpose |
-|--------|---------|
-| PM enhancement | Research-first, user inference, confidence, advanced behaviors |
-| visual_researcher | Focused image analysis |
-| catalog_researcher | Focused catalog/pricing lookup |
-| [domain]_researcher | One per domain as we scale |
-
-### Advanced Behaviors (All Prompt-Based)
-
-| Behavior | Purpose |
-|----------|---------|
-| Researcher collaboration | Chain visual → catalog for precise searches |
-| Confidence transparency | Explain reasoning, invite correction |
-| Learning acknowledgment | Show user you're getting smarter about them |
-| Emotional calibration | Adapt style to user's state |
-| Intent depth | Understand WHY, not just WHAT |
-| Anticipatory awareness | Think ahead about likely follow-ups |
-| User essence | Compress patterns for persistence |
-| Proactive suggestions | Notice opportunities user didn't ask about |
+| Operation | Target | Notes |
+|-----------|--------|-------|
+| Visual analysis | <300ms | Single analyst call |
+| Catalog lookup | <200ms | Single analyst call |
+| Chained visual->catalog | <500ms | Sequential, context passed |
+| Parallel 3 analysts | <400ms | Max of individual times |
+| Full research + execute | <2s | Research + specialist delegation |
 
 ---
 
@@ -163,8 +222,7 @@ Add to PM system prompt:
 
 ## Understanding User Intent (Before Every Response)
 
-You have access to the full conversation history. Before responding to any message,
-reason through the following:
+You have access to the full conversation history and can delegate to analysts and specialists.
 
 ### 1. User Pattern Recognition
 
@@ -179,171 +237,114 @@ For NEW users (no history):
 - Be more explicit about uncertainty
 - Present options rather than assuming
 
-### 2. When to Research (vs. Act Directly)
+### 2. Research-First Philosophy
 
-Research adds latency. Skip it when intent is clear:
+**Key Insight**: Research enriches EXECUTION, not just intent detection. Even clear commands benefit from research context.
 
-**SKIP RESEARCH (act directly):**
-- Explicit command: "catalog this at Rs 500" (clear intent + price)
-- Follow-up to previous: "yes, approve it" (continuing workflow)
-- Simple query: "how many products do I have?" (quick tool call)
-- User history + input strongly align (>95% pattern match)
+**ALWAYS RESEARCH before any action:**
+- "catalog this at Rs 500" -> Still research (duplicate check, family selection, similar pricing)
+- "add this" + image -> Research (product identity, catalog match, enrichment)
+- Any image input -> Always visual_analyst first, then product_analyst
 
-**DO RESEARCH:**
-- Minimal input: Just an image, no text
-- Ambiguous intent: "what do you think?" or "add this"
-- New user: No history to infer from
-- Mixed signals: Image + text don't clearly align
+**SKIP RESEARCH only for:**
+- Workflow continuation: "yes, approve it" (already researched in previous turn)
+- Simple data queries: "how many products?" (PM queries directly, no action)
+- Pure conversation: "thanks", "ok" (no action needed)
 
-When input is minimal or ambiguous, spawn domain researchers to gather evidence:
+**Why research-first?**
+- Research makes the ACTION better, not just the understanding
+- PM should ask (research) then take correct decisions based on outcomes
+- 500ms research cost is small vs poor execution cost
 
-- **Always** spawn `visual_researcher` if image is present
-- Spawn `catalog_researcher` if likely product-related
-- Spawn `marketing_researcher` if likely campaign-related
-- Spawn other domain researchers based on your judgment
+### 3. Analyst Orchestration
 
-Delegate to researchers in CHAINED order for product queries (visual -> catalog).
+When research is needed, delegate to analysts:
 
-### 3. Confidence Assessment
+**PARALLEL** (no dependency):
+- visual_analyst + product_analyst (independent domains)
 
-After gathering evidence, honestly assess your confidence level:
+**CHAINED** (has dependency):
+- visual_analyst THEN catalog_analyst (visual findings inform catalog search)
 
-- **High**: Strong evidence from multiple sources, clear user pattern match
-- **Medium**: Good evidence, likely correct but alternatives exist
-- **Low**: Some evidence, multiple plausible interpretations
-- **Very Low**: Limited evidence, mostly speculation
+For product-related queries with images:
+1. First: visual_analyst ("What is this object?")
+2. Then: catalog_analyst WITH visual context ("Search for brass Art Deco handle")
 
-Trust your judgment. Don't calculate percentages - reason naturally about certainty.
+This gives catalog_analyst precise search terms instead of guessing.
 
-### 4. Response Strategy (Based on Confidence)
+### 4. Confidence and Response (LLM Intelligence)
 
-**High Confidence** - DIRECT_ACTION:
+**Trust natural language expression** - PM calibrates confidence naturally through language:
+
+- High confidence: "I'll catalog this brass handle at Rs 450. Proceed?"
+- Medium confidence: "I think this might be a vintage door handle..."
+- Low confidence: "I'm not sure, but it could be..."
+
+**No rigid tiers or templates** - PM reasons about HOW to express, not WHICH tier to use.
+
+**Prompt guidance:**
+- "Be transparent about uncertainty"
+- "Offer alternatives when unsure"
+- "Lead with observations, then inference"
+- "Invite correction naturally"
+
+**Why LLM Intelligence over rigid tiers:**
+- LLMs naturally express uncertainty through language
+- 4 tiers implies false precision (can't reliably distinguish "low" from "very low")
+- Natural expression is more authentic and conversational
+- No confidence enum or tier-to-template mapping needed
+
+### 6. When to Delegate to Specialists
+
+After research phase, if ACTION is needed:
+- Pass analyst findings as context to specialist
+- Specialist focuses on execution, not research
+- Specialist receives enriched context, not raw user input
+
+Pattern:
 ```
-[Observations from research]
+PM: "catalog_specialist, create this product based on analyst findings:
+     - Visual: brass Art Deco handle, 1930s, good condition
+     - Catalog: 3 similar at Rs 450-650, no Art Deco variant exists
+     - User history: catalogs products, typical range Rs 400-700
 
-[Action you're taking with clear reasoning]
-
-[Details: price, category, etc.]
-
-Shall I proceed?
-```
-
-**Medium Confidence** - LEAD_WITH_TOP:
-```
-[Observations from research]
-
-[Primary recommendation with reasoning]
-
-Or:
-- [Alternative 1]
-- [Alternative 2]
-
-Which direction?
-```
-
-**Low Confidence** - PRESENT_OPTIONS:
-```
-[Observations from research]
-
-I see a few directions:
-1. [Option 1 with brief context]
-2. [Option 2 with brief context]
-3. [Option 3 with brief context]
-
-Which would you like?
-```
-
-**Very Low Confidence** - OBSERVE_AND_ASK:
-```
-[Observations - what you noticed]
-
-What would you like to do with this?
+     Recommend: Add to 'Vintage Hardware' at Rs 550"
 ```
 
-### 5. Evidence in Response
+### 7. Evidence in Response
 
-Always lead with what you OBSERVED (facts from research), then what you INFERRED (your hypothesis). This lets users correct inference without feeling you're blind.
+Always lead with what you OBSERVED (facts from analysts), then what you INFERRED (your hypothesis).
 
 Example:
 ```
 "I see a brass door handle, Art Deco style (~1930s), good condition.
-[OBSERVATION - from visual_researcher]
+[OBSERVATION - from visual_analyst]
 
 Your catalog has 3 similar handles at Rs 450-650. You've added 2 handles this week.
-[OBSERVATION - from catalog_researcher + conversation history]
+[OBSERVATION - from catalog_analyst + conversation history]
 
 Recommendation: Add at Rs 550 (matches your pattern)
-[INFERENCE - your hypothesis]
-"
+[INFERENCE - your hypothesis]"
 ```
 
 </research_first_behavior>
 ```
 
-### 6. Error Handling (Researcher Failures)
-
-Researchers may fail or return empty results. Handle gracefully:
-
-**Researcher returns error:**
-- Log for debugging, but don't crash
-- Proceed with available evidence
-- Reduce confidence proportionally
-- Example: "I couldn't analyze the image in detail (low quality), but based on the text..."
-
-**Researcher returns no results:**
-- Distinguish "no data" from "error"
-- "No similar items in catalog" is useful information
-- Factor into response: "This appears to be a new category for your catalog"
-
-**Chained researcher can't proceed:**
-- If visual_researcher fails, catalog_researcher gets no context
-- Fall back to generic catalog search using user's text
-- Or ask user for more description (acknowledge limitation)
-
-**Multiple researchers fail:**
-- Fall back to OBSERVE_AND_ASK
-- Be honest: "I'm having trouble analyzing this. Can you describe what you'd like to do?"
-
-**Pattern:**
-```
-"I could see [what worked], but had trouble with [what failed].
-Based on what I have: [best effort recommendation]
-Or: can you tell me more about [what would help]?"
-```
-
-### 7. Multi-Image Handling
-
-When user sends multiple images:
-
-**Batch detection:**
-- Related items (5 jars from same family) -> Process as collection
-- Unrelated items (jar + marketing flyer) -> Process separately
-
-**Collection handling:**
-- Visual researcher: Identify common elements + variations
-- Catalog researcher: Find family matches, suggest structure
-- Response: "I see 5 related items... [collective recommendation]"
-
-**Mixed handling:**
-- Route each image to appropriate domain researcher
-- Synthesize findings per domain
-- Present organized by domain
-
-**Limit handling:**
-- More than 10 images: Process first 10, acknowledge remainder
-- "I'll start with these 10 items. Send the rest after?"
-
 ---
 
-## Researcher Prompts
+## Analyst Prompts
 
-### visual_researcher
+### visual_analyst
 
 ```xml
 <role>
-You are a visual analysis specialist. Your job is to analyze images and return
-detailed observations. You are fast and focused.
+You are a visual analyst. Your job is to analyze images and return detailed
+observations. You are fast and focused.
 </role>
+
+<tools>
+- `view_image`: See and analyze any image
+</tools>
 
 <instructions>
 Given an image, observe and report:
@@ -360,34 +361,39 @@ Be factual. Report what you SEE, not what you assume about intent.
 </instructions>
 
 <output_format>
-Return your findings in natural language. Example:
+Return findings in natural language:
 
 "Primary object: Door handle
 Materials: Brass, possibly solid (not plated based on patina pattern)
 Style/Era: Art Deco, likely 1920s-1940s based on geometric patterns
-Condition: Good - natural patina present, no damage visible, original finish intact
+Condition: Good - natural patina present, no damage visible
 Dimensions: Approximately 15cm length based on proportions
-Notable features: Hand-forged details on backplate, original screws present
+Notable features: Hand-forged details on backplate
 Image quality: High - good lighting, sharp focus
 
-Confidence: High (85%) - clear image with distinctive style markers"
+Confidence: High - clear image with distinctive style markers"
 </output_format>
 
 <boundaries>
 - Do NOT suggest what the user should do with this item
 - Do NOT make assumptions about user intent
-- Do NOT provide pricing or categorization (that's catalog_researcher's job)
+- Do NOT provide pricing or categorization (that's catalog_analyst's job)
 - Focus purely on visual observation
 </boundaries>
 ```
 
-### catalog_researcher
+### catalog_analyst
 
 ```xml
 <role>
-You are a catalog research specialist. Your job is to find relevant information
-from the product catalog and pricing data. You are fast and focused.
+You are a catalog analyst. Your job is to find relevant information from the
+product catalog and pricing data. You are fast and focused.
 </role>
+
+<tools>
+- `read_data`: Query product, family, pricing tables
+- `aggregate_data`: Get pricing statistics and distributions
+</tools>
 
 <instructions>
 Given context (image description, user query, or product reference), research:
@@ -398,13 +404,11 @@ Given context (image description, user query, or product reference), research:
 4. **Gaps**: Any missing variants or categories?
 5. **Recent Activity**: Any recent changes to similar items?
 
-Use your tools:
-- `read_data`: Query product, family, pricing tables
-- `aggregate_data`: Get pricing statistics
+Use precise search terms when visual context is provided.
 </instructions>
 
 <output_format>
-Return your findings in natural language. Example:
+Return findings in natural language:
 
 "Similar items found: 3 brass handles in 'Vintage Hardware' family
 - HANDLE-BRASS-001: Vintage Brass Handle, Rs 450
@@ -417,34 +421,88 @@ Relevant families: 'Vintage Hardware' (best match), 'Door Accessories' (broader)
 
 Gaps identified: No Art Deco-specific variant exists in catalog
 
-Confidence: High (90%) - good data coverage for this category"
+Confidence: High - good data coverage for this category"
 </output_format>
 
 <boundaries>
 - Do NOT suggest what the user should do
 - Do NOT make assumptions about user intent
 - Focus purely on catalog facts and patterns
-- Stay within catalog/pricing domain (don't query marketing, finance, etc.)
+- Stay within catalog/pricing domain
 </boundaries>
 ```
 
-### Template for Future Researchers
+### product_analyst
 
 ```xml
 <role>
-You are a {domain} research specialist. Your job is to find relevant information
-from {domain} data. You are fast and focused.
+You are a product analyst. Your job is to research detailed product knowledge
+from external sources - what products ARE in the world. You are fast and focused.
 </role>
+
+<tools>
+- `web_search`: Search for product information
+- `hsn_lookup`: HSN/HS code classification lookup
+</tools>
+
+<instructions>
+Given visual context or product reference, research:
+
+1. **Product Identity**: What is the proper industry name for this product?
+2. **Specifications**: Standard sizes, dimensions, capacities, materials
+3. **Classifications**: HSN codes, industry categories, certifications
+4. **Usage**: What industries use this? Common applications?
+5. **Variants**: What related products or accessories exist?
+
+Focus on detailed product knowledge that enriches catalog entries.
+</instructions>
+
+<output_format>
+Return findings in natural language:
+
+"Product identity: Wide Mouth Glass Mason Jar
+Standard sizes: 250ml, 500ml, 1L (most common)
+Materials: Borosilicate glass (premium), soda-lime glass (standard)
+
+Classifications:
+- HSN Code: 7010 (glass containers)
+- Category: Food storage containers
+- GST Rate: 18%
+
+Usage: Food preservation, canning, craft storage, DIY projects
+Common in: Food industry, home goods, craft supplies
+
+Related products: Metal lids, plastic pour caps, labels, jar openers
+
+Confidence: High - well-documented product category"
+</output_format>
+
+<boundaries>
+- Do NOT suggest what user should do (PM's job)
+- Do NOT assume user intent
+- Focus on product KNOWLEDGE, not pricing
+- Stay factual about what the product IS
+</boundaries>
+```
+
+### Template for Future Analysts
+
+```xml
+<role>
+You are a {domain} analyst. Your job is to find relevant information from
+{domain} data. You are fast and focused.
+</role>
+
+<tools>
+- `read_data`: Query {domain} tables
+- `aggregate_data`: Get {domain} statistics
+</tools>
 
 <instructions>
 Given context, research:
 1. [Domain-specific query 1]
 2. [Domain-specific query 2]
 3. [Domain-specific query 3]
-
-Use your tools:
-- `read_data`: Query {domain} tables
-- `aggregate_data`: Get {domain} statistics
 </instructions>
 
 <output_format>
@@ -454,15 +512,124 @@ Return findings in natural language with confidence assessment.
 <boundaries>
 - Do NOT suggest actions (PM's job)
 - Do NOT assume user intent
-- Stay within {domain} (don't query other domains)
+- Stay within {domain}
 </boundaries>
 ```
 
 ---
 
-## User Pattern Learning (No Database)
+## Specialist Prompt Pattern (Slimmed)
 
-PM infers user patterns from conversation history. No explicit storage needed.
+Specialists no longer need research patterns - they receive research context from PM.
+
+```xml
+<background_information>
+## Your Role
+You are the **{Domain} Specialist** - focused on execution within your domain.
+
+## Your Position
+- PM delegates to you WITH research context from analysts
+- You receive enriched input, not raw user queries
+- You focus on: validation, CRUD, HITL approval flows
+
+## Context You Receive
+PM provides analyst findings as context:
+- Visual analysis (what the item is)
+- Catalog research (similar items, pricing patterns)
+- Market research (external rates, HSN codes)
+- User patterns (history, preferences)
+
+You don't need to re-research - focus on execution.
+</background_information>
+
+<instructions>
+## Execution Focus
+
+Given PM's research context + intent:
+1. Validate the proposed action against schema constraints
+2. Check for any edge cases PM may have missed
+3. Construct the write operation
+4. Present for HITL approval
+
+## You Do NOT
+- Re-analyze images (visual_analyst already did)
+- Re-query for similar products (catalog_analyst already did)
+- Research product details (product_analyst already did)
+- Infer user intent (PM already did)
+
+Focus on EXECUTION, not RESEARCH.
+</instructions>
+```
+
+---
+
+## Error Handling (LLM Intelligence)
+
+**Decision**: Trust PM to reason about failures and respond contextually.
+
+### Prompt Guidance (Not Code-Based Fallbacks)
+
+PM handles errors through intelligence, not rigid rules:
+
+**When an analyst fails:**
+- Explain what you learned and what you couldn't
+- Offer user options: retry, proceed with partial info, provide more input
+- Be transparent - don't pretend you have information you don't
+
+**Example responses:**
+
+- visual_analyst fails (blurry): "The image is unclear. Can you resend a clearer photo?"
+- product_analyst fails (timeout): "I can see [visual], but couldn't research details. Proceed anyway?"
+- catalog_analyst fails (DB error): "I know what this IS, but couldn't check your inventory right now."
+
+### Why LLM Intelligence Over Code-Based Fallbacks
+
+Each failure is unique:
+- Error type matters (timeout vs not found vs invalid)
+- User input quality matters
+- Partial results from other analysts matter
+- PM synthesizes contextual, natural response
+
+**No rigid fallback chains in code:**
+- Avoids complex error handling logic
+- PM adapts to situation
+- Graceful degradation emerges from intelligence
+
+---
+
+## Multi-Image Handling
+
+```xml
+<multi_image_handling>
+
+When user sends multiple images:
+
+**Batch detection:**
+- Related items (5 jars from same family) -> Process as collection
+- Unrelated items (jar + marketing flyer) -> Process separately
+
+**Collection handling:**
+- visual_analyst: Identify common elements + variations
+- catalog_analyst: Find family matches, suggest structure
+- Response: "I see 5 related items... [collective recommendation]"
+
+**Mixed handling:**
+- Route each image to appropriate domain
+- Synthesize findings per domain
+- Present organized by domain
+
+**Limit handling:**
+- More than 10 images: Process first 10, acknowledge remainder
+- "I'll start with these 10 items. Send the rest after?"
+
+</multi_image_handling>
+```
+
+---
+
+## User Pattern Learning
+
+PM infers patterns from conversation history. No explicit database needed.
 
 ### What PM Infers
 
@@ -472,41 +639,32 @@ PM infers user patterns from conversation history. No explicit storage needed.
 | Typical intents | "User usually catalogs items, rarely asks for appraisals" |
 | Price sensitivity | "User typically prices items in Rs 400-600 range" |
 | Response preference | "User's replies are brief, they prefer concise responses" |
-| Correction patterns | "User corrected category twice, I should be less certain about categories" |
+| Correction patterns | "User corrected category twice, be less certain about categories" |
 
-### Prompt Guidance for Inference
+### User Essence (Deferred to Framework)
 
-```xml
-<user_pattern_inference>
+**Decision**: Leverage DeepAgents built-in summarization middleware.
 
-The conversation history IS the user profile. From it, notice:
+DeepAgents provides:
+- Automatic conversation context compression
+- Long-running session state management
+- Built-in memory patterns
 
-- **Frequency patterns**: What does this user ask about most?
-- **Language patterns**: How do they phrase requests? Brief or detailed?
-- **Correction patterns**: What have they corrected? (signals where to be less confident)
-- **Workflow patterns**: What sequences do they follow? (image -> catalog -> price?)
-- **Preference patterns**: Do they prefer options or recommendations?
+**Why defer?**
+- Framework solution is battle-tested
+- Avoids premature optimization
+- Can layer custom strategy on top later if needed
 
-Use these patterns to:
-- Adjust which researchers you spawn
-- Calibrate your confidence levels
-- Match their response style
-
-Example reasoning:
-"Looking at history: User has sent 5 product images this week, all cataloged.
-They corrected my category suggestion once. They reply with single words ('yes', 'ok').
-Inference: High likelihood of catalog intent, be careful with categories, keep response brief."
-
-</user_pattern_inference>
-```
+**When to revisit:**
+- If framework summarization proves insufficient
+- If cross-session pattern persistence needed beyond framework capabilities
+- Design custom solution with real usage data informing requirements
 
 ---
 
-## Cold Start Handling (Minimal Code)
+## Cold Start Handling
 
-For truly new users, PM uses company patterns as baseline.
-
-### Company Patterns (Loaded into Context)
+### Company Patterns
 
 ```python
 class CompanyPatterns(BaseModel):
@@ -518,7 +676,7 @@ class CompanyPatterns(BaseModel):
     typical_user_journey: str  # "image -> catalog -> price -> export"
 ```
 
-### PM Prompt for Cold Start
+### Cold Start Prompt
 
 ```xml
 <cold_start_handling>
@@ -544,154 +702,29 @@ Pay extra attention to their response - it teaches you their patterns.
 
 ---
 
-## Outcome Tracking (Minimal)
+## Advanced Behaviors
 
-Track whether PM's hypothesis was correct. PM already has conversation history for everything else.
-
-### What We Track
-
-```python
-class HypothesisOutcome(BaseModel):
-    """Lightweight - just what we can't infer from context."""
-
-    thread_id: str
-    was_correct: bool  # Did user accept or correct?
-    timestamp: datetime
-```
-
-### How We Use It
-
-1. **Track**: After workflow completion, record if user accepted or corrected
-2. **Review**: Periodically review accuracy trends
-3. **Adjust**: If accuracy drops, refine prompts
-
-No complex calibration infrastructure. PM learns from conversation history naturally.
-
----
-
-## Response Strategy Reference
-
-### Confidence Levels (Prompt Guidance)
-
-| Confidence | Strategy | When to Use |
-|------------|----------|-------------|
-| High | DIRECT_ACTION | Multiple evidence sources align, clear user pattern |
-| Medium | LEAD_WITH_TOP | Good evidence, but alternatives plausible |
-| Low | PRESENT_OPTIONS | Mixed signals, multiple valid interpretations |
-| Very Low | OBSERVE_AND_ASK | Limited evidence, high uncertainty |
-
-### Response Patterns
-
-**DIRECT_ACTION (High)**
-```
-[Observations]
-[Action statement]
-[Details]
-Shall I proceed?
-```
-
-**LEAD_WITH_TOP (Medium)**
-```
-[Observations]
-[Primary recommendation]
-
-Or:
-- [Alternative 1]
-- [Alternative 2]
-
-Which direction?
-```
-
-**PRESENT_OPTIONS (Low)**
-```
-[Observations]
-
-I see a few directions:
-1. [Option 1]
-2. [Option 2]
-3. [Option 3]
-
-Which would you like?
-```
-
-**OBSERVE_AND_ASK (Very Low)**
-```
-[Observations]
-
-What would you like to do with this?
-```
-
----
-
-## Advanced Behaviors (Intelligence Enhancements)
-
-Beyond basic research-first behavior, PM exhibits these advanced capabilities to feel like an intelligent partner, not just a tool.
-
-### 1. Researcher Collaboration (Chained Research)
-
-**Insight**: In a real team, researchers share context. Visual findings should inform catalog search.
-
-```xml
-<researcher_collaboration>
-
-When spawning multiple researchers, consider dependencies:
-
-**PARALLEL** (no dependency):
-- Visual + Marketing (independent domains)
-
-**CHAINED** (has dependency):
-- Visual THEN Catalog (visual findings inform catalog search)
-
-For product-related queries with images:
-1. First: visual_researcher ("What is this object?")
-2. Then: catalog_researcher WITH visual context ("Search for brass Art Deco handle")
-
-This gives catalog_researcher precise search terms instead of guessing.
-
-Example:
-- Without chaining: catalog_researcher searches "handle" (broad, noisy results)
-- With chaining: catalog_researcher searches "brass Art Deco door handle 1930s" (precise)
-
-</researcher_collaboration>
-```
-
-### 2. Confidence Transparency
-
-**Insight**: Users trust systems that explain their reasoning. Show your work.
+### 1. Confidence Transparency
 
 ```xml
 <confidence_transparency>
 
-For LEAD_WITH_TOP and PRESENT_OPTIONS responses, briefly explain your reasoning:
+For LEAD_WITH_TOP and PRESENT_OPTIONS responses, briefly explain reasoning:
 
 **Pattern:**
 "I think you want [X] because:
 - [Evidence from user history]
-- [Evidence from research]
+- [Evidence from analysts]
 - [What's uncertain]
 
 [Your recommendation]
 
 Am I reading this right?"
 
-**Example:**
-"I'm fairly confident you want to catalog this because:
-- You've cataloged 3 similar handles this week
-- Your typical price range matches (Rs 450-650)
-- But you haven't explicitly said 'catalog'
-
-Recommendation: Add at Rs 550
-
-Am I reading this right, or did you have something else in mind?"
-
-This invites correction without feeling like a dumb question.
-
 </confidence_transparency>
 ```
 
-### 3. Learning Acknowledgment
-
-**Insight**: When corrected, explicitly acknowledge what you learned. Builds trust.
+### 2. Learning Acknowledgment
 
 ```xml
 <learning_acknowledgment>
@@ -703,161 +736,35 @@ When user corrects your assumption:
 3. **Pivot to correct action**
 
 **Pattern:**
-"Got it - [correct intent], not [wrong assumption]. I notice [pattern for this user].
+"Got it - [correct intent], not [wrong assumption]. I notice [pattern].
 I'll keep that in mind. [Proceed with correct action]..."
-
-**Example:**
-User: "No, I want to appraise it, not catalog"
-
-Response:
-"Ah, appraisal not catalog - noted. I notice you prefer appraisals for vintage Art Deco pieces.
-I'll remember that for similar items. Pulling market data now..."
-
-This shows you're getting smarter about THIS user specifically.
 
 </learning_acknowledgment>
 ```
 
-### 4. Emotional Calibration
-
-**Insight**: Adapt your style to user's emotional state, not just their words.
+### 3. Emotional Calibration
 
 ```xml
 <emotional_calibration>
 
 Notice emotional signals and adapt:
 
-**Frustrated** (short replies, multiple corrections, negative tone):
+**Frustrated** (short replies, corrections, negative tone):
 - Slow down, be more careful
 - Offer more options, fewer assumptions
-- Acknowledge friction: "Let me make sure I get this right..."
 
-**Confident** (quick approvals, no corrections, decisive):
+**Confident** (quick approvals, decisive):
 - Be more autonomous
 - Fewer options, more action
-- Match their pace
 
-**Confused** (questions, hesitation, partial responses):
+**Confused** (questions, hesitation):
 - Explain more
 - Break into smaller steps
-- Check understanding: "Does that make sense?"
-
-**Signals to watch:**
-- Reply length (short = frustrated or confident, depends on history)
-- Correction frequency (high = be more careful)
-- Question marks (confused, needs clarity)
-- Explicit emotion ("ugh", "great", "not sure")
-
-Adapt your response style to their state.
 
 </emotional_calibration>
 ```
 
-### 5. Intent Depth (Understanding WHY)
-
-**Insight**: Same action with different WHYs needs different responses.
-
-```xml
-<intent_depth>
-
-Beyond WHAT (catalog, appraise, export), understand WHY:
-
-**Same action, different WHYs:**
-
-Cataloging for SALE:
-- Focus on competitive pricing
-- Quick, efficient listing
-- Market positioning
-
-Cataloging for INSURANCE:
-- Focus on accurate valuation
-- Detailed documentation
-- Provenance emphasis
-
-Cataloging for COLLECTION:
-- Focus on organization
-- Condition notes
-- Personal significance
-
-**How to infer WHY:**
-- User history (what do they usually do after cataloging?)
-- Explicit signals ("need this for insurance")
-- Item type (antiques often for appraisal/insurance)
-- Company context (B2B vs B2C)
-
-**When WHY is unclear and affects response:**
-"Are you looking to sell this, or document it for another purpose?
-This affects how I'll set up the listing."
-
-Only ask when WHY genuinely changes your approach.
-
-</intent_depth>
-```
-
-### 6. Anticipatory Awareness
-
-**Insight**: Think ahead about likely follow-ups to be ready.
-
-```xml
-<anticipatory_awareness>
-
-After responding to primary intent, briefly note likely follow-ups in your reasoning:
-
-**Common sequences:**
-- Catalog -> pricing inquiry
-- Catalog -> social posting
-- Appraisal -> sell decision
-- Pricing -> competitor comparison
-
-**What to do:**
-Simply be aware of what's likely next. When the follow-up comes, you'll have context primed.
-
-No need to pre-fetch or cache. Your reasoning about "what's next" prepares you naturally.
-
-</anticipatory_awareness>
-```
-
-### 7. User Essence (Compressed Persistent Memory)
-
-**Insight**: Context window has limits. Compress patterns into persistent essence.
-
-```xml
-<user_essence>
-
-Every ~10 interactions, synthesize user patterns into compressed essence:
-
-**What to capture:**
-- Primary domain and intent distribution
-- Response style preference (brief/detailed)
-- Key corrections made (what to be careful about)
-- Workflow patterns (typical sequences)
-- Price sensitivity and ranges
-
-**Format (lightweight, ~200 tokens):**
-"User Essence:
-- Primary: catalog (80%), pricing (15%), other (5%)
-- Style: brief responses, decisive
-- Corrections: category suggestions (2x), be careful with categories
-- Workflow: image -> catalog -> price (typical)
-- Price range: Rs 400-700"
-
-**Usage:**
-- Load at session start (supplements conversation history)
-- Helps with long conversations where early patterns scroll out
-- Informs cold-start for returning users
-
-**When to Update:**
-PM decides naturally. When patterns shift significantly (major correction, new workflow preference), PM regenerates essence as part of its response. No code triggers needed.
-
-**Storage:**
-Simple user_essence text field in user table. PM generates, middleware persists.
-
-</user_essence>
-```
-
-### 8. Proactive Suggestions
-
-**Insight**: A smart assistant notices opportunities user didn't ask about.
+### 4. Proactive Suggestions
 
 ```xml
 <proactive_suggestions>
@@ -865,40 +772,26 @@ Simple user_essence text field in user table. PM generates, middleware persists.
 After completing user's request, consider valuable insights:
 
 **Patterns to notice:**
-- Multiple similar items -> suggest family/collection grouping
-- Pricing inconsistencies -> suggest price adjustment
+- Multiple similar items -> suggest family grouping
+- Pricing inconsistencies -> suggest adjustment
 - Missing variants -> suggest filling gaps
-- Seasonal timing -> suggest optimal listing time
-- Incomplete product -> suggest missing info
 
 **Format:**
-"[Complete user's request first]
+"[Complete request first]
 
 By the way, I noticed [pattern]. Would you like me to [suggestion]?"
 
-**Examples:**
-"Done - added to catalog at Rs 550.
-
-By the way, I noticed you've added 5 blue bottles this week but they're in different families.
-Would you like me to create a 'Blue Collection' to group them?"
-
-"Cataloged successfully.
-
-I noticed this Art Deco handle is priced lower than your similar items (Rs 550 vs avg Rs 650).
-Want me to adjust, or is there a reason for the difference?"
-
 **Guidelines:**
-- Only suggest if genuinely valuable
+- Only if genuinely valuable
 - Maximum one suggestion per response
-- Don't be noisy - quality over quantity
-- Frame as optional ("Would you like..." not "You should...")
+- Frame as optional
 
 </proactive_suggestions>
 ```
 
 ---
 
-## Example Flow (Enhanced)
+## Example Flow
 
 ### Input
 User sends image of brass handle, no text. User has history of cataloging products.
@@ -906,67 +799,72 @@ User sends image of brass handle, no text. User has history of cataloging produc
 ### PM Reasoning (Internal)
 
 ```
-1. USER PATTERNS (from history):
+1. USER PATTERNS (from history + essence):
    - Cataloged 2 handles this week
-   - Primary domain: catalog (90% of interactions)
+   - Primary domain: catalog (90%)
    - Prefers brief responses
-   - No corrections on handle categorization
-   - Emotional state: confident (quick approvals lately)
+   - No corrections on handles
 
-2. RESEARCHERS TO SPAWN (CHAINED):
-   - First: visual_researcher (image present)
-   - Then: catalog_researcher WITH visual context
+2. INPUT ANALYSIS:
+   - Image present, no text
+   - Ambiguous intent -> RESEARCH NEEDED
 
-3. [Spawns visual_researcher]
+3. SPAWN ANALYSTS (CHAINED):
+   - First: visual_analyst (image present)
+   - Then: catalog_analyst WITH visual context
 
 4. VISUAL FINDINGS:
    "Brass door handle, Art Deco, 1930s, good condition, hand-forged details"
 
-5. [Spawns catalog_researcher with context: "brass Art Deco door handle 1930s"]
+5. CATALOG FINDINGS (with visual context):
+   "3 similar in 'Vintage Hardware' at Rs 450-650, no Art Deco variant"
 
-6. CATALOG FINDINGS:
-   "3 similar in 'Vintage Hardware' at Rs 450-650, no Art Deco variant exists"
+6. CONFIDENCE ASSESSMENT:
+   - User pattern: strongly suggests catalog
+   - Visual: confirms catalogable product
+   - Catalog: clear pricing precedent
+   - Confidence: Medium-High -> LEAD_WITH_TOP
 
-7. CONFIDENCE ASSESSMENT:
-   - User pattern strongly suggests catalog intent
-   - Visual confirms catalogable product
-   - Catalog shows clear pricing precedent
-   - User is in confident mode (match their pace)
-   - Confidence: Medium-High (LEAD_WITH_TOP)
-
-8. ANTICIPATORY AWARENESS:
-   - Likely follow-up: pricing inquiry or social posting
-   - Context primed for quick response
-
-9. PROACTIVE CHECK:
-   - Noticed: No Art Deco variant in catalog
-   - Worth suggesting: Yes (fills a gap)
-
-10. RESPONSE with transparency + proactive suggestion:
+7. RESPONSE STRATEGY:
+   - Lead with observation + recommendation
+   - Offer alternative
+   - Invite correction
 ```
 
-### PM Response (Enhanced)
+### PM Response
 
 ```
-Brass door handle, Art Deco style (~1930s), good condition with natural patina
-and hand-forged details.
+Brass door handle, Art Deco style (~1930s), good condition with natural
+patina and hand-forged details.
 
 I think you want to catalog this because:
 - You've cataloged 2 similar handles this week
-- Your typical range (Rs 450-650) matches the catalog
+- Your typical range (Rs 450-650) matches
 
 Recommendation: Add to 'Vintage Hardware' at Rs 550
 
 Or:
-- Get detailed appraisal (Art Deco pieces can have collector value)
+- Get detailed appraisal (Art Deco can have collector value)
 - Different approach
 
 Am I reading this right?
 
 ---
 
-By the way, I noticed there's no Art Deco-specific variant in your catalog yet.
-Want me to create an 'Art Deco Hardware' sub-family for pieces like this?
+By the way, I noticed there's no Art Deco-specific variant in your catalog.
+Want me to create an 'Art Deco Hardware' sub-family?
+```
+
+### If User Approves
+
+PM delegates to catalog_specialist WITH context:
+```
+"Create product based on analyst findings:
+- Visual: brass Art Deco handle, 1930s, good condition
+- Catalog: 3 similar at Rs 450-650, 'Vintage Hardware' family
+- User confirmed: Add at Rs 550
+
+Execute the catalog creation."
 ```
 
 ### If User Corrects
@@ -974,15 +872,15 @@ Want me to create an 'Art Deco Hardware' sub-family for pieces like this?
 ```
 User: "No, I want to appraise it"
 
-PM Response (with learning acknowledgment):
+PM Response:
 "Ah, appraisal not catalog - noted. I notice you prefer appraisals for
-vintage Art Deco pieces. I'll remember that for similar items.
+vintage Art Deco pieces. I'll remember that.
 
-Pulling market data... [instant - was pre-fetched]
+[Spawns product_analyst for appraisal data]
 
 Based on recent auction data:
 - Art Deco brass hardware: Rs 800-1,500 at auction
-- Similar handles sold: Rs 950 avg (last 6 months)
+- Similar handles sold: Rs 950 avg
 - Condition premium: +15% for original patina
 
 Estimated value: Rs 900-1,100
@@ -994,50 +892,49 @@ Would you like a detailed appraisal report?"
 
 ## Implementation Roadmap
 
-### Phase 1: Core Foundation (Week 1)
+### Phase 1: Core Analysts (Week 1)
 
 | Task | Type | Effort |
 |------|------|--------|
-| Enhance PM prompt with research-first behavior | Prompt | 1 day |
-| Add advanced behaviors to PM prompt | Prompt | 1 day |
-| Create visual_researcher specialist | Prompt + Config | 1 day |
-| Create catalog_researcher specialist | Prompt + Config | 1 day |
-| Test chained delegation (visual → catalog) | Testing | 1 day |
+| Create visual_analyst (prompt + config) | Prompt + Code | 1 day |
+| Create product_analyst (prompt + config) | Prompt + Code | 1 day |
+| Create catalog_analyst (prompt + config) | Prompt + Code | 1 day |
+| Enhance PM prompt with analyst orchestration | Prompt | 1 day |
+| Test chained delegation (visual -> product -> catalog) | Testing | 1 day |
 
-### Phase 2: Intelligence Enhancements (Week 2)
-
-| Task | Type | Effort |
-|------|------|--------|
-| Implement confidence transparency in responses | Prompt | 0.5 day |
-| Implement learning acknowledgment pattern | Prompt | 0.5 day |
-| Implement emotional calibration | Prompt | 0.5 day |
-| Add intent depth (WHY) reasoning | Prompt | 0.5 day |
-| Test enhanced behaviors | Testing | 1 day |
-| Add company patterns loading | Code | 1 day |
-
-### Phase 3: Persistence & Tracking (Week 3)
+### Phase 2: Specialist Slimdown (Week 1-2)
 
 | Task | Type | Effort |
 |------|------|--------|
-| Add HypothesisOutcome tracking (was_correct only) | Schema + Code | 0.5 day |
-| Add user essence field to user table | Schema | 0.5 day |
-| Update middleware to load/save essence | Code | 0.5 day |
+| Remove research patterns from catalog_specialist | Prompt | 0.5 day |
+| Add "receives context" pattern to specialists | Prompt | 0.5 day |
+| Test specialist with pre-provided context | Testing | 0.5 day |
+
+### Phase 3: PM Intelligence (Week 2)
+
+| Task | Type | Effort |
+|------|------|--------|
+| Add research-first philosophy to PM | Prompt | 0.5 day |
+| Add response strategies to PM (LLM Intelligence) | Prompt | 0.5 day |
+| Add user pattern inference to PM | Prompt | 0.5 day |
+| Test full research-first flow | Testing | 1 day |
+
+### Phase 4: Persistence & Integration (Week 3)
+
+| Task | Type | Effort |
+|------|------|--------|
+| Add hypothesis_outcome tracking | Schema + Code | 0.5 day |
+| Enhance company context middleware with patterns | Code | 0.5 day |
+| Integrate DeepAgents summarization middleware | Config | 0.5 day |
 | Test persistence across sessions | Testing | 0.5 day |
 
-### Phase 4: Calibration & Refinement (Week 4+)
+### Phase 5: Additional Analysts (Ongoing)
 
 | Task | Type | Effort |
 |------|------|--------|
-| Analyze accuracy by confidence band | Analysis | 0.5 day |
-| Update PM prompt with calibration feedback | Prompt | 0.5 day |
-| Refine proactive suggestions based on feedback | Prompt | 0.5 day |
-| Iterate based on real usage | Ongoing | - |
-
-### Phase 5: Domain Expansion (Ongoing)
-
-- Add researcher per new domain (prompt only)
-- Update PM prompt with new domain awareness
-- No code changes needed for expansion
+| Create operations_analyst | Prompt + Code | 1 day |
+| Create marketing_analyst | Prompt + Code | 1 day |
+| Each follows established pattern | Prompt | 0.5 day each |
 
 ---
 
@@ -1048,22 +945,10 @@ Would you like a detailed appraisal report?"
 | Clarification rate | <30% | Messages where PM asks "what do you want?" |
 | Hypothesis accuracy | >70% | Top intent matches actual intent |
 | User correction rate | <15% | User corrects PM's assumption |
-| Research latency | <500ms | Time for parallel researcher execution |
-| Cold start recovery | <5 msgs | Messages until accuracy matches warm users |
-
----
-
-## What We Removed (vs. Previous Design)
-
-| Removed | Why |
-|---------|-----|
-| Routing code (keyword matching) | PM reasons about relevance |
-| User profile database | PM infers from conversation history |
-| Confidence calculation code | PM assesses naturally |
-| Rigid findings schemas | Natural language findings |
-| Scoped tool factory | Prompt researchers to stay focused |
-| Cross-domain protocol code | PM synthesizes all findings |
-| Complex implementation roadmap | Mostly prompts now |
+| Research latency | <500ms | Time for chained analyst execution |
+| Prompt size (analysts) | <400 lines | Per-agent line count |
+| Prompt size (specialists) | <700 lines | Per-agent line count |
+| Cross-domain reuse | >3x | Domains using visual_analyst |
 
 ---
 
@@ -1071,40 +956,93 @@ Would you like a detailed appraisal report?"
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `prompts/project_manager_intelligent.prompt` | Modify | Add research-first + advanced behaviors |
-| `prompts/researchers/visual_researcher.prompt` | Create | Visual analysis specialist |
-| `prompts/researchers/catalog_researcher.prompt` | Create | Catalog research specialist |
-| `specialists/visual_researcher.py` | Create | Minimal config (model, tools) |
-| `specialists/catalog_researcher.py` | Create | Minimal config (model, tools) |
-| `schemas/hypothesis_outcome.py` | Create | Lightweight outcome tracking |
-| `workflows/outcome_tracker.py` | Modify | Add was_correct tracking |
-| `middleware/context_middleware.py` | Modify | Load/save user essence (simple text field) |
+| `prompts/analysts/visual_analyst.prompt` | Create | Visual observation ("What do I SEE?") |
+| `prompts/analysts/product_analyst.prompt` | Create | External product knowledge ("What IS this?") |
+| `prompts/analysts/catalog_analyst.prompt` | Create | Internal catalog research ("What do we HAVE?") |
+| `prompts/project_manager_intelligent.prompt` | Modify | Add research-first + analyst orchestration |
+| `prompts/specialists/catalog_specialist.prompt` | Modify | Remove research patterns, add context receiving |
+| `analysts/visual_analyst.py` | Create | Analyst config (Gemini Flash, view_image tool) |
+| `analysts/product_analyst.py` | Create | Analyst config (Gemini Flash, web_search, hsn_lookup) |
+| `analysts/catalog_analyst.py` | Create | Analyst config (Gemini Flash, read_data, aggregate_data) |
+| `middleware/company_context_middleware.py` | Modify | Add company pattern fields |
 
 ---
 
 ## Summary
 
-**Philosophy**: Trust PM intelligence. Guide through prompts, not code.
+**Philosophy**: Intelligence-First. Trust PM reasoning over rigid scaffolding.
 
-**Architecture**: PM reasons about user patterns, spawns researchers, synthesizes findings, responds with calibrated confidence.
+**Architecture**: Two-layer agent model with 3 core analysts:
 
-**Implementation**: Mostly prompts. Minimal code for outcome tracking, user essence, and researcher configs.
+| Analyst | Question | Source |
+|---------|----------|--------|
+| visual_analyst | "What do I SEE?" | Image observation |
+| product_analyst | "What IS this?" | External knowledge |
+| catalog_analyst | "What do we HAVE?" | Internal DB |
 
-**Scaling**: Add researchers via prompts. No code changes per domain.
+**Key Decisions (from Debates):**
 
-**What Makes PM Feel Intelligent** (not just functional):
+| Decision | Approach |
+|----------|----------|
+| Two-layer separation | Analysts (research) + Specialists (execution) |
+| Research philosophy | RESEARCH-FIRST - always before action |
+| Analyst execution | HYBRID - chain when dependency, parallel otherwise |
+| Specialist design | Remove patterns, keep ALL tools |
+| Confidence expression | LLM Intelligence - natural language |
+| Error handling | LLM Intelligence - contextual responses |
+| User essence | Defer to DeepAgents framework |
+| Company patterns | Enhance existing middleware |
 
-| Capability | How It Feels to User |
-|------------|---------------------|
-| Research-first | "It understood my vague input" |
-| Chained research | "The search results were exactly right" |
-| Confidence transparency | "It explained why it thought that" |
-| Learning acknowledgment | "It remembered my preference" |
-| Emotional calibration | "It matched my pace/mood" |
-| Intent depth | "It knew WHY I wanted this" |
-| Anticipatory awareness | "It was ready for my follow-up" |
-| Proactive suggestions | "It noticed something I missed" |
+**Benefits**:
 
-**The Difference**: A tool responds. An intelligent partner collaborates, explains, learns, empathizes, anticipates, and suggests.
+- Focused prompts (~300 lines analysts, ~600 lines specialists)
+- Cross-domain reuse (visual_analyst serves 5+ domains)
+- 44-60% token savings on research-only queries
+- Linear scaling (add pair per domain, no bloat)
 
-This is how I work. Now PM works the same way.
+**The Difference**: A tool responds. An intelligent partner researches, synthesizes, and acts with informed confidence.
+
+---
+
+## Appendix: Migration from Merged to Two-Layer
+
+### Current State (Merged)
+
+```
+catalog_specialist.prompt: ~824 lines
+- Contains research workflow
+- Contains execution workflow
+- Contains examples for both
+```
+
+### Target State (Two-Layer)
+
+```
+visual_analyst.prompt: ~250 lines (NEW)
+catalog_analyst.prompt: ~350 lines (NEW)
+catalog_specialist.prompt: ~600 lines (SLIMMED)
+- Research patterns REMOVED
+- Context receiving pattern ADDED
+- Execution patterns KEPT
+```
+
+### Migration Steps
+
+1. Extract research sections from catalog_specialist -> catalog_analyst
+2. Extract image analysis patterns -> visual_analyst
+3. Add "receives context" pattern to catalog_specialist
+4. Update PM to orchestrate analysts
+5. Test end-to-end flow
+
+---
+
+**Version History:**
+
+- v3.0.0 (2025-12-07): Final Architecture post-debates
+  - Renamed market_analyst -> product_analyst (detailed product knowledge focus)
+  - Research-First philosophy (always research before action)
+  - LLM Intelligence for confidence and error handling (no rigid tiers)
+  - Defer user essence to DeepAgents framework
+  - Enhance existing company context middleware
+- v2.0.0 (2025-12-07): Two-Layer Architecture - Analysts + Specialists separation
+- v1.0.0 (2025-12-06): Initial design with researchers (merged approach)
