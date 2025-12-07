@@ -1,9 +1,9 @@
 # Hypothesis Engine: Intelligence-First Intent Detection
 
-**Status**: Design Complete - Revised v3.0
+**Status**: Design Complete - Revised v3.1
 **Date**: 2025-12-07
 **Authors**: Jarvis + Human Architect
-**Revision**: v3.0 - Final Architecture (Post-Debates)
+**Revision**: v3.1 - Final Architecture with Shared Workspace Protocol
 
 ---
 
@@ -294,20 +294,47 @@ This gives catalog_analyst precise search terms instead of guessing.
 - Natural expression is more authentic and conversational
 - No confidence enum or tier-to-template mapping needed
 
+### 5. Shared Workspace for Context Transfer
+
+**Key Insight**: DeepAgents includes FilesystemMiddleware by default for all agents. Files written by analysts persist in state and are accessible to subsequent agents.
+
+**Why use workspace files?**
+- **No information loss**: Specialist reads full analyst findings, not PM's summary
+- **Debugging**: Files are inspectable in state
+- **Structured data**: Analysts can write YAML/JSON in markdown
+- **Token efficiency**: PM works with summaries, specialists read full detail
+
+**Workspace Convention:**
+```
+/workspace/findings/
+  visual.md       # visual_analyst writes detailed observations
+  product.md      # product_analyst writes product knowledge
+  catalog.md      # catalog_analyst writes catalog matches
+```
+
+**Protocol:**
+1. Analysts write detailed findings to `/workspace/findings/{analyst_name}.md`
+2. Analysts return brief summary to PM (for orchestration decisions)
+3. PM references file paths when delegating to specialists
+4. Specialists read full findings directly from workspace
+
 ### 6. When to Delegate to Specialists
 
 After research phase, if ACTION is needed:
-- Pass analyst findings as context to specialist
-- Specialist focuses on execution, not research
+- Reference workspace files for full context
+- Specialist reads analyst findings directly (no information loss)
 - Specialist receives enriched context, not raw user input
 
 Pattern:
 ```
-PM: "catalog_specialist, create this product based on analyst findings:
-     - Visual: brass Art Deco handle, 1930s, good condition
-     - Catalog: 3 similar at Rs 450-650, no Art Deco variant exists
-     - User history: catalogs products, typical range Rs 400-700
+PM: "catalog_specialist, create this product.
 
+     Read full analyst context from:
+     - /workspace/findings/visual.md
+     - /workspace/findings/product.md
+     - /workspace/findings/catalog.md
+
+     Summary: Brass Art Deco handle, 1930s, 3 similar at Rs 450-650.
      Recommend: Add to 'Vintage Hardware' at Rs 550"
 ```
 
@@ -344,6 +371,8 @@ observations. You are fast and focused.
 
 <tools>
 - `view_image`: See and analyze any image
+- `write_file`: Write findings to workspace
+- `read_file`: Read context from workspace (if needed)
 </tools>
 
 <instructions>
@@ -361,17 +390,37 @@ Be factual. Report what you SEE, not what you assume about intent.
 </instructions>
 
 <output_format>
-Return findings in natural language:
+1. Write detailed findings to `/workspace/findings/visual.md`
+2. Return brief summary to PM
 
-"Primary object: Door handle
-Materials: Brass, possibly solid (not plated based on patina pattern)
-Style/Era: Art Deco, likely 1920s-1940s based on geometric patterns
-Condition: Good - natural patina present, no damage visible
-Dimensions: Approximately 15cm length based on proportions
-Notable features: Hand-forged details on backplate
-Image quality: High - good lighting, sharp focus
+**File format (`/workspace/findings/visual.md`):**
+```markdown
+# Visual Analysis Findings
 
-Confidence: High - clear image with distinctive style markers"
+## Primary Object
+- Type: Door handle
+- Material: Brass (solid - patina pattern indicates not plated)
+
+## Style & Era
+- Style: Art Deco
+- Era: 1920s-1940s (geometric patterns characteristic)
+- Confidence: High
+
+## Condition
+- Overall: Good
+- Patina: Natural, desirable
+- Damage: None visible
+
+## Dimensions (estimated)
+- Length: ~15cm
+- Width: ~5cm
+
+## Image Quality
+- Clarity: High
+- Lighting: Good
+```
+
+**Return to PM:** "Brass Art Deco door handle, 1930s, good condition. Full details in /workspace/findings/visual.md"
 </output_format>
 
 <boundaries>
@@ -379,6 +428,7 @@ Confidence: High - clear image with distinctive style markers"
 - Do NOT make assumptions about user intent
 - Do NOT provide pricing or categorization (that's catalog_analyst's job)
 - Focus purely on visual observation
+- ALWAYS write detailed findings to workspace before returning
 </boundaries>
 ```
 
@@ -393,6 +443,8 @@ product catalog and pricing data. You are fast and focused.
 <tools>
 - `read_data`: Query product, family, pricing tables
 - `aggregate_data`: Get pricing statistics and distributions
+- `write_file`: Write findings to workspace
+- `read_file`: Read prior analyst findings from workspace
 </tools>
 
 <instructions>
@@ -408,20 +460,40 @@ Use precise search terms when visual context is provided.
 </instructions>
 
 <output_format>
-Return findings in natural language:
+1. Read visual findings from `/workspace/findings/visual.md` (if available)
+2. Write detailed findings to `/workspace/findings/catalog.md`
+3. Return brief summary to PM
 
-"Similar items found: 3 brass handles in 'Vintage Hardware' family
-- HANDLE-BRASS-001: Vintage Brass Handle, Rs 450
-- HANDLE-BRASS-002: Art Deco Handle, Rs 600
-- HANDLE-BRASS-003: Antique Door Handle, Rs 550
+**File format (`/workspace/findings/catalog.md`):**
+```markdown
+# Catalog Analysis Findings
 
-Pricing patterns: Range Rs 450-650, average Rs 533, trend stable
+## Visual Context (from /workspace/findings/visual.md)
+- Product: Brass Art Deco door handle, 1930s
 
-Relevant families: 'Vintage Hardware' (best match), 'Door Accessories' (broader)
+## Similar Items Found
+| SKU | Name | Price | Family |
+|-----|------|-------|--------|
+| HANDLE-BRASS-001 | Vintage Brass Handle | Rs 450 | Vintage Hardware |
+| HANDLE-BRASS-002 | Art Deco Handle | Rs 600 | Vintage Hardware |
+| HANDLE-BRASS-003 | Antique Door Handle | Rs 550 | Vintage Hardware |
 
-Gaps identified: No Art Deco-specific variant exists in catalog
+## Pricing Analysis
+- Range: Rs 450-650
+- Average: Rs 533
+- Trend: Stable
 
-Confidence: High - good data coverage for this category"
+## Relevant Families
+- Best match: Vintage Hardware
+- Alternative: Door Accessories
+
+## Gaps Identified
+- No Art Deco-specific variant exists
+
+## Confidence: High
+```
+
+**Return to PM:** "3 similar at Rs 450-650 in Vintage Hardware. No Art Deco variant. Full details in /workspace/findings/catalog.md"
 </output_format>
 
 <boundaries>
@@ -429,6 +501,8 @@ Confidence: High - good data coverage for this category"
 - Do NOT make assumptions about user intent
 - Focus purely on catalog facts and patterns
 - Stay within catalog/pricing domain
+- ALWAYS read visual findings first (if available)
+- ALWAYS write detailed findings to workspace before returning
 </boundaries>
 ```
 
@@ -443,6 +517,8 @@ from external sources - what products ARE in the world. You are fast and focused
 <tools>
 - `web_search`: Search for product information
 - `hsn_lookup`: HSN/HS code classification lookup
+- `write_file`: Write findings to workspace
+- `read_file`: Read prior analyst findings from workspace
 </tools>
 
 <instructions>
@@ -458,23 +534,45 @@ Focus on detailed product knowledge that enriches catalog entries.
 </instructions>
 
 <output_format>
-Return findings in natural language:
+1. Read visual findings from `/workspace/findings/visual.md` (if available)
+2. Write detailed findings to `/workspace/findings/product.md`
+3. Return brief summary to PM
 
-"Product identity: Wide Mouth Glass Mason Jar
-Standard sizes: 250ml, 500ml, 1L (most common)
-Materials: Borosilicate glass (premium), soda-lime glass (standard)
+**File format (`/workspace/findings/product.md`):**
+```markdown
+# Product Analysis Findings
 
-Classifications:
-- HSN Code: 7010 (glass containers)
-- Category: Food storage containers
+## Visual Context (from /workspace/findings/visual.md)
+- Observed: Brass door handle, Art Deco style
+
+## Product Identity
+- Proper name: Art Deco Brass Door Handle
+- Industry category: Architectural Hardware
+- Sub-category: Door Furniture
+
+## Specifications
+- Standard sizes: 12-18cm length typical
+- Materials: Solid brass, cast brass, brass-plated
+- Era: 1920s-1940s original, reproductions common
+
+## Classifications
+- HSN Code: 8302 (base metal mountings)
 - GST Rate: 18%
+- Import category: Decorative hardware
 
-Usage: Food preservation, canning, craft storage, DIY projects
-Common in: Food industry, home goods, craft supplies
+## Market Context
+- Usage: Residential restoration, vintage decor, collectors
+- Industries: Interior design, antique trade, hospitality
 
-Related products: Metal lids, plastic pour caps, labels, jar openers
+## Related Products
+- Matching backplates
+- Period-appropriate screws
+- Brass polish/care products
 
-Confidence: High - well-documented product category"
+## Confidence: High
+```
+
+**Return to PM:** "Art Deco brass door handle, HSN 8302, restoration/collector market. Full details in /workspace/findings/product.md"
 </output_format>
 
 <boundaries>
@@ -482,6 +580,8 @@ Confidence: High - well-documented product category"
 - Do NOT assume user intent
 - Focus on product KNOWLEDGE, not pricing
 - Stay factual about what the product IS
+- ALWAYS read visual findings first (if available)
+- ALWAYS write detailed findings to workspace before returning
 </boundaries>
 ```
 
@@ -520,7 +620,7 @@ Return findings in natural language with confidence assessment.
 
 ## Specialist Prompt Pattern (Slimmed)
 
-Specialists no longer need research patterns - they receive research context from PM.
+Specialists no longer need research patterns - they receive research context from PM and can read full analyst findings from workspace.
 
 ```xml
 <background_information>
@@ -532,32 +632,39 @@ You are the **{Domain} Specialist** - focused on execution within your domain.
 - You receive enriched input, not raw user queries
 - You focus on: validation, CRUD, HITL approval flows
 
-## Context You Receive
-PM provides analyst findings as context:
-- Visual analysis (what the item is)
-- Catalog research (similar items, pricing patterns)
-- Market research (external rates, HSN codes)
-- User patterns (history, preferences)
+## Context Access
+PM provides summary + file references. For full context, read workspace files:
+- `/workspace/findings/visual.md` - Visual observations
+- `/workspace/findings/product.md` - Product knowledge (HSN, specs)
+- `/workspace/findings/catalog.md` - Catalog matches, pricing
 
-You don't need to re-research - focus on execution.
+**Always read workspace files** for complete analyst findings before execution.
 </background_information>
+
+<tools>
+- `read_file`: Read analyst findings from workspace
+- `read_data`: Query database for validation
+- `write_data`: Create/update records
+- `inspect_schema`: Check table structure
+</tools>
 
 <instructions>
 ## Execution Focus
 
-Given PM's research context + intent:
-1. Validate the proposed action against schema constraints
-2. Check for any edge cases PM may have missed
-3. Construct the write operation
-4. Present for HITL approval
+Given PM's delegation:
+1. Read full analyst findings from `/workspace/findings/`
+2. Validate the proposed action against schema constraints
+3. Check for any edge cases PM may have missed
+4. Construct the write operation
+5. Present for HITL approval
 
 ## You Do NOT
-- Re-analyze images (visual_analyst already did)
-- Re-query for similar products (catalog_analyst already did)
-- Research product details (product_analyst already did)
+- Re-analyze images (read /workspace/findings/visual.md instead)
+- Re-query for similar products (read /workspace/findings/catalog.md instead)
+- Research product details (read /workspace/findings/product.md instead)
 - Infer user intent (PM already did)
 
-Focus on EXECUTION, not RESEARCH.
+Focus on EXECUTION using workspace context, not RESEARCH.
 </instructions>
 ```
 
@@ -980,7 +1087,7 @@ Would you like a detailed appraisal report?"
 | product_analyst | "What IS this?" | External knowledge |
 | catalog_analyst | "What do we HAVE?" | Internal DB |
 
-**Key Decisions (from Debates):**
+**Key Decisions (from Debates + Research):**
 
 | Decision | Approach |
 |----------|----------|
@@ -992,6 +1099,7 @@ Would you like a detailed appraisal report?"
 | Error handling | LLM Intelligence - contextual responses |
 | User essence | Defer to DeepAgents framework |
 | Company patterns | Enhance existing middleware |
+| Context transfer | Shared workspace via FilesystemMiddleware (prompt-only) |
 
 **Benefits**:
 
@@ -999,6 +1107,7 @@ Would you like a detailed appraisal report?"
 - Cross-domain reuse (visual_analyst serves 5+ domains)
 - 44-60% token savings on research-only queries
 - Linear scaling (add pair per domain, no bloat)
+- Zero information loss (specialists read full analyst findings from workspace)
 
 **The Difference**: A tool responds. An intelligent partner researches, synthesizes, and acts with informed confidence.
 
@@ -1038,6 +1147,10 @@ catalog_specialist.prompt: ~600 lines (SLIMMED)
 
 **Version History:**
 
+- v3.1.0 (2025-12-07): Added Shared Workspace Protocol
+  - Analysts write detailed findings to /workspace/findings/
+  - Specialists read full context from workspace (zero information loss)
+  - Leverages DeepAgents built-in FilesystemMiddleware (prompt-only, no code)
 - v3.0.0 (2025-12-07): Final Architecture post-debates
   - Renamed market_analyst -> product_analyst (detailed product knowledge focus)
   - Research-First philosophy (always research before action)
