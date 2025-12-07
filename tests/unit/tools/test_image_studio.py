@@ -142,13 +142,13 @@ class TestImageStudioSchemas:
         assert input_spec.lighting.type == "soft studio"
         assert input_spec.material_treatment.primary_material == "clear glass"
 
-    def test_image_studio_input_empty_images_for_generation(self):
-        """Test ImageStudioInput with no images (pure generation)."""
-        input_spec = ImageStudioInput(
-            images=[],
-            creative_direction="Generate luxury bathroom scene",
-        )
-        assert len(input_spec.images) == 0
+    def test_image_studio_input_empty_images_rejected(self):
+        """Test ImageStudioInput rejects empty images list."""
+        with pytest.raises(ValueError, match="at least 1 item"):
+            ImageStudioInput(
+                images=[],
+                creative_direction="Generate luxury bathroom scene",
+            )
 
     def test_image_metadata_structure(self):
         """Test ImageMetadata schema."""
@@ -415,39 +415,34 @@ class TestImageProcessing:
 
 
 # =============================================================================
-# Group 4: Pure Generation Tests (No Source Images)
+# Group 4: Output Specification Tests
 # =============================================================================
 
 
-class TestPureGeneration:
-    """Test pure generation (no source images)."""
+class TestOutputSpecs:
+    """Test output specification handling."""
 
+    @patch("autifyme_agents.tools.image_studio.tool._save_base64_image")
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    def test_generate_without_images(
-        self, mock_llm_factory, mock_gemini_response_with_image
+    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
+    def test_output_specs_respected(
+        self, mock_load, mock_llm_factory, mock_save, mock_gemini_response_with_image
     ):
-        """Test generation with no source images."""
+        """Test output specifications are passed to LLM factory."""
+        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
+        mock_save.return_value = (
+            Path("/tmp/output.png"),
+            ImageMetadata(width=3840, height=2160, format="PNG", size_bytes=50000, aspect_ratio="16:9"),
+            "pending/test/output.png"
+        )
+
         mock_llm = MagicMock()
         mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
         tool.invoke({
-            "images": [],
-            "creative_direction": "Generate luxury bathroom vanity scene, morning light",
-        })
-
-        mock_llm.invoke.assert_called_once()
-
-    @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    def test_generate_output_specs(self, mock_llm_factory, mock_gemini_response_with_image):
-        """Test generation respects output specifications."""
-        mock_llm = MagicMock()
-        mock_llm.invoke = MagicMock(return_value=mock_gemini_response_with_image)
-        mock_llm_factory.return_value = mock_llm
-
-        tool = create_image_studio_tool()
-        tool.invoke({
+            "images": [{"path": "/tmp/source.png", "label": "product"}],
             "creative_direction": "Studio shot with dramatic lighting",
             "output": {
                 "size": "4K",
@@ -465,8 +460,12 @@ class TestPureGeneration:
 
     @patch("autifyme_agents.tools.image_studio.tool._save_base64_image")
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    def test_generate_returns_outputs(self, mock_llm_factory, mock_save, mock_gemini_response_with_image):
-        """Test generation returns output variants."""
+    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
+    def test_processing_returns_outputs(
+        self, mock_load, mock_llm_factory, mock_save, mock_gemini_response_with_image
+    ):
+        """Test processing returns output variants."""
+        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
         mock_save.return_value = (
             Path("/tmp/output.png"),
             ImageMetadata(width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"),
@@ -479,6 +478,7 @@ class TestPureGeneration:
 
         tool = create_image_studio_tool()
         result = tool.invoke({
+            "images": [{"path": "/tmp/source.png", "label": "product"}],
             "creative_direction": "Office desk scene",
         })
 
@@ -487,14 +487,17 @@ class TestPureGeneration:
         assert "outputs" in data
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
-    def test_generate_api_error(self, mock_llm_factory):
-        """Test generation handles API errors."""
+    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
+    def test_api_error_handling(self, mock_load, mock_llm_factory):
+        """Test API error handling."""
+        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
         mock_llm = MagicMock()
         mock_llm.invoke = MagicMock(side_effect=Exception("Generation failed"))
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
         result = tool.invoke({
+            "images": [{"path": "/tmp/source.png", "label": "product"}],
             "creative_direction": "Kitchen scene",
         })
 
@@ -631,10 +634,12 @@ class TestThreadIdInjection:
 
     @patch("autifyme_agents.tools.image_studio.tool._save_base64_image")
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
+    @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")
     def test_explicit_thread_id_takes_precedence(
-        self, mock_llm_factory, mock_save, mock_gemini_response_with_image
+        self, mock_load, mock_llm_factory, mock_save, mock_gemini_response_with_image
     ):
         """Test explicit thread_id takes precedence over config."""
+        mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
         mock_save.return_value = (
             Path("/tmp/output.png"),
             ImageMetadata(width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"),
@@ -650,6 +655,7 @@ class TestThreadIdInjection:
         # Both explicit and config thread_id
         result = tool.invoke(
             {
+                "images": [{"path": "/tmp/source.png", "label": "product"}],
                 "creative_direction": "Create scene",
                 "thread_id": "explicit_thread",
             },
