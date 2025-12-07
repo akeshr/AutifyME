@@ -93,7 +93,7 @@ User feels: "This system understood me."
 | catalog_analyst        |                    | marketing_specialist   |
 +------------------------+                    +------------------------+
          |                                                |
-         | Fast, Gemini Flash                            | Careful, HITL
+         | Fast, Gemini 2.5 Flash                        | Careful, HITL
          | Read-only, Parallel                           | Write-enabled
          | Cross-domain reuse                            | Domain-specific
          +------------------------------------------------+
@@ -114,8 +114,8 @@ User feels: "This system understood me."
 
 | Term | Purpose | Model | Access | Prompt Size |
 |------|---------|-------|--------|-------------|
-| **Analyst** | Research, understand, find patterns | Gemini Flash | Read-only | ~250-400 lines |
-| **Specialist** | Execute, create, modify | Gemini Flash/Pro | Write (HITL) | ~500-700 lines |
+| **Analyst** | Research, understand, find patterns | Gemini 2.5 Flash | Read-only | ~250-400 lines |
+| **Specialist** | Execute, create, modify | Gemini 2.5 Flash | Write (HITL) | ~500-700 lines |
 
 Both are SubAgents under PM, but with different roles.
 
@@ -185,11 +185,13 @@ The product_analyst focuses on **detailed product knowledge** from external sour
 
 | Agent | Type | Model | Tools | Prompt Size |
 |-------|------|-------|-------|-------------|
-| visual_analyst | Analyst | Gemini Flash 2.0 | view_image | ~250 lines |
-| product_analyst | Analyst | Gemini Flash 2.0 | web_search, hsn_lookup | ~300 lines |
-| catalog_analyst | Analyst | Gemini Flash 2.0 | read_data, aggregate_data | ~350 lines |
-| catalog_specialist | Specialist | Gemini Flash 2.0 | write_data, create_record | ~600 lines (slimmed) |
-| creative_specialist | Specialist | Gemini Flash 2.0 | image_studio | ~500 lines (slimmed) |
+| visual_analyst | Analyst | Gemini 2.5 Flash | view_image, write_file, read_file | ~300 lines |
+| product_analyst | Analyst | Gemini 2.5 Flash | web_search, hsn_lookup, write_file, read_file | ~350 lines |
+| catalog_analyst | Analyst | Gemini 2.5 Flash | read_data, aggregate_data, write_file, read_file | ~400 lines |
+| catalog_specialist | Specialist | Gemini 2.5 Flash | read_file, read_data, write_data, inspect_schema | ~600 lines (slimmed) |
+| creative_specialist | Specialist | Gemini 2.5 Flash | read_file, image_studio | ~500 lines (slimmed) |
+
+**Note**: `write_file` and `read_file` are provided by DeepAgents FilesystemMiddleware (default). Used for shared workspace context transfer.
 
 ### Code We Write
 
@@ -199,7 +201,8 @@ The product_analyst focuses on **detailed product knowledge** from external sour
 | Specialist slimdown | Remove research patterns, add context receiving | Separation of concerns |
 | Outcome tracking | Persist whether hypothesis was correct | Can't infer across sessions |
 | Company patterns | Cold start baseline for new users | Need data source |
-| User essence storage | Persist compressed user patterns | Context window limits |
+
+**Note**: User essence storage deferred to DeepAgents SummarizationMiddleware (built-in).
 
 ### Latency Targets
 
@@ -596,6 +599,8 @@ You are a {domain} analyst. Your job is to find relevant information from
 <tools>
 - `read_data`: Query {domain} tables
 - `aggregate_data`: Get {domain} statistics
+- `write_file`: Write findings to workspace
+- `read_file`: Read prior analyst findings from workspace
 </tools>
 
 <instructions>
@@ -606,13 +611,19 @@ Given context, research:
 </instructions>
 
 <output_format>
-Return findings in natural language with confidence assessment.
+1. Read prior findings from `/workspace/findings/` (if relevant)
+2. Write detailed findings to `/workspace/findings/{domain}.md`
+3. Return brief summary to PM
+
+**File format:** Use markdown with structured sections for easy parsing.
+**Return to PM:** Brief summary + reference to workspace file.
 </output_format>
 
 <boundaries>
 - Do NOT suggest actions (PM's job)
 - Do NOT assume user intent
 - Stay within {domain}
+- ALWAYS write detailed findings to workspace before returning
 </boundaries>
 ```
 
@@ -916,23 +927,23 @@ User sends image of brass handle, no text. User has history of cataloging produc
    - Image present, no text
    - Ambiguous intent -> RESEARCH NEEDED
 
-3. SPAWN ANALYSTS (CHAINED):
-   - First: visual_analyst (image present)
-   - Then: catalog_analyst WITH visual context
+3. SPAWN ANALYSTS:
+   - First: visual_analyst (image present) -> writes to /workspace/findings/visual.md
+   - Parallel: product_analyst (reads visual.md) -> writes to /workspace/findings/product.md
+   - Then: catalog_analyst (reads visual.md) -> writes to /workspace/findings/catalog.md
 
-4. VISUAL FINDINGS:
-   "Brass door handle, Art Deco, 1930s, good condition, hand-forged details"
+4. ANALYST FINDINGS (from workspace):
+   - visual.md: "Brass door handle, Art Deco, 1930s, good condition, hand-forged details"
+   - product.md: "Art Deco brass door handle, HSN 8302, restoration/collector market"
+   - catalog.md: "3 similar in 'Vintage Hardware' at Rs 450-650, no Art Deco variant"
 
-5. CATALOG FINDINGS (with visual context):
-   "3 similar in 'Vintage Hardware' at Rs 450-650, no Art Deco variant"
-
-6. CONFIDENCE ASSESSMENT:
+5. CONFIDENCE ASSESSMENT:
    - User pattern: strongly suggests catalog
    - Visual: confirms catalogable product
    - Catalog: clear pricing precedent
    - Confidence: Medium-High -> LEAD_WITH_TOP
 
-7. RESPONSE STRATEGY:
+6. RESPONSE STRATEGY:
    - Lead with observation + recommendation
    - Offer alternative
    - Invite correction
@@ -1068,9 +1079,9 @@ Would you like a detailed appraisal report?"
 | `prompts/analysts/catalog_analyst.prompt` | Create | Internal catalog research ("What do we HAVE?") |
 | `prompts/project_manager_intelligent.prompt` | Modify | Add research-first + analyst orchestration |
 | `prompts/specialists/catalog_specialist.prompt` | Modify | Remove research patterns, add context receiving |
-| `analysts/visual_analyst.py` | Create | Analyst config (Gemini Flash, view_image tool) |
-| `analysts/product_analyst.py` | Create | Analyst config (Gemini Flash, web_search, hsn_lookup) |
-| `analysts/catalog_analyst.py` | Create | Analyst config (Gemini Flash, read_data, aggregate_data) |
+| `analysts/visual_analyst.py` | Create | Analyst config (Gemini 2.5 Flash, view_image tool) |
+| `analysts/product_analyst.py` | Create | Analyst config (Gemini 2.5 Flash, web_search, hsn_lookup) |
+| `analysts/catalog_analyst.py` | Create | Analyst config (Gemini 2.5 Flash, read_data, aggregate_data) |
 | `middleware/company_context_middleware.py` | Modify | Add company pattern fields |
 
 ---
@@ -1139,9 +1150,11 @@ catalog_specialist.prompt: ~600 lines (SLIMMED)
 
 1. Extract research sections from catalog_specialist -> catalog_analyst
 2. Extract image analysis patterns -> visual_analyst
-3. Add "receives context" pattern to catalog_specialist
-4. Update PM to orchestrate analysts
-5. Test end-to-end flow
+3. Create product_analyst for external product knowledge
+4. Add workspace write pattern to all analysts
+5. Add "receives context" + workspace read pattern to specialists
+6. Update PM to orchestrate analysts with workspace references
+7. Test end-to-end flow with workspace file verification
 
 ---
 
