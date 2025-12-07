@@ -109,10 +109,9 @@ Other domain researchers can run in parallel if independent.
 | Component | Purpose | Why Code Needed |
 |-----------|---------|-----------------|
 | Researcher specialists | Separate agents with focused prompts, fast models | Optimization (speed, cost) |
-| Outcome tracking | Persist hypothesis accuracy for calibration | Can't infer from context |
+| Outcome tracking | Persist whether hypothesis was correct | Can't infer across sessions |
 | Company patterns | Cold start baseline for new users | Need data source |
 | User essence storage | Persist compressed user patterns across sessions | Context window limits |
-| Anticipatory cache | Store pre-fetched research for follow-ups | Performance optimization |
 
 ### Researcher Model Specifications
 
@@ -149,7 +148,7 @@ Other domain researchers can run in parallel if independent.
 | Learning acknowledgment | Show user you're getting smarter about them |
 | Emotional calibration | Adapt style to user's state |
 | Intent depth | Understand WHY, not just WHAT |
-| Anticipatory research | Pre-fetch likely follow-ups |
+| Anticipatory awareness | Think ahead about likely follow-ups |
 | User essence | Compress patterns for persistence |
 | Proactive suggestions | Notice opportunities user didn't ask about |
 
@@ -207,16 +206,18 @@ Delegate to researchers in CHAINED order for product queries (visual -> catalog)
 
 ### 3. Confidence Assessment
 
-After gathering evidence, honestly assess your confidence:
+After gathering evidence, honestly assess your confidence level:
 
-- **High (>90%)**: Strong evidence from multiple sources, clear user pattern match
-- **Medium-High (70-90%)**: Good evidence, likely correct but alternatives exist
-- **Medium (40-70%)**: Some evidence, multiple plausible interpretations
-- **Low (<40%)**: Limited evidence, mostly speculation
+- **High**: Strong evidence from multiple sources, clear user pattern match
+- **Medium**: Good evidence, likely correct but alternatives exist
+- **Low**: Some evidence, multiple plausible interpretations
+- **Very Low**: Limited evidence, mostly speculation
+
+Trust your judgment. Don't calculate percentages - reason naturally about certainty.
 
 ### 4. Response Strategy (Based on Confidence)
 
-**High Confidence (>90%)** - DIRECT_ACTION:
+**High Confidence** - DIRECT_ACTION:
 ```
 [Observations from research]
 
@@ -227,7 +228,7 @@ After gathering evidence, honestly assess your confidence:
 Shall I proceed?
 ```
 
-**Medium-High (70-90%)** - LEAD_WITH_TOP:
+**Medium Confidence** - LEAD_WITH_TOP:
 ```
 [Observations from research]
 
@@ -240,7 +241,7 @@ Or:
 Which direction?
 ```
 
-**Medium (40-70%)** - PRESENT_OPTIONS:
+**Low Confidence** - PRESENT_OPTIONS:
 ```
 [Observations from research]
 
@@ -252,7 +253,7 @@ I see a few directions:
 Which would you like?
 ```
 
-**Low (<40%)** - OBSERVE_AND_ASK:
+**Very Low Confidence** - OBSERVE_AND_ASK:
 ```
 [Observations - what you noticed]
 
@@ -543,70 +544,45 @@ Pay extra attention to their response - it teaches you their patterns.
 
 ---
 
-## Outcome Tracking (Minimal Code Needed)
+## Outcome Tracking (Minimal)
 
-We need to track outcomes to calibrate confidence over time. This requires code.
+Track whether PM's hypothesis was correct. PM already has conversation history for everything else.
 
 ### What We Track
 
 ```python
 class HypothesisOutcome(BaseModel):
-    """Extend workflow_outcomes with hypothesis tracking."""
+    """Lightweight - just what we can't infer from context."""
 
-    # Link to workflow
-    tracking_id: str
     thread_id: str
-
-    # What PM predicted
-    predicted_intent: str
-    predicted_confidence: float  # PM's stated confidence
-    response_strategy: str  # "direct_action", "lead_with_top", etc.
-
-    # What actually happened
-    actual_intent: str  # Inferred from user's selection/correction
-    was_correct: bool
-    user_corrected: bool
-
-    # For calibration
+    was_correct: bool  # Did user accept or correct?
     timestamp: datetime
 ```
 
 ### How We Use It
 
-1. **Track**: After each interaction, record prediction vs. outcome
-2. **Analyze**: Periodically analyze accuracy by confidence band
-3. **Adjust**: Update PM prompt with calibration guidance
+1. **Track**: After workflow completion, record if user accepted or corrected
+2. **Review**: Periodically review accuracy trends
+3. **Adjust**: If accuracy drops, refine prompts
 
-```xml
-<calibration_feedback>
-
-Based on historical accuracy:
-- When you say "90% confident", you're actually right 85% of the time
-- When you say "70% confident", you're actually right 68% of the time
-
-Adjust accordingly:
-- Be slightly more conservative with high confidence claims
-- Your medium confidence is well-calibrated
-
-</calibration_feedback>
-```
+No complex calibration infrastructure. PM learns from conversation history naturally.
 
 ---
 
 ## Response Strategy Reference
 
-### Confidence Thresholds (Prompt Guidance)
+### Confidence Levels (Prompt Guidance)
 
 | Confidence | Strategy | When to Use |
 |------------|----------|-------------|
-| >90% | DIRECT_ACTION | Multiple evidence sources align, clear user pattern |
-| 70-90% | LEAD_WITH_TOP | Good evidence, but alternatives plausible |
-| 40-70% | PRESENT_OPTIONS | Mixed signals, multiple valid interpretations |
-| <40% | OBSERVE_AND_ASK | Limited evidence, high uncertainty |
+| High | DIRECT_ACTION | Multiple evidence sources align, clear user pattern |
+| Medium | LEAD_WITH_TOP | Good evidence, but alternatives plausible |
+| Low | PRESENT_OPTIONS | Mixed signals, multiple valid interpretations |
+| Very Low | OBSERVE_AND_ASK | Limited evidence, high uncertainty |
 
 ### Response Patterns
 
-**DIRECT_ACTION (>90%)**
+**DIRECT_ACTION (High)**
 ```
 [Observations]
 [Action statement]
@@ -614,7 +590,7 @@ Adjust accordingly:
 Shall I proceed?
 ```
 
-**LEAD_WITH_TOP (70-90%)**
+**LEAD_WITH_TOP (Medium)**
 ```
 [Observations]
 [Primary recommendation]
@@ -626,7 +602,7 @@ Or:
 Which direction?
 ```
 
-**PRESENT_OPTIONS (40-70%)**
+**PRESENT_OPTIONS (Low)**
 ```
 [Observations]
 
@@ -638,7 +614,7 @@ I see a few directions:
 Which would you like?
 ```
 
-**OBSERVE_AND_ASK (<40%)**
+**OBSERVE_AND_ASK (Very Low)**
 ```
 [Observations]
 
@@ -818,35 +794,27 @@ Only ask when WHY genuinely changes your approach.
 </intent_depth>
 ```
 
-### 6. Anticipatory Research
+### 6. Anticipatory Awareness
 
-**Insight**: Pre-fetch likely follow-ups for instant multi-turn responses.
+**Insight**: Think ahead about likely follow-ups to be ready.
 
 ```xml
-<anticipatory_research>
+<anticipatory_awareness>
 
-After responding to primary intent, consider likely follow-ups:
+After responding to primary intent, briefly note likely follow-ups in your reasoning:
 
 **Common sequences:**
-- Catalog -> "What's the pricing?" -> Pre-research pricing trends
-- Catalog -> "Post to social" -> Pre-research marketing templates
-- Appraisal -> "Should I sell?" -> Pre-research market demand
-- Pricing -> "Compare to competitors" -> Pre-research competitor data
+- Catalog -> pricing inquiry
+- Catalog -> social posting
+- Appraisal -> sell decision
+- Pricing -> competitor comparison
 
-**When to pre-fetch (>60% probability):**
-- User has followed this sequence before
-- Natural next step in workflow
-- Low cost to research, high value if needed
+**What to do:**
+Simply be aware of what's likely next. When the follow-up comes, you'll have context primed.
 
-**Implementation:**
-After completing primary response, spawn background research for top 1-2 likely follow-ups.
-Cache results for next turn.
+No need to pre-fetch or cache. Your reasoning about "what's next" prepares you naturally.
 
-**Benefit:**
-User asks follow-up -> Response is instant (already researched).
-Feels like you anticipated their needs.
-
-</anticipatory_research>
+</anticipatory_awareness>
 ```
 
 ### 7. User Essence (Compressed Persistent Memory)
@@ -878,28 +846,11 @@ Every ~10 interactions, synthesize user patterns into compressed essence:
 - Helps with long conversations where early patterns scroll out
 - Informs cold-start for returning users
 
-**Update Trigger Mechanism:**
+**When to Update:**
+PM decides naturally. When patterns shift significantly (major correction, new workflow preference), PM regenerates essence as part of its response. No code triggers needed.
 
-Essence updates are triggered by the UserEssenceManager (code component):
-
-1. **Interaction counter**: Incremented on each workflow completion
-   - Every 10 interactions: Queue essence regeneration
-
-2. **Significant correction detection**: PM sets flag in outcome tracking
-   - User explicitly corrects intent: "No, I wanted X not Y"
-   - Category/pricing correction with impact on patterns
-   - Flag triggers immediate essence update
-
-3. **Session boundary**: On session end (inactivity timeout)
-   - Synthesize any pending changes
-   - Ensures essence is fresh for next session
-
-4. **Update process**:
-   - PM generates essence using prompt (no code logic)
-   - UserEssenceManager persists to user_essence table
-   - Next session loads fresh essence into PM context
-
-**Implementation note**: PM generates the essence text via prompt. The code only handles when to trigger and where to store.
+**Storage:**
+Simple user_essence text field in user table. PM generates, middleware persists.
 
 </user_essence>
 ```
@@ -977,15 +928,15 @@ User sends image of brass handle, no text. User has history of cataloging produc
    "3 similar in 'Vintage Hardware' at Rs 450-650, no Art Deco variant exists"
 
 7. CONFIDENCE ASSESSMENT:
-   - User pattern strongly suggests catalog intent (90% history)
+   - User pattern strongly suggests catalog intent
    - Visual confirms catalogable product
    - Catalog shows clear pricing precedent
    - User is in confident mode (match their pace)
-   - Confidence: ~85% (LEAD_WITH_TOP)
+   - Confidence: Medium-High (LEAD_WITH_TOP)
 
-8. ANTICIPATORY RESEARCH (background):
-   - Pre-fetch pricing trends (likely follow-up)
-   - Pre-fetch similar items for comparison
+8. ANTICIPATORY AWARENESS:
+   - Likely follow-up: pricing inquiry or social posting
+   - Context primed for quick response
 
 9. PROACTIVE CHECK:
    - Noticed: No Art Deco variant in catalog
@@ -1068,11 +1019,10 @@ Would you like a detailed appraisal report?"
 
 | Task | Type | Effort |
 |------|------|--------|
-| Add HypothesisOutcome tracking | Schema + Code | 1 day |
-| Implement user essence storage | Schema + Code | 1 day |
-| Implement user essence update logic | Code | 0.5 day |
-| Implement anticipatory cache | Code | 0.5 day |
-| Test persistence across sessions | Testing | 1 day |
+| Add HypothesisOutcome tracking (was_correct only) | Schema + Code | 0.5 day |
+| Add user essence field to user table | Schema | 0.5 day |
+| Update middleware to load/save essence | Code | 0.5 day |
+| Test persistence across sessions | Testing | 0.5 day |
 
 ### Phase 4: Calibration & Refinement (Week 4+)
 
@@ -1126,12 +1076,9 @@ Would you like a detailed appraisal report?"
 | `prompts/researchers/catalog_researcher.prompt` | Create | Catalog research specialist |
 | `specialists/visual_researcher.py` | Create | Minimal config (model, tools) |
 | `specialists/catalog_researcher.py` | Create | Minimal config (model, tools) |
-| `schemas/hypothesis_outcome.py` | Create | Outcome tracking schema |
-| `schemas/user_essence.py` | Create | Compressed user patterns schema |
-| `workflows/outcome_tracker.py` | Modify | Add hypothesis tracking |
-| `core/user_essence_manager.py` | Create | User essence CRUD + update logic |
-| `core/anticipatory_cache.py` | Create | Pre-fetched research cache |
-| `middleware/context_middleware.py` | Modify | Load user essence at startup |
+| `schemas/hypothesis_outcome.py` | Create | Lightweight outcome tracking |
+| `workflows/outcome_tracker.py` | Modify | Add was_correct tracking |
+| `middleware/context_middleware.py` | Modify | Load/save user essence (simple text field) |
 
 ---
 
@@ -1155,7 +1102,7 @@ Would you like a detailed appraisal report?"
 | Learning acknowledgment | "It remembered my preference" |
 | Emotional calibration | "It matched my pace/mood" |
 | Intent depth | "It knew WHY I wanted this" |
-| Anticipatory research | "The follow-up was instant" |
+| Anticipatory awareness | "It was ready for my follow-up" |
 | Proactive suggestions | "It noticed something I missed" |
 
 **The Difference**: A tool responds. An intelligent partner collaborates, explains, learns, empathizes, anticipates, and suggests.
