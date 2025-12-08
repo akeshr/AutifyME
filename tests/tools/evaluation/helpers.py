@@ -1064,9 +1064,9 @@ def show_orchestrator_flow(trace_id: str) -> list[dict]:
 
                 if name == "task":
                     subagent = args.get("subagent_type", args.get("specialist", "?"))
-                    desc = args.get("description", "")[:60]
+                    desc = args.get("description", "")
                     print(f"    -> task({subagent})")
-                    print(f"       desc: {desc}...")
+                    print(f"       desc: {desc}")
                     call_info["args_summary"]["subagent"] = subagent
                     call_info["args_summary"]["description"] = desc
                 else:

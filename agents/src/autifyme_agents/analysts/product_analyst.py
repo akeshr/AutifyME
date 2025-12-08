@@ -16,6 +16,7 @@ from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.middleware import MultimodalInjectionMiddleware
 from autifyme_agents.tools.research_tools import (
     extract_web_content_tool,
     research_product_tool,
@@ -66,11 +67,15 @@ def create_product_analyst(
         extract_web_content_tool,
     ]
 
+    # Multimodal middleware injects images from paths in delegation message
+    middleware = [MultimodalInjectionMiddleware()]
+
     spec: dict[str, Any] = {
         "name": "product_analyst",
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
+        "middleware": middleware,
         # FilesystemMiddleware (write_file, read_file) is provided by default via DeepAgents
         # No interrupt_on - analysts are read-only
     }

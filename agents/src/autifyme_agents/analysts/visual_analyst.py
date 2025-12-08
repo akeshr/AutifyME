@@ -16,6 +16,7 @@ from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.middleware import MultimodalInjectionMiddleware
 from autifyme_agents.tools import create_view_image_tool
 
 
@@ -62,11 +63,17 @@ def create_visual_analyst(
         create_view_image_tool(),
     ]
 
+    # Multimodal middleware injects images from paths in delegation message
+    # When PM includes image paths in the task description, the middleware
+    # loads and injects the images so the analyst's LLM can see them directly
+    middleware = [MultimodalInjectionMiddleware()]
+
     spec: dict[str, Any] = {
         "name": "visual_analyst",
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
+        "middleware": middleware,
         # FilesystemMiddleware (write_file, read_file) is provided by default via DeepAgents
         # No interrupt_on - analysts are read-only
     }

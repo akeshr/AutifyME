@@ -128,7 +128,7 @@ RIGHT: "Analyze the image at 'inbox/thread_id/photo.jpg' to identify materials..
 ```
 
 For product-related queries with images:
-1. First: visual_analyst ("Analyze the image at '{storage_path}' to identify...")
+1. First: visual_analyst ("Analyze the image at '<storage_path>' to identify...")
 2. Then: catalog_analyst WITH visual context ("Search for brass Art Deco handle")
 
 This gives analysts the file reference they need, and catalog_analyst precise search terms.

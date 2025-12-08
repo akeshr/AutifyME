@@ -16,6 +16,7 @@ from langchain.chat_models import BaseChatModel
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.middleware import MultimodalInjectionMiddleware
 
 # Tables catalog_analyst can read (no write access)
 CATALOG_ANALYST_TABLES = [
@@ -91,11 +92,15 @@ def create_catalog_analyst(
         create_aggregate_data_tool(storage, tables=CATALOG_ANALYST_TABLES),
     ]
 
+    # Multimodal middleware injects images from paths in delegation message
+    middleware = [MultimodalInjectionMiddleware()]
+
     spec: dict[str, Any] = {
         "name": "catalog_analyst",
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
+        "middleware": middleware,
         # FilesystemMiddleware (write_file, read_file) is provided by default via DeepAgents
         # No interrupt_on - analysts are read-only
     }

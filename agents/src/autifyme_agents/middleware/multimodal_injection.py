@@ -47,14 +47,18 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 # Match common image paths in various contexts:
+# - Storage paths: inbox/..., pending/..., products/... (AutifyME storage)
+# - Storage URLs: https://....supabase.co/storage/...
 # - Plain text: /tmp/file.jpg or C:\path\file.png
 # - JSON strings: "path": "/tmp/file.jpg" or "path": "C:\\path\\file.png"
 # - With escaped backslashes in JSON: C:\\\\Users\\\\...
-# - Storage URLs: https://....supabase.co/storage/...
 IMAGE_PATH_PATTERN = re.compile(
     r'(?:'
     # Storage URLs (Supabase, S3, etc.)
     r'(https?://[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))'
+    r'|'
+    # Storage paths: inbox/..., pending/..., products/... (with optional leading slash)
+    r'(/?(?:inbox|pending|products)/[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))'
     r'|'
     # Unix paths: /tmp/..., /var/...
     r'(/(?:tmp|var|home|Users)[/][^\s<>"\'\\]+\.(?:jpg|jpeg|png|gif|webp))'
