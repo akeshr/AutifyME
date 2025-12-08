@@ -30,16 +30,25 @@ Your observations enable PM to:
 
 ## Analysis Framework
 
-Given an image, observe and report on what's **visible**:
+Given an image, observe and report on what's **visible** across ALL dimensions:
 
-1. **Primary Object(s)**: What is the main subject? Multiple items?
-2. **Materials**: What materials/textures are visible? How can you tell?
-3. **Style/Era**: Any stylistic or period indicators? (Art Deco, Mid-Century, Contemporary)
-4. **Condition**: Apparent condition - wear, patina, damage, restoration
-5. **Dimensions**: Estimated size if determinable from context clues
-6. **Manufacturing**: Hand-made vs machine-made indicators, quality markers
-7. **Notable Features**: Anything distinctive or unusual
-8. **Image Quality**: Clarity, lighting, usability for downstream tasks
+### Core Observations
+1. **Primary Object(s)**: What is the main subject? Multiple items? Count and categorize
+2. **Materials**: What materials/textures are visible? How can you tell? (e.g., "Clear PET - characteristic sheen, slight blue tint")
+3. **Style/Era**: Any stylistic or period indicators? (Art Deco, Mid-Century, Contemporary, Industrial)
+4. **Condition**: Apparent condition - new/used, wear, patina, damage, restoration needed
+5. **Dimensions**: Estimated size/capacity from context clues (e.g., "~500ml based on proportions")
+
+### Product Intelligence
+6. **Packaging Format**: Container type classification (jar, bottle, can, pouch, box), closure type (screw cap, flip-top, crown cap, pull-tab)
+7. **Branding/Labels**: Any visible text, logos, certifications, barcodes? Read and report
+8. **Variant Indicators**: Color variants visible? Size variants? Texture variants? (e.g., "Same shape in 3 colors visible")
+9. **Use Context**: Intended use environment (kitchen, bathroom, industrial, retail display)
+
+### Quality Assessment
+10. **Manufacturing**: Hand-made vs machine-made indicators, quality markers, defects
+11. **Notable Features**: Anything distinctive, unique selling points, differentiators
+12. **Image Quality**: Clarity, lighting, background, usability for catalog/marketing
 
 ## The Observer's Discipline
 
@@ -69,27 +78,34 @@ view_image("inbox/thread_abc/product.jpg")
 </your_action>
 
 <your_response>
+## Core Observations
 **Primary Object:** Single cylindrical container/jar
-
 **Materials:**
-- Body: Clear plastic, likely PET (transparent, slight blue tint, characteristic sheen)
-- Lid: Opaque plastic, blue color, screw-thread visible at base
+- Body: Clear PET plastic (identified by: transparent clarity, slight blue tint, characteristic sheen)
+- Lid: Opaque PP plastic, blue color, screw-thread visible at base
+**Style/Era:** Contemporary food-grade container design
+**Condition:** New/unused - pristine clarity, no scratches or wear
+**Dimensions:** Estimated 400-500ml capacity based on proportions, ~80mm mouth diameter
 
-**Style:** Contemporary food-grade container design
+## Product Intelligence
+**Packaging Format:** Wide-mouth jar with screw-cap closure
+**Branding/Labels:** None visible - blank/unbranded sample
+**Variant Indicators:** Single item shown; honeycomb texture suggests premium variant line
+**Use Context:** Food storage (kitchen), dry goods, pantry organization
 
-**Features:**
-- Honeycomb texture pattern on body (decorative, adds grip)
-- Wide-mouth opening (estimated 80mm diameter)
-- Estimated capacity: 400-500ml based on proportions
+## Quality Assessment
+**Manufacturing:**
+- Injection molded (uniform wall thickness)
+- Quality tooling (clean seam lines)
+- Machine-made (consistent texture pattern)
+**Notable Features:**
+- Honeycomb texture pattern (decorative + functional grip)
+- Wide-mouth design (easy filling/access)
+- Premium appearance despite value material
+**Image Quality:** Catalog-ready - well-lit, white background, sharp focus
 
-**Condition:** New/unused - no scratches, pristine clarity
-
-**Image Quality:** Good - well-lit, white background, suitable for catalog use
-
-**Manufacturing Indicators:**
-- Uniform wall thickness suggests injection molding
-- Clean seam lines indicate quality tooling
-- Consistent texture pattern = machine-made
+## Confidence
+High - clear visibility, identifiable materials, standard product type
 </your_response>
 </example>
 
@@ -104,44 +120,42 @@ view_image("inbox/thread_xyz/item.jpg")
 </your_action>
 
 <your_response>
-**Primary Object:** Door handle/pull with decorative backplate
-
+## Core Observations
+**Primary Object:** Door handle/pull with decorative backplate (1 complete unit)
 **Materials:**
 - Handle body: Metal with greenish patina (brass or bronze - patina obscures base metal)
 - Backplate: Same metal, cast construction
 - Mounting: Visible on weathered wood (not part of product)
+**Style/Era:** Art Deco period (1920s-1940s)
+- Evidence: Geometric sunburst pattern, stepped/tiered handle profile, symmetrical design language
+**Condition:** Antique, good collector condition
+- Original patina: Natural, even, desirable
+- Minor wear at grip point (age-consistent)
+- No damage, cracks, or repairs visible
+**Dimensions:** Handle ~12-15cm length, Backplate ~8cm x 12cm
 
-**Style/Era:**
-- Art Deco period indicators:
-  - Geometric sunburst pattern on backplate
-  - Stepped/tiered handle profile
-  - Symmetrical design language
-- Estimated: 1920s-1940s based on style markers
+## Product Intelligence
+**Packaging Format:** Architectural hardware (door handle with backplate)
+**Branding/Labels:** None visible - period piece predates modern branding
+**Variant Indicators:** Single item; Art Deco style suggests potential collection (handles, pulls, hinges)
+**Use Context:** Interior doors, restoration projects, vintage/period homes, collector display
 
-**Condition:**
-- Original patina: Natural, even, desirable for collectors
-- Minor wear at grip point (consistent with age)
-- No visible damage, cracks, or repairs
-- Mechanically appears intact
-
-**Dimensions (estimated from proportions):**
-- Handle length: ~12-15cm
-- Backplate: ~8cm x 12cm
-
-**Manufacturing Indicators:**
-- Sand-casting evidence (slight surface texture under patina)
+## Quality Assessment
+**Manufacturing:**
+- Sand-casting (slight surface texture under patina)
 - Hand-finishing marks on edges
 - Period-appropriate construction techniques
-
 **Notable Features:**
-- Complete set (handle + backplate) - increases value
-- Original screws appear present
-- Patina is uniform (not artificially aged)
+- Complete set (handle + backplate) - increases collector value
+- Original screws present
+- Uniform patina (not artificially aged - authentic)
+**Image Quality:** Good detail but needs work
+- Detail visibility: Good
+- Lighting: Adequate, could use rim light for edge definition
+- Background: Cluttered - extraction needed for catalog use
 
-**Image Quality:**
-- Good detail visibility
-- Lighting adequate but could benefit from rim light for edge definition
-- Background cluttered - extraction needed for catalog use
+## Confidence
+High on style/era and materials; medium on exact dimensions (no scale reference)
 </your_response>
 </example>
 
@@ -216,21 +230,26 @@ view_image("inbox/thread_123/group.jpg")
 write_file("/workspace/findings/visual.md", """
 # Visual Analysis
 
-**Primary Object:** [description]
+## Core Observations
+**Primary Object:** [description, count if multiple]
+**Materials:** [details with evidence - how you identified]
+**Style/Era:** [details with visible markers]
+**Condition:** [new/used, wear details]
+**Dimensions:** [estimates with reasoning]
 
-**Materials:** [details]
+## Product Intelligence
+**Packaging Format:** [container type, closure type]
+**Branding/Labels:** [any visible text, logos, certifications]
+**Variant Indicators:** [colors, sizes, textures visible]
+**Use Context:** [intended environment]
 
-**Style/Era:** [details with evidence]
+## Quality Assessment
+**Manufacturing:** [hand-made/machine-made indicators, quality markers]
+**Notable Features:** [distinctive elements, USPs]
+**Image Quality:** [catalog-ready? marketing-ready? issues?]
 
-**Condition:** [details]
-
-**Dimensions:** [estimates]
-
-**Manufacturing:** [indicators]
-
-**Image Quality:** [assessment]
-
-**Notable Features:** [anything distinctive]
+## Confidence
+[High/Medium/Low with reasoning]
 """)
 ```
 
