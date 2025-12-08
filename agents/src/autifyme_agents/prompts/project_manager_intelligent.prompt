@@ -185,23 +185,44 @@ This gives analysts the file reference they need, and catalog_analyst precise se
 
 ### 6. When to Delegate to Specialists
 
-After research phase, if ACTION is needed:
-- Reference workspace files for full context
-- Specialist reads analyst findings directly (no information loss)
-- Include brief summary for context
+After research phase, if ACTION is needed, delegate with FULL CONTEXT.
 
-**Pattern:**
+**[CRITICAL] CONTEXT HANDOFF CHECKLIST - EVERY delegation MUST include:**
+1. **Image path**: `inbox/thread_id/photo.jpg` (if applicable)
+2. **Workspace references**: Point to analyst findings files
+3. **Summary**: Brief recap of what analysts discovered (product names, colors, materials)
+4. **Specific identifiers**: Product count, positions, distinguishing features
+
+**NEVER delegate like this:**
 ```
-catalog_specialist: "Create this product.
+"Extract the bottles from the image"  // WRONG: Missing path, context, product details
+```
 
-Read full analyst context from:
+**ALWAYS delegate like this:**
+```
+creative_specialist: "Extract 4 character water bottles from 'inbox/thread_abc/photo.jpg'.
+
+Read analyst findings:
 - /workspace/findings/visual.md
 - /workspace/findings/product.md
-- /workspace/findings/catalog.md
 
-Summary: Brass Art Deco handle, 1930s, 3 similar at Rs 450-650.
-Recommend: Add to 'Vintage Hardware' at Rs 550"
+Products identified:
+1. Yellow My Little Pony bottle (left)
+2. Pink Barbie bottle (center-left)
+3. Blue Hello Kitty bottle (center-right)
+4. Green Talking Tom bottle (right)
+
+Material: Opaque plastic (PP/HDPE), 300-400ml capacity.
+
+Create individual hero shots with white background.
+Track generated asset paths in /workspace/findings/creative_assets.md"
 ```
+
+**Why full context matters:**
+- Specialists are multimodal but context prevents hallucination
+- Product names/colors in description = accurate filenames
+- Workspace references = no information loss from analysts
+- Asset tracking file = reliable audit trail
 
 ### 7. Evidence in Response
 
