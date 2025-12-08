@@ -422,16 +422,25 @@ All helpers in `tests/tools/evaluation/helpers.py`:
 
 ```python
 from tests.tools.evaluation.helpers import (
+    # Core Analysis (Phases 1-3)
     show_tree,             # Phase 1: Build tree, get ID lookup
     show_orchestrator_flow, # Phase 1: Orchestrator decisions chronologically
     show_node,             # Phase 2: Full INPUT/REASONING/OUTPUT for one node
     show_handoff,          # Phase 3: Context handoff analysis
     show_llm_calls,        # Summary of all LLM calls
-    compare_traces,        # Before/after comparison
+
+    # Supplementary: Issue Detection
+    detect_issues,         # Auto-detect errors, high tokens, loops, missing context
+    scan_all_handoffs,     # List all task delegations with context markers
+
+    # Utilities
+    compare_traces,        # Before/after comparison (Phase 6)
     list_recent,           # Recent traces
     list_failures,         # Failed traces
 )
 ```
+
+### Core Analysis Functions
 
 | Function | Purpose | Returns |
 |----------|---------|---------|
@@ -441,6 +450,20 @@ from tests.tools.evaluation.helpers import (
 | `show_handoff(parent_id, child_id)` | Context handoff: HAD -> PASSED -> RECEIVED -> **OUTPUT** | `dict` with issues |
 | `show_llm_calls(trace_id)` | All LLM calls summary | `None` (prints) |
 | `compare_traces(id1, id2)` | Before/after metrics | `None` (prints) |
+
+### Supplementary: Automated Issue Detection
+
+Use these **after** systematic analysis to cross-check findings, or to quickly scan for obvious problems:
+
+| Function | Purpose | Returns |
+|----------|---------|---------|
+| `detect_issues(trace_id)` | Auto-detect: ERROR, HIGH_TOKENS (>50k), TOOL_LOOP (3+ calls), MISSING_CONTEXT | `list[dict]` with severity |
+| `scan_all_handoffs(trace_id)` | List all task delegations showing `[OK]`/`[X]` status and `[+file]` marker | `list[dict]` of issues only |
+
+**`scan_all_handoffs` output**:
+- `[OK] agent_name` - Delegation looks healthy
+- `[OK] agent_name [+file]` - File path was passed in description
+- `[X] agent_name` - Child asked for missing context (HIGH severity)
 
 **Note**: `show_handoff` is optimized for orchestrator -> task delegations. For agent LLM -> tool handoffs, "WHAT PARENT PASSED" may be empty but "WHAT CHILD RECEIVED" will show correct data.
 
@@ -461,6 +484,10 @@ show_handoff(ids['<parent_id>'], ids['<child_id>'])
 
 # 5. Then analyze child node
 show_node(ids['<child_id>'])
+
+# 6. (Optional) Cross-check with automated detection
+detect_issues("<trace_id>")       # Verify no issues missed
+scan_all_handoffs("<trace_id>")   # Overview of all delegations
 ```
 
 ---
