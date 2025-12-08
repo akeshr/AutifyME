@@ -17,6 +17,7 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import MultimodalInjectionMiddleware
+from autifyme_agents.tools import create_view_image_tool
 
 # Tables catalog_analyst can read (no write access)
 CATALOG_ANALYST_TABLES = [
@@ -84,12 +85,15 @@ def create_catalog_analyst(
     # Import here to avoid circular imports
     from autifyme_agents.tools.data_engine import (
         create_aggregate_data_tool,
+        create_inspect_schema_tool,
         create_read_data_tool,
     )
 
     tools: list[Any] = [
+        create_inspect_schema_tool(storage, tables=CATALOG_ANALYST_TABLES),
         create_read_data_tool(storage, tables=CATALOG_ANALYST_TABLES),
         create_aggregate_data_tool(storage, tables=CATALOG_ANALYST_TABLES),
+        create_view_image_tool(),  # View images for catalog matching
     ]
 
     # Multimodal middleware injects images from paths in delegation message

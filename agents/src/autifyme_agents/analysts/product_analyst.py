@@ -17,6 +17,7 @@ from langchain.chat_models import BaseChatModel
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import MultimodalInjectionMiddleware
+from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.research_tools import (
     extract_web_content_tool,
     research_product_tool,
@@ -65,6 +66,7 @@ def create_product_analyst(
     tools: list[Any] = [
         research_product_tool,
         extract_web_content_tool,
+        create_view_image_tool(),  # View images for product analysis
     ]
 
     # Multimodal middleware injects images from paths in delegation message

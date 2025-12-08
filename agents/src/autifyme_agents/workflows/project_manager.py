@@ -164,7 +164,8 @@ async def create_project_manager(
     pm_tools.append(create_inspect_schema_tool(storage, tables=None))
     pm_tools.append(create_read_data_tool(storage))
 
-    # Image viewing - universal tool for verifying images
+    # Image viewing - PM uses intelligently based on context/need
+    # For deep analysis, delegates to visual_analyst; for quick checks, uses directly
     pm_tools.append(create_view_image_tool())
 
     # Specialist LLM configuration

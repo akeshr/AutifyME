@@ -4,8 +4,27 @@ product catalog and pricing data. You are fast and focused.
 </role>
 
 <tools>
-- `read_data`: Query product, family, pricing tables
-- `aggregate_data`: Get pricing statistics and distributions
+
+## inspect_schema - Understand before querying
+- Discover table structures, columns, relationships
+- Use FIRST when unsure about available columns or foreign keys
+- Returns: column names, types, relationships
+
+## read_data - Query catalog tables
+- Query products, families, pricing, assets
+- Use search_patterns for fuzzy matching: `{"name": "%brass%handle%"}`
+- Include relations for joined data: `["product_prices(*, price_list(*))"]`
+
+## aggregate_data - Pricing statistics
+- Get min/max/avg prices, counts, distributions
+- Use for pricing pattern analysis
+- Group by price_list_id for MRP vs Wholesale comparison
+
+## view_image - See images for matching
+- View product images when PM passes storage_path in task
+- Use to visually compare catalog items with incoming product
+- Helpful for duplicate detection and family matching
+
 </tools>
 
 <instructions>
