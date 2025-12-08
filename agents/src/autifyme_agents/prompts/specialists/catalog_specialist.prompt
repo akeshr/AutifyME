@@ -93,7 +93,7 @@ Images arrive to you via two paths:
 - `read_data` - Query with filters, relations, pagination
   - **filters**: Exact match (IDs, booleans, enums)
   - **search_patterns**: Fuzzy ILIKE (names, descriptions, SKUs)
-  - **relations**: Nested data `['variant_axes(*, variant_values(*))']`, `['product_prices(*, price_list(*))']`
+  - **relations**: Nested data `['variant_axes(*, variant_values(*))']`, `['product_prices(*, price_lists(*))']`
 
 - `aggregate_data` - Analytics with GROUP BY and HAVING
   - **Use for:** Counting products per family, calculating avg/min/max prices, analyzing catalog distribution
@@ -415,7 +415,7 @@ read_data(
   table="products",
   search_patterns={"sku": "%JAR%"},
   filters={"status": "ACTIVE", "product_type": "FINISHED_GOOD"},
-  relations=["product_prices(*, price_list(*))"]
+  relations=["product_prices(*, price_lists(*))"]
 )
 -> Available jars:
    - JAR-PET-250ML (uuid-jar-250): MRP Rs 25
@@ -434,9 +434,15 @@ aggregate_data(
 
 read_data(
   table="product_families",
-  search_patterns={"name": "%gift%", "name": "%combo%", "name": "%set%"}
+  search_patterns={"name": "%gift%"}
 )
--> No gift set family exists - need to create
+-> No gift set family exists
+
+read_data(
+  table="product_families",
+  search_patterns={"name": "%combo%"}
+)
+-> No combo family exists - need to create
 
 **PHASE 4: Market Research for Gift Set Pricing**
 research_product_tool(
@@ -605,7 +611,7 @@ aggregate_data(
 
 read_data(
   table="product_families",
-  relations=["products"],
+  relations=["products(*)"],
   filters={"is_active": true}
 )
 -> Detailed family breakdown:
@@ -645,7 +651,7 @@ read_data(
 
 read_data(
   table="product_prices",
-  relations=["product"]
+  relations=["products(*)"]
 )
 -> Found 5 active products with NO prices at all!
    - JAR-GLASS-2L, CONTAINER-SQUARE-250ML, BOTTLE-PET-200ML, LABEL-ROUND-50MM, CAP-TWIST-38MM
@@ -675,7 +681,7 @@ read_data(
 read_data(
   table="bom",
   filters={"is_active": true},
-  relations=["bom_lines"]
+  relations=["bom_lines(*)"]
 )
 -> Only 3 BOMs exist
    (2 manufacturable products missing BOM definitions!)
@@ -683,7 +689,7 @@ read_data(
 **PHASE 7: Variant Coverage**
 read_data(
   table="variant_axes",
-  relations=["variant_values"]
+  relations=["variant_values(*)"]
 )
 -> Size axis: 250ml, 500ml, 750ml, 1L, 2L (5 values)
 -> Color axis: Clear, Amber, Blue (3 values)

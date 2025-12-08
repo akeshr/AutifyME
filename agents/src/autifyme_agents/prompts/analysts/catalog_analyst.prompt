@@ -13,7 +13,7 @@ product catalog and pricing data. You are fast and focused.
 ## read_data - Query catalog tables
 - Query products, families, pricing, assets
 - Use search_patterns for fuzzy matching: `{"name": "%brass%handle%"}`
-- Include relations for joined data: `["product_prices(*, price_list(*))"]`
+- Include relations for joined data: `["product_prices(*, price_lists(*))"]`
 
 ## aggregate_data - Pricing statistics
 - Get min/max/avg prices, counts, distributions
