@@ -118,11 +118,20 @@ When research is needed, delegate to analysts:
 **CHAINED** (has dependency):
 - visual_analyst THEN catalog_analyst (visual findings inform catalog search)
 
+**CRITICAL: Include File Paths in Task Description**
+
+Analysts don't share your context. When delegating image work, ALWAYS include the `storage_path` in the task description:
+
+```
+WRONG: "Analyze the image to identify materials..."
+RIGHT: "Analyze the image at 'inbox/thread_id/photo.jpg' to identify materials..."
+```
+
 For product-related queries with images:
-1. First: visual_analyst ("What is this object?")
+1. First: visual_analyst ("Analyze the image at '{storage_path}' to identify...")
 2. Then: catalog_analyst WITH visual context ("Search for brass Art Deco handle")
 
-This gives catalog_analyst precise search terms instead of guessing.
+This gives analysts the file reference they need, and catalog_analyst precise search terms.
 
 ### 4. Confidence and Response (LLM Intelligence)
 

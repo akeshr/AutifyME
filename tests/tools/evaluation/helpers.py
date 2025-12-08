@@ -859,6 +859,13 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
         child_input = child.inputs.get("input", {})
         if isinstance(child_input, dict):
             child_subagent = child_input.get("subagent_type")
+        # Also try direct subagent_type in inputs
+        if not child_subagent:
+            child_subagent = child.inputs.get("subagent_type")
+
+    # Debug: show what we detected
+    if child_subagent:
+        print(f"  (Matched to: {child_subagent})")
 
     if parent.outputs:
         parsed = parse_lc_output(parent.outputs)
@@ -989,32 +996,32 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
 
 
 # =============================================================================
-# show_pm_flow: Show PM's decisions chronologically
+# show_orchestrator_flow: Show orchestrator's decisions chronologically
 # =============================================================================
 
 
-def show_pm_flow(trace_id: str) -> list[dict]:
-    """Show PM's decisions in chronological order.
+def show_orchestrator_flow(trace_id: str) -> list[dict]:
+    """Show orchestrator's decisions in chronological order.
 
-    Useful for understanding the orchestration flow.
+    Useful for understanding the orchestration flow in any multi-agent system.
 
     Args:
         trace_id: LangSmith trace ID
 
     Returns:
-        List of PM decisions
+        List of orchestrator decisions
     """
     client = _get_client()
     runs = list(client.list_runs(trace_id=trace_id))
 
-    # Find root (PM)
+    # Find root (orchestrator)
     root = next((r for r in runs if not r.parent_run_id), None)
     if not root:
         print("No root found")
         return []
 
-    # Find LLM calls that are direct children of PM's model chains
-    pm_llm_calls = []
+    # Find LLM calls that are direct children of orchestrator's model chains
+    orchestrator_llm_calls = []
     by_id = {str(r.id): r for r in runs}
 
     for r in runs:
@@ -1023,19 +1030,19 @@ def show_pm_flow(trace_id: str) -> list[dict]:
             if parent and parent.name == "model":
                 # Check if grandparent is root
                 if parent.parent_run_id and str(parent.parent_run_id) == str(root.id):
-                    pm_llm_calls.append(r)
+                    orchestrator_llm_calls.append(r)
 
-    pm_llm_calls.sort(key=lambda x: x.start_time or datetime.min)
+    orchestrator_llm_calls.sort(key=lambda x: x.start_time or datetime.min)
 
     print(f"\n{'='*70}")
-    print(f"PM DECISION FLOW")
+    print(f"ORCHESTRATOR DECISION FLOW")
     print(f"Trace: {trace_id}")
     print(f"{'='*70}")
 
     decisions = []
 
-    for i, run in enumerate(pm_llm_calls, 1):
-        print(f"\n[{i}] PM Decision - {str(run.id)[:8]}")
+    for i, run in enumerate(orchestrator_llm_calls, 1):
+        print(f"\n[{i}] Decision - {str(run.id)[:8]}")
         print(f"    Full ID: {run.id}")
         print(f"    Tokens: {run.total_tokens or 0:,}")
 
@@ -1075,6 +1082,10 @@ def show_pm_flow(trace_id: str) -> list[dict]:
         decisions.append(decision)
 
     print(f"\n{'='*70}")
-    print(f"Total PM decisions: {len(decisions)}")
+    print(f"Total orchestrator decisions: {len(decisions)}")
 
     return decisions
+
+
+# Backward compatibility alias
+show_pm_flow = show_orchestrator_flow

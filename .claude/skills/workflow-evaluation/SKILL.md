@@ -45,15 +45,15 @@ When building the tree:
 CONTEXT HANDOFF: [parent] -> [tool_name] -> [child]
 ----------------------------------------------------
 What parent HAD available:
-- [ ] Image path: ___
+- [ ] File/media paths: ___
 - [ ] User message: ___
-- [ ] Company context: ___
+- [ ] Domain context: ___
 - [ ] Previous findings: ___
 
 What parent PASSED to tool:
 - [ ] In args: ___
 - [ ] In task description: ___
-- [ ] Via workspace files: ___
+- [ ] Via shared files: ___
 
 What child RECEIVED:
 - [ ] Matches what was passed? Y/N
@@ -96,19 +96,19 @@ NEXT: [ ] Recurse to ___ / [ ] Return to parent / [ ] Done
 ### Using Helper Functions
 
 ```python
-from tests.tools.evaluation.helpers import show_tree, show_node, show_handoff, show_pm_flow
+from tests.tools.evaluation.helpers import show_tree, show_node, show_handoff, show_orchestrator_flow
 
 # Step 1: Get tree structure with full UUID lookup
-ids = show_tree("3c3cfa58-8eb9-4f0e-a381-584ec5859d12")
+ids = show_tree("<trace_id>")
 
-# Step 2: See PM's decision flow
-show_pm_flow("3c3cfa58-8eb9-4f0e-a381-584ec5859d12")
+# Step 2: See orchestrator's decision flow
+show_orchestrator_flow("<trace_id>")
 
 # Step 3: Analyze specific node (use FULL UUID from ids dict)
-show_node(ids['44427c51'])
+show_node(ids['<short_id>'])
 
 # Step 4: Check handoff before recursing
-show_handoff(ids['e5c016a5'], ids['e0bdc7ae'])
+show_handoff(ids['<parent_short_id>'], ids['<child_short_id>'])
 ```
 
 ### Tree Output Format
@@ -116,22 +116,22 @@ show_handoff(ids['e5c016a5'], ids['e0bdc7ae'])
 Tree shows **FULL UUIDs** for direct copy-paste into `show_node()` and `show_handoff()`:
 
 ```
-TRACE: 3c3cfa58-8eb9-4f0e-a381-584ec5859d12
+TRACE: <trace_id>
 Status: success | Cost: $0.04 | Time: 45.2s | Tokens: 471,193
 LLM calls: 12 | Tool calls: 8 | Total nodes: 150
 ================================================================================
-[3c3cfa58-8eb9-4f0e-a381-584ec5859d12] LangGraph (chain) | 45.2s
-  +-- [44427c51-9d91-4927-9911-d2b3c31301b5] GeminiWithRetry (llm) | 14,076tok -> download *
-  +-- [e5c016a5-f179-42ca-b73b-571fe706b1d1] GeminiWithRetry (llm) | 14,439tok -> task *
-      +-- [e0bdc7ae-xxxx-xxxx-xxxx-xxxxxxxxxxxx] task (tool) -> visual_analyst
-          +-- [c3b8232c-xxxx-xxxx-xxxx-xxxxxxxxxxxx] LangGraph (chain) | 4,924tok
-      +-- [8fb88c64-xxxx-xxxx-xxxx-xxxxxxxxxxxx] task (tool) -> product_analyst
+[<full-uuid>] LangGraph (chain) | 45.2s
+  +-- [<full-uuid>] ModelWithRetry (llm) | 14,076tok -> download_media *
+  +-- [<full-uuid>] ModelWithRetry (llm) | 14,439tok -> task *
+      +-- [<full-uuid>] task (tool) -> agent_a
+          +-- [<full-uuid>] LangGraph (chain) | 4,924tok
+      +-- [<full-uuid>] task (tool) -> agent_b
   ...
 
 Legend: * = LLM | X = Error | -> = delegates/calls
 ```
 
-Copy any UUID directly: `show_node("44427c51-9d91-4927-9911-d2b3c31301b5")`
+Copy any UUID directly: `show_node("<full-uuid>")`
 
 ---
 
@@ -157,13 +157,13 @@ Copy any UUID directly: `show_node("44427c51-9d91-4927-9911-d2b3c31301b5")`
 
 ```python
 # 1. Read the agent's prompt file
-Read("agents/src/autifyme_agents/prompts/project_manager_intelligent.prompt")
+Read("prompts/<agent_name>.prompt")
 
 # 2. Read tool definitions this agent can use
-Read("agents/src/autifyme_agents/tools/task_tool.py")
+Read("tools/<tool_name>.py")
 
 # 3. Read the agent implementation (for tool bindings, schema)
-Read("agents/src/autifyme_agents/workflows/project_manager.py")
+Read("workflows/<agent_name>.py")
 ```
 
 **Input Checklist**:
@@ -180,7 +180,7 @@ Read("agents/src/autifyme_agents/workflows/project_manager.py")
 Get what the LLM actually thought:
 
 ```python
-run = client.read_run(id_map['bf173a71'])  # Use full UUID from map
+run = client.read_run(id_map['<short_id>'])  # Use full UUID from map
 # Parse run.outputs for the LLM's reasoning and decisions
 ```
 
@@ -210,24 +210,28 @@ run = client.read_run(id_map['bf173a71'])  # Use full UUID from map
 When parent calls a tool/task, verify the handoff:
 
 ```
-CONTEXT HANDOFF: PM -> task(visual_analyst)
-============================================
+CONTEXT HANDOFF: [Orchestrator] -> task([Child Agent])
+======================================================
 
-WHAT PM HAD:
-- Image path: inbox/whatsapp_.../image.jpg [from download tool]
-- User message: [Media attachment: 1812452379380528]
-- Company context: Pavisha, Professional brand voice
-- Conversation history: 2 cancelled downloads, 1 successful
+WHAT PARENT HAD:
+- File path: <path from previous tool> [if applicable]
+- User message: <original user input>
+- Domain context: <company/user context>
+- Prior results: <from earlier tool calls>
 
-WHAT PM PASSED IN TASK ARGS:
-- subagent_type: visual_analyst
-- description: "Analyze the image to identify materials..."
-- image_path: ??? <-- CHECK THIS
+WHAT PARENT PASSED IN TASK ARGS:
+- agent_type: <child_agent_name>
+- description: "<task description>"
+- file_path: ??? <-- CHECK THIS
 
-WHAT VISUAL_ANALYST RECEIVED:
-- Did it get the image path? Y/N
-- Did it get company context? Y/N
-- Did it get any prior findings? N/A (first analyst)
+WHAT CHILD RECEIVED:
+- Did it get the file path? Y/N
+- Did it get domain context? Y/N
+- Did it get prior findings? Y/N
+
+WHAT CHILD OUTPUT:
+- Result/error message from the child
+- Reveals consequence of broken handoff immediately
 
 HANDOFF QUALITY: [OK / PARTIAL / BROKEN]
 ISSUE: [None / Describe what was lost]
@@ -237,10 +241,10 @@ ISSUE: [None / Describe what was lost]
 
 | Issue | Symptom | Where to Look |
 |-------|---------|---------------|
-| Image path not passed | Child can't see image | Task args in parent output |
-| Company context lost | Generic responses | Task description or workspace |
-| Prior findings not shared | Redundant work | Workspace protocol compliance |
-| Wrong workspace path | File not found | Path in task description |
+| File path not passed | Child can't access file | Task args in parent output |
+| Domain context lost | Generic responses | Task description or shared state |
+| Prior findings not shared | Redundant work | Shared workspace compliance |
+| Wrong file path format | File not found | Path in task description |
 
 ---
 
@@ -259,10 +263,10 @@ But diagnosis should be based on **behavioral issues found during analysis**, no
 
 | Issue Type | Root Cause Location |
 |------------|---------------------|
-| Wrong routing | PM prompt routing rules |
-| Missing tool call | Specialist prompt OR tool description |
+| Wrong routing | Orchestrator prompt routing rules |
+| Missing tool call | Agent prompt OR tool description |
 | Wrong tool args | Prompt examples OR schema definition |
-| Context loss | **Handoff point** - task args or workspace |
+| Context loss | **Handoff point** - task args or shared state |
 | Incomplete output | Output schema OR prompt instructions |
 | Hallucination | Prompt lacks grounding instructions |
 
@@ -365,6 +369,7 @@ compare_traces(old_trace_id, result.trace_id)
 - Parent had: ___
 - Parent passed: ___
 - Child received: ___
+- Child output: ___
 - Handoff quality: [OK/PARTIAL/BROKEN]
 
 **Issues**: [None / List]
@@ -417,43 +422,45 @@ All helpers in `tests/tools/evaluation/helpers.py`:
 
 ```python
 from tests.tools.evaluation.helpers import (
-    show_tree,      # Phase 1: Build tree, get ID lookup
-    show_pm_flow,   # Phase 1: PM decisions chronologically
-    show_node,      # Phase 2: Full INPUT/REASONING/OUTPUT for one node
-    show_handoff,   # Phase 3: Context handoff analysis
-    show_llm_calls, # Summary of all LLM calls
-    compare_traces, # Before/after comparison
-    list_recent,    # Recent traces
-    list_failures,  # Failed traces
+    show_tree,             # Phase 1: Build tree, get ID lookup
+    show_orchestrator_flow, # Phase 1: Orchestrator decisions chronologically
+    show_node,             # Phase 2: Full INPUT/REASONING/OUTPUT for one node
+    show_handoff,          # Phase 3: Context handoff analysis
+    show_llm_calls,        # Summary of all LLM calls
+    compare_traces,        # Before/after comparison
+    list_recent,           # Recent traces
+    list_failures,         # Failed traces
 )
 ```
 
 | Function | Purpose | Returns |
 |----------|---------|---------|
 | `show_tree(trace_id)` | Hierarchical tree with tokens, decisions | `dict[short_id, full_uuid]` |
-| `show_pm_flow(trace_id)` | PM decisions in order with tool calls | `list[dict]` |
-| `show_node(run_id)` | Full analysis template for one node | `dict` with parsed data |
-| `show_handoff(parent_id, child_id)` | Context handoff verification | `dict` with issues |
+| `show_orchestrator_flow(trace_id)` | Orchestrator decisions in order with tool calls | `list[dict]` |
+| `show_node(run_id)` | Full analysis template for one node (no truncation on `description`) | `dict` with parsed data |
+| `show_handoff(parent_id, child_id)` | Context handoff: HAD -> PASSED -> RECEIVED -> **OUTPUT** | `dict` with issues |
 | `show_llm_calls(trace_id)` | All LLM calls summary | `None` (prints) |
 | `compare_traces(id1, id2)` | Before/after metrics | `None` (prints) |
+
+**Note**: `show_handoff` is optimized for orchestrator -> task delegations. For agent LLM -> tool handoffs, "WHAT PARENT PASSED" may be empty but "WHAT CHILD RECEIVED" will show correct data.
 
 ### Typical Workflow
 
 ```python
 # 1. Build tree, get ID lookup
-ids = show_tree("trace_id")
+ids = show_tree("<trace_id>")
 
-# 2. See PM's orchestration decisions
-show_pm_flow("trace_id")
+# 2. See orchestrator's decisions
+show_orchestrator_flow("<trace_id>")
 
-# 3. Analyze first PM LLM call
-show_node(ids['44427c51'])
+# 3. Analyze first orchestrator LLM call
+show_node(ids['<short_id>'])
 
 # 4. Before recursing into task, check handoff
-show_handoff(ids['44427c51'], ids['e0bdc7ae'])
+show_handoff(ids['<parent_id>'], ids['<child_id>'])
 
 # 5. Then analyze child node
-show_node(ids['e0bdc7ae'])
+show_node(ids['<child_id>'])
 ```
 
 ---
@@ -462,11 +469,11 @@ show_node(ids['e0bdc7ae'])
 
 | What | Where |
 |------|-------|
-| PM prompt | `prompts/project_manager_intelligent.prompt` |
-| Specialist prompts | `prompts/specialists/*.prompt` |
+| Orchestrator prompt | `prompts/<orchestrator>.prompt` |
+| Agent prompts | `prompts/<agents>/*.prompt` |
 | Tool definitions | `tools/*.py` |
-| Agent implementations | `workflows/*.py`, `specialists/*.py` |
-| Workspace protocol | `/workspace/findings/` |
+| Agent implementations | `workflows/*.py`, `agents/*.py` |
+| Shared state/workspace | Application-specific |
 | **Evaluation helpers** | `tests/tools/evaluation/helpers.py` |
 
 ---
@@ -477,5 +484,5 @@ show_node(ids['e0bdc7ae'])
 |-------|------|
 | `prompt-engineering` | Before editing any prompt |
 | `tool-development` | Fixing tool definitions |
-| `specialist-creation` | Adding new specialists |
+| `specialist-creation` | Adding new agents |
 | `autonomous-testing` | Verifying fixes |
