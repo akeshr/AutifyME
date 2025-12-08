@@ -34,8 +34,8 @@ class AggregateDataInput(BaseModel):
             "Aggregation operations as {alias: 'function(column)'}. "
             "Examples: "
             "{'total': 'count(*)'} - count all rows, "
-            "{'avg_price': 'avg(base_price)'} - average price, "
-            "{'min_price': 'min(base_price)', 'max_price': 'max(base_price)'} - min/max. "
+            "{'avg_val': 'avg(amount)'} - average price, "
+            "{'min_price': 'min(amount)', 'max_price': 'max(amount)'} - min/max. "
             "Supported functions: count, sum, avg, min, max"
         )
     )
@@ -44,7 +44,7 @@ class AggregateDataInput(BaseModel):
         description=(
             "[EXACT MATCH] Case-sensitive filters applied BEFORE aggregation.\n"
             "Use for: IDs, booleans, enums, status codes.\n"
-            "Examples: {'is_active': True}, {'product_family_id': 'uuid-123'}, {'status': ['active','draft']}.\n"
+            "Examples: {'is_active': True}, {'parent_id': 'uuid-123'}, {'status': ['active','draft']}.\n"
             "CRITICAL: For text/name filtering, use search_patterns instead (fuzzy match)."
         )
     )
@@ -67,7 +67,7 @@ class AggregateDataInput(BaseModel):
             "Filters on aggregated results. "
             "Examples: "
             "{'total': {'gt': 10}} - groups with total > 10, "
-            "{'avg_price': {'gte': 100, 'lte': 500}} - average price between 100-500. "
+            "{'avg_val': {'gte': 100, 'lte': 500}} - average price between 100-500. "
             "Operators: gt, gte, lt, lte, eq, neq"
         )
     )
@@ -137,7 +137,7 @@ def create_aggregate_data_tool(
             # Average price by brand, only active products
             aggregate_data(
                 table="products",
-                aggregates={"avg_price": "avg(base_price)", "count": "count(*)"},
+                aggregates={"avg_val": "avg(amount)", "count": "count(*)"},
                 filters={"is_active": True},
                 group_by=["brand"],
                 having={"count": {"gt": 5}}
@@ -222,13 +222,13 @@ def create_aggregate_data_tool(
             "AGGREGATES SYNTAX:\n"
             "- Format: {'alias': 'function(column)'}\n"
             "- Functions: count(*), sum(col), avg(col), min(col), max(col)\n"
-            "- Multiple: {'total': 'count(*)', 'avg_price': 'avg(base_price)', 'price_range': 'max(base_price)-min(base_price)'}\n\n"
+            "- Multiple: {'total': 'count(*)', 'avg_val': 'avg(amount)', 'price_range': 'max(amount)-min(amount)'}\n\n"
             "SCENARIOS:\n"
-            "- Catalog health: aggregates={'count':'count(*)','avg_price':'avg(base_price)'}, group_by=['product_family_id'] - products per family with pricing\n"
-            "- Find sparse families: aggregates={'count':'count(*)'}, group_by=['product_family_id'], having={'count':{'lt':5}} - families with <5 products\n"
-            "- Price variance audit: aggregates={'spread':'max(base_price)-min(base_price)'}, group_by=['product_family_id'], having={'spread':{'gt':50}} - inconsistent pricing\n"
-            "- Variant coverage: table='variant_values', aggregates={'count':'count(*)'}, group_by=['variant_axis_id'] - values per axis\n"
-            "- Executive dashboard: aggregates={'total':'count(*)','active':'sum(case when is_active then 1 else 0 end)','catalog_value':'sum(base_price)'} - no group_by for totals\n\n"
+            "- Count by category: aggregates={'count':'count(*)','avg_val':'avg(amount)'}, group_by=['parent_id'] - records per category\n"
+            "- Find sparse groups: aggregates={'count':'count(*)'}, group_by=['parent_id'], having={'count':{'lt':5}} - groups with <5 records\n"
+            "- Value variance: aggregates={'spread':'max(amount)-min(amount)'}, group_by=['parent_id'], having={'spread':{'gt':50}} - value variance\n"
+            "- Child count: table='child_records', aggregates={'count':'count(*)'}, group_by=['group_id'] - children per parent\n"
+            "- Dashboard totals: aggregates={'total':'count(*)','active':'sum(case when is_active then 1 else 0 end)','total_value':'sum(amount)'} - no group_by for totals\n\n"
             "HAVING OPERATORS:\n"
             "- {'alias': {'gt': N}} - greater than\n"
             "- {'alias': {'gte': N}} - greater than or equal\n"

@@ -27,9 +27,9 @@ analyzing how a new product fits into the existing catalog ecosystem.
 4. Limit relations to those actually needed for your analysis
 
 **Relation Syntax:**
-- CORRECT: `["product_family(name,sku_prefix)"]` - nested inside parentheses
-- CORRECT: `["product_family(*)", "product_images(*)"]` - multiple flat relations
-- WRONG: `["product_family.products(*)"]` - dot notation fails
+- CORRECT: `["product_families(name,sku_prefix)"]` - nested inside parentheses
+- CORRECT: `["product_families(*)", "product_images(*)"]` - multiple flat relations
+- WRONG: `["product_families.products(*)"]` - dot notation fails
 - Use `inspect_schema` FIRST if unsure about exact table/relation names
 
 ## aggregate_data - Pricing statistics
@@ -116,7 +116,7 @@ Use precise search terms when visual context is provided.
 **Relation loading:**
 - Load relations ONLY when you need joined data for your analysis
 - Use `inspect_schema` FIRST if relation query fails with INVALID_RELATION
-- Prefer specific columns over `(*)` when possible: `["product_family(name,id)"]`
+- Prefer specific columns over `(*)` when possible: `["product_families(name,id)"]`
 
 **Token efficiency:**
 - Avoid fetching entire catalog - use limit when exploring
@@ -230,7 +230,7 @@ PM: "Find similar items. Read /workspace/findings/visual.md for details."
 4. read_data(
      table="products",
      ids=["id1", "id2", "id3"],
-     relations=["product_family(name,sku_prefix)"]
+     relations=["product_families(name,sku_prefix)"]
    )
    -> Batch fetch with relations for found products only
 
@@ -461,14 +461,14 @@ PM: "Find PET bottles with pricing details"
      tables=["products"],
      details=["relationships"]
    )
-   -> Reveals: products has FK to 'product_family' (not 'product_families')
+   -> Reveals: products.product_family_id references 'product_families.id'
    -> And: prices are in 'prices' table with FK 'product_id'
 
 3. read_data(
      table="products",
      search_patterns={"name": "%PET%bottle%"},
      columns=["id", "name", "sku_code"],
-     relations=["product_family(name)"]
+     relations=["product_families(name)"]
    )
    -> Found 5 PET bottles with correct relation syntax
 
