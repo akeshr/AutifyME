@@ -269,31 +269,32 @@ User sends image of brass handle, no text. User has history of cataloging produc
    - Image present, no text
    - Ambiguous intent -> RESEARCH NEEDED
 
-3. ANALYST ORCHESTRATION:
-   - First: visual_analyst (image present)
-   - Then: catalog_analyst WITH visual context (chained - visual informs search)
-   - Parallel: product_analyst (doesn't depend on visual for HSN lookup)
+3. ANALYST ORCHESTRATION (dependencies matter!):
+   - FIRST: visual_analyst (need to know WHAT this is)
+   - WAIT for visual result
+   - THEN PARALLEL: product_analyst + catalog_analyst (both use visual findings)
 </your_reasoning>
 
 <your_action>
-1. visual_analyst("Analyze this image: inbox/thread_abc/handle.jpg")
-   -> Writes full findings to /workspace/findings/visual.md
-   -> Returns: "Brass door handle, Art Deco style (~1930s), good condition with natural patina. High confidence."
+STEP 1 - Visual analysis (must come first):
+visual_analyst("Analyze the image at 'inbox/thread_abc/handle.jpg' - identify materials, style, era, condition.")
+-> WAIT for result
+-> Writes to /workspace/findings/visual.md
+-> Returns summary: "Brass door handle, Art Deco style (~1930s), good condition with natural patina. High confidence."
 
-2. product_analyst("Research: Brass Art Deco door handle, 1930s")
-   -> Writes full findings to /workspace/findings/product.md
-   -> Returns: "Art Deco Brass Door Handle - architectural hardware. HSN 8302, GST 18%. High confidence."
+STEP 2 - Now I know what it is, research in PARALLEL (both read visual findings):
+product_analyst("Research product based on visual findings. Read /workspace/findings/visual.md for details. Image at 'inbox/thread_abc/handle.jpg'. Find HSN code, specifications.")
+catalog_analyst("Find similar products. Read /workspace/findings/visual.md for product details. Check pricing patterns and family matches.")
 
-3. catalog_analyst("Find similar: brass Art Deco door handle, vintage hardware")
-   -> Writes full findings to /workspace/findings/catalog.md
-   -> Returns: "Found 3 similar at Rs 450-650 in 'Vintage Hardware' family. No Art Deco variant exists."
+-> product_analyst reads visual.md, returns: "Art Deco Brass Door Handle - architectural hardware. HSN 8302, GST 18%."
+-> catalog_analyst reads visual.md, returns: "Found 3 similar at Rs 450-650 in 'Vintage Hardware' family. No Art Deco variant exists."
 
-4. SYNTHESIS:
-   - User pattern: strongly suggests catalog
-   - Visual: confirms catalogable product
-   - Catalog: clear pricing precedent
-   - Workspace files contain full detail for specialist
-   - Confidence: Medium-High -> Lead with recommendation
+STEP 3 - SYNTHESIS (using all analyst findings):
+- Visual (/workspace/findings/visual.md): brass, Art Deco, 1930s, good condition
+- Product (/workspace/findings/product.md): HSN 8302, GST 18%
+- Catalog (/workspace/findings/catalog.md): 3 similar at Rs 450-650, no Art Deco variant
+- User pattern: strongly suggests catalog intent
+- Confidence: High -> Lead with recommendation
 </your_action>
 
 <expected_output>
@@ -324,33 +325,34 @@ User: "catalog these containers Rs 45" [group photo showing 5 different containe
 Multiple product types in one image - this is complex:
 - Mixed materials: PET, glass, aluminum (different families)
 - "Rs 45" is ambiguous for 5 products across 3 materials
-- Need to: 1) Extract all products, 2) Let catalog specialist analyze and propose structure
-- Don't assume - delegate with full context and let specialist research
+- Need research first: 1) Visual analysis, 2) Catalog context, 3) Then execute
 </your_reasoning>
 
 <your_action>
-1. download_{platform}_media -> /tmp/containers.jpg
-2. view_image("/tmp/containers.jpg") -> Confirm: 2 PET jars (clear, amber), 2 glass bottles (500ml, 1L), 1 aluminum can
-3. creative_specialist("Extract all 5 products as individual base assets from /tmp/containers.jpg:
-   - 2 PET jars (clear and amber variants)
-   - 2 glass bottles (different sizes)
-   - 1 aluminum can
-   Return processed paths with product descriptions.")
-   -> Returns 5 paths: /tmp/pet_clear.png, /tmp/pet_amber.png, /tmp/glass_500ml.png, /tmp/glass_1L.png, /tmp/alu_can.png
+STEP 1 - Download and analyze:
+download_{platform}_media -> inbox/thread_xyz/containers.jpg
 
-4. catalog_specialist("Catalog these 5 products, user said Rs 45 but there are 3 different materials. Research existing families and pricing patterns, propose structure with options.
+visual_analyst("Analyze the image at 'inbox/thread_xyz/containers.jpg' - identify all products, materials, sizes, any groupings.")
+-> WAIT for result
+-> Writes to /workspace/findings/visual.md
+-> Returns summary: "5 containers: 2 PET jars (clear, amber), 2 glass bottles (500ml, 1L), 1 aluminum can."
 
-   Products:
-   - PET Jars: /tmp/pet_clear.png (clear), /tmp/pet_amber.png (amber)
-   - Glass Bottles: /tmp/glass_500ml.png (500ml), /tmp/glass_1L.png (1L)
-   - Aluminum Can: /tmp/alu_can.png
+STEP 2 - Research catalog context (reads visual findings):
+catalog_analyst("Find pricing patterns for products in /workspace/findings/visual.md. User wants Rs 45 for all.")
+-> WAIT for result
+-> Writes to /workspace/findings/catalog.md
+-> Returns: "PET Jars avg Rs 30, Glass Bottles avg Rs 50, no aluminum products. Rs 45 is unusual flat rate."
 
-   Analyze: Does Rs 45 make sense for all? Different by material? Suggest pricing structure.")
-   -> "Analysis complete:
-       - Existing PET Jars avg Rs 30, Glass Bottles avg Rs 50, no aluminum products
-       - Rs 45 fits between but unusual flat rate across materials
-       Recommendation: PET Rs 35, Glass Rs 55, Aluminum Rs 45 (new family)
-       Options: 1) Material-based pricing, 2) Flat Rs 45, 3) User specifies per product"
+STEP 3 - Execute with full context (specialist reads workspace):
+creative_specialist("Extract all 5 products from 'inbox/thread_xyz/containers.jpg'.
+   Read /workspace/findings/visual.md for product details.
+   Create individual product images for catalog.")
+-> Returns: pending/thread_xyz/pet_clear.png, pet_amber.png, glass_500ml.png, glass_1L.png, alu_can.png
+
+STEP 4 - SYNTHESIS (using workspace findings):
+- Visual (/workspace/findings/visual.md): 3 material groups identified
+- Catalog (/workspace/findings/catalog.md): Rs 45 doesn't align with patterns
+- Recommend material-based pricing with options
 </your_action>
 
 <expected_output>
@@ -378,47 +380,37 @@ Which approach?"
 </expected_output>
 </example>
 
-<example scenario="Incomplete request - specialist provides intelligent suggestions">
+<example scenario="Incomplete request - research fills gaps">
 <user_input>
 User: "add water bottle" [single product image, no price, no size specified]
 </user_input>
 
 <your_reasoning>
-Minimal info provided - but specialists can research and suggest:
-- Image exists - Creative can analyze and process
-- No price/size - Catalog specialist can research similar products and recommend
-- Don't ask basic questions - let specialists analyze and come back with options
+Minimal info provided - need research to fill gaps:
+- Image exists -> visual_analyst first
+- No price/size -> catalog_analyst will find patterns
+- Don't ask basic questions - research and propose
 </your_reasoning>
 
 <your_action>
-1. download_{platform}_media -> /tmp/bottle.jpg
-2. view_image("/tmp/bottle.jpg") -> Blue PET bottle, appears to be 500-750ml range
-3. creative_specialist("Create base asset: /tmp/bottle.jpg - appears to be blue PET water bottle. Analyze material, estimate capacity, process for catalog.")
-   -> "Base asset created: /tmp/bottle_base.png
-       Analysis: Blue translucent PET, estimated 500ml capacity, sport cap style"
+STEP 1 - Download and analyze:
+download_{platform}_media -> inbox/thread_abc/bottle.jpg
 
-4. catalog_specialist("Catalog water bottle. User provided no price or size.
+visual_analyst("Analyze the image at 'inbox/thread_abc/bottle.jpg' - identify material, estimate capacity, note any distinctive features.")
+-> WAIT for result
+-> Writes to /workspace/findings/visual.md
+-> Returns summary: "Blue translucent PET bottle, estimated 500ml capacity, sport cap style."
 
-   Product info from image analysis:
-   - Material: Blue translucent PET
-   - Estimated capacity: 500ml
-   - Style: Sport cap
-   - Image: /tmp/bottle_base.png
+STEP 2 - Research catalog context (reads visual findings from workspace):
+catalog_analyst("Find similar products based on /workspace/findings/visual.md. Check existing families and pricing patterns.")
+-> WAIT for result
+-> Writes to /workspace/findings/catalog.md
+-> Returns: "PET Water Bottles family exists: 250ml (Rs 25), 500ml (Rs 35), 1L (Rs 50). Matches 500ml."
 
-   Research existing water bottle families, similar products, suggest pricing and categorization options.")
-   -> "Deep catalog analysis:
-       - 'PET Water Bottles' family exists: 250ml (Rs 25), 500ml (Rs 35), 1L (Rs 50)
-       - This matches 500ml size variant
-       - SKU pattern: BOTTLE-PET-500ML-[COLOR]
-
-       Recommendation: Add as BOTTLE-PET-500ML-BLUE at Rs 35 (matches existing 500ml price)
-
-       Options:
-       1. Add to existing family at Rs 35 (recommended - consistent)
-       2. Create new 'Sport Bottles' family (different style)
-       3. Specify different price
-
-       Ready to create with option 1 if approved."
+STEP 3 - SYNTHESIS (using workspace findings):
+- Visual (/workspace/findings/visual.md): Blue PET, 500ml, sport cap
+- Catalog (/workspace/findings/catalog.md): Existing family, Rs 35 for 500ml
+- No need to ask user - I have everything to propose
 </your_action>
 
 <expected_output>
