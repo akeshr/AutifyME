@@ -738,11 +738,7 @@ def show_node(run_id: str) -> dict:
         result["outputs"] = parsed_output
 
         if parsed_output["content"]:
-            content = parsed_output["content"]
-            if len(content) > 300:
-                print(f"Content: {content[:300]}...")
-            else:
-                print(f"Content: {content}")
+            print(f"Content: {parsed_output['content']}")
 
         if parsed_output["tool_calls"]:
             print(f"\nTool Calls: {len(parsed_output['tool_calls'])}")
@@ -753,13 +749,9 @@ def show_node(run_id: str) -> dict:
                 args = tc.get("args", {})
                 print(f"\n  -> {name}")
 
-                # Show all args - NO truncation for 'description' (critical for handoff)
+                # Show all args - NO truncation
                 for k, v in args.items():
-                    v_str = str(v)
-                    # Don't truncate description - it's the handoff contract
-                    if k != "description" and len(v_str) > 80:
-                        v_str = v_str[:80] + "..."
-                    print(f"     {k}: {v_str}")
+                    print(f"     {k}: {v}")
 
                 # Mark if this is a task delegation
                 if name == "task":
@@ -768,7 +760,7 @@ def show_node(run_id: str) -> dict:
 
     elif run.run_type == "tool":
         # Tool outputs are usually in outputs directly
-        print(f"Tool result: {str(run.outputs)[:200]}...")
+        print(f"Tool result: {run.outputs}")
 
     print(f"\n{'='*70}")
 
@@ -878,12 +870,12 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
                     continue
 
                 passed_context["subagent_type"] = tc_subagent
-                passed_context["description"] = args.get("description", "")[:200]
+                passed_context["description"] = args.get("description", "")
 
                 # Check for key context fields
                 for key in ["image_path", "file_path", "url", "product_id", "context"]:
                     if key in args:
-                        passed_context[key] = str(args[key])[:100]
+                        passed_context[key] = str(args[key])
                 break  # Found the matching call
 
     for k, v in passed_context.items():
@@ -930,19 +922,13 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
             if isinstance(output_val, dict):
                 # Specialist returns structured output
                 for k, v in output_val.items():
-                    v_str = str(v)
-                    if len(v_str) > 200:
-                        v_str = v_str[:200] + "..."
-                    child_output[k] = v_str
+                    child_output[k] = str(v)
             else:
-                child_output["output"] = str(output_val)[:300]
+                child_output["output"] = str(output_val)
         else:
             # Raw outputs
             for k, v in child.outputs.items():
-                v_str = str(v)
-                if len(v_str) > 200:
-                    v_str = v_str[:200] + "..."
-                child_output[k] = v_str
+                child_output[k] = str(v)
 
     for k, v in child_output.items():
         print(f"  {k}: {v}")
@@ -1070,11 +1056,10 @@ def show_orchestrator_flow(trace_id: str) -> list[dict]:
                     call_info["args_summary"]["description"] = desc
                 else:
                     print(f"    -> {name}")
-                    # Show first 2 args
-                    for k, v in list(args.items())[:2]:
-                        v_str = str(v)[:50]
-                        print(f"       {k}: {v_str}")
-                        call_info["args_summary"][k] = v_str
+                    # Show all args - NO truncation
+                    for k, v in args.items():
+                        print(f"       {k}: {v}")
+                        call_info["args_summary"][k] = str(v)
 
                 decision["tool_calls"].append(call_info)
 
@@ -1194,15 +1179,15 @@ def scan_all_handoffs(trace_id: str) -> list[dict]:
         severity = "OK"
 
         if child_asked_for_context:
-            issue_found = f"Child asked for missing context: '{child_output_text[:80]}...'"
+            issue_found = f"Child asked for missing context: '{child_output_text}'"
             severity = "HIGH"
 
         # Print result - always show what was delegated
         status_icon = "[X]" if issue_found else "[OK]"
         file_marker = " [+file]" if task_has_file else ""
         print(f"\n{status_icon} {subagent}{file_marker}")
-        print(f"    Task ID: {str(task_run.id)[:12]}...")
-        print(f"    Description: {task_description[:100]}{'...' if len(task_description) > 100 else ''}")
+        print(f"    Task ID: {task_run.id}")
+        print(f"    Description: {task_description}")
         if issue_found:
             print(f"    ISSUE: {issue_found}")
             issues.append({
@@ -1217,7 +1202,7 @@ def scan_all_handoffs(trace_id: str) -> list[dict]:
     if issues:
         print(f"FOUND {len(issues)} HANDOFF ISSUE(S)")
         for i in issues:
-            print(f"  - [{i['severity']}] {i['subagent']}: {i['issue'][:60]}...")
+            print(f"  - [{i['severity']}] {i['subagent']}: {i['issue']}")
     else:
         print("No handoff issues detected")
     print(f"{'='*70}")
@@ -1332,7 +1317,7 @@ def detect_issues(trace_id: str) -> list[dict]:
                                 "severity": "HIGH",
                                 "node_id": str(task_run.id),
                                 "node_name": f"task({subagent})",
-                                "description": f"Child asked for missing context: {content[:60]}...",
+                                "description": f"Child asked for missing context: {content}",
                             })
                             break
 
@@ -1349,12 +1334,12 @@ def detect_issues(trace_id: str) -> list[dict]:
         if high:
             print("HIGH SEVERITY:")
             for i in high:
-                print(f"  [{i['type']}] {i['node_name']}: {i['description'][:60]}")
+                print(f"  [{i['type']}] {i['node_name']}: {i['description']}")
 
         if medium:
             print("\nMEDIUM SEVERITY:")
             for i in medium:
-                print(f"  [{i['type']}] {i['node_name']}: {i['description'][:60]}")
+                print(f"  [{i['type']}] {i['node_name']}: {i['description']}")
 
     print(f"\n{'='*70}")
 

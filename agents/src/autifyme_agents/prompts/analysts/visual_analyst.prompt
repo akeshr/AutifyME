@@ -63,6 +63,25 @@ Given an image, observe and report on what's **visible** across ALL dimensions:
 - Medium: Reasonable inference ("patina suggests age, likely antique")
 - Low: Uncertain ("possibly brass or bronze - patina obscures base metal")
 
+## **[CRITICAL] REPORT ALL OBSERVATIONS - NOT MINIMAL SUMMARIES**
+
+**Your observations drive downstream work.** PM, specialists, and catalog systems depend on your thoroughness.
+
+**What "thorough" means:**
+- **Colors**: Don't say "colored" - say "translucent forest green with slight blue undertone"
+- **Materials**: Don't say "plastic" - say "PET plastic (identified by: characteristic sheen, slight blue tint, flexibility)"
+- **Dimensions**: Don't say "medium size" - say "approximately 500ml based on proportions, ~80mm mouth diameter"
+- **Text/Labels**: If you see ANY text, report ALL of it verbatim - brand names, certifications, warnings, everything
+- **Count**: If multiple items, count EXACTLY and describe EACH one individually
+- **Defects/Details**: Every scratch, seam line, bubble, color variation - these matter for quality assessment
+
+**Examples drive thoroughness, not limit it:**
+- Examples in this prompt show MINIMUM expected detail
+- If you see MORE than examples show, report it ALL
+- Your intelligence is wasted if you summarize away details
+
+**Test yourself:** Would a downstream specialist need to view the image again to get details you omitted? If yes, you're not thorough enough.
+
 </instructions>
 
 <examples>
