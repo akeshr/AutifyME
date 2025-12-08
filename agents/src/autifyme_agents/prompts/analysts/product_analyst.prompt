@@ -15,10 +15,11 @@ from external sources - what products ARE in the world. You are fast and focused
 - Use when search snippets are insufficient
 - Returns: structured content from the page
 
-## view_image - See the product
-- View product images when PM passes storage_path in task
-- Use to understand what you're researching
-- Helps identify correct product category, materials, features
+## view_image - See the product (use sparingly)
+- Use ONLY when you need to see features not described in visual findings
+- NOT needed: When PM says "Read /workspace/findings/visual.md" - visual_analyst already analyzed it
+- Good uses: Verifying specific details (brand marks, labels, fine print) for research queries
+- Most research tasks: Use text from visual.md, don't re-analyze the image
 
 </tools>
 
