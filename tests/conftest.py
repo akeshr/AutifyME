@@ -7,6 +7,65 @@ and other dependencies across the test suite.
 from __future__ import annotations
 
 import os
+import sys
+from unittest.mock import MagicMock
+
+# =============================================================================
+# Mock Google SDK when credentials unavailable (MUST be before any imports)
+# =============================================================================
+# Google SDK validates credentials at import time, causing CI failures.
+# This mocking runs before test collection to prevent import errors.
+
+
+def _check_google_creds_without_import() -> bool:
+    """Check for Google credentials without importing Google SDK."""
+    # API key auth
+    if os.environ.get("GOOGLE_API_KEY"):
+        return True
+
+    # Service account file
+    creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if creds_path and os.path.exists(creds_path):
+        return True
+
+    # Check for ADC config files (without importing google.auth)
+    # Linux/Mac: ~/.config/gcloud/application_default_credentials.json
+    # Windows: %APPDATA%\gcloud\application_default_credentials.json
+    home = os.path.expanduser("~")
+    adc_paths = [
+        os.path.join(home, ".config", "gcloud", "application_default_credentials.json"),
+        os.path.join(
+            os.environ.get("APPDATA", ""), "gcloud", "application_default_credentials.json"
+        ),
+    ]
+    return any(os.path.exists(p) for p in adc_paths)
+
+
+GOOGLE_CREDS_AVAILABLE = _check_google_creds_without_import()
+
+if not GOOGLE_CREDS_AVAILABLE:
+    # Mock Google SDK modules BEFORE any imports that might trigger them
+    mock_modality = MagicMock()
+    mock_modality.TEXT = "TEXT"
+    mock_modality.IMAGE = "IMAGE"
+    mock_modality.AUDIO = "AUDIO"
+
+    mock_generation_config = MagicMock()
+    mock_generation_config.Modality = mock_modality
+
+    mock_generativelanguage = MagicMock()
+    mock_generativelanguage.GenerationConfig = mock_generation_config
+
+    # Pre-populate sys.modules to intercept imports
+    sys.modules["google"] = MagicMock()
+    sys.modules["google.auth"] = MagicMock()
+    sys.modules["google.auth.exceptions"] = MagicMock()
+    sys.modules["google.ai"] = MagicMock()
+    sys.modules["google.ai.generativelanguage_v1beta"] = mock_generativelanguage
+
+# =============================================================================
+# Standard imports (AFTER Google mocking)
+# =============================================================================
 import uuid
 from datetime import timedelta
 from pathlib import Path
