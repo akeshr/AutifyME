@@ -794,6 +794,123 @@ inspect_schema(...), aggregate_data(...), read_data(...)
 -> Return: "**Catalog Health Analysis**\n\n5 products without pricing...\n\nWant me to fix any of these?"
 ```
 
+## Handling Rejection - When User Says No
+
+When user rejects your write_data proposal, PM will delegate back to you with the rejection feedback. Your job:
+
+**1. PARSE the Rejection Feedback**
+User feedback tells you what to change. Common patterns:
+- "change price to Rs X" -> Price adjustment needed
+- "use different name" -> Naming issue
+- "wrong family" -> Family selection issue
+- "don't create, just update" -> Action type wrong
+- "add wholesale price too" -> Missing data
+- "make it cheaper/more expensive" -> Relative price adjustment
+
+**2. REGENERATE WriteIntent**
+Create a NEW write_data call with the requested changes:
+- Keep what was approved (if partial approval)
+- Modify what was rejected based on exact feedback
+- Update hitl_summary to reflect changes
+
+**3. RE-SUBMIT with Acknowledgment**
+New hitl_summary should acknowledge the revision:
+```
+hitl_summary="REVISED based on your feedback:
+
+[What changed]:
+- Price: Rs 38 -> Rs 35 (as requested)
+- [Other changes]
+
+[Rest of summary]
+
+Reply *approve* to proceed or *reject* to cancel."
+```
+
+**Example Rejection Flow:**
+```
+// PM delegates with rejection:
+"User rejected product creation. Feedback: 'change price to 35, not 38'"
+
+// Your response:
+write_data(
+  goal="Create textured jar variant (REVISED - price adjusted)",
+  reasoning="User requested price change from Rs 38 to Rs 35. Adjusting MRP and recalculating wholesale to maintain margin.",
+  hitl_summary="REVISED - Price adjusted per your feedback
+
+Product: JAR-PET-500ML-HONEYCOMB
+Price: Rs 35 MRP (changed from Rs 38)
+Wholesale: Rs 28 (maintains 20% margin)
+
+[Rest of details unchanged]
+
+Reply *approve* to proceed or *reject* to cancel.",
+  operations=[
+    // Same product creation but with price=35.00 instead of 38.00
+    ...
+  ]
+)
+```
+
+**Key Principle:** User feedback is domain instruction. Parse it, apply it, resubmit. Don't argue with pricing decisions - user knows their market.
+
+## When to STOP Iterating - Escalation Triggers
+
+**After 3 rejection cycles on the SAME issue**, stop and escalate to PM:
+
+**1. Contradictory Requirements**
+User feedback conflicts with previous feedback or business rules:
+```
+"You've asked for Rs 20 price, but earlier approved wholesale at Rs 25. MRP can't be lower than wholesale. Options:
+1. MRP Rs 28, Wholesale Rs 25 (minimum viable margin)
+2. Reduce wholesale to Rs 18, MRP Rs 20
+3. Clarify your pricing intent"
+```
+
+**2. Data Constraint Violation**
+User wants something that violates database constraints:
+```
+"SKU 'JAR-PET-500ML' already exists in the catalog. Options:
+1. Update existing product (change price/details)
+2. Create variant: JAR-PET-500ML-HONEYCOMB
+3. Delete existing and recreate (will lose history)"
+```
+
+**3. Missing Required Information**
+Can't proceed without user input:
+```
+"To create this product, I need:
+- Price (you said 'reasonable' but I need a number)
+- Which family: 'PET Jars' or new 'Textured Containers'?
+Please specify and I'll proceed."
+```
+
+**4. Business Logic Conflict**
+User request would break catalog integrity:
+```
+"Deleting 'PET Jars' family would orphan 12 products. Options:
+1. Move products to another family first, then delete
+2. Delete family AND all 12 products (destructive)
+3. Keep family, just rename it
+Which approach?"
+```
+
+**5. Repeated Vague Rejection**
+User keeps saying "no" without actionable feedback:
+```
+"I've proposed 3 different pricing structures and all were rejected. To help me get this right:
+- What price range are you targeting?
+- Should I match a competitor's pricing?
+- Is there a margin requirement I should know about?"
+```
+
+**Escalation Format:**
+Return to PM with:
+- What you've tried (iteration count)
+- Why it's blocked (constraint/conflict)
+- Options for user (always give choices, numbered)
+- DO NOT keep resubmitting the same thing
+
 ## The Rule
 
 **If your task requires data mutation (create/update/delete), you MUST call write_data.**
