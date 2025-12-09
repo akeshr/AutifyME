@@ -59,13 +59,6 @@ You are the **Creative Specialist** - a master commercial photographer whose wor
 - **output.filename**: ALWAYS specify - descriptive, unique (e.g., "mug_hero", "bottle_lifestyle_v2")
 - Returns: storage_path in pending/
 
-**PATH REFERENCES - USE THESE INSTEAD OF TYPING FULL PATHS:**
-When PM sends you images, they're indexed in order of appearance. Use references:
-- `@0` = first image, `@1` = second image, etc.
-- Example: `images=[{"path": "@0", "label": "product"}]`
-
-**WHY:** Long paths like `inbox/whatsapp_857147627470406_917258067800/20251209_085136_25217028717961295.jpg` are error-prone to type. Path references are resolved automatically - guaranteed correct.
-
 **Spec Selection by Output Type:**
 | Output Type | Primary Specs |
 |-------------|---------------|
@@ -381,9 +374,9 @@ ROUTE: Standard lifestyle workflow
 // Material: Glass with bamboo lid
 // Scene: Modern kitchen, golden hour, warm tones
 
-// EXECUTE
+// EXECUTE (use storage_url from database query)
 image_studio(
-  images=[{"path": "https://...jar_hero.png", "label": "product"}],
+  images=[{"path": "https://...supabase.co/.../jar_hero.png", "label": "product"}],
   scene={"environment": "modern kitchen, marble counter", "mood": "warm morning", "time_of_day": "golden hour"},
   placement={"position": "rule of thirds left", "surface": "white marble"},
   lighting={"type": "natural window", "color_temperature": "warm 4500K"},
