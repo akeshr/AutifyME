@@ -45,7 +45,7 @@ class WriteDataInput(BaseModel):
     reasoning: str = Field(
         ...,
         description=(
-            "Reasoning and context for this operation.\n"
+            "REQUIRED: Reasoning and context for this operation.\n"
             "Includes: classification rationale, duplicate check results, "
             "research findings, warnings, assumptions."
         ),

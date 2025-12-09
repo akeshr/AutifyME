@@ -260,26 +260,19 @@ class WriteIntent(BaseModel):
     reasoning: str = Field(
         ...,
         description=(
-            "Reasoning and context for this operation.\n"
+            "REQUIRED: Reasoning and context for this operation.\n"
             "Includes: classification rationale, duplicate check results, "
             "research findings, warnings, assumptions."
         ),
     )
 
     hitl_summary: str = Field(
-        default="",
+        ...,
         description=(
-            "Human-readable approval summary for HITL messaging (<1500 chars).\n"
-            "Write this for the business user who will approve/reject.\n"
+            "REQUIRED: Human-readable approval summary for HITL (<1500 chars).\n"
+            "Write for the business user who will approve/reject.\n"
             "Include: operation goal, key impacts, warnings, sample SKUs/names.\n"
-            "End with approval instructions.\n"
-            "If empty, system generates fallback from goal/impact.\n"
-            "Example:\n"
-            "'Creating PET Jars family with 2 size variants.\n"
-            "Impact: 1 family, 2 products. Uploading 2 images.\n"
-            "Warning: SKU count increases by 2.\n"
-            "Examples: JAR-PET-500ML, JAR-PET-1L.\n"
-            "Reply *approve* to proceed or *reject* to cancel.'"
+            "End with: 'Reply *approve* to proceed or *reject* to cancel.'"
         ),
     )
 
