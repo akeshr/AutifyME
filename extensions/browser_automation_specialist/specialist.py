@@ -17,7 +17,7 @@ except ImportError:
     raise ImportError(
         "google_computer_use extension required. Install with:\n"
         "cd extensions/google_computer_use && uv pip install -e '.[playwright]' && playwright install chromium"
-    )
+    ) from None
 
 
 class BrowserAutomationSpecialist:

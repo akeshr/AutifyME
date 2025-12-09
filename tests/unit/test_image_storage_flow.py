@@ -6,15 +6,10 @@ Tests the serverless-compatible image persistence architecture:
 - On approval: pending/ -> products/ (move operation)
 """
 
-import asyncio
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from tests.fixtures.fake_storage import FakeStorage
-
 
 # =============================================================================
 # Fixtures
@@ -398,7 +393,7 @@ class TestEndToEndImageFlow:
         self, storage: FakeStorage, sample_image_bytes: bytes, thread_id: str
     ):
         """Test complete flow: WhatsApp image -> inbox -> product record."""
-        from autifyme_agents.schemas.write_intent import AssetUpload, Operation, WriteIntent
+        from autifyme_agents.schemas.write_intent import Operation, WriteIntent
         from autifyme_agents.tools.data_engine._executor import MultiOperationExecutor
 
         # Step 1: WhatsApp image uploaded to inbox

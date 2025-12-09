@@ -16,7 +16,7 @@ except ImportError:
     raise ImportError(
         "google_computer_use extension required. Install with:\n"
         "cd extensions/google_computer_use && uv pip install -e '.[playwright]'"
-    )
+    ) from None
 
 
 # Global executor (reused across tool calls for session persistence)
@@ -122,7 +122,7 @@ async def browser_automation_tool(
         }
 
     except Exception as e:
-        raise ToolException(f"Browser automation failed: {str(e)}")
+        raise ToolException(f"Browser automation failed: {str(e)}") from e
 
 
 async def cleanup_browser():

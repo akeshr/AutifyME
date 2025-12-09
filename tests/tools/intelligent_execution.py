@@ -22,12 +22,12 @@ load_dotenv()
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.integrations.storage.storage_factory import get_storage
-from autifyme_agents.workflows.channels.protocol import MessagingChannel
-from autifyme_agents.workflows.orchestration.runner import WorkflowRunner
+from autifyme_agents.core.ports import StorageInterface  # noqa: E402
+from autifyme_agents.integrations.storage.storage_factory import get_storage  # noqa: E402
+from autifyme_agents.workflows.channels.protocol import MessagingChannel  # noqa: E402
+from autifyme_agents.workflows.orchestration.runner import WorkflowRunner  # noqa: E402
 
-from .models import ExecutionResult
+from .models import ExecutionResult  # noqa: E402
 
 
 class _IntelligentConsoleChannel(MessagingChannel):

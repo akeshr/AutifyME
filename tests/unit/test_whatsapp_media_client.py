@@ -98,29 +98,25 @@ class TestGetMediaURL:
         """HTTP 404 raises HTTPStatusError."""
         mock_response = mock_httpx_response(status_code=404)
 
-        with patch('httpx.get', return_value=mock_response):
-            with pytest.raises(httpx.HTTPStatusError):
-                media_client.get_media_url("nonexistent_media")
+        with patch('httpx.get', return_value=mock_response), pytest.raises(httpx.HTTPStatusError):
+            media_client.get_media_url("nonexistent_media")
 
     def test_get_media_url_http_403(self, media_client, mock_httpx_response):
         """HTTP 403 (permission denied) raises HTTPStatusError."""
         mock_response = mock_httpx_response(status_code=403)
 
-        with patch('httpx.get', return_value=mock_response):
-            with pytest.raises(httpx.HTTPStatusError):
-                media_client.get_media_url("forbidden_media")
+        with patch('httpx.get', return_value=mock_response), pytest.raises(httpx.HTTPStatusError):
+            media_client.get_media_url("forbidden_media")
 
     def test_get_media_url_timeout(self, media_client):
         """Network timeout raises TimeoutException."""
-        with patch('httpx.get', side_effect=httpx.TimeoutException("Connection timeout")):
-            with pytest.raises(httpx.TimeoutException):
-                media_client.get_media_url("media_timeout")
+        with patch('httpx.get', side_effect=httpx.TimeoutException("Connection timeout")), pytest.raises(httpx.TimeoutException):
+            media_client.get_media_url("media_timeout")
 
     def test_get_media_url_network_error(self, media_client):
         """Network error raises ConnectError."""
-        with patch('httpx.get', side_effect=httpx.ConnectError("Connection failed")):
-            with pytest.raises(httpx.ConnectError):
-                media_client.get_media_url("media_error")
+        with patch('httpx.get', side_effect=httpx.ConnectError("Connection failed")), pytest.raises(httpx.ConnectError):
+            media_client.get_media_url("media_error")
 
 
 class TestDownloadMedia:
@@ -140,9 +136,8 @@ class TestDownloadMedia:
             headers={"Content-Type": "image/jpeg"}
         )
 
-        with patch('httpx.get', return_value=mock_response) as mock_get:
-            with patch('pathlib.Path.write_bytes'):
-                path, content, mime_type = media_client.download_media("media_abc123")
+        with patch('httpx.get', return_value=mock_response) as mock_get, patch('pathlib.Path.write_bytes'):
+            path, content, mime_type = media_client.download_media("media_abc123")
 
         assert isinstance(path, Path)
         assert "media_abc123" in str(path)
@@ -163,17 +158,15 @@ class TestDownloadMedia:
 
         mock_response = mock_httpx_response(status_code=500)
 
-        with patch('httpx.get', return_value=mock_response):
-            with pytest.raises(httpx.HTTPStatusError):
-                media_client.download_media("media_error")
+        with patch('httpx.get', return_value=mock_response), pytest.raises(httpx.HTTPStatusError):
+            media_client.download_media("media_error")
 
     def test_download_media_timeout(self, media_client):
         """Timeout during download raises TimeoutException."""
         media_client.get_media_url = Mock(return_value="https://example.com/media.jpg")
 
-        with patch('httpx.get', side_effect=httpx.TimeoutException("Download timeout")):
-            with pytest.raises(httpx.TimeoutException):
-                media_client.download_media("media_timeout")
+        with patch('httpx.get', side_effect=httpx.TimeoutException("Download timeout")), pytest.raises(httpx.TimeoutException):
+            media_client.download_media("media_timeout")
 
     def test_download_media_write_failure(self, media_client, mock_httpx_response):
         """Write failure doesn't crash (serverless scenario) - returns bytes only."""
@@ -186,9 +179,8 @@ class TestDownloadMedia:
             headers={"Content-Type": "image/png"}
         )
 
-        with patch('httpx.get', return_value=mock_response):
-            with patch('pathlib.Path.write_bytes', side_effect=OSError("Read-only filesystem")):
-                path, content, mime_type = media_client.download_media("media_abc123")
+        with patch('httpx.get', return_value=mock_response), patch('pathlib.Path.write_bytes', side_effect=OSError("Read-only filesystem")):
+            path, content, mime_type = media_client.download_media("media_abc123")
 
         # Should still return bytes even if write fails
         assert content == test_bytes
@@ -206,9 +198,8 @@ class TestDownloadMedia:
             headers={"Content-Type": "video/mp4"}
         )
 
-        with patch('httpx.get', return_value=mock_response):
-            with patch('pathlib.Path.write_bytes'):
-                path, content, mime_type = media_client.download_media("large_media")
+        with patch('httpx.get', return_value=mock_response), patch('pathlib.Path.write_bytes'):
+            path, content, mime_type = media_client.download_media("large_media")
 
         assert len(content) == 12 * 1024 * 1024
         assert mime_type == "video/mp4"
@@ -224,9 +215,8 @@ class TestDownloadMedia:
             headers={}  # No Content-Type
         )
 
-        with patch('httpx.get', return_value=mock_response):
-            with patch('pathlib.Path.write_bytes'):
-                path, content, mime_type = media_client.download_media("unknown_media")
+        with patch('httpx.get', return_value=mock_response), patch('pathlib.Path.write_bytes'):
+            path, content, mime_type = media_client.download_media("unknown_media")
 
         assert mime_type == "application/octet-stream"
         assert path.suffix == ""  # No extension for unknown type
@@ -311,11 +301,10 @@ class TestEdgeCases:
         )
 
         paths = []
-        with patch('httpx.get', return_value=mock_response):
-            with patch('pathlib.Path.write_bytes'):
-                for i in range(3):
-                    path, _, _ = media_client.download_media(f"media_{i}")
-                    paths.append(str(path))
+        with patch('httpx.get', return_value=mock_response), patch('pathlib.Path.write_bytes'):
+            for i in range(3):
+                path, _, _ = media_client.download_media(f"media_{i}")
+                paths.append(str(path))
 
         # All paths should be unique (contain timestamps and different media IDs)
         assert len(set(paths)) == 3
@@ -331,9 +320,8 @@ class TestEdgeCases:
             headers={"Content-Type": "image/jpeg; charset=utf-8"}
         )
 
-        with patch('httpx.get', return_value=mock_response):
-            with patch('pathlib.Path.write_bytes'):
-                path, content, mime_type = media_client.download_media("media_unicode")
+        with patch('httpx.get', return_value=mock_response), patch('pathlib.Path.write_bytes'):
+            path, content, mime_type = media_client.download_media("media_unicode")
 
         # Should extract base MIME type (ignore charset)
         assert "image/jpeg" in mime_type or mime_type == "image/jpeg; charset=utf-8"

@@ -662,12 +662,11 @@ def main():
             return
 
         # Default: treat as message
-        if sys.argv[1].startswith("-"):
-            # Skip argument parsing flags
-            if sys.argv[1] not in ["--hitl-mode"]:
-                print("Unknown option:", sys.argv[1])
-                print("Use --help for usage information")
-                sys.exit(1)
+        if sys.argv[1].startswith("-") and sys.argv[1] not in ["--hitl-mode"]:
+            # Unknown option
+            print("Unknown option:", sys.argv[1])
+            print("Use --help for usage information")
+            sys.exit(1)
 
         message = " ".join(arg for arg in sys.argv[1:] if not arg.startswith("-") and arg not in ["interactive", "auto_approve", "auto_reject", "auto_edit", "question"])
         if message:

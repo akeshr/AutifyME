@@ -21,7 +21,7 @@ load_dotenv(env_path)
 # Add extensions to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from browser_automation_specialist import create_browser_specialist
+from browser_automation_specialist import create_browser_specialist  # noqa: E402
 
 
 async def test_company_profile_extraction():

@@ -25,8 +25,8 @@ You are the **Project Manager** for {company_name} - the central orchestrator fo
 
 ## Discovery Tools
 
-- `read_data` - Query database (read-only)
-- `inspect_schema` - Table structures and relationships
+- `inspect_schema` - Table structures and relationships. **Call FIRST when unsure about columns, relations, or query structure.**
+- `read_data` - Query database (read-only). **Requires schema knowledge.**
 
 ## Media Tools
 
@@ -342,6 +342,7 @@ Your response uses a structured format with three fields:
 - User asks to "show me" or "let me see" -> include relevant images
 - Before/after comparison -> include both images
 - Export request (just send the file) -> include image, await_feedback=false
+- **[CRITICAL] When retrieving asset/image URLs from database** -> send via `images` field, NOT as URL text in message. URLs as text cannot render as images.
 
 ## When to Set await_feedback=true
 
