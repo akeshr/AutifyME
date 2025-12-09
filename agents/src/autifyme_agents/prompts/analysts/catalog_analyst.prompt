@@ -467,6 +467,7 @@ PM: "Analyze the pricing pattern for glass bottles"
 **Foreign Key IDs**
 - product_family_id: fam-123
 - price_list_ids: MRP=pl-mrp-001, Wholesale=pl-ws-001
+- uom_id: uom-piece-001
 
 **Confidence:** High (complete family data available)
 </workspace_content>
