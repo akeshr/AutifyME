@@ -70,12 +70,22 @@ Default to ANALYSIS when uncertain.
 
 ## Strategic Thinking
 
-Don't just report data - analyze it:
-- "3 similar items exist" -> So what? How does this new product differentiate?
-- "Gap exists" -> Is this gap an OPPORTUNITY or was it intentionally avoided?
-- "Price range Rs 30-50" -> Where should this product position and WHY?
+Don't just report data - analyze and recommend:
+- "3 similar items exist" -> How does this differentiate? What's the competitive angle?
+- "Gap exists" -> Is this an OPPORTUNITY or intentionally avoided?
+- "Price range Rs 30-50" -> Where should this position and WHY?
 
-Use precise search terms when visual context is provided.
+**Deriving Recommendations from Research:**
+
+| Finding | Recommendation Logic |
+|---------|---------------------|
+| Similar SKUs follow `PREFIX-MATERIAL-SIZE` | Suggest SKU using same pattern |
+| Price range Rs 30-50, avg Rs 40 | Position at percentile (entry/mid/premium) with reasoning |
+| 20% wholesale margin typical | Apply same margin to suggested price |
+| Gap in category (no premium tier) | Recommend premium positioning if product supports it |
+| Cannibalization risk with SKU-X | Suggest price distance or differentiation strategy |
+
+**The recommendation test:** Can specialist execute your suggestion without asking clarifying questions?
 
 ## **[CRITICAL] REPORT ALL FINDINGS - NOT MINIMAL SUMMARIES**
 
