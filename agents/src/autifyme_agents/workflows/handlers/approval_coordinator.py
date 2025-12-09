@@ -45,6 +45,7 @@ class ApprovalCoordinator:
         pending_interrupts: list[InterruptInfo],
         conversation_history: list[Any],
         raw_payload: dict[str, Any],
+        media_path: str | None = None,
     ) -> tuple[Command[Any] | None, str | None]:
         """Invoke approval analyzer and build Command from response.
 
@@ -62,6 +63,7 @@ class ApprovalCoordinator:
             pending_interrupts: List of normalized interrupt dicts
             conversation_history: Full conversation history for context
             raw_payload: Raw message payload (for sender info)
+            media_path: Optional storage_path if user sent image with response
 
         Returns:
             Tuple of (Command object if successful else None, approval_tracking_id or None)
@@ -122,7 +124,7 @@ class ApprovalCoordinator:
 
             # Build Command from structured approval response
             command_obj = self._build_command_from_approval(
-                approval_response, pending_interrupts
+                approval_response, pending_interrupts, media_path
             )
 
             return command_obj, approval_tracking_id
@@ -167,6 +169,7 @@ class ApprovalCoordinator:
         self,
         approval_response: BatchApprovalResponse,
         pending_interrupts: list[InterruptInfo],
+        media_path: str | None = None,
     ) -> Command[Any]:
         """Build LangGraph Command from structured approval response.
 
@@ -220,15 +223,20 @@ class ApprovalCoordinator:
             elif response.type == "reject":
                 # User rejected or wants changes - send user's actual response to PM
                 # Simple marker format so PM recognizes this as HITL feedback (not hallucination)
+                feedback_text = response.user_message or 'User rejected'
+                # Include media_path if user sent image with their feedback
+                if media_path:
+                    feedback_text = f"{feedback_text}\n[ATTACHED_IMAGE] {media_path}"
                 decision = {
                     "type": "reject",
-                    "message": f"[HITL_FEEDBACK] {response.user_message or 'User rejected'}"
+                    "message": f"[HITL_FEEDBACK] {feedback_text}"
                 }
                 logger.debug(
                     f"Built reject decision for interrupt {idx}",
                     extra={
                         "interrupt_id": interrupt_info.interrupt_id,
                         "user_feedback": response.user_message,
+                        "media_path": media_path,
                     }
                 )
 

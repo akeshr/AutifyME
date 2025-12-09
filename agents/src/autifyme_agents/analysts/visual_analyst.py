@@ -53,10 +53,11 @@ def create_visual_analyst(
     system_prompt = load_prompt("analysts/visual_analyst.prompt")
 
     description = (
-        "Visual Analyst - observes images and returns detailed findings. "
-        "Reports: materials, style/era, condition, dimensions, quality indicators. "
+        "Visual Analyst - comprehensive visual intelligence from images. "
+        "Reports: materials, dimensions, construction quality, branding/labels, "
+        "packaging format, use-context, variant detection, condition assessment. "
         "Cross-domain reuse: serves catalog, marketing, operations, quality workflows. "
-        "Read-only - does NOT suggest actions or make recommendations."
+        "Read-only - observes and reports, does NOT suggest actions."
     )
 
     tools: list[Any] = [

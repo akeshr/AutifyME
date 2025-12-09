@@ -23,7 +23,7 @@ def _load_history() -> list[dict]:
         return []
 
     try:
-        with open(HISTORY_FILE, encoding="utf-8") as f:
+        with HISTORY_FILE.open(encoding="utf-8") as f:
             return json.load(f)
     except (OSError, json.JSONDecodeError):
         # Corrupted file - start fresh
@@ -36,7 +36,7 @@ def _save_history(history: list[dict]) -> None:
     Args:
         history: List of test execution dictionaries
     """
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+    with HISTORY_FILE.open("w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, default=str)
 
 

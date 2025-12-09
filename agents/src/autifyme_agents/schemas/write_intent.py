@@ -260,25 +260,27 @@ class WriteIntent(BaseModel):
     reasoning: str = Field(
         ...,
         description=(
-            "Reasoning and context for this operation.\n"
+            "REQUIRED: Reasoning and context for this operation.\n"
             "Includes: classification rationale, duplicate check results, "
             "research findings, warnings, assumptions."
         ),
     )
 
     hitl_summary: str = Field(
-        default="",
+        ...,
         description=(
-            "Human-readable approval summary for HITL messaging (<1500 chars).\n"
-            "Write this for the business user who will approve/reject.\n"
-            "Include: operation goal, key impacts, warnings, sample SKUs/names.\n"
-            "End with approval instructions.\n"
-            "If empty, system generates fallback from goal/impact.\n"
+            "REQUIRED: Human-readable approval summary for HITL (<1500 chars).\n"
+            "Write for the BUSINESS USER who will approve/reject.\n\n"
+            "MUST include:\n"
+            "- What will be created/updated (plain language)\n"
+            "- Key impacts (counts, SKUs, prices)\n"
+            "- Any warnings or assumptions\n"
+            "- End with: 'Reply *approve* to proceed or *reject* to cancel'\n\n"
             "Example:\n"
-            "'Creating PET Jars family with 2 size variants.\n"
-            "Impact: 1 family, 2 products. Uploading 2 images.\n"
-            "Warning: SKU count increases by 2.\n"
-            "Examples: JAR-PET-500ML, JAR-PET-1L.\n"
+            "'Creating PET Jars family with 2 size variants.\n\n"
+            "Products: JAR-PET-500ML (Rs 30), JAR-PET-1L (Rs 50)\n"
+            "Images: 2 product photos attached\n\n"
+            "This will add 1 product family and 2 new SKUs.\n\n"
             "Reply *approve* to proceed or *reject* to cancel.'"
         ),
     )
@@ -309,12 +311,14 @@ class WriteIntent(BaseModel):
     impact: dict[str, Any] = Field(
         ...,
         description=(
-            "Simplified impact analysis for logging/analytics.\n"
+            "Simplified impact analysis.\n"
             "Format: {\n"
             "  'creates': {'table_name': count, ...},\n"
             "  'updates': {'table_name': count, ...},\n"
             "  'deletes': {'table_name': count, ...},\n"
-            "  'warnings': ['warning1', 'warning2']\n"
+            "  'asset_uploads': count,\n"
+            "  'warnings': ['warning1', 'warning2'],\n"
+            "  'examples': ['example SKU 1', 'example SKU 2']\n"
             "}"
         ),
     )

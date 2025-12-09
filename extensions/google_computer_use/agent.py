@@ -36,7 +36,7 @@ except ImportError:
     raise ImportError(
         "google-genai package required for Computer Use. "
         "Install with: uv pip install google-genai"
-    )
+    ) from None
 
 
 class ActionType(str, Enum):
@@ -366,9 +366,8 @@ class ComputerUseAgent:
                         )
 
                         # Check safety decision
-                        if hasattr(fc, "safety_decision"):
-                            if fc.safety_decision.get("decision") == "require_confirmation":
-                                action.requires_confirmation = True
+                        if hasattr(fc, "safety_decision") and fc.safety_decision.get("decision") == "require_confirmation":
+                            action.requires_confirmation = True
 
                         # Handle confirmation
                         if action.requires_confirmation:

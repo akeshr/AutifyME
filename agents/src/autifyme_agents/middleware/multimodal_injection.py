@@ -289,6 +289,15 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
     This enables specialists to make visual decisions without
     relying on separate tool calls to view images.
 
+    PATH REFERENCE RESOLUTION:
+    LLMs can hallucinate/corrupt long paths when typing them out for tool calls.
+    To prevent this, specialists can use path references instead of full paths:
+
+    - @0, @1, @2... - Reference by index (order paths appear in delegation)
+    - @product, @style_ref... - Reference by label (matched from image metadata)
+
+    The middleware resolves these references to actual paths before tool execution.
+
     Example:
         ```python
         from autifyme_agents.middleware.multimodal_injection import (
@@ -301,6 +310,11 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             "middleware": [MultimodalInjectionMiddleware()],
             ...
         }
+
+        # Specialist can then use references in image_studio:
+        # {"images": [{"path": "@0", "label": "product"}]}
+        # Instead of:
+        # {"images": [{"path": "inbox/whatsapp_.../20251209_085136_25217028717961295.jpg", "label": "product"}]}
         ```
     """
 
@@ -312,6 +326,9 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         """
         super().__init__()
         self.enabled = enabled
+        # Store injected paths for reference resolution in tool calls
+        # List of (path, detected_label) tuples in order of appearance
+        self._injected_paths: list[tuple[str, str | None]] = []
 
     def _process_messages(self, messages: list[Any]) -> list[Any]:
         """Process messages to inject images.
@@ -322,6 +339,9 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         This allows the specialist to:
         1. SEE input images from PM delegation (HumanMessage)
         2. SEE output images from tool results (ToolMessage)
+
+        Also stores extracted paths in self._injected_paths for reference
+        resolution when specialist calls image_studio with @0, @1, etc.
 
         Args:
             messages: List of messages
@@ -341,6 +361,15 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                         "Injecting %d image(s) into HumanMessage",
                         len(image_paths),
                         extra={"paths": image_paths}
+                    )
+                    # Store paths for reference resolution (with None label - to be inferred)
+                    for path in image_paths:
+                        if not any(p == path for p, _ in self._injected_paths):
+                            self._injected_paths.append((path, None))
+                    logger.info(
+                        "Stored %d path(s) for reference resolution: %s",
+                        len(self._injected_paths),
+                        [p for p, _ in self._injected_paths]
                     )
                     multimodal_content = _transform_to_multimodal(
                         msg.content, image_paths
@@ -513,6 +542,85 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         logger.debug("[MULTIMODAL] No image paths found, returning original result")
         return result
 
+    # =========================================================================
+    # Path Reference Resolution
+    # =========================================================================
+
+    def _resolve_path_reference(self, path: str) -> str:
+        """Resolve a path reference (@0, @1, @product) to actual path.
+
+        Args:
+            path: Either a real path or a reference like @0, @1, @product
+
+        Returns:
+            Resolved actual path, or original path if not a reference
+        """
+        if not path.startswith("@"):
+            return path
+
+        ref = path[1:]  # Remove @
+
+        # Try numeric index first (@0, @1, etc.)
+        if ref.isdigit():
+            idx = int(ref)
+            if 0 <= idx < len(self._injected_paths):
+                resolved = self._injected_paths[idx][0]
+                logger.info(
+                    "Resolved path reference @%d -> %s",
+                    idx, resolved
+                )
+                return resolved
+            else:
+                logger.warning(
+                    "Path reference @%d out of range (have %d paths)",
+                    idx, len(self._injected_paths)
+                )
+                return path
+
+        # Try label match (@product, @style_ref, etc.)
+        # Currently labels are None, but could be populated from image metadata
+        for stored_path, label in self._injected_paths:
+            if label and label.lower() == ref.lower():
+                logger.info(
+                    "Resolved path reference @%s -> %s",
+                    ref, stored_path
+                )
+                return stored_path
+
+        # No match - return original (will likely fail, but with clear error)
+        logger.warning(
+            "Could not resolve path reference @%s (available: %s)",
+            ref, [f"@{i}" for i in range(len(self._injected_paths))]
+        )
+        return path
+
+    def _resolve_image_studio_args(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Resolve path references in image_studio tool arguments.
+
+        Args:
+            args: Tool arguments dict
+
+        Returns:
+            Modified args with resolved paths
+        """
+        if "images" not in args:
+            return args
+
+        images = args.get("images", [])
+        if not isinstance(images, list):
+            return args
+
+        resolved_images = []
+        for img in images:
+            if isinstance(img, dict) and "path" in img:
+                original_path = img["path"]
+                resolved_path = self._resolve_path_reference(original_path)
+                if resolved_path != original_path:
+                    img = {**img, "path": resolved_path}
+            resolved_images.append(img)
+
+        return {**args, "images": resolved_images}
+
     def wrap_tool_call(
         self,
         request: ToolCallRequest,
@@ -520,8 +628,8 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
     ) -> ToolMessage | Command[Any]:
         """Intercept tool call and inject images into the result.
 
-        This runs IMMEDIATELY after tool execution, allowing us to work
-        with structured data before any serialization happens.
+        For image_studio: Resolves path references BEFORE execution.
+        For all tools: Injects images into result AFTER execution.
 
         Args:
             request: The tool call request
@@ -538,6 +646,18 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             tool_name or "unknown"
         )
 
+        # BEFORE execution: Resolve path references for image_studio
+        if tool_name == "image_studio" and self._injected_paths:
+            original_args = request.tool_call.get("args", {})
+            if isinstance(original_args, dict):
+                resolved_args = self._resolve_image_studio_args(original_args)
+                if resolved_args != original_args:
+                    logger.info(
+                        "[MULTIMODAL] Resolved path references in image_studio args"
+                    )
+                    # Create new tool_call with resolved args
+                    request.tool_call = {**request.tool_call, "args": resolved_args}
+
         # Execute the tool
         result = handler(request)
 
@@ -547,7 +667,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             type(result.content).__name__ if hasattr(result, "content") else "N/A"
         )
 
-        # Only process image_studio tool (view_image handles its own multimodal output)
+        # AFTER execution: Process image_studio output for multimodal injection
         if tool_name == "image_studio":
             processed = self._process_tool_result(result, tool_name)
             logger.debug(
@@ -566,6 +686,9 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
     ) -> ToolMessage | Command[Any]:
         """(async) Intercept tool call and inject images into the result.
 
+        For image_studio: Resolves path references BEFORE execution.
+        For all tools: Injects images into result AFTER execution.
+
         Args:
             request: The tool call request
             handler: The next handler in the chain
@@ -581,6 +704,18 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             tool_name or "unknown"
         )
 
+        # BEFORE execution: Resolve path references for image_studio
+        if tool_name == "image_studio" and self._injected_paths:
+            original_args = request.tool_call.get("args", {})
+            if isinstance(original_args, dict):
+                resolved_args = self._resolve_image_studio_args(original_args)
+                if resolved_args != original_args:
+                    logger.info(
+                        "[MULTIMODAL] Resolved path references in image_studio args"
+                    )
+                    # Create new tool_call with resolved args
+                    request.tool_call = {**request.tool_call, "args": resolved_args}
+
         # Execute the tool
         result = await handler(request)
 
@@ -590,7 +725,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             type(result.content).__name__ if hasattr(result, "content") else "N/A"
         )
 
-        # Only process image_studio tool (view_image handles its own multimodal output)
+        # AFTER execution: Process image_studio output for multimodal injection
         if tool_name == "image_studio":
             processed = self._process_tool_result(result, tool_name)
             logger.debug(

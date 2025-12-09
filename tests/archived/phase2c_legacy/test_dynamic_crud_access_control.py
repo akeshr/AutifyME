@@ -27,102 +27,102 @@ class TestSchemaGeneration:
 
     def test_read_only_schema_fields(self):
         """Read-only schema should have query_filter, not change_spec."""
-        ReadSchema = _create_operation_input_schema(["read"])
+        read_schema = _create_operation_input_schema(["read"])
 
         # Verify field presence
-        assert "user_request_summary" in ReadSchema.model_fields
-        assert "reasoning" in ReadSchema.model_fields
-        assert "intent_type" in ReadSchema.model_fields
-        assert "query_filter" in ReadSchema.model_fields
-        assert "execution_plan" in ReadSchema.model_fields
-        assert "specialist_name" in ReadSchema.model_fields
-        assert "schema_version" in ReadSchema.model_fields
+        assert "user_request_summary" in read_schema.model_fields
+        assert "reasoning" in read_schema.model_fields
+        assert "intent_type" in read_schema.model_fields
+        assert "query_filter" in read_schema.model_fields
+        assert "execution_plan" in read_schema.model_fields
+        assert "specialist_name" in read_schema.model_fields
+        assert "schema_version" in read_schema.model_fields
 
         # Verify mutation fields absent
-        assert "change_spec" not in ReadSchema.model_fields
-        assert "impact_analysis" not in ReadSchema.model_fields
+        assert "change_spec" not in read_schema.model_fields
+        assert "impact_analysis" not in read_schema.model_fields
 
     def test_full_crud_schema_fields(self):
         """Full CRUD schema should have change_spec and impact_analysis."""
-        CrudSchema = _create_operation_input_schema(["create", "read", "update", "delete"])
+        crud_schema = _create_operation_input_schema(["create", "read", "update", "delete"])
 
         # Verify all fields present
-        assert "user_request_summary" in CrudSchema.model_fields
-        assert "reasoning" in CrudSchema.model_fields
-        assert "intent_type" in CrudSchema.model_fields
-        assert "change_spec" in CrudSchema.model_fields
-        assert "impact_analysis" in CrudSchema.model_fields
-        assert "execution_plan" in CrudSchema.model_fields
-        assert "specialist_name" in CrudSchema.model_fields
-        assert "schema_version" in CrudSchema.model_fields
+        assert "user_request_summary" in crud_schema.model_fields
+        assert "reasoning" in crud_schema.model_fields
+        assert "intent_type" in crud_schema.model_fields
+        assert "change_spec" in crud_schema.model_fields
+        assert "impact_analysis" in crud_schema.model_fields
+        assert "execution_plan" in crud_schema.model_fields
+        assert "specialist_name" in crud_schema.model_fields
+        assert "schema_version" in crud_schema.model_fields
 
         # Verify read-only field absent
-        assert "query_filter" not in CrudSchema.model_fields
+        assert "query_filter" not in crud_schema.model_fields
 
     def test_mixed_operations_schema(self):
         """Mixed operations schema should have mutation fields."""
-        MixedSchema = _create_operation_input_schema(["read", "update"])
+        mixed_schema = _create_operation_input_schema(["read", "update"])
 
         # Should have mutation fields (for update)
-        assert "change_spec" in MixedSchema.model_fields
-        assert "impact_analysis" in MixedSchema.model_fields
-        assert "execution_plan" in MixedSchema.model_fields
+        assert "change_spec" in mixed_schema.model_fields
+        assert "impact_analysis" in mixed_schema.model_fields
+        assert "execution_plan" in mixed_schema.model_fields
 
         # Should not have read-only simplified structure
-        assert "query_filter" not in MixedSchema.model_fields
+        assert "query_filter" not in mixed_schema.model_fields
 
     def test_schema_names(self):
         """Schema class names should be descriptive."""
-        ReadSchema = _create_operation_input_schema(["read"])
-        assert ReadSchema.__name__ == "ReadOperationInput"
+        read_schema = _create_operation_input_schema(["read"])
+        assert read_schema.__name__ == "ReadOperationInput"
 
-        CrudSchema = _create_operation_input_schema(["create", "read", "update", "delete"])
-        assert CrudSchema.__name__ == "FullCrudOperationInput"
+        crud_schema = _create_operation_input_schema(["create", "read", "update", "delete"])
+        assert crud_schema.__name__ == "FullCrudOperationInput"
 
-        UpdateSchema = _create_operation_input_schema(["update"])
-        assert UpdateSchema.__name__ == "UpdateOperationInput"
+        update_schema = _create_operation_input_schema(["update"])
+        assert update_schema.__name__ == "UpdateOperationInput"
 
     def test_schema_config(self):
         """Schemas should have extra='forbid' config."""
-        ReadSchema = _create_operation_input_schema(["read"])
+        read_schema = _create_operation_input_schema(["read"])
 
         # Verify config
-        assert ReadSchema.model_config.get("extra") == "forbid"
+        assert read_schema.model_config.get("extra") == "forbid"
 
     def test_read_schema_field_descriptions(self):
         """Read-only schema should have operation-specific descriptions."""
-        ReadSchema = _create_operation_input_schema(["read"])
+        read_schema = _create_operation_input_schema(["read"])
 
         # Check intent_type description mentions read-only
-        intent_desc = ReadSchema.model_fields["intent_type"].description
+        intent_desc = read_schema.model_fields["intent_type"].description
         assert "read" in intent_desc.lower()
 
         # Check execution_plan description mentions read-only
-        plan_desc = ReadSchema.model_fields["execution_plan"].description
+        plan_desc = read_schema.model_fields["execution_plan"].description
         assert "read-only" in plan_desc.lower() or "query" in plan_desc.lower()
 
     def test_crud_schema_field_descriptions(self):
         """CRUD schema should have mutation-aware descriptions."""
-        CrudSchema = _create_operation_input_schema(["create", "read", "update", "delete"])
+        crud_schema = _create_operation_input_schema(["create", "read", "update", "delete"])
 
         # Check intent_type description lists all operations
-        intent_desc = CrudSchema.model_fields["intent_type"].description
+        intent_desc = crud_schema.model_fields["intent_type"].description
         assert "create" in intent_desc.lower()
         assert "read" in intent_desc.lower()
         assert "update" in intent_desc.lower()
         assert "delete" in intent_desc.lower()
 
         # Check impact_analysis description mentions HITL
-        impact_desc = CrudSchema.model_fields["impact_analysis"].description
+        impact_desc = crud_schema.model_fields["impact_analysis"].description
         assert "HITL" in impact_desc or "approval" in impact_desc.lower()
 
     def test_schema_required_fields(self):
         """Verify required vs optional fields."""
-        ReadSchema = _create_operation_input_schema(["read"])
+        read_schema = _create_operation_input_schema(["read"])
 
         # Required fields
         required_fields = [
-            name for name, field in ReadSchema.model_fields.items()
+            name for name, field in read_schema.model_fields.items()
             if field.is_required()
         ]
         assert "user_request_summary" in required_fields
@@ -132,7 +132,7 @@ class TestSchemaGeneration:
 
         # Optional fields with sensible defaults
         optional_fields = [
-            name for name, field in ReadSchema.model_fields.items()
+            name for name, field in read_schema.model_fields.items()
             if not field.is_required()
         ]
         assert "query_filter" in optional_fields  # Has default={}
@@ -141,10 +141,10 @@ class TestSchemaGeneration:
 
     def test_schema_instantiation(self):
         """Schemas should be instantiable with correct parameters."""
-        ReadSchema = _create_operation_input_schema(["read"])
+        read_schema = _create_operation_input_schema(["read"])
 
         # Valid instantiation
-        instance = ReadSchema(
+        instance = read_schema(
             user_request_summary="Find all products",
             reasoning="User wants to browse",
             intent_type="read",
@@ -156,10 +156,10 @@ class TestSchemaGeneration:
 
     def test_schema_validation_rejects_extra_fields(self):
         """Schema should reject unexpected fields (extra='forbid')."""
-        ReadSchema = _create_operation_input_schema(["read"])
+        read_schema = _create_operation_input_schema(["read"])
 
         with pytest.raises(ValidationError) as exc_info:
-            ReadSchema(
+            read_schema(
                 user_request_summary="Test",
                 reasoning="Test",
                 intent_type="read",
@@ -171,15 +171,15 @@ class TestSchemaGeneration:
 
     def test_json_schema_output(self):
         """JSON Schema output should only include defined fields."""
-        ReadSchema = _create_operation_input_schema(["read"])
+        read_schema = _create_operation_input_schema(["read"])
 
-        json_schema = ReadSchema.model_json_schema()
+        json_schema = read_schema.model_json_schema()
 
         # Verify properties match model fields
-        assert set(json_schema["properties"].keys()) == set(ReadSchema.model_fields.keys())
+        assert set(json_schema["properties"].keys()) == set(read_schema.model_fields.keys())
 
         # Verify additionalProperties is false
-        assert json_schema.get("additionalProperties") == False
+        assert not json_schema.get("additionalProperties")
 
         # Verify query_filter has default
         assert json_schema["properties"]["query_filter"].get("default") == {}
@@ -438,8 +438,8 @@ class TestJSONSchemaForLLMs:
 
     def test_read_only_json_schema(self):
         """Read-only JSON Schema should only show query fields."""
-        ReadSchema = _create_operation_input_schema(["read"])
-        json_schema = ReadSchema.model_json_schema()
+        read_schema = _create_operation_input_schema(["read"])
+        json_schema = read_schema.model_json_schema()
 
         # Check properties
         properties = json_schema["properties"]
@@ -455,12 +455,12 @@ class TestJSONSchemaForLLMs:
         assert "execution_plan" in required
 
         # Check additionalProperties
-        assert json_schema.get("additionalProperties") == False
+        assert not json_schema.get("additionalProperties")
 
     def test_crud_json_schema(self):
         """CRUD JSON Schema should show mutation fields."""
-        CrudSchema = _create_operation_input_schema(["create", "read", "update", "delete"])
-        json_schema = CrudSchema.model_json_schema()
+        crud_schema = _create_operation_input_schema(["create", "read", "update", "delete"])
+        json_schema = crud_schema.model_json_schema()
 
         # Check properties
         properties = json_schema["properties"]
@@ -479,8 +479,8 @@ class TestJSONSchemaForLLMs:
 
     def test_field_descriptions_in_json_schema(self):
         """JSON Schema should include field descriptions."""
-        ReadSchema = _create_operation_input_schema(["read"])
-        json_schema = ReadSchema.model_json_schema()
+        read_schema = _create_operation_input_schema(["read"])
+        json_schema = read_schema.model_json_schema()
 
         # Check descriptions present
         assert "description" in json_schema["properties"]["intent_type"]
@@ -489,8 +489,8 @@ class TestJSONSchemaForLLMs:
 
     def test_json_schema_structure(self):
         """JSON Schema should have standard OpenAI structure."""
-        ReadSchema = _create_operation_input_schema(["read"])
-        json_schema = ReadSchema.model_json_schema()
+        read_schema = _create_operation_input_schema(["read"])
+        json_schema = read_schema.model_json_schema()
 
         # Check standard fields
         assert "type" in json_schema

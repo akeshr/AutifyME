@@ -35,7 +35,7 @@ except ImportError:
     raise ImportError(
         "Playwright required for PlaywrightExecutor. "
         "Install with: uv pip install playwright && playwright install chromium"
-    )
+    ) from None
 
 from .agent import ActionExecutor, ActionType, BrowserState, ComputerAction
 

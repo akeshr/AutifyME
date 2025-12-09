@@ -336,9 +336,9 @@ class TestImageProcessing:
             "background": {"treatment": "white"},
         })
 
-        # Graceful degradation: image load fails with warning, LLM returns no image
+        # File not found returns specific error code
         assert result["success"] is False
-        assert result["error_code"] == ImageStudioErrorCode.API_ERROR
+        assert result["error_code"] == ImageStudioErrorCode.FILE_NOT_FOUND
 
     @patch("autifyme_agents.tools.image_studio.tool._get_gemini3_image_llm")
     @patch("autifyme_agents.tools.image_studio.tool._load_and_encode_image")

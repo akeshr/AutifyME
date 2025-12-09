@@ -1,13 +1,19 @@
-"""Gemini blank response retry handler.
+"""Gemini resilience handler for blank responses and timeouts.
 
-Gemini occasionally returns valid API responses with blank content.
-This module provides a wrapper that detects blank responses and retries
-with exponential backoff + jitter.
+Gemini has known issues:
+1. Occasionally returns valid API responses with blank content
+2. Native timeout parameter is not respected (hangs indefinitely)
+
+This module provides a wrapper that:
+- Detects blank responses and retries with exponential backoff + jitter
+- Enforces request timeout using concurrent.futures (sync) / asyncio.timeout (async)
 """
 
 import asyncio
 import logging
 import random
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any
 
 from langchain_core.messages import AIMessage
@@ -27,21 +33,37 @@ class BlankResponseError(Exception):
     pass
 
 
-class GeminiWithRetry(ChatGoogleGenerativeAI):
-    """ChatGoogleGenerativeAI with automatic retry on blank responses.
+class GeminiTimeoutError(Exception):
+    """Raised when Gemini request times out.
 
-    Gemini occasionally returns valid API responses with blank content.
-    This wrapper detects blank responses and retries with exponential
-    backoff + jitter, maintaining the BaseChatModel interface for
-    compatibility with DeepAgents and other LangChain components.
+    Gemini's native timeout parameter is broken (doesn't fail fast).
+    This error is raised when our enforced timeout is exceeded.
+    """
+
+    pass
+
+
+class GeminiWithRetry(ChatGoogleGenerativeAI):
+    """ChatGoogleGenerativeAI with automatic retry on blank responses and enforced timeout.
+
+    Gemini has known issues:
+    1. Occasionally returns valid API responses with blank content
+    2. Native timeout parameter is broken (doesn't fail fast)
+
+    This wrapper:
+    - Detects blank responses and retries with exponential backoff + jitter
+    - Enforces request timeout since native timeout is unreliable
+    - Maintains BaseChatModel interface for DeepAgents/LangChain compatibility
 
     Attributes:
         max_retries: Maximum retry attempts (default: 3)
         retry_base_delay: Base delay in seconds for exponential backoff (default: 1.0)
+        request_timeout: Enforced timeout per request in seconds (default: 120.0)
     """
 
     max_retries: int = 3
     retry_base_delay: float = 1.0
+    request_timeout: float = 120.0
 
     def _is_blank_response(self, message: AIMessage) -> bool:
         """Check if response is blank/empty.
@@ -129,13 +151,44 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
         jitter: float = delay * random.uniform(0, 0.5)
         return delay + jitter
 
+    def _invoke_with_timeout(
+        self,
+        input: Any,
+        config: RunnableConfig | None,
+        **kwargs: Any,
+    ) -> AIMessage:
+        """Execute parent invoke with enforced timeout.
+
+        Uses ThreadPoolExecutor to enforce timeout since Gemini's native
+        timeout parameter is broken.
+
+        Args:
+            input: Input to the model
+            config: Runnable configuration
+            **kwargs: Additional arguments
+
+        Returns:
+            AI message from parent invoke
+
+        Raises:
+            GeminiTimeoutError: If request exceeds timeout
+        """
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(super().invoke, input, config, **kwargs)
+            try:
+                return future.result(timeout=self.request_timeout)
+            except FuturesTimeoutError:
+                raise GeminiTimeoutError(
+                    f"Gemini request timed out after {self.request_timeout}s"
+                ) from None
+
     def invoke(
         self,
         input: Any,
         config: RunnableConfig | None = None,
         **kwargs: Any,
     ) -> AIMessage:
-        """Invoke with automatic retry on blank responses.
+        """Invoke with automatic retry on blank responses and timeouts.
 
         Args:
             input: Input to the model
@@ -147,29 +200,43 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
 
         Raises:
             BlankResponseError: If all retry attempts return blank responses
+            GeminiTimeoutError: If all retry attempts time out
         """
         import time
 
-        last_error: BlankResponseError | None = None
+        last_error: BlankResponseError | GeminiTimeoutError | None = None
 
         for attempt in range(1, self.max_retries + 1):
-            result = super().invoke(input, config, **kwargs)
+            try:
+                result = self._invoke_with_timeout(input, config, **kwargs)
 
-            if not self._is_blank_response(result):
-                if attempt > 1:
-                    logger.info(
-                        f"Gemini blank response recovered on attempt {attempt}",
-                        extra={"attempt": attempt, "model": self.model},
-                    )
-                return result
+                if not self._is_blank_response(result):
+                    if attempt > 1:
+                        logger.info(
+                            f"Gemini recovered on attempt {attempt}",
+                            extra={"attempt": attempt, "model": self.model},
+                        )
+                    return result
 
-            last_error = BlankResponseError(
-                f"Gemini returned blank response on attempt {attempt}/{self.max_retries}"
-            )
-            logger.warning(
-                f"Gemini blank response detected, attempt {attempt}/{self.max_retries}",
-                extra={"attempt": attempt, "max_retries": self.max_retries, "model": self.model},
-            )
+                last_error = BlankResponseError(
+                    f"Gemini returned blank response on attempt {attempt}/{self.max_retries}"
+                )
+                logger.warning(
+                    f"Gemini blank response detected, attempt {attempt}/{self.max_retries}",
+                    extra={"attempt": attempt, "max_retries": self.max_retries, "model": self.model},
+                )
+
+            except GeminiTimeoutError as e:
+                last_error = e
+                logger.warning(
+                    f"Gemini timeout on attempt {attempt}/{self.max_retries}",
+                    extra={
+                        "attempt": attempt,
+                        "max_retries": self.max_retries,
+                        "timeout": self.request_timeout,
+                        "model": self.model,
+                    },
+                )
 
             if attempt < self.max_retries:
                 delay = self._get_retry_delay(attempt)
@@ -177,10 +244,40 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
                 time.sleep(delay)
 
         logger.error(
-            f"Gemini blank response persisted after {self.max_retries} attempts",
-            extra={"max_retries": self.max_retries, "model": self.model},
+            f"Gemini failed after {self.max_retries} attempts",
+            extra={"max_retries": self.max_retries, "model": self.model, "last_error": str(last_error)},
         )
         raise last_error  # type: ignore[misc]
+
+    async def _ainvoke_with_timeout(
+        self,
+        input: Any,
+        config: RunnableConfig | None,
+        **kwargs: Any,
+    ) -> AIMessage:
+        """Execute parent ainvoke with enforced timeout.
+
+        Uses asyncio.timeout (Python 3.11+) to enforce timeout since
+        Gemini's native timeout parameter is broken.
+
+        Args:
+            input: Input to the model
+            config: Runnable configuration
+            **kwargs: Additional arguments
+
+        Returns:
+            AI message from parent ainvoke
+
+        Raises:
+            GeminiTimeoutError: If request exceeds timeout
+        """
+        try:
+            async with asyncio.timeout(self.request_timeout):
+                return await super().ainvoke(input, config, **kwargs)
+        except TimeoutError:
+            raise GeminiTimeoutError(
+                f"Gemini request timed out after {self.request_timeout}s"
+            ) from None
 
     async def ainvoke(
         self,
@@ -188,7 +285,7 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
         config: RunnableConfig | None = None,
         **kwargs: Any,
     ) -> AIMessage:
-        """Async invoke with automatic retry on blank responses.
+        """Async invoke with automatic retry on blank responses and timeouts.
 
         Args:
             input: Input to the model
@@ -200,27 +297,41 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
 
         Raises:
             BlankResponseError: If all retry attempts return blank responses
+            GeminiTimeoutError: If all retry attempts time out
         """
-        last_error: BlankResponseError | None = None
+        last_error: BlankResponseError | GeminiTimeoutError | None = None
 
         for attempt in range(1, self.max_retries + 1):
-            result = await super().ainvoke(input, config, **kwargs)
+            try:
+                result = await self._ainvoke_with_timeout(input, config, **kwargs)
 
-            if not self._is_blank_response(result):
-                if attempt > 1:
-                    logger.info(
-                        f"Gemini blank response recovered on attempt {attempt}",
-                        extra={"attempt": attempt, "model": self.model},
-                    )
-                return result
+                if not self._is_blank_response(result):
+                    if attempt > 1:
+                        logger.info(
+                            f"Gemini recovered on attempt {attempt}",
+                            extra={"attempt": attempt, "model": self.model},
+                        )
+                    return result
 
-            last_error = BlankResponseError(
-                f"Gemini returned blank response on attempt {attempt}/{self.max_retries}"
-            )
-            logger.warning(
-                f"Gemini blank response detected, attempt {attempt}/{self.max_retries}",
-                extra={"attempt": attempt, "max_retries": self.max_retries, "model": self.model},
-            )
+                last_error = BlankResponseError(
+                    f"Gemini returned blank response on attempt {attempt}/{self.max_retries}"
+                )
+                logger.warning(
+                    f"Gemini blank response detected, attempt {attempt}/{self.max_retries}",
+                    extra={"attempt": attempt, "max_retries": self.max_retries, "model": self.model},
+                )
+
+            except GeminiTimeoutError as e:
+                last_error = e
+                logger.warning(
+                    f"Gemini timeout on attempt {attempt}/{self.max_retries}",
+                    extra={
+                        "attempt": attempt,
+                        "max_retries": self.max_retries,
+                        "timeout": self.request_timeout,
+                        "model": self.model,
+                    },
+                )
 
             if attempt < self.max_retries:
                 delay = self._get_retry_delay(attempt)
@@ -228,7 +339,7 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
                 await asyncio.sleep(delay)
 
         logger.error(
-            f"Gemini blank response persisted after {self.max_retries} attempts",
-            extra={"max_retries": self.max_retries, "model": self.model},
+            f"Gemini failed after {self.max_retries} attempts",
+            extra={"max_retries": self.max_retries, "model": self.model, "last_error": str(last_error)},
         )
         raise last_error  # type: ignore[misc]

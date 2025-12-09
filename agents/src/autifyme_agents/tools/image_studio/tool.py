@@ -392,12 +392,30 @@ def _process_images(input_spec: ImageStudioInput) -> ImageStudioOutput:
     try:
         # Load and encode all labeled images
         image_uris: list[tuple[str, str]] = []  # (label, uri)
+        load_errors: list[str] = []
         for img_input in input_spec.images[:15]:  # Gemini limit
             try:
                 uri, _ = _load_and_encode_image(img_input.path)
                 image_uris.append((img_input.label, uri))
             except Exception as e:
-                logger.warning(f"Failed to load image [{img_input.label}]: {e}")
+                error_msg = f"[{img_input.label}] {img_input.path}: {e}"
+                load_errors.append(error_msg)
+                logger.warning(f"Failed to load image: {error_msg}")
+
+        # Fail if no images loaded - don't proceed without visual input
+        if not image_uris:
+            attempted_paths = [img.path for img in input_spec.images]
+            return ImageStudioOutput(
+                success=False,
+                error=f"Failed to load any images. Errors: {'; '.join(load_errors)}",
+                error_code=ImageStudioErrorCode.FILE_NOT_FOUND,
+                warnings=[f"Attempted paths: {attempted_paths}"],
+                next_steps=[
+                    "Verify file paths exist in storage",
+                    "Check if paths were copied correctly (LLMs can corrupt long IDs)",
+                    "Use view_image tool first to confirm path works",
+                ],
+            )
 
         # Create LLM and prompt
         llm = _get_gemini3_image_llm(output_spec=input_spec.output)

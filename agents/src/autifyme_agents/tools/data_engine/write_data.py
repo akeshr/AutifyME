@@ -8,7 +8,7 @@ import logging
 from typing import Any
 
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.tool_error_handler import (
@@ -21,90 +21,13 @@ from autifyme_agents.tools.data_engine._executor import MultiOperationExecutor
 logger = logging.getLogger(__name__)
 
 
-class WriteDataInput(BaseModel):
+class WriteDataInput(WriteIntent):
     """
-    Input schema for write_data tool - WriteIntent structure.
+    Tool input schema - extends WriteIntent with execution options.
 
-    As per UNIVERSAL_DATA_ENGINE_DESIGN.md (lines 722-745).
-    Streamlined multi-operation write intent with auto-dependency resolution.
-
-    Uses nested Pydantic models (Operation, AssetUpload) so specialists see
-    the exact schema with all required/optional fields and validation.
+    Inherits all WriteIntent fields (goal, reasoning, hitl_summary, etc.)
+    and adds dry_run/validate_only modes for preview and validation.
     """
-
-    model_config = {"extra": "forbid"}
-
-    goal: str = Field(
-        ...,
-        description=(
-            "Human-readable goal of this write intent.\n"
-            "Example: 'Create PET Bottles product family with Size and Color variants'"
-        ),
-    )
-
-    reasoning: str = Field(
-        ...,
-        description=(
-            "Reasoning and context for this operation.\n"
-            "Includes: classification rationale, duplicate check results, "
-            "research findings, warnings, assumptions."
-        ),
-    )
-
-    hitl_summary: str = Field(
-        ...,
-        description=(
-            "REQUIRED: Human-readable approval summary for HITL (<1500 chars).\n"
-            "Write for the BUSINESS USER who will approve/reject.\n\n"
-            "MUST include:\n"
-            "- What will be created/updated (plain language)\n"
-            "- Key impacts (counts, SKUs, prices)\n"
-            "- Any warnings or assumptions\n"
-            "- End with: 'Reply *approve* to proceed or *reject* to cancel'\n\n"
-            "Example:\n"
-            "'Creating PET Jars family with 2 size variants.\n\n"
-            "Products: JAR-PET-500ML (Rs 30), JAR-PET-1L (Rs 50)\n"
-            "Images: 2 product photos attached\n\n"
-            "This will add 1 product family and 2 new SKUs.\n\n"
-            "Reply *approve* to proceed or *reject* to cancel.'"
-        ),
-    )
-
-    asset_uploads: list[AssetUpload] = Field(
-        default_factory=list,
-        description=(
-            "Files to persist BEFORE database operations (atomically).\n"
-            "Use storage_path from image_studio/download_media output.\n"
-            "Example: AssetUpload(storage_path='pending/.../img.png', returns='asset', caption='Product photo')\n"
-            "Reference in operations: '@asset.public_url', '@hero.size_bytes', '@hero.caption'"
-        ),
-    )
-
-    operations: list[Operation] = Field(
-        ...,
-        description=(
-            "List of operations to execute atomically.\n"
-            "Engine automatically orders by dependencies (topological sort).\n"
-            "All operations execute in single transaction with automatic rollback.\n"
-            "Reference syntax: Use @name.field to reference previous operations.\n"
-            "Example: 'family_id': '@parent.id' references operation with returns='family'"
-        ),
-    )
-
-    impact: dict[str, Any] = Field(
-        ...,
-        description=(
-            "Simplified impact analysis.\n"
-            "Format: {\n"
-            "  'creates': {'table_name': count, ...},\n"
-            "  'updates': {'table_name': count, ...},\n"
-            "  'deletes': {'table_name': count, ...},\n"
-            "  'asset_uploads': count,\n"
-            "  'warnings': ['warning1', 'warning2'],\n"
-            "  'examples': ['example SKU 1', 'example SKU 2']\n"
-            "}"
-        ),
-    )
 
     dry_run: bool = Field(
         default=False,

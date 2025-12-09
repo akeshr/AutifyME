@@ -17,9 +17,6 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-# Mark all tests in this module as async
-pytestmark = pytest.mark.asyncio
-
 from autifyme_agents.schemas.registry import (
     ColumnSchema,
     ColumnType,
@@ -27,6 +24,9 @@ from autifyme_agents.schemas.registry import (
     TableSchema,
 )
 from tests.fixtures.fake_storage import FakeStorage
+
+# Mark all tests in this module as async
+pytestmark = pytest.mark.asyncio
 
 # =============================================================================
 # Fixtures

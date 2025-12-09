@@ -488,10 +488,7 @@ def show_context_flow(trace_id: str, target_agent: str) -> None:
 
     while current:
         path.append(current)
-        if current.parent_run_id:
-            current = by_id.get(str(current.parent_run_id))
-        else:
-            current = None
+        current = by_id.get(str(current.parent_run_id)) if current.parent_run_id else None
 
     path.reverse()
 
@@ -1139,10 +1136,9 @@ def show_orchestrator_flow(trace_id: str) -> list[dict]:
     for r in runs:
         if r.run_type == "llm" and r.parent_run_id:
             parent = by_id.get(str(r.parent_run_id))
-            if parent and parent.name == "model":
-                # Check if grandparent is root
-                if parent.parent_run_id and str(parent.parent_run_id) == str(root.id):
-                    orchestrator_llm_calls.append(r)
+            if parent and parent.name == "model" and parent.parent_run_id and str(parent.parent_run_id) == str(root.id):
+                # Grandparent is root - this is an orchestrator LLM call
+                orchestrator_llm_calls.append(r)
 
     orchestrator_llm_calls.sort(key=lambda x: x.start_time or datetime.min)
 
