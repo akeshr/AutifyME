@@ -39,6 +39,101 @@ def _get_client() -> Client:
 # =============================================================================
 
 
+def _extract_user_input(root_run) -> str:
+    """Extract user input preview from root run for show_tree header."""
+    if not root_run.inputs or "messages" not in root_run.inputs:
+        return "(no input found)"
+
+    messages = root_run.inputs["messages"]
+    if messages and isinstance(messages[0], list):
+        messages = messages[0]
+
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+
+        # Check for human message - two formats:
+        # 1. Simple format: {"type": "human", "content": ...}
+        # 2. LangChain serialization: {"id": ["...", "HumanMessage"], "kwargs": {"content": ...}}
+        is_human = False
+        content = ""
+
+        # Format 1: Simple format
+        if msg.get("type") == "human":
+            is_human = True
+            content = msg.get("content", "")
+            # Check for media attachment
+            if "[Media attachment:" in content:
+                return "[Image] (no text)"
+
+        # Format 2: LangChain serialization
+        msg_id = msg.get("id", [])
+        if isinstance(msg_id, list) and "HumanMessage" in msg_id:
+            is_human = True
+            content = msg.get("kwargs", {}).get("content", "")
+
+        if is_human:
+            # Handle multimodal content (list of parts)
+            if isinstance(content, list):
+                has_image = any(
+                    p.get("type") == "image_url"
+                    for p in content
+                    if isinstance(p, dict)
+                )
+                text_parts = [
+                    p.get("text", "")
+                    for p in content
+                    if isinstance(p, dict) and p.get("type") == "text"
+                ]
+                text = " ".join(text_parts).strip()
+
+                if has_image and text:
+                    return f"[Image] {text[:80]}..."
+                elif has_image:
+                    return "[Image] (no text)"
+                elif text:
+                    return f"{text[:100]}..."
+                else:
+                    return "(empty)"
+            else:
+                # Plain text
+                if content:
+                    return f"{content[:100]}..." if len(content) > 100 else content
+                return "(empty)"
+
+    return "(no HumanMessage found)"
+
+
+def _extract_pm_output(root_run) -> str:
+    """Extract PM output preview from root run for show_tree header."""
+    if not root_run.outputs:
+        return "(no output)"
+
+    # Try structured_response first (AutifyME pattern)
+    sr = root_run.outputs.get("structured_response", {})
+    if isinstance(sr, dict) and "message" in sr:
+        msg = sr["message"]
+        if msg:
+            # Truncate and clean up
+            preview = msg[:120].replace("\n", " ")
+            return f'"{preview}..."' if len(msg) > 120 else f'"{preview}"'
+
+    # Fallback: check messages output
+    messages = root_run.outputs.get("messages", [])
+    if messages:
+        # Get last AIMessage
+        for msg in reversed(messages):
+            if isinstance(msg, dict):
+                msg_id = msg.get("id", [])
+                if isinstance(msg_id, list) and "AIMessage" in msg_id:
+                    content = msg.get("kwargs", {}).get("content", "")
+                    if content:
+                        preview = content[:120].replace("\n", " ")
+                        return f'"{preview}..."' if len(content) > 120 else f'"{preview}"'
+
+    return "(no PM message found)"
+
+
 def show_tree(trace_id: str) -> dict[str, str]:
     """Print hierarchical tree of trace execution with full context.
 
@@ -89,10 +184,17 @@ def show_tree(trace_id: str) -> dict[str, str]:
     if root.end_time and root.start_time:
         total_ms = int((root.end_time - root.start_time).total_seconds() * 1000)
 
+    # Extract user input and PM output for quick context
+    user_input_preview = _extract_user_input(root)
+    pm_output_preview = _extract_pm_output(root)
+
     # Header
     print(f"\nTRACE: {trace_id}")
     print(f"Status: {root.status} | Cost: ${total_cost:.4f} | Time: {total_ms/1000:.1f}s | Tokens: {total_tokens:,}")
     print(f"LLM calls: {llm_count} | Tool calls: {tool_count} | Total nodes: {len(runs)}")
+    print("")
+    print(f"USER: {user_input_preview}")
+    print(f"PM: {pm_output_preview}")
     print("=" * 90)
 
     def extract_model(run) -> str:
@@ -1208,6 +1310,128 @@ def scan_all_handoffs(trace_id: str) -> list[dict]:
     print(f"{'='*70}")
 
     return issues
+
+
+# =============================================================================
+# prev_trace / next_trace: On-demand thread navigation
+# =============================================================================
+
+
+def prev_trace(trace_id: str) -> str | None:
+    """Get previous trace in same session, or None if first.
+
+    Enables on-demand navigation through conversation threads.
+    Use when you need to see what happened before the current trace.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        Previous trace ID, or None if this is the first trace in session
+
+    Example:
+        >>> prev_id = prev_trace('a194cf05')
+        >>> if prev_id:
+        ...     show_orchestrator_flow(prev_id)
+    """
+    client = _get_client()
+    run = client.read_run(trace_id)
+
+    if not run.session_id:
+        print(f"No session_id found for trace: {trace_id}")
+        return None
+
+    # Get all root traces in this session, sorted by time
+    session_runs = list(client.list_runs(
+        project_name="autifyme-dev",
+        is_root=True,
+        filter=f'eq(session_id, "{run.session_id}")'
+    ))
+
+    if not session_runs:
+        return None
+
+    # Sort by start_time
+    session_runs.sort(key=lambda x: x.start_time or datetime.min)
+
+    # Find current trace position
+    current_idx = None
+    for i, r in enumerate(session_runs):
+        if str(r.id) == trace_id or str(r.id).startswith(trace_id):
+            current_idx = i
+            break
+
+    if current_idx is None:
+        print(f"Trace {trace_id} not found in session")
+        return None
+
+    if current_idx == 0:
+        print("This is the first trace in the session")
+        return None
+
+    prev_run = session_runs[current_idx - 1]
+    print(f"Previous trace: {prev_run.id}")
+    print(f"  Time: {prev_run.start_time}")
+    return str(prev_run.id)
+
+
+def next_trace(trace_id: str) -> str | None:
+    """Get next trace in same session, or None if last.
+
+    Enables on-demand navigation through conversation threads.
+    Use when you need to see what happened after the current trace.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        Next trace ID, or None if this is the last trace in session
+
+    Example:
+        >>> next_id = next_trace('f264838e')
+        >>> if next_id:
+        ...     show_orchestrator_flow(next_id)
+        ...     # See what user did after PM asked for direction
+    """
+    client = _get_client()
+    run = client.read_run(trace_id)
+
+    if not run.session_id:
+        print(f"No session_id found for trace: {trace_id}")
+        return None
+
+    # Get all root traces in this session, sorted by time
+    session_runs = list(client.list_runs(
+        project_name="autifyme-dev",
+        is_root=True,
+        filter=f'eq(session_id, "{run.session_id}")'
+    ))
+
+    if not session_runs:
+        return None
+
+    # Sort by start_time
+    session_runs.sort(key=lambda x: x.start_time or datetime.min)
+
+    # Find current trace position
+    current_idx = None
+    for i, r in enumerate(session_runs):
+        if str(r.id) == trace_id or str(r.id).startswith(trace_id):
+            current_idx = i
+            break
+
+    if current_idx is None:
+        print(f"Trace {trace_id} not found in session")
+        return None
+
+    if current_idx == len(session_runs) - 1:
+        print("This is the last trace in the session")
+        return None
+
+    next_run = session_runs[current_idx + 1]
+    print(f"Next trace: {next_run.id}")
+    print(f"  Time: {next_run.start_time}")
+    return str(next_run.id)
 
 
 # =============================================================================

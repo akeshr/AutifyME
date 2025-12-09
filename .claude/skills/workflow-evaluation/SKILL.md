@@ -91,34 +91,77 @@ NEXT: [ ] Recurse to ___ / [ ] Return to parent / [ ] Done
 
 ---
 
-## Phase 1: Build the Execution Tree
+## Phase 1: Build Context
 
-### Using Helper Functions
+**First see the trace, then understand expected behavior.**
 
-```python
-from tests.tools.evaluation.helpers import show_tree, show_node, show_handoff, show_orchestrator_flow
+### 1.1 Build the Tree (Always First)
 
-# Step 1: Get tree structure with full UUID lookup
-ids = show_tree("<trace_id>")
+`show_tree("<trace_id>")` - Always start here.
 
-# Step 2: See orchestrator's decision flow
-show_orchestrator_flow("<trace_id>")
+The header immediately tells you:
 
-# Step 3: Analyze specific node (use FULL UUID from ids dict)
-show_node(ids['<short_id>'])
+- **USER/PM preview** - what this trace is about
+- **Root trace** = PM (orchestrator)
+- **Nested task** = Sub-agent (analyst or specialist)
 
-# Step 4: Check handoff before recursing
-show_handoff(ids['<parent_short_id>'], ids['<child_short_id>'])
-```
+### 1.2 Establish Expected Behavior (First Principles)
+
+**Question:** "What SHOULD happen for this user input?"
+
+**Sources (in order of authority):**
+
+1. **User Intent** - What is the user actually trying to accomplish?
+2. **Domain Knowledge** - What would an expert do in this situation?
+3. **System Design** - What is this agent designed to do?
+
+**Read the relevant files:**
+
+- For PM: `prompts/project_manager_intelligent.prompt`
+- For sub-agents: `prompts/<agent_name>.prompt`
+- Tool definitions: `tools/<tool_name>.py`
+
+**[CRITICAL] The prompt tells you what the system DOES - not what it SHOULD do.**
+
+When comparing actual vs expected, the gap could be in ANY layer:
+
+| If... | Then fix... |
+|-------|-------------|
+| Agent deviated from correct prompt | Agent reasoning or handoff |
+| Agent followed prompt, outcome wrong | **Prompt itself** |
+| Agent lacked tools to succeed | Tool availability/descriptions |
+| Agent was wrong choice entirely | Architecture/routing |
+
+### 1.3 Continue Building Context
+
+1. `show_orchestrator_flow("<trace_id>")` - See decision sequence
+2. `show_node(ids['<short_id>'])` - Drill into specific node
+3. `show_handoff(parent_id, child_id)` - Check context passing before recursing
+
+### 1.4 Thread Navigation (On-Demand)
+
+During analysis, if you need adjacent traces:
+
+- `prev_trace(trace_id)` - What happened before?
+- `next_trace(trace_id)` - What happened after?
+
+**When to check:**
+
+- PM asked user for direction - check next trace for response
+- Agent behavior seems correct - check if prior trace set wrong context
+- User had to repeat themselves - compare consecutive traces
+
+**Why on-demand:** Navigate based on what you discover, not upfront.
 
 ### Tree Output Format
 
-Tree shows **FULL UUIDs** for direct copy-paste into `show_node()` and `show_handoff()`:
-
-```
+```text
 TRACE: <trace_id>
 Status: success | Cost: $0.04 | Time: 45.2s | Tokens: 471,193
 LLM calls: 12 | Tool calls: 8 | Total nodes: 150
+
+USER: [Image] (no text)
+PM: "I see four children's water bottles..."
 ================================================================================
 [<full-uuid>] LangGraph (chain) | 45.2s
   +-- [<full-uuid>] ModelWithRetry (llm) | 14,076tok -> download_media *
@@ -185,10 +228,11 @@ run = client.read_run(id_map['<short_id>'])  # Use full UUID from map
 ```
 
 **Reasoning Checklist**:
+
 - [ ] LLM acknowledged input correctly?
 - [ ] Reasoning chain is logical?
 - [ ] No jumps or unfounded assumptions?
-- [ ] Followed prompt instructions?
+- [ ] If followed prompt but outcome wrong - is the prompt flawed?
 
 ### Step 2.3: Analyze OUTPUT from Trace
 
@@ -259,16 +303,25 @@ After completing node-by-node analysis, you may examine:
 
 But diagnosis should be based on **behavioral issues found during analysis**, not metrics.
 
-### Issue Classification
+### Issue Classification (Multi-Layer)
 
-| Issue Type | Root Cause Location |
-|------------|---------------------|
-| Wrong routing | Orchestrator prompt routing rules |
-| Missing tool call | Agent prompt OR tool description |
-| Wrong tool args | Prompt examples OR schema definition |
-| Context loss | **Handoff point** - task args or shared state |
-| Incomplete output | Output schema OR prompt instructions |
-| Hallucination | Prompt lacks grounding instructions |
+**[CRITICAL] Don't assume the prompt is correct. Consider ALL layers:**
+
+| Issue Type | Possible Root Causes (check all) |
+|------------|----------------------------------|
+| Wrong routing | Prompt routing rules, tool descriptions, agent capabilities |
+| Missing tool call | Prompt instructions, tool availability, tool descriptions |
+| Wrong tool args | Prompt examples, schema definition, handoff quality |
+| Context loss | Handoff description, shared state design, parent reasoning |
+| Wrong outcome | **Prompt logic itself**, tool behavior, architecture |
+| Hallucination | Prompt grounding, context insufficiency, tool limitations |
+
+**Diagnosis questions:**
+
+1. What did the USER want? (ground truth)
+2. What would an EXPERT do? (ideal behavior)
+3. What did the SYSTEM do? (actual behavior)
+4. WHERE is the gap? (could be any layer)
 
 ### Root Cause Template
 
@@ -283,6 +336,28 @@ TRACE BACK:
 ROOT CAUSE: [One sentence - the actual source of the problem]
 FIX LOCATION: [File:line]
 ```
+
+### Issue Pattern Reference
+
+Use these patterns when diagnosing and describing issues:
+
+| Pattern | Detection | Typical Root Cause |
+|---------|-----------|-------------------|
+| PREMATURE_TERMINATION | Orchestrator responded with research tools unused | Prompt ambiguity about "sufficient" research |
+| WRONG_ROUTING | Task sent to wrong sub-agent | Tool descriptions unclear |
+| CONTEXT_LOSS | Child missing info parent had | Handoff description incomplete |
+| FORMAT_TEMPLATE_TRAP | Agent followed format literally without reasoning | Example showed format, not thinking process |
+| HIGH_TOKENS | >50k tokens in single call | Unbounded context or loop |
+| TOOL_LOOP | Same tool called 3+ times | Missing termination condition |
+
+**Orchestrator-Specific Patterns:**
+
+| Pattern | What Happened | Look For |
+|---------|---------------|----------|
+| PREMATURE_TERMINATION | PM responded before exhausting research | Research tools available but not called |
+| WRONG_ROUTING | PM delegated to wrong specialist | Task description vs specialist capabilities |
+| MISSING_DELEGATION | PM did work specialist should do | PM prompt routing rules |
+| OVER_DELEGATION | Specialist called for PM-level task | Task complexity vs specialist scope |
 
 ---
 
@@ -401,14 +476,14 @@ compare_traces(old_trace_id, result.trace_id)
 3. **DO NOT use truncated IDs for API calls** - Keep full UUID mapping
 4. **DO NOT move to next node without completing template** - Prevents drift
 5. **DO NOT fix symptoms** - Trace to root cause first
-6. **DO NOT assume agent behavior** - Read the prompt file
+6. **DO NOT assume prompt is correct** - Gap could be in any layer
 
 ---
 
 ## The Mindset
 
 1. **Execution flow first** - Top to bottom, depth-first
-2. **Code is truth** - Prompts define expected behavior
+2. **User intent is truth** - Prompt tells you what system does, not what it should do
 3. **Handoffs are fragile** - Always verify context passing
 4. **Metrics are symptoms** - Behavioral analysis reveals causes
 5. **Template prevents drift** - Fill it completely before moving on
@@ -422,7 +497,11 @@ All helpers in `tests/tools/evaluation/helpers.py`:
 
 ```python
 from tests.tools.evaluation.helpers import (
-    # Core Analysis (Phases 1-3)
+    # Thread Navigation (on-demand)
+    prev_trace,            # Get previous trace in session
+    next_trace,            # Get next trace in session
+
+    # Core Analysis (Phases 1-4)
     show_tree,             # Phase 1: Build tree, get ID lookup
     show_orchestrator_flow, # Phase 1: Orchestrator decisions chronologically
     show_node,             # Phase 2: Full INPUT/REASONING/OUTPUT for one node
@@ -439,6 +518,15 @@ from tests.tools.evaluation.helpers import (
     list_failures,         # Failed traces
 )
 ```
+
+### Thread Navigation Functions
+
+| Function | Purpose | Returns |
+|----------|---------|---------|
+| `prev_trace(trace_id)` | Get previous trace in same session | `str` (trace ID) or `None` |
+| `next_trace(trace_id)` | Get next trace in same session | `str` (trace ID) or `None` |
+
+**Usage:** Navigate on-demand when analysis reveals you need context from adjacent traces.
 
 ### Core Analysis Functions
 
