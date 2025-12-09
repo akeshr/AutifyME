@@ -19,6 +19,89 @@ description: Become a top 0.00001% workflow evaluator - systematically analyze t
 
 ---
 
+## Investigation Approach
+
+### Choose Your Mode
+
+| Mode | When | Approach |
+|------|------|----------|
+| **Quick Scan** | Initial triage, known patterns | `show_tree` -> form hypothesis -> decide if worth deep dive |
+| **Deep Dive** | New issue, complex failure, high impact | Full phases 1-6, 5 Whys, counterfactual analysis |
+
+**Quick Scan (5 min):**
+
+1. `show_tree("<trace_id>")` - see USER/PM, structure, metrics
+2. Scan for obvious patterns: missing delegations, errors, unusual flow
+3. Form initial hypothesis: "Looks like PREMATURE_TERMINATION"
+4. Decision: Known issue? Worth deep dive? Quick fix?
+
+**Deep Dive (30+ min):** Full systematic analysis with advanced techniques below.
+
+### Hypothesis-Driven Investigation
+
+**Don't follow phases blindly. Form hypotheses and test them.**
+
+```
+HYPOTHESIS: PM didn't research because prompt is ambiguous about cold start
+TEST: Read prompt, check for cold start guidance
+RESULT: Prompt says "lean on context" - ambiguous when no context exists
+CONFIRM/REJECT: Confirmed - prompt gap
+NEXT: Fix prompt with explicit cold start section
+```
+
+**The cycle:** Observe -> Hypothesize -> Test -> Confirm/Reject -> Iterate
+
+### The 5 Whys
+
+**Don't stop at the first cause. Dig to the systemic issue.**
+
+```
+WHY 1: PM didn't call catalog_analyst
+WHY 2: Because prompt said "lean on context" which PM interpreted as "ask user"
+WHY 3: Because prompt example showed asking, not researching
+WHY 4: Because designer assumed users always have history
+WHY 5: Because cold start wasn't treated as a distinct scenario
+
+ROOT: Cold start is not a first-class scenario in the design
+FIX: Add explicit cold start handling to prompt
+```
+
+### Counterfactual Reasoning
+
+**Ask "What if?" to identify pivotal decisions.**
+
+```
+COUNTERFACTUAL: What if PM had called catalog_analyst first?
+
+TRACE THE ALTERNATIVE:
+- catalog_analyst would find: "4 bottles already exist"
+- PM would know: this is "update pricing" not "add new"
+- Output would be: actionable recommendation, not question
+
+CONCLUSION: This single missing tool call changed the entire outcome
+PRIORITY: High - this is a branch point in the decision tree
+```
+
+### Institutional Memory
+
+**Track patterns across evaluations to find systemic issues.**
+
+After each evaluation, update the log:
+
+```markdown
+## Issue Log
+
+| Date | Trace | Pattern | Root Cause | Fix |
+|------|-------|---------|------------|-----|
+| 12/09 | f264838e | PREMATURE_TERMINATION | Cold start ambiguity | Added cold start section |
+
+## Recurring Patterns
+- Cold start issues: 3 this month -> systemic gap in prompt
+- Handoff issues: 2 this month -> review task descriptions
+```
+
+---
+
 ## [CRITICAL] Anti-Drift Rules
 
 These rules prevent common evaluation mistakes:
@@ -517,6 +600,22 @@ from tests.tools.evaluation.helpers import (
     list_recent,           # Recent traces
     list_failures,         # Failed traces
 )
+```
+
+### Trace Discovery Functions
+
+| Function | Purpose | Returns |
+|----------|---------|---------|
+| `list_recent(hours=24, limit=10)` | Recent traces in chronological order (oldest first) | `list[str]` of trace IDs |
+| `list_failures(hours=24, limit=10)` | Failed/error traces only | `None` (prints) |
+
+**Usage:** Start evaluation workflow with `list_recent`:
+
+```python
+traces = list_recent(hours=24, limit=3)  # Get last 3 traces
+show_tree(traces[0])                      # Start from first (oldest)
+show_tree(traces[1])                      # Move to second
+show_tree(traces[2])                      # Move to third
 ```
 
 ### Thread Navigation Functions

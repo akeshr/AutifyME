@@ -635,12 +635,23 @@ def list_failures(hours: int = 24, limit: int = 10) -> None:
 # =============================================================================
 
 
-def list_recent(hours: int = 24, limit: int = 10) -> None:
-    """List recent traces.
+def list_recent(hours: int = 24, limit: int = 10) -> list[str]:
+    """List recent traces in chronological order (oldest first).
+
+    Returns trace IDs sorted oldest-to-newest so you can start evaluation
+    from "the first one" and work forward.
 
     Args:
         hours: Look back this many hours
         limit: Max traces to show
+
+    Returns:
+        List of trace IDs in chronological order (oldest first)
+
+    Example:
+        >>> traces = list_recent(hours=24, limit=3)
+        >>> # Start evaluation from first trace
+        >>> show_tree(traces[0])
     """
     client = _get_client()
 
@@ -655,14 +666,28 @@ def list_recent(hours: int = 24, limit: int = 10) -> None:
 
     if not runs:
         print(f"No traces in last {hours} hours")
-        return
+        return []
+
+    # Sort chronologically (oldest first) for evaluation order
+    runs.sort(key=lambda x: x.start_time or datetime.min)
 
     print(f"\nRECENT TRACES (last {hours}h): {len(runs)} found")
-    print("=" * 70)
+    print("Sorted: oldest first (start evaluation from #1)")
+    print("=" * 90)
 
-    for r in runs:
+    trace_ids = []
+    for i, r in enumerate(runs, 1):
+        trace_id = str(r.id)
+        trace_ids.append(trace_id)
         cost = r.total_cost or 0
-        print(f"{str(r.id)[:12]} | {r.status:8} | ${cost:.4f} | {r.name[:30]}")
+        time_str = r.start_time.strftime("%H:%M:%S") if r.start_time else "??:??:??"
+        user_preview = _extract_user_input(r)[:50]
+        print(f"#{i} {trace_id[:12]} | {time_str} | {r.status:8} | ${cost:.4f} | {user_preview}")
+
+    print("")
+    print("Usage: show_tree(traces[0]) to start evaluation from first trace")
+
+    return trace_ids
 
 
 # =============================================================================
