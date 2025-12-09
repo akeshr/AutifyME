@@ -75,8 +75,8 @@ class WriteDataInput(BaseModel):
         description=(
             "Files to persist BEFORE database operations (atomically).\n"
             "Use storage_path from image_studio/download_media output.\n"
-            "Example: AssetUpload(storage_path='pending/.../img.png', returns='hero', caption='Product photo')\n"
-            "Reference in operations: '@hero.public_url', '@hero.size_bytes', '@hero.caption'"
+            "Example: AssetUpload(storage_path='pending/.../img.png', returns='asset', caption='Product photo')\n"
+            "Reference in operations: '@asset.public_url', '@hero.size_bytes', '@hero.caption'"
         ),
     )
 
@@ -87,7 +87,7 @@ class WriteDataInput(BaseModel):
             "Engine automatically orders by dependencies (topological sort).\n"
             "All operations execute in single transaction with automatic rollback.\n"
             "Reference syntax: Use @name.field to reference previous operations.\n"
-            "Example: 'family_id': '@family.id' references operation with returns='family'"
+            "Example: 'family_id': '@parent.id' references operation with returns='family'"
         ),
     )
 
@@ -181,7 +181,7 @@ def create_write_data_tool(
         USE WHEN:
         - Creating multi-table entities (product family + variants)
         - Atomic operations with dependencies (create family, then products)
-        - Operations requiring cross-table references (@family.id)
+        - Operations requiring cross-table references (@parent.id)
         - Complex database mutations with ACID guarantees
 
         NOT FOR:
@@ -220,8 +220,8 @@ def create_write_data_tool(
                         "action": "create",
                         "table": "variant_axes",
                         "data": [
-                            {"name": "Size", "product_family_id": "@family.id", "is_active": True},
-                            {"name": "Color", "product_family_id": "@family.id", "is_active": True}
+                            {"name": "Size", "product_family_id": "@parent.id", "is_active": True},
+                            {"name": "Color", "product_family_id": "@parent.id", "is_active": True}
                         ],
                         "dependencies": ["family"],
                         "returns": "axes_batch"
@@ -230,8 +230,8 @@ def create_write_data_tool(
                         "action": "create",
                         "table": "variant_values",
                         "data": [
-                            {"name": "500ml", "variant_axis_id": "@axes_batch[0].id"},
-                            {"name": "1L", "variant_axis_id": "@axes_batch[0].id"},
+                            {"name": "500ml", "variant_axis_id": "@batch[0].id"},
+                            {"name": "1L", "variant_axis_id": "@batch[0].id"},
                             {"name": "Clear", "variant_axis_id": "@axes_batch[1].id"},
                             {"name": "Amber", "variant_axis_id": "@axes_batch[1].id"}
                         ],
@@ -242,10 +242,10 @@ def create_write_data_tool(
                         "action": "create",
                         "table": "products",
                         "data": [
-                            {"product_family_id": "@family.id", "sku": "JAR-PET-500ML-CLEAR", "name": "PET Food Jar 500ml Clear", "base_price": 30.0},
-                            {"product_family_id": "@family.id", "sku": "JAR-PET-500ML-AMBER", "name": "PET Food Jar 500ml Amber", "base_price": 32.0},
-                            {"product_family_id": "@family.id", "sku": "JAR-PET-1L-CLEAR", "name": "PET Food Jar 1L Clear", "base_price": 45.0},
-                            {"product_family_id": "@family.id", "sku": "JAR-PET-1L-AMBER", "name": "PET Food Jar 1L Amber", "base_price": 48.0}
+                            {"product_family_id": "@parent.id", "sku": "JAR-PET-500ML-CLEAR", "name": "PET Food Jar 500ml Clear", "base_price": 30.0},
+                            {"product_family_id": "@parent.id", "sku": "JAR-PET-500ML-AMBER", "name": "PET Food Jar 500ml Amber", "base_price": 32.0},
+                            {"product_family_id": "@parent.id", "sku": "JAR-PET-1L-CLEAR", "name": "PET Food Jar 1L Clear", "base_price": 45.0},
+                            {"product_family_id": "@parent.id", "sku": "JAR-PET-1L-AMBER", "name": "PET Food Jar 1L Amber", "base_price": 48.0}
                         ],
                         "dependencies": ["family"]
                     }
@@ -400,20 +400,20 @@ def create_write_data_tool(
         description=(
             "Execute atomic multi-table transactions with dependency resolution and cross-table references.\n\n"
             "REQUIRED FIELDS:\n"
-            "- goal: Human-readable intent ('Create PET Bottles family with Size variants')\n"
+            "- goal: Human-readable intent ('Create parent record with child records')\n"
             "- reasoning: Investigation results, duplicate checks, research findings, assumptions\n"
             "- hitl_summary: Business user approval message (<1500 chars) ending with 'Reply *approve* to proceed or *reject* to cancel'\n"
             "- operations: List of {action, table, data, returns?, dependencies?, filters?, updates?}\n"
             "- impact: {creates: {table: count}, updates: {table: count}, deletes: {table: count}, warnings: [], examples: []}\n\n"
             "REFERENCE SYNTAX (@name.field):\n"
-            "- Single result: '@family.id' references operation with returns='family'\n"
-            "- Batch result: '@axes_batch[0].id' references first item from batch operation\n"
+            "- Single result: '@parent.id' references operation with returns='family'\n"
+            "- Batch result: '@batch[0].id' references first item from batch operation\n"
             "- Engine auto-resolves dependencies via topological sort\n\n"
             "SCENARIOS:\n"
-            "- Create product family with variants: operations=[{create product_families, returns='family'}, {create variant_axes with '@family.id', returns='axes'}, {create products with '@family.id'}]\n"
-            "- Tiered bulk price update: Multiple update operations with different filters for size-based pricing\n"
-            "- Soft delete with cleanup: Update products is_active=False, then update junction table, then variant_values\n"
-            "- Asset upload + DB: asset_uploads=[{storage_path='pending/...', returns='hero', caption='...'}] then '@hero.public_url' in operations\n\n"
+            "- Create product family with variants: operations=[{create product_families, returns='family'}, {create variant_axes with '@parent.id', returns='axes'}, {create products with '@parent.id'}]\n"
+            "- Bulk update: Multiple update operations with different filter conditions\n"
+            "- Soft delete with cleanup: Update records is_active=False, then update related junction tables\n"
+            "- Asset upload + DB: asset_uploads=[{storage_path='pending/...', returns='asset', caption='...'}] then '@asset.public_url' in operations\n\n"
             "MODES:\n"
             "- dry_run=True: Validate and show impact without executing\n"
             "- validate_only=True: Schema/constraint checks only\n\n"

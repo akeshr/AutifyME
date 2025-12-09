@@ -1,12 +1,19 @@
-"""Minimal helper scripts for workflow evaluation.
+"""Helper scripts for workflow evaluation.
 
 These are convenience functions for REPL-based evaluation.
 They format LangSmith data for quick human/AI comprehension.
 
 Usage:
-    from tests.tools.evaluation.helpers import show_tree, show_llm_calls
-    show_tree("trace_id")
-    show_llm_calls("trace_id")
+    from tests.tools.evaluation.helpers import show_tree, show_node, show_handoff
+
+    # Phase 1: Build tree
+    ids = show_tree("trace_id")
+
+    # Phase 2: Analyze nodes (use FULL UUID from ids dict)
+    show_node(ids['44427c51'])  # Comprehensive node analysis
+
+    # Phase 3: Check context handoff before recursing
+    show_handoff(ids['e5c016a5'], ids['e0bdc7ae'])  # parent -> child
 """
 
 from datetime import datetime, timedelta
@@ -30,6 +37,101 @@ def _get_client() -> Client:
 # =============================================================================
 # show_tree: Hierarchical trace view
 # =============================================================================
+
+
+def _extract_user_input(root_run) -> str:
+    """Extract user input preview from root run for show_tree header."""
+    if not root_run.inputs or "messages" not in root_run.inputs:
+        return "(no input found)"
+
+    messages = root_run.inputs["messages"]
+    if messages and isinstance(messages[0], list):
+        messages = messages[0]
+
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+
+        # Check for human message - two formats:
+        # 1. Simple format: {"type": "human", "content": ...}
+        # 2. LangChain serialization: {"id": ["...", "HumanMessage"], "kwargs": {"content": ...}}
+        is_human = False
+        content = ""
+
+        # Format 1: Simple format
+        if msg.get("type") == "human":
+            is_human = True
+            content = msg.get("content", "")
+            # Check for media attachment
+            if "[Media attachment:" in content:
+                return "[Image] (no text)"
+
+        # Format 2: LangChain serialization
+        msg_id = msg.get("id", [])
+        if isinstance(msg_id, list) and "HumanMessage" in msg_id:
+            is_human = True
+            content = msg.get("kwargs", {}).get("content", "")
+
+        if is_human:
+            # Handle multimodal content (list of parts)
+            if isinstance(content, list):
+                has_image = any(
+                    p.get("type") == "image_url"
+                    for p in content
+                    if isinstance(p, dict)
+                )
+                text_parts = [
+                    p.get("text", "")
+                    for p in content
+                    if isinstance(p, dict) and p.get("type") == "text"
+                ]
+                text = " ".join(text_parts).strip()
+
+                if has_image and text:
+                    return f"[Image] {text[:80]}..."
+                elif has_image:
+                    return "[Image] (no text)"
+                elif text:
+                    return f"{text[:100]}..."
+                else:
+                    return "(empty)"
+            else:
+                # Plain text
+                if content:
+                    return f"{content[:100]}..." if len(content) > 100 else content
+                return "(empty)"
+
+    return "(no HumanMessage found)"
+
+
+def _extract_pm_output(root_run) -> str:
+    """Extract PM output preview from root run for show_tree header."""
+    if not root_run.outputs:
+        return "(no output)"
+
+    # Try structured_response first (AutifyME pattern)
+    sr = root_run.outputs.get("structured_response", {})
+    if isinstance(sr, dict) and "message" in sr:
+        msg = sr["message"]
+        if msg:
+            # Truncate and clean up
+            preview = msg[:120].replace("\n", " ")
+            return f'"{preview}..."' if len(msg) > 120 else f'"{preview}"'
+
+    # Fallback: check messages output
+    messages = root_run.outputs.get("messages", [])
+    if messages:
+        # Get last AIMessage
+        for msg in reversed(messages):
+            if isinstance(msg, dict):
+                msg_id = msg.get("id", [])
+                if isinstance(msg_id, list) and "AIMessage" in msg_id:
+                    content = msg.get("kwargs", {}).get("content", "")
+                    if content:
+                        preview = content[:120].replace("\n", " ")
+                        return f'"{preview}..."' if len(content) > 120 else f'"{preview}"'
+
+    return "(no PM message found)"
 
 
 def show_tree(trace_id: str) -> dict[str, str]:
@@ -58,7 +160,6 @@ def show_tree(trace_id: str) -> dict[str, str]:
         id_lookup[short_id] = str(r.id)
 
     # Build parent-child relationships
-    by_id = {str(r.id): r for r in runs}
     children: dict[str, list] = {str(r.id): [] for r in runs}
 
     root = None
@@ -83,10 +184,17 @@ def show_tree(trace_id: str) -> dict[str, str]:
     if root.end_time and root.start_time:
         total_ms = int((root.end_time - root.start_time).total_seconds() * 1000)
 
+    # Extract user input and PM output for quick context
+    user_input_preview = _extract_user_input(root)
+    pm_output_preview = _extract_pm_output(root)
+
     # Header
     print(f"\nTRACE: {trace_id}")
     print(f"Status: {root.status} | Cost: ${total_cost:.4f} | Time: {total_ms/1000:.1f}s | Tokens: {total_tokens:,}")
     print(f"LLM calls: {llm_count} | Tool calls: {tool_count} | Total nodes: {len(runs)}")
+    print("")
+    print(f"USER: {user_input_preview}")
+    print(f"PM: {pm_output_preview}")
     print("=" * 90)
 
     def extract_model(run) -> str:
@@ -149,7 +257,7 @@ def show_tree(trace_id: str) -> dict[str, str]:
 
     def print_node(run, indent=0):
         prefix = "  " * indent + ("+-- " if indent > 0 else "")
-        short_id = str(run.id)[:8]
+        full_id = str(run.id)
 
         # Duration
         duration = ""
@@ -174,9 +282,9 @@ def show_tree(trace_id: str) -> dict[str, str]:
         elif run.run_type == "tool":
             extras = extract_tool_args(run)
 
-        # Build line
-        name = run.name[:30]
-        line = f"{prefix}[{short_id}] {name} ({run.run_type})"
+        # Build line - use FULL UUID for easy copy-paste
+        name = run.name[:25]
+        line = f"{prefix}[{full_id}] {name} ({run.run_type})"
         if duration:
             line += f" | {duration}"
         line += extras
@@ -452,7 +560,7 @@ def compare_traces(trace_id_before: str, trace_id_after: str) -> None:
         print("Could not get stats for one or both traces")
         return
 
-    print(f"\nCOMPARISON")
+    print("\nCOMPARISON")
     print("=" * 50)
     print(f"{'':20} {'BEFORE':>12} {'AFTER':>12} {'DELTA':>12}")
     print("-" * 50)
@@ -527,12 +635,23 @@ def list_failures(hours: int = 24, limit: int = 10) -> None:
 # =============================================================================
 
 
-def list_recent(hours: int = 24, limit: int = 10) -> None:
-    """List recent traces.
+def list_recent(hours: int = 24, limit: int = 10) -> list[str]:
+    """List recent traces in chronological order (oldest first).
+
+    Returns trace IDs sorted oldest-to-newest so you can start evaluation
+    from "the first one" and work forward.
 
     Args:
         hours: Look back this many hours
         limit: Max traces to show
+
+    Returns:
+        List of trace IDs in chronological order (oldest first)
+
+    Example:
+        >>> traces = list_recent(hours=24, limit=3)
+        >>> # Start evaluation from first trace
+        >>> show_tree(traces[0])
     """
     client = _get_client()
 
@@ -547,11 +666,930 @@ def list_recent(hours: int = 24, limit: int = 10) -> None:
 
     if not runs:
         print(f"No traces in last {hours} hours")
-        return
+        return []
+
+    # Sort chronologically (oldest first) for evaluation order
+    runs.sort(key=lambda x: x.start_time or datetime.min)
 
     print(f"\nRECENT TRACES (last {hours}h): {len(runs)} found")
-    print("=" * 70)
+    print("Sorted: oldest first (start evaluation from #1)")
+    print("=" * 90)
+
+    trace_ids = []
+    for i, r in enumerate(runs, 1):
+        trace_id = str(r.id)
+        trace_ids.append(trace_id)
+        cost = r.total_cost or 0
+        time_str = r.start_time.strftime("%H:%M:%S") if r.start_time else "??:??:??"
+        user_preview = _extract_user_input(r)[:50]
+        print(f"#{i} {trace_id[:12]} | {time_str} | {r.status:8} | ${cost:.4f} | {user_preview}")
+
+    print("")
+    print("Usage: show_tree(traces[0]) to start evaluation from first trace")
+
+    return trace_ids
+
+
+# =============================================================================
+# parse_lc_messages: Parse LangChain serialization format
+# =============================================================================
+
+
+def parse_lc_messages(messages: list) -> list[dict]:
+    """Parse LangChain message serialization format into clean dicts.
+
+    LangChain serializes messages as: {lc: 1, type: "constructor", id: [...], kwargs: {...}}
+    This function extracts the useful parts.
+
+    Args:
+        messages: Raw messages from run.inputs['messages']
+
+    Returns:
+        List of dicts with keys: type, content, tool_calls
+    """
+    # Handle nested list (common in LangSmith)
+    if messages and isinstance(messages[0], list):
+        messages = messages[0]
+
+    parsed = []
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+
+        # Extract message type from id field
+        msg_id = msg.get("id", [])
+        msg_type = "unknown"
+        if isinstance(msg_id, list) and msg_id:
+            # id is like ["langchain_core", "messages", "HumanMessage"]
+            msg_type = msg_id[-1] if msg_id else "unknown"
+
+        # Extract content and tool_calls from kwargs
+        kwargs = msg.get("kwargs", {})
+        content = kwargs.get("content", "")
+        tool_calls = kwargs.get("tool_calls", [])
+
+        # Handle multimodal content (list of parts)
+        if isinstance(content, list):
+            text_parts = []
+            has_image = False
+            for part in content:
+                if isinstance(part, dict):
+                    if part.get("type") == "text":
+                        text_parts.append(part.get("text", ""))
+                    elif part.get("type") == "image_url":
+                        has_image = True
+            content = " ".join(text_parts)
+            if has_image:
+                content = f"[IMAGE] {content}" if content else "[IMAGE]"
+
+        parsed.append({
+            "type": msg_type,
+            "content": content,
+            "tool_calls": tool_calls,
+        })
+
+    return parsed
+
+
+def parse_lc_output(outputs: dict) -> dict:
+    """Parse LangChain LLM output format.
+
+    Args:
+        outputs: Raw outputs from run.outputs
+
+    Returns:
+        Dict with keys: content, tool_calls, raw
+    """
+    result = {"content": "", "tool_calls": [], "raw": outputs}
+
+    if not outputs:
+        return result
+
+    try:
+        generations = outputs.get("generations", [[]])
+        if generations and generations[0]:
+            gen = generations[0][0] if isinstance(generations[0], list) else generations[0]
+            if isinstance(gen, dict):
+                msg = gen.get("message", {})
+                kwargs = msg.get("kwargs", {})
+
+                result["content"] = kwargs.get("content", "")
+                result["tool_calls"] = kwargs.get("tool_calls", [])
+    except Exception:
+        pass
+
+    return result
+
+
+# =============================================================================
+# show_node: Comprehensive single node analysis
+# =============================================================================
+
+
+def show_node(run_id: str) -> dict:
+    """Show comprehensive analysis for a single node.
+
+    Outputs the full INPUT/REASONING/OUTPUT template for evaluation.
+    Returns structured data for programmatic use.
+
+    Args:
+        run_id: Full LangSmith run UUID
+
+    Returns:
+        Dict with parsed node data
+    """
+    client = _get_client()
+    run = client.read_run(run_id)
+
+    print(f"\n{'='*70}")
+    print(f"NODE: [{str(run.id)[:8]}] {run.name}")
+    print(f"Full ID: {run.id}")
+    print(f"Type: {run.run_type} | Status: {run.status} | Tokens: {run.total_tokens or 0:,}")
+    print(f"{'='*70}")
+
+    result = {
+        "id": str(run.id),
+        "name": run.name,
+        "type": run.run_type,
+        "status": run.status,
+        "tokens": run.total_tokens or 0,
+        "inputs": {},
+        "outputs": {},
+        "tool_calls": [],
+    }
+
+    # === INPUT ANALYSIS ===
+    print("\n--- INPUT (from trace) ---")
+
+    if run.inputs:
+        if "messages" in run.inputs:
+            messages = parse_lc_messages(run.inputs["messages"])
+            result["inputs"]["messages"] = messages
+
+            print(f"Messages: {len(messages)}")
+            for i, msg in enumerate(messages):
+                content_preview = msg["content"][:100] + "..." if len(msg["content"]) > 100 else msg["content"]
+                print(f"  [{i}] {msg['type']}: {content_preview}")
+
+                # Show tool calls in AIMessage
+                if msg["tool_calls"]:
+                    print(f"      Tool calls: {len(msg['tool_calls'])}")
+                    for tc in msg["tool_calls"]:
+                        print(f"        -> {tc.get('name', '?')}")
+        else:
+            # Non-message inputs (tool inputs)
+            print("Tool inputs:")
+            for key, value in run.inputs.items():
+                val_str = str(value)
+                if len(val_str) > 100:
+                    val_str = val_str[:100] + "..."
+                print(f"  {key}: {val_str}")
+                result["inputs"][key] = value
+
+    # === REASONING (for LLM nodes) ===
+    if run.run_type == "llm":
+        print("\n--- REASONING (LLM decision) ---")
+        # Model info
+        model = "unknown"
+        if run.extra:
+            model = run.extra.get("invocation_params", {}).get("model", "")
+            if not model:
+                model = run.extra.get("model", "unknown")
+        print(f"Model: {model}")
+
+    # === OUTPUT ANALYSIS ===
+    print("\n--- OUTPUT ---")
+
+    if run.outputs:
+        parsed_output = parse_lc_output(run.outputs)
+        result["outputs"] = parsed_output
+
+        if parsed_output["content"]:
+            print(f"Content: {parsed_output['content']}")
+
+        if parsed_output["tool_calls"]:
+            print(f"\nTool Calls: {len(parsed_output['tool_calls'])}")
+            result["tool_calls"] = parsed_output["tool_calls"]
+
+            for tc in parsed_output["tool_calls"]:
+                name = tc.get("name", "unknown")
+                args = tc.get("args", {})
+                print(f"\n  -> {name}")
+
+                # Show all args - NO truncation
+                for k, v in args.items():
+                    print(f"     {k}: {v}")
+
+                # Mark if this is a task delegation
+                if name == "task":
+                    subagent = args.get("subagent_type", args.get("specialist", "unknown"))
+                    print(f"     [HANDOFF CHECK REQUIRED -> {subagent}]")
+
+    elif run.run_type == "tool":
+        # Tool outputs are usually in outputs directly
+        print(f"Tool result: {run.outputs}")
+
+    print(f"\n{'='*70}")
+
+    return result
+
+
+# =============================================================================
+# show_handoff: Context handoff analysis between parent and child
+# =============================================================================
+
+
+def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
+    """Analyze context handoff between parent and child nodes.
+
+    Critical for evaluating if parent passed necessary context to child.
+
+    Args:
+        parent_run_id: Full UUID of parent run
+        child_run_id: Full UUID of child run
+
+    Returns:
+        Dict with handoff analysis
+    """
+    client = _get_client()
+    parent = client.read_run(parent_run_id)
+    child = client.read_run(child_run_id)
+
+    print(f"\n{'='*70}")
+    print("CONTEXT HANDOFF ANALYSIS")
+    print(f"{'='*70}")
+    print(f"Parent: [{str(parent.id)[:8]}] {parent.name}")
+    print(f"Child:  [{str(child.id)[:8]}] {child.name}")
+    print(f"{'='*70}")
+
+    result = {
+        "parent_id": str(parent.id),
+        "child_id": str(child.id),
+        "parent_had": {},
+        "parent_passed": {},
+        "child_received": {},
+        "child_output": {},
+        "issues": [],
+    }
+
+    # === WHAT PARENT HAD ===
+    print("\n--- WHAT PARENT HAD AVAILABLE ---")
+
+    parent_context = {}
+
+    # Check parent's input messages for context
+    if parent.inputs and "messages" in parent.inputs:
+        messages = parse_lc_messages(parent.inputs["messages"])
+        for msg in messages:
+            # Look for image paths, URLs, etc.
+            content = msg.get("content", "")
+            if "inbox/" in content or "/tmp/" in content or "http" in content:
+                parent_context["media_reference"] = content[:100]
+            if msg["type"] == "HumanMessage":
+                parent_context["user_message"] = content[:100]
+
+    # Check parent's tool results from previous calls
+    if parent.inputs and "messages" in parent.inputs:
+        messages = parse_lc_messages(parent.inputs["messages"])
+        for msg in messages:
+            if msg["type"] == "ToolMessage":
+                content = msg.get("content", "")
+                # Look for file paths in tool results
+                if "storage_path" in content or "inbox/" in content:
+                    parent_context["file_from_tool"] = content[:150]
+
+    for k, v in parent_context.items():
+        print(f"  {k}: {v}")
+        result["parent_had"][k] = v
+
+    if not parent_context:
+        print("  (No specific context detected)")
+
+    # === WHAT PARENT PASSED ===
+    print("\n--- WHAT PARENT PASSED IN TOOL CALL ---")
+
+    passed_context = {}
+
+    # Find the specific tool call that led to this child
+    # by matching child's input subagent_type
+    child_subagent = None
+    if child.inputs:
+        child_input = child.inputs.get("input", {})
+        if isinstance(child_input, dict):
+            child_subagent = child_input.get("subagent_type")
+        # Also try direct subagent_type in inputs
+        if not child_subagent:
+            child_subagent = child.inputs.get("subagent_type")
+
+    # Debug: show what we detected
+    if child_subagent:
+        print(f"  (Matched to: {child_subagent})")
+
+    if parent.outputs:
+        parsed = parse_lc_output(parent.outputs)
+        for tc in parsed.get("tool_calls", []):
+            args = tc.get("args", {})
+            # Match the specific task call by subagent_type
+            if tc.get("name") == "task":
+                tc_subagent = args.get("subagent_type", "unknown")
+                # If we know child's subagent, only show matching call
+                if child_subagent and tc_subagent != child_subagent:
+                    continue
+
+                passed_context["subagent_type"] = tc_subagent
+                passed_context["description"] = args.get("description", "")
+
+                # Check for key context fields
+                for key in ["image_path", "file_path", "url", "product_id", "context"]:
+                    if key in args:
+                        passed_context[key] = str(args[key])
+                break  # Found the matching call
+
+    for k, v in passed_context.items():
+        print(f"  {k}: {v}")
+        result["parent_passed"][k] = v
+
+    if not passed_context:
+        print("  (Could not extract tool call args)")
+
+    # === WHAT CHILD RECEIVED ===
+    print("\n--- WHAT CHILD RECEIVED ---")
+
+    child_received = {}
+
+    if child.inputs:
+        for k, v in child.inputs.items():
+            if k != "messages":  # Skip raw messages
+                child_received[k] = str(v)[:100]
+
+        # Also check first message content
+        if "messages" in child.inputs:
+            messages = parse_lc_messages(child.inputs["messages"])
+            if messages:
+                first_human = next((m for m in messages if m["type"] == "HumanMessage"), None)
+                if first_human:
+                    child_received["first_message"] = first_human["content"][:150]
+
+    for k, v in child_received.items():
+        print(f"  {k}: {v}")
+        result["child_received"][k] = v
+
+    if not child_received:
+        print("  (No inputs found)")
+
+    # === WHAT CHILD OUTPUT (the result) ===
+    print("\n--- WHAT CHILD OUTPUT ---")
+
+    child_output = {}
+
+    if child.outputs:
+        # For task tools, output is usually in 'output' key
+        if "output" in child.outputs:
+            output_val = child.outputs["output"]
+            if isinstance(output_val, dict):
+                # Specialist returns structured output
+                for k, v in output_val.items():
+                    child_output[k] = str(v)
+            else:
+                child_output["output"] = str(output_val)
+        else:
+            # Raw outputs
+            for k, v in child.outputs.items():
+                child_output[k] = str(v)
+
+    for k, v in child_output.items():
+        print(f"  {k}: {v}")
+        result["child_output"] = child_output
+
+    if not child_output:
+        print("  (No output found)")
+
+    # === HANDOFF QUALITY ASSESSMENT ===
+    print("\n--- HANDOFF QUALITY ---")
+
+    issues = []
+
+    # Check for image/file path passing
+    if "media_reference" in parent_context or "file_from_tool" in parent_context:
+        # Parent had file, check if child got it
+        child_has_file = any(
+            "inbox/" in str(v) or "/tmp/" in str(v) or "storage_path" in str(v)
+            for v in child_received.values()
+        )
+        passed_has_file = any(
+            "inbox/" in str(v) or "/tmp/" in str(v)
+            for v in passed_context.values()
+        )
+
+        if not passed_has_file:
+            issues.append("Image/file path NOT in tool args")
+        if not child_has_file:
+            issues.append("Image/file path NOT received by child")
+
+    # Check description clarity
+    if "description" in passed_context:
+        desc = passed_context["description"]
+        if len(desc) < 20:
+            issues.append("Task description very short - may lack context")
+
+    if issues:
+        print("ISSUES FOUND:")
+        for issue in issues:
+            print(f"  [!] {issue}")
+        result["issues"] = issues
+        print("\nHANDOFF QUALITY: PARTIAL/BROKEN")
+    else:
+        print("No obvious issues detected")
+        print("\nHANDOFF QUALITY: OK (verify manually)")
+
+    print(f"\n{'='*70}")
+
+    return result
+
+
+# =============================================================================
+# show_orchestrator_flow: Show orchestrator's decisions chronologically
+# =============================================================================
+
+
+def show_orchestrator_flow(trace_id: str) -> list[dict]:
+    """Show orchestrator's decisions in chronological order.
+
+    Useful for understanding the orchestration flow in any multi-agent system.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        List of orchestrator decisions
+    """
+    client = _get_client()
+    runs = list(client.list_runs(trace_id=trace_id))
+
+    # Find root (orchestrator)
+    root = next((r for r in runs if not r.parent_run_id), None)
+    if not root:
+        print("No root found")
+        return []
+
+    # Find LLM calls that are direct children of orchestrator's model chains
+    orchestrator_llm_calls = []
+    by_id = {str(r.id): r for r in runs}
 
     for r in runs:
-        cost = r.total_cost or 0
-        print(f"{str(r.id)[:12]} | {r.status:8} | ${cost:.4f} | {r.name[:30]}")
+        if r.run_type == "llm" and r.parent_run_id:
+            parent = by_id.get(str(r.parent_run_id))
+            if parent and parent.name == "model":
+                # Check if grandparent is root
+                if parent.parent_run_id and str(parent.parent_run_id) == str(root.id):
+                    orchestrator_llm_calls.append(r)
+
+    orchestrator_llm_calls.sort(key=lambda x: x.start_time or datetime.min)
+
+    print(f"\n{'='*70}")
+    print("ORCHESTRATOR DECISION FLOW")
+    print(f"Trace: {trace_id}")
+    print(f"{'='*70}")
+
+    decisions = []
+
+    for i, run in enumerate(orchestrator_llm_calls, 1):
+        print(f"\n[{i}] Decision - {str(run.id)[:8]}")
+        print(f"    Full ID: {run.id}")
+        print(f"    Tokens: {run.total_tokens or 0:,}")
+
+        decision = {
+            "index": i,
+            "id": str(run.id),
+            "tokens": run.total_tokens or 0,
+            "tool_calls": [],
+        }
+
+        # Parse output for tool calls
+        if run.outputs:
+            parsed = parse_lc_output(run.outputs)
+            for tc in parsed.get("tool_calls", []):
+                name = tc.get("name", "unknown")
+                args = tc.get("args", {})
+
+                call_info = {"name": name, "args_summary": {}}
+
+                if name == "task":
+                    subagent = args.get("subagent_type", args.get("specialist", "?"))
+                    desc = args.get("description", "")
+                    print(f"    -> task({subagent})")
+                    print(f"       desc: {desc}")
+                    call_info["args_summary"]["subagent"] = subagent
+                    call_info["args_summary"]["description"] = desc
+                else:
+                    print(f"    -> {name}")
+                    # Show all args - NO truncation
+                    for k, v in args.items():
+                        print(f"       {k}: {v}")
+                        call_info["args_summary"][k] = str(v)
+
+                decision["tool_calls"].append(call_info)
+
+        decisions.append(decision)
+
+    print(f"\n{'='*70}")
+    print(f"Total orchestrator decisions: {len(decisions)}")
+
+    return decisions
+
+
+# Backward compatibility alias
+show_pm_flow = show_orchestrator_flow
+
+
+# =============================================================================
+# scan_all_handoffs: Auto-detect broken context handoffs
+# =============================================================================
+
+
+def scan_all_handoffs(trace_id: str) -> list[dict]:
+    """Scan all task delegations and list them with context analysis.
+
+    Finds every task(subagent) delegation and shows what was passed.
+    Checks for common issues like missing file paths.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        List of handoff issues: [{child_id, subagent, issue, severity}]
+    """
+    client = _get_client()
+    runs = list(client.list_runs(trace_id=trace_id))
+
+    # Find all task tool calls
+    task_runs = [r for r in runs if r.run_type == "tool" and r.name == "task"]
+
+    print(f"\n{'='*70}")
+    print(f"HANDOFF SCAN: {trace_id}")
+    print(f"Found {len(task_runs)} task delegations")
+    print(f"{'='*70}")
+
+    issues = []
+
+    for task_run in task_runs:
+        # Extract subagent type and description from task input
+        # LangSmith stores tool inputs in various formats - check multiple locations
+        subagent = "unknown"
+        task_description = ""
+        if task_run.inputs:
+            # Try 1: Direct keys in inputs (common for StructuredTool)
+            subagent = task_run.inputs.get("subagent_type", "unknown")
+            task_description = task_run.inputs.get("description", "")
+
+            # Try 2: Nested under 'input' dict or string
+            if subagent == "unknown":
+                task_input = task_run.inputs.get("input", {})
+                if isinstance(task_input, dict):
+                    subagent = task_input.get("subagent_type", subagent)
+                    task_description = task_input.get("description", task_description)
+                elif isinstance(task_input, str):
+                    # Try 3: Parse string input (Python repr or JSON)
+                    import ast
+                    import json
+                    try:
+                        # Try Python literal first (single quotes from LangSmith)
+                        parsed = ast.literal_eval(task_input)
+                        if isinstance(parsed, dict):
+                            subagent = parsed.get("subagent_type", subagent)
+                            task_description = parsed.get("description", task_description)
+                    except (ValueError, SyntaxError):
+                        # Fall back to JSON
+                        try:
+                            parsed = json.loads(task_input)
+                            if isinstance(parsed, dict):
+                                subagent = parsed.get("subagent_type", subagent)
+                                task_description = parsed.get("description", task_description)
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
+            # Try 4: Check prompt/description directly (some tools store differently)
+            if subagent == "unknown":
+                subagent = task_run.inputs.get("specialist", task_run.inputs.get("agent", "unknown"))
+            if not task_description:
+                task_description = task_run.inputs.get("prompt", task_run.inputs.get("task", ""))
+
+        # Check if file path was passed in task description
+        task_has_file = bool(
+            "inbox/" in task_description
+            or "pending/" in task_description
+            or "products/" in task_description
+            or "storage_path" in task_description
+        )
+
+        # Check child output for signs of missing context
+        child_asked_for_context = False
+        child_output_text = ""
+        if task_run.outputs:
+            output = task_run.outputs.get("output", {})
+            if isinstance(output, dict):
+                # Check nested messages for "provide" or "need" keywords
+                messages = output.get("messages", [])
+                for msg in messages:
+                    if isinstance(msg, dict):
+                        content = msg.get("content", "")
+                        if isinstance(content, str):
+                            child_output_text = content
+                            if any(kw in content.lower() for kw in [
+                                "provide the", "need the", "please provide",
+                                "storage_path", "image path", "file path"
+                            ]):
+                                child_asked_for_context = True
+
+        # Determine issue
+        issue_found = None
+        severity = "OK"
+
+        if child_asked_for_context:
+            issue_found = f"Child asked for missing context: '{child_output_text}'"
+            severity = "HIGH"
+
+        # Print result - always show what was delegated
+        status_icon = "[X]" if issue_found else "[OK]"
+        file_marker = " [+file]" if task_has_file else ""
+        print(f"\n{status_icon} {subagent}{file_marker}")
+        print(f"    Task ID: {task_run.id}")
+        print(f"    Description: {task_description}")
+        if issue_found:
+            print(f"    ISSUE: {issue_found}")
+            issues.append({
+                "child_id": str(task_run.id),
+                "subagent": subagent,
+                "issue": issue_found,
+                "severity": severity,
+                "description": task_description,
+            })
+
+    print(f"\n{'='*70}")
+    if issues:
+        print(f"FOUND {len(issues)} HANDOFF ISSUE(S)")
+        for i in issues:
+            print(f"  - [{i['severity']}] {i['subagent']}: {i['issue']}")
+    else:
+        print("No handoff issues detected")
+    print(f"{'='*70}")
+
+    return issues
+
+
+# =============================================================================
+# prev_trace / next_trace: On-demand thread navigation
+# =============================================================================
+
+
+def prev_trace(trace_id: str) -> str | None:
+    """Get previous trace in same session, or None if first.
+
+    Enables on-demand navigation through conversation threads.
+    Use when you need to see what happened before the current trace.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        Previous trace ID, or None if this is the first trace in session
+
+    Example:
+        >>> prev_id = prev_trace('a194cf05')
+        >>> if prev_id:
+        ...     show_orchestrator_flow(prev_id)
+    """
+    client = _get_client()
+    run = client.read_run(trace_id)
+
+    if not run.session_id:
+        print(f"No session_id found for trace: {trace_id}")
+        return None
+
+    # Get all root traces in this session, sorted by time
+    session_runs = list(client.list_runs(
+        project_name="autifyme-dev",
+        is_root=True,
+        filter=f'eq(session_id, "{run.session_id}")'
+    ))
+
+    if not session_runs:
+        return None
+
+    # Sort by start_time
+    session_runs.sort(key=lambda x: x.start_time or datetime.min)
+
+    # Find current trace position
+    current_idx = None
+    for i, r in enumerate(session_runs):
+        if str(r.id) == trace_id or str(r.id).startswith(trace_id):
+            current_idx = i
+            break
+
+    if current_idx is None:
+        print(f"Trace {trace_id} not found in session")
+        return None
+
+    if current_idx == 0:
+        print("This is the first trace in the session")
+        return None
+
+    prev_run = session_runs[current_idx - 1]
+    print(f"Previous trace: {prev_run.id}")
+    print(f"  Time: {prev_run.start_time}")
+    return str(prev_run.id)
+
+
+def next_trace(trace_id: str) -> str | None:
+    """Get next trace in same session, or None if last.
+
+    Enables on-demand navigation through conversation threads.
+    Use when you need to see what happened after the current trace.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        Next trace ID, or None if this is the last trace in session
+
+    Example:
+        >>> next_id = next_trace('f264838e')
+        >>> if next_id:
+        ...     show_orchestrator_flow(next_id)
+        ...     # See what user did after PM asked for direction
+    """
+    client = _get_client()
+    run = client.read_run(trace_id)
+
+    if not run.session_id:
+        print(f"No session_id found for trace: {trace_id}")
+        return None
+
+    # Get all root traces in this session, sorted by time
+    session_runs = list(client.list_runs(
+        project_name="autifyme-dev",
+        is_root=True,
+        filter=f'eq(session_id, "{run.session_id}")'
+    ))
+
+    if not session_runs:
+        return None
+
+    # Sort by start_time
+    session_runs.sort(key=lambda x: x.start_time or datetime.min)
+
+    # Find current trace position
+    current_idx = None
+    for i, r in enumerate(session_runs):
+        if str(r.id) == trace_id or str(r.id).startswith(trace_id):
+            current_idx = i
+            break
+
+    if current_idx is None:
+        print(f"Trace {trace_id} not found in session")
+        return None
+
+    if current_idx == len(session_runs) - 1:
+        print("This is the last trace in the session")
+        return None
+
+    next_run = session_runs[current_idx + 1]
+    print(f"Next trace: {next_run.id}")
+    print(f"  Time: {next_run.start_time}")
+    return str(next_run.id)
+
+
+# =============================================================================
+# detect_issues: Auto-detect common trace problems
+# =============================================================================
+
+
+def detect_issues(trace_id: str) -> list[dict]:
+    """Auto-detect common issues in a trace.
+
+    Checks for:
+    - Broken handoffs (file paths not passed)
+    - Failed/errored runs
+    - Tool loops (same tool called 3+ times in sequence)
+    - High token usage (>50k tokens in single LLM call)
+    - Child agents asking for missing context
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        List of issues: [{type, severity, node_id, description}]
+    """
+    client = _get_client()
+    runs = list(client.list_runs(trace_id=trace_id))
+
+    print(f"\n{'='*70}")
+    print(f"ISSUE DETECTION: {trace_id}")
+    print(f"Scanning {len(runs)} nodes...")
+    print(f"{'='*70}")
+
+    issues = []
+
+    # 1. Check for failed/errored runs
+    failed_runs = [r for r in runs if r.status == "error" or r.error]
+    for r in failed_runs:
+        issues.append({
+            "type": "ERROR",
+            "severity": "HIGH",
+            "node_id": str(r.id),
+            "node_name": r.name,
+            "description": f"Run failed: {r.error or 'unknown error'}",
+        })
+
+    # 2. Check for high token usage
+    high_token_runs = [r for r in runs if r.run_type == "llm" and (r.total_tokens or 0) > 50000]
+    for r in high_token_runs:
+        issues.append({
+            "type": "HIGH_TOKENS",
+            "severity": "MEDIUM",
+            "node_id": str(r.id),
+            "node_name": r.name,
+            "description": f"High token usage: {r.total_tokens:,} tokens",
+        })
+
+    # 3. Check for tool loops (same tool called 3+ times by same agent)
+    # Group runs by parent
+    by_parent: dict[str, list] = {}
+    for r in runs:
+        if r.run_type == "tool" and r.parent_run_id:
+            parent_key = str(r.parent_run_id)
+            if parent_key not in by_parent:
+                by_parent[parent_key] = []
+            by_parent[parent_key].append(r)
+
+    for parent_id, tool_runs in by_parent.items():
+        tool_counts: dict[str, int] = {}
+        for tr in tool_runs:
+            tool_counts[tr.name] = tool_counts.get(tr.name, 0) + 1
+        for tool_name, count in tool_counts.items():
+            if count >= 3 and tool_name not in ("write_todos", "SummarizationMiddleware"):
+                issues.append({
+                    "type": "TOOL_LOOP",
+                    "severity": "MEDIUM",
+                    "node_id": parent_id,
+                    "node_name": tool_name,
+                    "description": f"Tool '{tool_name}' called {count} times - possible loop",
+                })
+
+    # 4. Scan handoffs (reuse scan_all_handoffs logic but quieter)
+    task_runs = [r for r in runs if r.run_type == "tool" and r.name == "task"]
+
+    for task_run in task_runs:
+        # Check child output for signs of missing context
+        if task_run.outputs:
+            output = task_run.outputs.get("output", {})
+            if isinstance(output, dict):
+                messages = output.get("messages", [])
+                for msg in messages:
+                    if isinstance(msg, dict):
+                        content = msg.get("content", "")
+                        if isinstance(content, str) and any(kw in content.lower() for kw in [
+                            "provide the", "need the", "please provide",
+                            "storage_path", "image path", "file path"
+                        ]):
+                            subagent = "unknown"
+                            if task_run.inputs:
+                                # Try direct key first, then nested
+                                subagent = task_run.inputs.get("subagent_type", "unknown")
+                                if subagent == "unknown":
+                                    task_input = task_run.inputs.get("input", {})
+                                    if isinstance(task_input, dict):
+                                        subagent = task_input.get("subagent_type", "unknown")
+
+                            issues.append({
+                                "type": "MISSING_CONTEXT",
+                                "severity": "HIGH",
+                                "node_id": str(task_run.id),
+                                "node_name": f"task({subagent})",
+                                "description": f"Child asked for missing context: {content}",
+                            })
+                            break
+
+    # Print summary
+    print(f"\n--- ISSUES FOUND: {len(issues)} ---\n")
+
+    if not issues:
+        print("No issues detected. Trace looks healthy.")
+    else:
+        # Group by severity
+        high = [i for i in issues if i["severity"] == "HIGH"]
+        medium = [i for i in issues if i["severity"] == "MEDIUM"]
+
+        if high:
+            print("HIGH SEVERITY:")
+            for i in high:
+                print(f"  [{i['type']}] {i['node_name']}: {i['description']}")
+
+        if medium:
+            print("\nMEDIUM SEVERITY:")
+            for i in medium:
+                print(f"  [{i['type']}] {i['node_name']}: {i['description']}")
+
+    print(f"\n{'='*70}")
+
+    return issues

@@ -26,7 +26,7 @@ class ReadDataInput(BaseModel):
 
     table: str = Field(
         ...,
-        description="Table name (e.g., 'products', 'product_families')"
+        description="Table name. Use inspect_schema to discover available tables."
     )
     filters: dict[str, Any] | None = Field(
         None,
@@ -45,11 +45,11 @@ class ReadDataInput(BaseModel):
         None,
         description=(
             "[FUZZY MATCH] Case-insensitive ILIKE pattern matching. "
-            "Use for searching text fields (names, descriptions, SKUs). "
+            "Use for searching text fields (names, descriptions, codes). "
             "Examples: "
-            "{'name': '%bottle%'} (contains 'bottle'), "
-            "{'sku_code': 'SKU-%'} (starts with 'SKU-'), "
-            "{'name': '%PET%jar%'} (contains 'PET' AND 'jar'). "
+            "{'name': '%search%'} (contains), "
+            "{'code': 'PREFIX-%'} (starts with), "
+            "{'name': '%term1%term2%'} (contains both). "
             "Use % as wildcard. RECOMMENDED for all name/text searches."
         )
     )
@@ -62,18 +62,18 @@ class ReadDataInput(BaseModel):
         description=(
             "Related tables to include (PostgREST syntax).\n"
             "SYNTAX:\n"
-            "- Basic: 'table(col1,col2)' or 'table(*)' for all columns\n"
+            "- Basic: 'related_table(col1,col2)' or 'related_table(*)' for all columns\n"
             "- Nested: 'parent(*,child(*))' - parent with nested child (CORRECT)\n"
             "- WRONG: 'parent.child(*)' - dot notation does NOT work\n"
             "EXAMPLES:\n"
-            "- ['product_family(name,sku_prefix)'] - family name and prefix\n"
-            "- ['product_family(*)', 'product_images(image_url,display_order)'] - multiple relations\n"
-            "- ['variant_axes(*,variant_values(*))'] - axes with nested values (CORRECT)\n"
-            "- ['product_variant_values(variant_value(name,variant_axis(name)))'] - deep nesting\n"
+            "- ['categories(name,code)'] - single relation with specific columns\n"
+            "- ['categories(*)', 'images(url,sort_order)'] - multiple relations\n"
+            "- ['parent(*,children(*))'] - nested hierarchy (CORRECT)\n"
+            "- ['junction(detail(name,parent(name)))'] - deep nesting through junction\n"
             "CRITICAL:\n"
             "- Nested relations: wrap child inside parent parentheses, NOT dot notation\n"
-            "- Table names MUST be exact (e.g., 'price_lists' not 'price_list')\n"
-            "- Use inspect_schema with details=['relationships'] to verify foreign key targets"
+            "- Table names MUST match exactly (check singular vs plural with inspect_schema)\n"
+            "- Use inspect_schema with details=['relationships'] to verify FK targets"
         )
     )
     ids: list[str] | None = Field(
@@ -208,7 +208,7 @@ def create_read_data_tool(
                 filters={"is_active": True, "product_family_id": ["fam-1", "fam-2", "fam-3"]},
                 search_patterns={"sku": "%500ML%"},
                 columns=["id", "sku", "name", "base_price", "product_family_id"],
-                relations=["product_family(name,sku_prefix)"],
+                relations=["product_families(name,sku_prefix)"],
                 limit=50
             )
             # Returns: 500ml products from 3 families with family metadata
@@ -229,7 +229,7 @@ def create_read_data_tool(
                 table="products",
                 filters={"is_active": True},
                 relations=[
-                    "product_family(name,sku_prefix,material)",
+                    "product_families(name,sku_prefix,material)",
                     "product_variant_values(variant_value(name,variant_axis(name)))",
                     "product_images(image_url,display_order)"
                 ],
@@ -254,7 +254,7 @@ def create_read_data_tool(
                 table="products",
                 filters={"is_active": True, "product_family_id": "fam-pet-bottles"},
                 columns=["id", "sku", "base_price", "created_at"],
-                relations=["product_family(name)"],
+                relations=["product_families(name)"],
                 count_only=False
             )
             # Returns: Full product list with metadata for SKU count analysis
@@ -264,7 +264,7 @@ def create_read_data_tool(
                 table="products",
                 ids=["uuid-1", "uuid-2", "uuid-3", "uuid-4", "uuid-5", "uuid-6"],
                 columns=["id", "sku", "base_price", "is_active"],
-                relations=["product_family(name)"]
+                relations=["product_families(name)"]
             )
             # Returns: Specific products for bulk price update verification
 
@@ -419,15 +419,15 @@ def create_read_data_tool(
             "Fetch records with filters, search patterns, joins, batch IDs, pagination, and counting.\n\n"
             "CRITICAL - filters vs search_patterns:\n"
             "- filters = EXACT MATCH (case-sensitive): {'is_active': True}, {'id': 'uuid-123'}, {'status': ['draft','published']}\n"
-            "- search_patterns = FUZZY MATCH (case-insensitive ILIKE): {'name': '%PET%'}, {'sku': 'JAR-%'}, {'name': '%bottle%jar%'}\n"
-            "- COMMON MISTAKE: filters={'name': 'PET Bottles'} returns NOTHING if exact name doesn't exist. Use search_patterns={'name': '%PET%'} instead!\n\n"
+            "- search_patterns = FUZZY MATCH (case-insensitive ILIKE): {'name': '%term%'}, {'code': 'PREFIX-%'}\n"
+            "- COMMON MISTAKE: filters={'name': 'Some Name'} returns NOTHING if exact name doesn't exist. Use search_patterns instead!\n\n"
             "SCENARIOS:\n"
-            "- Find products by name: search_patterns={'name': '%jar%'} (NOT filters)\n"
-            "- Duplicate check: search_patterns={'name': '%PET%bottle%'} to find potential matches\n"
+            "- Find by name: search_patterns={'name': '%search%'} (NOT filters)\n"
+            "- Duplicate check: search_patterns={'name': '%term1%term2%'} for potential matches\n"
             "- Batch fetch by IDs: ids=['uuid-1','uuid-2','uuid-3'] for bulk operations\n"
-            "- Paginated catalog: filters={'is_active': True}, limit=25, offset=50 for page 3\n"
-            "- Load with relations: relations=['product_family(name,sku_prefix)','product_images(image_url)']\n"
-            "- Nested relations: relations=['variant_axes(*,variant_values(*))'] for hierarchy (NOT variant_axes.variant_values)\n"
+            "- Paginated list: filters={'is_active': True}, limit=25, offset=50 for page 3\n"
+            "- Load with relations: relations=['related_table(col1,col2)'] (use inspect_schema for table names)\n"
+            "- Nested relations: relations=['parent(*,children(*))'] for hierarchy (NOT parent.children)\n"
             "- Count only: count_only=True for efficient counting without fetching records\n\n"
             "RETURNS: {results: [...], count: N, pagination?: {limit, offset, has_more}}\n\n"
             "NOT FOR: Aggregations with GROUP BY (use aggregate_data) or writes (use write_data)."

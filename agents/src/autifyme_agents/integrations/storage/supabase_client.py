@@ -919,25 +919,24 @@ class SupabaseStorageClient(StorageInterface):
                 select_parts.extend(group_by)
 
             # Add aggregate functions
-            # PostgREST syntax: column.function()::alias
+            # PostgREST syntax: column.function()::alias (double colon for aliasing)
+            # NOT column.function()::type::alias (no type casting - just ::alias)
             for alias, aggregate_expr in aggregates.items():
                 # Parse aggregate expression like "count(*)", "sum(price)", "avg(rating)"
                 # PostgREST expects: "price.sum()::total_price" or "id.count()::total"
 
                 # Handle count(*) special case
                 if "count(*)" in aggregate_expr.lower():
-                    select_parts.append(f"id.count()::int::{alias}")
+                    select_parts.append(f"id.count()::{alias}")
                 else:
                     # Extract function and column: "sum(price)" -> function=sum, column=price
                     import re
                     match = re.match(r'(\w+)\(([^)]+)\)', aggregate_expr)
                     if match:
                         func, column = match.groups()
-                        # PostgREST syntax for aggregates
-                        if func.lower() in ('sum', 'avg', 'min', 'max'):
-                            select_parts.append(f"{column}.{func.lower()}()::numeric::{alias}")
-                        elif func.lower() == 'count':
-                            select_parts.append(f"{column}.count()::int::{alias}")
+                        # PostgREST syntax for aggregates: column.func()::alias
+                        if func.lower() in ('sum', 'avg', 'min', 'max', 'count'):
+                            select_parts.append(f"{column}.{func.lower()}()::{alias}")
                         else:
                             logger.warning(f"Unknown aggregate function: {func}")
                             select_parts.append(f"{column}.{func.lower()}()::{alias}")

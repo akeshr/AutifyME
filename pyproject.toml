@@ -159,37 +159,21 @@ module = [
 ]
 ignore_missing_imports = true
 
+# Google SDK wrappers - stubs incomplete/evolving, need ignores when stubs present but
+# must suppress unused-ignore when stubs absent (ignore_missing_imports makes types Any)
+[[tool.mypy.overrides]]
+module = [
+    "autifyme_agents.core.google_media_factory",
+    "autifyme_agents.core.google_live_api",
+]
+warn_unused_ignores = false
+
 # Adapter layer - interfaces with Supabase SDK which has incomplete type stubs
 # (response.data typed as JSON union instead of actual dict/list types)
 [[tool.mypy.overrides]]
 module = "autifyme_agents.integrations.storage.supabase_client"
 disable_error_code = ["return-value", "assignment", "arg-type", "index", "operator", "union-attr", "call-overload"]
 
-# ALL MYPY ERRORS FIXED! 🎉
-#
-# Previous technical debt (100+ errors across 18 modules) - ALL RESOLVED:
-#
-# ✅ High priority (FIXED - 0 errors):
-# - universal_crud_tool.py: FIXED - Split query_advanced into type-safe methods
-# - context_middleware.py: FIXED - Clean query_entities/count_entities usage
-# - supabase_client.py: FIXED - @overload decorators for return type inference
-# - operation_intent.py: FIXED - Pydantic plugin + op_type mapping
-# - campaign_persistence_tools.py: FIXED - Pydantic mypy plugin
-# - strict_openai_model.py: FIXED - Pydantic mypy plugin
-#
-# ✅ Medium priority (FIXED - 0 errors):
-# - pm_context_tools.py: FIXED
-# - runner.py: FIXED
-# - product_search_tools.py: FIXED
-# - postgres_saver_factory.py: FIXED
-# - market_intelligence_specialist.py: FIXED
-# - config.py: FIXED
-#
-# ✅ Low priority (FIXED - 0 errors):
-# - All 7 remaining files: FIXED
-#
-# **Result:** 82 source files, 0 errors, 100% type-safe codebase
-# No workarounds, no type: ignore, no cast() - clean architecture from first principles
 
 [tool.pytest.ini_options]
 # Test configuration

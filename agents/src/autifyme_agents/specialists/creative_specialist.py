@@ -114,6 +114,7 @@ def create_creative_specialist(
     )
 
     # Multimodal middleware injects images from paths in delegation message
+    # FilesystemMiddleware (read_file for workspace) is provided by default via DeepAgents
     middleware = [MultimodalInjectionMiddleware()]
 
     spec: dict[str, Any] = {

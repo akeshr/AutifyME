@@ -7,6 +7,19 @@ and other dependencies across the test suite.
 from __future__ import annotations
 
 import os
+
+# =============================================================================
+# Set dummy Google API key for CI environments without credentials
+# =============================================================================
+# Google SDK validates credentials at import time. Setting GOOGLE_API_KEY
+# bypasses ADC lookup, preventing CI failures. The key is never used since
+# tests mock the LLM layer.
+if not os.environ.get("GOOGLE_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = "test-dummy-key-for-ci"
+
+# =============================================================================
+# Standard imports
+# =============================================================================
 import uuid
 from datetime import timedelta
 from pathlib import Path

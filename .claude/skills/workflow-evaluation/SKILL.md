@@ -1,6 +1,6 @@
 ---
 name: workflow-evaluation
-description: Become a top 0.00001% workflow evaluator - systematically analyze traces, identify issues, and implement fixes
+description: Become a top 0.00001% workflow evaluator - systematically analyze traces, identify issues, and implement fixes (project)
 ---
 
 # Workflow Evaluation Skill
@@ -18,254 +18,454 @@ description: Become a top 0.00001% workflow evaluator - systematically analyze t
 
 ---
 
-## Quick Start: REPL Commands
+## Investigation Approach
 
-```python
-from dotenv import load_dotenv
-load_dotenv()
-from langsmith import Client
-client = Client()
+### Choose Your Mode
 
-# List recent traces
-runs = list(client.list_runs(project_name='autifyme-dev', is_root=True, limit=10))
-for r in runs:
-    print(f"{r.id} | {r.status} | ${r.total_cost or 0:.4f} | {r.name}")
+| Mode | When | Approach |
+|------|------|----------|
+| **Quick Scan** | Initial triage, known patterns | `show_tree` -> form hypothesis -> decide if worth deep dive |
+| **Deep Dive** | New issue, complex failure, high impact | Full phases 1-6, 5 Whys, counterfactual analysis |
 
-# Pick a trace and get structure
-trace_id = "YOUR_TRACE_ID"
-trace_runs = list(client.list_runs(trace_id=trace_id))
+**Quick Scan (5 min):**
+
+1. `show_tree("<trace_id>")` - see USER/PM, structure, metrics
+2. Scan for obvious patterns: missing delegations, errors, unusual flow
+3. Form initial hypothesis: "Looks like PREMATURE_TERMINATION"
+4. Decision: Known issue? Worth deep dive? Quick fix?
+
+**Deep Dive (30+ min):** Full systematic analysis with advanced techniques below.
+
+### Hypothesis-Driven Investigation
+
+**Don't follow phases blindly. Form hypotheses and test them.**
+
+```
+HYPOTHESIS: PM didn't research because prompt is ambiguous about cold start
+TEST: Read prompt, check for cold start guidance
+RESULT: Prompt says "lean on context" - ambiguous when no context exists
+CONFIRM/REJECT: Confirmed - prompt gap
+NEXT: Fix prompt with explicit cold start section
+```
+
+**The cycle:** Observe -> Hypothesize -> Test -> Confirm/Reject -> Iterate
+
+### The 5 Whys
+
+**Don't stop at the first cause. Dig to the systemic issue.**
+
+```
+WHY 1: PM didn't call catalog_analyst
+WHY 2: Because prompt said "lean on context" which PM interpreted as "ask user"
+WHY 3: Because prompt example showed asking, not researching
+WHY 4: Because designer assumed users always have history
+WHY 5: Because cold start wasn't treated as a distinct scenario
+
+ROOT: Cold start is not a first-class scenario in the design
+FIX: Add explicit cold start handling to prompt
+```
+
+### Counterfactual Reasoning
+
+**Ask "What if?" to identify pivotal decisions.**
+
+```
+COUNTERFACTUAL: What if PM had called catalog_analyst first?
+
+TRACE THE ALTERNATIVE:
+- catalog_analyst would find: "4 bottles already exist"
+- PM would know: this is "update pricing" not "add new"
+- Output would be: actionable recommendation, not question
+
+CONCLUSION: This single missing tool call changed the entire outcome
+PRIORITY: High - this is a branch point in the decision tree
+```
+
+### Institutional Memory
+
+**Track patterns across evaluations to find systemic issues.**
+
+After each evaluation, update the log:
+
+```markdown
+## Issue Log
+
+| Date | Trace | Pattern | Root Cause | Fix |
+|------|-------|---------|------------|-----|
+| 12/09 | f264838e | PREMATURE_TERMINATION | Cold start ambiguity | Added cold start section |
+
+## Recurring Patterns
+- Cold start issues: 3 this month -> systemic gap in prompt
+- Handoff issues: 2 this month -> review task descriptions
 ```
 
 ---
 
-## Phase 1: Build the Tree
+## [CRITICAL] Anti-Drift Rules
 
-### Get Hierarchical View
+These rules prevent common evaluation mistakes:
 
-```python
-from tests.tools.evaluation.helpers import show_tree
-ids = show_tree(trace_id)  # Returns dict mapping short_id -> full_id
+### Rule 1: NO Token/Cost Analysis Until Phase 4
+
+Token counts and costs are SYMPTOMS, not causes. You may note them in the tree for reference, but:
+- **DO NOT** investigate high token usage until you've completed node-by-node analysis
+- **DO NOT** let token numbers guide your investigation order
+- **DO** follow execution order (chronological/depth-first)
+
+### Rule 2: Full UUIDs, Not Truncated
+
+When building the tree:
+- Display short IDs for readability: `[bf173a71]`
+- But ALWAYS have full UUID accessible for API calls
+- Tree helper should return: `{short_id: full_uuid}` mapping
+
+### Rule 3: Context Handoff Checkpoint (MANDATORY)
+
+**BEFORE recursing into any tool call**, you MUST complete the Context Handoff Checklist:
+
+```
+CONTEXT HANDOFF: [parent] -> [tool_name] -> [child]
+----------------------------------------------------
+What parent HAD available:
+- [ ] File/media paths: ___
+- [ ] User message: ___
+- [ ] Domain context: ___
+- [ ] Previous findings: ___
+
+What parent PASSED to tool:
+- [ ] In args: ___
+- [ ] In task description: ___
+- [ ] Via shared files: ___
+
+What child RECEIVED:
+- [ ] Matches what was passed? Y/N
+- [ ] Missing anything critical? Y/N
+
+HANDOFF QUALITY: [OK / PARTIAL / BROKEN]
 ```
 
-Output:
+**Only after completing this checklist, recurse into the child node.**
+
+### Rule 4: Complete Analysis Before Moving On
+
+For each node, you MUST fill out the analysis template BEFORE moving to the next node:
+
 ```
-TRACE: 2d421f5e-aeff-41c7-aff2-bbf57739a75c
-Status: success | Cost: $0.04 | Time: 12.3s | Tokens: 28,644
-LLM calls: 3 | Tool calls: 4 | Total nodes: 12
-==========================================================================================
-[2d421f5e] LangGraph (chain) | 12.3s
-  +-- [1201ef22] tools (chain) | 11.2s
-    +-- [a393449a] task (tool) | 11.1s -> cataloging
-      +-- [d65ec38a] LangGraph (chain) | 11.0s
-        +-- [67ab4efa] tools (chain) | 8.2s
-          +-- [641d7533] image_studio (tool) | 8.1s [action=analyze]
-            +-- [47343c3b] GeminiWithRetry (llm) | 6.2s | gemini-3-pro-image | 3,834tok *
-        +-- [dd8f0256] model (chain) | 2.1s
-          +-- [96aba441] GeminiWithRetry (llm) | 1.9s | gemini-2.5-flash | 8,234tok -> image_studio *
-  +-- [bf173a71] GeminiWithRetry (llm) | 0.8s | gemini-2.5-flash | 4,521tok -> task *
+NODE: [id] [name]
+================
+INPUT (from codebase):
+- Prompt file: ___ (key rules: ___)
+- Tools available: ___
+- Context received: ___
+
+REASONING (from trace):
+- LLM's decision: ___
+- Logic sound? Y/N - Why: ___
+
+OUTPUT (from trace):
+- Action taken: ___
+- Args passed: ___
+
+ISSUES FOUND: [ ] None / [ ] List: ___
+
+NEXT: [ ] Recurse to ___ / [ ] Return to parent / [ ] Done
+```
+
+---
+
+## Phase 1: Build Context
+
+**First see the trace, then understand expected behavior.**
+
+### 1.1 Build the Tree (Always First)
+
+`show_tree("<trace_id>")` - Always start here.
+
+The header immediately tells you:
+
+- **USER/PM preview** - what this trace is about
+- **Root trace** = PM (orchestrator)
+- **Nested task** = Sub-agent (analyst or specialist)
+
+### 1.2 Establish Expected Behavior (First Principles)
+
+**Question:** "What SHOULD happen for this user input?"
+
+**Sources (in order of authority):**
+
+1. **User Intent** - What is the user actually trying to accomplish?
+2. **Domain Knowledge** - What would an expert do in this situation?
+3. **System Design** - What is this agent designed to do?
+
+**Read the relevant files:**
+
+- For PM: `prompts/project_manager.prompt`
+- For sub-agents: `prompts/<agent_name>.prompt`
+- Tool definitions: `tools/<tool_name>.py`
+
+**[CRITICAL] The prompt tells you what the system DOES - not what it SHOULD do.**
+
+When comparing actual vs expected, the gap could be in ANY layer:
+
+| If... | Then fix... |
+|-------|-------------|
+| Agent deviated from correct prompt | Agent reasoning or handoff |
+| Agent followed prompt, outcome wrong | **Prompt itself** |
+| Agent lacked tools to succeed | Tool availability/descriptions |
+| Agent was wrong choice entirely | Architecture/routing |
+
+### 1.3 Continue Building Context
+
+1. `show_orchestrator_flow("<trace_id>")` - See decision sequence
+2. `show_node(ids['<short_id>'])` - Drill into specific node
+3. `show_handoff(parent_id, child_id)` - Check context passing before recursing
+
+### 1.4 Thread Navigation (On-Demand)
+
+During analysis, if you need adjacent traces:
+
+- `prev_trace(trace_id)` - What happened before?
+- `next_trace(trace_id)` - What happened after?
+
+**When to check:**
+
+- PM asked user for direction - check next trace for response
+- Agent behavior seems correct - check if prior trace set wrong context
+- User had to repeat themselves - compare consecutive traces
+
+**Why on-demand:** Navigate based on what you discover, not upfront.
+
+### Tree Output Format
+
+```text
+TRACE: <trace_id>
+Status: success | Cost: $0.04 | Time: 45.2s | Tokens: 471,193
+LLM calls: 12 | Tool calls: 8 | Total nodes: 150
+
+USER: [Image] (no text)
+PM: "I see four children's water bottles..."
+================================================================================
+[<full-uuid>] LangGraph (chain) | 45.2s
+  +-- [<full-uuid>] ModelWithRetry (llm) | 14,076tok -> download_media *
+  +-- [<full-uuid>] ModelWithRetry (llm) | 14,439tok -> task *
+      +-- [<full-uuid>] task (tool) -> agent_a
+          +-- [<full-uuid>] LangGraph (chain) | 4,924tok
+      +-- [<full-uuid>] task (tool) -> agent_b
+  ...
 
 Legend: * = LLM | X = Error | -> = delegates/calls
-Usage: ids = show_tree('...'); show_llm_detail(ids['<short_id>'])
 ```
 
-**Key info per node:**
-- `[8-char-id]` - Use with `show_llm_detail(ids['8-char-id'])` to drill down
-- Model name and token count for LLM calls
-- `-> tool_name` shows what the LLM decided to call
-- `-> specialist` shows delegation target for task tools
-- `X` marker and error snippet for failed nodes
-
-### What to Look For
-
-- **Missing nodes**: Expected tool wasn't called
-- **Wrong routing**: Went to wrong department/specialist
-- **Excessive depth**: Too many delegation layers
-- **Error nodes**: Any node with `X` marker and error snippet
+Copy any UUID directly: `show_node("<full-uuid>")`
 
 ---
 
-## Phase 2: Review LLM Calls
+## Phase 2: Systematic Node Analysis
 
-### Get All LLM Reasoning
+### The Three-Layer Analysis (PER NODE)
+
+```
++------------------+     +------------------+     +------------------+
+|   1. INPUT       | --> |   2. REASONING   | --> |   3. OUTPUT      |
+|   (from CODE)    |     |   (from TRACE)   |     |   (from TRACE)   |
++------------------+     +------------------+     +------------------+
+| - System prompt  |     | - What did LLM   |     | - Tool call?     |
+| - Tools + desc   |     |   think/decide?  |     |   -> HANDOFF     |
+| - User context   |     | - Is logic sound?|     |      CHECK then  |
+| - Schema         |     | - Any gaps?      |     |      RECURSE     |
++------------------+     +------------------+     +------------------+
+```
+
+### Step 2.1: Reconstruct INPUT from Codebase
+
+**DO NOT rely solely on trace for input.** Read the source files:
 
 ```python
-from tests.tools.evaluation.helpers import show_llm_calls
-show_llm_calls(trace_id)
+# 1. Read the agent's prompt file
+Read("prompts/<agent_name>.prompt")
+
+# 2. Read tool definitions this agent can use
+Read("tools/<tool_name>.py")
+
+# 3. Read the agent implementation (for tool bindings, schema)
+Read("workflows/<agent_name>.py")
 ```
 
-Output:
-```
-LLM CALLS: 3 total | 28,644 tokens | $0.04
-==========================================
+**Input Checklist**:
 
-[1] PM (orchestrator)
-    Model: gemini-2.5-flash | Tokens: 8,234
-    Decision: Route to CatalogingDept for product extraction
-    Tool calls: delegate_to_department(department="cataloging", task="...")
+| Component | Source | Status |
+|-----------|--------|--------|
+| System prompt | `prompts/*.prompt` | [ ] Read |
+| Tool definitions | `tools/*.py` | [ ] Read |
+| Output schema | Agent implementation | [ ] Read |
+| User context | Trace inputs | [ ] Checked |
 
-[2] CatalogingDept (department)
-    Model: gemini-2.5-flash | Tokens: 12,410
-    Decision: Use ImageAnalysisSpecialist for image analysis
-    Tool calls: delegate_to_specialist(specialist="image_analysis", ...)
+### Step 2.2: Analyze REASONING from Trace
 
-[3] ImageAnalysisSpecialist (specialist)
-    Model: gemini-2.5-flash | Tokens: 8,000
-    Decision: Extract product data from image
-    Tool calls: image_studio(action="analyze", ...)
-```
-
-### Dig Into Specific LLM Call
+Get what the LLM actually thought:
 
 ```python
-from tests.tools.evaluation.helpers import show_llm_detail
-
-# Use the short ID from show_tree output
-show_llm_detail(ids['96aba441'])  # ids dict from show_tree()
+run = client.read_run(id_map['<short_id>'])  # Use full UUID from map
+# Parse run.outputs for the LLM's reasoning and decisions
 ```
 
-Output:
-```
-=== LLM CALL: ImageAnalysisSpecialist ===
+**Reasoning Checklist**:
 
-SYSTEM PROMPT (first 500 chars):
-You are the Image Analysis Specialist. Your job is to...
+- [ ] LLM acknowledged input correctly?
+- [ ] Reasoning chain is logical?
+- [ ] No jumps or unfounded assumptions?
+- [ ] If followed prompt but outcome wrong - is the prompt flawed?
 
-USER CONTEXT:
-- Image URL: https://...
-- Task: Extract product information
+### Step 2.3: Analyze OUTPUT from Trace
 
-ASSISTANT OUTPUT:
-{
-  "reasoning": "I can see a wooden chair with...",
-  "tool_calls": [{"name": "image_studio", "args": {...}}]
-}
+**If OUTPUT is a TOOL CALL:**
 
-TOOL RESULTS:
-- image_studio: {"success": true, "products": [...]}
-```
+1. **STOP** - Do not immediately recurse
+2. **Complete Context Handoff Checklist** (see Rule 3)
+3. **Only then** recurse into child node
+
+**If OUTPUT is a FINAL ANSWER:**
+- Validate correctness against expected outcome
 
 ---
 
-## Phase 3: Evaluate Each Dimension
+## Phase 3: Context Handoff Analysis
 
-For each LLM call, ask yourself:
+### [CRITICAL] Before Every Recursion
 
-### 1. REASONING
-- Did it show its thinking?
-- Is the logic sound?
-- Any jumps or gaps?
+When parent calls a tool/task, verify the handoff:
 
-### 2. DECISION
-- Given the context, was this the right choice?
-- Would an expert decide differently?
+```
+CONTEXT HANDOFF: [Orchestrator] -> task([Child Agent])
+======================================================
 
-### 3. TOOL USAGE
-- Right tool selected?
-- Arguments correct and complete?
-- Result handled properly?
+WHAT PARENT HAD:
+- File path: <path from previous tool> [if applicable]
+- User message: <original user input>
+- Domain context: <company/user context>
+- Prior results: <from earlier tool calls>
 
-### 4. CONTEXT
-- Did it use the context provided?
-- Did it ignore important information?
-- Did it pass context correctly to children?
+WHAT PARENT PASSED IN TASK ARGS:
+- agent_type: <child_agent_name>
+- description: "<task description>"
+- file_path: ??? <-- CHECK THIS
 
-### 5. OUTPUT
-- All required fields present?
-- Data accurate?
-- Format correct?
+WHAT CHILD RECEIVED:
+- Did it get the file path? Y/N
+- Did it get domain context? Y/N
+- Did it get prior findings? Y/N
 
-### 6. COMPLIANCE
-- Following system prompt instructions?
-- Any constraint violations?
+WHAT CHILD OUTPUT:
+- Result/error message from the child
+- Reveals consequence of broken handoff immediately
+
+HANDOFF QUALITY: [OK / PARTIAL / BROKEN]
+ISSUE: [None / Describe what was lost]
+```
+
+### Common Handoff Issues
+
+| Issue | Symptom | Where to Look |
+|-------|---------|---------------|
+| File path not passed | Child can't access file | Task args in parent output |
+| Domain context lost | Generic responses | Task description or shared state |
+| Prior findings not shared | Redundant work | Shared workspace compliance |
+| Wrong file path format | File not found | Path in task description |
 
 ---
 
-## Phase 4: Identify Root Cause
+## Phase 4: Diagnosis (AFTER Full Analysis)
 
-### Common Patterns
+### Only Now Consider Metrics
 
-| Symptom | Likely Root Cause | Where to Look |
-|---------|-------------------|---------------|
-| Wrong routing | PM prompt missing routing rules | `prompts/project_manager_intelligent.prompt` |
-| Missing tool call | Specialist prompt unclear on when to call | `prompts/specialists/*.prompt` |
-| Incomplete output | Output schema not enforced | Specialist's structured output config |
-| Context loss | Delegation not passing context | Department/specialist delegation code |
-| Hallucination | Prompt lacks grounding instruction | System prompt |
-| Loop/stuck | Missing termination condition | System prompt |
+After completing node-by-node analysis, you may examine:
+- Token usage patterns
+- Cost distribution
+- Latency bottlenecks
 
-### Trace Root Cause
+But diagnosis should be based on **behavioral issues found during analysis**, not metrics.
 
-```python
-# If specialist failed, check what it received
-from tests.tools.evaluation.helpers import show_context_flow
-show_context_flow(trace_id, "ImageAnalysisSpecialist")
+### Issue Classification (Multi-Layer)
+
+**[CRITICAL] Don't assume the prompt is correct. Consider ALL layers:**
+
+| Issue Type | Possible Root Causes (check all) |
+|------------|----------------------------------|
+| Wrong routing | Prompt routing rules, tool descriptions, agent capabilities |
+| Missing tool call | Prompt instructions, tool availability, tool descriptions |
+| Wrong tool args | Prompt examples, schema definition, handoff quality |
+| Context loss | Handoff description, shared state design, parent reasoning |
+| Wrong outcome | **Prompt logic itself**, tool behavior, architecture |
+| Hallucination | Prompt grounding, context insufficiency, tool limitations |
+
+**Diagnosis questions:**
+
+1. What did the USER want? (ground truth)
+2. What would an EXPERT do? (ideal behavior)
+3. What did the SYSTEM do? (actual behavior)
+4. WHERE is the gap? (could be any layer)
+
+### Root Cause Template
+
+```
+ISSUE: [What went wrong]
+NODE: [Where it happened]
+TRACE BACK:
+1. OUTPUT showed: ___
+2. REASONING was: ___
+3. INPUT analysis reveals: ___
+
+ROOT CAUSE: [One sentence - the actual source of the problem]
+FIX LOCATION: [File:line]
 ```
 
-Output:
-```
-CONTEXT FLOW TO: ImageAnalysisSpecialist
-=========================================
+### Issue Pattern Reference
 
-FROM PM:
-  user_message: "catalog this product"
-  image_url: "https://..."
+Use these patterns when diagnosing and describing issues:
 
-FROM CatalogingDept:
-  task: "analyze product image"
-  image_url: "https://..."  <-- PASSED CORRECTLY
+| Pattern | Detection | Typical Root Cause |
+|---------|-----------|-------------------|
+| PREMATURE_TERMINATION | Orchestrator responded with research tools unused | Prompt ambiguity about "sufficient" research |
+| WRONG_ROUTING | Task sent to wrong sub-agent | Tool descriptions unclear |
+| CONTEXT_LOSS | Child missing info parent had | Handoff description incomplete |
+| FORMAT_TEMPLATE_TRAP | Agent followed format literally without reasoning | Example showed format, not thinking process |
+| HIGH_TOKENS | >50k tokens in single call | Unbounded context or loop |
+| TOOL_LOOP | Same tool called 3+ times | Missing termination condition |
 
-TO ImageAnalysisSpecialist:
-  task: "analyze product image"
-  image_url: None  <-- LOST HERE!
+**Orchestrator-Specific Patterns:**
 
-ROOT CAUSE: CatalogingDept delegation didn't include image_url
-```
+| Pattern | What Happened | Look For |
+|---------|---------------|----------|
+| PREMATURE_TERMINATION | PM responded before exhausting research | Research tools available but not called |
+| WRONG_ROUTING | PM delegated to wrong specialist | Task description vs specialist capabilities |
+| MISSING_DELEGATION | PM did work specialist should do | PM prompt routing rules |
+| OVER_DELEGATION | Specialist called for PM-level task | Task complexity vs specialist scope |
 
 ---
 
-## Phase 5: Fix It
+## Phase 5: Implement Fix
 
-### CRITICAL: For Prompt Changes, Invoke prompt-engineering Skill First
+### [CRITICAL] For Prompt Changes
 
 ```
 skill: prompt-engineering
 ```
 
-**Always invoke `prompt-engineering` skill before editing any prompt file.** This ensures:
-- Proper prompt structure (XML, right altitude, canonical examples)
-- Domain expert voice (not AI assistant voice)
-- Versioning alongside code
+**Always invoke `prompt-engineering` skill before editing any prompt file.**
 
-### Prompt Locations
+### Fix Template
 
-```
-agents/src/autifyme_agents/prompts/
-  |-- project_manager_intelligent.prompt   <- PM orchestrator
-  |-- approval_analyzer.prompt             <- HITL analyzer
-  |-- specialists/
-      |-- catalog_specialist.prompt        <- Cataloging specialist
-      |-- creative_specialist.prompt       <- Creative specialist
-```
+```markdown
+## Fix for: [Issue description]
 
-### Code Locations
+**Root Cause**: [One sentence]
+**Location**: [File path:line numbers]
 
-```
-agents/src/autifyme_agents/
-  |-- workflows/
-      |-- project_manager.py               <- PM implementation
-      |-- approval_analyzer.py             <- HITL implementation
-  |-- specialists/
-      |-- catalog_specialist.py            <- Cataloging implementation
-      |-- creative_specialist.py           <- Creative implementation
-  |-- tools/                               <- Tool definitions
-```
+**Change**:
+- Before: [What it said]
+- After: [What it should say]
 
-### Tool Changes
-
-```python
-# Find tool definition in agents/src/autifyme_agents/tools/
-# Check schema, description, examples
-# Use Edit to clarify
+**Rationale**: [Why this fixes the root cause]
 ```
 
 ---
@@ -273,154 +473,229 @@ agents/src/autifyme_agents/
 ## Phase 6: Verify Fix
 
 ```python
-# Re-run the same scenario
+# Re-run scenario
 from tests.tools import execute_scenario
-result = execute_scenario("catalog this product", media_path="path/to/image.jpg")
+result = execute_scenario("original user message", media_path="...")
 
-# Compare traces
-from tests.tools.evaluation.helpers import compare_traces
+# Compare
 compare_traces(old_trace_id, result.trace_id)
 ```
 
-Output:
-```
-COMPARISON: abc123 vs def456
-=============================
-                    BEFORE      AFTER
-Outcome:            failure     success
-Latency:            12.3s       11.8s (-4%)
-Cost:               $0.04       $0.04 (0%)
+**Verification Checklist**:
+- [ ] Issue no longer reproduces
+- [ ] Same scenario produces correct output
+- [ ] No new issues introduced
+- [ ] No regressions in other scenarios
 
-RESOLVED:
-- ImageAnalysisSpecialist now receives image_url
+---
 
-NEW ISSUES:
-- None
+## Complete Evaluation Template
 
-VERDICT: Fix successful
+**Use this template for every evaluation. Fill ALL sections.**
+
+```markdown
+# Trace Evaluation: [full_trace_id]
+
+## Overview
+- **Status**: [success/failure]
+- **User Input**: [what user sent]
+- **Expected Outcome**: [what should happen]
+- **Actual Outcome**: [what happened]
+
+## Execution Tree
+[Paste tree with full UUIDs in lookup]
+
+## Node-by-Node Analysis
+
+### Node 1: [name] [full_uuid]
+
+**INPUT** (from codebase):
+- Prompt: [file] - Key rules: ___
+- Tools: [list]
+- Context received: ___
+
+**REASONING** (from trace):
+- Decision: ___
+- Logic: [sound/flawed] - ___
+
+**OUTPUT** (from trace):
+- Action: ___
+- Args: ___
+
+**CONTEXT HANDOFF** (if tool call):
+- Parent had: ___
+- Parent passed: ___
+- Child received: ___
+- Child output: ___
+- Handoff quality: [OK/PARTIAL/BROKEN]
+
+**Issues**: [None / List]
+
+### Node 2: [name] [full_uuid]
+[Repeat structure]
+
+## Diagnosis Summary
+
+| Issue | Node | Root Cause | Fix Location |
+|-------|------|------------|--------------|
+| | | | |
+
+## Fixes Applied
+[Details per fix]
+
+## Verification
+- [ ] Re-ran scenario
+- [ ] Issue resolved
+- [ ] No regressions
 ```
 
 ---
 
-## Helper Scripts Reference
+## Anti-Patterns (DO NOT)
+
+1. **DO NOT jump to token analysis first** - Follow execution flow, metrics come last
+2. **DO NOT skip the handoff checklist** - Context loss is a common root cause
+3. **DO NOT use truncated IDs for API calls** - Keep full UUID mapping
+4. **DO NOT move to next node without completing template** - Prevents drift
+5. **DO NOT fix symptoms** - Trace to root cause first
+6. **DO NOT assume prompt is correct** - Gap could be in any layer
+
+---
+
+## The Mindset
+
+1. **Execution flow first** - Top to bottom, depth-first
+2. **User intent is truth** - Prompt tells you what system does, not what it should do
+3. **Handoffs are fragile** - Always verify context passing
+4. **Metrics are symptoms** - Behavioral analysis reveals causes
+5. **Template prevents drift** - Fill it completely before moving on
+6. **Verify always** - Never assume fix worked
+
+---
+
+## Helper Functions Reference
 
 All helpers in `tests/tools/evaluation/helpers.py`:
 
+```python
+from tests.tools.evaluation.helpers import (
+    # Thread Navigation (on-demand)
+    prev_trace,            # Get previous trace in session
+    next_trace,            # Get next trace in session
+
+    # Core Analysis (Phases 1-4)
+    show_tree,             # Phase 1: Build tree, get ID lookup
+    show_orchestrator_flow, # Phase 1: Orchestrator decisions chronologically
+    show_node,             # Phase 2: Full INPUT/REASONING/OUTPUT for one node
+    show_handoff,          # Phase 3: Context handoff analysis
+    show_llm_calls,        # Summary of all LLM calls
+
+    # Supplementary: Issue Detection
+    detect_issues,         # Auto-detect errors, high tokens, loops, missing context
+    scan_all_handoffs,     # List all task delegations with context markers
+
+    # Utilities
+    compare_traces,        # Before/after comparison (Phase 6)
+    list_recent,           # Recent traces
+    list_failures,         # Failed traces
+)
+```
+
+### Trace Discovery Functions
+
 | Function | Purpose | Returns |
 |----------|---------|---------|
-| `show_tree(trace_id)` | Full tree with IDs, models, tokens, decisions | `dict[short_id, full_id]` |
-| `show_llm_calls(trace_id)` | All LLM calls with summaries | `None` |
-| `show_llm_detail(run_id)` | Full prompt/output for one call | `None` |
-| `show_context_flow(trace_id, agent)` | Track context to specific agent | `None` |
-| `compare_traces(id1, id2)` | Before/after comparison | `None` |
-| `list_failures(hours=24)` | Recent failed traces | `None` |
-| `list_recent(hours=24)` | Recent traces (any status) | `None` |
+| `list_recent(hours=24, limit=10)` | Recent traces in chronological order (oldest first) | `list[str]` of trace IDs |
+| `list_failures(hours=24, limit=10)` | Failed/error traces only | `None` (prints) |
 
-**Typical workflow:**
+**Usage:** Start evaluation workflow with `list_recent`:
+
 ```python
-ids = show_tree(trace_id)           # See structure, get ID lookup
-show_llm_detail(ids['bf173a71'])    # Drill into specific LLM call
+traces = list_recent(hours=24, limit=3)  # Get last 3 traces
+show_tree(traces[0])                      # Start from first (oldest)
+show_tree(traces[1])                      # Move to second
+show_tree(traces[2])                      # Move to third
+```
+
+### Thread Navigation Functions
+
+| Function | Purpose | Returns |
+|----------|---------|---------|
+| `prev_trace(trace_id)` | Get previous trace in same session | `str` (trace ID) or `None` |
+| `next_trace(trace_id)` | Get next trace in same session | `str` (trace ID) or `None` |
+
+**Usage:** Navigate on-demand when analysis reveals you need context from adjacent traces.
+
+### Core Analysis Functions
+
+| Function | Purpose | Returns |
+|----------|---------|---------|
+| `show_tree(trace_id)` | Hierarchical tree with tokens, decisions | `dict[short_id, full_uuid]` |
+| `show_orchestrator_flow(trace_id)` | Orchestrator decisions in order with tool calls | `list[dict]` |
+| `show_node(run_id)` | Full analysis template for one node (no truncation on `description`) | `dict` with parsed data |
+| `show_handoff(parent_id, child_id)` | Context handoff: HAD -> PASSED -> RECEIVED -> **OUTPUT** | `dict` with issues |
+| `show_llm_calls(trace_id)` | All LLM calls summary | `None` (prints) |
+| `compare_traces(id1, id2)` | Before/after metrics | `None` (prints) |
+
+### Supplementary: Automated Issue Detection
+
+Use these **after** systematic analysis to cross-check findings, or to quickly scan for obvious problems:
+
+| Function | Purpose | Returns |
+|----------|---------|---------|
+| `detect_issues(trace_id)` | Auto-detect: ERROR, HIGH_TOKENS (>50k), TOOL_LOOP (3+ calls), MISSING_CONTEXT | `list[dict]` with severity |
+| `scan_all_handoffs(trace_id)` | List all task delegations showing `[OK]`/`[X]` status and `[+file]` marker | `list[dict]` of issues only |
+
+**`scan_all_handoffs` output**:
+- `[OK] agent_name` - Delegation looks healthy
+- `[OK] agent_name [+file]` - File path was passed in description
+- `[X] agent_name` - Child asked for missing context (HIGH severity)
+
+**Note**: `show_handoff` is optimized for orchestrator -> task delegations. For agent LLM -> tool handoffs, "WHAT PARENT PASSED" may be empty but "WHAT CHILD RECEIVED" will show correct data.
+
+### Typical Workflow
+
+```python
+# 1. Build tree, get ID lookup
+ids = show_tree("<trace_id>")
+
+# 2. See orchestrator's decisions
+show_orchestrator_flow("<trace_id>")
+
+# 3. Analyze first orchestrator LLM call
+show_node(ids['<short_id>'])
+
+# 4. Before recursing into task, check handoff
+show_handoff(ids['<parent_id>'], ids['<child_id>'])
+
+# 5. Then analyze child node
+show_node(ids['<child_id>'])
+
+# 6. (Optional) Cross-check with automated detection
+detect_issues("<trace_id>")       # Verify no issues missed
+scan_all_handoffs("<trace_id>")   # Overview of all delegations
 ```
 
 ---
 
-## Direct REPL (No Helpers)
+## Quick Reference: File Locations
 
-If helpers aren't available, use raw LangSmith SDK:
-
-```python
-from dotenv import load_dotenv
-load_dotenv()
-from langsmith import Client
-client = Client()
-
-# Get trace structure
-runs = list(client.list_runs(trace_id="..."))
-for r in runs:
-    print(f"{r.id[:8]} | {r.run_type} | {r.name}")
-
-# Get specific run details
-run = client.read_run("run_id")
-print(run.inputs)  # What it received
-print(run.outputs)  # What it produced
-
-# Get LLM messages (for llm run_type)
-if run.inputs and "messages" in run.inputs:
-    msgs = run.inputs["messages"]
-    # Parse the LangChain message format...
-```
-
----
-
-## Evaluation Checklist
-
-Before declaring "done":
-
-- [ ] Built tree, understood flow
-- [ ] Reviewed each LLM call's reasoning
-- [ ] Identified all issues (not just first one)
-- [ ] Traced to root cause (not symptom)
-- [ ] Fixed with minimal, surgical change
-- [ ] Verified fix with re-run
-- [ ] No regressions introduced
-- [ ] Documented what was learned
-
----
-
-## Mindset
-
-1. **Verify before assuming**: NEVER assume what an agent/specialist does based on its name. ALWAYS read the actual prompt file and code to understand its role, responsibilities, and expected behavior before evaluating.
-2. **Evidence over opinion**: Every finding cites specific trace data
-3. **Root cause over symptom**: The error message is not the cause
-4. **Minimal fix**: Change as little as possible
-5. **Verify always**: Never assume fix worked
-6. **Learn continuously**: Each evaluation makes you better
-
-**CRITICAL**: Before evaluating any agent's behavior:
-```python
-# 1. Read the agent's prompt to understand its role
-Read("agents/src/autifyme_agents/prompts/specialists/catalog_specialist.prompt")
-
-# 2. Read the agent's implementation to understand its tools and flow
-Read("agents/src/autifyme_agents/specialists/catalog_specialist.py")
-
-# 3. THEN evaluate if behavior matches expected responsibilities
-```
+| What | Where |
+|------|-------|
+| Orchestrator prompt | `prompts/<orchestrator>.prompt` |
+| Agent prompts | `prompts/<agents>/*.prompt` |
+| Tool definitions | `tools/*.py` |
+| Agent implementations | `workflows/*.py`, `agents/*.py` |
+| Shared state/workspace | Application-specific |
+| **Evaluation helpers** | `tests/tools/evaluation/helpers.py` |
 
 ---
 
 ## Related Skills
 
-Invoke these when needed:
-
-| Skill | When to Use |
-|-------|-------------|
-| `prompt-engineering` | **ALWAYS** before editing any prompt file |
-| `tool-development` | When fixing/improving tool definitions |
-| `specialist-creation` | When adding new specialists |
-| `autonomous-testing` | When re-running scenarios to verify fixes |
-
----
-
-## Project Context
-
-**Architecture**: 2-level hierarchy (PM -> Specialists -> Tools)
-- PM orchestrates, delegates to specialists
-- Specialists use tools to accomplish tasks
-- HITL middleware for human approval
-
-**LangSmith Project**: `autifyme-dev`
-
-**Key Workflows**:
-- Product cataloging (image -> extraction -> HITL -> save)
-- Campaign creation (brief -> creative -> HITL -> publish)
-
----
-
-## References
-
-- **Framework Design**: `docs/architecture/testing/WORKFLOW_EVALUATION_FRAMEWORK.md`
-- **Trace Analysis**: `tests/tools/trace_analysis.py`
-- **Prompts**: `agents/src/autifyme_agents/prompts/`
-- **Architecture**: `docs/architecture/core/AGENTS_DESIGN.md`
-- **LangSmith**: https://smith.langchain.com
+| Skill | When |
+|-------|------|
+| `prompt-engineering` | Before editing any prompt |
+| `tool-development` | Fixing tool definitions |
+| `specialist-creation` | Adding new agents |
+| `autonomous-testing` | Verifying fixes |

@@ -220,7 +220,7 @@ class ReadDataInput(BaseModel):
     # Required field with validation
     table: str = Field(
         ...,
-        description="Table name (e.g., 'products', 'categories')"
+        description="Table name (use inspect_schema to discover tables)"
     )
 
     # Optional with clear purpose
@@ -283,17 +283,17 @@ async def _read_data_impl(...) -> dict[str, Any]:
 
     search_patterns = FUZZY MATCH (case-insensitive ILIKE)
     - Use for: Names, descriptions, any text search
-    - Examples: {'name': '%jar%'}, {'sku': '%500ML%'}
+    - Examples: {'name': '%term%'}, {'code': '%PREFIX%'}
 
     Examples:
         # Simple query
-        read_data(table="products", filters={"is_active": True})
+        read_data(table="your_table", filters={"is_active": True})
 
         # Complex with relations
         read_data(
-            table="products",
-            search_patterns={"name": "%bottle%"},
-            relations=["product_family(name)"],
+            table="your_table",
+            search_patterns={"name": "%search%"},
+            relations=["related_table(name)"],
             limit=50
         )
     """
@@ -317,7 +317,7 @@ def create_read_data_tool(
 
     Examples:
         # Cataloging Specialist - restricted
-        tool = create_read_data_tool(storage, tables=["products", "categories"])
+        tool = create_read_data_tool(storage, tables=["allowed_table_1", "allowed_table_2"])
 
         # Market Intelligence - full access
         tool = create_read_data_tool(storage)

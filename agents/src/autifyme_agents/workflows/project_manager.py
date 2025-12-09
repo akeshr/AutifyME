@@ -18,6 +18,11 @@ from deepagents import create_deep_agent
 from langchain.agents.structured_output import ToolStrategy
 from langchain.chat_models import BaseChatModel
 
+from autifyme_agents.analysts import (
+    create_catalog_analyst,
+    create_product_analyst,
+    create_visual_analyst,
+)
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
@@ -65,7 +70,7 @@ def _load_prompt(
     channel: MessagingChannel | None = None,
 ) -> str:
     """Load and format PM prompt with company context."""
-    prompt_template = load_prompt("project_manager_intelligent.prompt")
+    prompt_template = load_prompt("project_manager.prompt")
 
     platform_name = "unknown"
     if channel is not None:
@@ -86,12 +91,23 @@ def _load_prompt(
 - Root Categories: {', '.join(root_categories)}
 """
 
+    # Company patterns for cold-start handling
+    patterns = base_context.company_patterns
+    price_min, price_max = patterns.typical_price_range
+    patterns_text = f"""
+**Company Patterns (For Cold-Start Handling):**
+- Primary Workflow: {patterns.primary_workflow}
+- Price Range: Rs {price_min:.0f} - Rs {price_max:.0f}
+- Common Product Types: {', '.join(patterns.common_product_types) if patterns.common_product_types else 'N/A'}
+- SKU Pattern: {patterns.naming_conventions.get('sku_pattern', 'FAMILY-SIZE-VARIANT')}
+"""
+
     return prompt_template.format(
         company_name=company_profile.name,
         brand_voice=company_profile.brand_voice,
         target_audience=company_profile.target_audience,
         platform=platform_name,
-    ) + "\n\n" + catalog_summary_text + "\n" + taxonomy_text
+    ) + "\n\n" + catalog_summary_text + "\n" + taxonomy_text + "\n" + patterns_text
 
 
 async def create_project_manager(
@@ -148,7 +164,8 @@ async def create_project_manager(
     pm_tools.append(create_inspect_schema_tool(storage, tables=None))
     pm_tools.append(create_read_data_tool(storage))
 
-    # Image viewing - universal tool for verifying images
+    # Image viewing - PM uses intelligently based on context/need
+    # For deep analysis, delegates to visual_analyst; for quick checks, uses directly
     pm_tools.append(create_view_image_tool())
 
     # Specialist LLM configuration
@@ -159,7 +176,12 @@ async def create_project_manager(
         max_retries=5,  # Match PM resilience for blank response handling
     )
 
-    # Domain Specialists (with storage for image persistence)
+    # Analysts (Research Layer) - Fast, read-only, cross-domain reusable
+    visual_analyst = create_visual_analyst()
+    product_analyst = create_product_analyst()
+    catalog_analyst = create_catalog_analyst(storage=storage)
+
+    # Specialists (Execution Layer) - HITL-enabled, domain-specific
     creative_specialist = create_creative_specialist(
         model=None,
         storage=storage,
@@ -169,7 +191,15 @@ async def create_project_manager(
         storage=storage,
     )
 
-    subagents: list[Any] = [creative_specialist, catalog_specialist]
+    subagents: list[Any] = [
+        # Analysts first (research layer)
+        visual_analyst,
+        product_analyst,
+        catalog_analyst,
+        # Specialists second (execution layer)
+        creative_specialist,
+        catalog_specialist,
+    ]
 
     # Structured output for multimodal responses (text + images)
     response_format = ToolStrategy(
