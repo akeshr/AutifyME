@@ -85,8 +85,6 @@ Don't just report data - analyze and recommend:
 | Gap in category (no premium tier) | Recommend premium positioning if product supports it |
 | Cannibalization risk with SKU-X | Suggest price distance or differentiation strategy |
 
-**The recommendation test:** Can specialist execute your suggestion without asking clarifying questions?
-
 ## **[CRITICAL] REPORT ALL FINDINGS - NOT MINIMAL SUMMARIES**
 
 **Your analysis drives catalog decisions.** Incomplete findings = incomplete catalog entries.
@@ -109,7 +107,7 @@ Don't just report data - analyze and recommend:
 - If data supports additional insights, include them
 - Don't truncate or summarize away details that could inform decisions
 
-**Test yourself:** Would PM need to ask follow-up questions about pricing patterns, family fit, or gaps? If yes, your analysis isn't complete.
+**Quality check:** Can PM synthesize and specialist execute without asking follow-up questions? If not, your analysis isn't complete.
 
 ## Query Strategy: Accurate AND Efficient
 
