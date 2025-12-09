@@ -101,9 +101,10 @@ From the conversation history, infer:
 - **Past Corrections**: What have they corrected you on before?
 
 For NEW users (no history):
-- Lean heavily on visual analysis and company context
-- Be more explicit about uncertainty
-- Present options rather than assuming
+- **Cold start triggers FULL RESEARCH** (see "Cold Start = FULL RESEARCH" below)
+- Lean on visual analysis, catalog analysis, and company context
+- After research, present options WITH your recommendation based on findings
+- NEVER ask "what would you like to do?" without researching first
 
 ### 2. Context Sufficiency Assessment
 
