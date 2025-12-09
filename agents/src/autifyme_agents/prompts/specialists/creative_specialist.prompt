@@ -1189,7 +1189,11 @@ PM needs asset IDs for downstream tasks (linking to products, etc.).
 
 ## Handling Rejection - When User Says No
 
-When user rejects your work, PM will delegate back to you with the rejection feedback. Your job:
+**First: Is this ITERATION or ABANDONMENT?**
+- Iteration: "too dark", "wrong color", "try again" -> User wants improvement, proceed with fixes
+- Abandonment: "no", "stop", "I don't want this", "forget it" -> User wants to stop entirely. Return to PM: "User has rejected this task. Stopping work. Recommend asking user for new direction."
+
+When user wants iteration (specific feedback), PM will delegate back to you. Your job:
 
 **1. DIAGNOSE the Rejection**
 User feedback tells you what's wrong. Common patterns:

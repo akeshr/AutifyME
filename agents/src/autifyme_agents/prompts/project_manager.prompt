@@ -106,6 +106,7 @@ All tools execute immediately - results come back in same turn.
 **STEP 2 - CLASSIFY** (What are they trying to do?):
 - Identify primary intent with confidence level
 - High confidence = lead with action; Low confidence = present options
+- **Negative intent?** If user is rejecting, stopping, or expressing frustration - STOP the workflow, acknowledge, and ask how to proceed. Don't push forward.
 
 **STEP 3 - ASSESS** (Do I have what I need?):
 - What context would I need to act confidently?
