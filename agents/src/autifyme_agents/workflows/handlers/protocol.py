@@ -28,12 +28,15 @@ class WorkflowHandler(Protocol):
         sender: str,
         thread_id: str,
         interrupt_value: Any,
-    ) -> None:
+    ) -> dict[str, Any] | None:
         """Send workflow-specific interrupt to user via channel.
 
         Args:
             sender: Channel-specific sender ID
             thread_id: Conversation thread ID
             interrupt_value: Interrupt value from LangGraph (may be wrapped)
+
+        Returns:
+            Error dict if validation failed (for auto-reject), None on success
         """
         ...

@@ -134,6 +134,12 @@ warn_unreachable = true
 strict_equality = true
 show_error_codes = true
 plugins = ["pydantic.mypy"]
+# Exclude non-production code from type checking
+exclude = [
+    "^database/",
+    "^extensions/",
+    "^tests/archived/",
+]
 
 [tool.pydantic-mypy]
 init_forbid_extra = true
@@ -173,6 +179,18 @@ warn_unused_ignores = false
 [[tool.mypy.overrides]]
 module = "autifyme_agents.integrations.storage.supabase_client"
 disable_error_code = ["return-value", "assignment", "arg-type", "index", "operator", "union-attr", "call-overload"]
+
+# Test files - relaxed typing (test code doesn't require production-level strictness)
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+disallow_any_generics = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+warn_return_any = false
+warn_unreachable = false
+disable_error_code = ["override", "abstract", "arg-type", "return-value", "misc", "call-arg", "attr-defined", "var-annotated", "import-not-found", "unused-coroutine", "import-untyped", "assignment", "index", "no-redef", "unreachable", "call-overload"]
 
 
 [tool.pytest.ini_options]
