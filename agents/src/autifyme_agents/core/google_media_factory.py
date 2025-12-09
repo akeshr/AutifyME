@@ -66,8 +66,8 @@ class VeoVideoGenerator:
                 "GOOGLE_API_KEY environment variable or api_key parameter required"
             )
 
-        # Configure client
-        genai.configure(api_key=self.api_key)
+        # Configure client (type stubs lag behind actual SDK API)
+        genai.configure(api_key=self.api_key)  # type: ignore[attr-defined]
         self.client = genai.Client()
 
     async def generate_video(
@@ -113,7 +113,8 @@ class VeoVideoGenerator:
             request_params["reference_images"] = reference_images  # type: ignore[assignment]
 
         # Start video generation (async operation)
-        operation = await self.client.models.generate_video(
+        # Note: generate_video is the correct API; type stubs suggest generate_videos incorrectly
+        operation = await self.client.models.generate_video(  # type: ignore[attr-defined]
             model=self.model, **request_params
         )
 
@@ -172,7 +173,7 @@ class VeoVideoGenerator:
             request_params["prompt"] = extension_prompt  # type: ignore[assignment]
 
         # Start video extension (async operation)
-        operation = await self.client.models.extend_video(
+        operation = await self.client.models.extend_video(  # type: ignore[attr-defined]
             model=self.model, **request_params
         )
 

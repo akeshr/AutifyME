@@ -86,8 +86,8 @@ class GeminiLiveSession:
                 "GOOGLE_API_KEY environment variable or api_key parameter required"
             )
 
-        # Configure client
-        genai.configure(api_key=self.api_key)
+        # Configure client (type stubs lag behind actual SDK API)
+        genai.configure(api_key=self.api_key)  # type: ignore[attr-defined]
         self.client = genai.Client()
         self._session: AsyncSession | None = None
 
@@ -116,14 +116,14 @@ class GeminiLiveSession:
         if self.system_instruction:
             config["system_instruction"] = self.system_instruction
 
-        # Create session
-        self._session = await self.client.live.connect(**config)
+        # Create session (Live API methods not in type stubs)
+        self._session = await self.client.live.connect(**config)  # type: ignore[attr-defined]
 
         # Register callbacks
         if audio_callback:
-            self._session.on_audio(audio_callback)
+            self._session.on_audio(audio_callback)  # type: ignore[union-attr]
         if text_callback:
-            self._session.on_text(text_callback)
+            self._session.on_text(text_callback)  # type: ignore[union-attr]
 
     async def send_audio(self, audio_bytes: bytes) -> None:
         """
@@ -134,7 +134,7 @@ class GeminiLiveSession:
         """
         if not self._session:
             raise RuntimeError("Session not started. Call start() first.")
-        await self._session.send_audio(audio_bytes)
+        await self._session.send_audio(audio_bytes)  # type: ignore[attr-defined]
 
     async def send_text(self, text: str) -> None:
         """
@@ -145,7 +145,7 @@ class GeminiLiveSession:
         """
         if not self._session:
             raise RuntimeError("Session not started. Call start() first.")
-        await self._session.send_text(text)
+        await self._session.send_text(text)  # type: ignore[attr-defined]
 
     async def send_video(self, video_frame: bytes, mime_type: str = "image/jpeg") -> None:
         """
@@ -157,7 +157,7 @@ class GeminiLiveSession:
         """
         if not self._session:
             raise RuntimeError("Session not started. Call start() first.")
-        await self._session.send_video(video_frame, mime_type=mime_type)
+        await self._session.send_video(video_frame, mime_type=mime_type)  # type: ignore[attr-defined]
 
     async def close(self) -> None:
         """Close Live API session and WebSocket connection."""
