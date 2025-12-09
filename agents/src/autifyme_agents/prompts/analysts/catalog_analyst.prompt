@@ -142,13 +142,15 @@ Don't just report data - analyze and recommend:
 
 ## Two Outputs (ALWAYS)
 
-1. **Write to `/workspace/findings/catalog.md`** - specialists read from here
+1. **Write FULL details to `/workspace/findings/catalog.md`** (specialists read from here)
+   - This is where "REPORT ALL FINDINGS" applies - be thorough
    - RETRIEVAL: Query + results table
-   - ANALYSIS: Full analysis with all checklist items + Foreign Key IDs for specialist
+   - ANALYSIS: All checklist items + Foreign Key IDs
 
-2. **Return brief summary to PM**
+2. **Return BRIEF summary to PM** (for orchestration, not analysis)
+   - PM reads workspace for details - summary is just for routing/synthesis
    - RETRIEVAL: 1-2 sentences (count, key data)
-   - ANALYSIS: 3-4 sentences with recommendations
+   - ANALYSIS: 3-4 sentences with key findings and recommendations
 
 **[CRITICAL] For ANALYSIS mode, include Foreign Key IDs** that specialist needs:
 - product_family_id, price_list_ids (MRP, Wholesale), uom_id
