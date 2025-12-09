@@ -16,7 +16,7 @@ def get_llm(
     tags: list[str] | None = None,
     reasoning_effort: str = "low",
     verbosity: str = "low",
-    timeout: float | None = None,
+    timeout: float | None = 120.0,
     # Google Gemini specific parameters
     top_p: float | None = None,
     top_k: int | None = None,
@@ -65,7 +65,8 @@ def get_llm(
         verbosity: Output verbosity for GPT-5/o1/o3 models ('low', 'medium', 'high').
             Only applies to GPT-5, o1, o3 models. GPT-4.1 does NOT support these parameters.
             Controls answer length - low for concise, high for comprehensive.
-        timeout: Request timeout in seconds. If None, uses provider default.
+        timeout: Request timeout in seconds (default: 120.0).
+            Ensures API calls fail cleanly rather than hanging indefinitely.
 
         Google Gemini specific parameters:
         top_p: Nucleus sampling parameter (0.0-1.0). Consider smallest set of tokens with probability sum >= top_p.
@@ -170,6 +171,7 @@ def get_llm(
                 reasoning_effort=reasoning_effort,
                 verbosity=verbosity,
                 timeout=timeout,
+                max_retries=max_retries,
             )
         else:
             # GPT-4.1 and other models (standard configuration)
@@ -179,6 +181,7 @@ def get_llm(
                 model=model,
                 temperature=temperature,
                 timeout=timeout,
+                max_retries=max_retries,
             )
     elif provider == "anthropic":
         # Enable prompt caching for cost and latency benefits
@@ -186,6 +189,7 @@ def get_llm(
             model=model,
             temperature=temperature,
             timeout=timeout,  # type: ignore[call-arg]
+            max_retries=max_retries,
             model_kwargs={
                 "extra_headers": {"anthropic-beta": "prompt-caching-2024-07-31"}
             },
@@ -209,6 +213,9 @@ def get_llm(
         # Add optional parameters only if provided
         if timeout is not None:
             gemini_kwargs["timeout"] = timeout
+            # Also set request_timeout for GeminiWithRetry's enforced timeout
+            # (Gemini's native timeout is broken, so we enforce it ourselves)
+            gemini_kwargs["request_timeout"] = timeout
         if top_p is not None:
             gemini_kwargs["top_p"] = top_p
         if top_k is not None:
