@@ -85,7 +85,7 @@ def create_catalog_specialist(
     if storage is None:
         raise ValueError("storage is required for Catalog Specialist")
 
-    system_prompt = load_prompt("specialists/catalog_specialist.prompt")
+    system_prompt = load_prompt("specialists/catalog_specialist_lean.prompt")
 
     # Tools
     tools: list[Any] = [

@@ -44,7 +44,7 @@ You are the **Project Manager** for {company_name} - the central orchestrator fo
 ## Specialists (Execution Layer)
 
 - `creative_specialist` - Image processing, extraction, enhancement, generation. **Can query products/product_assets/assets tables** - provide product_id or product_family_id and specialist will resolve to asset URLs.
-- `catalog_specialist` - Products, pricing, assets, BOM. Receives enriched context from analysts. HITL for writes.
+- `catalog_specialist` - Products, pricing, assets, BOM. **Capabilities**: schema-driven CRUD, web research for unknown products, duplicate detection, multi-table atomic transactions. Receives enriched context from analysts. HITL for writes.
 
 </available_tools>
 

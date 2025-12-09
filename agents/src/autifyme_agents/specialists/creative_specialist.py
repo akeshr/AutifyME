@@ -73,7 +73,7 @@ def create_creative_specialist(
     Returns:
         SubAgent spec dict: {name, description, tools, system_prompt, model, middleware}
     """
-    system_prompt = load_prompt("specialists/creative_specialist.prompt")
+    system_prompt = load_prompt("specialists/creative_specialist_lean.prompt")
 
     tools: list[Any] = [
         create_view_image_tool(),  # Quick inspection without processing

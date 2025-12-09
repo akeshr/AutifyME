@@ -58,6 +58,55 @@ A senior partner unblocks with research: *"I analyzed your catalog - similar pro
 
 ---
 
+## The Reasoning Framework Pattern
+
+> **Intelligent agents THINK before they ACT.**
+
+The most important discovery from the PM prompt refactor: give agents a structured way to assess their situation before taking action.
+
+### The 4-Step Framework
+
+```
+STEP 1 - INVENTORY (What do I have?)
+- Session context: Conversation history, user patterns, established facts
+- Domain context: Existing data, patterns, constraints
+- Message context: What user just provided
+- Workspace context: Findings from prior research (if any)
+
+STEP 2 - CLASSIFY (What are they trying to do?)
+- Identify primary intent with confidence level
+- High confidence = lead with action
+- Low confidence = research first, then present options
+
+STEP 3 - ASSESS (Do I have what I need?)
+- What context would I need to act confidently?
+- What do I HAVE vs what do I NEED?
+- Is the gap significant enough to justify research?
+
+STEP 4 - ROUTE (Based on gap size)
+| Gap Size | Action |
+|----------|--------|
+| None | Proceed directly - have everything needed |
+| Specific | Targeted research - fill only the gap |
+| Substantial | Full research - multiple tools/queries needed |
+```
+
+### Why This Matters
+
+**Without framework:** Agent either asks too many questions (annoying) or acts without enough context (wrong).
+
+**With framework:** Agent intelligently calibrates research depth to actual need.
+
+### Applying to Different Agent Types
+
+| Agent Type | Framework Emphasis |
+|------------|-------------------|
+| Orchestrators (PM) | Full 4-step - routes to specialists based on gaps |
+| Analysts | Steps 1-2 primarily - research is their job |
+| Specialists | Steps 1,3,4 - execute with context, escalate gaps |
+
+---
+
 ## The Core Insight: Domain Expert Voice
 
 ### The Single Most Important Thing
@@ -127,8 +176,104 @@ GOOD: "Light reveals form and material truth. Background serves the story. Execu
 | Agent Type | Altitude | Focus |
 |------------|----------|-------|
 | PM | High | Cross-domain orchestration, delegation with context |
-| Specialists | Medium | Domain execution, deep research, complete tool calls |
+| Analysts | Medium-High | Domain research, findings to workspace, brief summary back |
+| Specialists | Medium | Domain execution, HITL operations, complete tool calls |
 | Tool Prompts | Low-Medium | Execute instructions faithfully with domain mastery |
+
+---
+
+## Orchestrators vs Executors
+
+### The Critical Distinction
+
+**Orchestrators (PM)** and **Executors (Analysts/Specialists)** need fundamentally different prompts.
+
+| Aspect | Orchestrator | Executor |
+|--------|--------------|----------|
+| **Primary Job** | Route and synthesize | Research or execute |
+| **Tool Access** | Read-only, delegation | Domain-specific, write access |
+| **Decision Making** | Which specialist? What context? | How to accomplish the task? |
+| **Output** | User-facing communication | Findings or database changes |
+| **Prompt Focus** | Reasoning framework, routing logic | Domain expertise, tool mastery |
+
+### Orchestrator Prompt Principles
+
+1. **Minimal direct tools** - orchestrators delegate, not execute
+2. **Rich subagent descriptions** - PM routes based on these descriptions
+3. **Reasoning framework** - INVENTORY -> CLASSIFY -> ASSESS -> ROUTE
+4. **Context handoff protocol** - how to pass context to specialists
+5. **Synthesis focus** - how to combine findings into user response
+
+### Executor Prompt Principles
+
+1. **Deep domain expertise** - the 0.01% practitioner voice
+2. **Tool mastery** - strategic selection, chaining, verification
+3. **Workspace protocol** - where to write findings, what to return
+4. **HITL awareness** - what requires approval, how to present proposals
+5. **Escalation patterns** - when to return to orchestrator
+
+---
+
+## The Workspace Protocol
+
+### Context Handoff Architecture
+
+Analysts and specialists communicate via workspace files, not inline context bloat.
+
+```
+/workspace/findings/
+  visual.md       # Visual analyst findings
+  product.md      # Product analyst findings
+  catalog.md      # Catalog analyst findings
+```
+
+### The Protocol
+
+**1. Orchestrator delegates with workspace reference:**
+```
+"Analyze this image. Write findings to /workspace/findings/visual.md"
+```
+
+**2. Analyst writes FULL findings to workspace:**
+```
+write_file("/workspace/findings/visual.md", """
+# Visual Analysis
+
+## Core Observations
+**Primary Object:** [detailed description]
+**Materials:** [with evidence]
+...
+
+## Confidence
+High - clear visibility, identifiable materials
+""")
+```
+
+**3. Analyst returns BRIEF summary to orchestrator:**
+```
+"Clear PET jar with honeycomb texture, 500ml capacity, blue lid. High confidence."
+```
+
+**4. Orchestrator delegates to specialist with workspace reference:**
+```
+"Create this product. Read /workspace/findings/visual.md and /workspace/findings/catalog.md for full context."
+```
+
+**5. Specialist reads full findings before executing:**
+```
+read_file("/workspace/findings/visual.md")
+read_file("/workspace/findings/catalog.md")
+// Now has complete context for execution
+```
+
+### The Benefit
+
+| Without Workspace | With Workspace |
+|-------------------|----------------|
+| Context bloats with each hop | Context stays lean |
+| Information lost in summarization | Full findings preserved |
+| Specialist lacks detail | Specialist has everything |
+| PM prompt grows huge | PM prompt stays focused |
 
 ---
 
@@ -558,16 +703,82 @@ Both layers together = robust system.
 
 ## XML Structure Template
 
+### For Orchestrators (PM)
+
 ```xml
 <background_information>
   ## Your Role
-  [World-class practitioner framing]
+  [Orchestrator framing - central coordinator]
+
+  ## Company Context
+  [Injected at runtime - brand voice, target audience]
+
+  ## Your Position
+  [Two-layer architecture: Analysts (research) + Specialists (execution)]
+</background_information>
+
+<available_tools>
+  ## Discovery Tools
+  [Read-only tools for orchestrator's direct use]
+
+  ## Analysts (Research Layer)
+  [Each analyst with: purpose, outputs, cross-domain reuse, read-only note]
+
+  ## Specialists (Execution Layer)
+  [Each specialist with: domain, capabilities, HITL note]
+</available_tools>
+
+<instructions>
+  ## The Prime Directive
+  [Research and propose. Never ask without trying.]
+
+  ## Synchronous Execution
+  [Tools execute immediately - no "waiting for..."]
+
+  ## Task Routing
+  [Which specialist for which task type]
+</instructions>
+
+<reasoning_framework>
+  ## Before Every Response: Assess and Route
+
+  **STEP 1 - INVENTORY** (What do I have?)
+  **STEP 2 - CLASSIFY** (What are they trying to do?)
+  **STEP 3 - ASSESS** (Do I have what I need?)
+  **STEP 4 - ROUTE** (Based on gap size)
+
+  ## Research Orchestration
+  [CHAINED vs PARALLEL patterns]
+
+  ## Context Handoff
+  [How to pass context to specialists]
+</reasoning_framework>
+
+<examples>
+  [2-3 domain-agnostic examples showing reasoning framework in action]
+  [Each: INVENTORY -> CLASSIFY -> ASSESS -> ROUTE -> ACTION]
+</examples>
+
+<output_format>
+  [Structured response format with user-facing message]
+</output_format>
+```
+
+### For Executors (Analysts/Specialists)
+
+```xml
+<background_information>
+  ## Your Role
+  [World-class practitioner framing - top 0.01%]
+
+  ## Your Position
+  [Relationship to PM, what you receive, what you return]
 
   ## Your Expertise
   [Domain doctrine - deep knowledge to reason FROM]
 
   ## Storage/Architecture
-  [Mental model for any infrastructure specifics]
+  [Mental model for infrastructure specifics]
 </background_information>
 
 <available_tools>
@@ -575,14 +786,15 @@ Both layers together = robust system.
   - What it does
   - What it returns
   - **The ONLY way to X** (if exclusive)
+  - Strategic context (when to use)
 </available_tools>
 
 <instructions>
   ## Core Mindset
-  [How to think - domain expert principles]
+  [Domain expert principles]
 
-  ## Decision Framework
-  [How to analyze, research, decide]
+  ## Process Framework
+  [DIAGNOSE -> DECLARE -> PRESCRIBE -> REVIEW -> DELIVER]
 
   ## Quality Standards
   [Quality as identity, not checklist]
@@ -591,14 +803,17 @@ Both layers together = robust system.
 <examples>
   [2-4 COMPLEX examples showing full cognitive cycle]
   [Each: Analyze -> Research -> Decide -> Execute -> Review]
+  [Show tool mastery, verification loops, edge cases]
 </examples>
 
 <output_format>
-  ## Return Structure
-  [What to return in different scenarios]
+  ## Two Outputs (for Analysts)
+  1. Write full findings to workspace
+  2. Return brief summary to PM
 
-  ## Before Returning
-  [Self-review as identity check]
+  ## Completion Rules (for Specialists)
+  - ACTION tasks -> write_data MANDATORY
+  - ANALYSIS tasks -> return findings to PM
 </output_format>
 ```
 
