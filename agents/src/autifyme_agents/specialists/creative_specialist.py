@@ -14,7 +14,7 @@ Architecture:
 - Has inspect_schema (scoped to assets/product_images) for schema discovery
 - Has write_data (scoped to assets) for persisting processed images
 - Has read_data (scoped to assets + product images) for reference
-- Uses MultimodalInjectionMiddleware to SEE images in delegation messages
+- Uses view_image tool to see images from storage_path
 
 Storage Architecture:
 - Generated images are uploaded to pending/{thread_id}/ immediately
@@ -34,7 +34,6 @@ from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.middleware import MultimodalInjectionMiddleware
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.image_studio import create_image_studio_tool
 
@@ -62,16 +61,15 @@ def create_creative_specialist(
 ) -> dict[str, Any]:
     """Create Creative Specialist SubAgent spec.
 
-    The specialist receives images directly via MultimodalInjectionMiddleware.
-    When PM includes image paths in the task description, the middleware
-    loads and injects the images so the specialist's LLM can see them.
+    The specialist uses view_image tool to see images from storage_path.
+    PM passes storage_path in task description, specialist calls view_image to see it.
 
     Args:
         model: Optional LLM override. Defaults to Gemini 3 Pro (multimodal).
         storage: Optional storage client for image persistence to Supabase.
 
     Returns:
-        SubAgent spec dict: {name, description, tools, system_prompt, model, middleware}
+        SubAgent spec dict: {name, description, tools, system_prompt, model}
     """
     system_prompt = load_prompt("specialists/creative_specialist_lean.prompt")
 
@@ -113,17 +111,12 @@ def create_creative_specialist(
         temperature=1.0,
     )
 
-    # Multimodal middleware injects images from paths in delegation message
-    # FilesystemMiddleware (read_file for workspace) is provided by default via DeepAgents
-    middleware = [MultimodalInjectionMiddleware()]
-
     spec: dict[str, Any] = {
         "name": "creative_specialist",
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
         "model": specialist_model,
-        "middleware": middleware,
         "interrupt_on": {"write_data": True},  # HITL approval before write_data execution
     }
 
