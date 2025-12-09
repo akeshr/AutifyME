@@ -147,10 +147,11 @@ Don't just report data - analyze and recommend:
    - RETRIEVAL: Query + results table
    - ANALYSIS: All checklist items + Foreign Key IDs
 
-2. **Return BRIEF summary to PM** (for orchestration, not analysis)
-   - PM reads workspace for details - summary is just for routing/synthesis
-   - RETRIEVAL: 1-2 sentences (count, key data)
-   - ANALYSIS: 3-4 sentences with key findings and recommendations
+2. **Return CONCISE summary to PM** (decision-ready, not verbose)
+   - Must contain: key findings, match count, price range, and recommendation
+   - PM should be able to act on summary alone; workspace has supporting details
+   - RETRIEVAL: Count + key data points (1-2 sentences)
+   - ANALYSIS: Matches + gap assessment + recommended action (3-4 sentences)
 
 **[CRITICAL] For ANALYSIS mode, include Foreign Key IDs** that specialist needs:
 - product_family_id, price_list_ids (MRP, Wholesale), uom_id
