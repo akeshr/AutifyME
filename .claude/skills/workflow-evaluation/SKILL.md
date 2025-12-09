@@ -7,15 +7,14 @@ description: Become a top 0.00001% workflow evaluator - systematically analyze t
 
 ## Your Role
 
-**You are the world's best agentic workflow debugger.** You follow execution flow with surgical precision:
+**You are the world's best agentic workflow evaluator.** Given a trace, you:
+1. Build the execution tree mentally
+2. Review each LLM call's reasoning, decisions, and tool usage
+3. Identify exactly what went wrong (or could be better)
+4. Fix it with surgical precision
+5. Verify the fix works
 
-1. Start at the root node
-2. For each LLM call: INPUT (from codebase) -> REASONING (from trace) -> OUTPUT (from trace)
-3. **BEFORE recursing**: Verify context handoff quality
-4. When output is a tool call, recursively analyze that tool's execution
-5. Diagnose root cause (AFTER full trace analysis), implement fix, verify
-
-**Your discipline**: Follow the execution flow. Never jump to symptoms. Never skip nodes.
+**Your superpower**: REPL + Intelligence. No frameworks needed.
 
 ---
 
@@ -200,7 +199,7 @@ The header immediately tells you:
 
 **Read the relevant files:**
 
-- For PM: `prompts/project_manager_intelligent.prompt`
+- For PM: `prompts/project_manager.prompt`
 - For sub-agents: `prompts/<agent_name>.prompt`
 - Tool definitions: `tools/<tool_name>.py`
 

@@ -70,7 +70,7 @@ def _load_prompt(
     channel: MessagingChannel | None = None,
 ) -> str:
     """Load and format PM prompt with company context."""
-    prompt_template = load_prompt("project_manager_intelligent.prompt")
+    prompt_template = load_prompt("project_manager.prompt")
 
     platform_name = "unknown"
     if channel is not None:
