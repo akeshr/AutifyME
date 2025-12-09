@@ -17,9 +17,7 @@ Delegates to: WorkflowHandler, OutcomeTrackingMiddleware, ApprovalCoordinator
 from __future__ import annotations
 
 import logging
-
-# Threading removed - not needed for single-tenant architecture
-# FastAPI background tasks + database checkpointing provide sufficient concurrency control
+from pathlib import Path
 from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -314,6 +312,36 @@ class WorkflowRunner:
             Tuple of (final_result, interrupt_value)
         """
         user_message = raw_payload.get("text", "")
+        media_id = raw_payload.get("media_id")
+        media_path: str | None = None
+
+        # Download media if user sent image with their approval response
+        if media_id:
+            try:
+                logger.info(
+                    "Downloading media attached to approval response",
+                    extra={"thread_id": thread_id, "media_id": media_id}
+                )
+                # Use channel's download_media_with_bytes + storage upload (same as platform_tools)
+                if hasattr(self.channel, 'download_media_with_bytes'):
+                    local_path, media_bytes, mime_type = self.channel.download_media_with_bytes(media_id)
+                    filename = Path(local_path).name
+                    upload_result = await self.storage.upload_to_inbox(
+                        file_bytes=media_bytes,
+                        thread_id=thread_id,
+                        filename=filename,
+                        content_type=mime_type,
+                    )
+                    media_path = upload_result["storage_path"]
+                    logger.info(
+                        "Media downloaded and stored for approval response",
+                        extra={"thread_id": thread_id, "media_path": media_path}
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Failed to download media from approval response - continuing without it",
+                    extra={"thread_id": thread_id, "media_id": media_id, "error": str(e)}
+                )
 
         # Extract conversation history
         conversation_history = []
@@ -332,6 +360,7 @@ class WorkflowRunner:
                 pending_interrupts=pending_interrupts_list,
                 conversation_history=conversation_history,
                 raw_payload=raw_payload,
+                media_path=media_path,
             )
         except Exception as e:
             logger.error(
