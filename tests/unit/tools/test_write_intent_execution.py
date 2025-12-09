@@ -878,20 +878,28 @@ class TestValidation:
 
     @pytest.mark.asyncio
     async def test_validation_empty_operations_list(self, mock_storage):
-        """Test validation detects empty operations list."""
+        """Test validation detects empty operations list.
+
+        Pydantic validation raises ValidationError before tool execution
+        for invalid input structures like empty operations.
+        """
+        from pydantic import ValidationError
+
         tool = create_write_data_tool(mock_storage, tables=None)
 
-        # This should fail at Pydantic validation level (caught and returned as error response)
-        result = await tool.ainvoke({
-            "goal": "Test empty ops",
-            "reasoning": "Should fail",
-            "hitl_summary": TEST_HITL_SUMMARY,
-            "operations": [],  # Empty!
-            "impact": {}
-        })
+        # Empty operations fails at Pydantic validation level
+        with pytest.raises(ValidationError) as exc_info:
+            await tool.ainvoke({
+                "goal": "Test empty ops",
+                "reasoning": "Should fail",
+                "hitl_summary": TEST_HITL_SUMMARY,
+                "operations": [],  # Empty!
+                "impact": {}
+            })
 
-        assert result["success"] is False
-        assert "operations" in result["error"] or "empty" in result["error"].lower()
+        # Verify error mentions operations validation
+        error_str = str(exc_info.value).lower()
+        assert "operations" in error_str or "empty" in error_str
 
     @pytest.mark.asyncio
     async def test_validation_passes_for_valid_intent(self, mock_storage):

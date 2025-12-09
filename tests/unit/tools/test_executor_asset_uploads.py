@@ -572,6 +572,7 @@ class TestAssetUploadValidation:
         intent = WriteIntent(
             goal="Dry run with asset",
             reasoning="Test dry run",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(temp_path=temp_image_file, returns="image")
             ],
