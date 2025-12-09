@@ -175,37 +175,33 @@ PM: "Find similar items. Read /workspace/findings/visual.md for details."
 1. read_file("/workspace/findings/visual.md")
    -> Read visual context first
 
-2. write_todos([
-     {"content": "Search products for brass handles", "status": "in_progress"},
-     {"content": "Analyze pricing patterns", "status": "pending"},
-     {"content": "Write findings to workspace", "status": "pending"}
-   ])
-
-3. read_data(
+2. read_data(
      table="products",
      search_patterns={"name": "%brass%handle%"},
      columns=["id", "name", "sku_code"]
    )
    -> Found 3 brass handles (get IDs first, no relations yet)
 
-4. read_data(
+3. read_data(
      table="products",
      ids=["id1", "id2", "id3"],
      relations=["product_families(name,sku_prefix)"]
    )
    -> Batch fetch with relations for found products only
 
-5. aggregate_data(
+4. aggregate_data(
      table="product_prices",
      aggregates={"avg_price": "avg(price)", "min_price": "min(price)", "max_price": "max(price)"},
      filters={"product_id": ["id1", "id2", "id3"]}
    )
    -> Avg Rs 533, Range Rs 450-650
 
-6. write_todos([...mark all completed...])
+5. write_file("/workspace/findings/catalog.md", """[full analysis below]""")
 </your_action>
 
-<your_response>
+<workspace_content>
+# Catalog Strategy Analysis
+
 **Visual Context**
 - Product: Brass Art Deco door handle, 1930s, good condition
 
@@ -246,8 +242,17 @@ PM: "Find similar items. Read /workspace/findings/visual.md for details."
 - Suggested Wholesale: Rs 440 (maintains 20% margin)
 - Positioning: Premium specialist - vintage collectors, interior designers
 
+**Foreign Key IDs**
+- product_family_id: fam-vintage-123
+- price_list_ids: MRP=pl-mrp-001, Wholesale=pl-ws-001
+- uom_id: uom-piece-001
+
 **Confidence:** High (clear matches, strategic opportunity identified)
-</your_response>
+</workspace_content>
+
+<pm_summary>
+"Found 3 similar brass handles at Rs 450-600 in 'Vintage Hardware' family. No Art Deco specific category exists - this is a NEW_CATEGORY opportunity for premium collectors. Recommend: SKU HANDLE-DECO-BRASS-STD at Rs 550 MRP (mid-range). Low cannibalization risk."
+</pm_summary>
 </example>
 
 <example scenario="New product category research">
@@ -259,33 +264,27 @@ PM: "Check catalog for product in /workspace/findings/visual.md"
 <your_action>
 1. read_file("/workspace/findings/visual.md")
 
-2. write_todos([
-     {"content": "Find PET jar products in catalog", "status": "in_progress"},
-     {"content": "Check for honeycomb variant", "status": "pending"},
-     {"content": "Analyze pricing and write findings", "status": "pending"}
-   ])
-
-3. read_data(
+2. read_data(
      table="products",
      search_patterns={"name": "%PET%jar%500%"},
      columns=["id", "name", "sku_code"]
    )
    -> Zero results (too specific)
 
-4. read_data(
+3. read_data(
      table="products",
      search_patterns={"name": "%PET%jar%"},
      columns=["id", "name", "sku_code", "product_family_id"]
    )
    -> Found 3 PET jars (broader search worked)
 
-5. read_data(
+4. read_data(
      table="products",
      search_patterns={"name": "%honeycomb%"}
    )
    -> No matches (gap identified: no honeycomb variants)
 
-6. aggregate_data(
+5. aggregate_data(
      table="product_prices",
      aggregates={"avg_price": "avg(price)", "count": "count(*)"},
      group_by=["price_list_id"],
@@ -293,10 +292,12 @@ PM: "Check catalog for product in /workspace/findings/visual.md"
    )
    -> MRP avg Rs 35, Wholesale avg Rs 28
 
-7. write_todos([...mark all completed...])
+6. write_file("/workspace/findings/catalog.md", """[full analysis below]""")
 </your_action>
 
-<your_response>
+<workspace_content>
+# Catalog Strategy Analysis
+
 **Visual Context**
 - Product: Clear PET jar, 500ml, honeycomb texture
 
@@ -338,8 +339,17 @@ PM: "Check catalog for product in /workspace/findings/visual.md"
 - Suggested Wholesale: Rs 34 (maintains margin)
 - Positioning: Premium variant within value family - "everyday premium"
 
+**Foreign Key IDs**
+- product_family_id: fam-pet-jars-456
+- price_list_ids: MRP=pl-mrp-001, Wholesale=pl-ws-001
+- uom_id: uom-piece-001
+
 **Confidence:** High (family exists, clear gap, pricing logic solid)
-</your_response>
+</workspace_content>
+
+<pm_summary>
+"Found 3 similar PET jars at Rs 25-55 in 'PET Jars' family. No honeycomb/textured variant exists - this is a NEW_VARIANT opportunity for premium tier. Recommend: SKU JAR-PET-500ML-HONEYCOMB at Rs 42 MRP (20% texture premium). Low-Medium cannibalization risk with smooth variant."
+</pm_summary>
 </example>
 
 <example scenario="Retrieval - data request">
@@ -415,9 +425,13 @@ PM: "Analyze the pricing pattern for glass bottles"
    )
    -> MRP: avg Rs 52, range Rs 35-85
    -> Wholesale: avg Rs 42, range Rs 28-70
+
+4. write_file("/workspace/findings/catalog.md", """[full analysis below]""")
 </your_action>
 
-<your_response>
+<workspace_content>
+# Catalog Strategy Analysis
+
 **Glass Bottles Pricing Pattern**
 
 **Products in Family**
@@ -450,8 +464,12 @@ PM: "Analyze the pricing pattern for glass bottles"
 - 350ml glass bottle: Rs 45 MRP, Rs 36 wholesale
 - Consider amber glass variant at 15% premium
 
+**Foreign Key IDs**
+- product_family_id: fam-123
+- price_list_ids: MRP=pl-mrp-001, Wholesale=pl-ws-001
+
 **Confidence:** High (complete family data available)
-</your_response>
+</workspace_content>
 
 <pm_summary>
 "Glass bottles show consistent 20% margin, ~Rs 0.08/ml pricing. Gap at 350ml and no premium variants. Recommend: 350ml at Rs 45 MRP, consider amber glass premium tier."
