@@ -11,6 +11,9 @@ import pytest
 
 from tests.fixtures.fake_storage import FakeStorage
 
+# Standard HITL summary for all tests
+TEST_HITL_SUMMARY = "Test operation. Reply *approve* to proceed or *reject* to cancel."
+
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -340,6 +343,7 @@ class TestExecutorMoveOperation:
         intent = WriteIntent(
             goal="Create asset record for generated image",
             reasoning="Moving approved image to products and creating record",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(
                     storage_path=pending_result["storage_path"],
@@ -409,6 +413,7 @@ class TestEndToEndImageFlow:
         intent = WriteIntent(
             goal="Create asset from user-uploaded image",
             reasoning="User sent product image via WhatsApp",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[],  # No upload needed - already in inbox
             operations=[
                 Operation(
@@ -456,6 +461,7 @@ class TestEndToEndImageFlow:
         intent = WriteIntent(
             goal="Approve and store AI-generated lifestyle shot",
             reasoning="User approved the generated image",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(
                     storage_path=pending_result["storage_path"],

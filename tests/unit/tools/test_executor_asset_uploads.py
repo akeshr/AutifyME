@@ -19,6 +19,9 @@ from autifyme_agents.tools.data_engine._executor import (
 )
 from tests.fixtures.fake_storage import FakeStorage
 
+# Standard HITL summary for all tests
+TEST_HITL_SUMMARY = "Test operation. Reply *approve* to proceed or *reject* to cancel."
+
 
 @pytest.fixture
 def storage():
@@ -98,6 +101,7 @@ class TestAssetUploadSchema:
         intent = WriteIntent(
             goal="Create product with image",
             reasoning="Testing asset upload flow",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(
                     temp_path="/tmp/product.png",
@@ -122,6 +126,7 @@ class TestAssetUploadSchema:
         intent = WriteIntent(
             goal="Create product without image",
             reasoning="No assets needed",
+            hitl_summary=TEST_HITL_SUMMARY,
             operations=[
                 Operation(
                     action="create",
@@ -150,6 +155,7 @@ class TestExecutorAssetUploads:
         intent = WriteIntent(
             goal="Create product with image",
             reasoning="Test upload flow",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(
                     temp_path=temp_image_file,
@@ -191,6 +197,7 @@ class TestExecutorAssetUploads:
         intent = WriteIntent(
             goal="Create asset record with URL",
             reasoning="Test reference resolution",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(
                     temp_path=temp_image_file,
@@ -228,6 +235,7 @@ class TestExecutorAssetUploads:
         intent = WriteIntent(
             goal="Create product with multiple images",
             reasoning="Test multi-upload",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(
                     temp_path=temp_image_file,
@@ -274,6 +282,7 @@ class TestExecutorAssetUploads:
         intent = WriteIntent(
             goal="Upload to marketing bucket",
             reasoning="Test custom bucket",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(
                     temp_path=temp_image_file,
@@ -325,6 +334,7 @@ class TestAssetRollbackOnError:
         _ = WriteIntent(
             goal="Create product with duplicate SKU",
             reasoning="Test rollback",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(
                     temp_path=temp_image_file,
@@ -354,6 +364,7 @@ class TestAssetRollbackOnError:
         intent = WriteIntent(
             goal="Create product successfully",
             reasoning="Test no rollback on success",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(
                     temp_path=temp_image_file,
@@ -394,6 +405,7 @@ class TestAssetRollbackOnError:
         intent = WriteIntent(
             goal="Create with multiple images",
             reasoning="Test multi-asset rollback",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(temp_path=temp_image_file, returns="image1"),
                 AssetUpload(temp_path=temp_jpeg_file, returns="image2"),
@@ -429,6 +441,7 @@ class TestAssetReferenceResolution:
         intent = WriteIntent(
             goal="Create asset with size",
             reasoning="Test size resolution",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(temp_path=temp_image_file, returns="uploaded_file")
             ],
@@ -458,6 +471,7 @@ class TestAssetReferenceResolution:
         intent = WriteIntent(
             goal="Create asset with content type",
             reasoning="Test content type resolution",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(temp_path=temp_image_file, returns="uploaded_file")
             ],
@@ -487,6 +501,7 @@ class TestAssetReferenceResolution:
         intent = WriteIntent(
             goal="Create asset with storage path",
             reasoning="Test storage path resolution",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(
                     temp_path=temp_image_file,
@@ -530,6 +545,7 @@ class TestAssetUploadValidation:
         intent = WriteIntent(
             goal="Create with missing file",
             reasoning="Test file not found",
+            hitl_summary=TEST_HITL_SUMMARY,
             asset_uploads=[
                 AssetUpload(
                     temp_path="/nonexistent/path.png",
