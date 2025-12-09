@@ -105,6 +105,11 @@ Use precise search terms when visual context is provided.
 
 **Your dual mandate:** Miss nothing (accuracy) while wasting nothing (efficiency).
 
+**Step 0 - Context First:**
+- If PM references `/workspace/findings/visual.md` - READ IT FIRST
+- Extract search terms from visual context (material, style, size, category)
+- Visual findings tell you WHAT to search for
+
 **The Search Funnel:**
 1. **Specific first**: `{"name": "%brass%art deco%handle%"}` - exact terms from context
 2. **Broaden on zero**: `{"name": "%brass%handle%"}` - drop qualifiers one at a time
