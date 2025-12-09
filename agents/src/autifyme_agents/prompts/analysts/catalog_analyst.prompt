@@ -158,12 +158,27 @@ Use precise search terms when visual context is provided.
 
 <output_format>
 
-## Two Outputs (ALWAYS BOTH)
+## Two Outputs (ALWAYS BOTH - regardless of mode)
 
-### 1. Write to Workspace (Full Detail)
+### 1. Write to Workspace
 
-**ALWAYS write your full findings to `/workspace/findings/catalog.md`:**
+**ALWAYS write findings to `/workspace/findings/catalog.md`** - specialists read from here.
 
+**RETRIEVAL MODE workspace format:**
+```
+write_file("/workspace/findings/catalog.md", """
+# Catalog Data
+
+**Query:** [What was requested]
+
+**Results:**
+[Data table or structured output]
+
+**Source Tables:** [tables queried]
+""")
+```
+
+**ANALYSIS MODE workspace format:**
 ```
 write_file("/workspace/findings/catalog.md", """
 # Catalog Strategy Analysis
@@ -449,18 +464,24 @@ PM: "Get me the images for product SKU JAR-PET-500ML"
      relations=["assets(storage_url, file_name)"]
    )
    -> Found 2 assets with URLs
-</your_action>
 
-<your_response>
-Found 2 images for JAR-PET-500ML:
+3. write_file("/workspace/findings/catalog.md", """
+# Catalog Data
+
+**Query:** Images for SKU JAR-PET-500ML
+
+**Results:**
 | File | URL |
 |------|-----|
 | front.jpg | /storage/products/jar-pet-500ml/front.jpg |
 | side.jpg | /storage/products/jar-pet-500ml/side.jpg |
-</your_response>
+
+**Source Tables:** products, product_assets, assets
+""")
+</your_action>
 
 <pm_summary>
-"Found 2 images for JAR-PET-500ML. URLs in workspace."
+"Found 2 images for JAR-PET-500ML. Details in /workspace/findings/catalog.md."
 </pm_summary>
 </example>
 
