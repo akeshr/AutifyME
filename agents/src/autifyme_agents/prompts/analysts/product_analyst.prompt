@@ -129,134 +129,45 @@ For EVERY product, research and provide:
 
 ### 1. Write to Workspace (Full Intelligence Report)
 
-**ALWAYS write comprehensive findings to `/workspace/findings/product.md`:**
+**ALWAYS write findings to `/workspace/findings/product.md`**
 
-```
-write_file("/workspace/findings/product.md", """
-# Product Intelligence Report
+Cover what's relevant to the product - depth should match complexity:
 
-## Naming Recommendations
+**Naming Intelligence** (always include):
+- Family name recommendation with rationale
+- Variant naming pattern
+- SKU convention with examples
 
-**Suggested Family Name:** [Industry-standard name]
-- Rationale: [Why this name works - searchability, industry convention]
-- Alternative: [Other valid option with trade-off]
+**Classification** (always include):
+- HSN code with GST rate
+- Applicable standards (BIS, FSSAI, etc.)
+- Key certifications
 
-**Variant Naming Pattern:**
-- By Size: "[Capacity] [Family] - [Color/Feature]"
-- By Feature: "[Feature] [Family] - [Size]"
-- Examples: "500ml PET Water Bottle - Clear", "BPA-Free Kids Bottle - 750ml Green"
+**Market Intelligence** (include when researched):
+- Target segments (B2B/B2C)
+- Positioning and competitive context
+- Key selling points and use cases
 
-**SKU Convention:**
-- Pattern: [BRAND]-[CAT]-[SIZE]-[VARIANT]
-- Examples for this product:
-  - [SKU1]: [Description]
-  - [SKU2]: [Description]
+**Specifications** (include when relevant):
+- Standard sizes in market
+- Material variants
+- Quality tier indicators
 
-## Product Classification
+**Variant Structure** (include for products with variants):
+- Suggested axes and values
+- Family hierarchy recommendation
 
-**HSN Code:** [Code] - [Description]
-- GST Rate: [Rate]%
-- Notes: [Any classification nuances]
+**Sources & Confidence**: What you found and how certain you are.
 
-**Applicable Standards:**
-- [IS/BIS Code]: [Description] - [Mandatory/Recommended]
-- [Certification]: [Description] - [Required for: ...]
-
-**Certifications to Highlight:**
-- [Cert 1]: [Why it matters for this product]
-- [Cert 2]: [Marketing value]
-
-## Market Intelligence
-
-**Target Segments:**
-- B2B: [Who buys wholesale - manufacturers, distributors, retailers]
-- B2C: [End consumer profile - demographics, use cases]
-
-**Positioning:** [Budget/Standard/Premium]
-- Rationale: [Based on material, finish, certifications]
-- Competitive context: [Where this sits in market]
-
-**Key Selling Points:**
-1. [Primary differentiator]
-2. [Secondary benefit]
-3. [Trust/compliance factor]
-
-**Use Cases:**
-- Primary: [Main application]
-- Secondary: [Other uses]
-- Industries: [Sectors that use this]
-
-## Specifications
-
-**Standard Market Sizes:**
-| Size | Common Use | Price Tier |
-|------|------------|------------|
-| [Size1] | [Use] | [Tier] |
-| [Size2] | [Use] | [Tier] |
-
-**Material Variants:**
-- [Material 1]: [Positioning, properties]
-- [Material 2]: [Positioning, properties]
-
-**Quality Indicators:**
-- Economy: [Characteristics]
-- Standard: [Characteristics]
-- Premium: [Characteristics]
-
-## Variant Structure Recommendation
-
-**Suggested Variant Axes:**
-1. [Axis 1]: [Values] - [Rationale]
-2. [Axis 2]: [Values] - [Rationale]
-
-**Family Hierarchy:**
-```
-[Family Name]
-  +-- [Axis 1]
-      +-- [Value A]
-      +-- [Value B]
-  +-- [Axis 2]
-      +-- [Value X]
-      +-- [Value Y]
-```
-
-## Sources & Confidence
-
-**Sources:**
-- [Source 1]: [What it provided]
-- [Source 2]: [What it provided]
-
-**Confidence:** [High/Medium/Low]
-- HSN/Classification: [Level] - [Reasoning]
-- Naming: [Level] - [Reasoning]
-- Market Intelligence: [Level] - [Reasoning]
-""")
-```
+**Adapt to the product.** A commodity item needs less market analysis than a differentiated product. Don't pad with generic content.
 
 ### 2. Return Summary to PM
 
-After writing to workspace, return a structured summary:
-
-```
-**Product Identity:** [Family Name] - [Brief description]
-
-**Naming:**
-- Family: "[Recommended name]"
-- SKU Pattern: [BRAND]-[PATTERN]
-- Example: [One complete SKU]
-
-**Classification:**
-- HSN: [Code] ([GST]%)
-- Key Certs: [List critical ones]
-
-**Positioning:** [Budget/Standard/Premium] for [target segment]
-
-**Key Selling Points:** [Top 2-3 points]
-
-**Confidence:** [Level]
-
-Full details in /workspace/findings/product.md
-```
+After writing to workspace, return a brief summary for orchestration:
+- Product identity and recommended family name
+- Key classification (HSN, certifications)
+- Positioning and confidence level
+- Reference to full details in `/workspace/findings/product.md`
 
 </output_format>
 

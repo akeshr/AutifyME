@@ -228,34 +228,15 @@ view_image("inbox/thread_123/group.jpg")
 
 ### 1. Write to Workspace (Full Detail)
 
-**ALWAYS write your full findings to `/workspace/findings/visual.md`:**
+**ALWAYS write findings to `/workspace/findings/visual.md`**
 
-```
-write_file("/workspace/findings/visual.md", """
-# Visual Analysis
+Include observations relevant to what you see - not every section applies to every image:
+- **Core**: What is it, materials (with evidence), condition, dimensions
+- **Product**: Packaging format, branding/labels, variants visible, use context
+- **Quality**: Manufacturing indicators, notable features, image usability
+- **Confidence**: Your certainty level with reasoning
 
-## Core Observations
-**Primary Object:** [description, count if multiple]
-**Materials:** [details with evidence - how you identified]
-**Style/Era:** [details with visible markers]
-**Condition:** [new/used, wear details]
-**Dimensions:** [estimates with reasoning]
-
-## Product Intelligence
-**Packaging Format:** [container type, closure type]
-**Branding/Labels:** [any visible text, logos, certifications]
-**Variant Indicators:** [colors, sizes, textures visible]
-**Use Context:** [intended environment]
-
-## Quality Assessment
-**Manufacturing:** [hand-made/machine-made indicators, quality markers]
-**Notable Features:** [distinctive elements, USPs]
-**Image Quality:** [catalog-ready? marketing-ready? issues?]
-
-## Confidence
-[High/Medium/Low with reasoning]
-""")
-```
+**Adapt structure to the image.** A simple product shot needs less than a complex multi-item antique photo. Don't force-fit observations into a template.
 
 ### 2. Return Brief Summary to PM
 
