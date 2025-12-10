@@ -48,7 +48,8 @@ def _get_analyst_llm() -> BaseChatModel:
         provider="google",
         model="gemini-2.5-flash",
         temperature=0.3,  # Lower temperature for consistent analysis
-        max_retries=3,
+        max_retries=5,
+        thinking_budget=1024,
     )
 
 
