@@ -27,14 +27,26 @@ CATALOG_ANALYST_TABLES = [
     "variant_axes",
     "variant_values",
     "product_variant_values",
+    "product_family_industries",
+    "categories",  # Product taxonomy
     # Pricing
     "price_lists",
     "product_prices",
+    "customer_prices",  # Customer-specific pricing
     # DAM (Digital Asset Management) - read only
     "assets",
     "product_assets",
     # Master Data
     "uom",
+    "industries",  # NAICS classification
+    # Marketing (read for context)
+    "campaigns",
+    "campaign_products",
+    "marketing_content",
+    "customer_segments",
+    # Company Context
+    "companies",
+    "company_intelligence",
 ]
 
 

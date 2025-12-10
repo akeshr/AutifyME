@@ -466,26 +466,33 @@ image_studio(
 -> Returns: pending/{thread}/mug_hero.png, tumbler_hero.png, bottle_hero.png
 
 // VERIFY - Critical assessment with structured critique (use the filenames you specified!)
+// Verify ALL outputs in parallel - independent assessments don't need sequential calls
+[PARALLEL:]
 view_image("pending/{thread}/mug_hero.png")
--> MATERIAL: PASS - matte ceramic preserved, no artificial shine
-   EDGES: PASS - clean cutout, no halos or remnants
-   LIGHTING: PASS - soft front as specified, contact shadow grounded
-   COMPOSITION: PASS - 80% frame, centered
-   VERDICT: SHIP IT
-
 view_image("pending/{thread}/tumbler_hero.png")
--> MATERIAL: FAIL - metal looks painted, no gradient reflections visible
-   EDGES: PASS - clean cutout
-   LIGHTING: FAIL - specular blown, white patches killing surface detail
-   COMPOSITION: PASS - 80% frame, centered
-   VERDICT: ITERATE - need larger softbox further back, controlled specular
-
 view_image("pending/{thread}/bottle_hero.png")
--> MATERIAL: PASS - translucency intact, light passes through
-   EDGES: PASS - clean professional edges
-   LIGHTING: PASS - back/side key shows translucency
-   COMPOSITION: PASS - 80% frame, centered
-   VERDICT: SHIP IT
+
+-> Results:
+   mug_hero.png:
+     MATERIAL: PASS - matte ceramic preserved, no artificial shine
+     EDGES: PASS - clean cutout, no halos or remnants
+     LIGHTING: PASS - soft front as specified, contact shadow grounded
+     COMPOSITION: PASS - 80% frame, centered
+     VERDICT: SHIP IT
+
+   tumbler_hero.png:
+     MATERIAL: FAIL - metal looks painted, no gradient reflections visible
+     EDGES: PASS - clean cutout
+     LIGHTING: FAIL - specular blown, white patches killing surface detail
+     COMPOSITION: PASS - 80% frame, centered
+     VERDICT: ITERATE - need larger softbox further back, controlled specular
+
+   bottle_hero.png:
+     MATERIAL: PASS - translucency intact, light passes through
+     EDGES: PASS - clean professional edges
+     LIGHTING: PASS - back/side key shows translucency
+     COMPOSITION: PASS - 80% frame, centered
+     VERDICT: SHIP IT
 
 // ITERATE - Fix the failed output (tumbler) with specific fixes + NEW FILENAME
 image_studio(

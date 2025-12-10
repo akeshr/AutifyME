@@ -85,7 +85,7 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
     prompt_text = load_prompt("approval_analyzer.prompt")
 
     # Build prompt template
-    # Input variables: pending_interrupts, user_message, conversation_history
+    # Input variables: pending_interrupts, user_message, has_media, conversation_history
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", prompt_text),
         ("human", """**Conversation History:**
@@ -94,10 +94,13 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
 **Pending Interrupts:**
 {pending_interrupts_formatted}
 
+**Has Media Attachment:** {has_media}
+
 **Current User Message:**
 {user_message}
 
 Use the conversation history to understand context and resolve references (e.g., "the cheaper one", "same description", "make it 25").
+If has_media is True and user message contains product details (not explicit approval), treat as NEW INFORMATION (reject to pass to specialist).
 Analyze the user's response and return BatchApprovalResponse with exactly {interrupt_count} responses (one per interrupt)."""),
     ])
 
@@ -106,6 +109,7 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
         """Format inputs for prompt template."""
         pending_interrupts = inputs["pending_interrupts"]
         user_message = inputs.get("user_message", "")
+        has_media = inputs.get("has_media", False)
         conversation_history = inputs.get("conversation_history", [])
 
         # Format interrupts for display - show only high-level summary
@@ -156,6 +160,7 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
                 else "(No prior conversation)"
             ),
             "pending_interrupts_formatted": "\n".join(interrupt_lines),
+            "has_media": "True" if has_media else "False",
             "user_message": user_message,
             "interrupt_count": len(pending_interrupts),
         }
@@ -174,6 +179,7 @@ def analyze_approval(
     pending_interrupts: list[InterruptInfo],
     user_message: str,
     conversation_history: list[Any] | None = None,
+    has_media: bool = False,
     llm: BaseChatModel | None = None,
     run_id: str | None = None,
 ) -> BatchApprovalResponse:
@@ -183,6 +189,7 @@ def analyze_approval(
         pending_interrupts: List of InterruptInfo objects
         user_message: User's approval/rejection message
         conversation_history: Full conversation history for context (helps resolve ambiguous references)
+        has_media: Whether user attached media (image) with their response
         llm: Optional LLM override
         run_id: Optional run_id to use as trace_id in LangSmith
 
@@ -209,6 +216,7 @@ def analyze_approval(
             {
                 "pending_interrupts": interrupts_as_dicts,
                 "user_message": user_message,
+                "has_media": has_media,
                 "conversation_history": conversation_history or [],
             },
             config=config if config else None,
