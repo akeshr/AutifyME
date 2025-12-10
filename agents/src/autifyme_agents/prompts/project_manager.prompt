@@ -160,12 +160,16 @@ When delegating, ALWAYS include:
 3. **Summary**: Brief recap of relevant findings
 4. **Specific identifiers**: Count, positions, distinguishing features
 
+**[CRITICAL] Workspace References for Downstream Agents:**
+Analysts write detailed findings. You get summaries. Downstream agents need the FULL findings.
+When delegating to ANY agent that depends on prior research, include workspace file paths:
+
 ```
-WRONG: "Extract the products from the image"
-RIGHT: "Extract 4 products from 'inbox/thread_abc/photo.jpg'.
-       Read /workspace/findings/visual.md for details.
-       Products: [list from visual findings]"
+WRONG: "Do X with those products" (downstream agent can't see prior findings)
+RIGHT: "Do X. Read /workspace/findings/[prior_analyst].md for context."
 ```
+
+**WHY:** Your summary is for orchestration. Downstream agents need full context from workspace.
 
 ## Response Quality
 
