@@ -4,32 +4,13 @@ Context management strategies for PM and agents.
 Provides custom ContextEdit implementations for intelligent context pruning.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Protocol
 
-from langchain_core.messages import BaseMessage, ToolMessage
+from langchain_core.messages import AnyMessage, BaseMessage, ToolMessage
 
-
-class TokenCounter(Protocol):
-    """Protocol for counting tokens in messages."""
-
-    def __call__(self, messages: Sequence[BaseMessage]) -> int:
-        """Count tokens in message sequence."""
-        ...
-
-
-class ContextEdit(Protocol):
-    """Protocol for context editing strategies."""
-
-    def apply(
-        self,
-        messages: list[BaseMessage],
-        *,
-        count_tokens: TokenCounter,
-    ) -> None:
-        """Apply edit to messages in place."""
-        ...
+# Type alias matching LangChain's expected signature
+TokenCounter = Callable[[Sequence[BaseMessage]], int]
 
 
 @dataclass
@@ -65,7 +46,7 @@ class TruncateToolResultsEdit:
 
     def apply(
         self,
-        messages: list[BaseMessage],
+        messages: list[AnyMessage],
         *,
         count_tokens: TokenCounter,
     ) -> None:
@@ -135,7 +116,7 @@ class GraduatedTruncationEdit:
 
     def apply(
         self,
-        messages: list[BaseMessage],
+        messages: list[AnyMessage],
         *,
         count_tokens: TokenCounter,
     ) -> None:
@@ -216,7 +197,7 @@ class HybridTruncateThenClearEdit:
 
     def apply(
         self,
-        messages: list[BaseMessage],
+        messages: list[AnyMessage],
         *,
         count_tokens: TokenCounter,
     ) -> None:
@@ -234,7 +215,7 @@ class HybridTruncateThenClearEdit:
 
     def _truncate_phase(
         self,
-        messages: list[BaseMessage],
+        messages: list[AnyMessage],
         count_tokens: TokenCounter,
     ) -> None:
         """Truncate old tool results."""
@@ -266,7 +247,7 @@ class HybridTruncateThenClearEdit:
 
     def _clear_phase(
         self,
-        messages: list[BaseMessage],
+        messages: list[AnyMessage],
         count_tokens: TokenCounter,
     ) -> None:
         """Clear oldest tool results completely."""

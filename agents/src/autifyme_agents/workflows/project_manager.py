@@ -209,9 +209,9 @@ async def create_project_manager(
         handle_errors=True,  # Retry on parse errors
     )
 
-    # Aggressive context management: Truncate ALL tool results at 30k tokens
-    # This prevents context bloat from specialists, schemas, and data queries
-    # Truncation preserves first 500 chars (summaries) while saving tokens
+    # Aggressive context management: Truncate data tools at 30k tokens
+    # Task tool (subagent calls) preserved - contains specialist decisions
+    # Other tools (schema, read_data, etc.) truncated - raw data can be re-fetched
     pm_middleware = [
         ContextEditingMiddleware(
             edits=[
@@ -221,7 +221,7 @@ async def create_project_manager(
                     max_truncate_length=500,  # Keep first 500 chars of each result
                     keep_recent_truncate=3,  # Don't truncate last 3 results
                     keep_recent_clear=5,  # Don't clear last 5 results
-                    exclude_tools=(),  # Truncate everything - no exceptions
+                    exclude_tools=("task",),  # Preserve subagent results
                 )
             ]
         )
