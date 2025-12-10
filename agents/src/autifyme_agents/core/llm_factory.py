@@ -32,7 +32,7 @@ def get_llm(
     ] | None = None,
     image_size: Literal["1K", "2K", "4K"] | None = None,
     # Retry configuration for Gemini blank response handling
-    max_retries: int = 3,
+    max_retries: int = 5,
     retry_base_delay: float = 1.0,
 ) -> BaseChatModel:
     """
