@@ -41,6 +41,7 @@ CATALOG_TABLES_CRUD = [
     "product_variant_values",
     "product_family_industries",
     "customer_segments",
+    "categories",  # Product taxonomy hierarchy
     # DAM (Digital Asset Management)
     "assets",
     "product_assets",
@@ -49,6 +50,7 @@ CATALOG_TABLES_CRUD = [
     # Pricing
     "price_lists",
     "product_prices",
+    "customer_prices",  # Customer-specific pricing
     # Manufacturing (BOM)
     "bom",
     "bom_lines",
@@ -59,6 +61,9 @@ CATALOG_TABLES_CRUD = [
 CATALOG_TABLES_READ_ONLY = [
     "uom",
     "uom_conversion",
+    "industries",  # NAICS classification (read-only reference)
+    "companies",  # Single-tenant company info
+    "company_intelligence",  # Auto-discovered brand intel
 ]
 
 CATALOG_TABLES_ALL = CATALOG_TABLES_CRUD + CATALOG_TABLES_READ_ONLY

@@ -98,6 +98,7 @@ class ApprovalCoordinator:
                 pending_interrupts=pending_interrupts,
                 user_message=user_message,
                 conversation_history=conversation_history,
+                has_media=media_path is not None,  # Signal if user sent media with response
                 run_id=approval_run_id,
             )
 

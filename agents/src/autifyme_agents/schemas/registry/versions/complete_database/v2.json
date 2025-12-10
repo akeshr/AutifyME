@@ -3417,6 +3417,1171 @@
       ],
       "business_rules": [],
       "indexes": ["product_family_id", "product_id", "customer_segment_id", "campaign_id", "platform", "content_type", "is_active"]
+    },
+    "categories": {
+      "name": "categories",
+      "description": "Hierarchical product taxonomy. Single-tenant: all categories belong to THE company. Products link via product_families.category_id.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "default": "gen_random_uuid()",
+          "description": "Primary key"
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "categories.id",
+          "description": "Parent category for hierarchy (NULL for root categories)"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "description": "Category display name"
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "nullable": false,
+          "unique": true,
+          "description": "URL-friendly unique identifier"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "description": "Category description"
+        },
+        "google_product_category": {
+          "name": "google_product_category",
+          "type": "text",
+          "nullable": true,
+          "description": "Google Product Category ID for shopping feeds"
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "description": "Display order within parent"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Whether category is active"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "categories",
+          "foreign_key": "parent_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Self-referential hierarchy"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["parent_id", "slug", "is_active", "sort_order"]
+    },
+    "industries": {
+      "name": "industries",
+      "description": "NAICS 2022 industry classification. Hierarchical taxonomy for multi-industry product targeting.",
+      "columns": {
+        "naics_code": {
+          "name": "naics_code",
+          "type": "text",
+          "nullable": false,
+          "primary_key": true,
+          "description": "NAICS code (2-6 digits)",
+          "pattern": "^[0-9]{2,6}$"
+        },
+        "parent_code": {
+          "name": "parent_code",
+          "type": "text",
+          "nullable": true,
+          "references": "industries.naics_code",
+          "description": "Parent NAICS code for hierarchy"
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "nullable": false,
+          "description": "Industry label/name"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "description": "Industry description"
+        },
+        "level": {
+          "name": "level",
+          "type": "integer",
+          "nullable": false,
+          "description": "Hierarchy level (1-6)",
+          "valid_values": [1, 2, 3, 4, 5, 6]
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Whether active"
+        },
+        "naics_year": {
+          "name": "naics_year",
+          "type": "integer",
+          "nullable": false,
+          "default": "2022",
+          "description": "NAICS classification year"
+        }
+      },
+      "primary_key": "naics_code",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "industries",
+          "foreign_key": "parent_code",
+          "target_column": "naics_code",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Self-referential hierarchy"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["parent_code", "level", "is_active"]
+    },
+    "campaigns": {
+      "name": "campaigns",
+      "description": "Marketing campaigns with budget, timeline, and performance tracking. Central entity for campaign management.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "default": "gen_random_uuid()",
+          "description": "Primary key"
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "text",
+          "nullable": false,
+          "unique": true,
+          "description": "Business-friendly campaign identifier"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "description": "Campaign name"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "description": "Campaign description"
+        },
+        "campaign_type": {
+          "name": "campaign_type",
+          "type": "text",
+          "nullable": false,
+          "description": "Campaign type classification",
+          "valid_values": ["product_launch", "seasonal", "promotional", "awareness", "retention", "acquisition"]
+        },
+        "campaign_category": {
+          "name": "campaign_category",
+          "type": "text",
+          "nullable": true,
+          "description": "Campaign category"
+        },
+        "primary_objective": {
+          "name": "primary_objective",
+          "type": "text",
+          "nullable": false,
+          "description": "Primary campaign goal",
+          "valid_values": ["sales", "awareness", "engagement", "traffic", "leads", "retention"]
+        },
+        "secondary_objectives": {
+          "name": "secondary_objectives",
+          "type": "array",
+          "nullable": true,
+          "element_type": "text",
+          "description": "Additional campaign objectives"
+        },
+        "target_audience_description": {
+          "name": "target_audience_description",
+          "type": "text",
+          "nullable": true,
+          "description": "Target audience description"
+        },
+        "total_budget": {
+          "name": "total_budget",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Total campaign budget"
+        },
+        "budget_currency": {
+          "name": "budget_currency",
+          "type": "text",
+          "nullable": true,
+          "default": "'INR'",
+          "description": "Budget currency (ISO 4217)"
+        },
+        "budget_allocation": {
+          "name": "budget_allocation",
+          "type": "jsonb",
+          "nullable": true,
+          "default": "'{}'::jsonb",
+          "description": "Per-channel budget breakdown"
+        },
+        "planned_start_date": {
+          "name": "planned_start_date",
+          "type": "date",
+          "nullable": false,
+          "description": "Planned start date"
+        },
+        "planned_end_date": {
+          "name": "planned_end_date",
+          "type": "date",
+          "nullable": false,
+          "description": "Planned end date"
+        },
+        "actual_start_date": {
+          "name": "actual_start_date",
+          "type": "date",
+          "nullable": true,
+          "description": "Actual start date"
+        },
+        "actual_end_date": {
+          "name": "actual_end_date",
+          "type": "date",
+          "nullable": true,
+          "description": "Actual end date"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "nullable": true,
+          "default": "'draft'",
+          "description": "Campaign status",
+          "valid_values": ["draft", "approved", "scheduled", "active", "paused", "completed", "cancelled"]
+        },
+        "approval_status": {
+          "name": "approval_status",
+          "type": "text",
+          "nullable": true,
+          "default": "'pending'",
+          "description": "Approval workflow status",
+          "valid_values": ["pending", "approved", "rejected", "revision_requested"]
+        },
+        "approved_by": {
+          "name": "approved_by",
+          "type": "text",
+          "nullable": true,
+          "description": "Approver identifier"
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Approval timestamp"
+        },
+        "target_metrics": {
+          "name": "target_metrics",
+          "type": "jsonb",
+          "nullable": true,
+          "default": "'{}'::jsonb",
+          "description": "Campaign KPI targets"
+        },
+        "total_impressions": {
+          "name": "total_impressions",
+          "type": "bigint",
+          "nullable": true,
+          "default": "0",
+          "description": "Total impressions"
+        },
+        "total_clicks": {
+          "name": "total_clicks",
+          "type": "bigint",
+          "nullable": true,
+          "default": "0",
+          "description": "Total clicks"
+        },
+        "total_conversions": {
+          "name": "total_conversions",
+          "type": "integer",
+          "nullable": true,
+          "default": "0",
+          "description": "Total conversions"
+        },
+        "total_spend": {
+          "name": "total_spend",
+          "type": "decimal",
+          "nullable": true,
+          "default": "0",
+          "description": "Total spend to date"
+        },
+        "generated_by": {
+          "name": "generated_by",
+          "type": "text",
+          "nullable": true,
+          "description": "AI model or user who generated"
+        },
+        "generation_prompt_version": {
+          "name": "generation_prompt_version",
+          "type": "text",
+          "nullable": true,
+          "description": "AI prompt version"
+        },
+        "specialist_versions": {
+          "name": "specialist_versions",
+          "type": "jsonb",
+          "nullable": true,
+          "default": "'{}'::jsonb",
+          "description": "Specialist versions used"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "default": "now()",
+          "description": "Last update timestamp"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "nullable": true,
+          "description": "Creator identifier"
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "nullable": true,
+          "description": "Last updater identifier"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [],
+      "business_rules": [],
+      "indexes": ["campaign_id", "status", "campaign_type", "planned_start_date", "planned_end_date"]
+    },
+    "campaign_products": {
+      "name": "campaign_products",
+      "description": "M:N junction linking campaigns to promoted products/families with promotion details.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "default": "gen_random_uuid()",
+          "description": "Primary key"
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "campaigns.id",
+          "description": "Campaign"
+        },
+        "product_family_id": {
+          "name": "product_family_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "product_families.id",
+          "description": "Product family (XOR with product_id)"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "products.id",
+          "description": "Specific product (XOR with product_family_id)"
+        },
+        "is_primary_product": {
+          "name": "is_primary_product",
+          "type": "boolean",
+          "nullable": true,
+          "default": "false",
+          "description": "Hero product for campaign"
+        },
+        "featured_order": {
+          "name": "featured_order",
+          "type": "integer",
+          "nullable": true,
+          "description": "Display order"
+        },
+        "promotion_type": {
+          "name": "promotion_type",
+          "type": "text",
+          "nullable": true,
+          "description": "Promotion type",
+          "valid_values": ["discount", "bundle", "bogo", "new_arrival", "clearance", "featured"]
+        },
+        "discount_percentage": {
+          "name": "discount_percentage",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Discount percentage"
+        },
+        "special_price": {
+          "name": "special_price",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Special campaign price"
+        },
+        "special_price_start": {
+          "name": "special_price_start",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Special price start"
+        },
+        "special_price_end": {
+          "name": "special_price_end",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Special price end"
+        },
+        "impressions": {
+          "name": "impressions",
+          "type": "bigint",
+          "nullable": true,
+          "default": "0",
+          "description": "Product impressions in campaign"
+        },
+        "clicks": {
+          "name": "clicks",
+          "type": "bigint",
+          "nullable": true,
+          "default": "0",
+          "description": "Product clicks"
+        },
+        "conversions": {
+          "name": "conversions",
+          "type": "integer",
+          "nullable": true,
+          "default": "0",
+          "description": "Product conversions"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "campaigns",
+          "foreign_key": "campaign_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Deleted when campaign deleted"
+        },
+        {
+          "type": "parent",
+          "target_table": "product_families",
+          "foreign_key": "product_family_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Product family link"
+        },
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Product link"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["campaign_id", "product_family_id", "product_id", "is_primary_product"]
+    },
+    "campaign_assets": {
+      "name": "campaign_assets",
+      "description": "Campaign creative asset library with approval workflow and versioning.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "default": "gen_random_uuid()",
+          "description": "Primary key"
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "campaigns.id",
+          "description": "Parent campaign"
+        },
+        "asset_type": {
+          "name": "asset_type",
+          "type": "text",
+          "nullable": false,
+          "description": "Asset type",
+          "valid_values": ["image", "video", "graphic", "logo", "banner"]
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "nullable": false,
+          "description": "Asset URL"
+        },
+        "alt_text": {
+          "name": "alt_text",
+          "type": "text",
+          "nullable": true,
+          "description": "Alt text for accessibility"
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "nullable": true,
+          "description": "Asset title"
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "nullable": true,
+          "description": "Width in pixels"
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "nullable": true,
+          "description": "Height in pixels"
+        },
+        "duration_seconds": {
+          "name": "duration_seconds",
+          "type": "integer",
+          "nullable": true,
+          "description": "Video duration"
+        },
+        "file_size_bytes": {
+          "name": "file_size_bytes",
+          "type": "bigint",
+          "nullable": true,
+          "description": "File size"
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "text",
+          "nullable": true,
+          "description": "MIME type"
+        },
+        "usage_context": {
+          "name": "usage_context",
+          "type": "array",
+          "nullable": true,
+          "element_type": "text",
+          "description": "Usage contexts (hero_banner, social_post, email_header)"
+        },
+        "platform_optimized_for": {
+          "name": "platform_optimized_for",
+          "type": "array",
+          "nullable": true,
+          "element_type": "text",
+          "description": "Platforms this asset is optimized for"
+        },
+        "is_approved": {
+          "name": "is_approved",
+          "type": "boolean",
+          "nullable": true,
+          "default": "false",
+          "description": "Approval status"
+        },
+        "approved_by": {
+          "name": "approved_by",
+          "type": "text",
+          "nullable": true,
+          "description": "Approver"
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Approval timestamp"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "nullable": true,
+          "default": "1",
+          "description": "Asset version"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": true,
+          "default": "true",
+          "description": "Whether active"
+        },
+        "times_used": {
+          "name": "times_used",
+          "type": "integer",
+          "nullable": true,
+          "default": "0",
+          "description": "Usage counter"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "default": "now()",
+          "description": "Last update timestamp"
+        },
+        "uploaded_by": {
+          "name": "uploaded_by",
+          "type": "text",
+          "nullable": true,
+          "description": "Uploader"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "campaigns",
+          "foreign_key": "campaign_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Deleted when campaign deleted"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["campaign_id", "asset_type", "is_approved", "is_active"]
+    },
+    "campaign_channels": {
+      "name": "campaign_channels",
+      "description": "Platform-specific campaign configurations and performance metrics.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "default": "gen_random_uuid()",
+          "description": "Primary key"
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "uuid",
+          "nullable": false,
+          "references": "campaigns.id",
+          "description": "Parent campaign"
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "nullable": false,
+          "description": "Platform",
+          "valid_values": ["facebook", "instagram", "youtube", "twitter", "linkedin", "google_ads", "amazon", "whatsapp", "email", "website"]
+        },
+        "platform_campaign_id": {
+          "name": "platform_campaign_id",
+          "type": "text",
+          "nullable": true,
+          "description": "External platform campaign ID"
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "text",
+          "nullable": true,
+          "description": "Platform account ID"
+        },
+        "allocated_budget": {
+          "name": "allocated_budget",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Channel budget allocation"
+        },
+        "actual_spend": {
+          "name": "actual_spend",
+          "type": "decimal",
+          "nullable": true,
+          "default": "0",
+          "description": "Actual spend to date"
+        },
+        "channel_config": {
+          "name": "channel_config",
+          "type": "jsonb",
+          "nullable": true,
+          "default": "'{}'::jsonb",
+          "description": "Platform-specific settings"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "nullable": true,
+          "default": "'draft'",
+          "description": "Channel status",
+          "valid_values": ["draft", "scheduled", "active", "paused", "completed"]
+        },
+        "total_impressions": {
+          "name": "total_impressions",
+          "type": "bigint",
+          "nullable": true,
+          "default": "0",
+          "description": "Channel impressions"
+        },
+        "total_clicks": {
+          "name": "total_clicks",
+          "type": "bigint",
+          "nullable": true,
+          "default": "0",
+          "description": "Channel clicks"
+        },
+        "total_conversions": {
+          "name": "total_conversions",
+          "type": "integer",
+          "nullable": true,
+          "default": "0",
+          "description": "Channel conversions"
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Channel start time"
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Channel end time"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "campaigns",
+          "foreign_key": "campaign_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Deleted when campaign deleted"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["campaign_id", "platform", "status"]
+    },
+    "customer_prices": {
+      "name": "customer_prices",
+      "description": "Customer-specific pricing overrides. Supports price list assignment or per-product special prices.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "default": "gen_random_uuid()",
+          "description": "Primary key"
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "Customer receiving special pricing"
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "products.id",
+          "description": "Product with special pricing (XOR with price_list_id)"
+        },
+        "price_list_id": {
+          "name": "price_list_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "price_lists.id",
+          "description": "Price list assigned to customer (XOR with product_id)"
+        },
+        "special_price": {
+          "name": "special_price",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Fixed special price"
+        },
+        "discount_percent": {
+          "name": "discount_percent",
+          "type": "decimal",
+          "nullable": true,
+          "description": "Percentage discount"
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "date",
+          "nullable": true,
+          "default": "CURRENT_DATE",
+          "description": "Effective from date"
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "date",
+          "nullable": true,
+          "description": "Effective to date"
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "nullable": false,
+          "default": "100",
+          "description": "Priority (higher wins)"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "description": "Whether active"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "nullable": true,
+          "description": "Notes"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "products",
+          "foreign_key": "product_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Product link"
+        },
+        {
+          "type": "parent",
+          "target_table": "price_lists",
+          "foreign_key": "price_list_id",
+          "target_column": "id",
+          "cascade_delete": true,
+          "cascade_update": false,
+          "description": "Price list link"
+        }
+      ],
+      "business_rules": [],
+      "indexes": ["customer_id", "product_id", "price_list_id", "is_active"]
+    },
+    "companies": {
+      "name": "companies",
+      "description": "Single-tenant company master. Exactly 1 company. All other tables implicitly belong to this company.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "default": "gen_random_uuid()",
+          "description": "Primary key"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "description": "Company display name"
+        },
+        "legal_name": {
+          "name": "legal_name",
+          "type": "text",
+          "nullable": true,
+          "description": "Legal entity name"
+        },
+        "domain": {
+          "name": "domain",
+          "type": "text",
+          "nullable": true,
+          "description": "Primary domain"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "description": "Company description"
+        },
+        "brand_voice": {
+          "name": "brand_voice",
+          "type": "text",
+          "nullable": true,
+          "description": "Brand voice guidelines"
+        },
+        "target_audience": {
+          "name": "target_audience",
+          "type": "text",
+          "nullable": true,
+          "description": "Target audience description"
+        },
+        "brand_attributes": {
+          "name": "brand_attributes",
+          "type": "jsonb",
+          "nullable": true,
+          "description": "Brand attributes JSONB"
+        },
+        "target_markets": {
+          "name": "target_markets",
+          "type": "array",
+          "nullable": true,
+          "element_type": "text",
+          "description": "Target markets"
+        },
+        "website": {
+          "name": "website",
+          "type": "text",
+          "nullable": true,
+          "description": "Website URL"
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "nullable": true,
+          "description": "Contact email"
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "nullable": true,
+          "description": "Contact phone"
+        },
+        "address_line1": {
+          "name": "address_line1",
+          "type": "text",
+          "nullable": true,
+          "description": "Address line 1"
+        },
+        "address_line2": {
+          "name": "address_line2",
+          "type": "text",
+          "nullable": true,
+          "description": "Address line 2"
+        },
+        "city": {
+          "name": "city",
+          "type": "text",
+          "nullable": true,
+          "description": "City"
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "nullable": true,
+          "description": "State/Province"
+        },
+        "postal_code": {
+          "name": "postal_code",
+          "type": "text",
+          "nullable": true,
+          "description": "Postal code"
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "nullable": true,
+          "default": "'IN'",
+          "description": "Country code"
+        },
+        "default_currency": {
+          "name": "default_currency",
+          "type": "text",
+          "nullable": false,
+          "default": "'INR'",
+          "description": "Default currency"
+        },
+        "default_timezone": {
+          "name": "default_timezone",
+          "type": "text",
+          "nullable": false,
+          "default": "'Asia/Kolkata'",
+          "description": "Default timezone"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "default": "now()",
+          "description": "Creation timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [],
+      "business_rules": [],
+      "indexes": []
+    },
+    "company_intelligence": {
+      "name": "company_intelligence",
+      "description": "Auto-discovered company intelligence. Single row corresponding to the single company.",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "default": "gen_random_uuid()",
+          "description": "Primary key"
+        },
+        "business_models": {
+          "name": "business_models",
+          "type": "array",
+          "nullable": false,
+          "default": "'{}'::text[]",
+          "element_type": "text",
+          "description": "Business models (B2B, B2C, D2C)"
+        },
+        "brand_voice": {
+          "name": "brand_voice",
+          "type": "text",
+          "nullable": true,
+          "description": "Discovered brand voice"
+        },
+        "brand_values": {
+          "name": "brand_values",
+          "type": "array",
+          "nullable": true,
+          "default": "'{}'::text[]",
+          "element_type": "text",
+          "description": "Brand values"
+        },
+        "target_audiences": {
+          "name": "target_audiences",
+          "type": "jsonb",
+          "nullable": true,
+          "default": "'[]'::jsonb",
+          "description": "Target audiences JSONB"
+        },
+        "visual_identity": {
+          "name": "visual_identity",
+          "type": "jsonb",
+          "nullable": true,
+          "default": "'{}'::jsonb",
+          "description": "Visual identity (colors, fonts)"
+        },
+        "price_positioning": {
+          "name": "price_positioning",
+          "type": "text",
+          "nullable": true,
+          "description": "Price positioning",
+          "valid_values": ["budget", "mid-range", "premium", "luxury"]
+        },
+        "competitors": {
+          "name": "competitors",
+          "type": "jsonb",
+          "nullable": true,
+          "default": "'[]'::jsonb",
+          "description": "Competitor analysis"
+        },
+        "confidence_score": {
+          "name": "confidence_score",
+          "type": "real",
+          "nullable": true,
+          "description": "Discovery confidence (0-1)"
+        },
+        "sources": {
+          "name": "sources",
+          "type": "array",
+          "nullable": true,
+          "default": "'{}'::text[]",
+          "element_type": "text",
+          "description": "Data sources"
+        },
+        "discovered_at": {
+          "name": "discovered_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Discovery timestamp"
+        },
+        "last_updated": {
+          "name": "last_updated",
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "description": "Last update timestamp"
+        }
+      },
+      "primary_key": "id",
+      "relationships": [],
+      "business_rules": [],
+      "indexes": []
     }
   }
 }

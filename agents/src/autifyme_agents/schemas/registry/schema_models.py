@@ -31,7 +31,11 @@ class ColumnType(str, Enum):
     TEXT = "text"
     INTEGER = "integer"
     BIGINT = "bigint"
+    SMALLINT = "smallint"
     DECIMAL = "decimal"
+    NUMERIC = "numeric"
+    REAL = "real"  # 4-byte floating point
+    DOUBLE_PRECISION = "double precision"  # 8-byte floating point
     BOOLEAN = "boolean"
     TIMESTAMP = "timestamp"
     TIMESTAMPTZ = "timestamptz"
@@ -57,7 +61,7 @@ class ColumnSchema(BaseModel):
     description: str | None = Field(None, description="Column description")
 
     # Agent-critical fields for autonomous operations
-    valid_values: list[str] | None = Field(
+    valid_values: list[str | int] | None = Field(
         None,
         description="Allowed enum values. Agent MUST use one of these values."
     )
@@ -202,7 +206,7 @@ class TableSchema(BaseModel):
             if col.unique and not col.primary_key
         ]
 
-    def get_enum_columns(self) -> dict[str, list[str]]:
+    def get_enum_columns(self) -> dict[str, list[str | int]]:
         """Get columns with valid_values (enum constraints).
 
         Returns:

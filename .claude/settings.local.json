@@ -68,7 +68,9 @@
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",
       "Skill(workflow-evaluation)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(uv sync:*)",
+      "Bash(move:*)"
     ],
     "deny": [],
     "ask": []

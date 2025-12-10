@@ -15,6 +15,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from deepagents import create_deep_agent
+from langchain.agents.middleware import ContextEditingMiddleware
 from langchain.agents.structured_output import ToolStrategy
 from langchain.chat_models import BaseChatModel
 
@@ -27,6 +28,7 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.integrations.storage import get_store
+from autifyme_agents.middleware.context_management import HybridTruncateThenClearEdit
 from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
 from autifyme_agents.schemas.models import CompanyProfile
@@ -207,11 +209,30 @@ async def create_project_manager(
         handle_errors=True,  # Retry on parse errors
     )
 
+    # Aggressive context management: Truncate data tools at 30k tokens
+    # Task tool (subagent calls) preserved - contains specialist decisions
+    # Other tools (schema, read_data, etc.) truncated - raw data can be re-fetched
+    pm_middleware = [
+        ContextEditingMiddleware(
+            edits=[
+                HybridTruncateThenClearEdit(
+                    trigger_truncate=30000,  # Start truncating at 30k tokens
+                    trigger_clear=80000,  # Clear if still over 80k
+                    max_truncate_length=500,  # Keep first 500 chars of each result
+                    keep_recent_truncate=3,  # Don't truncate last 3 results
+                    keep_recent_clear=5,  # Don't clear last 5 results
+                    exclude_tools=("task",),  # Preserve subagent results
+                )
+            ]
+        )
+    ]
+
     project_manager = create_deep_agent(
         tools=pm_tools,
         system_prompt=instructions,
         model=llm,
         subagents=subagents,
+        middleware=pm_middleware,
         response_format=response_format,
         interrupt_on={},
         checkpointer=checkpointer,

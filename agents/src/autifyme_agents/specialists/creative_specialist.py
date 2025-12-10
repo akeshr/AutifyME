@@ -48,10 +48,14 @@ CREATIVE_READ_TABLES = [
     "assets",           # Read existing assets
     "product_assets",   # Read product-asset links (product_id -> asset_id)
     "products",         # Read products to resolve family_id -> product_ids
+    "product_families", # Read product families for context
+    "campaign_assets",  # Read campaign creative assets
+    "campaigns",        # Read campaigns for asset context
 ]
 
 CREATIVE_WRITE_TABLES = [
     "assets",           # Create asset records for processed images
+    "campaign_assets",  # Create campaign creative assets
 ]
 
 

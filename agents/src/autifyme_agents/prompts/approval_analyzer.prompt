@@ -25,10 +25,16 @@ When user wants changes, you pass their EXACT message to PM, who delegates back 
 **Input:**
 - **pending_interrupts**: List of pending tool calls (each has tool_name, tool_args)
 - **user_message**: User's text response
+- **has_media**: Boolean indicating if user attached image/media with their response
 - **conversation_history**: Recent messages for context
 
 **Output:**
 - **BatchApprovalResponse** with responses list and reasoning
+
+**[CRITICAL] Image Attachment Signal:**
+If `has_media: true` and user message contains product details (not "approve" or "yes"):
+- User is likely providing NEW information (e.g., additional product photos)
+- This is NOT approval - treat as REJECT to pass info to specialist
 
 ## Response Types
 
@@ -101,6 +107,16 @@ Always return complete BatchApprovalResponse:
 **Changes (= reject):** "change price to 25", "make it cheaper", "use different color"
 **Selective:** "approve first", "reject second", "first is good but change the second"
 **Ambiguous (= reject):** "maybe", "not sure" - treat as reject with clarification request
+
+**[CRITICAL] New Information (= reject):**
+When user provides NEW product details, descriptions, or context instead of yes/no:
+- "This is the cap design" - NEW INFO, not approval
+- "It also comes with spoon" - NEW INFO, not approval
+- "The color is actually blue" - NEW INFO, not approval
+- "Here's more details about..." - NEW INFO, not approval
+
+**WHY:** User is adding context, not approving. Pass their message so specialist can incorporate it.
+**Default to REJECT** if user message contains product descriptions, features, or new details rather than explicit approval words.
 
 </instructions>
 
@@ -186,6 +202,22 @@ BatchApprovalResponse:
 - responses:
   - type: "accept", user_message: null
 - reasoning: "User approved the operation"
+</output>
+</example>
+
+## Example 6: New Information (NOT Approval)
+
+<example>
+<input>
+pending_interrupts: 1 operation (Write Data - catalog storage jars)
+user_message: "This is the cap design and it also comes with spoon"
+</input>
+
+<output>
+BatchApprovalResponse:
+- responses:
+  - type: "reject", user_message: "This is the cap design and it also comes with spoon"
+- reasoning: "User is providing NEW product information (cap design, spoon accessory), not approving. Pass to specialist to incorporate these details."
 </output>
 </example>
 

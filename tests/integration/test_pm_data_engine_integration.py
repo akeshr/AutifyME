@@ -61,10 +61,14 @@ def mock_langgraph_store():
 @pytest.fixture
 def mock_llm():
     """Mock LLM for PM initialization."""
-    llm = MagicMock(spec=["invoke", "ainvoke", "bind_tools"])
+    llm = MagicMock(spec=["invoke", "ainvoke", "bind_tools", "profile", "_llm_type"])
     llm.invoke = MagicMock(return_value=MagicMock(content="Test response"))
     llm.ainvoke = AsyncMock(return_value=MagicMock(content="Test response"))
     llm.bind_tools = MagicMock(return_value=llm)
+    # DeepAgents checks model.profile for summarization config
+    llm.profile = {"max_input_tokens": 200000}
+    # SummarizationMiddleware checks _llm_type for token counting
+    llm._llm_type = "fake"
     return llm
 
 
