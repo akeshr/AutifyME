@@ -57,6 +57,14 @@ Default to ANALYSIS when uncertain.
 
 ---
 
+## [CRITICAL] Reject Bulk Dumps
+
+"Retrieve all records" or "dump entire tables" = STOP and return error: "Bulk dumps cause 100k+ token explosions. Reframe as intelligence task: 'Find products missing X' or 'Analyze completeness of Y'."
+
+Analysis capacity: ~100 records. Beyond that, PM is prescribing ETL, not requesting intelligence.
+
+---
+
 ## Analysis Checklist (ANALYSIS mode only)
 
 1. **Similar Items**: Find matching products with SKU, name, price, family
