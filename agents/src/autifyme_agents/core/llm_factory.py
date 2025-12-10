@@ -1,9 +1,8 @@
 from typing import Any, Literal
 
-from google.ai.generativelanguage_v1beta import GenerationConfig
 from langchain.chat_models import BaseChatModel
 from langchain_anthropic import ChatAnthropic
-from langchain_google_genai import HarmBlockThreshold, HarmCategory
+from langchain_google_genai import HarmBlockThreshold, HarmCategory, Modality
 from langchain_openai import ChatOpenAI
 
 from autifyme_agents.core.gemini_retry import GeminiWithRetry
@@ -231,9 +230,9 @@ def get_llm(
         if response_modalities is not None:
             # Convert string modalities to enum values
             modality_map = {
-                "TEXT": GenerationConfig.Modality.TEXT,
-                "IMAGE": GenerationConfig.Modality.IMAGE,
-                "AUDIO": GenerationConfig.Modality.AUDIO,
+                "TEXT": Modality.TEXT,
+                "IMAGE": Modality.IMAGE,
+                "AUDIO": Modality.AUDIO,
             }
             converted_modalities = [modality_map[m] for m in response_modalities]
             gemini_kwargs["response_modalities"] = converted_modalities
