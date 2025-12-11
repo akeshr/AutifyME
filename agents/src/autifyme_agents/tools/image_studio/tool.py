@@ -598,60 +598,55 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
     return StructuredTool.from_function(
         func=_image_studio_impl,
         name="image_studio",
-        description="""Professional image processing with Gemini 3 Pro Image.
-
-IMAGES - REQUIRED (minimum 1):
-At least one labeled image required. Reference labels in your specs/instructions.
-- images: [{path: "inbox/thread/photo.jpg", label: "product"}]
-- Use [label] in your specs: "extract [product] from background"
-
-STRUCTURED SPECS - Use what applies:
-- extraction: Target in multi-product (target_description, position_hint, isolation, edge_treatment)
-- background: Background treatment (treatment, color, scene_description)
-- lighting: Light setup (type, direction, quality, color_temperature, shadows, special_requirements)
-- composition: Framing (product_coverage, position, camera_angle, negative_space, crop_instruction)
-- enhancement: Post-processing (sharpness, contrast, color_treatment, detail_enhancement, cleanup)
-- scene: Environment (environment, style, mood, time_of_day, props_and_context)
-- placement: Product in scene (position, scale, surface, interaction)
-- focus: Depth of field (focus_point, depth_of_field, falloff)
-- material_treatment: Material rendering (primary_material, rendering_notes, preserve_details)
-- custom_spec: OOTB ideas (instruction, style_reference, color_palette, special_effect, extra)
-- creative_direction: Free-form notes
-
-NOTE: Every spec has a "custom" field for spec-specific OOTB ideas.
-
-EXAMPLES:
-
-1. Hero shot extraction:
-{
-  "images": [{"path": "inbox/thread/group.jpg", "label": "source"}],
-  "extraction": {"target_description": "glass jar on left in [source]", "isolation": "complete"},
-  "background": {"treatment": "transparent"},
-  "material_treatment": {"primary_material": "clear glass", "rendering_notes": "preserve caustics"}
-}
-
-2. Lifestyle with style reference:
-{
-  "images": [
-    {"path": "inbox/thread/product.jpg", "label": "product"},
-    {"path": "inbox/thread/mood.jpg", "label": "style_ref"}
-  ],
-  "scene": {"environment": "modern kitchen", "style": "match [style_ref] mood"},
-  "placement": {"position": "place [product] on marble counter"},
-  "lighting": {"type": "natural window matching [style_ref]"}
-}
-
-3. Multi-product composition:
-{
-  "images": [
-    {"path": "inbox/thread/jar1.jpg", "label": "main"},
-    {"path": "inbox/thread/jar2.jpg", "label": "variant"}
-  ],
-  "composition": {"position": "[main] center hero, [variant] supporting right"},
-  "creative_direction": "Family shot - main variant hero, second supporting"
-}
-
-OUTPUT: Returns storage_path in pending/ for write_data.""",
+        description=(
+            "PURPOSE: Professional image processing (Gemini 3 Pro Image) - transform user uploads into catalog-ready assets. Extract products, generate lifestyle scenes, create hero shots, compose families. Your creative studio.\n\n"
+            "LABELED IMAGES ARCHITECTURE (key differentiator):\n"
+            "- Each image has label: [{path: 'inbox/thread/photo.jpg', label: 'product'}]\n"
+            "- Reference labels in specs: 'extract [product]', 'match [style_ref] lighting', 'place [product] on [background]'\n"
+            "- Model reasons: Gemini understands specs + labeled images, decides what to do\n"
+            "- Single powerful operation: prompt + labeled images -> new image\n"
+            "- Common labels: 'product'/'source' (main), 'style_ref' (mood/lighting), 'background' (scene), 'product_variant' (family shots)\n"
+            "- Max 15 images (Gemini constraint)\n\n"
+            "USE WHEN:\n"
+            "- Messy product photo: Extract clean product for catalog\n"
+            "- Hero shot needed: Transform phone photo to professional image\n"
+            "- Lifestyle scene: Place product in realistic environment\n"
+            "- Background removal: Transparent PNG or white background\n"
+            "- Family shot: Compose multiple variants together\n"
+            "- Material showcase: Highlight glass clarity, metal finish, texture\n\n"
+            "DON'T USE:\n"
+            "- Simple viewing (use view_image)\n"
+            "- When image already catalog-ready\n"
+            "- Text extraction/analysis (use view_image)\n\n"
+            "STRUCTURED SPECS (all optional - use what applies):\n"
+            "- extraction: {target_description: 'glass jar on left in [source]', isolation: 'complete', edge_treatment: 'sharp'}\n"
+            "- background: {treatment: 'transparent'/'solid_color'/'scene', color: 'white', scene_description: 'modern kitchen'}\n"
+            "- lighting: {type: 'natural_window'/'studio_3point', direction: 'front'/'side', special_requirements: 'match [style_ref]'}\n"
+            "- composition: {position: 'center'/'[main] center [variant] right', camera_angle: 'slight_top', negative_space: 'generous_top'}\n"
+            "- enhancement: {sharpness: 'tack_sharp', color_treatment: 'vibrant'}\n"
+            "- scene: {environment: 'modern_kitchen', style: 'match [style_ref]', mood: 'warm_inviting'}\n"
+            "- placement: {position: 'place [product] on marble counter', scale: 'prominent'}\n"
+            "- material_treatment: {primary_material: 'clear_glass', rendering_notes: 'preserve caustics'}\n"
+            "- custom_spec: {instruction: 'dramatic shot with water droplets', style_reference: 'Apple product photography'}\n"
+            "- creative_direction: Free-form notes ('Family shot - main hero, second supporting')\n"
+            "- output: {format: 'png'/'jpeg', size: '1K'/'2K', aspect_ratio: '1:1'/'16:9'}\n\n"
+            "CRITICAL:\n"
+            "- images parameter REQUIRED: Min 1 labeled image, max 15\n"
+            "- Labels enable composition: Model knows which image is which via labels\n"
+            "- Reference labels in specs: Use [label] syntax\n"
+            "- storage_path output: Use this for write_data product_images (pending/ path)\n"
+            "- View before and after: view_image to see input/output before cataloging\n"
+            "- Material matters: Glass, metal, plastic need different rendering (specify material_treatment)\n"
+            "- One output per call: Not batch processing\n\n"
+            "EXAMPLES:\n"
+            "# Extract with transparent background\n"
+            "image_studio(images=[{path: 'inbox/thread/photo.jpg', label: 'source'}], extraction={target_description: 'glass jar in [source]', isolation: 'complete'}, background={treatment: 'transparent'}, material_treatment={primary_material: 'clear_glass'})\n"
+            "Returns: Clean extracted jar, transparent PNG, caustics preserved\n\n"
+            "# Lifestyle with style reference\n"
+            "image_studio(images=[{path: 'inbox/t/product.jpg', label: 'product'}, {path: 'inbox/t/mood.jpg', label: 'style_ref'}], scene={environment: 'modern kitchen', style: 'match [style_ref]'}, placement={position: 'place [product] on counter'}, lighting={type: 'natural_window', special_requirements: 'match [style_ref]'})\n"
+            "Returns: Product in kitchen matching reference mood/lighting\n\n"
+            "RETURNS: ImageStudioOutput with outputs[].storage_path (pending/ path for write_data), metadata. Use storage_path in write_data for product_images table."
+        ),
         args_schema=ImageStudioInput,
         return_direct=False,
     )
