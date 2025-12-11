@@ -70,7 +70,12 @@
       "Skill(workflow-evaluation)",
       "Bash(grep:*)",
       "Bash(uv sync:*)",
-      "Bash(move:*)"
+      "Bash(move:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:www.promptingguide.ai)",
+      "WebFetch(domain:docs.claude.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:patmcguinness.substack.com)"
     ],
     "deny": [],
     "ask": []
