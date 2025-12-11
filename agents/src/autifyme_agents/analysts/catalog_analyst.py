@@ -89,11 +89,13 @@ def create_catalog_analyst(
     system_prompt = load_prompt("analysts/catalog_analyst.prompt")
 
     description = (
-        "Catalog Analyst - internal catalog strategy analyst. "
-        "Reports: similar items, pricing patterns, family matches, gap analysis, "
-        "cannibalization risk, SKU recommendations, price recommendations, competitive positioning. "
-        "Cross-domain reuse: serves catalog, marketing, operations workflows. "
-        "Read-only - analyzes and reports, does NOT modify data."
+        "Catalog Analyst - catalog data retrieval and analysis.\n\n"
+        "DELEGATE WHEN:\n"
+        "- 'Get me X' / 'Show me Y' catalog queries\n"
+        "- Duplicate/similarity checks needed\n"
+        "- Pricing analysis, gap analysis required\n"
+        "- Company context or details needed\n\n"
+        "DOES NOT: Create/modify records, process images, research external sources."
     )
 
     # Import here to avoid circular imports

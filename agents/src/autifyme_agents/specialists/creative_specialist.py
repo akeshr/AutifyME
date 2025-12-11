@@ -97,15 +97,14 @@ def create_creative_specialist(
         tools.append(create_write_data_tool(storage, tables=CREATIVE_WRITE_TABLES))
 
     description = (
-        "Creative Specialist - professional product photographer creating studio-quality images. "
-        "Produces: marketplace-ready hero shots (pure white background, studio lighting, color-accurate), "
-        "multi-product extraction with clean isolation, lifestyle shots with contextual scenes. "
-        "IMAGE SOURCES (two options): "
-        "(1) Include storage_path directly in task - specialist SEES images, OR "
-        "(2) Provide product_id or product_family_id - specialist queries to find asset URLs. "
-        "Has read_data access to: products (resolve family->products), product_assets (product->asset links), assets (get storage_url). "
-        "Returns: processed images with storage_path (in pending/). "
-        "Creates asset records via write_data (HITL approval required)."
+        "Creative Specialist - image processing and generation.\n\n"
+        "DELEGATE WHEN:\n"
+        "- Extract products from images (hero shots)\n"
+        "- Enhance/edit images (background, lighting, quality)\n"
+        "- Generate lifestyle/marketing visuals\n"
+        "- Multi-product extraction from group photos\n\n"
+        "DOES NOT: Create catalog records (only asset records), analyze catalog data.\n"
+        "REQUIRES: HITL approval for asset record creation."
     )
 
     # Use provided model or default to Gemini 3 Pro (multimodal)

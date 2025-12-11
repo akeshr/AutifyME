@@ -57,11 +57,13 @@ def create_product_analyst(
     system_prompt = load_prompt("analysts/product_analyst.prompt")
 
     description = (
-        "Product Analyst - external product intelligence expert. "
-        "Reports: naming recommendations (family name, variant pattern, SKU convention), "
-        "HSN codes, specifications, BIS/FSSAI compliance, market positioning, competitive landscape. "
-        "Cross-domain reuse: serves catalog, marketing, quality, procurement workflows. "
-        "Read-only - researches and reports, does NOT execute actions."
+        "Product Analyst - market intelligence and product knowledge.\n\n"
+        "DELEGATE WHEN:\n"
+        "- Unknown product needs research (HSN, specs, standards)\n"
+        "- Naming/SKU recommendations needed\n"
+        "- Market positioning or competitive analysis required\n"
+        "- Compliance information needed (BIS, FSSAI, certifications)\n\n"
+        "DOES NOT: Query catalog database, create records, process images."
     )
 
     tools: list[Any] = [

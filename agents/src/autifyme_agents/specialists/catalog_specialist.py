@@ -114,11 +114,14 @@ def create_catalog_specialist(
     tools.append(create_view_image_tool())
 
     description = (
-        "Catalog Specialist - domain expert for product catalog operations. "
-        "Handles: products, families, variants, pricing, asset records, BOM. "
-        "Capabilities: schema-driven CRUD, web research, duplicate detection, "
-        "multi-table atomic transactions. Receives processed images from "
-        "Creative Specialist. Does NOT process images directly."
+        "Catalog Specialist - catalog CRUD with HITL approval.\n\n"
+        "DELEGATE WHEN:\n"
+        "- Create/update/delete products, families, variants\n"
+        "- Pricing operations (MRP, wholesale, customer-specific)\n"
+        "- Asset record creation (after images processed)\n"
+        "- BOM/manufacturing data management\n\n"
+        "DOES NOT: Process images (receives processed), analyze images.\n"
+        "REQUIRES: HITL approval for all database writes."
     )
 
     # Multimodal middleware injects images from paths in delegation message

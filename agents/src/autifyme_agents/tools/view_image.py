@@ -163,12 +163,15 @@ def create_view_image_tool() -> StructuredTool:
         func=_view_image_impl,
         name="view_image",
         description=(
-            "View an image. Returns the actual image so you can SEE it.\n\n"
-            "Use this to:\n"
-            "- Diagnose source images from inbox/ (download_media)\n"
-            "- Verify outputs from image_studio (pending/)\n"
-            "- Quality check before write_data\n\n"
-            "Example: view_image('inbox/thread_id/photo.jpg')"
+            "View an image - returns the actual image so your LLM can SEE it.\n\n"
+            "USE WHEN:\n"
+            "- You need to see what's in an image (materials, products, quality)\n"
+            "- Verifying image_studio outputs before write_data\n"
+            "- Comparing images (before/after, variants)\n"
+            "- Any situation where seeing the image helps your task\n\n"
+            "INPUT: storage_path like 'inbox/thread_id/photo.jpg' or 'pending/thread_id/edit.png'\n"
+            "RETURNS: Multimodal content - the image appears in your context\n\n"
+            "NOTE: This is YOUR eyes on images. Use proactively when visual information helps."
         ),
         args_schema=ViewImageInput,
         return_direct=False,
