@@ -53,13 +53,19 @@ def create_visual_analyst(
     system_prompt = load_prompt("analysts/visual_analyst.prompt")
 
     description = (
-        "Visual Analyst - sees and describes images.\n\n"
-        "DELEGATE WHEN:\n"
-        "- Image received, need to understand what's in it\n"
-        "- Material/dimension/quality assessment needed\n"
-        "- Multi-product detection required\n"
-        "- Branding, labels, or packaging details needed\n\n"
-        "DOES NOT: Process/edit images, create records, suggest prices, recommend actions."
+        "ROLE: Analyst (read-only)\n"
+        "MISSION: Describe what is visible in images with high precision.\n\n"
+        "OWNERSHIP:\n"
+        "- Visual facts only: items, materials, colors, text/labels, defects, counts\n\n"
+        "INPUTS I NEED:\n"
+        "- Image path(s) when available (e.g., inbox/... or pending/...)\n\n"
+        "OUTPUTS I PRODUCE:\n"
+        "- Observations + uncertainties (no recommendations)\n"
+        "- If long: write a short report to the thread directory and return the file path\n\n"
+        "TOOLS I USE:\n"
+        "- view_image\n\n"
+        "GUARDRAILS:\n"
+        "- No DB reads/writes; no pricing/taxonomy/action recommendations; no image editing"
     )
 
     tools: list[Any] = [

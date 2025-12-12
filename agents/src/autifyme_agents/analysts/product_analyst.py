@@ -57,13 +57,22 @@ def create_product_analyst(
     system_prompt = load_prompt("analysts/product_analyst.prompt")
 
     description = (
-        "Product Analyst - market intelligence and product knowledge.\n\n"
-        "DELEGATE WHEN:\n"
-        "- Unknown product needs research (HSN, specs, standards)\n"
-        "- Naming/SKU recommendations needed\n"
-        "- Market positioning or competitive analysis required\n"
-        "- Compliance information needed (BIS, FSSAI, certifications)\n\n"
-        "DOES NOT: Query catalog database, create records, process images."
+        "ROLE: Analyst (read-only)\n"
+        "MISSION: Convert an unknown product into market-grounded facts (name, specs, standards).\n\n"
+        "OWNERSHIP:\n"
+        "- External product knowledge: naming conventions, spec sheets, standards/compliance context\n"
+        "- Web research + source-backed summaries\n\n"
+        "INPUTS I NEED:\n"
+        "- Product cues: brand/model/keywords OR an image path to infer them\n"
+        "- Target market/jurisdiction if compliance matters (e.g., India)\n\n"
+        "OUTPUTS I PRODUCE:\n"
+        "- A concise, source-backed brief (with links)\n"
+        "- Clear unknowns/assumptions and what to confirm before writing data\n"
+        "- If long: write a report to the thread directory and return the file path\n\n"
+        "TOOLS I USE:\n"
+        "- research_product_tool, extract_web_content_tool, view_image\n\n"
+        "GUARDRAILS:\n"
+        "- No internal DB reads/writes; no record creation; no image editing"
     )
 
     tools: list[Any] = [

@@ -89,13 +89,22 @@ def create_catalog_analyst(
     system_prompt = load_prompt("analysts/catalog_analyst.prompt")
 
     description = (
-        "Catalog Analyst - catalog data retrieval and analysis.\n\n"
-        "DELEGATE WHEN:\n"
-        "- 'Get me X' / 'Show me Y' catalog queries\n"
-        "- Duplicate/similarity checks needed\n"
-        "- Pricing analysis, gap analysis required\n"
-        "- Company context or details needed\n\n"
-        "DOES NOT: Create/modify records, process images, research external sources."
+        "ROLE: Analyst (read-only)\n"
+        "MISSION: Answer 'What do we already have?' from our catalog database.\n\n"
+        "OWNERSHIP:\n"
+        "- Internal catalog intelligence: duplicates, family fit, pricing patterns, asset linkage context\n"
+        "- Scoped DB reads only (table access is enforced)\n\n"
+        "INPUTS I NEED:\n"
+        "- What to compare against (keywords/attributes), and any candidate IDs if known\n"
+        "- Optional image path(s) to visually match variants\n\n"
+        "OUTPUTS I PRODUCE:\n"
+        "- Ranked similar items + the evidence (IDs, fields, aggregates)\n"
+        "- A short recommendation-ready brief for the PM (still read-only)\n"
+        "- If long: write results to the thread directory and return the file path\n\n"
+        "TOOLS I USE:\n"
+        "- inspect_schema, read_data, aggregate_data, view_image\n\n"
+        "GUARDRAILS:\n"
+        "- No write_data; no external web research; no image editing"
     )
 
     # Import here to avoid circular imports

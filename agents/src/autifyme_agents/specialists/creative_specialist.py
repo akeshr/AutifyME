@@ -96,17 +96,29 @@ def create_creative_specialist(
         # Scoped write access to assets table only
         tools.append(create_write_data_tool(storage, tables=CREATIVE_WRITE_TABLES))
 
-    description = (
-        "Creative Specialist - image processing and generation.\n\n"
-        "DELEGATE WHEN:\n"
-        "- Extract products from images (hero shots)\n"
-        "- Enhance/edit images (background, lighting, quality)\n"
-        "- Generate lifestyle/marketing visuals\n"
-        "- Multi-product extraction from group photos\n\n"
-        "DOES NOT: Create catalog records (only asset records), analyze catalog data.\n"
-        "REQUIRES: HITL approval for asset record creation."
-    )
 
+    description = (
+        "ROLE: Specialist (execution)\n"
+        "MISSION: Turn raw product photos into marketplace-ready visuals (and optionally persist asset records).\n\n"
+        "OWNERSHIP:\n"
+        "- Image processing & generation: extraction, cleanup, enhancement, hero shots, lifestyle creatives\n"
+        "- Visual QA on outputs (before downstream catalog linking)\n\n"
+        "INPUTS I NEED:\n"
+        "- Source image storage_path(s) (typically inbox/...)\n"
+        "- Creative intent (hero vs lifestyle), output aspect ratio/format if constrained\n\n"
+        "OUTPUTS I PRODUCE:\n"
+        "- Processed image outputs with paths (always local temp path; storage_path in pending/ when storage is configured)\n"
+        "- Notes on what was changed + any visual risks/uncertainties\n"
+        "- If long: write a production note to the thread directory and return the file path\n\n"
+        "HITL LOOP (when write_data is enabled):\n"
+        "- Propose write_data intents for DB changes and wait for approval\n"
+        "- On rejection, you will receive user feedback (often prefixed [HITL_FEEDBACK]); revise and resubmit\n\n"
+        "TOOLS I USE:\n"
+        "- view_image, image_studio\n"
+        "- If storage is provided: inspect_schema, read_data, write_data (scoped to creative/asset tables; HITL for writes)\n\n"
+        "GUARDRAILS:\n"
+        "- No product/pricing/taxonomy CRUD; if a catalog change is needed, delegate to catalog_specialist"
+    )
     # Use provided model or default to Gemini 3 Pro (multimodal)
     specialist_model = model if model is not None else get_llm(
         provider="google",

@@ -34,14 +34,14 @@ This is intentionally NOT a fixed workflow system. It’s a minimal set of contr
 
 **Goal:** eliminate PM role ambiguity (orchestrator vs executor) and stop redundant work.
 
-- **PM MUST NOT analyze content.** No image viewing, no catalog queries, no product research.
-- **PM SHOULD do only coordination primitives:**
+- **PM SHOULD NOT do deep domain analysis or execution.** PM may do lightweight sanity checks (read-only) when it reduces latency, but should delegate anything non-trivial.
+- **PM SHOULD do only coordination primitives (plus lightweight read-only checks):**
   - Download/normalize attachments
   - Create/choose `workspace/thread_<id>/` directory
   - Read subagent outputs from filesystem
   - Decide sequencing / parallelism / escalation
 
-**Implication:** if PM currently has tools like `view_image`, `read_data`, `inspect_schema`, treat them as legacy and (a) remove from PM prompt/tooling, or (b) explicitly forbid using them in the PM prompt.
+**Implication:** PM can keep read-only tools (`inspect_schema`, `read_data`, `view_image`) for quick checks, but the PM prompt should strongly bias toward delegating deep analysis to analysts and execution to specialists.
 
 ### 0.2 Context Packet Contract (PM → Subagent)
 
@@ -82,6 +82,8 @@ Add explicit gates so you don’t “feel” autonomy—you measure it:
 
 ## Layer 1: Tool Descriptions (Foundation)
 
+**Canonical doc:** `docs/architecture/tools/LAYER1_TOOL_CATALOG.md`
+
 **Format:** PURPOSE / USE WHEN / DON'T USE / RETURNS / NEEDS
 
 **Order:** Logical dependency chain (discover → read → analyze → execute)
@@ -106,6 +108,8 @@ Add explicit gates so you don’t “feel” autonomy—you measure it:
 ---
 
 ## Layer 2: Specialist Descriptions (Framework)
+
+**Canonical doc:** `docs/architecture/workflows/LAYER2_SUBAGENTS.md`
 
 **Format:** Domain ownership + DELEGATE WHEN + DOES NOT + REQUIRES
 
@@ -173,9 +177,12 @@ Add explicit gates so you don’t “feel” autonomy—you measure it:
 
 - ✅ Vision finalized (ARCHITECTURAL_VISION.md)
 - ✅ Refinement sessions complete (VISION_REFINEMENT_SESSION.md)
-- ✅ Layer 1: Tool Descriptions (COMPLETE - 68% compression, 912 lines → 289 lines)
-  - ✅ All 8 tools optimized (inspect_schema, read_data, view_image, aggregate_data, research_product_tool, extract_web_content_tool, write_data, image_studio)
-- ⏳ Layer 2: Specialist Descriptions (NEXT)
+- ✅ Layer 1: Tool Descriptions (COMPLETE)
+  - ✅ Canonical catalog added: `docs/architecture/tools/LAYER1_TOOL_CATALOG.md`
+  - ✅ Return-contract clarity: tools are explicitly categorized (success-wrapped vs plain dict vs multimodal blocks)
+  - ✅ All core tools optimized (inspect_schema, read_data, view_image, aggregate_data, research_product_tool, extract_web_content_tool, write_data, image_studio)
+- ✅ Layer 2: Specialist Descriptions (COMPLETE)
+  - ✅ Canonical subagent roster added: `docs/architecture/workflows/LAYER2_SUBAGENTS.md`
 - ⏳ Layer 3: Agent Prompts
 - ⏳ Layer 4: PM Prompt
 
