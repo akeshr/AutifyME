@@ -24,6 +24,62 @@ Layer 1: Tool Descriptions ← START HERE
 
 ---
 
+## Layer 0: Operating Contracts + Validation Gates (Make the vision executable)
+
+The bottom-up prompt-first layering is correct, but it currently lacks a small set of **shared invariants** that prevent the exact anti-patterns documented in `AGENT_TOOL_REDESIGN.md` (role ambiguity, redundant work, inconsistent delegation/context, fragile multi-step coordination).
+
+This is intentionally NOT a fixed workflow system. It’s a minimal set of contracts so dynamic orchestration stays stable.
+
+### 0.1 Role Boundary Decision (PM vs Analysts vs Specialists)
+
+**Goal:** eliminate PM role ambiguity (orchestrator vs executor) and stop redundant work.
+
+- **PM MUST NOT analyze content.** No image viewing, no catalog queries, no product research.
+- **PM SHOULD do only coordination primitives:**
+  - Download/normalize attachments
+  - Create/choose `workspace/thread_<id>/` directory
+  - Read subagent outputs from filesystem
+  - Decide sequencing / parallelism / escalation
+
+**Implication:** if PM currently has tools like `view_image`, `read_data`, `inspect_schema`, treat them as legacy and (a) remove from PM prompt/tooling, or (b) explicitly forbid using them in the PM prompt.
+
+### 0.2 Context Packet Contract (PM → Subagent)
+
+**Problem:** “delegate with context (not instructions)” is right but underspecified, causing under/over-context and inconsistent handoffs.
+
+Define a minimal, consistent context packet (even if it’s just prompt text) that always includes:
+- `thread_dir`: path like `workspace/thread_123/`
+- `user_intent`: 1-2 lines, intent only (no analysis)
+- `inputs`: media paths, entity refs, record IDs, workspace location
+- `constraints`: quality bar, deadlines, budget/latency limits if any
+- `prior_findings`: file paths the subagent should read (if present)
+- `deliverable`: exact output file name + summary expectation
+
+### 0.3 Output Contract (Subagent → PM)
+
+Keep your filesystem protocol, but add two invariants:
+- Every subagent returns (a) **1-paragraph summary** and (b) **a single primary file path**.
+- Every output file starts with a tiny header: `Date/Inputs/Assumptions/Confidence/Next actions`.
+
+This makes PM synthesis reliable without PM re-analysis.
+
+### 0.4 Dynamic Orchestration Guardrails (Anti-chaos, not workflows)
+
+Add prompt-level rules (applies to PM and specialists):
+- **Attempt budget:** max N retries / alternative strategies before escalation.
+- **Ambiguity policy:** if >1 plausible interpretation affects data writes, escalate with options.
+- **Conflict policy:** if two domain outputs disagree, either (a) route to a reviewer agent, or (b) ask user (never silently pick).
+
+### 0.5 Validation Gates (How you prove the redesign works)
+
+Add explicit gates so you don’t “feel” autonomy—you measure it:
+- **Routing gate:** correct domain selection on a fixed scenario set
+- **Redundancy gate:** no duplicate image viewing / duplicate catalog queries when analyst context exists
+- **Resilience gate:** tool failures trigger fallbacks + structured escalation, not workflow death
+- **HITL gate:** writes always route through approval analyzer flow (no ad-hoc parsing)
+
+---
+
 ## Layer 1: Tool Descriptions (Foundation)
 
 **Format:** PURPOSE / USE WHEN / DON'T USE / RETURNS / NEEDS

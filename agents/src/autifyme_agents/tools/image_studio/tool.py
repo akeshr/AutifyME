@@ -645,7 +645,9 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "# Lifestyle with style reference\n"
             "image_studio(images=[{path: 'inbox/t/product.jpg', label: 'product'}, {path: 'inbox/t/mood.jpg', label: 'style_ref'}], scene={environment: 'modern kitchen', style: 'match [style_ref]'}, placement={position: 'place [product] on counter'}, lighting={type: 'natural_window', special_requirements: 'match [style_ref]'})\n"
             "Returns: Product in kitchen matching reference mood/lighting\n\n"
-            "RETURNS: ImageStudioOutput with outputs[].storage_path (pending/ path for write_data), metadata. Use storage_path in write_data for product_images table."
+            "RETURNS: Always a structured dict with success flag.\n"
+            "- success=True: ImageStudioOutput fields (outputs[] with storage_path in pending/, metadata, warnings, next_steps)\n"
+            "- success=False: {error, error_code, warnings, next_steps}"
         ),
         args_schema=ImageStudioInput,
         return_direct=False,

@@ -246,7 +246,10 @@ def create_aggregate_data_tool(
             "# Quality audit: Find families with sparse variants\n"
             "aggregate_data(table='products', aggregates={'variant_count': 'count(*)'}, filters={'is_active': True}, group_by=['product_family_id'], having={'variant_count': {'lt': 3}})\n"
             "Returns: Only families with <3 active products - [{product_family_id: 'fam-5', variant_count: 1}, ...]\n\n"
-            "RETURNS: Array of objects with group columns + computed aggregates, or single row if no group_by"
+            "RETURNS: Always a structured dict with success flag.\n"
+            "- success=True: {table, aggregates, group_by, results, count}\n"
+            "  * results is an array of rows with group_by columns + aggregate aliases\n"
+            "- success=False: {error, error_type, table, Agent Action: ...}"
         ),
         args_schema=AggregateDataInput,
         coroutine=_aggregate_data_impl,

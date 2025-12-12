@@ -404,7 +404,10 @@ def create_research_product_tool(settings: Settings) -> StructuredTool:
             "# Compliance research\n"
             "research_product_tool(query='HSN code plastic storage containers food packaging India', max_results=3)\n"
             "Returns: HSN code 3923, classification, regulatory requirements\n\n"
-            "RETURNS: ProductResearchResult with answer (AI summary), sources (title/url/content/relevance_score), confidence, key_findings. Use extract_web_content_tool on high-relevance URLs (0.8+) for deep-dive."
+            "RETURNS: Always a structured dict with success flag.\n"
+            "- success=True: ProductResearchResult fields (e.g., query, answer?, sources[], confidence, key_findings[])\n"
+            "- success=False: {error, error_type, query, Agent Action: ...}\n"
+            "Use extract_web_content_tool on high-relevance URLs (0.8+) for deep-dive."
         ),
         args_schema=ResearchProductInput,
     )
@@ -659,7 +662,9 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
             "# Technical spec sheet\n"
             "extract_web_content_tool(url='https://compliance.example.com/hsn-classification-plastics')\n"
             "Returns: Complete HSN guide, code definitions, customs requirements\n\n"
-            "RETURNS: WebContentAnalysis with url, title, content (markdown/text), word_count. Errors return graceful fallback (try alternative or use research summary)."
+            "RETURNS: Always a structured dict with success flag.\n"
+            "- success=True: WebContentAnalysis fields (url, title, content, format, word_count, extracted_at, etc.)\n"
+            "- success=False: {error, error_type, url, Agent Action: ...}"
         ),
         args_schema=ExtractWebContentInput,
     )

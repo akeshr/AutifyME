@@ -5,7 +5,8 @@ messaging platforms without hardcoding platform logic in the Runner.
 
 Storage Architecture:
     User-uploaded images are immediately persisted to Supabase Storage (inbox folder)
-    to survive Vercel /tmp cleanup. The tool returns the Supabase public URL.
+    to survive Vercel /tmp cleanup. The tool returns the bucket-relative storage_path
+    (a public URL can be derived where needed).
 """
 
 from __future__ import annotations
@@ -178,7 +179,7 @@ def create_platform_media_tools(
         name=f"download_{platform_name}_media",
         description=(
             f"Download media from {platform_name} and persist to Supabase inbox/. "
-            f"Returns: storage_path (e.g., 'inbox/thread_id/file.jpg'), mime_type, size_bytes. "
+            f"RETURNS: Plain dict (not success-wrapped) with storage_path (e.g., 'inbox/thread_id/file.jpg'), mime_type, size_bytes. "
             f"Use storage_path in image_studio, view_image, and write_data."
         ),
         args_schema=DownloadMediaInput,

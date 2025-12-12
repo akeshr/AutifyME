@@ -31,14 +31,13 @@ class ReadDataInput(BaseModel):
     filters: dict[str, Any] | None = Field(
         None,
         description=(
-            "[EXACT MATCH] Case-sensitive exact value matching. "
-            "Use when you have exact values (IDs, booleans, status codes). "
+            "[EXACT MATCH] Equality / IN matching (no wildcards). "
+            "Use when you have exact values (IDs, booleans, enums/status codes). "
             "Examples: "
             "{'is_active': True}, "
             "{'category_id': 'cat-123'}, "
-            "{'status': ['draft', 'published']} (IN operator for lists), "
-            "{'name': {'$in': ['Exact Name 1', 'Exact Name 2']}} (requires EXACT match). "
-            "CRITICAL: For name searches, use search_patterns instead (fuzzy match)."
+            "{'status': ['draft', 'published']} (IN operator for lists). "
+            "CRITICAL: Do NOT use '%' wildcards here. For text/name searching, use search_patterns."
         )
     )
     search_patterns: dict[str, str] | None = Field(
@@ -84,8 +83,11 @@ class ReadDataInput(BaseModel):
         )
     )
     limit: int | None = Field(
-        None,
-        description="Maximum rows to return (pagination). Default: no limit",
+        50,
+        description=(
+            "Maximum rows to return (pagination). Default: 50 for safety/token efficiency. "
+            "Increase only when needed; prefer columns=[...] to keep payload small."
+        ),
         gt=0,
         le=1000
     )
@@ -167,7 +169,7 @@ def create_read_data_tool(
         filters = EXACT MATCH (case-sensitive)
         - Use for: IDs, booleans, enums, status codes, foreign keys
         - Examples: {'is_active': True}, {'id': 'uuid-123'}
-        - {'name': {'$in': ['Name 1', 'Name 2']}} → ONLY matches EXACT names
+        - {'name': ['Name 1', 'Name 2']} → ONLY matches EXACT names
         - Returns 0 results if name doesn't match exactly (case, spacing, etc.)
 
         search_patterns = FUZZY MATCH (case-insensitive ILIKE)
@@ -177,7 +179,7 @@ def create_read_data_tool(
         - RECOMMENDED for all name/text searches
 
         Common Mistake:
-        ❌ filters={'name': {'$in': ['PET Jar', 'PET Bottles']}}  # Returns 0 if exact name doesn't exist
+        ❌ filters={'name': ['PET Jar', 'PET Bottles']}  # Returns 0 if exact name doesn't exist
         ✅ search_patterns={'name': '%PET%'}  # Returns all products with 'PET' in name
 
         Returns:
@@ -189,7 +191,7 @@ def create_read_data_tool(
             # ❌ WRONG: Using filters for name search (returns 0 if names don't match exactly)
             read_data(
                 table="product_families",
-                filters={"name": {"$in": ["PET Jar", "PET Bottles"]}},  # Requires EXACT match
+                filters={"name": ["PET Jar", "PET Bottles"]},  # Requires EXACT match
                 columns=["id", "name"]
             )
             # Returns: [] (empty) if actual names are "PET Food Jars" or "PET Water Bottles"
@@ -416,14 +418,13 @@ def create_read_data_tool(
         func=_read_data_impl,
         name="read_data",
         description=(
-            "PURPOSE: Universal database read tool - get all data you need. Fetch records, search, filter, join relationships, batch reads, pagination. CRITICAL before write_data to check duplicates and lookup foreign keys.\n\n"
+            "PURPOSE: Universal database read tool - fetch records, search text, apply exact filters, include relations, batch reads, pagination, and counts. Use this before write_data to (1) check duplicates and (2) look up foreign keys/IDs.\n\n"
             "CRITICAL DISTINCTION - filters vs search_patterns (most common source of errors):\n"
-            "- filters: EXACT match, case-sensitive - use for IDs, booleans, enums\n"
+            "- filters: equality / IN matching (no wildcards) - use for IDs, booleans, enums/statuses\n"
             "  Example: {'id': 'uuid-123'}, {'is_active': True}, {'status': ['draft','published']}\n"
-            "- search_patterns: FUZZY match, case-insensitive ILIKE - use for names, text, SKUs\n"
-            "  Example: {'name': '%PET%'}, {'sku': 'JAR-%'}, {'name': '%PET%500ML%'}\n"
-            "COMMON MISTAKE: filters={'name': 'PET Jars'} returns NOTHING unless EXACTLY 'PET Jars'\n"
-            "  -> Use search_patterns={'name': '%PET%Jars%'} for fuzzy match instead!\n\n"
+            "- search_patterns: wildcard patterns using % (case-insensitive ILIKE) - use for names, text, SKUs\n"
+            "  Example: {'name': '%PET%Jars%'}, {'sku': 'JAR-%'}, {'name': '%PET%500ML%'}\n"
+            "RULE: If you're matching human text and you didn't include %, you probably meant search_patterns.\n\n"
             "USE WHEN:\n"
             "- Duplicate check (CRITICAL before create): Does this product/SKU/entity exist?\n"
             "- Foreign key lookup: Get IDs for relationships (family_id, uom_id, price_list_id)\n"
@@ -439,7 +440,9 @@ def create_read_data_tool(
             "- relations syntax: Nested uses 'parent(*,child(*))' NOT 'parent.child(*)'\n"
             "- Use inspect_schema with details=['relationships'] to verify FK targets before using relations\n"
             "- ids parameter overrides filters/search_patterns (batch fetch mode)\n"
-            "- count_only=True returns only count, no records (efficient for 'how many')\n\n"
+            "- count_only=True returns only count, no records (efficient for 'how many')\n"
+            "- limit defaults to 50 for efficiency; increase only when needed\n"
+            "- Use columns=['id',...] whenever possible to reduce payload\n\n"
             "EXAMPLES:\n"
             "# Duplicate check before create (CRITICAL workflow)\n"
             "read_data(table='products', search_patterns={'sku': '%HONEYCOMB%'}, columns=['id','sku'])\n"
@@ -450,7 +453,11 @@ def create_read_data_tool(
             "# Combined: exact filters + fuzzy search + relations\n"
             "read_data(table='products', filters={'is_active': True, 'product_family_id': ['fam-1','fam-2']}, search_patterns={'sku': '%500ML%'}, relations=['product_families(name)'], limit=50)\n"
             "Returns: Active 500ml products from 2 families with family names\n\n"
-            "RETURNS: Array of records matching criteria, or {count: N} if count_only=True"
+            "RETURNS: Always a structured dict with success flag.\n"
+            "- success=True: {table, operation, results?, count, pagination?}\n"
+            "  * operation='query'|'batch_read'|'count'\n"
+            "  * results present for query/batch_read; count present for all\n"
+            "- success=False: {error, error_type, table, Agent Action: ...}"
         ),
         args_schema=ReadDataInput,
         coroutine=_read_data_impl,

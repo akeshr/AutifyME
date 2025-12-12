@@ -391,7 +391,11 @@ def create_inspect_schema_tool(
             "# Multi-table operation - understand relationships\n"
             "inspect_schema(tables=['products','product_families','variant_axes'], details=['structure','relationships'])\n"
             "Returns: Foreign keys (products.product_family_id -> product_families.id), cascade behavior\n\n"
-            "RETURNS: Schema dict with requested details per table - structure (columns/types/constraints), relationships (FKs/cascades), stats (row counts), samples (real data)"
+            "RETURNS: Always a structured dict with success flag.\n"
+            "- success=True: {domain, version, details, tables{table_name: {...}}}\n"
+            "  * tables[...] contains requested sections: structure/relationships/constraints/stats/samples\n"
+            "- success=False: {error, error_type, tables, Agent Action: ...}\n"
+            "NOTE: Tools may be table-scoped per specialist; if a table is forbidden you'll get a permission-style error with an action hint."
         ),
         args_schema=InspectSchemaInput,
         coroutine=_inspect_schema_impl,
