@@ -10,7 +10,7 @@ from autifyme_agents.core.gemini_retry import GeminiWithRetry
 
 def get_llm(
     provider: str = "google",
-    model: str = "gemini-2.5-flash",
+    model: str = "gemini-2.5-pro",
     temperature: float = 0.1,
     tags: list[str] | None = None,
     reasoning_effort: str = "low",

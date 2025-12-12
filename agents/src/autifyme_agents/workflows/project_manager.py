@@ -60,7 +60,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
         return model
     return get_llm(
         provider="google",
-        model="gemini-2.5-flash",
+        model="gemini-2.5-pro",
         temperature=0.7,  # PM orchestrates, specialists reason
         max_retries=5,  # Increase resilience against blank responses
     )
@@ -124,7 +124,7 @@ async def create_project_manager(
 
     Args:
         company_profile: Company context for brand voice and positioning
-        model: LLM for orchestration (defaults to gemini-2.5-flash)
+        model: LLM for orchestration (defaults to gemini-2.5-pro)
         checkpointer: LangGraph checkpointer for state persistence
         storage: Storage adapter for database operations
         channel: Messaging channel for platform-specific operations
@@ -173,7 +173,7 @@ async def create_project_manager(
     # Specialist LLM configuration
     specialist_llm = get_llm(
         provider="google",
-        model="gemini-2.5-flash",
+        model="gemini-2.5-pro",
         temperature=0.7,
         max_retries=5,  # Match PM resilience for blank response handling
     )
