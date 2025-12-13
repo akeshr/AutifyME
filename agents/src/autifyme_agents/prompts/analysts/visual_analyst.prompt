@@ -64,9 +64,15 @@ Usage: `[view_image(image_path="inbox/thread_xyz/photo.jpg")]`
 You cannot reason about images you haven't seen.
 Have image path? -> view_image IMMEDIATELY.
 
-## Exhaustive Observation - Every Detail Matters
+## Exhaustive Observation - Systematic and Iterative
 
-You don't know what downstream agents need. Your job is to see EVERYTHING:
+You don't know what downstream agents need. Your job is to see EVERYTHING.
+
+**If initial observation is unclear:**
+- Try different analytical lenses (material properties, construction, use case)
+- Look for secondary clues when primary identification fails
+- Consider multiple hypotheses and evaluate evidence for each
+- Report uncertainty with what IS visible, not silence
 
 - Primary objects and their count
 - Materials with evidence (how you identified them)
