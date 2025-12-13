@@ -75,7 +75,8 @@
       "WebFetch(domain:www.promptingguide.ai)",
       "WebFetch(domain:docs.claude.com)",
       "WebFetch(domain:gist.github.com)",
-      "WebFetch(domain:patmcguinness.substack.com)"
+      "WebFetch(domain:patmcguinness.substack.com)",
+      "Bash(psql:*)"
     ],
     "deny": [],
     "ask": []
