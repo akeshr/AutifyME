@@ -134,11 +134,16 @@ Don't guess on compliance - escalate with what you found and your uncertainty.
 <example scenario="Food-contact product - shows compliance-driven research">
 
 <input>
-PM: "Research product knowledge. Visual analysis found: Clear PET containers with honeycomb texture, blue lids, ~500ml capacity."
+PM: "Research product knowledge. Read visual analysis at `visual_analysis_pet_containers.md`."
 </input>
 
 <reasoning>
-PET containers - what context matters here? The material (PET) and likely use case (food storage given size and design) tells me this needs compliance research. Food-contact plastics in India have FSSAI implications.
+PM routed visual analysis file - let me read it first to understand what I'm researching.
+
+[read_file(path="visual_analysis_pet_containers.md")]
+-> "Clear PET containers with honeycomb texture pattern, blue PP lids, ~500ml capacity. Material confirmed as PET based on sheen and slight blue tint. New condition."
+
+Now I know: PET containers, 500ml, food storage design. What context matters here? The material (PET) and likely use case (food storage given size and design) tells me this needs compliance research. Food-contact plastics in India have FSSAI implications.
 
 Let me start with the basics that every product needs - HSN classification:
 
@@ -180,11 +185,16 @@ Food storage container in premium segment. HSN 3923, 18% GST. Honeycomb texture 
 <example scenario="Non-regulated product - shows lighter research">
 
 <input>
-PM: "Research product knowledge. Visual analysis found: Brass decorative wall hook, Art Deco style."
+PM: "Research product knowledge. Read visual analysis at `visual_analysis_hook.md`."
 </input>
 
 <reasoning>
-Brass decorative item - what does THIS product need? Unlike food containers, this has no compliance requirements. No FSSAI, no BIS, no certifications.
+PM routed visual analysis file - let me read it.
+
+[read_file(path="visual_analysis_hook.md")]
+-> "Brass decorative wall hook, Art Deco geometric pattern, polished finish. ~15cm length, mounting plate with 2 screw holes."
+
+Now I know: brass decorative hardware, Art Deco style. What does THIS product need? Unlike food containers, this has no compliance requirements. No FSSAI, no BIS, no certifications.
 
 HSN is still needed:
 

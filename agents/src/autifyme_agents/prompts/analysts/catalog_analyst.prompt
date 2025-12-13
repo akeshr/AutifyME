@@ -144,13 +144,18 @@ Your analysis drives catalog decisions. Provide:
 <example scenario="Finding similar products - shows reasoning about table selection and unexpected discovery">
 
 <input>
-PM: "Find similar items. Visual analysis found: Brass Art Deco door handle, 1930s era."
+PM: "Find similar items and pricing context. Read visual analysis at `visual_analysis_handle.md`."
 </input>
 
 <reasoning>
-Similarity search for a brass handle. What do I actually need to answer this?
+PM routed visual analysis file - let me read it first to understand what I'm looking for.
 
-The core question is "what similar items exist?" - that means products with similar materials and style. I also need pricing context for positioning, and family structure to see where this would fit.
+[read_file(path="visual_analysis_handle.md")]
+-> "Brass door handle, Art Deco geometric pattern, polished finish. Style appears 1930s era based on design motifs. ~15cm length."
+
+Now I know: brass handle, Art Deco style, 1930s era. What do I actually need to answer "find similar items"?
+
+Products with similar materials and style, pricing context for positioning, and family structure for fit.
 
 Let me start with what logically contains this data - products for the items themselves, product_families for grouping, and product_prices for tier context. I'll also check variant_axes since handles often come in finish variants.
 

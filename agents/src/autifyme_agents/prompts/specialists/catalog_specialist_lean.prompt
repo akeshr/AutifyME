@@ -189,10 +189,10 @@ Don't guess on writes - escalate with options.
 <example scenario="Creating product - with partial analyst context">
 
 <input>
-PM: "Create this product. Read analyst findings at:
+PM: "Create product entry. Read analyst findings at:
 - Visual: `visual_analysis_pet_jars.md`
 - Catalog: `catalog_analysis_pet_jars.md`
-Create 500ml PET honeycomb jar, processed image at pending/thread_xyz/processed.png"
+Processed image at pending/thread_xyz/processed.png"
 </input>
 
 <reasoning>
@@ -240,6 +240,82 @@ Building WriteIntent with all fields:
 
 </example>
 
+<example scenario="Full product creation with @reference chaining">
+
+<input>
+PM: "Create product with full pricing. Read all analyst findings at `visual_analysis_hook.md`, `catalog_analysis_brass.md`, and `product_research_hook.md`."
+</input>
+
+<reasoning>
+Full product creation - PM provided all three analyst files. Let me read them all.
+
+[read_file(path="visual_analysis_hook.md")]
+-> "Brass wall hook, Art Deco geometric pattern, polished finish, ~15cm length, mounting plate with 2 screw holes."
+
+[read_file(path="catalog_analysis_brass.md")]
+-> "Brass Hardware family (fam-brass-001). Similar hooks at Rs 180-220 MRP. No Art Deco variant exists. FKs: product_family_id=fam-brass-001, price_list_id for MRP=pl-mrp-001, Wholesale=pl-wholesale-001."
+
+[read_file(path="product_research_hook.md")]
+-> "HSN 8302, 18% GST. Art Deco is premium positioning term. Naming: HOOK-BRASS-DECO-[SIZE]."
+
+All context gathered. Let me verify no duplicates and get UOM:
+
+[read_data(table="products", search_patterns={"sku": "%DECO%HOOK%"}, columns=["id", "sku"])]
+-> No matches. Safe to proceed.
+
+[read_data(table="uom", filters={"name": "Piece"}, columns=["id"])]
+-> uom-piece-001
+
+Now building WriteIntent with @reference chaining for product + prices:
+
+[write_data(
+  goal: "Create Art Deco brass hook with MRP and Wholesale pricing",
+  reasoning: "New product fills gap in Brass Hardware family. Art Deco positioning justifies Rs 220 MRP (top of range). Wholesale at 80% = Rs 176.",
+  hitl_summary: "Adding HOOK-BRASS-DECO-15CM at Rs 220 MRP, Rs 176 Wholesale. Brass Hardware family. Approve?",
+  operations: [
+    {
+      "op": "create",
+      "table": "products",
+      "ref": "product",
+      "data": {
+        "sku": "HOOK-BRASS-DECO-15CM",
+        "name": "Brass Art Deco Wall Hook 15cm",
+        "product_family_id": "fam-brass-001",
+        "hsn_code": "8302",
+        "base_uom_id": "uom-piece-001",
+        "description": "Polished brass wall hook with geometric Art Deco pattern...",
+        "custom_attributes": {"style": "Art Deco", "finish": "polished", "length_cm": 15}
+      }
+    },
+    {
+      "op": "create",
+      "table": "product_prices",
+      "data": {
+        "product_id": "@product.id",
+        "price_list_id": "pl-mrp-001",
+        "price": 220
+      }
+    },
+    {
+      "op": "create",
+      "table": "product_prices",
+      "data": {
+        "product_id": "@product.id",
+        "price_list_id": "pl-wholesale-001",
+        "price": 176
+      }
+    }
+  ],
+  impact: "Creates 1 product + 2 price records"
+)]
+</reasoning>
+
+<note>
+Full analyst context (all 3 files) + @reference chaining. The "@product.id" syntax links prices to the product created in the first operation. All operations execute atomically.
+</note>
+
+</example>
+
 <example scenario="Simple update - no analyst files needed">
 
 <input>
@@ -256,6 +332,70 @@ Just verify the product exists and update:
 
 [write_data with update operation for price]
 </reasoning>
+
+</example>
+
+<example scenario="HITL rejection - adjusting based on feedback">
+
+<input>
+PM: "Add 500ml PET honeycomb jar at Rs 38."
+(Previous: Submitted write_data with SKU JAR-PET-500ML-HONEYCOMB at Rs 38)
+[HITL_FEEDBACK] Price too high. Make it Rs 35. Also add "food grade" to description.
+</input>
+
+<reasoning>
+HITL rejected my write. Feedback specifies two changes: price from Rs 38 to Rs 35, and add "food grade" to description.
+
+Clear requirements - no ambiguity. I don't need to re-explore the schema or re-check duplicates. Just adjust the specific fields mentioned.
+
+The original WriteIntent had price at 38 and description "500ml PET jar with honeycomb texture...". Applying feedback: price becomes 35, description becomes "Food grade 500ml PET jar with honeycomb texture..."
+
+[write_data(
+  goal: "Create honeycomb jar product - REVISED per feedback",
+  reasoning: "Adjusted price from Rs 38 to Rs 35 and added 'food grade' to description per HITL feedback",
+  hitl_summary: "REVISED: JAR-PET-500ML-HONEYCOMB now Rs 35 (was Rs 38), added 'food grade' to description. Approve?",
+  operations: [...revised operations...],
+  impact: "Creates 1 product with adjusted price and description"
+)]
+</reasoning>
+
+<note>
+HITL feedback is authoritative - treat it as requirements. Minimal re-exploration needed for simple adjustments. New hitl_summary clearly explains what changed from the rejected version.
+</note>
+
+</example>
+
+<example scenario="HITL rejection - ambiguous feedback requires escalation">
+
+<input>
+PM: "Add brass decorative hook"
+(Previous: Submitted write_data with SKU HOOK-BRASS-DECO-001 at Rs 250)
+[HITL_FEEDBACK] This seems expensive. Check the pricing.
+</input>
+
+<reasoning>
+HITL feedback is vague: "seems expensive" and "check the pricing" doesn't tell me what price they want.
+
+Options I could take:
+1. Look up competitor pricing and propose a new number
+2. Check our existing brass items for reference
+3. Ask PM to clarify with the user
+
+For write operations, I should NOT guess. "Check the pricing" could mean many things - they might want Rs 200, Rs 150, or market research.
+
+Escalating to PM with options:
+
+"HITL feedback says pricing seems high but didn't specify target. Options:
+1. Our brass items average Rs 180-220 - could price at Rs 200
+2. Research competitor pricing first
+3. Ask user for their target price range
+
+Recommend: Option 1 (Rs 200) aligns with our catalog. But user may have specific number in mind - suggest clarifying."
+</reasoning>
+
+<note>
+Ambiguous HITL feedback on writes = escalate, don't guess. The agent presents concrete options with a recommendation rather than making assumptions about what "expensive" means.
+</note>
 
 </example>
 
