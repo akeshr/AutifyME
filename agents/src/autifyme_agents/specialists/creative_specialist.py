@@ -40,8 +40,8 @@ from autifyme_agents.tools.image_studio import create_image_studio_tool
 if TYPE_CHECKING:
     from autifyme_agents.core.ports import StorageInterface
 
-# Creative Specialist uses Gemini 2.5 Pro for multimodal reasoning (can see images)
-CREATIVE_SPECIALIST_MODEL = "gemini-2.5-pro"
+# Creative Specialist uses Gemini 2.5 Flash Lite for multimodal reasoning (can see images)
+CREATIVE_SPECIALIST_MODEL = "gemini-2.5-flash-lite"
 
 # Tables accessible by Creative Specialist
 CREATIVE_READ_TABLES = [
@@ -69,7 +69,7 @@ def create_creative_specialist(
     PM passes storage_path in task description, specialist calls view_image to see it.
 
     Args:
-        model: Optional LLM override. Defaults to Gemini 2.5 Pro (multimodal).
+        model: Optional LLM override. Defaults to Gemini 2.5 Flash Lite (multimodal).
         storage: Optional storage client for image persistence to Supabase.
 
     Returns:

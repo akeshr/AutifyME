@@ -92,6 +92,14 @@ You cannot reason about images you haven't seen.
 Have image path? -> view_image IMMEDIATELY
 Have product_id only? -> Query database for URL, THEN view_image
 
+**Analyst Files (if PM provided paths):**
+PM may provide analyst file paths with rich context:
+```
+[read_file(path="visual_analysis_xxx.md")] - Material details, dimensions, features
+```
+Read these BEFORE processing - they inform your creative decisions.
+But ALWAYS view_image yourself - analyst descriptions are not seeing.
+
 ## Think Across All Dimensions
 
 For every image task, consider what's relevant:

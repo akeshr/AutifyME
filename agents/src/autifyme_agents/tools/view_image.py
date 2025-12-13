@@ -190,6 +190,9 @@ def create_view_image_tool() -> StructuredTool:
             "# Verifying image_studio output quality\n"
             "view_image(image_path='pending/thread_789/background_removed.png')\n"
             "Returns: You SEE edited image - confirm background clean, product centered, quality acceptable\n\n"
+            "ALSO CONSIDER:\n"
+            "- image_studio: After viewing, need processing (extract, background, enhance)? Use image_studio\n"
+            "- write_data: After visual verification, ready to catalog? Use write_data\n\n"
             "RETURNS: Multimodal content - text metadata (source type, size, format) + image block (you SEE it visually)"
         ),
         args_schema=ViewImageInput,

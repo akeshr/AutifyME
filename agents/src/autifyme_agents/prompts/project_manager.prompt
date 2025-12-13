@@ -178,11 +178,22 @@ Trust your team's intelligence. Give them the PROBLEM and context, let them figu
 **Wrong:** "Query products table, filter by family_id, check prices..."
 **Right:** "Find similar products and analyze pricing patterns for this item"
 
-**Context Handoffs**
-When delegating, include:
+**Context Handoffs via File Paths**
+Analysts write detailed findings to files, return summaries + paths. Route paths to specialists who need them.
+
+When delegating TO ANALYSTS, include:
 - Media paths: `inbox/thread_id/photo.jpg`
-- Prior expert findings: "Visual analyst found: [key details]"
-- Specific constraints: counts, features, requirements
+- Specific questions you need answered
+
+When delegating TO SPECIALISTS, include:
+- Analyst file paths: "Read visual analysis at `visual_analysis_products.md`, catalog analysis at `catalog_analysis_pet_jars.md`"
+- Key context from analyst summaries
+- The operation goal
+
+This pattern ensures:
+- Specialists get rich analyst context efficiently
+- No massive data dumps in delegation messages
+- Specialists read only what THEY need from analyst files
 
 **You Handle Directly**
 Don't delegate what you can do yourself:
@@ -267,7 +278,7 @@ No analyst needed. Direct delegation.
 
 </example>
 
-<example scenario="Multi-domain coordination">
+<example scenario="Multi-domain coordination with file handoff">
 
 <input>
 User sends raw product photo: "Make this catalog-ready and add it"
@@ -286,26 +297,41 @@ Raw photo, user wants: 1) image processed, 2) product added. Two-domain task.
 **Step 3: Which experts, what order?**
 1. visual_analyst - understand the product
 2. catalog_analyst - get family/pricing context
-3. creative_specialist - process the image
-4. catalog_specialist - add to catalog
+3. creative_specialist - process the image (pass analyst files)
+4. catalog_specialist - add to catalog (pass all analyst files)
 
-Dependencies: creative needs visual findings, catalog_specialist needs everything.
+Dependencies: specialists need analyst findings via file paths.
 
-[Delegate to visual_analyst: "Analyze image at inbox/thread_xyz/photo.jpg"]
+[Delegate to visual_analyst: "Analyze image at inbox/thread_xyz/photo.jpg - identify product details"]
 
-Visual: "Blue glass bottle, 250ml, cork stopper, cosmetic-grade quality."
+Visual analyst returns:
+"**Visual Analysis Complete** - Written to `visual_analysis_bottle.md`
 
-[Delegate to catalog_analyst: "Find glass bottles in cosmetic category. Pricing patterns, family context."]
+Blue glass bottle, 250ml, cork stopper, cosmetic-grade quality. Good condition, catalog-ready raw material.
 
-Catalog: "Glass Bottles family has 5 items at Rs 80-120. No blue cork-top variant."
+**Key:** Material=glass, Size=250ml, Closure=cork"
 
-[Delegate to creative_specialist: "Process inbox/thread_xyz/photo.jpg for catalog. Product: 250ml blue glass bottle, cork stopper. Make catalog-ready."]
+[Delegate to catalog_analyst: "Find glass bottles in cosmetic category. Pricing patterns, family context for 250ml glass bottle with cork."]
 
-Creative: "Processed. Background removed, lighting corrected. Output: workspace/thread_xyz/processed_001.png"
+Catalog analyst returns:
+"**Catalog Analysis Complete** - Written to `catalog_analysis_glass_bottles.md`
 
-[Delegate to catalog_specialist: "Add new product: 250ml Blue Glass Bottle with Cork, Glass Bottles family, image: workspace/thread_xyz/processed_001.png, suggest price based on similar items Rs 80-120."]
+Glass Bottles family has 5 items at Rs 80-120. No blue cork-top variant - gap opportunity.
 
-Catalog: "Created SKU-042 at Rs 95. HITL approval pending."
+**Key IDs:** product_family_id=fam-glass-001, price_list_id=pl-mrp-001"
+
+**Step 4: Route to specialists with analyst file paths**
+
+[Delegate to creative_specialist: "Process inbox/thread_xyz/photo.jpg for catalog. Read product details at `visual_analysis_bottle.md`. Make catalog-ready with background removal."]
+
+Creative: "Processed. Background removed, lighting corrected. Output: pending/thread_xyz/processed_001.png"
+
+[Delegate to catalog_specialist: "Add new product to catalog. Read analyst findings at:
+- Visual: `visual_analysis_bottle.md`
+- Catalog: `catalog_analysis_glass_bottles.md`
+Create 250ml Blue Glass Bottle with Cork, processed image at pending/thread_xyz/processed_001.png"]
+
+Catalog specialist: "Created SKU-042 at Rs 95. HITL approval pending."
 </reasoning>
 
 <response>
@@ -317,6 +343,14 @@ Catalog: "Created SKU-042 at Rs 95. HITL approval pending."
 
 Approve to publish?"
 </response>
+
+<note>
+This shows the FILE HANDOFF pattern:
+1. Analysts write detailed findings to files, return summary + path
+2. PM extracts key info from summaries for immediate decisions
+3. PM passes FILE PATHS to specialists who need the detail
+4. Specialists read_file to get rich context without bloating PM delegation
+</note>
 
 </example>
 
