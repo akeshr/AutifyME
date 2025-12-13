@@ -55,50 +55,94 @@
 
 ---
 
-### Problem 2: Analysts and Specialists are Very Restricted
+### Problem 2: Analysts and Specialists are Very Restricted - [FIXED]
+
+**Status:** FIXED (December 13, 2025)
 
 **Vision Requirement:**
-> "Specialists are autonomous domain masters who explore possibilities... **Explorative Problem-Solving (Explore → Reason → Output) ALWAYS**... Autonomous regardless of analyst context."
+> "Specialists are autonomous domain masters who explore possibilities... **Explorative Problem-Solving (Explore -> Reason -> Output) ALWAYS**... Autonomous regardless of analyst context."
 
-**Current Implementation:**
+**What Was Fixed:**
 
-```
-# Catalog specialist prompt line 8:
-"PM delegates to you for catalog operations WITH enriched context from analysts."
+| Agent | Before | After |
+|-------|--------|-------|
+| **catalog_specialist** | "WITH enriched context from analysts", "You focus on EXECUTION" | Autonomy declaration, Explore->Reason->Output framework, Self-verification |
+| **creative_specialist** | Good patterns but no policy layer | Autonomy declaration, Policy layer, Self-verification, Escalation |
+| **catalog_analyst** | Good principles but no self-check | Autonomy declaration, Policy layer, Self-verification, Confidence calibration |
+| **product_analyst** | Good principles but no structure | Autonomy declaration, Policy layer, Self-verification, Escalation |
+| **visual_analyst** | OK but inconsistent with others | Autonomy declaration, Policy layer, Self-verification |
 
-# Catalog specialist prompt line 14:
-"You have scoped database access to the catalog domain tables"
-```
+**Files Changed:**
+- `agents/src/autifyme_agents/prompts/specialists/catalog_specialist_lean.prompt`
+- `agents/src/autifyme_agents/prompts/specialists/creative_specialist_lean.prompt`
+- `agents/src/autifyme_agents/prompts/analysts/catalog_analyst.prompt`
+- `agents/src/autifyme_agents/prompts/analysts/product_analyst.prompt`
+- `agents/src/autifyme_agents/prompts/analysts/visual_analyst.prompt`
 
-**Violations:**
+**Key Changes Applied to ALL Agents:**
 
-**2A. Dependency Signal**
+1. **Autonomy Declaration in Identity:**
+   ```xml
+   **Your Autonomy:**
+   - You EXPLORE first, regardless of what context PM provides
+   - Analyst findings are SUPPLEMENTARY - validate through your own exploration
+   - You decide HOW to accomplish the goal PM delegates
+   - You are a domain MASTER, not a passive executor
+   ```
 
-- Specialist prompt emphasizes "WITH enriched context from analysts"
-- Creates expectation that analysts provide context, specialist just executes
-- Contradicts vision: "Autonomous regardless of analyst context"
+2. **Policy Layer with Goals:**
+   ```xml
+   <policy>
+   ## Your Goals (Priority Order)
+   1. **ACCURACY** - ...
+   2. **COMPLETENESS** - ...
+   3. **STRATEGIC VALUE** - ...
+   4. **EFFICIENCY** - ...
+   </policy>
+   ```
 
-**2B. Scope Confusion**
+3. **Self-Verification Section:**
+   ```xml
+   <self_verification>
+   ## Before [Action] - Self-Check
+   - Exploration complete?
+   - Quality criteria met?
+   - Confidence calibration?
+   </self_verification>
+   ```
 
-- "Scoped database access" sounds restrictive
-- Vision says: "Deep Domain Mastery - full tool access for that domain"
-- Unclear if scoping is domain boundary (correct) or artificial limitation (wrong)
+4. **Escalation Protocol (Specialists):**
+   ```xml
+   <escalation>
+   ## When to Escalate to PM
+   - Ambiguous requirements
+   - Domain boundary crossed
+   - Conflicting information
+   </escalation>
+   ```
 
-**2C. Exploration Not Emphasized**
+5. **Explore -> Reason -> Output Framework (Catalog Specialist):**
+   ```xml
+   <exploration_framework>
+   ## EXPLORE -> REASON -> OUTPUT (Mandatory)
+   ### Step 1: EXPLORE (Always First)
+   ### Step 2: REASON (Synthesize All Information)
+   ### Step 3: OUTPUT (Execute with Confidence)
+   </exploration_framework>
+   ```
 
-- Prompt doesn't emphasize: "ALWAYS explore FIRST, regardless of analyst findings"
-- "Understand Before Acting" principle exists, but buried
-- No clear "Explore → Reason → Output" structure
+**AI Autonomy Alignment:**
 
-**Manifestation:**
+| Principle | Implementation |
+|-----------|----------------|
+| SENSE | Each agent senses via their domain tools (view_image, read_data, research) |
+| THINK: Knowledge | Tools provide knowledge access (schema, catalog, web research) |
+| THINK: Policy | Explicit policy layer with prioritized goals |
+| THINK: Reasoning | Self-verification before output |
+| ACT | Domain-specific actions (write_data, image_studio, etc.) |
+| Self-Awareness | Confidence calibration, escalation when uncertain |
 
-- Specialists may skip exploration when analysts provided context
-- Specialists may wait for PM to provide "complete" context
-- Specialists may not know they have autonomy to research/discover independently
-
-**Root Cause:** Prompts emphasize dependency and execution over autonomous exploration.
-
-**Autonomy Impact:** **CRITICAL** - Specialists become passive executors, not domain experts.
+**Validation:** Test with autonomous testing framework to verify exploration-first behavior.
 
 ---
 
@@ -202,29 +246,7 @@ search_patterns: dict[str, str] | None = Field(
 
 ### Problem 2: Specialist Restriction - Specific Issues
 
-| Issue | Current State | Vision Requirement | Impact |
-|-------|---------------|-------------------|--------|
-| **Dependency Language** | "PM delegates WITH enriched context from analysts" | "Autonomous regardless of analyst context" | Specialists wait for analyst findings |
-| **Passive Execution Framing** | "You focus on EXECUTION" | "Explorative Problem-Solving - FIRST: Explore comprehensively" | Specialists skip exploration |
-| **Exploration Not First** | Principles: "Understand Before Acting" (buried) | "Explore → Reason → Output ALWAYS (structure)" | Exploration feels optional |
-| **Scope Ambiguity** | "Scoped database access to catalog domain tables" | "Deep Domain Mastery - full tool access for that domain" | Unclear if tools are limited |
-| **No Escalation Triggers** | Prompt doesn't define when to escalate | "Escalate when hitting domain boundaries" | Specialists don't know when to stop |
-
-**Evidence from Catalog Specialist Prompt:**
-
-- Line 8: "WITH enriched context from analysts" - dependency signal
-- Line 8: "You focus on EXECUTION" - passive framing
-- Line 54-63: "Understand Before Acting" principle exists but not emphasized as FIRST step
-- Line 14: "Scoped database access" - sounds restrictive (though may be correct domain boundary)
-- No "ALWAYS explore FIRST" mandate
-- No "Analyst context is supplementary, not directive" clarification
-
-**What's Missing:**
-
-- Opening principle: "You are AUTONOMOUS. Explore FIRST, regardless of analyst context."
-- Clear structure: "Step 1: Explore (schema, data, images). Step 2: Reason (synthesize). Step 3: Output (execute)."
-- Explicit: "Analyst findings are supplementary. Validate through your own exploration."
-- Escalation protocol: "When to escalate vs iterate vs proceed"
+**Status:** ADDRESSED - See "Problem 2: Analysts and Specialists are Very Restricted - [FIXED]" above for details.
 
 ---
 
@@ -325,19 +347,19 @@ LOW AUTONOMY                                  HIGH AUTONOMY
 
 ### P0: CRITICAL - Breaks Autonomous Reasoning
 
-1. **Problem 1: PM Fixed Workflows**
+1. **Problem 1: PM Fixed Workflows** - [FIXED]
    - Impact: PM becomes template follower, not intelligent orchestrator
    - Blocks: Dynamic multi-domain coordination
    - Fix Effort: Medium (prompt rewrite + multiple examples)
 
-2. **Problem 2: Specialist Dependency**
+2. **Problem 2: Specialist Dependency** - [FIXED]
    - Impact: Specialists become passive executors, not explorative experts
    - Blocks: Autonomous exploration and domain mastery
    - Fix Effort: Medium (prompt restructure + autonomy emphasis)
 
 ### P1: HIGH - Reduces Effectiveness
 
-3. **Problem 3: Tool Usage Inefficiency**
+3. **Problem 3: Tool Usage Inefficiency** - [PENDING]
    - Impact: Agents underutilize powerful tools, make avoidable mistakes
    - Blocks: Efficient workflows, power user capabilities
    - Fix Effort: High (redesign all tool descriptions to decision guide format)
@@ -346,17 +368,18 @@ LOW AUTONOMY                                  HIGH AUTONOMY
 
 ## Next Steps
 
-**Proposed Sequence:**
+**Progress:**
 
-1. **Fix Problem 1 (PM Orchestration)** - Enable dynamic reasoning
-2. **Fix Problem 2 (Specialist Autonomy)** - Enable explorative mastery
-3. **Fix Problem 3 (Tool Guidance)** - Enable power usage
+1. **Fix Problem 1 (PM Orchestration)** - [COMPLETED] Dynamic reasoning enabled
+2. **Fix Problem 2 (Specialist Autonomy)** - [COMPLETED] Explorative mastery enabled
+3. **Fix Problem 3 (Tool Guidance)** - [NEXT] Enable power usage
 
-**Why This Order:**
+**Remaining Work:**
 
-- PM orchestration affects all workflows (highest leverage)
-- Specialist autonomy unblocks domain expertise (enables quality)
-- Tool guidance amplifies both (optimization layer)
+- **Problem 3:** Redesign tool descriptions from API reference to decision guides
+  - Add PURPOSE / USE WHEN / DON'T USE / RETURNS / NEEDS format
+  - Signal tool overlap explicitly
+  - Include power user guidance
 
 **Validation:**
 
