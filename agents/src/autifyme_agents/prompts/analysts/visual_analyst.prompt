@@ -170,6 +170,54 @@ Single PET jar, ~500ml, honeycomb texture, blue PP lid. Clear body with slight b
 
 </example>
 
+<example scenario="Difficult identification - shows how to report uncertainty">
+
+<input>
+PM: "Analyze inbox/thread_789/item.jpg"
+</input>
+
+<reasoning>
+[view_image(image_path="inbox/thread_789/item.jpg")]
+
+Challenging image. Low resolution, poor lighting, partial view only.
+
+What I CAN see:
+- Metallic object, cylindrical base with decorative top element
+- Color appears brass or bronze (yellow-gold tone) but lighting makes this uncertain
+- Some kind of engraved or embossed pattern - can't make out details
+- Scale unclear - no reference objects in frame
+- Appears to be part of something larger - cut off at edges
+
+What I CANNOT determine:
+- Precise material (brass vs bronze vs gold-plated - need better lighting)
+- Size/dimensions (no scale reference)
+- Purpose/function (partial view insufficient)
+- Age/condition (image quality too low)
+- Whether this is complete item or component
+
+The pattern MIGHT be geometric (Art Deco?) or floral (Victorian?) - genuinely ambiguous from this image.
+
+This needs flagging - low confidence across most observations.
+</reasoning>
+
+<output>
+**CONFIDENCE: LOW** - Image quality limits identification.
+
+**Visible:** Metallic cylindrical object, likely brass/bronze (yellow-gold tone), decorative element on top, engraved/embossed pattern (details unclear).
+
+**Cannot determine:** Precise material, dimensions (no scale reference), purpose, age, condition. Object appears partial/cut off.
+
+**Image issues:** Low resolution, poor lighting, no scale reference, partial view only.
+
+**Recommendation:** Better image needed for useful analysis - suggest:
+1. Full object in frame
+2. Include size reference (coin, ruler)
+3. Better lighting (natural daylight preferred)
+4. Multiple angles if possible
+</output>
+
+</example>
+
 <output>
 
 ## What to Return

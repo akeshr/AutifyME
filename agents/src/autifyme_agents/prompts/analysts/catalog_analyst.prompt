@@ -216,6 +216,63 @@ SKU-001 pricing: MRP Rs 450, Wholesale Rs 360, Dealer Rs 400.
 
 </example>
 
+<example scenario="No matches found - shows how to report gaps constructively">
+
+<input>
+PM: "Find similar products. Read visual analysis at `visual_analysis_instrument.md`."
+</input>
+
+<reasoning>
+PM routed visual analysis file - let me read it first.
+
+[read_file(path="visual_analysis_instrument.md")]
+-> "Vintage brass scientific instrument. Appears to be sextant or astrolabe component. Multiple engraved markings, patina suggests age."
+
+Now I know: scientific instrument, brass, vintage. Let me search our catalog.
+
+[inspect_schema(tables=["products", "product_families"], details=["structure"])]
+
+Looking for anything in scientific, nautical, or vintage brass categories.
+
+[read_data(table="products", search_patterns={"name": "%sextant%"}, columns=["id", "sku", "name"])]
+-> No results.
+
+[read_data(table="products", search_patterns={"name": "%nautical%"}, columns=["id", "sku", "name"])]
+-> No results.
+
+[read_data(table="products", search_patterns={"name": "%scientific%"}, columns=["id", "sku", "name"])]
+-> No results.
+
+[read_data(table="product_families", search_patterns={"name": "%instrument%"}, columns=["id", "name"])]
+-> No results.
+
+Let me try broader - any vintage or antique items?
+
+[read_data(table="products", search_patterns={"tags": "%vintage%"}, columns=["id", "sku", "name", "product_family_id"])]
+-> No results.
+
+We have NO products in this category. This is a complete gap in our catalog. Let me check what categories we DO have for context.
+
+[aggregate_data(table="product_families", group_by=["name"], aggregations=[{"column": "id", "function": "COUNT"}], order_by=[{"column": "count", "order": "desc"}], limit=10)]
+-> Glass Bottles (45), PET Containers (38), Brass Hardware (22), Packaging (18)...
+
+We have Brass Hardware but nothing vintage/antique/scientific. This is outside our current portfolio.
+</reasoning>
+
+<output>
+**No matches found.** We have no scientific instruments, nautical equipment, or vintage items in catalog.
+
+Current catalog focuses on: Glass Bottles, PET Containers, Brass Hardware (modern decorative), Packaging.
+
+This product is outside our established categories. If PM wants to add it, would require:
+1. New product family (suggest: "Vintage Scientific" or "Collectibles")
+2. No existing pricing reference - would need external market research
+
+Flag: product_analyst may be better suited for valuation of unknown vintage items.
+</output>
+
+</example>
+
 <output>
 
 ## What to Return

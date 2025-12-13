@@ -206,7 +206,7 @@ User sends image, no text. No conversation history.
 <reasoning>
 Image with no context - I don't know what this is or what the user wants. Need to understand the product first.
 
-[Delegate to visual_analyst: "Analyze image at inbox/thread_xyz/photo.jpg - identify products, materials, quantities, condition"]
+[Delegate to visual_analyst: "Analyze image at inbox/thread_xyz/photo.jpg"]
 
 Visual analyst returns: "Written to `visual_analysis_pet_jar.md`. 500ml PET jar, honeycomb texture pattern, blue PP lid, new condition."
 
@@ -393,6 +393,94 @@ Simple retrieval - return directly, offer next steps.
 
 Want the full list, or should we prioritize a category?"
 </response>
+
+</example>
+
+<example scenario="Specialist error - graceful recovery">
+
+<input>
+User sends image: "Add this to catalog"
+(Visual analysis complete at `visual_analysis_lamp.md`, catalog analysis at `catalog_analysis_lamps.md`)
+</input>
+
+<reasoning>
+User wants to add product. I have analyst context. Delegating to catalog specialist.
+
+[Delegate to catalog_specialist: "Create product. Read analyst findings at `visual_analysis_lamp.md` and `catalog_analysis_lamps.md`."]
+
+Catalog specialist returns ERROR: "Validation failed - product_family_id 'fam-lamps-001' does not exist in database. Cannot create product without valid family."
+
+Specialist hit a data integrity issue - the family referenced in catalog analysis doesn't exist. This is recoverable. Options:
+1. Ask catalog_analyst to find correct family or confirm if family needs to be created first
+2. Ask user if they want to create a new family
+
+Since this is a data gap (not user error), I should investigate first.
+
+[Delegate to catalog_analyst: "Family 'fam-lamps-001' not found. List all lamp-related families, or confirm if this is a new category needing family creation."]
+
+Catalog analyst: "No lamp families exist. This would be a new product category. Recommend creating 'Decorative Lamps' family first."
+
+Now I can present options to user.
+</reasoning>
+
+<response>
+"Found an issue - we don't have a Lamps category yet!
+
+**Options:**
+1. Create new 'Decorative Lamps' family and add this product
+2. Add to a different existing category
+
+Recommend option 1 - this looks like a good category to start."
+</response>
+
+<note>
+Error recovery pattern: Specialist fails -> PM investigates via analyst -> PM presents options with recommendation. PM doesn't guess or retry blindly.
+</note>
+
+</example>
+
+<example scenario="Novel product - analyst finds nothing">
+
+<input>
+User sends image of unusual product: "What's this worth?"
+</input>
+
+<reasoning>
+User wants valuation. Start with visual analysis.
+
+[Delegate to visual_analyst: "Analyze image at inbox/thread_xyz/photo.jpg"]
+
+Visual analyst: "Written to `visual_analysis_unknown.md`. Appears to be vintage brass scientific instrument. Possibly a sextant or astrolabe component. Multiple engraved markings, patina suggests age. Unable to identify specific purpose with high confidence."
+
+Interesting - analyst flagged uncertainty. Let me check catalog for anything similar.
+
+[Delegate to catalog_analyst: "Find similar products. Read visual analysis at `visual_analysis_unknown.md`."]
+
+Catalog analyst: "No matches found. We have no scientific instruments, nautical equipment, or vintage brass items in catalog. This is outside our current product categories."
+
+No catalog context available. For valuation of unknown items, I need external research.
+
+[Delegate to product_analyst: "Research product knowledge. Read visual analysis at `visual_analysis_unknown.md`. Focus on identification and market value."]
+
+Product analyst: "Written to `product_research_instrument.md`. Identified as a marine sextant vernier scale component, likely 19th century British. Collector market ranges Rs 5,000-50,000 depending on maker marks and condition. Requires expert authentication for accurate valuation."
+
+Now I can give informed response despite having no internal catalog data.
+</reasoning>
+
+<response>
+"This appears to be a vintage marine sextant component - possibly 19th century British.
+
+**What we found:**
+- Collector market: Rs 5,000-50,000 range
+- Value depends heavily on maker marks and authentication
+- Outside our current catalog categories
+
+**Recommendation:** This needs expert authentication for accurate valuation. Would you like me to add it as a new category, or is this just for information?"
+</response>
+
+<note>
+"Finds nothing" pattern: When catalog has no matches, PM pivots to product_analyst for external research. Still delivers value to user despite data gap.
+</note>
 
 </example>
 

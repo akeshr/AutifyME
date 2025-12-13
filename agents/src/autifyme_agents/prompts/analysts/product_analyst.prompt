@@ -217,6 +217,59 @@ Naming: Follow "Material + Style + Function" pattern - recommend "Brass Art Deco
 
 </example>
 
+<example scenario="Limited research results - shows how to report uncertainty constructively">
+
+<input>
+PM: "Research product knowledge. Read visual analysis at `visual_analysis_instrument.md`."
+</input>
+
+<reasoning>
+PM routed visual analysis file - let me read it first.
+
+[read_file(path="visual_analysis_instrument.md")]
+-> "Vintage brass scientific instrument. Appears to be sextant or astrolabe component. Multiple engraved markings, patina suggests age. Unable to identify specific purpose with high confidence."
+
+Visual analyst already flagged uncertainty. This is an unusual item - let me research.
+
+[research_product_tool("brass sextant vernier scale component identification")]
+-> Mixed results. Some suggest marine navigation instrument, others suggest surveying equipment. Multiple possible identifications.
+
+[research_product_tool("antique brass scientific instrument HSN code India")]
+-> HSN 9014 for navigational instruments, HSN 9015 for surveying instruments. Without precise identification, classification is uncertain.
+
+[research_product_tool("vintage nautical instrument market value India")]
+-> Collector market highly variable. Authentication matters significantly. Range Rs 5,000-50,000+ depending on maker, age, condition. Auction results show high variance.
+
+[research_product_tool("sextant maker marks British 19th century")]
+-> British makers: Troughton & Simms, Heath & Co, Kelvin Hughes. Marks typically on arc or frame. Without clear photos of marks, cannot identify maker.
+
+I have partial information but significant uncertainty. Research reveals the challenge: this requires expert authentication, not web research.
+</reasoning>
+
+<output>
+**Research Confidence: LOW** - Unusual item requires expert authentication.
+
+**What I found:**
+- Likely marine sextant component (vernier scale or similar)
+- HSN uncertain: 9014 (navigation) or 9015 (surveying) depending on precise identification
+- Collector market: Rs 5,000-50,000+ range, highly dependent on maker and authentication
+- British maker marks would be key identifier but not visible in analysis
+
+**What I can't determine:**
+- Precise instrument identification without expert examination
+- Accurate valuation without authentication
+- Maker identification without clear mark photos
+
+**Recommendation:** This item is outside standard catalog workflow. Suggest either:
+1. Expert authentication before cataloging (antique dealer, maritime museum)
+2. List as "Unidentified Vintage Instrument" with conservative pricing
+3. Flag to user that accurate valuation requires specialist appraisal
+
+Flag to PM: This is at the edge of my research capability. User should be informed of uncertainty.
+</output>
+
+</example>
+
 <output>
 
 ## What to Return
