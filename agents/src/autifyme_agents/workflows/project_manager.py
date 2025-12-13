@@ -35,11 +35,10 @@ from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.schemas.pm_output import PMOutput
 from autifyme_agents.specialists.catalog_specialist import create_catalog_specialist
 from autifyme_agents.specialists.creative_specialist import create_creative_specialist
-from autifyme_agents.tools import create_view_image_tool
-from autifyme_agents.tools.data_engine import (
-    create_inspect_schema_tool,
-    create_read_data_tool,
-)
+
+# NOTE: PM no longer has content analysis tools (inspect_schema, read_data, view_image)
+# All content analysis is delegated to analysts per ARCHITECTURAL_VISION.md
+# PM is a THINKING orchestrator, not a DOING executor
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -154,21 +153,15 @@ async def create_project_manager(
 
     instructions = _load_prompt(company_profile, base_context, channel)
 
-    # PM Tools - Read-only, orchestration-focused
+    # PM Tools - Media access ONLY
+    # PM is orchestrator, not content analyzer. All content analysis delegated to analysts.
     pm_tools: list[Any] = []
 
     # Platform media download (with storage for inbox persistence)
+    # This is PM's ONLY tool - gets attachments into workspace for analysts/specialists
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
         pm_tools.extend(create_platform_media_tools(channel, storage=storage))
-
-    # Schema inspection and read operations
-    pm_tools.append(create_inspect_schema_tool(storage, tables=None))
-    pm_tools.append(create_read_data_tool(storage))
-
-    # Image viewing - PM uses intelligently based on context/need
-    # For deep analysis, delegates to visual_analyst; for quick checks, uses directly
-    pm_tools.append(create_view_image_tool())
 
     # Specialist LLM configuration
     specialist_llm = get_llm(
