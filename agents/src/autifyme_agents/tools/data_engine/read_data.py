@@ -44,12 +44,15 @@ class ReadDataInput(BaseModel):
         None,
         description=(
             "[FUZZY MATCH] Case-insensitive ILIKE pattern matching. "
-            "Use for searching text fields (names, descriptions, codes). "
+            "Use for searching TEXT columns (names, descriptions, codes, SKUs). "
             "Examples: "
             "{'name': '%search%'} (contains), "
             "{'code': 'PREFIX-%'} (starts with), "
             "{'name': '%term1%term2%'} (contains both). "
-            "Use % as wildcard. RECOMMENDED for all name/text searches."
+            "Use % as wildcard. RECOMMENDED for all name/text searches. "
+            "CRITICAL: Only works on TEXT columns, NOT on array columns (text[]). "
+            "For array columns like 'tags', use filters with exact array values or query differently. "
+            "Use inspect_schema to check column types before querying."
         )
     )
     columns: list[str] | None = Field(
@@ -437,6 +440,9 @@ def create_read_data_tool(
             "- For analytics/GROUP BY (use aggregate_data)\n"
             "- For writes (use write_data)\n\n"
             "CRITICAL GOTCHAS:\n"
+            "- search_patterns ONLY works on TEXT columns, NOT on array columns (text[])\n"
+            "  * Columns like 'tags' are often arrays - check with inspect_schema first\n"
+            "  * Using search_patterns on arrays causes: 'operator does not exist: text[] ~~* unknown'\n"
             "- relations syntax: Nested uses 'parent(*,child(*))' NOT 'parent.child(*)'\n"
             "- Use inspect_schema with details=['relationships'] to verify FK targets before using relations\n"
             "- ids parameter overrides filters/search_patterns (batch fetch mode)\n"

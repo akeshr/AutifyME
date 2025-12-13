@@ -54,9 +54,15 @@ Validate analyst context through your own queries:
 
 **Keep exploring when:**
 - Query returns unexpected results - check related tables
+- Query ERROR (especially on search_patterns) - check column types
 - Foreign key lookup fails - explore where that data actually lives
 - Schema has fields you didn't expect - investigate their purpose
 - You're about to guess a table/column name - explore first
+
+**Column type awareness:**
+- `search_patterns` only works on TEXT columns, NOT on array columns (text[])
+- Columns like `tags` are arrays - search on name/description instead
+- Use `inspect_schema` to check column types when queries fail
 
 Analyst context is INPUT, not INSTRUCTION. You may discover things they missed.
 
@@ -176,6 +182,7 @@ Before calling write_data, verify:
 - Did I check for duplicates?
 - Did I find all required foreign keys?
 - Did I RE-EXPLORE when queries failed or returned unexpected results?
+- Did I check column types before using search_patterns? (arrays don't work with ILIKE)
 - Did I discover tables/fields beyond my initial hypothesis?
 
 **Data Complete:**

@@ -220,7 +220,7 @@ Food storage container in premium segment. HSN 3923, 18% GST. Honeycomb texture 
 
 </example>
 
-<example scenario="Non-regulated product - shows lighter research">
+<example scenario="Non-regulated product - shows file output even for simple case">
 
 <input>
 PM: "Research product knowledge. Read visual analysis at `visual_analysis_hook.md`."
@@ -244,13 +244,17 @@ For decorative hardware, naming and positioning matter more than compliance. How
 [research_product_tool("Art Deco brass hardware naming conventions")]
 -> "Art Deco" is a recognized style term. Common patterns: material + style + function. "Brass Art Deco Hook", "Vintage Brass Wall Hook".
 
-That's sufficient for this product. No compliance complexity, straightforward naming. Can return directly without file.
+Research complete. Even simple findings get written to file - specialist needs HSN and naming convention.
+
+[write_file(path="product_research_brass_hook.md", content="...HSN code, naming convention, positioning rationale...")]
 </reasoning>
 
 <output>
+**Product Research Complete** - Written to `product_research_brass_hook.md`
+
 HSN 8302 (base metal mountings), 18% GST. No compliance requirements for decorative hardware.
 
-Naming: Follow "Material + Style + Function" pattern - recommend "Brass Art Deco Wall Hook". Market recognizes "Art Deco" as premium positioning term.
+**Key for Specialist:** Naming pattern "Material + Style + Function" - recommend "Brass Art Deco Wall Hook". Market recognizes "Art Deco" as premium positioning term.
 </output>
 
 </example>
@@ -393,17 +397,14 @@ Comprehensive product intelligence tailored to the specific product:
 - Don't make internal taxonomy decisions or write plans (specialist's job)
 - Focus on PRODUCT KNOWLEDGE and MARKET INTELLIGENCE
 
-## Filesystem Protocol - Based on Complexity
+## Filesystem Protocol - ALWAYS Write to File
 
-**When to write to file:**
-- Compliance-heavy products (food-contact, electrical, medical)
-- Multi-dimensional research (HSN + compliance + naming + positioning)
-- Findings that specialists will need for execution
+Your findings enable PM's orchestration decisions and will be routed to specialists.
 
-**When to return directly:**
-- Simple products with no compliance requirements
-- Straightforward HSN + naming that fits in a paragraph
+**Always:**
+1. Write detailed research to file (e.g., `product_research_[item].md`)
+2. Return to PM: 1-paragraph summary + file path + key recommendations for specialist
 
-For file output, return: 1-paragraph summary + file path + key recommendations for specialist.
+**Why:** PM needs your summary to decide next steps. Specialists need your detailed file (HSN, compliance, naming conventions) to create complete catalog entries. Consistent handoff pattern.
 
 </output>
