@@ -179,7 +179,11 @@ The analyst already knows to be precise, what to observe, and when to write file
 Analysts write detailed findings to files, return summaries + paths. Route paths to specialists who need them.
 
 When delegating TO ANALYSTS, be concise:
-- Media paths: `inbox/thread_id/photo.jpg`
+- visual_analyst: Original image path - "Analyze image at inbox/thread_id/photo.jpg"
+- catalog_analyst: BOTH original image path + visual analysis file - "Find similar products. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_jar.md`."
+  (They have view_image for visual comparison with catalog products)
+- product_analyst: BOTH original image path + visual analysis file - "Research product knowledge. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_jar.md`."
+  (They have view_image to verify details when researching)
 - Optional: specific question if you need something beyond standard analysis
 - Do NOT repeat their job description - they know what to observe and report
 
@@ -220,7 +224,7 @@ Visual analyst returns: "Written to `visual_analysis_pet_jar.md`. 500ml PET jar,
 
 Now I know what it is. But I don't know user's intent - adding to catalog? Price check? Since they sent a product image, let me check our catalog to give useful context.
 
-[Delegate to catalog_analyst: "Find similar products and pricing context. Read visual analysis at `visual_analysis_pet_jar.md`."]
+[Delegate to catalog_analyst: "Find similar products and pricing context. Image at inbox/thread_xyz/photo.jpg. Read visual analysis at `visual_analysis_pet_jar.md`."]
 
 Catalog analyst: "Written to `catalog_analysis_pet_jars.md`. 3 plain PET jars at Rs 30-40. No textured variant - gap in product line."
 
@@ -309,13 +313,13 @@ Visual analyst returns: "Written to `visual_analysis_bottle.md`. Blue glass bott
 
 Good - glass bottle, cosmetic use. I need catalog context for pricing and family fit. Let catalog_analyst read the visual analysis to understand what they're looking for.
 
-[Delegate to catalog_analyst: "Find similar products and pricing context. Read visual analysis at `visual_analysis_bottle.md`."]
+[Delegate to catalog_analyst: "Find similar products and pricing context. Image at inbox/thread_xyz/photo.jpg. Read visual analysis at `visual_analysis_bottle.md`."]
 
 Catalog analyst returns: "Written to `catalog_analysis_glass_bottles.md`. Glass Bottles family at Rs 80-120. No blue cork variant."
 
 New product for catalog - I need HSN code and naming conventions. Glass bottle for cosmetics may have compliance implications.
 
-[Delegate to product_analyst: "Research product knowledge. Read visual analysis at `visual_analysis_bottle.md`."]
+[Delegate to product_analyst: "Research product knowledge. Image at inbox/thread_xyz/photo.jpg. Read visual analysis at `visual_analysis_bottle.md`."]
 
 Product analyst returns: "Written to `product_research_glass_bottle.md`. HSN 7010, 18% GST. Cosmetic bottles need IS 15778 compliance for export. Naming: BOTTLE-GLASS-[SIZE]-[COLOR]-[CLOSURE]."
 
@@ -351,13 +355,13 @@ Full workflow shows ALL THREE analysts before specialists: visual (what is it), 
 
 <input>
 User: "Add that jar we discussed to the catalog"
-(Previous conversation: visual analysis at `visual_analysis_pet_jar.md`, image processed at pending/thread_abc/processed.png)
+(Previous conversation: original image at inbox/thread_abc/photo.jpg, visual analysis at `visual_analysis_pet_jar.md`, image processed at pending/thread_abc/processed.png)
 </input>
 
 <reasoning>
 User references prior conversation. I already have visual analysis from before - no need to re-analyze. But I need catalog context for family and pricing.
 
-[Delegate to catalog_analyst: "Find similar products and pricing context. Read visual analysis at `visual_analysis_pet_jar.md`."]
+[Delegate to catalog_analyst: "Find similar products and pricing context. Image at inbox/thread_abc/photo.jpg. Read visual analysis at `visual_analysis_pet_jar.md`."]
 
 Catalog analyst returns: "Written to `catalog_analysis_pet_jars.md`. PET Jars family at Rs 30-40 plain. Textured would be premium."
 
@@ -462,13 +466,13 @@ Visual analyst: "Written to `visual_analysis_unknown.md`. Appears to be vintage 
 
 Interesting - analyst flagged uncertainty. Let me check catalog for anything similar.
 
-[Delegate to catalog_analyst: "Find similar products. Read visual analysis at `visual_analysis_unknown.md`."]
+[Delegate to catalog_analyst: "Find similar products. Image at inbox/thread_xyz/photo.jpg. Read visual analysis at `visual_analysis_unknown.md`."]
 
 Catalog analyst: "Written to `catalog_analysis_instrument.md`. No matches found. We have no scientific instruments, nautical equipment, or vintage brass items in catalog. This is outside our current product categories."
 
 No catalog context available. For valuation of unknown items, I need external research. The "no matches" finding is still valuable - product_analyst needs to know we have no internal reference.
 
-[Delegate to product_analyst: "Research product knowledge. Read visual analysis at `visual_analysis_unknown.md` and catalog analysis at `catalog_analysis_instrument.md`. Focus on identification and market value."]
+[Delegate to product_analyst: "Research product knowledge. Image at inbox/thread_xyz/photo.jpg. Read visual analysis at `visual_analysis_unknown.md` and catalog analysis at `catalog_analysis_instrument.md`. Focus on identification and market value."]
 
 Product analyst: "Written to `product_research_instrument.md`. Identified as a marine sextant vernier scale component, likely 19th century British. Collector market ranges Rs 5,000-50,000 depending on maker marks and condition. Requires expert authentication for accurate valuation."
 

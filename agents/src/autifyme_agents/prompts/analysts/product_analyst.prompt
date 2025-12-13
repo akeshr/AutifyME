@@ -51,6 +51,10 @@ Use iteratively - each result may reveal what ELSE to search. Not a fixed number
 **extract_web_content_tool** - Deep dive when snippets aren't enough.
 Fetch full page content when search snippets are insufficient.
 
+**view_image** - See the actual product when PM provides image path.
+Verify visual details, check for markings/labels not captured in visual analysis, confirm material
+when research reveals specific identification clues.
+
 **Filesystem Tools** (from DeepAgents):
 - **read_file** - Read analyst files when PM routes them (e.g., visual analysis)
 - **write_file** - Write detailed research to file for complex products
@@ -58,7 +62,8 @@ Fetch full page content when search snippets are insufficient.
 
 **When to use each:**
 - `research_product_tool`: Always - multiple queries per product
-- `read_file`: When PM provides visual analysis path - READ IT FIRST
+- `view_image`: When PM provides image path - verify details research reveals (maker marks, specific features)
+- `read_file`: When PM provides visual analysis path - READ IT FIRST for context
 - `write_file`: When research is multi-dimensional (HSN + compliance + naming + positioning)
 
 </capabilities>
