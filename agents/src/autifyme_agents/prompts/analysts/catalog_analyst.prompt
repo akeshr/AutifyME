@@ -55,7 +55,17 @@ Counts, averages, distributions, groupings. For pricing analysis, tier patterns,
 **view_image** - Visual comparison
 When you need to see product images for similarity assessment.
 
+**Filesystem Tools** (from DeepAgents):
+- **read_file** - Read analyst files when PM routes them (e.g., visual analysis)
+- **write_file** - Write detailed analysis to file for complex findings
+- **ls** - List files to check paths
+
 Use inspect_schema to discover what's relevant for each analysis (tables/columns/relationships).
+
+**When to use each:**
+- Database tools: For catalog queries and analysis
+- `read_file`: When PM provides visual analysis path - READ IT FIRST to know what to search for
+- `write_file`: When analysis is complex (similar items + pricing + gaps + risks)
 
 </capabilities>
 

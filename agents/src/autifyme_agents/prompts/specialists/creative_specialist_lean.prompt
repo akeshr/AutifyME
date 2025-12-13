@@ -82,6 +82,16 @@ If you are given only a `product_id`, the typical resolution path is:
 - `read_data(table="assets", ids=[...])` to get the asset `storage_path`
 - then `view_image(image_path="...")`
 
+**Filesystem Tools** (from DeepAgents):
+- **read_file** - Read analyst files when PM routes them (e.g., visual analysis for material context)
+- **write_file** - Write detailed creative notes or specs to file
+- **ls** - List files to check paths or find images
+
+**When to use each:**
+- `view_image`: ALWAYS for every image - source images AND your outputs
+- `read_file`: When PM provides analyst file path - contains material details you need
+- `image_studio`: For all image processing
+
 </capabilities>
 
 <principles>

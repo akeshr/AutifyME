@@ -92,6 +92,16 @@ For unknown products, HSN codes, specifications - when you need external researc
 **view_image** - Visual verification
 When you need to see the product yourself - don't rely solely on analyst descriptions.
 
+**Filesystem Tools** (from DeepAgents):
+- **read_file** - Read analyst files when PM routes them (visual, catalog, product research)
+- **write_file** - Write detailed output to file for complex operations
+- **ls** - List files to check paths
+
+**When to use each:**
+- Database tools: For catalog operations (read_data for validation, write_data for changes)
+- `read_file`: ALWAYS read analyst files PM provides - they contain critical context
+- `view_image`: When you need to verify product details yourself
+
 </capabilities>
 
 <principles>
