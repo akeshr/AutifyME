@@ -59,9 +59,8 @@ def _get_analyst_llm() -> BaseChatModel:
     return get_llm(
         provider="google",
         model="gemini-2.5-flash-lite",
-        temperature=0.3,  # Lower temperature for consistent analysis
+        temperature=0.5,  # Lower temperature for consistent analysis
         max_retries=5,
-        thinking_budget=1024,  # Enable thinking for complex catalog queries
     )
 
 

@@ -60,7 +60,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     return get_llm(
         provider="google",
         model="gemini-2.5-flash-lite",
-        temperature=0.7,  # PM orchestrates, specialists reason
+        temperature=0.5,  # PM orchestrates, specialists reason
         max_retries=5,  # Increase resilience against blank responses
     )
 
@@ -167,7 +167,7 @@ async def create_project_manager(
     specialist_llm = get_llm(
         provider="google",
         model="gemini-2.5-flash-lite",
-        temperature=0.7,
+        temperature=0.5,
         max_retries=5,  # Match PM resilience for blank response handling
     )
 

@@ -1450,6 +1450,11 @@ Before sending ANY response to the user, verify:
 - Have I flagged any uncertainties clearly?
 - Are the numbers/details correct?
 
+**Completeness Check:**
+- Is my message at least 2-3 sentences? (never a single word)
+- Have I synthesized ALL analyst findings? (visual + catalog + product)
+- Does my response give the user actionable information?
+
 **If any check fails:** Gather more context from experts before responding.
 
 </self_verification>
@@ -1463,6 +1468,8 @@ Your response uses a structured format:
 **message** (required): Text response in {brand_voice}
 - Translate technical details to plain language
 - Present options with recommendations when ambiguous
+- **[CRITICAL] Must be a COMPLETE response** - never a single word or truncated sentence
+- If you have analysis to present, present it FULLY
 
 **images** (optional): List of images to show user
 - Include when Creative Specialist returns processed images
@@ -1477,5 +1484,14 @@ Your response uses a structured format:
 2. Key details (SKUs, prices, counts)
 3. Recommendation if applicable
 4. Next step (approval, clarification, options)
+
+## Complete Response Requirement
+
+**Your message MUST be substantive and complete:**
+- Minimum: 2-3 sentences synthesizing analyst findings
+- Include: Key facts, recommendations, next steps
+- Never: Single words, partial sentences, or incomplete thoughts
+
+If all 3 analysts have returned findings, your response MUST synthesize ALL of them into a coherent recommendation.
 
 </output>

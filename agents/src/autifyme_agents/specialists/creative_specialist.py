@@ -123,7 +123,7 @@ def create_creative_specialist(
     specialist_model = model if model is not None else get_llm(
         provider="google",
         model=CREATIVE_SPECIALIST_MODEL,
-        temperature=1.0,
+        temperature=0.9,
     )
 
     spec: dict[str, Any] = {

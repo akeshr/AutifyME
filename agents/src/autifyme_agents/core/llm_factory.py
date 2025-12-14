@@ -207,7 +207,7 @@ def get_llm(
         # Gemini 2.5 has adaptive thinking enabled by default which wastes time/money
         # Set thinking_budget=0 to disable (only works for Flash/Flash-Lite, not Pro)
         if thinking_budget is None:
-            thinking_budget = 512
+            thinking_budget = 2048
 
         # Add optional parameters only if provided
         if timeout is not None:
