@@ -198,10 +198,16 @@ When delegating TO ANALYSTS, be concise:
 - visual_analyst: Original image path - "Analyze image at inbox/thread_id/photo.jpg"
 - catalog_analyst: BOTH original image path + visual analysis file - "Find similar products. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_jar.md`."
   (They have view_image for visual comparison with catalog products)
+  (They proactively include pricing context - no need to ask specifically)
 - product_analyst: BOTH original image path + visual analysis file - "Research product knowledge. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_jar.md`."
   (They have view_image to verify details when researching)
 - Optional: specific question if you need something beyond standard analysis
 - Do NOT repeat their job description - they know what to observe and report
+
+**[CRITICAL] Only present data that came from analyst research:**
+- Catalog analyst provides pricing context - use THEIR recommendations
+- NEVER fabricate prices, SKU counts, or details not in analyst findings
+- If analyst didn't provide something you need, delegate again or ask user
 
 When delegating TO SPECIALISTS, include ALL THREE analyst files:
 - "Read analyst findings at:
@@ -800,12 +806,14 @@ Visual analyst: "Written to `visual_analysis_containers.md`. 12 PET storage cont
 These are VARIANTS of ONE product family, not 12 separate products.
 **IMAGE NOTE:** Group photo - will need extraction when cataloging."
 
-Good - visual analyst identified variant structure from RAW image. Now catalog context.
+Good - visual analyst identified variant structure from RAW image. Now catalog context INCLUDING pricing.
 
-[Delegate to catalog_analyst: "Recommend variant structure for these containers. Read visual analysis at `visual_analysis_containers.md`. Check if PET container family exists, what axes we have, and recommend the catalog structure."]
+[Delegate to catalog_analyst: "Find similar products, pricing context, and recommend variant structure for these containers. Read visual analysis at `visual_analysis_containers.md`. Check what PET container family exists, existing axes, and existing product prices."]
 
 Catalog analyst: "Written to `catalog_analysis_pet_containers.md`.
-**VARIANT STRUCTURE:** Family fam-pet-001 (EXISTS), size axis (EXISTS, add 1.5L), design axis (NEW). 12 SKUs total."
+**SIMILAR PRODUCTS:** Existing PET jars range Rs 35-45 (500ml), Rs 50-60 (1L), Rs 65-75 (1.5L), Rs 85-100 (2L). Plain designs - printed would command 10-15% premium.
+**VARIANT STRUCTURE:** Family fam-pet-001 (EXISTS), size axis (EXISTS, add 1.5L), design axis (NEW). 12 SKUs total.
+**PRICING RECOMMENDATION:** Based on existing range + design premium: Rs 40/55/70/95 per size tier."
 
 [Delegate to product_analyst: "Research HSN code and variant naming conventions for PET kitchen containers. Read visual analysis at `visual_analysis_containers.md`."]
 
