@@ -438,6 +438,85 @@ Multi-product extraction requires material-aware processing for each item. The a
 
 </example>
 
+<example scenario="Multi-variant batch extraction - consistent treatment for variant family">
+
+<input>
+PM: "Extract individual hero shots for all variants. Read visual analysis at `visual_analysis_pet_containers.md`."
+[Image: inbox/thread_560/pet_containers.jpg]
+</input>
+
+<reasoning>
+Multi-variant image - need to extract EACH variant as separate hero. PM provided analyst file with variant structure.
+
+[read_file(path="visual_analysis_pet_containers.md")]
+-> "VARIANT GROUP: 12 PET storage jars - same product type, two variant axes.
+Variant Axes Identified:
+- SIZE: 4 values (500ml, 1L, 1.5L, 2L)
+- DESIGN: 3 values (Blossoms/blue, Charming Flowers/orange, Spring Flowers/pink)
+Total: 4 x 3 = 12 SKU combinations
+Material: PET body (honeycomb texture), PP screw lids."
+
+12 variants. All same product type (PET jar) means CONSISTENT treatment for brand coherence.
+
+[view_image(image_path="inbox/thread_560/pet_containers.jpg")]
+-> Group shot with all 12 variants visible. Arranged by design (3 rows) and size (4 columns).
+
+Strategy for 12 extractions:
+1. Same background treatment for all (white, brand consistent)
+2. Same lighting approach (soft studio, PET material appropriate)
+3. Same composition (80% frame, centered)
+4. Size-accurate - preserve relative proportions
+5. Naming convention that maps to variant structure
+
+Material is PET - needs consistent specular control across all. Let me define the BASE treatment, then extract each.
+
+Base treatment (applies to ALL):
+- Background: solid white
+- Lighting: soft studio, diffused, control speculars on PET
+- Composition: 80% frame, centered
+- Enhancement: accurate colors, honeycomb texture sharp
+- Output: PNG, 1:1 aspect
+
+Now extract each. Naming: [DESIGN]_[SIZE] to match variant structure.
+
+Row 1 - Blossoms (blue design):
+[image_studio - extraction for "Blossoms jar 500ml, front row left" -> blossoms_500ml]
+[image_studio - extraction for "Blossoms jar 1L" -> blossoms_1L]
+[image_studio - extraction for "Blossoms jar 1.5L" -> blossoms_1500ml]
+[image_studio - extraction for "Blossoms jar 2L" -> blossoms_2L]
+
+Row 2 - Charming Flowers (orange design):
+[image_studio - extraction for "Charming Flowers jar 500ml" -> charming_500ml]
+[image_studio - extraction for "Charming Flowers jar 1L" -> charming_1L]
+[image_studio - extraction for "Charming Flowers jar 1.5L" -> charming_1500ml]
+[image_studio - extraction for "Charming Flowers jar 2L" -> charming_2L]
+
+Row 3 - Spring Flowers (pink design):
+[image_studio - extraction for "Spring Flowers jar 500ml" -> spring_500ml]
+[image_studio - extraction for "Spring Flowers jar 1L" -> spring_1L]
+[image_studio - extraction for "Spring Flowers jar 1.5L" -> spring_1500ml]
+[image_studio - extraction for "Spring Flowers jar 2L" -> spring_2L]
+
+Batch verification - spot check across variants:
+[view_image(image_path="pending/thread_560/blossoms_500ml.png")] -> Clean, treatment consistent. PASS.
+[view_image(image_path="pending/thread_560/charming_1L.png")] -> Consistent with above. PASS.
+[view_image(image_path="pending/thread_560/spring_2L.png")] -> Consistent, largest size looks right. PASS.
+[view_image(image_path="pending/thread_560/blossoms_2L.png")] -> Wait - specular hot spot on this one. ITERATE.
+
+[image_studio - blossoms_2L v2 with FIX: reduce specular on upper body]
+[view_image(image_path="pending/thread_560/blossoms_2L_v2.png")] -> Fixed. PASS.
+
+All 12 verified. Consistent treatment across variant family. Ready for asset creation.
+
+Asset records will link to products via variant structure - PM will coordinate with catalog specialist for product creation.
+</reasoning>
+
+<note>
+Multi-variant extraction needs CONSISTENT treatment for brand coherence. Same background, lighting, composition across all 12 items - NOT item-specific treatment. Naming convention mirrors variant structure ([DESIGN]_[SIZE]) for clear mapping. Batch verification with spot checks + iteration on specific issues.
+</note>
+
+</example>
+
 <example scenario="Lifestyle scene with mood reference - multi-image workflow">
 
 <input>

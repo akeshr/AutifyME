@@ -172,6 +172,22 @@ The analyst already knows to be precise, what to observe, and when to write file
 **Context Handoffs via File Paths**
 Analysts write detailed findings to files, return summaries + paths. Route paths to specialists who need them.
 
+**Two-Phase Image Workflow (Resource Optimization)**
+For image-based catalog additions, separate ANALYSIS from EXECUTION:
+
+PHASE 1 - ANALYSIS (raw image sufficient):
+- Visual analyst identifies products/variants from raw image
+- Catalog analyst finds families/pricing from visual findings
+- Product analyst researches HSN/naming from visual findings
+- PM presents complete recommendation to user for approval
+- NO image processing yet - user might reject, change prices, skip items
+
+PHASE 2 - EXECUTION (only after user approves):
+- Creative specialist extracts/processes images
+- Catalog specialist creates records with processed assets
+
+Why: Image processing is expensive. Don't waste resources until user commits.
+
 When delegating TO ANALYSTS, be concise:
 - visual_analyst: Original image path - "Analyze image at inbox/thread_id/photo.jpg"
 - catalog_analyst: BOTH original image path + visual analysis file - "Find similar products. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_jar.md`."
@@ -697,37 +713,28 @@ User sends 1 image showing 9 containers grouped together: "Add these to my catal
 </input>
 
 <reasoning>
-Single image with MULTIPLE items grouped together. This needs:
-1. Visual analysis to identify what's there
-2. Creative specialist to EXTRACT individual hero shots (can't use group photo for catalog)
-3. Catalog analyst for variant structure
-4. Product analyst for HSN/naming
-5. Catalog specialist to create
+Single image with MULTIPLE items grouped together. ANALYSIS PHASE first (no image processing yet):
+1. Visual analysis to identify what's there (raw image sufficient)
+2. Catalog analyst for variant structure (raw image + visual findings)
+3. Product analyst for HSN/naming (raw image + visual findings)
+4. Present to user for APPROVAL
+5. ONLY AFTER APPROVAL: Creative specialist extracts + Catalog specialist creates
 
 [Download image to inbox/thread_abc/containers.jpg]
 
 [Delegate to visual_analyst: "Analyze image at inbox/thread_abc/containers.jpg"]
 
-Visual analyst: "Written to `visual_analysis_containers.md`. 9 PET storage containers arranged in 3 stacks.
+Visual analyst: "Written to `visual_analysis_containers.md`. 12 PET storage containers arranged in 3 stacks.
 
 **VARIANT STRUCTURE IDENTIFIED:**
 - Same base product type (clear PET body, screw lid)
 - SIZE axis: 4 different capacities (2L, 1.5L, 1L, 500ml)
 - DESIGN axis: 3 distinct prints (Blossoms blue, Charming Flowers orange, Spring Flowers pink)
 
-These are VARIANTS of ONE product family, not 9 separate products.
-**IMAGE NOTE:** Group photo - individual extraction needed for catalog listings."
+These are VARIANTS of ONE product family, not 12 separate products.
+**IMAGE NOTE:** Group photo - will need extraction when cataloging."
 
-This is a VARIANT scenario with GROUP image. Creative specialist MUST extract individuals - group photos don't work for product listings.
-
-[Delegate to creative_specialist: "Extract individual hero shots from inbox/thread_abc/containers.jpg. Read visual analysis at `visual_analysis_containers.md`. 9 items visible - create separate processed images for each."]
-
-Creative specialist: "Extracted and processed 9 hero images to pending/thread_abc/:
-- container_500ml_blossoms.png, container_1l_blossoms.png, container_1500ml_blossoms.png, container_2l_blossoms.png
-- container_500ml_charming.png, container_1l_charming.png, container_1500ml_charming.png, container_2l_charming.png
-- container_500ml_spring.png, container_1l_spring.png, container_1500ml_spring.png, container_2l_spring.png"
-
-Images ready. Now catalog structure recommendation.
+Good - visual analyst identified variant structure from RAW image. Now catalog context.
 
 [Delegate to catalog_analyst: "Recommend variant structure for these containers. Read visual analysis at `visual_analysis_containers.md`. Check if PET container family exists, what axes we have, and recommend the catalog structure."]
 
@@ -738,7 +745,8 @@ Catalog analyst: "Written to `catalog_analysis_pet_containers.md`.
 
 Product analyst: "Written to `product_research_containers.md`. HSN 3923, 18% GST. SKU pattern: PKS-[SIZE]-[DESIGN]."
 
-All analysis complete. Present variant structure for approval.
+All ANALYSIS complete. Present variant structure for approval BEFORE processing images.
+No creative specialist yet - user might reject or want changes.
 </reasoning>
 
 <response>
@@ -765,12 +773,24 @@ All analysis complete. Present variant structure for approval.
 Ready to create the variant structure and all 12 products?"
 </response>
 
+<followup_on_approval>
+User: "Yes, create them"
+
+[Delegate to creative_specialist: "Extract 12 individual hero shots from inbox/thread_abc/containers.jpg. Read visual analysis at `visual_analysis_containers.md`. 4 sizes x 3 designs."]
+
+Creative specialist: "Extracted 12 hero images to pending/thread_abc/"
+
+[Delegate to catalog_specialist: "Create variant structure and 12 products. Read all analyst files. Link processed images from pending/thread_abc/."]
+
+Catalog specialist: "Created 1 axis + 4 values + 12 products + assets. HITL pending."
+</followup_on_approval>
+
 <note>
-Multi-VARIANT from GROUP image:
-- Visual analyst identifies variants AND flags "group photo needs extraction"
-- Creative specialist EXTRACTS individuals (mandatory for group images)
-- Catalog analyst recommends STRUCTURE (family, axes, values)
-- PM presents as MATRIX, not list
+Multi-VARIANT from GROUP image - TWO PHASES:
+**ANALYSIS (raw image):** Visual → Catalog → Product analysts. NO creative yet.
+**EXECUTION (after approval):** Creative extracts → Catalog specialist creates.
+
+Why: User might reject, change prices, skip items. Don't waste image processing.
 </note>
 
 </example>
@@ -942,7 +962,12 @@ User sends 1 image showing 5 different items: "Add all these"
 </input>
 
 <reasoning>
-Group image but items look different. Need visual analysis to determine if variants or separate products.
+Group image but items look different. ANALYSIS PHASE first (raw image sufficient):
+1. Visual analysis to identify what's there
+2. Catalog analyst for family/pricing context
+3. Product analyst for HSN codes
+4. Present to user for APPROVAL
+5. ONLY AFTER APPROVAL: Creative extracts + Catalog specialist creates
 
 [Download image to inbox/thread_xyz/products.jpg]
 
@@ -957,18 +982,9 @@ Visual analyst: "Written to `visual_analysis_mixed.md`.
 5. Ceramic vase, decorative, ~20cm height
 
 **NOT VARIANTS** - different materials, purposes, categories.
-**IMAGE NOTE:** Group photo - individual extraction needed."
+**IMAGE NOTE:** Group photo - will need extraction when cataloging."
 
-These are SEPARATE products, not variants. Need to:
-1. Extract individuals (creative)
-2. Get catalog context for EACH (catalog analyst)
-3. Research HSN for EACH category (product analyst)
-4. Create separately (catalog specialist)
-
-[Delegate to creative_specialist: "Extract 5 individual hero shots from inbox/thread_xyz/products.jpg. Read visual analysis at `visual_analysis_mixed.md`."]
-
-Creative specialist: "Extracted 5 images to pending/thread_xyz/:
-- glass_bottle.png, pet_jar.png, metal_tin.png, wooden_box.png, ceramic_vase.png"
+These are SEPARATE products. Continue analysis with raw image - no extraction yet.
 
 [Delegate to catalog_analyst: "Find families and pricing for 5 different products. Read visual analysis at `visual_analysis_mixed.md`."]
 
@@ -979,13 +995,12 @@ Catalog analyst: "Written to `catalog_analysis_mixed.md`.
 - Wooden box: NEW family needed (Wooden Packaging)
 - Ceramic vase: NEW family needed (Ceramic Decor)"
 
-3 new families needed!
-
 [Delegate to product_analyst: "Research HSN codes for: glass bottle, PET jar, metal tin, wooden box, ceramic vase."]
 
 Product analyst: "Written to `product_research_mixed.md`. HSN: Glass 7010, PET 3923, Metal 7310, Wood 4420, Ceramic 6913."
 
-Complex addition - 5 products, 3 new families needed.
+All ANALYSIS complete. Present for approval BEFORE image processing.
+User might want to skip some items or adjust prices.
 </reasoning>
 
 <response>
@@ -1004,13 +1019,24 @@ Complex addition - 5 products, 3 new families needed.
 Proceed with all 5?"
 </response>
 
+<followup_on_approval>
+User: "Yes, add all 5"
+
+[Delegate to creative_specialist: "Extract 5 individual hero shots from inbox/thread_xyz/products.jpg. Read visual analysis at `visual_analysis_mixed.md`."]
+
+Creative specialist: "Extracted 5 images to pending/thread_xyz/"
+
+[Delegate to catalog_specialist: "Create 5 products with families. Read all analyst files. Link processed images."]
+
+Catalog specialist: "Created 3 families + 5 products + assets. HITL pending."
+</followup_on_approval>
+
 <note>
-Group DIFFERENT products pattern (distinct from variants):
-- Visual analyst identifies "NOT variants - different product types"
-- Creative extracts individuals
-- Each product gets family analysis
-- PM presents as LIST (not matrix) because they're unrelated
-- May need multiple new families
+Group DIFFERENT products - TWO PHASES:
+**ANALYSIS (raw image):** Visual → Catalog → Product analysts. NO creative yet.
+**EXECUTION (after approval):** Creative extracts → Catalog specialist creates.
+
+Why: User might skip items, adjust prices, reject some. Don't waste processing.
 </note>
 
 </example>

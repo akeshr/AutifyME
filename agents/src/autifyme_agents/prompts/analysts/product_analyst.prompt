@@ -384,6 +384,95 @@ This example shows iterative research:
 
 </example>
 
+<example scenario="Multi-variant product - naming conventions for multiple axes">
+
+<input>
+PM: "Research product knowledge. Read visual analysis at `visual_analysis_pet_containers.md`. Image at inbox/thread_234/pet_containers.jpg"
+</input>
+
+<reasoning>
+PM routed visual analysis file - let me read it first.
+
+[read_file(path="visual_analysis_pet_containers.md")]
+-> "VARIANT GROUP: 12 PET storage jars - same product type, two variant axes.
+Variant Axes Identified:
+- SIZE: 4 values (500ml, 1L, 1.5L, 2L)
+- DESIGN: 3 values (Blossoms/blue, Charming Flowers/orange, Spring Flowers/pink)
+Total: 4 x 3 = 12 SKU combinations
+Material: PET body (honeycomb texture), PP screw lids."
+
+Multi-variant product with TWO axes (Size and Design). I need to research:
+1. HSN (standard)
+2. Compliance (food-contact)
+3. Naming conventions that handle BOTH variant axes
+
+Starting with HSN:
+
+[research_product_tool("PET container jar HSN code India GST")]
+-> HSN 3923 - Articles for conveyance/packing of goods, of plastics. 18% GST.
+
+Food-contact compliance:
+
+[research_product_tool("PET food container compliance India FSSAI BPA")]
+-> Food-grade PET is BPA-free. FSSAI registration for manufacturers. BIS standard IS 16739:2018.
+
+Now the key question - how does the market name multi-variant products like this?
+
+[research_product_tool("plastic storage container naming size variants ecommerce")]
+-> Size typically at END of name: "Container 500ml", "Container 1L". Allows sorting. Some use "Small/Medium/Large" but ml is more precise.
+
+[research_product_tool("product naming design pattern variant SKU convention")]
+-> Design/print names typically as series or collection: "Blossoms Collection", "Spring Series". Design name can be prefix OR suffix depending on whether size or design is primary differentiator.
+
+For this product - what's the primary differentiator? Let me view the image to understand positioning:
+
+[view_image(image_path="inbox/thread_234/pet_containers.jpg")]
+-> The designs are prominent - large floral prints dominate visual. Size differences secondary in presentation. Suggests design is the primary differentiator.
+
+So naming should emphasize DESIGN first, SIZE second:
+- Family: "Floral Storage Jars" or "Printed Storage Jars"
+- Design prefix: "Blossoms", "Charming Flowers", "Spring Flowers"
+- Size suffix: "500ml", "1L", "1.5L", "2L"
+- Pattern: [DESIGN] Storage Jar [SIZE]
+- Example: "Blossoms Storage Jar 500ml"
+
+Market positioning research:
+
+[research_product_tool("printed floral storage container market India premium")]
+-> Printed/decorative containers position as gift-worthy, kitchen decor. 20-30% premium over plain. Often sold as sets.
+
+[research_product_tool("storage container set bundle pricing ecommerce India")]
+-> Sets of 3-4 sizes common. "Complete set" SKU alongside individual variants. Set pricing typically 10-15% discount vs sum of individuals.
+
+This reveals variant structure opportunity - not just 12 individual SKUs, but potential set SKUs.
+
+Writing comprehensive research to file:
+
+[write_file(path="product_research_pet_containers.md", content="...HSN, compliance, naming by axis, family recommendation, set opportunity, positioning...")]
+</reasoning>
+
+<output>
+**Product Research Complete** - Written to `product_research_pet_containers.md`
+
+HSN 3923, 18% GST. Food-grade compliance relevant (FSSAI, BIS).
+
+**Multi-Variant Naming Convention:**
+- Design is PRIMARY differentiator (prominent visual)
+- Pattern: [DESIGN] Storage Jar [SIZE]
+- Family: "Floral Storage Jars" (groups all designs)
+- Examples: "Blossoms Storage Jar 500ml", "Spring Flowers Storage Jar 2L"
+
+**Key for Specialist:**
+- 2 variant axes: Design (3 values) + Size (4 values)
+- Design names: "Blossoms", "Charming Flowers", "Spring Flowers"
+- Size values: 500ml, 1L, 1.5L, 2L
+- Total SKUs: 12 individual + potential set SKUs
+
+**Positioning:** Gift-worthy decorative storage, 20-30% premium over plain containers. Set bundles common in market.
+</output>
+
+</example>
+
 <output>
 
 ## What to Return
