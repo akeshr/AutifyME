@@ -383,6 +383,137 @@ Flag: product_analyst may be better suited for valuation of unknown vintage item
 
 </example>
 
+<example scenario="Multi-variant analysis - recommending variant structure for same-product-type items">
+
+<input>
+PM: "Find similar products and recommend catalog structure. Read visual analysis at `visual_analysis_containers.md`. Image at inbox/thread_789/containers.jpg."
+</input>
+
+<reasoning>
+PM routed visual analysis - let me read it first.
+
+[read_file(path="visual_analysis_containers.md")]
+-> "9 PET storage containers arranged in 3 stacks. Same base product type (clear PET body, screw lid).
+
+**Variant Dimensions Observed:**
+- SIZE: 4 different heights/capacities (estimated 2L, 1.5L, 1L, 500ml based on proportions)
+- DESIGN/PRINT: 3 distinct prints with matching lid colors:
+  - 'Blossoms' - blue floral print, blue lid
+  - 'Charming Flowers' - orange/yellow floral print, orange lid
+  - 'Spring Flowers' - pink floral print, pink lid
+
+These are variants of ONE product family, not 9 separate products."
+
+Excellent - visual analyst already identified the variant structure. This is a VARIANT STRUCTURE task, not a similarity search. I need to:
+1. Check if this family/axes already exist
+2. Recommend the catalog structure
+3. Provide foreign keys for existing elements
+
+Let me explore what we have for PET containers.
+
+[inspect_schema(tables=["product_families", "variant_axes", "variant_values", "products"], details=["structure", "relationships"])]
+
+Good - I see the variant structure: product_families -> variant_axes -> variant_values, and products link to variant_values through product_variant_values junction.
+
+[read_data(table="product_families", search_patterns={"name": "%PET%"}, columns=["id", "name", "sku_prefix"])]
+-> Found: fam-pet-001 "PET Kitchen Storage" (sku_prefix: PKS)
+
+Let me check if this family already has variant axes:
+
+[read_data(table="variant_axes", filters={"product_family_id": "fam-pet-001"}, columns=["id", "name", "display_name", "position"])]
+-> Found 2 axes:
+  - axis-size-001 "capacity" (position 1)
+  - axis-color-001 "color" (position 2)
+
+We have a family with existing axes! But "color" might not match "design/print". Let me check the values:
+
+[read_data(table="variant_values", filters={"variant_axis_id": "axis-size-001"}, columns=["id", "value", "sku_code", "display_label"])]
+-> Existing sizes: 500ml (500ML), 1L (1L), 2L (2L)
+-> MISSING: 1.5L
+
+[read_data(table="variant_values", filters={"variant_axis_id": "axis-color-001"}, columns=["id", "value", "sku_code", "display_label"])]
+-> Existing: Clear (CLR), Blue (BLU), Green (GRN)
+-> MISSING: All the print designs (Blossoms, Charming Flowers, Spring Flowers)
+
+The existing "color" axis is for solid colors, not printed designs. These printed containers need a DIFFERENT axis - "design" or "print_pattern".
+
+Let me check if there are printed products already:
+
+[read_data(table="products", search_patterns={"name": "%floral%"}, columns=["id", "sku", "name", "product_family_id"])]
+-> No results. These printed containers are NEW to our catalog.
+
+**Strategic Analysis:**
+
+Option A: Add prints to existing "color" axis
+- PRO: Uses existing structure
+- CON: Semantically wrong - "Blossoms" isn't a color, it's a design. Would confuse future categorization.
+
+Option B: Create new "design" axis for this family
+- PRO: Semantically correct, extensible for future prints
+- CON: Existing products have no design (would need "Plain" value)
+
+Option C: Create NEW product family for printed containers
+- PRO: Clean separation of plain vs printed lines
+- CON: Duplicates size axis, more complex catalog
+
+**Recommendation:** Option B - Add "design" axis to existing family.
+- Most extensible and semantically correct
+- Existing plain containers get "Plain" design value (or NULL)
+- New printed containers get their print design value
+- Size axis reused as-is (just add 1.5L value)
+
+**Variant Structure for Specialist:**
+```
+Family: fam-pet-001 "PET Kitchen Storage" (EXISTS)
+
+Axis 1: capacity (EXISTS - axis-size-001)
+  Values: 500ml, 1L, 1.5L (NEW), 2L
+
+Axis 2: design (NEW)
+  Values: Plain (for existing), Blossoms, Charming Flowers, Spring Flowers
+
+Products to create: 4 sizes x 3 new designs = 12 SKUs
+SKU pattern: PKS-[SIZE]-[DESIGN] e.g., PKS-1L-BLOSSOMS
+```
+
+This is complex - writing full analysis to file.
+
+[write_file(path="catalog_analysis_pet_containers.md", content="...full variant structure analysis, existing FKs, new items needed, SKU explosion calculation, pricing recommendations...")]
+</reasoning>
+
+<output>
+**Catalog Analysis Complete** - Written to `catalog_analysis_pet_containers.md`
+
+**This is a VARIANT STRUCTURE task**, not 9 separate products.
+
+**Recommendation:** Add to existing "PET Kitchen Storage" family (fam-pet-001)
+- Existing size axis reusable (add 1.5L value)
+- NEW "design" axis needed for print patterns
+- 12 new SKUs: 4 sizes x 3 designs
+
+**Structure for Specialist:**
+| Element | Status | ID/Action |
+|---------|--------|-----------|
+| Family | EXISTS | fam-pet-001 |
+| Size axis | EXISTS | axis-size-001 (add 1.5L value) |
+| Design axis | NEW | Create with: Plain, Blossoms, Charming Flowers, Spring Flowers |
+| Products | NEW | 12 SKUs (4 x 3) |
+
+**Pricing:** Existing plain containers at Rs 35-80 range. Printed versions typically +15-20% premium. Suggest Rs 40-95 range.
+
+**Key IDs:** fam-pet-001, axis-size-001, existing size values in file.
+</output>
+
+<note>
+Multi-variant pattern: Catalog analyst recognizes this is ONE product family with multiple variant axes, NOT separate products. Provides complete variant structure including:
+- Which elements exist vs need creation
+- Axis semantics (color vs design distinction)
+- SKU explosion calculation (4 x 3 = 12)
+- Foreign keys for existing elements
+</note>
+
+</example>
+
 <output>
 
 ## What to Return

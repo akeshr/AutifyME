@@ -488,6 +488,176 @@ Ambiguous HITL feedback on writes = escalate, don't guess. The agent presents co
 
 </example>
 
+<example scenario="Multi-variant creation - family with 2 axes, multiple products">
+
+<input>
+PM: "Create products for the floral container variants. Read all analyst findings:
+- Visual: `visual_analysis_containers.md`
+- Catalog: `catalog_analysis_pet_containers.md`
+- Product research: `product_research_containers.md`
+Processed images at pending/thread_789/"
+</input>
+
+<reasoning>
+ACTION task - multi-variant creation. PM provided all analyst files. Let me read them.
+
+[read_file(path="visual_analysis_containers.md")]
+-> "9 PET containers. 3 sizes visible (2L, 1L, 500ml), 3 designs (Blossoms, Charming Flowers, Spring Flowers)."
+
+[read_file(path="catalog_analysis_pet_containers.md")]
+-> "**Variant Structure:**
+Family: fam-pet-001 'PET Kitchen Storage' (EXISTS)
+Size axis: axis-size-001 (EXISTS, add 1.5L value)
+Design axis: NEW - create with Blossoms, Charming Flowers, Spring Flowers
+Products: 4 sizes x 3 designs = 12 SKUs
+Pricing: Rs 40-95 range"
+
+[read_file(path="product_research_containers.md")]
+-> "HSN 3923, 18% GST. SKU pattern: PKS-[SIZE]-[DESIGN]. Food-grade PET containers."
+
+I have clear variant structure from catalog analyst. Need to:
+1. Add missing size value (1.5L) to existing axis
+2. Create new "design" axis
+3. Create design values
+4. Create 12 products linked to variant values
+
+Let me verify existing IDs:
+
+[read_data(table="variant_axes", filters={"id": "axis-size-001"}, columns=["id", "name"])]
+-> Confirmed exists
+
+[read_data(table="variant_values", filters={"variant_axis_id": "axis-size-001"}, columns=["id", "value", "sku_code"])]
+-> Existing: val-500ml (500ML), val-1l (1L), val-2l (2L)
+
+Good. Building WriteIntent with @reference chaining for the full variant structure:
+
+[write_data(
+  goal: "Create floral PET container product line with variant structure",
+  reasoning: "Adding new 'design' variant axis to existing PET family, creating 3 design values, adding missing 1.5L size value, then creating 12 products (4 sizes x 3 designs) with variant linkages",
+  hitl_summary: "Creating 'Floral PET Containers' product line:
+
+- NEW axis: 'design' (Blossoms, Charming Flowers, Spring Flowers)
+- NEW size value: 1.5L
+- 12 NEW products: PKS-500ML-BLOSSOMS through PKS-2L-SPRING
+
+Pricing: Rs 40-95 range based on size.
+HSN: 3923 (18% GST)
+
+This creates 1 axis + 4 values + 12 products.
+Approve?",
+  operations: [
+    // 1. Create new design axis
+    {
+      "op": "create",
+      "table": "variant_axes",
+      "ref": "design_axis",
+      "data": {
+        "product_family_id": "fam-pet-001",
+        "name": "design",
+        "display_name": "Print Design",
+        "position": 2
+      }
+    },
+    // 2. Create design values
+    {
+      "op": "create",
+      "table": "variant_values",
+      "ref": "val_blossoms",
+      "data": {
+        "variant_axis_id": "@design_axis.id",
+        "value": "Blossoms",
+        "sku_code": "BLOSSOMS",
+        "display_label": "Blossoms (Blue Floral)"
+      }
+    },
+    {
+      "op": "create",
+      "table": "variant_values",
+      "ref": "val_charming",
+      "data": {
+        "variant_axis_id": "@design_axis.id",
+        "value": "Charming Flowers",
+        "sku_code": "CHARMING",
+        "display_label": "Charming Flowers (Orange)"
+      }
+    },
+    {
+      "op": "create",
+      "table": "variant_values",
+      "ref": "val_spring",
+      "data": {
+        "variant_axis_id": "@design_axis.id",
+        "value": "Spring Flowers",
+        "sku_code": "SPRING",
+        "display_label": "Spring Flowers (Pink)"
+      }
+    },
+    // 3. Add missing 1.5L size value
+    {
+      "op": "create",
+      "table": "variant_values",
+      "ref": "val_1500ml",
+      "data": {
+        "variant_axis_id": "axis-size-001",
+        "value": "1500ml",
+        "sku_code": "1500ML",
+        "display_label": "1.5 Litre"
+      }
+    },
+    // 4. Create products - example for 500ml x Blossoms
+    {
+      "op": "create",
+      "table": "products",
+      "ref": "prod_500_blossoms",
+      "data": {
+        "sku": "PKS-500ML-BLOSSOMS",
+        "name": "PET Storage Container 500ml - Blossoms",
+        "product_family_id": "fam-pet-001",
+        "hsn_code": "3923",
+        "description": "Food-grade PET container with Blossoms blue floral print and matching blue lid",
+        "price": 40
+      }
+    },
+    // 5. Link product to variant values
+    {
+      "op": "create",
+      "table": "product_variant_values",
+      "data": {
+        "product_id": "@prod_500_blossoms.id",
+        "variant_value_id": "val-500ml"
+      }
+    },
+    {
+      "op": "create",
+      "table": "product_variant_values",
+      "data": {
+        "product_id": "@prod_500_blossoms.id",
+        "variant_value_id": "@val_blossoms.id"
+      }
+    },
+    // ... repeat pattern for all 12 products (4 sizes x 3 designs)
+    // 500ml x Charming, 500ml x Spring
+    // 1L x Blossoms, 1L x Charming, 1L x Spring
+    // 1.5L x Blossoms, 1.5L x Charming, 1.5L x Spring
+    // 2L x Blossoms, 2L x Charming, 2L x Spring
+  ],
+  impact: "Creates 1 variant axis + 4 variant values + 12 products + 24 variant linkages"
+)]
+</reasoning>
+
+<note>
+Multi-variant pattern shows:
+1. Creating variant axis with @reference for chaining
+2. Creating variant values linked to axis via @design_axis.id
+3. Creating products linked to family
+4. Creating product_variant_values junction entries linking products to BOTH size and design values
+5. Each product needs 2 junction entries (one per axis)
+
+For 12 products this would be ~50 operations total. The example shows the pattern - actual implementation repeats for all combinations.
+</note>
+
+</example>
+
 <output>
 
 ## Completion
