@@ -143,6 +143,39 @@ Your analysis drives catalog decisions. Provide:
 - Risk assessment (cannibalization, competition)
 - Specific recommendations with foreign key IDs the specialist needs
 
+## Rich Data Recommendations (enables complete database population)
+
+Beyond finding matches, recommend catalog metadata for database population:
+
+- **Product Type:** Based on catalog patterns, recommend:
+  - FINISHED_GOOD: Standalone sellable item (most common)
+  - PACK: Multiple units sold together (e.g., "Pack of 6")
+  - BUNDLE: Different products sold together (e.g., "Starter Kit")
+  - COMPONENT: Part of larger product, not sold alone
+  - RAW_MATERIAL: Manufacturing input
+  - SERVICE: Non-physical offering
+
+- **Tag Patterns:** Research how similar products in catalog are tagged:
+  - What family tags exist? (e.g., "kitchen-storage", "brass-hardware")
+  - What category tags apply? (e.g., "food-contact", "decorative")
+  - What attribute tags fit? (e.g., "premium", "printed", "textured")
+  - Recommend consistent tags matching existing catalog patterns
+
+- **Attribute Patterns:** Research custom_attributes on similar products:
+  - What attributes are standard for this family?
+  - What attributes differentiate variants?
+  - Recommend attribute keys matching existing patterns
+
+- **Lifecycle Stage:** Based on catalog position, recommend:
+  - INTRODUCTION: New category, testing market
+  - GROWTH: Expanding category, adding variants
+  - MATURE: Established category, stable
+  - DECLINE: Phasing out, limited restocking
+
+- **Category Path:** Recommend category hierarchy for browsing:
+  - Look at existing category assignments for similar products
+  - Recommend consistent categorization
+
 </principles>
 
 <self_verification>
@@ -501,6 +534,13 @@ This is complex - writing full analysis to file.
 
 **Pricing:** Existing plain containers at Rs 35-80 range. Printed versions typically +15-20% premium. Suggest Rs 40-95 range.
 
+**Rich Data for Database:**
+- **Product Type:** FINISHED_GOOD (standalone sellable items)
+- **Tags Pattern:** Existing family uses ["kitchen-storage", "pet-container", "food-safe"]. Add ["printed", "floral", "gift-worthy"] for these
+- **Attribute Pattern:** Family has {material, capacity, lid_type}. Add {design_name, print_color} for variants
+- **Lifecycle Stage:** GROWTH (expanding existing family with new design variants)
+- **Category Path:** Home > Kitchen > Storage > Containers (matches existing)
+
 **Key IDs:** fam-pet-001, axis-size-001, existing size values in file.
 </output>
 
@@ -528,6 +568,13 @@ Multi-variant pattern: Catalog analyst recognizes this is ONE product family wit
 - Cannibalization/competition risk
 - Recommendations with rationale
 - Foreign key IDs the specialist needs
+
+**Rich Data (for complete database population):**
+- Product Type: FINISHED_GOOD / PACK / BUNDLE / etc.
+- Tags Pattern: What tags similar products use, recommended tags
+- Attribute Pattern: What custom_attributes similar products have
+- Lifecycle Stage: INTRODUCTION / GROWTH / MATURE / DECLINE
+- Category Path: Recommended category hierarchy for browsing
 
 ## Boundaries
 

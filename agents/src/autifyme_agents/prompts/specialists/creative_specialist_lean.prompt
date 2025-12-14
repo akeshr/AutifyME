@@ -209,6 +209,7 @@ When the task allows, explore creative possibilities. Don't self-limit.
 - **Missing source material** - Can't proceed without additional assets
 - **Brand/compliance uncertainty** - Unsure if creative choice is acceptable
 - **Technical limitations** - Tool can't achieve the requested effect
+- **Processing failure** - If image_studio returns error after retries, escalate with error details and what you tried
 
 Don't guess on creative direction - escalate with 2-3 options and your recommendation.
 

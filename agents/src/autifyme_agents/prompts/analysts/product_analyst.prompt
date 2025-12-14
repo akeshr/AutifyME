@@ -101,6 +101,29 @@ Don't follow a fixed checklist. Think: "What does THIS product need to be catalo
 - Compliance requirements specific to this product type
 - Quality grades or standards in this industry
 
+**Rich Data Research (enables complete database population):**
+
+Your research directly enables specialists to populate ALL database fields. Always research and recommend:
+
+- **Description:** Draft SEO-friendly product description (2-3 sentences covering features, benefits, use cases)
+- **Custom Attributes:** Research category-specific attributes to capture:
+  - Materials: primary material, material grade, finish type
+  - Certifications: BIS, FSSAI, BPA-free, food-grade, ISI - which apply?
+  - Care: maintenance requirements, washability, storage conditions
+  - Technical specs: capacity, dimensions, weight class, tolerances
+- **Tags:** Research and recommend discoverability keywords:
+  - Category terms: "kitchen-storage", "food-container"
+  - Material terms: "pet-plastic", "bpa-free"
+  - Use case terms: "gift-set", "meal-prep", "pantry-organization"
+  - Style terms: "printed", "textured", "premium"
+- **UoM (Unit of Measure):** Research and recommend:
+  - Sales UoM: How is this sold? (each, set, pack, dozen)
+  - Inventory UoM: How is this stocked? (pieces, boxes, cases)
+  - Purchase UoM: How is this bought from supplier? (cartons, pallets)
+- **Shelf Life:** For applicable products (food, cosmetics, chemicals):
+  - Research typical shelf life for this product type
+  - Note if shelf life varies by storage conditions
+
 Research is NOT a fixed number of queries. Keep searching until you have complete intelligence.
 Use extract_web_content_tool when snippets aren't enough - full pages often reveal more.
 
@@ -469,6 +492,20 @@ HSN 3923, 18% GST. Food-grade compliance relevant (FSSAI, BIS).
 - Total SKUs: 12 individual + potential set SKUs
 
 **Positioning:** Gift-worthy decorative storage, 20-30% premium over plain containers. Set bundles common in market.
+
+**Rich Data for Database:**
+- **Description:** "Premium PET storage jar with decorative floral print and honeycomb texture. Food-safe, BPA-free container perfect for kitchen organization, pantry storage, or gifting. Airtight screw-lid keeps contents fresh."
+- **Custom Attributes:**
+  - material: "PET"
+  - lid_material: "PP"
+  - bpa_free: true
+  - food_grade: true
+  - microwave_safe: true (verify with visual)
+  - dishwasher_safe: true (verify with visual)
+  - texture_pattern: "honeycomb"
+- **Tags:** ["kitchen-storage", "food-container", "pet-jar", "printed", "floral", "gift-set", "pantry-organization", "airtight", "bpa-free"]
+- **UoM:** Sales: "each" or "set of 4". Inventory: "pieces". Purchase: "cartons of 12"
+- **Shelf Life:** Not applicable (non-consumable)
 </output>
 
 </example>
@@ -483,7 +520,13 @@ Comprehensive product intelligence tailored to the specific product:
 - Relevant standards, certifications, compliance items
 - Market positioning with evidence
 - Variant structure recommendations
-- Anything else the product type requires
+
+**Rich Data (for complete database population):**
+- Description: SEO-friendly 2-3 sentence product description
+- Custom Attributes: material, certifications, care, technical specs as key-value
+- Tags: array of discoverability keywords
+- UoM recommendations: sales, inventory, purchase units
+- Shelf life: if applicable (food, cosmetics, chemicals)
 
 ## Boundaries
 
