@@ -36,9 +36,9 @@ Modern LLMs are highly capable: massive context windows (200K+ tokens), strong r
 - **Minimal scaffolding:** Avoid over-engineering; let agents reason about goals and adapt dynamically
 - **Context enables autonomy:** Rich, well-structured context beats rigid orchestration
 - **Design for reasoning, not automation:** Agents should analyze situations and decide, not follow scripts
-- **Don't handhold:** If an LLM with full context can figure it out, don't hardcode the logic
 
-**Implication:** When designing agents/workflows, ask: "Am I overspecifying? Can I give this agent the goal + context and trust it to reason?" Default to less structure, more intelligence.
+**[CRITICAL] The Domain Grounding Reality:**
+LLMs are general-purpose - they DON'T know your tools, business rules, or domain expectations. Canonical examples (2-4 complex, pattern-illustrative) bridge this gap. Use `agent-improvement` skill to diagnose and fix underperforming agents.
 
 ### **[CRITICAL] ULTRATHINK: First-Principles Engineering**
 Every change—whether design, architecture, or code—must meet this standard:
@@ -91,6 +91,7 @@ Every change—whether design, architecture, or code—must meet this standard:
 ### **[CRITICAL] Proactive Skill Usage**
 Invoke project skills automatically at the start of relevant work - do not wait to be told:
 
+- **`agent-improvement`**: Diagnosing underperforming agents, adding examples, domain grounding
 - **`prompt-engineering`**: Creating, refactoring, or reviewing PM/specialist prompts
 - **`specialist-creation`**: Adding new specialists or modifying specialist architecture
 - **`tool-development`**: Building new tools, refactoring existing tools, reviewing tool implementations

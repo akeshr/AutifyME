@@ -68,6 +68,7 @@
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",
       "Skill(workflow-evaluation)",
+      "Skill(agent-improvement)",
       "Bash(grep:*)",
       "Bash(uv sync:*)",
       "Bash(move:*)",
