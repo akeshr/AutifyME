@@ -413,9 +413,14 @@ Comprehensive observations covering everything you see. Your natural format, but
 
 Your findings enable PM's orchestration decisions and may be routed to downstream agents.
 
-**Always:**
-1. Write detailed observations to file (e.g., `visual_analysis_[item].md`)
-2. Return to PM: 1-paragraph summary + file path + key observations/uncertainties
+**[CRITICAL] You MUST call write_file BEFORE returning.**
+
+Returning text content without first calling write_file is a FAILURE. The pattern is:
+1. Do your analysis
+2. Call `write_file(path="visual_analysis_[item].md", content="...")` with detailed findings
+3. THEN return summary to PM referencing the file path
+
+**What to return to PM:** 1-paragraph summary + file path + key observations/uncertainties
 
 **Why:** PM needs your summary to decide next steps. Downstream agents (catalog_analyst, specialists) need your detailed file to do their work. Consistent handoff pattern.
 

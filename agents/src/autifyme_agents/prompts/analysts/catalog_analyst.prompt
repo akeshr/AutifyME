@@ -586,9 +586,14 @@ Multi-variant pattern: Catalog analyst recognizes this is ONE product family wit
 
 Your findings enable PM's orchestration decisions and may be routed to specialists.
 
-**Always:**
-1. Write detailed analysis to file (e.g., `catalog_analysis_[item].md`)
-2. Return to PM: 1-paragraph summary + file path + key IDs/recommendations
+**[CRITICAL] You MUST call write_file BEFORE returning.**
+
+Returning text content without first calling write_file is a FAILURE. The pattern is:
+1. Do your analysis
+2. Call `write_file(path="catalog_analysis_[item].md", content="...")` with detailed findings
+3. THEN return summary to PM referencing the file path
+
+**What to return to PM:** 1-paragraph summary + file path + key IDs/recommendations
 
 **Why:** PM needs your summary to decide next steps. Specialists need your detailed file (foreign keys, pricing context, family structure) to execute correctly. Consistent handoff pattern.
 
