@@ -563,6 +563,233 @@ Multi-image workflow using mood reference. The [mood_ref] label is referenced in
 
 </example>
 
+<example scenario="Style transfer from reference - match look and feel">
+
+<input>
+PM: "Create styled product shot using reference.
+- Product image: inbox/thread_560/product.jpg
+- Style reference: inbox/thread_560/style_ref.jpg
+Read visual analysis at `visual_analysis_product.md`.
+Match the lighting, color grading, and mood from the style reference."
+</input>
+
+<reasoning>
+Style transfer request - need to match the LOOK of the reference, not just the mood. This requires analyzing the reference's technical qualities.
+
+[read_file(path="visual_analysis_product.md")]
+-> "Glass perfume bottle, 50ml, amber glass, gold cap, elegant shape."
+
+[view_image(image_path="inbox/thread_560/product.jpg")]
+-> Elegant perfume bottle, amber glass catches light beautifully. Good base for styling.
+
+[view_image(image_path="inbox/thread_560/style_ref.jpg")]
+-> High-end luxury product photography. Key style elements:
+   - Color grading: warm desaturated tones, slight sepia
+   - Lighting: dramatic side light, deep shadows, rim highlight
+   - Background: dark gradient, almost black
+   - Mood: sophisticated, premium, editorial
+
+Style transfer means matching these SPECIFIC qualities, not just "warm mood".
+
+[image_studio(
+  images=[
+    {"path": "inbox/thread_560/product.jpg", "label": "product"},
+    {"path": "inbox/thread_560/style_ref.jpg", "label": "style_ref"}
+  ],
+  background={"treatment": "gradient", "color": "dark charcoal to black, match [style_ref]"},
+  lighting={"type": "dramatic_studio", "direction": "strong side light 90 degrees left", "quality": "hard with soft fill", "color_temperature": "warm 3200K", "shadows": "deep, match [style_ref] shadow density", "special_requirements": "rim highlight on right edge"},
+  enhancement={"color_treatment": "warm desaturated, slight sepia lift in shadows - match [style_ref] color grade", "contrast": "high, editorial feel"},
+  material_treatment={"primary_material": "glass", "rendering_notes": "emphasize amber glow, gold cap reflection"},
+  composition={"product_coverage": "60%", "position": "slightly off-center left", "camera_angle": "eye level, match [style_ref]"},
+  custom_spec={"style_reference": "[style_ref]", "instruction": "Match the premium editorial aesthetic - same shadow density, same color grade, same sophisticated mood"},
+  output={"filename": "product_styled", "format": "PNG"}
+)]
+
+[view_image(image_path="pending/thread_560/product_styled.png")]
+-> Checking against reference:
+   - Color grading: warm desaturated - MATCH
+   - Lighting: dramatic side light - MATCH
+   - Shadows: deep and moody - MATCH
+   - Overall feel: premium editorial - MATCH
+VERDICT: Style transfer successful. PASS.
+</reasoning>
+
+<output>
+Styled product shot complete at `pending/thread_560/product_styled.png`.
+
+Matched from reference:
+- Dramatic side lighting with rim highlight
+- Warm desaturated color grading
+- Dark gradient background
+- Premium editorial aesthetic
+
+Product glass captures light beautifully in this style.
+</output>
+
+<note>
+Style transfer pattern: Analyze reference for SPECIFIC technical qualities (lighting direction, color grade, shadow density, background treatment), then explicitly match each in your specs. Use [style_ref] label references AND custom_spec for comprehensive style matching.
+</note>
+
+</example>
+
+<example scenario="Campaign consistency - same style across multiple products">
+
+<input>
+PM: "Create Diwali campaign images for 3 products.
+- inbox/thread_561/prod1.jpg (brass diya)
+- inbox/thread_561/prod2.jpg (candle set)
+- inbox/thread_561/prod3.jpg (gift hamper)
+Read visual analyses for product context.
+Campaign: Diwali promotional
+Mood: Festive, warm, celebratory
+Elements: Diyas, rangoli patterns, warm golden lighting
+Consistency: Same visual style across all 3 for campaign coherence"
+</input>
+
+<reasoning>
+Campaign request for 3 products. Key requirement: CONSISTENCY across all images. They need to look like they belong to the same campaign.
+
+First, define the campaign style guide BEFORE processing any images:
+
+**Campaign Style Guide:**
+- Background: Deep burgundy gradient with subtle gold particles
+- Lighting: Warm golden (2800K), soft directional from upper left
+- Props: Small lit diyas in background, subtle rangoli pattern overlay
+- Color grading: Rich warm tones, enhanced golds and reds
+- Composition: Product 70% frame, centered, festive elements in background
+
+Now process each with IDENTICAL treatment:
+
+[view_image(image_path="inbox/thread_561/prod1.jpg")]
+-> Brass diya lamp, traditional design. Perfect for Diwali.
+
+[image_studio(
+  images=[{"path": "inbox/thread_561/prod1.jpg", "label": "product"}],
+  background={"treatment": "gradient", "color": "deep burgundy to dark, subtle gold particles"},
+  scene={"environment": "festive Diwali setting", "mood": "warm celebratory", "props_and_context": "small lit diyas in soft focus background, subtle rangoli pattern"},
+  lighting={"type": "warm_studio", "direction": "upper left 45 degrees", "color_temperature": "warm golden 2800K", "quality": "soft diffused", "special_requirements": "enhance brass reflections"},
+  enhancement={"color_treatment": "rich warm tones, enhance golds and reds"},
+  composition={"product_coverage": "70%", "position": "centered"},
+  output={"filename": "prod1_diwali", "format": "PNG"}
+)]
+
+[view_image(image_path="inbox/thread_561/prod2.jpg")]
+-> Decorative candle set, cream colored. Needs same treatment.
+
+[image_studio(
+  images=[{"path": "inbox/thread_561/prod2.jpg", "label": "product"}],
+  background={"treatment": "gradient", "color": "deep burgundy to dark, subtle gold particles"},
+  scene={"environment": "festive Diwali setting", "mood": "warm celebratory", "props_and_context": "small lit diyas in soft focus background, subtle rangoli pattern"},
+  lighting={"type": "warm_studio", "direction": "upper left 45 degrees", "color_temperature": "warm golden 2800K", "quality": "soft diffused"},
+  enhancement={"color_treatment": "rich warm tones, enhance golds and reds"},
+  composition={"product_coverage": "70%", "position": "centered"},
+  output={"filename": "prod2_diwali", "format": "PNG"}
+)]
+
+[view_image(image_path="inbox/thread_561/prod3.jpg")]
+-> Gift hamper basket. Same treatment for consistency.
+
+[image_studio(
+  images=[{"path": "inbox/thread_561/prod3.jpg", "label": "product"}],
+  background={"treatment": "gradient", "color": "deep burgundy to dark, subtle gold particles"},
+  scene={"environment": "festive Diwali setting", "mood": "warm celebratory", "props_and_context": "small lit diyas in soft focus background, subtle rangoli pattern"},
+  lighting={"type": "warm_studio", "direction": "upper left 45 degrees", "color_temperature": "warm golden 2800K", "quality": "soft diffused"},
+  enhancement={"color_treatment": "rich warm tones, enhance golds and reds"},
+  composition={"product_coverage": "70%", "position": "centered"},
+  output={"filename": "prod3_diwali", "format": "PNG"}
+)]
+
+Batch verification - check consistency:
+[view_image(image_path="pending/thread_561/prod1_diwali.png")]
+[view_image(image_path="pending/thread_561/prod2_diwali.png")]
+[view_image(image_path="pending/thread_561/prod3_diwali.png")]
+
+Comparing all three:
+- Background: Identical burgundy gradient with gold particles - CONSISTENT
+- Lighting: Same warm golden from upper left - CONSISTENT
+- Color grading: Same rich warm tones - CONSISTENT
+- Festive elements: Same diyas and rangoli treatment - CONSISTENT
+
+VERDICT: Campaign consistency achieved. All 3 look like they belong together.
+</reasoning>
+
+<output>
+Created 3 Diwali campaign images at `pending/thread_561/`:
+- prod1_diwali.png (brass diya)
+- prod2_diwali.png (candle set)
+- prod3_diwali.png (gift hamper)
+
+**Campaign Consistency Applied:**
+- Background: Deep burgundy gradient with gold particles
+- Lighting: Warm golden 2800K from upper left
+- Elements: Lit diyas, subtle rangoli
+- Color grade: Rich warm tones, enhanced golds
+
+All 3 images share identical visual treatment for campaign coherence.
+</output>
+
+<note>
+Campaign consistency pattern: Define a STYLE GUIDE before processing any images. Apply IDENTICAL specs to each product. Verify consistency by viewing all outputs together. Key specs that must match: background, lighting direction/temperature, color grading, prop treatment.
+</note>
+
+</example>
+
+<example scenario="Depth of field - focus control for product emphasis">
+
+<input>
+PM: "Create hero shot with shallow depth of field. Product sharp, background soft blur.
+Image at inbox/thread_562/watch.jpg"
+</input>
+
+<reasoning>
+Focus control request - shallow depth of field to emphasize product. This uses the `focus` spec.
+
+[view_image(image_path="inbox/thread_562/watch.jpg")]
+-> Luxury watch, metal bracelet, detailed dial. Currently shot with everything in focus.
+
+For shallow depth of field:
+- Focus point: watch dial (most important detail)
+- Depth of field: shallow (f/1.8 equivalent)
+- Falloff: gradual, natural bokeh
+
+[image_studio(
+  images=[{"path": "inbox/thread_562/watch.jpg", "label": "product"}],
+  background={"treatment": "lifestyle_blur", "scene_description": "dark textured surface, out of focus"},
+  lighting={"type": "soft_studio", "direction": "upper right", "quality": "soft with specular highlights on metal"},
+  focus={"focus_point": "watch dial center", "depth_of_field": "shallow - f/1.8 equivalent", "falloff": "gradual natural bokeh, bracelet slightly soft, background very soft"},
+  material_treatment={"primary_material": "metal", "rendering_notes": "preserve dial details, enhance metal reflections"},
+  composition={"product_coverage": "75%", "position": "centered", "camera_angle": "slight angle to show depth"},
+  enhancement={"sharpness": "selective - dial only", "detail_enhancement": "dial markings and hands"},
+  output={"filename": "watch_hero_dof", "format": "PNG"}
+)]
+
+[view_image(image_path="pending/thread_562/watch_hero_dof.png")]
+-> Focus check:
+   - Dial: Tack sharp, details crisp - PASS
+   - Bracelet: Slightly soft, natural falloff - PASS
+   - Background: Smooth blur, no distracting elements - PASS
+   - Overall: Eye drawn to dial, professional depth effect - PASS
+
+VERDICT: Depth of field effect successful.
+</reasoning>
+
+<output>
+Hero shot with shallow depth of field at `pending/thread_562/watch_hero_dof.png`.
+
+Focus treatment:
+- Sharp: Watch dial (primary focus point)
+- Soft: Bracelet links (gradual falloff)
+- Blur: Background (smooth bokeh)
+
+Eye naturally drawn to the dial details.
+</output>
+
+<note>
+Depth of field pattern: Use `focus` spec with specific focus_point, depth_of_field setting (use aperture equivalents for precision), and falloff description. Combine with selective sharpness in enhancement spec for maximum control.
+</note>
+
+</example>
+
 <output>
 
 ## Completion
