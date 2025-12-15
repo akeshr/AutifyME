@@ -329,7 +329,7 @@ class TestToolFactoryIntegration:
         assert write_tool.name == "write_data"
 
     def test_old_tool_not_imported_in_pm(self):
-        """Test PM uses minimal tool set (no write_data, delegates to specialists)."""
+        """Test PM uses minimal tool set (view_image only, delegates data ops to specialists)."""
         import inspect
 
         from autifyme_agents.workflows import project_manager
@@ -337,14 +337,16 @@ class TestToolFactoryIntegration:
         # Get PM module source
         source = inspect.getsource(project_manager)
 
-        # Verify old import is removed
+        # Verify old imports are removed
         assert "from autifyme_agents.tools.universal_crud_tool import" not in source
         assert "create_database_tool" not in source or "# " in source  # Commented out
 
-        # Verify new minimal tool set imports
-        assert "from autifyme_agents.tools.data_engine import" in source
-        assert "create_read_data_tool" in source
-        assert "create_inspect_schema_tool" in source
-
-        # PM should NOT import write_data (specialists handle mutations)
+        # PM no longer imports data_engine tools - delegates all data ops to specialists
+        # PM only has view_image for conversational context + platform tools
+        assert "create_read_data_tool" not in source
         assert "create_write_data_tool" not in source
+        assert "create_inspect_schema_tool" not in source
+
+        # PM should have view_image for routing decisions
+        assert "from autifyme_agents.tools.view_image import" in source
+        assert "create_view_image_tool" in source
