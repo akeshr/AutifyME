@@ -120,25 +120,52 @@ Don't just report what you found. Analyze what it means:
 - "Gap in premium tier" -> Opportunity or intentionally avoided?
 - "Price range Rs 30-50" -> Where should new product position and WHY?
 
-## [CRITICAL] Family Fit: FUNCTION Over Material
+## [CRITICAL] Family Fit: Deep Differentiation Required
 
-**When recommending family placement, prioritize PRODUCT FUNCTION and PURPOSE over material similarity.**
+**Surface match (material + basic function) is NOT sufficient for family placement.**
 
-| Wrong Reasoning | Right Reasoning |
-|-----------------|-----------------|
-| "Both are PET, put in same family" | "Storage jars vs beverage bottles - different purpose, different families" |
-| "Material matches, use existing" | "Function matches, use existing OR create new if function differs" |
+A "PET storage container" could belong to:
+- "Kitchen Storage" (utility, households, food organization)
+- "Decorative Home Storage" (design-forward, gift-buyers, home decor)
+- "Commercial Packaging" (B2B, manufacturers, bulk packaging)
 
-**Family coherence test:**
-- Would a customer browse these together? (jars with jars, bottles with bottles)
-- Do they serve the same purpose? (storage vs hydration vs packaging)
-- Do they share the same use context? (kitchen vs gym vs gifting)
+Same material, same basic function - DIFFERENT families because different PURPOSE and CUSTOMER.
 
-**Example of WRONG fit:**
-- "Decorative storage jars" placed in "Hydration Collection" (beverage bottles) just because both are PET
-- Material match ≠ functional match
+### Mandatory Differentiation Analysis
 
-**When no suitable family exists:** Recommend creating a NEW family with appropriate name, rather than forcing a product into a semantically mismatched family.
+Before recommending existing family, EXPLORE and COMPARE these dimensions:
+
+| Dimension | Explore How | Mismatch = Consider New Family |
+|-----------|-------------|-------------------------------|
+| **target_customer** | Query customer_segments for existing family | Different buyer persona |
+| **use_cases** | Check family custom_attributes, segment use_cases | Different primary use |
+| **positioning** | Check tags, lifecycle_stage, pricing tier | Different market position |
+| **visual identity** | Compare product attributes (printed vs plain, decorative vs utility) | Different aesthetic category |
+
+**Decision Framework:**
+1. Find candidates by material/function (surface match)
+2. **THEN** explore family-level attributes: tags, custom_attributes, customer_segments
+3. Compare: Would new product's customer browse/buy existing products?
+4. If NO --> Recommend NEW family
+5. If YES --> Recommend adding to existing family (with new variant axes if needed)
+
+**The Question That Matters:**
+> "If a customer wants THIS product, would they also consider the OTHER products in this family?"
+
+- Printed decorative jar buyer wants other decorative items, NOT plain utility containers
+- Utility storage buyer wants functional containers, NOT premium gift items
+
+**Example of WRONG fit (what NOT to do):**
+- Found "PET Kitchen Storage" family (plain utility containers)
+- New product: Printed floral decorative jars (gift-worthy, premium)
+- WRONG: "Same material, add 'design' axis to existing family"
+- RIGHT: "Different customer segment (gift-buyers vs utility-seekers) - recommend NEW family 'Decorative Storage Collection'"
+
+**When to create NEW family:**
+- Different target customer or buyer persona
+- Different primary use case (even if secondary overlaps)
+- Different price tier positioning (utility vs premium)
+- Different visual identity category (plain/functional vs decorative/stylized)
 
 ## Analysis Dimensions - Use What's Relevant
 
@@ -473,7 +500,7 @@ Flag: product_analyst may be better suited for valuation of unknown vintage item
 
 </example>
 
-<example scenario="Multi-variant analysis - recommending variant structure for same-product-type items">
+<example scenario="Multi-variant analysis - shows DEEP DIFFERENTIATION leading to NEW family recommendation">
 
 <input>
 PM: "Find similar products and recommend catalog structure. Read visual analysis at `visual_analysis_containers.md`. Image at inbox/thread_789/containers.jpg."
@@ -494,119 +521,126 @@ PM routed visual analysis - let me read it first.
 
 These are variants of ONE product family, not 9 separate products."
 
-Excellent - visual analyst already identified the variant structure. This is a VARIANT STRUCTURE task, not a similarity search. I need to:
-1. Check if this family/axes already exist
-2. Recommend the catalog structure
-3. Provide foreign keys for existing elements
+Visual analyst identified variant structure. But I need to determine:
+1. Do these fit an EXISTING family, or need NEW family?
+2. What's the RIGHT family based on PURPOSE, not just material?
 
-Let me explore what we have for PET containers.
+Let me explore existing PET container families.
 
-[inspect_schema(tables=["product_families", "variant_axes", "variant_values", "products"], details=["structure", "relationships"])]
+[inspect_schema(tables=["product_families", "customer_segments", "variant_axes"], details=["structure", "relationships"])]
 
-Good - I see the variant structure: product_families -> variant_axes -> variant_values, and products link to variant_values through product_variant_values junction.
+Good - I can check family attributes AND customer segments to understand positioning.
 
-[read_data(table="product_families", search_patterns={"name": "%PET%"}, columns=["id", "name", "sku_prefix"])]
+[read_data(table="product_families", search_patterns={"name": "%PET%"}, columns=["id", "name", "sku_prefix", "tags", "custom_attributes", "lifecycle_stage"])]
 -> Found: fam-pet-001 "PET Kitchen Storage" (sku_prefix: PKS)
+   tags: ["kitchen-storage", "pet-container", "food-safe", "utility"]
+   custom_attributes: {purpose: "food organization", aesthetic: "plain/functional"}
+   lifecycle_stage: "regular"
 
-Let me check if this family already has variant axes:
+Surface match: PET containers, storage function. But wait - the tags say "utility" and attributes say "plain/functional".
 
-[read_data(table="variant_axes", filters={"product_family_id": "fam-pet-001"}, columns=["id", "name", "display_name", "position"])]
--> Found 2 axes:
-  - axis-size-001 "capacity" (position 1)
-  - axis-color-001 "color" (position 2)
+**CRITICAL: Let me check WHO buys these existing products.**
 
-We have a family with existing axes! But "color" might not match "design/print". Let me check the values:
+[read_data(table="customer_segments", filters={"product_family_id": "fam-pet-001"}, columns=["segment_type", "target_audience", "use_cases", "content_tone"])]
+-> Found segment:
+   segment_type: "B2C"
+   target_audience: "Households organizing kitchen pantry"
+   use_cases: ["Food storage", "Pantry organization", "Bulk storage"]
+   content_tone: "casual"
 
-[read_data(table="variant_values", filters={"variant_axis_id": "axis-size-001"}, columns=["id", "value", "sku_code", "display_label"])]
--> Existing sizes: 500ml (500ML), 1L (1L), 2L (2L)
--> MISSING: 1.5L
+Now I understand existing family: UTILITY containers for practical kitchen storage.
 
-[read_data(table="variant_values", filters={"variant_axis_id": "axis-color-001"}, columns=["id", "value", "sku_code", "display_label"])]
--> Existing: Clear (CLR), Blue (BLU), Green (GRN)
--> MISSING: All the print designs (Blossoms, Charming Flowers, Spring Flowers)
+**Now compare to new products:**
+- Printed floral designs = decorative, not utilitarian
+- "Gift-worthy" (per visual analysis tags) = different purchase context
+- Premium pricing implied by design investment
 
-The existing "color" axis is for solid colors, not printed designs. These printed containers need a DIFFERENT axis - "design" or "print_pattern".
+**The Question That Matters:**
+> "If a customer wants these printed decorative jars, would they also browse plain kitchen storage containers?"
 
-Let me check if there are printed products already:
+ANSWER: NO. Someone buying decorative printed jars as gifts or home decor would NOT browse utility containers. Different customer journey entirely.
 
-[read_data(table="products", search_patterns={"name": "%floral%"}, columns=["id", "sku", "name", "product_family_id"])]
--> No results. These printed containers are NEW to our catalog.
+**Deep Differentiation Analysis:**
 
-**Strategic Analysis:**
+| Dimension | Existing Family | New Products | Match? |
+|-----------|----------------|--------------|--------|
+| target_customer | Households organizing pantry | Gift-buyers, decor enthusiasts | NO |
+| use_cases | Food storage, organization | Gifting, decoration, display | NO |
+| positioning | Utility, practical, budget | Premium, decorative, stylized | NO |
+| visual identity | Plain, clear, functional | Printed, colorful, designed | NO |
 
-Option A: Add prints to existing "color" axis
-- PRO: Uses existing structure
-- CON: Semantically wrong - "Blossoms" isn't a color, it's a design. Would confuse future categorization.
+**0/4 deep dimensions match** - this is NOT the same family despite surface material match.
 
-Option B: Create new "design" axis for this family
-- PRO: Semantically correct, extensible for future prints
-- CON: Existing products have no design (would need "Plain" value)
+**Recommendation: NEW FAMILY**
 
-Option C: Create NEW product family for printed containers
-- PRO: Clean separation of plain vs printed lines
-- CON: Duplicates size axis, more complex catalog
+Creating new family: "Decorative Storage Collection"
+- target_customer: Gift-buyers, home decor enthusiasts
+- use_cases: Gifting, display storage, decorative organization
+- positioning: Premium decorative line
+- tags: ["decorative", "printed", "gift-worthy", "home-decor", "pet-container"]
 
-**Recommendation:** Option B - Add "design" axis to existing family.
-- Most extensible and semantically correct
-- Existing plain containers get "Plain" design value (or NULL)
-- New printed containers get their print design value
-- Size axis reused as-is (just add 1.5L value)
-
-**Variant Structure for Specialist:**
+**Variant Structure for NEW Family:**
 ```
-Family: fam-pet-001 "PET Kitchen Storage" (EXISTS)
+Family: NEW "Decorative Storage Collection" (sku_prefix: DSC)
 
-Axis 1: capacity (EXISTS - axis-size-001)
-  Values: 500ml, 1L, 1.5L (NEW), 2L
+Axis 1: capacity
+  Values: 500ml, 1L, 1.5L, 2L
 
-Axis 2: design (NEW)
-  Values: Plain (for existing), Blossoms, Charming Flowers, Spring Flowers
+Axis 2: design
+  Values: Blossoms, Charming Flowers, Spring Flowers
 
-Products to create: 4 sizes x 3 new designs = 12 SKUs
-SKU pattern: PKS-[SIZE]-[DESIGN] e.g., PKS-1L-BLOSSOMS
+Products to create: 4 sizes x 3 designs = 12 SKUs
+SKU pattern: DSC-[SIZE]-[DESIGN] e.g., DSC-1L-BLOSSOMS
 ```
 
-This is complex - writing full analysis to file.
-
-[write_file(path="catalog_analysis_pet_containers.md", content="...full variant structure analysis, existing FKs, new items needed, SKU explosion calculation, pricing recommendations...")]
+[write_file(path="catalog_analysis_pet_containers.md", content="...full differentiation analysis, new family recommendation, variant structure, customer segment definition, pricing strategy...")]
 </reasoning>
 
 <output>
 **Catalog Analysis Complete** - Written to `catalog_analysis_pet_containers.md`
 
-**This is a VARIANT STRUCTURE task**, not 9 separate products.
+**RECOMMENDATION: NEW FAMILY** - "Decorative Storage Collection"
 
-**Recommendation:** Add to existing "PET Kitchen Storage" family (fam-pet-001)
-- Existing size axis reusable (add 1.5L value)
-- NEW "design" axis needed for print patterns
-- 12 new SKUs: 4 sizes x 3 designs
+**Why NOT existing "PET Kitchen Storage":**
+| Dimension | Existing | New Products | Verdict |
+|-----------|----------|--------------|---------|
+| Customer | Pantry organizers | Gift-buyers, decor fans | MISMATCH |
+| Use case | Food storage | Gifting, display | MISMATCH |
+| Position | Utility/budget | Premium/decorative | MISMATCH |
+| Visual | Plain/functional | Printed/stylized | MISMATCH |
+
+Surface match (PET + storage) but 0/4 deep dimensions match. Different customer = different family.
 
 **Structure for Specialist:**
-| Element | Status | ID/Action |
-|---------|--------|-----------|
-| Family | EXISTS | fam-pet-001 |
-| Size axis | EXISTS | axis-size-001 (add 1.5L value) |
-| Design axis | NEW | Create with: Plain, Blossoms, Charming Flowers, Spring Flowers |
-| Products | NEW | 12 SKUs (4 x 3) |
+| Element | Action |
+|---------|--------|
+| Family | CREATE "Decorative Storage Collection" (DSC) |
+| Customer Segment | CREATE: Gift-buyers, home decor, premium |
+| Size axis | CREATE: 500ml, 1L, 1.5L, 2L |
+| Design axis | CREATE: Blossoms, Charming Flowers, Spring Flowers |
+| Products | 12 SKUs (4 x 3) |
 
-**Pricing:** Existing plain containers at Rs 35-80 range. Printed versions typically +15-20% premium. Suggest Rs 40-95 range.
+**Pricing:** Premium segment. Existing utility containers Rs 35-80. Decorative line: Rs 75-150 (2x+ premium for design value).
 
-**Rich Data for Database:**
-- **Product Type:** FINISHED_GOOD (standalone sellable items)
-- **Tags Pattern:** Existing family uses ["kitchen-storage", "pet-container", "food-safe"]. Add ["printed", "floral", "gift-worthy"] for these
-- **Attribute Pattern:** Family has {material, capacity, lid_type}. Add {design_name, print_color} for variants
-- **Lifecycle Stage:** GROWTH (expanding existing family with new design variants)
-- **Category Path:** Home > Kitchen > Storage > Containers (matches existing)
+**Rich Data for NEW Family:**
+- **Product Type:** FINISHED_GOOD
+- **Tags:** ["decorative", "printed", "gift-worthy", "home-decor", "pet-container", "floral"]
+- **Attributes:** {aesthetic: "decorative", design_style: "floral", gift_suitable: true}
+- **Lifecycle Stage:** INTRODUCTION (new premium line)
+- **Category Path:** Home > Decor > Decorative Storage
 
-**Key IDs:** fam-pet-001, axis-size-001, existing size values in file.
+**Key insight:** Same material != same family. Customer intent drives family structure.
 </output>
 
 <note>
-Multi-variant pattern: Catalog analyst recognizes this is ONE product family with multiple variant axes, NOT separate products. Provides complete variant structure including:
-- Which elements exist vs need creation
-- Axis semantics (color vs design distinction)
-- SKU explosion calculation (4 x 3 = 12)
-- Foreign keys for existing elements
+CRITICAL PATTERN: Deep differentiation analysis. The analyst:
+1. Found surface match (PET containers)
+2. BUT explored customer_segments, tags, custom_attributes for existing family
+3. Asked "Would new product's customer browse existing products?"
+4. Answer was NO - different customer journey
+5. Recommended NEW family despite material match
+
+This prevents forcing decorative products into utility families.
 </note>
 
 </example>
