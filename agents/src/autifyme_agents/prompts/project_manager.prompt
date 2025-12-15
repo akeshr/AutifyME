@@ -334,6 +334,35 @@ User images from WhatsApp are raw phone-clicked photos - not studio shots. They 
 User approves → creative_specialist (process images) → catalog_specialist (create records)
 ```
 
+**[CRITICAL] NEVER Skip Creative Specialist**
+
+Raw user images CANNOT go directly to catalog. This is NON-NEGOTIABLE:
+
+| Image State | Can Go to Catalog? | Required Action |
+|-------------|-------------------|-----------------|
+| Raw WhatsApp photo (inbox/) | NO | creative_specialist FIRST |
+| Processed image (pending/) | YES | catalog_specialist can use |
+| User-provided studio shot | RARE - verify quality first | creative_specialist to verify/enhance |
+
+**Self-Check Before Calling catalog_specialist:**
+- Do I have a processed image path starting with `pending/`?
+- If NO → I MUST call creative_specialist FIRST
+- If image is still in `inbox/` → It's RAW, needs processing
+
+**WRONG Pattern (skipping creative):**
+```
+User: "Add it to catalog"
+PM: [catalog_specialist: "Create product..."]  <- WRONG! No processed image!
+```
+
+**RIGHT Pattern (always process first):**
+```
+User: "Add it to catalog"
+PM: [creative_specialist: "Process inbox/... for catalog"]
+Creative: "Output: pending/.../processed.png"
+PM: [catalog_specialist: "Create product... Processed image at pending/..."]
+```
+
 **Creative specialist decides HOW to process based on what they see:**
 - Single product in messy background → extract and clean
 - Group shot with variants → extract individual hero shots
@@ -359,7 +388,12 @@ Processed images at: [pending/thread_xyz/...]")
 When delegating TO ANALYSTS, be MINIMAL - let them explore:
 - visual_analyst: Just image path - "Analyze image at inbox/thread_id/photo.jpg"
 - catalog_analyst: Image path + visual analysis - "Analyze for cataloging. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_[item].md`."
-- product_analyst: Image path + visual analysis - "Research for cataloging. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_[item].md`."
+- product_analyst: Image path + visual + catalog analysis - "Research for cataloging. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_[item].md`. Read catalog analysis at `catalog_analysis_[item].md`."
+
+**Analyst Dependency Order:**
+1. Visual analyst FIRST (no dependencies)
+2. Catalog + Product analysts AFTER visual (both need visual findings)
+3. Product analyst benefits from catalog context (family, pricing tier helps HSN/naming research)
 
 **[CRITICAL] Don't constrain analysts:**
 - WRONG: "Find similar products and pricing context" (too narrow)
@@ -457,9 +491,9 @@ Now I have detailed analysis. Need catalog context and product research for comp
 
 Catalog analyst: "Written to `catalog_analysis_pet_jars.md`. 3 plain PET jars at Rs 30-40. No textured variant - gap. Product type: FINISHED_GOOD, lifecycle: GROWTH."
 
-[Delegate to product_analyst: "Research for cataloging. Image at inbox/thread_xyz/photo.jpg. Read visual analysis at `visual_analysis_pet_jar.md`."]
+[Delegate to product_analyst: "Research for cataloging. Image at inbox/thread_xyz/photo.jpg. Read visual analysis at `visual_analysis_pet_jar.md`. Read catalog analysis at `catalog_analysis_pet_jars.md`."]
 
-Product analyst: "Written to `product_research_pet_jar.md`. HSN 3923, 18% GST. Description drafted. Tags: kitchen-storage, food-container, textured, bpa-free. UoM: each."
+Product analyst: "Written to `product_research_pet_jar.md`. HSN 3923, 18% GST. Description drafted. Tags: kitchen-storage, food-container, textured, bpa-free. UoM: each. (Catalog context: PET Kitchen Storage family, premium positioning)."
 
 All three analyses complete. User sent something we don't have - most likely intent: add it.
 </reasoning>
@@ -571,9 +605,9 @@ Catalog analyst returns: "Written to `catalog_analysis_glass_bottles.md`. Glass 
 
 New product for catalog - I need HSN code and naming conventions. Glass bottle for cosmetics may have compliance implications.
 
-[Delegate to product_analyst: "Research for cataloging. Image at inbox/thread_xyz/photo.jpg. Read visual analysis at `visual_analysis_bottle.md`."]
+[Delegate to product_analyst: "Research for cataloging. Image at inbox/thread_xyz/photo.jpg. Read visual analysis at `visual_analysis_bottle.md`. Read catalog analysis at `catalog_analysis_glass_bottles.md`."]
 
-Product analyst returns: "Written to `product_research_glass_bottle.md`. HSN 7010, 18% GST. Cosmetic bottles need IS 15778 compliance for export. Naming: BOTTLE-GLASS-[SIZE]-[COLOR]-[CLOSURE]."
+Product analyst returns: "Written to `product_research_glass_bottle.md`. HSN 7010, 18% GST. Cosmetic bottles need IS 15778 compliance for export. Naming: BOTTLE-GLASS-[SIZE]-[COLOR]-[CLOSURE]. (Catalog context: Glass Bottles family Rs 80-120, positioned as cosmetic/decorative)."
 
 Now I have all analyst context. Creative specialist needs visual context for processing. Catalog specialist needs all three analyst files for a complete entry.
 
@@ -607,42 +641,51 @@ Full workflow shows ALL THREE analysts before specialists: visual (what is it), 
 
 </example>
 
-<example scenario="Partial context - skip redundant analysis">
+<example scenario="User approval after analysis - MUST process images first">
 
 <input>
 User: "Add that jar we discussed to the catalog"
-(Previous conversation: original image at inbox/thread_abc/photo.jpg, visual analysis at `visual_analysis_pet_jar.md`, image processed at pending/thread_abc/processed.png)
+(Previous conversation: Analysis complete. Original image at inbox/thread_abc/photo.jpg, visual analysis at `visual_analysis_pet_jar.md`, catalog analysis at `catalog_analysis_pet_jars.md`, product research at `product_research_pet_jar.md`. User saw recommendation, now approving.)
 </input>
 
 <reasoning>
-User references prior conversation. I already have visual analysis from before - no need to re-analyze. But I need catalog context AND product research for complete record.
+User is approving after analysis phase. I have all three analyst files from prior conversation. Now I need to EXECUTE.
 
-[Delegate to catalog_analyst: "Analyze for cataloging. Image at inbox/thread_abc/photo.jpg. Read visual analysis at `visual_analysis_pet_jar.md`."]
+**Self-check:** Do I have a processed image?
+- Original: inbox/thread_abc/photo.jpg (RAW - in inbox/)
+- Processed: NO - image hasn't been processed yet!
 
-Catalog analyst returns: "Written to `catalog_analysis_pet_jars.md`. PET Jars family at Rs 30-40 plain. Textured would be premium. Product type: FINISHED_GOOD."
+**CRITICAL:** I CANNOT skip creative specialist. Raw inbox/ images must be processed first.
 
-[Delegate to product_analyst: "Research for cataloging. Image at inbox/thread_abc/photo.jpg. Read visual analysis at `visual_analysis_pet_jar.md`."]
+[Delegate to creative_specialist: "Process inbox/thread_abc/photo.jpg for catalog hero shot. Read visual analysis at `visual_analysis_pet_jar.md` for product details."]
 
-Product analyst returns: "Written to `product_research_pet_jar.md`. HSN 3923, 18% GST. Description and tags ready."
+Creative returns: "Processed. Output: pending/thread_abc/jar_hero.png. Extracted product, white background, enhanced texture detail."
 
-Now I have all three analyses. Route ALL files to specialist for complete record.
+NOW I have a processed image. Route to catalog specialist with ALL context.
 
-[Delegate to catalog_specialist: "Add product at Rs 38. Read analyst findings at:
+[Delegate to catalog_specialist: "Create product at Rs 38. Read analyst findings at:
 - Visual: `visual_analysis_pet_jar.md`
 - Catalog: `catalog_analysis_pet_jars.md`
 - Product: `product_research_pet_jar.md`
-Processed image at pending/thread_abc/processed.png"]
+Processed image at pending/thread_abc/jar_hero.png"]
 
-Note: Didn't re-run visual_analyst - file exists from prior conversation. But DID run catalog and product analysts for complete data.
+Catalog specialist: "Created JAR-PET-500ML-HONEYCOMB at Rs 38 with complete data. Asset linked. HITL pending."
 </reasoning>
 
 <response>
-"Adding the honeycomb jar now:
-- Price: Rs 38 (premium over plain)
-- HSN: 3923 (18% GST)
+"Done! Created:
 
-Approve?"
+**SKU:** JAR-PET-500ML-HONEYCOMB
+**Price:** Rs 38
+**HSN:** 3923 (18% GST)
+**Image:** Processed and catalog-ready
+
+Approve to publish?"
 </response>
+
+<note>
+CRITICAL pattern: User approval triggers EXECUTION phase. Even with all analysis complete, PM MUST call creative_specialist first (image in inbox/ = raw), THEN catalog_specialist with processed image path (pending/).
+</note>
 
 </example>
 
