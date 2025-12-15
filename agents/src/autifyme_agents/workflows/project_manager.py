@@ -36,9 +36,9 @@ from autifyme_agents.schemas.pm_output import PMOutput
 from autifyme_agents.specialists.catalog_specialist import create_catalog_specialist
 from autifyme_agents.specialists.creative_specialist import create_creative_specialist
 
-# NOTE: PM no longer has content analysis tools (inspect_schema, read_data, view_image)
-# All content analysis is delegated to analysts per ARCHITECTURAL_VISION.md
-# PM is a THINKING orchestrator, not a DOING executor
+# NOTE: PM has LIMITED content tools - view_image only for conversational context
+# Detailed analysis still delegated to analysts per ARCHITECTURAL_VISION.md
+# PM sees images for routing decisions, analysts do thorough domain analysis
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -153,12 +153,17 @@ async def create_project_manager(
 
     instructions = _load_prompt(company_profile, base_context, channel)
 
-    # PM Tools - Media access ONLY
-    # PM is orchestrator, not content analyzer. All content analysis delegated to analysts.
+    # PM Tools - Media access + view_image for conversational context
+    # PM can SEE images for routing decisions; detailed analysis delegated to analysts
     pm_tools: list[Any] = []
 
+    # view_image for PM to see user images and understand conversational context
+    # PM uses this for: initial understanding, conversational references ("the blue one")
+    # PM does NOT use this for: detailed analysis (that's visual_analyst's job)
+    from autifyme_agents.tools.view_image import create_view_image_tool
+    pm_tools.append(create_view_image_tool())
+
     # Platform media download (with storage for inbox persistence)
-    # This is PM's ONLY tool - gets attachments into workspace for analysts/specialists
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
         pm_tools.extend(create_platform_media_tools(channel, storage=storage))
