@@ -311,16 +311,26 @@ def _save_base64_image(
 
 
 def _extract_image_from_response(response: Any) -> str | None:
-    """Extract base64 image data from Gemini response."""
-    content = getattr(response, "content", None)
-    if isinstance(content, list) and len(content) > 0:
-        part = content[0]
-        if isinstance(part, dict) and "image_url" in part:
-            url = part["image_url"].get("url", "")
-            if url.startswith("data:"):
-                return str(url)
+    """Extract base64 image data from Gemini response.
 
-    logger.warning("No image in response")
+    Gemini may return mixed content: ['text...', {'type': 'image_url', ...}]
+    We need to search ALL parts, not just the first one.
+    """
+    content = getattr(response, "content", None)
+    if isinstance(content, list):
+        for part in content:
+            if isinstance(part, dict) and "image_url" in part:
+                url = part["image_url"].get("url", "")
+                if url.startswith("data:"):
+                    return str(url)
+            # Also check for type: image_url format
+            if isinstance(part, dict) and part.get("type") == "image_url":
+                image_url = part.get("image_url", {})
+                url = image_url.get("url", "") if isinstance(image_url, dict) else ""
+                if url.startswith("data:"):
+                    return str(url)
+
+    logger.warning("No image in response content: %s", type(content))
     return None
 
 
@@ -560,7 +570,66 @@ def _image_studio_impl(
 
         result = _process_images(input_spec)
 
-        if result.success:
+        if result.success and result.outputs:
+            # Return multimodal content so agent SEES the generated image
+            # Format: [text with structured data, image for visual verification]
+            output_variant = result.outputs[0]
+            structured_data = {
+                "success": True,
+                "storage_path": output_variant.storage_path,
+                "local_path": output_variant.path,
+                "metadata": output_variant.metadata.model_dump() if output_variant.metadata else None,
+                "warnings": result.warnings,
+            }
+
+            # Load the generated image for visual return
+            # Use higher resolution for quality verification (agent needs to see detail)
+            try:
+                local_path = Path(output_variant.path)
+                if local_path.exists():
+                    with Image.open(local_path) as img:
+                        # Higher resolution for verification - agent needs to judge quality
+                        width, height = img.size
+                        max_dim = 1024  # Higher than view_image's 512 for quality checks
+                        if max(width, height) > max_dim:
+                            if width > height:
+                                new_width = max_dim
+                                new_height = int(height * (max_dim / width))
+                            else:
+                                new_height = max_dim
+                                new_width = int(width * (max_dim / height))
+                            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+                        # Convert to RGB if needed (for JPEG encoding)
+                        if img.mode in ("RGBA", "LA", "P"):
+                            rgb_img = Image.new("RGB", img.size, (255, 255, 255))
+                            if img.mode == "RGBA":
+                                rgb_img.paste(img, mask=img.split()[-1])
+                            else:
+                                rgb_img.paste(img)
+                            img = rgb_img
+
+                        buffer = io.BytesIO()
+                        img.save(buffer, format="JPEG", quality=90)  # Higher quality for verification
+                        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+                        data_uri = f"data:image/jpeg;base64,{encoded}"
+
+                    # Return multimodal: structured data + visual image
+                    import json
+                    return [
+                        {
+                            "type": "text",
+                            "text": f"Image generated successfully.\n{json.dumps(structured_data, indent=2)}"
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": data_uri}
+                        },
+                    ]
+            except Exception as img_err:
+                logger.warning(f"Could not load generated image for preview: {img_err}")
+
+            # Fallback to structured-only response if image load fails
             return build_success_response(result.model_dump())
         else:
             return {

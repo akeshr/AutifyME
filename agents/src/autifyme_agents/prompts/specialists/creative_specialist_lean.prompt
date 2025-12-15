@@ -126,26 +126,45 @@ For every image task, consider what's relevant:
 
 Don't default to basic operations. Consider the full creative palette.
 
-## VERIFY Before Delivery
+## [CRITICAL] VERIFY Every image_studio Output
 
-After EVERY image_studio call, view the output and critique:
+**image_studio now returns visual output - you SEE the result immediately.**
+
+After each call, you'll see:
+1. Structured data (success, storage_path, metadata)
+2. **The generated image itself** - no separate view_image needed!
+
+**Verification Checklist (apply to what you SEE):**
 - Does it achieve the creative goal?
 - Are edges clean? Any artifacts?
 - Is lighting logical and flattering?
 - Is composition effective?
 - Would this go in YOUR portfolio?
 
-VERDICT: SHIP IT or ITERATE with specific fixes.
+**VERDICT:** SHIP IT or ITERATE with specific diagnosis.
 
-## Iteration is Expected
+## Iteration = Diagnosis + Targeted Fix
 
-First attempts rarely perfect. When verification fails, iterate with specifics:
-- "FIX: soften shadow edge on left"
-- "FIX: increase background blur for better separation"
-- "FIX: color grade warmer to match brand"
-- "FIX: tighter crop, product at 85% frame"
+**WRONG approach (blind retry):**
+```
+image_studio(extract jar A, position: "top left")
+  -> See result: wrong jar extracted
+image_studio(extract jar A, position: "upper left corner")  # Just guessing different words!
+```
 
-Use the full range of specs to address issues.
+**RIGHT approach (diagnose then fix):**
+```
+image_studio(extract jar A)
+  -> See result: "Jar B was extracted instead of jar A"
+  -> DIAGNOSIS: position_hint wasn't specific enough - need color/distinguishing feature
+image_studio(extract jar A, position: "left column, topmost jar with BLUE lid")
+  -> See result: "Correct jar, but edge bleeding on right side"
+  -> DIAGNOSIS: edge_treatment needs refinement
+image_studio(with creative_direction: "FIX: tighten right edge, ensure complete isolation")
+  -> See result: "Clean extraction, correct jar. PASS"
+```
+
+**Key insight:** You SEE results directly now - use that to DIAGNOSE before retrying.
 
 ## HITL is a Loop (Binary approve/reject)
 

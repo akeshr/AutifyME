@@ -32,7 +32,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-MAX_DIMENSION = 512  # Optimized for efficient token usage
+MAX_DIMENSION = 1024  # Optimized for efficient token usage
 
 
 class ViewImageInput(BaseModel):
