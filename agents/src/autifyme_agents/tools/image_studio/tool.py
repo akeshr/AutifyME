@@ -506,7 +506,7 @@ def _image_studio_impl(
     thread_id: str | None = None,
     output: dict[str, Any] | OutputSpec | None = None,
     config: Annotated[RunnableConfig, InjectedToolArg] = None,  # type: ignore[assignment]
-) -> dict[str, Any]:
+) -> dict[str, Any] | list[dict[str, Any]]:
     """Image Studio tool implementation.
 
     Args:
@@ -587,9 +587,9 @@ def _image_studio_impl(
             try:
                 local_path = Path(output_variant.path)
                 if local_path.exists():
-                    with Image.open(local_path) as img:
+                    with Image.open(local_path) as pil_img:
                         # Higher resolution for verification - agent needs to judge quality
-                        width, height = img.size
+                        width, height = pil_img.size
                         max_dim = 1024  # Higher than view_image's 512 for quality checks
                         if max(width, height) > max_dim:
                             if width > height:
@@ -598,19 +598,19 @@ def _image_studio_impl(
                             else:
                                 new_height = max_dim
                                 new_width = int(width * (max_dim / height))
-                            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                            pil_img = pil_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
                         # Convert to RGB if needed (for JPEG encoding)
-                        if img.mode in ("RGBA", "LA", "P"):
-                            rgb_img = Image.new("RGB", img.size, (255, 255, 255))
-                            if img.mode == "RGBA":
-                                rgb_img.paste(img, mask=img.split()[-1])
+                        if pil_img.mode in ("RGBA", "LA", "P"):
+                            rgb_img = Image.new("RGB", pil_img.size, (255, 255, 255))
+                            if pil_img.mode == "RGBA":
+                                rgb_img.paste(pil_img, mask=pil_img.split()[-1])
                             else:
-                                rgb_img.paste(img)
-                            img = rgb_img
+                                rgb_img.paste(pil_img)
+                            pil_img = rgb_img
 
                         buffer = io.BytesIO()
-                        img.save(buffer, format="JPEG", quality=90)  # Higher quality for verification
+                        pil_img.save(buffer, format="JPEG", quality=90)  # Higher quality for verification
                         encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
                         data_uri = f"data:image/jpeg;base64,{encoded}"
 
