@@ -1,6 +1,7 @@
 # Domain-Specific Reasoning Protocols
 
 **Created:** December 15, 2025
+**Updated:** December 16, 2025
 **Status:** APPROVED - Ready for Implementation
 **Purpose:** Domain-agnostic framework for encoding domain expertise as executable reasoning protocols
 
@@ -8,11 +9,13 @@
 
 ## Executive Summary
 
-LLMs are general-purpose. Our domains require specific behavior. Fine-tuning is not an option. Examples get replicated, not understood. Rules get applied blindly.
+LLMs are general-purpose. Our domains require specific behavior. Fine-tuning is not an option.
 
-**The Solution:** Domain-Specific Reasoning Protocols - encoding domain expertise as mandatory reasoning steps that agents EXECUTE, not patterns they REPLICATE.
+**The Problem:** Output examples get COPIED, not understood. Rules get applied blindly.
 
-**Key Insight:** Domain knowledge can be encoded as PROCESS, not as facts or rules. The protocol IS the expertise.
+**The Solution:** Domain-Specific Reasoning Protocols - examples that encode the REASONING PROCESS, not just the output. Agents must EXECUTE the steps, not copy the answer.
+
+**Key Insight:** Domain knowledge can be encoded as PROCESS. The protocol IS the expertise.
 
 **Framework Approach:** Generic patterns that apply to ANY domain, instantiated with domain-specific entities and values.
 
@@ -27,16 +30,6 @@ LLMs are general-purpose. Our domains require specific behavior. Fine-tuning is 
 
 **PM-LEVEL PROTOCOLS**
 4. [PM Intelligence and Routing](#4-pm-intelligence-and-routing)
-   - 4.1 [Stateful/Stateless Architecture](#41-statefulstateless-architecture)
-   - 4.2 [PM State Schema](#42-pm-state-schema)
-   - 4.3 [PM Intelligence Layer (Pre-Routing)](#43-pm-intelligence-layer-pre-routing)
-   - 4.4 [The Routing Problem](#44-the-routing-problem)
-   - 4.5 [Domain Discovery Protocol](#45-domain-discovery-protocol)
-   - 4.6 [Intent Classification Protocol](#46-intent-classification-protocol)
-   - 4.7 [Complete PM Routing Flow](#47-complete-pm-routing-flow)
-   - 4.8 [Task Specification Contract](#48-task-specification-contract)
-   - 4.9 [Example: Image Only Scenario](#49-example-1-image-only-scenario)
-   - 4.10 [Discussion Points](#410-discussion-points)
 
 **GENERIC PATTERNS**
 5. [Generic Protocol Patterns](#5-generic-protocol-patterns)
@@ -46,7 +39,7 @@ LLMs are general-purpose. Our domains require specific behavior. Fine-tuning is 
 7. [Protocol Creation Guide](#7-protocol-creation-guide)
 8. [Domain Instantiation](#8-domain-instantiation)
 9. [Catalog Domain Example](#9-catalog-domain-example)
-10. [Marketing Domain Example](#10-marketing-domain-example)
+10. [Other Domains (Future)](#10-other-domains-future)
 
 **INTEGRATION**
 11. [Integration with Agent Architecture](#11-integration-with-agent-architecture)
@@ -56,10 +49,10 @@ LLMs are general-purpose. Our domains require specific behavior. Fine-tuning is 
 13. [Confidence Scoring Framework](#13-confidence-scoring-framework)
 14. [Failure Handling](#14-failure-handling)
 
-**RETRIEVAL & MEMORY**
-15. [RAG Strategy](#15-rag-strategy)
-16. [Episodic Memory (Layer 4)](#16-episodic-memory-layer-4)
-17. [Feedback Loop (Layer 5)](#17-feedback-loop-layer-5)
+**FUTURE WORK**
+15. [Protocol Delivery Strategy](#15-protocol-delivery-strategy)
+16. [Episodic Memory](#16-episodic-memory-layer-4)
+17. [Protocol Feedback and Improvement](#17-protocol-feedback-and-improvement)
 
 **REFERENCES**
 18. [References](#18-references)
@@ -77,14 +70,14 @@ LLMs are general-purpose. Our domains require specific behavior. Fine-tuning is 
 | Pattern matching | Grounded reasoning |
 | Training data patterns | YOUR operational patterns |
 
-### 1.2 Why Common Solutions Fail
+### 1.2 Why Common Solutions Are Incomplete
 
-| Approach | Problem |
-|----------|---------|
-| **Examples** | Get REPLICATED, not understood. Agent copies structure without reasoning. |
-| **Rules** | Get APPLIED BLINDLY. Agent doesn't know when/how to apply. |
-| **RAG** | Requires knowing WHAT to retrieve. Agent doesn't know what questions to ask. |
-| **More context** | Passive. Sits in prompt but doesn't guide reasoning. |
+| Approach | Limitation |
+|----------|------------|
+| **Output Examples** | Agent copies the OUTPUT format, not the REASONING that produced it |
+| **Rules** | Abstract principles - agent doesn't know when/how to apply |
+| **RAG** | Requires knowing WHAT to retrieve - agent doesn't know what questions to ask |
+| **More context** | Passive information - doesn't guide reasoning process |
 
 ### 1.3 The Core Insight
 
@@ -94,11 +87,13 @@ LLMs are general-purpose. Our domains require specific behavior. Fine-tuning is 
 - How YOUR business thinks about problems
 - How to use YOUR tools effectively
 
-**Examples can't teach this** because examples show WHAT to conclude, not HOW to reason.
+**Output examples alone can't teach this** - they show WHAT to conclude, not HOW to reason.
 
-**Rules can't teach this** because rules are abstract - the agent doesn't know how to apply them.
+**The solution:** Examples that encode the REASONING PROCESS, not just the output. These are protocols - structured examples that show the steps the agent MUST execute.
 
-**The solution:** Encode domain expertise as EXECUTABLE PROCESS that works across ANY domain.
+**Key distinction:**
+- Output example: "Here's what a good product listing looks like"
+- Protocol (reasoning example): "Here's how to THINK through creating a product listing - step by step"
 
 ---
 
@@ -114,15 +109,17 @@ A Domain-Specific Reasoning Protocol is a **step-by-step reasoning process** tha
 
 **The protocol IS the domain expertise in executable form.**
 
-### 2.2 Protocol vs Example vs Rule
+### 2.2 Protocols ARE Structured Examples
 
-| Type | What It Provides | How Agent Uses It |
-|------|------------------|-------------------|
+Protocols are NOT an alternative to examples - they ARE examples, but examples of REASONING rather than OUTPUT.
+
+| Type | What It Shows | How Agent Uses It |
+|------|---------------|-------------------|
 | **Rule** | Abstract principle | Tries to apply (often incorrectly) |
-| **Example** | Specific case | Copies the pattern |
-| **Protocol** | Executable steps | EXECUTES the process |
+| **Output Example** | Final result | Copies the format |
+| **Protocol (Reasoning Example)** | Step-by-step process | EXECUTES each step |
 
-**Protocols can't be replicated - they must be executed.**
+**Protocols show the reasoning that PRODUCES the output.** When the agent sees explicit steps, it must execute them - it can't just copy the final answer.
 
 ### 2.3 Why Protocols Work
 
@@ -325,45 +322,28 @@ The PM is the **brain** of AutifyME - it thinks, remembers, and decides. Special
 | Learning from outcomes | YES | NO |
 | Proactive suggestions | YES | NO |
 
-### 4.2 PM State Schema
+### 4.2 PM State (Conceptual)
 
-```python
-# What PM maintains across conversation turns
+The PM maintains state across conversation turns. This is managed by LangGraph's checkpointer - no custom code needed.
 
-class PMSessionState:
-    """State managed by PM DeepAgent via LangGraph checkpointer."""
+**What PM Tracks:**
 
-    # Conversation tracking
-    conversation_history: list[ConversationTurn]  # Summarized, last 5-10 turns
-    current_topic: TopicContext | None            # What we're working on
+| State Category | What It Contains | Purpose |
+|----------------|------------------|---------|
+| **Conversation** | Recent turns (5-10), current topic | Continuity |
+| **Entities** | Recent entities, pending entity | Reference resolution |
+| **User Model** | Preferences, state (frustrated/exploring/efficient) | Adaptive responses |
+| **Workflow** | Active workflow, pending HITL | Coordination |
 
-    # Entity tracking (for reference resolution)
-    recent_entities: list[EntityReference]        # Last 5-10 entities mentioned
-    pending_entity: EntityReference | None        # "The one we're working on"
+**Entity Reference Elements:**
+- entity_type (product, family, campaign)
+- entity_id, entity_name
+- last_action (created, updated, discussed)
+- timestamp
 
-    # User modeling (for intelligent responses)
-    user_preferences: dict[str, Any]              # Learned from corrections
-    user_state: UserState                         # frustrated, exploring, efficient
-
-    # Workflow tracking
-    active_workflow: WorkflowState | None
-    pending_hitl: list[HITLRequest]
-
-class EntityReference:
-    """Reference to an entity for resolution."""
-    entity_type: str      # product, family, campaign, etc.
-    entity_id: str
-    entity_name: str
-    last_action: str      # created, updated, discussed
-    timestamp: datetime
-
-class TopicContext:
-    """Current topic of conversation."""
-    domain: str
-    intent: str           # CREATE, UPDATE, QUERY, etc.
-    primary_entity: EntityReference | None
-    related_entities: list[EntityReference]
-```
+**Topic Context Elements:**
+- domain, intent (CREATE, UPDATE, QUERY)
+- primary_entity, related_entities
 
 ### 4.3 PM Intelligence Layer (Pre-Routing)
 
@@ -682,85 +662,57 @@ DOMAIN SPECIALIST EXECUTES
 
 **Critical:** Specialists are stateless. They cannot look up context, resolve references, or remember previous calls. PM must pass EVERYTHING the specialist needs in a single, explicit task specification.
 
-```python
-# What PM passes to EVERY specialist invocation
+**Task Specification Elements:**
 
-class TaskSpecification:
-    """Contract between PM (stateful) and Specialist (stateless)."""
+| Category | Elements | Purpose |
+|----------|----------|---------|
+| **Identity** | specialist, domain | WHO is being asked |
+| **Intent** | action (CREATE/UPDATE/ANALYZE/QUERY), target_entity, target_id | WHAT to do |
+| **Context** | resolved_context (see below) | ALL resolved context |
+| **Protocols** | protocols_to_apply | WHICH protocols to execute |
+| **User Hints** | user_hints | Inference from PM intelligence |
+| **Communication** | response_style, user_state | HOW to respond |
 
-    # Identity - WHO is being asked
-    specialist: str                    # "cataloging_specialist", "marketing_specialist"
-    domain: str                        # "catalog", "marketing"
+**Resolved Context Elements:**
 
-    # Intent - WHAT to do
-    action: str                        # "CREATE", "UPDATE", "ANALYZE", "QUERY"
-    target_entity: str                 # "product", "campaign", "family"
-    target_id: str | None              # If UPDATE/specific entity
-
-    # Context - ALL resolved context (no references left)
-    resolved_context: ResolvedContext
-
-    # Protocols - WHICH to execute
-    protocols_to_apply: list[str]      # ["duplicate_prevention", "family_fit", "pricing"]
-
-    # User hints - inference from PM intelligence layer
-    user_hints: dict[str, Any]         # {"preferred_price": 350, "style": "casual"}
-
-    # Communication - HOW to respond
-    response_style: str                # "efficient", "detailed", "exploratory"
-    user_state: str                    # "frustrated", "exploring", "efficient"
-
-
-class ResolvedContext:
-    """All references resolved to explicit values."""
-
-    # Resolved entities (no "this", "it", "that product")
-    primary_entity: dict | None        # Full entity data if relevant
-    related_entities: list[dict]       # Other entities mentioned
-
-    # Resolved inputs
-    images: list[str]                  # Image URLs/paths
-    text_input: str                    # Original user text
-    resolved_text: str                 # With references replaced
-
-    # Conversation summary (not full history)
-    conversation_summary: str          # "User is adding products to Blue Pottery family"
-    relevant_prior_decisions: list[str]  # ["User rejected suggested family 'Vases'"]
-
-    # Business context
-    company_id: str
-    company_context: dict              # Company settings, preferences
-```
+| Element | Description |
+|---------|-------------|
+| primary_entity | Full entity data (no "this", "it") |
+| related_entities | Other entities mentioned |
+| images | Image URLs/paths |
+| text_input | Original user text |
+| resolved_text | With references replaced |
+| conversation_summary | Brief context (not full history) |
+| relevant_prior_decisions | What user rejected/confirmed |
+| company_id, company_context | Business settings |
 
 **Example Task Specification:**
 
 ```
-TaskSpecification(
-    specialist="cataloging_specialist",
-    domain="catalog",
-    action="CREATE",
-    target_entity="product",
-    target_id=None,
+TASK SPECIFICATION
+==================
+Identity:
+  - specialist: cataloging_specialist
+  - domain: catalog
 
-    resolved_context=ResolvedContext(
-        primary_entity=None,  # Creating new
-        related_entities=[
-            {"type": "family", "id": "fam_123", "name": "Blue Pottery Collection"}
-        ],
-        images=["https://storage.../img_abc.jpg"],
-        text_input="add this to the same family",
-        resolved_text="add this product to Blue Pottery Collection family",
-        conversation_summary="User adding products to Blue Pottery Collection. Last product was a vase priced at 450.",
-        relevant_prior_decisions=["User prefers descriptive names over SKU-style"],
-        company_id="comp_xyz",
-        company_context={"default_currency": "INR", "pricing_strategy": "premium"}
-    ),
+Intent:
+  - action: CREATE
+  - target_entity: product
+  - target_id: (none - creating new)
 
-    protocols_to_apply=["duplicate_prevention", "family_fit_assessment", "pricing_discovery"],
-    user_hints={"likely_price_range": "400-500", "style": "ceramic"},
-    response_style="efficient",
-    user_state="efficient"
-)
+Resolved Context:
+  - primary_entity: (none - creating new)
+  - related_entities: Blue Pottery Collection (fam_123)
+  - images: [https://storage.../img_abc.jpg]
+  - text_input: "add this to the same family"
+  - resolved_text: "add this product to Blue Pottery Collection family"
+  - conversation_summary: "User adding products to Blue Pottery Collection. Last product was vase at 450."
+  - relevant_prior_decisions: ["User prefers descriptive names over SKU-style"]
+  - company_context: INR currency, premium pricing strategy
+
+Protocols: duplicate_prevention, family_fit_assessment, pricing_discovery
+User Hints: likely_price_range=400-500, style=ceramic
+Communication: response_style=efficient, user_state=efficient
 ```
 
 **Why This Matters:**
@@ -2099,179 +2051,31 @@ MISMATCH + Not Cohesive = Product needs DIFFERENT FAMILY
 
 ---
 
-## 10. Marketing Domain Example
+## 10. Other Domains (Future)
 
-This section shows how the same patterns apply to a different domain.
+The same patterns apply to all domains in AutifyME's multi-domain architecture.
 
-### 10.1 Marketing Domain Elements
+**To create protocols for a new domain:**
 
-| Element | Marketing Instantiation |
-|---------|------------------------|
-| Entity | audience_segments |
-| Subject | campaigns |
-| Value | budget |
-| Criteria | audience_profiles |
-| Category | funnel_stage (awareness, consideration, conversion) |
-| Identifier | campaign_name |
+1. **Map domain elements** to generic placeholders:
+   | Element | Example (Marketing) | Example (Operations) |
+   |---------|---------------------|----------------------|
+   | Entity | audience_segments | processes |
+   | Subject | campaigns | orders |
+   | Value | budget | priority |
+   | Criteria | audience_profiles | requirements |
 
-### 10.2 Marketing Business Context
+2. **Define business context** (tiers, relationships, misconceptions)
 
-```xml
-<business_context domain="marketing">
+3. **Instantiate generic patterns** with domain-specific:
+   - Table names
+   - Field names
+   - Interpretation guidance
+   - Anti-patterns
 
-## Funnel Stages
+4. **Add domain-specific protocols** for unique decisions
 
-### AWARENESS (Budget: Rs 5K-20K)
-- Objective: Reach new audiences, build recognition
-- Channels: Social, display, video
-- Metric: Impressions, reach
-
-### CONSIDERATION (Budget: Rs 10K-50K)
-- Objective: Engage interested prospects
-- Channels: Search, retargeting, email
-- Metric: Clicks, engagement, time on site
-
-### CONVERSION (Budget: Rs 20K-100K)
-- Objective: Drive purchases, sign-ups
-- Channels: Search, shopping, remarketing
-- Metric: Conversions, ROAS
-
-## Key Relationships
-- audience_segments --> audience_profiles (who is in this segment)
-- campaigns --> audience_segments (who campaign targets)
-- audience_profiles DETERMINES segment fit (not channel, not budget)
-
-## Common Misconceptions
-- NOT: Same channel = same audience segment
-- ACTUALLY: Same customer need = same segment
-- NOT: Budget determines funnel stage
-- ACTUALLY: Objective determines funnel stage
-
-</business_context>
-```
-
-### 10.3 Audience Fit Protocol (Instantiated)
-
-```xml
-<protocol name="Audience Fit Protocol" domain="marketing" type="decision">
-
-## PURPOSE
-Determine if a campaign should target a candidate audience segment.
-
-## STEPS
-
-### Step 1: IDENTIFY - Candidate Segment
-Identify the audience segment being evaluated.
-Document: segment_id, segment_name
-
-**Result:**
-Candidate segment: [id, name]
-
-### Step 2: QUERY - Audience Profile
-**Execute:**
-read_data(
-  table="audience_profiles",
-  filters={"segment_id": [candidate_segment_id]}
-)
-
-**Why This Matters:**
-audience_profiles is THE deciding factor for segment fit.
-NOT channel. NOT budget. WHO YOU'RE REACHING determines fit.
-
-**How to Interpret:**
-The profile tells you demographics, interests, behaviors.
-"Tech-savvy millennials, early adopters" = different from
-"Budget-conscious families, value seekers"
-
-**Result:**
-Audience profile for this segment.
-
-### Step 3: QUERY - Segment's Current Campaigns
-**Execute:**
-read_data(
-  table="campaigns",
-  filters={"segment_id": [candidate_segment_id]},
-  columns=["name", "objective", "funnel_stage"],
-  limit=10
-)
-
-**Understand:**
-What campaigns currently target this? What objectives?
-
-**Result:**
-Sample campaigns with their attributes.
-
-### Step 4: ANALYZE - Campaign's Target Audience
-Based on campaign attributes (message, offer, creative):
-- Who is this speaking to?
-- What need does it address?
-- What action does it want?
-
-**Result:**
-Target audience profile for THIS campaign.
-
-### Step 5: COMPARE - Audience Match
-Compare Step 2 (segment's audience) with Step 4 (campaign's audience):
-- MATCH: Same audience type
-- MISMATCH: Different audience type
-- PARTIAL: Overlapping but distinct
-
-**Result:**
-Match assessment with evidence.
-
-### Step 6: CONCLUDE
-**Based on Step 5:**
-- MATCH: Campaign FITS this segment
-- MISMATCH: Campaign needs DIFFERENT segment
-- PARTIAL: Consider sub-segment
-
-## VERIFICATION
-- [ ] Step 2 query executed
-- [ ] Audience comparison based on evidence
-- [ ] Conclusion references step results
-
-## ANTI-PATTERNS
-- Matching based on channel alone
-- Skipping audience profile query
-- Using general marketing assumptions
-
-</protocol>
-```
-
-### 10.4 Example: Marketing Protocol Execution
-
-```
-TASK: Determine audience fit for "Summer Sale" campaign
-
-PROTOCOL SELECTED: Audience Fit Protocol
-
-STEP 1: IDENTIFY - Candidate Segment
-Candidate: "Young Professionals" (seg-003)
-Source: Suggested based on past summer campaigns
-
-STEP 2: QUERY - Audience Profile
-Executed: read_data(table="audience_profiles", filters={"segment_id": "seg-003"})
-Result: "Career-focused 25-35, premium buyers, convenience-oriented"
-
-STEP 3: QUERY - Segment Campaigns
-Executed: read_data(table="campaigns", filters={"segment_id": "seg-003"}, limit=10)
-Result: Premium product launches, time-saving offers. Avg budget Rs 50K.
-
-STEP 4: ANALYZE - Campaign's Audience
-Campaign: "Summer Sale" - 40% off clearance, bulk deals, family sizes
-Target: Budget-conscious, value-seeking, bulk buyers
-NOT: Premium, convenience-focused
-
-STEP 5: COMPARE - Audience Match
-Segment: Premium, convenience-focused professionals
-Campaign: Value-focused, bulk buyers
-Assessment: MISMATCH - different purchase motivation
-
-STEP 6: CONCLUDE
-MISMATCH = Campaign needs DIFFERENT segment
-
---> Search for value-focused family segment instead
-```
+**See Protocol Creation Guide (Section 7) for detailed instructions.**
 
 ---
 
@@ -2681,374 +2485,66 @@ Each protocol should add specific failure handling:
 
 ---
 
-## 15. RAG Strategy
+## 15. Protocol Delivery Strategy
 
-> STATUS: DISCUSSION NEEDED
+> STATUS: FUTURE - For now, protocols live directly in prompts
 
-How to efficiently deliver protocols to agents without context bloat.
+**Problem:** Full document injection (~8,000 tokens) causes attention dilution.
 
-### 15.1 The Problem
+**Current Approach:** Embed relevant protocols directly in specialist prompts.
 
-| Approach | Tokens | Issue |
-|----------|--------|-------|
-| Full document injection | ~8,000 | Attention dilution, expensive |
-| No injection (agent figures it out) | 0 | Agent doesn't know protocols |
+**Future Consideration:** When protocols grow, consider:
+- Layered architecture (always inject vs task-specific retrieval)
+- Agent-driven selection (agent picks which protocols to apply)
+- Semantic retrieval (match task to relevant protocols)
 
-### 15.2 Layered Architecture
-
+**Protocol Location:** For now, protocols are embedded in:
 ```
-+====================================================================+
-|              DOMAIN REASONING ARCHITECTURE (LAYERED)               |
-+====================================================================+
-
-ALWAYS INJECTED (~1,700 tokens):
-+--------------------------------------------------------------------+
-| LAYER 0: Protocol Framework (~500 tokens)                          |
-| - Protocol Selection Guide                                         |
-| - Composition Patterns                                             |
-| - Confidence Framework                                             |
-| - Failure Handling Principles                                      |
-+--------------------------------------------------------------------+
-| LAYER 1: Tool Mastery (~800 tokens)                                |
-| - read_data mastery                                                |
-| - aggregate_data mastery                                           |
-| - write_data mastery                                               |
-| - inspect_schema mastery                                           |
-+--------------------------------------------------------------------+
-| LAYER 2: Domain Context (~400 tokens)                              |
-| - Business Context (tiers, relationships)                          |
-| - Domain-Specific Anti-patterns                                    |
-+--------------------------------------------------------------------+
-
-RETRIEVED BASED ON TASK (~600-1,200 tokens):
-+--------------------------------------------------------------------+
-| LAYER 3: Decision Protocols (1-2 per task)                         |
-| - Fit Assessment (~600 tokens)                                     |
-| - Value Discovery (~500 tokens)                                    |
-| - New Entity (~600 tokens)                                         |
-| - Duplicate Prevention (~400 tokens)                               |
-| - Domain Orientation (~500 tokens)                                 |
-+--------------------------------------------------------------------+
-
-OPTIONAL (~300 tokens):
-+--------------------------------------------------------------------+
-| LAYER 4: Episodic Memory                                           |
-| - Relevant execution examples                                      |
-+--------------------------------------------------------------------+
-
-TOTAL: ~2,600-3,200 tokens (vs ~8,000 for full doc)
+agents/src/autifyme_agents/prompts/specialists/[domain]_specialist.prompt
 ```
 
-### 15.3 File Structure for RAG
-
-```
-docs/architecture/core/protocols/
-|-- PROTOCOL_FRAMEWORK.md           # Layer 0 (always inject)
-|-- TOOL_MASTERY.md                 # Layer 1 (always inject)
-|-- GENERIC_PATTERNS.md             # Reference only
-|
-|-- domains/
-    |-- catalog/
-    |   |-- CONTEXT.md              # Layer 2 (inject for catalog)
-    |   |-- FIT_PROTOCOL.md         # Layer 3 (retrieve when needed)
-    |   |-- PRICING_PROTOCOL.md     # Layer 3 (retrieve when needed)
-    |   |-- NEW_ENTITY_PROTOCOL.md  # Layer 3 (retrieve when needed)
-    |   |-- DUPLICATE_PROTOCOL.md   # Layer 3 (retrieve when needed)
-    |
-    |-- marketing/
-        |-- CONTEXT.md
-        |-- [protocols...]
-```
-
-### 15.4 Retrieval Options
-
-| Option | How It Works | Pros | Cons |
-|--------|--------------|------|------|
-| **A: Agent-Driven** | Agent selects protocols via prompt guidance | Simple, transparent | Relies on agent judgment |
-| **B: Keyword-Based** | Match task keywords to protocol triggers | Predictable | Brittle, misses synonyms |
-| **C: Semantic Search** | Embed task, find similar protocols | Flexible | May retrieve wrong protocols |
-| **D: Hybrid** | Keywords first, semantic fallback | Balanced | More complex |
-
-### 15.5 Discussion Points
-
-- [ ] Should we split the document into separate files (15.3)?
-- [ ] Which retrieval option (A/B/C/D)?
-- [ ] Is ~3,000 tokens acceptable for protocol context?
-- [ ] Should protocols live in prompts directory or docs?
+**When to revisit:** When prompt size becomes a performance/cost concern
 
 ---
 
 ## 16. Episodic Memory (Layer 4)
 
-> STATUS: DISCUSSION NEEDED
+> STATUS: FUTURE - Not needed for initial implementation
 
-Successful protocol executions become examples for future similar tasks.
+**Vision:** Successful protocol executions become examples for future similar tasks.
 
-### 16.1 The Vision
+**Concept:**
+- Capture successful protocol executions as "episodes"
+- Index for semantic retrieval
+- Inject relevant episodes as examples for similar future tasks
 
-```
-Workflow succeeds --> Capture as episode --> Index for retrieval -->
-Future similar task --> Retrieve relevant episode --> Inject as example
-```
+**Episode Components:**
+- Task description (for matching)
+- Protocols used
+- Key queries and evidence
+- Decision points and reasoning
+- Final output
+- User feedback (approved/edited/rejected)
 
-### 16.2 What is an Episode?
+**When to implement:** After protocols are stable and we have sufficient execution history to learn from.
 
-An episode captures a SUCCESSFUL protocol execution:
-
-| Component | Purpose |
-|-----------|---------|
-| Task Description | For semantic matching to future tasks |
-| Protocols Used | Which protocols applied |
-| Key Queries | Evidence gathered |
-| Decision Points | Where judgment was applied |
-| Final Output | What was produced |
-| User Feedback | Approved? Edited? Rejected? |
-
-### 16.3 Episode Schema
-
-```python
-class Episode:
-    # Identity
-    id: str
-    created_at: datetime
-    domain: str
-
-    # Task Context
-    task_description: str
-    task_embedding: list[float]  # For semantic search
-
-    # Execution
-    protocols_used: list[str]
-    key_queries: list[dict]      # {query, result_summary}
-    key_decisions: list[str]     # Reasoning at decision points
-    final_output: dict
-
-    # Outcome
-    user_feedback: "approved" | "approved_with_edits" | "rejected"
-    edit_details: str | None
-
-    # Metadata
-    execution_time_ms: int
-    tags: list[str]
-```
-
-### 16.4 Episode Capture
-
-**When to Capture:**
-
-| Outcome | Capture? | Reason |
-|---------|----------|--------|
-| Approved | Yes | Protocol worked perfectly |
-| Approved with Edits | Yes | Protocol mostly worked, edits inform gaps |
-| Rejected | No | Goes to feedback loop instead |
-
-**Capture Point:**
-After HITL resolution in workflow runner.
-
-### 16.5 Episode Retrieval
-
-```python
-def get_relevant_episodes(task: str, domain: str, k: int = 2):
-    """Retrieve episodes relevant to current task."""
-
-    # 1. Semantic search by task similarity
-    task_embedding = embed(task)
-
-    candidates = episode_store.search(
-        namespace=["episodes", domain],
-        query_embedding=task_embedding,
-        k=k * 3,
-        filter={"user_feedback": ["approved", "approved_with_edits"]}
-    )
-
-    # 2. Prefer clean approvals
-    approved = [e for e in candidates if e.user_feedback == "approved"]
-    edited = [e for e in candidates if e.user_feedback == "approved_with_edits"]
-
-    # 3. Select diverse examples
-    return select_diverse(approved + edited, k)
-```
-
-### 16.6 Episode Injection Format
-
-```xml
-<relevant_episode>
-
-## Similar Task: Product Family Assignment
-
-### Task
-"Add ceramic flower vase to catalog"
-
-### Protocols Applied
-1. Duplicate Prevention --> No duplicates found
-2. Family Fit Assessment --> Evaluated "Decorative Ceramics"
-   - Queried: customer_segments for family
-   - Result: "Gift buyers, home decor enthusiasts"
-   - Conclusion: MATCH (HIGH confidence)
-
-### Key Decision
-Product's decorative nature aligned with family's customer segment.
-Price Rs 150 placed in mid-decorative range.
-
-### Outcome
-Approved without edits.
-
-</relevant_episode>
-```
-
-### 16.7 Discussion Points
-
-| Question | Options |
-|----------|---------|
-| **When to capture?** | All approvals / Clean only / Sampled / Agent-flagged |
-| **When to inject?** | Always / On uncertainty / Agent requests / Never |
-| **Storage backend?** | LangGraph Store / PostgreSQL / Vector DB |
-| **Retention policy?** | Keep all / Rolling window / Quality-based |
-| **Episode format?** | Full trace / Summarized / Key decisions only |
+**For now:** Canonical examples in prompts serve this purpose
 
 ---
 
-## 17. Feedback Loop (Layer 5)
+## 17. Protocol Feedback and Improvement
 
-> STATUS: DISCUSSION NEEDED
+Protocol improvement is handled through trace evaluation using the existing **Workflow Evaluation Framework**.
 
-Protocols improve over time based on production outcomes.
+**See:** [WORKFLOW_EVALUATION_FRAMEWORK.md](../testing/WORKFLOW_EVALUATION_FRAMEWORK.md)
 
-### 17.1 The Vision
+**Process:**
+1. Evaluate workflow traces using the evaluation framework
+2. Identify protocol gaps from trace analysis (reasoning quality, decision quality dimensions)
+3. Update protocols based on findings
+4. Re-evaluate to confirm improvement
 
-```
-Execution outcome --> Classify feedback --> Route to improvement queue -->
-Periodic review --> Protocol refinement --> Deploy updated protocol
-```
-
-### 17.2 Feedback Types
-
-| Outcome | Meaning | Action |
-|---------|---------|--------|
-| **Approved** | Protocol worked | Validate, capture episode |
-| **Approved with Edits** | Protocol mostly worked | Analyze what was edited |
-| **Rejected** | Protocol failed | Critical gap, immediate review |
-| **No Protocol Fit** | Coverage gap | New protocol candidate |
-| **Escalated** | Agent uncertain | Clarity gap in protocol |
-
-### 17.3 Feedback Schema
-
-```python
-class ProtocolFeedback:
-    # Identity
-    id: str
-    workflow_id: str
-    domain: str
-    created_at: datetime
-
-    # Context
-    task_description: str
-    protocols_attempted: list[str]
-
-    # Outcome
-    feedback_type: str  # approved, edited, rejected, no_fit, escalated
-
-    # Details
-    agent_conclusion: str
-    user_action: str
-    edit_details: str | None
-    rejection_reason: str | None
-
-    # Analysis (populated during review)
-    root_cause: str | None
-    gap_type: str | None  # missing_step, unclear_guidance, edge_case, etc.
-    suggested_fix: str | None
-    priority: str | None  # critical, high, medium, low
-```
-
-### 17.4 Feedback Capture
-
-```python
-async def capture_feedback(workflow_id, task, protocols_used,
-                           agent_conclusion, user_feedback,
-                           edit_details=None, rejection_reason=None):
-
-    feedback = ProtocolFeedback(
-        id=f"fb_{workflow_id}",
-        workflow_id=workflow_id,
-        domain=extract_domain(task),
-        task_description=task,
-        protocols_attempted=protocols_used,
-        feedback_type=classify_feedback(user_feedback),
-        agent_conclusion=agent_conclusion,
-        user_action=user_feedback,
-        edit_details=edit_details,
-        rejection_reason=rejection_reason
-    )
-
-    await feedback_store.put(
-        namespace=["feedback", feedback.domain],
-        key=feedback.id,
-        value=feedback
-    )
-
-    # Alert on critical
-    if feedback.feedback_type == "rejected":
-        await alert_protocol_failure(feedback)
-```
-
-### 17.5 Review Cycle
-
-```
-+------------------------------------------------------------------+
-|                    WEEKLY REVIEW CYCLE                            |
-+------------------------------------------------------------------+
-
-1. AGGREGATE
-   - Collect feedback from past week
-   - Calculate success metrics per protocol
-   - Identify recurring patterns
-
-2. ANALYZE
-   - Cluster edit patterns (what's being changed?)
-   - Cluster rejection reasons (what's failing?)
-   - Identify coverage gaps (what's not covered?)
-
-3. PRIORITIZE
-   - Critical: Any rejection
-   - High: Recurring edits (3+ same edit)
-   - Medium: Single edits
-   - Low: Coverage gaps
-
-4. FIX
-   - Update protocol steps/guidance
-   - Add edge case handling
-   - Clarify ambiguous criteria
-   - Add new protocols if needed
-
-5. VALIDATE
-   - Test updated protocol against historical cases
-   - Check for regression
-
-6. DEPLOY
-   - Update protocol documents
-   - Monitor next week
-
-+------------------------------------------------------------------+
-```
-
-### 17.6 Metrics Dashboard
-
-| Metric | Target | Alert |
-|--------|--------|-------|
-| Success Rate | >90% | <80% |
-| Clean Approval Rate | >70% | <60% |
-| Rejection Rate | <5% | >10% |
-| Coverage Rate | >95% | <90% |
-
-### 17.7 Discussion Points
-
-| Question | Options |
-|----------|---------|
-| **Automation level?** | Manual review / Semi-auto (suggest fixes) / Auto-pilot |
-| **Review frequency?** | Daily / Weekly / On-demand |
-| **Who reviews?** | Human / AI-assisted / Fully automated |
-| **How to track improvements?** | Version protocols / A/B test / Before/after metrics |
+**No additional infrastructure required** - trace evaluation provides all the feedback signals needed.
 
 ---
 
@@ -3086,8 +2582,9 @@ async def capture_feedback(workflow_id, task, protocols_used,
 
 ---
 
-**Document Version:** 4.0
+**Document Version:** 5.0
 **Last Updated:** December 16, 2025
 **Revision:**
+- v5.0: Streamlined document - removed Python code sections (conceptual guidance only), simplified Sections 15-17 as FUTURE, fixed protocols vs examples framing, removed Marketing domain example (deferred)
 - v4.0: Added Multi-Domain Architecture (Section 3), PM Domain Routing Protocol (Section 4). Restructured ToC.
-- v3.0: Added Sections 12-17 (Composition, Confidence, Failure, RAG, Episodic Memory, Feedback Loop) - STATUS: DISCUSSION NEEDED
+- v3.0: Added Sections 12-17 (Composition, Confidence, Failure, RAG, Episodic Memory, Feedback Loop)
