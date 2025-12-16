@@ -121,7 +121,23 @@ Protocols are NOT an alternative to examples - they ARE examples, but examples o
 
 **Protocols show the reasoning that PRODUCES the output.** When the agent sees explicit steps, it must execute them - it can't just copy the final answer.
 
-### 2.3 Why Protocols Work
+### 2.3 Why Protocols Work: Tool Grounding
+
+**The key insight:** Protocols work because they force TOOL CALLS that ground reasoning in real data.
+
+```
+Without protocols:
+Agent sees example --> Copies output format --> Hallucinates plausible-looking data
+
+With protocols:
+Agent sees steps --> Executes read_data() --> Gets REAL data --> Must reason about ACTUAL results
+```
+
+**The agent can't fake query results.** When Step 2 says "EXECUTE read_data(...)", the tool returns actual database records. The agent must then reason about what it actually found, not what it imagines might exist.
+
+**This is the core mechanism:** Protocols don't just structure reasoning - they GROUND it in reality through mandatory tool execution.
+
+### 2.4 Protocol Structure
 
 ```
 RULE (Abstract):
@@ -260,15 +276,32 @@ LAYER 3: DOMAIN INSTANTIATION (Per Domain)
 +---------------------------------------------------------------------+
 ```
 
-### 3.4 Protocol Ownership by Agent Level
+### 3.4 Protocol Applicability: ALL Agents Need Domain Expertise
 
-| Agent Level | Protocol Type | Purpose |
-|-------------|---------------|---------|
-| **PM** | Domain Routing Protocols | Classify, route, synthesize |
-| **Analysts** | Exploration Protocols | Thorough, consistent investigation |
-| **Specialists** | Decision Protocols | Domain-specific reasoning |
-| **Any Agent** | Tool Mastery Protocols | Powerful, efficient tool usage |
-| **Any Agent** | Orientation Protocols | Understanding domain state |
+**Critical:** Protocols are NOT just for specialists. EVERY agent type requires domain, tool, and data expertise to perform effectively.
+
+| Agent Level | Protocol Types | Why They Need Protocols |
+|-------------|----------------|------------------------|
+| **PM** | Routing, Intelligence, Synthesis | Must understand domains to route correctly, resolve references, infer intent |
+| **Analysts** | Exploration, Orientation, Tool Mastery | Must query comprehensively, interpret data correctly, discover patterns |
+| **Specialists** | Decision, Domain-Specific, Tool Mastery | Must make grounded decisions using domain business rules |
+| **Any SubAgent** | Tool Mastery, Orientation | Must use tools efficiently and understand data context |
+
+**The common thread:** All agents interact with YOUR data using YOUR tools in YOUR domain context. Without protocols:
+- PM routes incorrectly (doesn't understand domain boundaries)
+- Analysts explore superficially (don't know what questions to ask)
+- Specialists decide poorly (apply general knowledge instead of your business rules)
+
+**Protocol coverage by agent:**
+
+| Protocol Category | PM | Analysts | Specialists |
+|-------------------|-------|----------|-------------|
+| Tool Mastery | YES | YES | YES |
+| Domain Orientation | YES | YES | YES |
+| Routing/Intelligence | YES | - | - |
+| Exploration Patterns | - | YES | - |
+| Decision Protocols | - | - | YES |
+| Business Context | YES | YES | YES |
 
 ### 3.5 Cross-Domain Scenarios
 
@@ -284,7 +317,7 @@ Some tasks span multiple domains. PM orchestrates:
 
 ## 4. PM Intelligence and Routing
 
-> STATUS: DISCUSSION NEEDED
+> **Design Target** - Describes ideal PM behavior. Current implementation may not include all aspects.
 
 The PM is the **brain** of AutifyME - it thinks, remembers, and decides. Specialists are the **hands** - they execute, return, and forget.
 
@@ -773,32 +806,30 @@ INTENT CLASSIFICATION:
 
 === TASK SPECIFICATION (PASSED TO STATELESS SPECIALIST) ===
 
-TaskSpecification(
-    specialist="cataloging_specialist",
-    domain="catalog",
-    action="CREATE",
-    target_entity="product",
-    target_id=None,
+TASK SPECIFICATION
+==================
+Identity:
+  - specialist: cataloging_specialist
+  - domain: catalog
 
-    resolved_context=ResolvedContext(
-        primary_entity=None,
-        related_entities=[
-            {"type": "family", "id": "fam_123", "name": "Blue Pottery Collection"}
-        ],
-        images=["https://storage.../vase_img.jpg"],
-        text_input="",  # No text provided
-        resolved_text="Create product in Blue Pottery Collection family",
-        conversation_summary="User batch-adding products to Blue Pottery Collection. Last 3 products: ceramic bowl (450), ceramic plate (380), ceramic cup (320).",
-        relevant_prior_decisions=["User confirmed Blue Pottery as target family"],
-        company_id="comp_xyz",
-        company_context={"default_currency": "INR"}
-    ),
+Intent:
+  - action: CREATE
+  - target_entity: product
+  - target_id: (none - creating new)
 
-    protocols_to_apply=["duplicate_prevention", "family_fit_assessment", "pricing_discovery"],
-    user_hints={"likely_family": "Blue Pottery Collection", "price_range": "300-500", "style": "ceramic"},
-    response_style="efficient",
-    user_state="efficient"
-)
+Resolved Context:
+  - primary_entity: (none - creating new)
+  - related_entities: Blue Pottery Collection (fam_123)
+  - images: [https://storage.../vase_img.jpg]
+  - text_input: (none - image only)
+  - resolved_text: "Create product in Blue Pottery Collection family"
+  - conversation_summary: "User batch-adding to Blue Pottery. Last 3: bowl (450), plate (380), cup (320)"
+  - relevant_prior_decisions: ["User confirmed Blue Pottery as target family"]
+  - company_context: INR currency
+
+Protocols: duplicate_prevention, family_fit_assessment, pricing_discovery
+User Hints: likely_family=Blue Pottery, price_range=300-500, style=ceramic
+Communication: response_style=efficient, user_state=efficient
 
 === SPECIALIST EXECUTION (STATELESS) ===
 
@@ -2133,10 +2164,28 @@ agents/src/autifyme_agents/prompts/
 4. Reach conclusion based on step results
 5. If no protocol fits, state this and escalate
 
-You are a PROTOCOL EXECUTOR + INTELLIGENT INTERPRETER.
-- Follow protocols precisely
-- Apply intelligence to interpret results
-- Escalate when protocols don't cover the situation
+## The Balance: Protocols + Intelligence
+
+You are an **AUTONOMOUS DOMAIN EXPERT** who uses protocols as your reasoning framework.
+
+**Protocols provide:**
+- WHAT to investigate (the steps)
+- WHICH queries to run (tool calls)
+- HOW to interpret data types (domain context)
+
+**Your intelligence provides:**
+- HOW to interpret specific results (judgment)
+- WHEN edge cases require escalation (recognition)
+- HOW to communicate findings (adaptation)
+
+**The balance:**
+- Protocol steps are MANDATORY - execute all of them
+- Interpretation is INTELLIGENT - apply domain expertise to actual results
+- Escalation is AUTONOMOUS - recognize when you're uncertain
+
+**Anti-pattern:** Skipping steps because "I already know the answer"
+**Anti-pattern:** Blindly following steps without intelligent interpretation
+**Correct:** Execute steps rigorously, interpret results intelligently
 </protocol_usage>
 
 <examples>
@@ -2146,42 +2195,7 @@ You are a PROTOCOL EXECUTOR + INTELLIGENT INTERPRETER.
 
 ---
 
-## 18. References
-
-### 18.1 Related Architecture Docs
-
-- [ARCHITECTURAL_VISION.md](./ARCHITECTURAL_VISION.md) - Overall system vision
-- [AGENTS_DESIGN.md](./AGENTS_DESIGN.md) - Agent hierarchy and roles
-- [AI_AGENT_ANATOMY.md](./AI_AGENT_ANATOMY.md) - SENSE-THINK-ACT-FEEDBACK framework
-- [PROMPT_ENGINEERING_STANDARDS.md](../tech/PROMPT_ENGINEERING_STANDARDS.md) - Prompt design standards
-
-### 18.2 Quick Reference
-
-**Generic Patterns:**
-- Fit Assessment - Does X belong with Y?
-- Value Discovery - What value should X have?
-- New Entity - Should we create new X?
-- Duplicate Prevention - Does X already exist?
-- Domain Orientation - What is current state of X?
-
-**Tool Mastery:**
-- read_data - Relations, filters, columns, limits
-- aggregate_data - Patterns, ranges, distributions
-- write_data - Verification, complete data, HITL
-- inspect_schema - Structure, relationships
-
-**Instantiation Process:**
-1. Map domain decisions to generic patterns
-2. Identify domain entities, values, criteria
-3. Replace placeholders
-4. Add domain-specific guidance
-5. Write business context
-
----
-
 ## 12. Protocol Composition Framework
-
-> STATUS: DISCUSSION NEEDED
 
 Tasks rarely require a single protocol. This section defines how protocols chain together.
 
@@ -2292,9 +2306,7 @@ Then execute each protocol in order.
 
 ## 13. Confidence Scoring Framework
 
-> STATUS: DISCUSSION NEEDED
-
-Protocols currently conclude with binary (MATCH/MISMATCH). Need gradients.
+Protocols should conclude with confidence levels, not just binary outcomes.
 
 ### 13.1 The Problem
 
@@ -2367,9 +2379,7 @@ Protocol doesn't provide decision criteria.
 
 ## 14. Failure Handling
 
-> STATUS: DISCUSSION NEEDED
-
-Each protocol needs explicit edge case handling.
+Each protocol needs explicit edge case handling. This section provides universal patterns.
 
 ### 14.1 Universal Failure Patterns
 
@@ -2548,6 +2558,40 @@ Protocol improvement is handled through trace evaluation using the existing **Wo
 
 ---
 
+## 18. References
+
+### 18.1 Related Architecture Docs
+
+- [ARCHITECTURAL_VISION.md](./ARCHITECTURAL_VISION.md) - Overall system vision
+- [AGENTS_DESIGN.md](./AGENTS_DESIGN.md) - Agent hierarchy and roles
+- [AI_AGENT_ANATOMY.md](./AI_AGENT_ANATOMY.md) - SENSE-THINK-ACT-FEEDBACK framework
+- [PROMPT_ENGINEERING_STANDARDS.md](../tech/PROMPT_ENGINEERING_STANDARDS.md) - Prompt design standards
+- [WORKFLOW_EVALUATION_FRAMEWORK.md](../testing/WORKFLOW_EVALUATION_FRAMEWORK.md) - Trace evaluation for protocol improvement
+
+### 18.2 Quick Reference
+
+**Generic Patterns:**
+- Fit Assessment - Does X belong with Y?
+- Value Discovery - What value should X have?
+- New Entity - Should we create new X?
+- Duplicate Prevention - Does X already exist?
+- Domain Orientation - What is current state of X?
+
+**Tool Mastery:**
+- read_data - Relations, filters, columns, limits
+- aggregate_data - Patterns, ranges, distributions
+- write_data - Verification, complete data, HITL
+- inspect_schema - Structure, relationships
+
+**Instantiation Process:**
+1. Map domain decisions to generic patterns
+2. Identify domain entities, values, criteria
+3. Replace placeholders
+4. Add domain-specific guidance
+5. Write business context
+
+---
+
 ## Appendix A: Pattern Quick Reference
 
 ### A.1 Pattern Selection Guide
@@ -2582,9 +2626,10 @@ Protocol improvement is handled through trace evaluation using the existing **Wo
 
 ---
 
-**Document Version:** 5.0
+**Document Version:** 5.1
 **Last Updated:** December 16, 2025
 **Revision:**
+- v5.1: ULTRATHINK review fixes - fixed section ordering (18 moved to end), resolved status contradictions, added tool grounding explanation (2.3), clarified ALL agents need protocols (3.4), added protocols+intelligence balance (11.2)
 - v5.0: Streamlined document - removed Python code sections (conceptual guidance only), simplified Sections 15-17 as FUTURE, fixed protocols vs examples framing, removed Marketing domain example (deferred)
 - v4.0: Added Multi-Domain Architecture (Section 3), PM Domain Routing Protocol (Section 4). Restructured ToC.
 - v3.0: Added Sections 12-17 (Composition, Confidence, Failure, RAG, Episodic Memory, Feedback Loop)
