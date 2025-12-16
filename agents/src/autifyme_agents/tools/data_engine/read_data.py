@@ -31,26 +31,28 @@ class ReadDataInput(BaseModel):
     filters: dict[str, Any] | None = Field(
         None,
         description=(
-            "[EXACT MATCH] Case-sensitive exact value matching. "
-            "Use when you have exact values (IDs, booleans, status codes). "
+            "[EXACT MATCH] Equality / IN matching (no wildcards). "
+            "Use when you have exact values (IDs, booleans, enums/status codes). "
             "Examples: "
             "{'is_active': True}, "
             "{'category_id': 'cat-123'}, "
-            "{'status': ['draft', 'published']} (IN operator for lists), "
-            "{'name': {'$in': ['Exact Name 1', 'Exact Name 2']}} (requires EXACT match). "
-            "CRITICAL: For name searches, use search_patterns instead (fuzzy match)."
+            "{'status': ['draft', 'published']} (IN operator for lists). "
+            "CRITICAL: Do NOT use '%' wildcards here. For text/name searching, use search_patterns."
         )
     )
     search_patterns: dict[str, str] | None = Field(
         None,
         description=(
             "[FUZZY MATCH] Case-insensitive ILIKE pattern matching. "
-            "Use for searching text fields (names, descriptions, codes). "
+            "Use for searching TEXT columns (names, descriptions, codes, SKUs). "
             "Examples: "
             "{'name': '%search%'} (contains), "
             "{'code': 'PREFIX-%'} (starts with), "
             "{'name': '%term1%term2%'} (contains both). "
-            "Use % as wildcard. RECOMMENDED for all name/text searches."
+            "Use % as wildcard. RECOMMENDED for all name/text searches. "
+            "CRITICAL: Only works on TEXT columns, NOT on array columns (text[]). "
+            "For array columns like 'tags', use filters with exact array values or query differently. "
+            "Use inspect_schema to check column types before querying."
         )
     )
     columns: list[str] | None = Field(
@@ -84,8 +86,11 @@ class ReadDataInput(BaseModel):
         )
     )
     limit: int | None = Field(
-        None,
-        description="Maximum rows to return (pagination). Default: no limit",
+        50,
+        description=(
+            "Maximum rows to return (pagination). Default: 50 for safety/token efficiency. "
+            "Increase only when needed; prefer columns=[...] to keep payload small."
+        ),
         gt=0,
         le=1000
     )
@@ -167,7 +172,7 @@ def create_read_data_tool(
         filters = EXACT MATCH (case-sensitive)
         - Use for: IDs, booleans, enums, status codes, foreign keys
         - Examples: {'is_active': True}, {'id': 'uuid-123'}
-        - {'name': {'$in': ['Name 1', 'Name 2']}} → ONLY matches EXACT names
+        - {'name': ['Name 1', 'Name 2']} → ONLY matches EXACT names
         - Returns 0 results if name doesn't match exactly (case, spacing, etc.)
 
         search_patterns = FUZZY MATCH (case-insensitive ILIKE)
@@ -177,7 +182,7 @@ def create_read_data_tool(
         - RECOMMENDED for all name/text searches
 
         Common Mistake:
-        ❌ filters={'name': {'$in': ['PET Jar', 'PET Bottles']}}  # Returns 0 if exact name doesn't exist
+        ❌ filters={'name': ['PET Jar', 'PET Bottles']}  # Returns 0 if exact name doesn't exist
         ✅ search_patterns={'name': '%PET%'}  # Returns all products with 'PET' in name
 
         Returns:
@@ -189,7 +194,7 @@ def create_read_data_tool(
             # ❌ WRONG: Using filters for name search (returns 0 if names don't match exactly)
             read_data(
                 table="product_families",
-                filters={"name": {"$in": ["PET Jar", "PET Bottles"]}},  # Requires EXACT match
+                filters={"name": ["PET Jar", "PET Bottles"]},  # Requires EXACT match
                 columns=["id", "name"]
             )
             # Returns: [] (empty) if actual names are "PET Food Jars" or "PET Water Bottles"
@@ -416,21 +421,53 @@ def create_read_data_tool(
         func=_read_data_impl,
         name="read_data",
         description=(
-            "Fetch records with filters, search patterns, joins, batch IDs, pagination, and counting.\n\n"
-            "CRITICAL - filters vs search_patterns:\n"
-            "- filters = EXACT MATCH (case-sensitive): {'is_active': True}, {'id': 'uuid-123'}, {'status': ['draft','published']}\n"
-            "- search_patterns = FUZZY MATCH (case-insensitive ILIKE): {'name': '%term%'}, {'code': 'PREFIX-%'}\n"
-            "- COMMON MISTAKE: filters={'name': 'Some Name'} returns NOTHING if exact name doesn't exist. Use search_patterns instead!\n\n"
-            "SCENARIOS:\n"
-            "- Find by name: search_patterns={'name': '%search%'} (NOT filters)\n"
-            "- Duplicate check: search_patterns={'name': '%term1%term2%'} for potential matches\n"
-            "- Batch fetch by IDs: ids=['uuid-1','uuid-2','uuid-3'] for bulk operations\n"
-            "- Paginated list: filters={'is_active': True}, limit=25, offset=50 for page 3\n"
-            "- Load with relations: relations=['related_table(col1,col2)'] (use inspect_schema for table names)\n"
-            "- Nested relations: relations=['parent(*,children(*))'] for hierarchy (NOT parent.children)\n"
-            "- Count only: count_only=True for efficient counting without fetching records\n\n"
-            "RETURNS: {results: [...], count: N, pagination?: {limit, offset, has_more}}\n\n"
-            "NOT FOR: Aggregations with GROUP BY (use aggregate_data) or writes (use write_data)."
+            "PURPOSE: Universal database read tool - fetch records, search text, apply exact filters, include relations, batch reads, pagination, and counts. Use this before write_data to (1) check duplicates and (2) look up foreign keys/IDs.\n\n"
+            "CRITICAL DISTINCTION - filters vs search_patterns (most common source of errors):\n"
+            "- filters: equality / IN matching (no wildcards) - use for IDs, booleans, enums/statuses\n"
+            "  Example: {'id': 'uuid-123'}, {'is_active': True}, {'status': ['draft','published']}\n"
+            "- search_patterns: wildcard patterns using % (case-insensitive ILIKE) - use for names, text, SKUs\n"
+            "  Example: {'name': '%PET%Jars%'}, {'sku': 'JAR-%'}, {'name': '%PET%500ML%'}\n"
+            "RULE: If you're matching human text and you didn't include %, you probably meant search_patterns.\n\n"
+            "USE WHEN:\n"
+            "- Duplicate check (CRITICAL before create): Does this product/SKU/entity exist?\n"
+            "- Foreign key lookup: Get IDs for relationships (family_id, uom_id, price_list_id)\n"
+            "- Context gathering: Current state (products in family, pricing patterns)\n"
+            "- Verification: Confirm assumptions (family exists? product active?)\n"
+            "- Batch fetch: Get multiple records by IDs\n"
+            "- Relationship exploration: Load related data via joins (relations parameter)\n\n"
+            "DON'T USE:\n"
+            "- For schema/structure (use inspect_schema)\n"
+            "- For analytics/GROUP BY (use aggregate_data)\n"
+            "- For writes (use write_data)\n\n"
+            "CRITICAL GOTCHAS:\n"
+            "- search_patterns ONLY works on TEXT columns, NOT on array columns (text[])\n"
+            "  * Columns like 'tags' are often arrays - check with inspect_schema first\n"
+            "  * Using search_patterns on arrays causes: 'operator does not exist: text[] ~~* unknown'\n"
+            "- relations syntax: Nested uses 'parent(*,child(*))' NOT 'parent.child(*)'\n"
+            "- Use inspect_schema with details=['relationships'] to verify FK targets before using relations\n"
+            "- ids parameter overrides filters/search_patterns (batch fetch mode)\n"
+            "- count_only=True returns only count, no records (efficient for 'how many')\n"
+            "- limit defaults to 50 for efficiency; increase only when needed\n"
+            "- Use columns=['id',...] whenever possible to reduce payload\n\n"
+            "EXAMPLES:\n"
+            "# Duplicate check before create (CRITICAL workflow)\n"
+            "read_data(table='products', search_patterns={'sku': '%HONEYCOMB%'}, columns=['id','sku'])\n"
+            "Returns: Any products with 'HONEYCOMB' in SKU (case-insensitive)\n\n"
+            "# Foreign key lookup for relationships\n"
+            "read_data(table='product_families', search_patterns={'name': '%PET%Jars%'}, columns=['id','name'])\n"
+            "Returns: Family IDs matching 'PET Jars' (fuzzy match)\n\n"
+            "# Combined: exact filters + fuzzy search + relations\n"
+            "read_data(table='products', filters={'is_active': True, 'product_family_id': ['fam-1','fam-2']}, search_patterns={'sku': '%500ML%'}, relations=['product_families(name)'], limit=50)\n"
+            "Returns: Active 500ml products from 2 families with family names\n\n"
+            "ALSO CONSIDER:\n"
+            "- inspect_schema: Need structure/columns/enums BEFORE querying? Use inspect_schema first\n"
+            "- aggregate_data: Need GROUP BY, SUM, AVG, COUNT by category? Use aggregate_data\n"
+            "- write_data: Ready to create/update? Use read_data first (duplicates + FKs), then write_data\n\n"
+            "RETURNS: Always a structured dict with success flag.\n"
+            "- success=True: {table, operation, results?, count, pagination?}\n"
+            "  * operation='query'|'batch_read'|'count'\n"
+            "  * results present for query/batch_read; count present for all\n"
+            "- success=False: {error, error_type, table, Agent Action: ...}"
         ),
         args_schema=ReadDataInput,
         coroutine=_read_data_impl,

@@ -23,13 +23,13 @@ from autifyme_agents.tools import create_view_image_tool
 def _get_analyst_llm() -> BaseChatModel:
     """Get fast, cheap LLM for analyst tasks.
 
-    Uses Gemini 2.5 Flash with minimal thinking for speed.
+    Uses Gemini 2.5 Flash Lite with minimal thinking for speed.
     Analysts are latency-sensitive (target <300ms).
     """
     return get_llm(
         provider="google",
-        model="gemini-2.5-flash",
-        temperature=0.3,  # Lower temperature for consistent observations
+        model="gemini-2.5-flash-lite",
+        temperature=0.7,  # Lower temperature for consistent observations
         max_retries=3,
     )
 
@@ -40,7 +40,7 @@ def create_visual_analyst(
     """Create Visual Analyst SubAgent spec.
 
     Args:
-        model: Optional LLM override. Defaults to Gemini 2.5 Flash.
+        model: Optional LLM override. Defaults to Gemini 2.5 Flash Lite.
 
     Returns:
         SubAgent spec dict for PM's subagents list.
@@ -53,11 +53,19 @@ def create_visual_analyst(
     system_prompt = load_prompt("analysts/visual_analyst.prompt")
 
     description = (
-        "Visual Analyst - comprehensive visual intelligence from images. "
-        "Reports: materials, dimensions, construction quality, branding/labels, "
-        "packaging format, use-context, variant detection, condition assessment. "
-        "Cross-domain reuse: serves catalog, marketing, operations, quality workflows. "
-        "Read-only - observes and reports, does NOT suggest actions."
+        "ROLE: Analyst (read-only)\n"
+        "MISSION: Describe what is visible in images with high precision.\n\n"
+        "OWNERSHIP:\n"
+        "- Visual facts only: items, materials, colors, text/labels, defects, counts\n\n"
+        "INPUTS I NEED:\n"
+        "- Image path(s) when available (e.g., inbox/... or pending/...)\n\n"
+        "OUTPUTS I PRODUCE:\n"
+        "- Observations + uncertainties (no recommendations)\n"
+        "- If long: write a short report to the thread directory and return the file path\n\n"
+        "TOOLS I USE:\n"
+        "- view_image\n\n"
+        "GUARDRAILS:\n"
+        "- No DB reads/writes; no pricing/taxonomy/action recommendations; no image editing"
     )
 
     tools: list[Any] = [

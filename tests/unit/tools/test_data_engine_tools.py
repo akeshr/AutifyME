@@ -347,8 +347,8 @@ class TestToolFactoryAndAccessControl:
         """Test that tool description includes usage guidance."""
         tool = create_inspect_schema_tool(mock_storage)
 
-        # Tool descriptions follow SCENARIOS format
-        assert "SCENARIOS" in tool.description or "CALL FIRST" in tool.description
+        # Tool descriptions follow USE WHEN format
+        assert "USE WHEN" in tool.description
         assert "RETURNS" in tool.description
         assert "CRITICAL" in tool.description
 

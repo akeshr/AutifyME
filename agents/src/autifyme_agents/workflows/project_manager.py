@@ -35,11 +35,10 @@ from autifyme_agents.schemas.models import CompanyProfile
 from autifyme_agents.schemas.pm_output import PMOutput
 from autifyme_agents.specialists.catalog_specialist import create_catalog_specialist
 from autifyme_agents.specialists.creative_specialist import create_creative_specialist
-from autifyme_agents.tools import create_view_image_tool
-from autifyme_agents.tools.data_engine import (
-    create_inspect_schema_tool,
-    create_read_data_tool,
-)
+
+# NOTE: PM has LIMITED content tools - view_image only for conversational context
+# Detailed analysis still delegated to analysts per ARCHITECTURAL_VISION.md
+# PM sees images for routing decisions, analysts do thorough domain analysis
 
 if TYPE_CHECKING:
     from autifyme_agents.workflows.channels.protocol import MessagingChannel
@@ -48,20 +47,20 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
-    """Return configured LLM for PM. Defaults to gemini-2.5-pro.
+    """Return configured LLM for PM. Defaults to gemini-2.5-flash-lite.
 
     Configuration rationale:
-    - thinking_budget=128: Minimum for Pro models (cannot disable like Flash).
+    - thinking_budget=0: Disabled for Flash-Lite to optimize speed/cost.
       PM is orchestrator so minimal thinking suffices.
     - max_retries=5: Production resilience against Gemini's occasional blank responses.
-    - temperature=0.7: Balanced creativity for user communication.
+    - temperature=0.5: Balanced creativity for user communication.
     """
     if model is not None:
         return model
     return get_llm(
         provider="google",
-        model="gemini-2.5-flash",
-        temperature=0.7,  # PM orchestrates, specialists reason
+        model="gemini-2.5-flash-lite",
+        temperature=1.0,  # PM orchestrates, specialists reason
         max_retries=5,  # Increase resilience against blank responses
     )
 
@@ -124,7 +123,7 @@ async def create_project_manager(
 
     Args:
         company_profile: Company context for brand voice and positioning
-        model: LLM for orchestration (defaults to gemini-2.5-flash)
+        model: LLM for orchestration (defaults to gemini-2.5-flash-lite)
         checkpointer: LangGraph checkpointer for state persistence
         storage: Storage adapter for database operations
         channel: Messaging channel for platform-specific operations
@@ -154,27 +153,26 @@ async def create_project_manager(
 
     instructions = _load_prompt(company_profile, base_context, channel)
 
-    # PM Tools - Read-only, orchestration-focused
+    # PM Tools - Media access + view_image for conversational context
+    # PM can SEE images for routing decisions; detailed analysis delegated to analysts
     pm_tools: list[Any] = []
+
+    # view_image for PM to see user images and understand conversational context
+    # PM uses this for: initial understanding, conversational references ("the blue one")
+    # PM does NOT use this for: detailed analysis (that's visual_analyst's job)
+    from autifyme_agents.tools.view_image import create_view_image_tool
+    pm_tools.append(create_view_image_tool())
 
     # Platform media download (with storage for inbox persistence)
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
         pm_tools.extend(create_platform_media_tools(channel, storage=storage))
 
-    # Schema inspection and read operations
-    pm_tools.append(create_inspect_schema_tool(storage, tables=None))
-    pm_tools.append(create_read_data_tool(storage))
-
-    # Image viewing - PM uses intelligently based on context/need
-    # For deep analysis, delegates to visual_analyst; for quick checks, uses directly
-    pm_tools.append(create_view_image_tool())
-
     # Specialist LLM configuration
     specialist_llm = get_llm(
         provider="google",
-        model="gemini-2.5-flash",
-        temperature=0.7,
+        model="gemini-2.5-flash-lite",
+        temperature=0.5,
         max_retries=5,  # Match PM resilience for blank response handling
     )
 

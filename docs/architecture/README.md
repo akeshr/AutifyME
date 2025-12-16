@@ -10,6 +10,7 @@ Timeless design blueprints and implementation ground truth.
 
 | Document | Purpose |
 | --- | --- |
+| **[DOMAIN_REASONING_PROTOCOLS.md](./core/DOMAIN_REASONING_PROTOCOLS.md)** | **[NEW]** Domain-specific reasoning protocols - encoding domain expertise as executable process |
 | **[DOMAIN_DESIGN_GUIDELINES.md](./core/DOMAIN_DESIGN_GUIDELINES.md)** | **[CRITICAL]** Architectural standards for designing new domains and workflows |
 | **[AGENTS_DESIGN.md](./core/AGENTS_DESIGN.md)** | **[CANONICAL]** Agent hierarchy, context engineering, specialist patterns |
 | **[ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./core/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md)** | **[GROUND TRUTH]** As-built implementation verified from code |
@@ -153,8 +154,9 @@ Before implementing any feature:
 1. Review **[AGENTS_DESIGN.md](./core/AGENTS_DESIGN.md)** for hierarchy and specialist patterns
 2. Check **[DOMAIN_DESIGN_GUIDELINES.md](./core/DOMAIN_DESIGN_GUIDELINES.md)** for architectural standards
 3. **Writing prompts?** Follow **[PROMPT_ENGINEERING_STANDARDS.md](./tech/PROMPT_ENGINEERING_STANDARDS.md)**
-4. Check **[LANGCHAIN_V1_FEATURES.md](./tech/LANGCHAIN_V1_FEATURES.md)** for native solutions
-5. Follow Cursor rules in `../../.cursor/rules/`
+4. **Adding domain expertise?** Use **[DOMAIN_REASONING_PROTOCOLS.md](./core/DOMAIN_REASONING_PROTOCOLS.md)** to encode as executable protocols
+5. Check **[LANGCHAIN_V1_FEATURES.md](./tech/LANGCHAIN_V1_FEATURES.md)** for native solutions
+6. Follow Cursor rules in `../../.cursor/rules/`
 
 ---
 

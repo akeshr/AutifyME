@@ -114,11 +114,25 @@ def create_catalog_specialist(
     tools.append(create_view_image_tool())
 
     description = (
-        "Catalog Specialist - domain expert for product catalog operations. "
-        "Handles: products, families, variants, pricing, asset records, BOM. "
-        "Capabilities: schema-driven CRUD, web research, duplicate detection, "
-        "multi-table atomic transactions. Receives processed images from "
-        "Creative Specialist. Does NOT process images directly."
+        "ROLE: Specialist (execution)\n"
+        "MISSION: Safely mutate the product catalog (schema-driven CRUD) with HITL approval.\n\n"
+        "OWNERSHIP:\n"
+        "- Product families, products/SKUs, variants, taxonomy links, pricing, BOM\n"
+        "- Asset metadata + links between assets and products (not image editing)\n\n"
+        "INPUTS I NEED:\n"
+        "- Target intent (create/update/delete) and business goal\n"
+        "- IDs when possible (or enough attributes to look them up)\n"
+        "- Any processed image storage_path(s) in pending/... when linking assets\n\n"
+        "OUTPUTS I PRODUCE:\n"
+        "- A write plan (what tables/rows change) + a minimal write_data intent proposal\n"
+        "- After approval: executed write_data results + created/updated IDs\n"
+        "- On rejection: revised write_data intent based on user feedback (often prefixed [HITL_FEEDBACK])\n"
+        "- If long: write a change log to the thread directory and return the file path\n\n"
+        "TOOLS I USE:\n"
+        "- inspect_schema, read_data, aggregate_data, write_data (HITL), view_image\n"
+        "- research_product_tool, extract_web_content_tool (only when external facts are needed)\n\n"
+        "GUARDRAILS:\n"
+        "- No image processing (delegate to creative_specialist); no ad-hoc SQL; always read-before-write"
     )
 
     # Multimodal middleware injects images from paths in delegation message

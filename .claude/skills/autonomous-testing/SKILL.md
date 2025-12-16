@@ -94,6 +94,12 @@ assert result2.interrupt_occurred, "PM should trigger HITL"
 ✅ Validate database persistence with Supabase MCP after successful tests
 ✅ Track progress with `list_recent_tests()`
 
+## Related Skills
+
+- **Deep trace analysis:** Use `workflow-evaluation` skill for systematic node-by-node analysis
+- **Prompt fixes:** Use `prompt-engineering` skill when updating PM/specialist prompts
+- **Diagnosing issues:** Use `agent-improvement` skill for gap analysis
+
 ## References
 
 - **Architecture**: `docs/architecture/testing/AUTONOMOUS_TESTING_FRAMEWORK.md`

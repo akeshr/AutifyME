@@ -40,8 +40,8 @@ from autifyme_agents.tools.image_studio import create_image_studio_tool
 if TYPE_CHECKING:
     from autifyme_agents.core.ports import StorageInterface
 
-# Creative Specialist uses Gemini 3 Pro for multimodal reasoning (can see images)
-CREATIVE_SPECIALIST_MODEL = "gemini-2.5-flash"
+# Creative Specialist uses Gemini 2.5 Flash Lite for multimodal reasoning (can see images)
+CREATIVE_SPECIALIST_MODEL = "gemini-2.5-flash-lite"
 
 # Tables accessible by Creative Specialist
 CREATIVE_READ_TABLES = [
@@ -69,7 +69,7 @@ def create_creative_specialist(
     PM passes storage_path in task description, specialist calls view_image to see it.
 
     Args:
-        model: Optional LLM override. Defaults to Gemini 3 Pro (multimodal).
+        model: Optional LLM override. Defaults to Gemini 2.5 Flash Lite (multimodal).
         storage: Optional storage client for image persistence to Supabase.
 
     Returns:
@@ -96,23 +96,34 @@ def create_creative_specialist(
         # Scoped write access to assets table only
         tools.append(create_write_data_tool(storage, tables=CREATIVE_WRITE_TABLES))
 
-    description = (
-        "Creative Specialist - professional product photographer creating studio-quality images. "
-        "Produces: marketplace-ready hero shots (pure white background, studio lighting, color-accurate), "
-        "multi-product extraction with clean isolation, lifestyle shots with contextual scenes. "
-        "IMAGE SOURCES (two options): "
-        "(1) Include storage_path directly in task - specialist SEES images, OR "
-        "(2) Provide product_id or product_family_id - specialist queries to find asset URLs. "
-        "Has read_data access to: products (resolve family->products), product_assets (product->asset links), assets (get storage_url). "
-        "Returns: processed images with storage_path (in pending/). "
-        "Creates asset records via write_data (HITL approval required)."
-    )
 
-    # Use provided model or default to Gemini 3 Pro (multimodal)
+    description = (
+        "ROLE: Specialist (execution)\n"
+        "MISSION: Turn raw product photos into marketplace-ready visuals (and optionally persist asset records).\n\n"
+        "OWNERSHIP:\n"
+        "- Image processing & generation: extraction, cleanup, enhancement, hero shots, lifestyle creatives\n"
+        "- Visual QA on outputs (before downstream catalog linking)\n\n"
+        "INPUTS I NEED:\n"
+        "- Source image storage_path(s) (typically inbox/...)\n"
+        "- Creative intent (hero vs lifestyle), output aspect ratio/format if constrained\n\n"
+        "OUTPUTS I PRODUCE:\n"
+        "- Processed image outputs with paths (always local temp path; storage_path in pending/ when storage is configured)\n"
+        "- Notes on what was changed + any visual risks/uncertainties\n"
+        "- If long: write a production note to the thread directory and return the file path\n\n"
+        "HITL LOOP (when write_data is enabled):\n"
+        "- Propose write_data intents for DB changes and wait for approval\n"
+        "- On rejection, you will receive user feedback (often prefixed [HITL_FEEDBACK]); revise and resubmit\n\n"
+        "TOOLS I USE:\n"
+        "- view_image, image_studio\n"
+        "- If storage is provided: inspect_schema, read_data, write_data (scoped to creative/asset tables; HITL for writes)\n\n"
+        "GUARDRAILS:\n"
+        "- No product/pricing/taxonomy CRUD; if a catalog change is needed, delegate to catalog_specialist"
+    )
+    # Use provided model or default to Gemini 2.5 Pro (multimodal)
     specialist_model = model if model is not None else get_llm(
         provider="google",
         model=CREATIVE_SPECIALIST_MODEL,
-        temperature=1.0,
+        temperature=0.9,
     )
 
     spec: dict[str, Any] = {

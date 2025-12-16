@@ -90,7 +90,7 @@ MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
 MAX_DIMENSION = 2048
 JPEG_QUALITY = 85
-GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
+GEMINI_3_IMAGE_MODEL = "gemini-2.5-flash-image"
 
 # Professional product photography system prompt
 TOOL_SYSTEM_PROMPT = """You are a master commercial photographer whose work appears in Vogue, Apple campaigns, and luxury brand catalogs.
@@ -311,16 +311,26 @@ def _save_base64_image(
 
 
 def _extract_image_from_response(response: Any) -> str | None:
-    """Extract base64 image data from Gemini response."""
-    content = getattr(response, "content", None)
-    if isinstance(content, list) and len(content) > 0:
-        part = content[0]
-        if isinstance(part, dict) and "image_url" in part:
-            url = part["image_url"].get("url", "")
-            if url.startswith("data:"):
-                return str(url)
+    """Extract base64 image data from Gemini response.
 
-    logger.warning("No image in response")
+    Gemini may return mixed content: ['text...', {'type': 'image_url', ...}]
+    We need to search ALL parts, not just the first one.
+    """
+    content = getattr(response, "content", None)
+    if isinstance(content, list):
+        for part in content:
+            if isinstance(part, dict) and "image_url" in part:
+                url = part["image_url"].get("url", "")
+                if url.startswith("data:"):
+                    return str(url)
+            # Also check for type: image_url format
+            if isinstance(part, dict) and part.get("type") == "image_url":
+                image_url = part.get("image_url", {})
+                url = image_url.get("url", "") if isinstance(image_url, dict) else ""
+                if url.startswith("data:"):
+                    return str(url)
+
+    logger.warning("No image in response content: %s", type(content))
     return None
 
 
@@ -496,7 +506,7 @@ def _image_studio_impl(
     thread_id: str | None = None,
     output: dict[str, Any] | OutputSpec | None = None,
     config: Annotated[RunnableConfig, InjectedToolArg] = None,  # type: ignore[assignment]
-) -> dict[str, Any]:
+) -> dict[str, Any] | list[dict[str, Any]]:
     """Image Studio tool implementation.
 
     Args:
@@ -560,7 +570,66 @@ def _image_studio_impl(
 
         result = _process_images(input_spec)
 
-        if result.success:
+        if result.success and result.outputs:
+            # Return multimodal content so agent SEES the generated image
+            # Format: [text with structured data, image for visual verification]
+            output_variant = result.outputs[0]
+            structured_data = {
+                "success": True,
+                "storage_path": output_variant.storage_path,
+                "local_path": output_variant.path,
+                "metadata": output_variant.metadata.model_dump() if output_variant.metadata else None,
+                "warnings": result.warnings,
+            }
+
+            # Load the generated image for visual return
+            # Use higher resolution for quality verification (agent needs to see detail)
+            try:
+                local_path = Path(output_variant.path)
+                if local_path.exists():
+                    with Image.open(local_path) as pil_img:
+                        # Higher resolution for verification - agent needs to judge quality
+                        width, height = pil_img.size
+                        max_dim = 1024  # Higher than view_image's 512 for quality checks
+                        if max(width, height) > max_dim:
+                            if width > height:
+                                new_width = max_dim
+                                new_height = int(height * (max_dim / width))
+                            else:
+                                new_height = max_dim
+                                new_width = int(width * (max_dim / height))
+                            pil_img = pil_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+                        # Convert to RGB if needed (for JPEG encoding)
+                        if pil_img.mode in ("RGBA", "LA", "P"):
+                            rgb_img = Image.new("RGB", pil_img.size, (255, 255, 255))
+                            if pil_img.mode == "RGBA":
+                                rgb_img.paste(pil_img, mask=pil_img.split()[-1])
+                            else:
+                                rgb_img.paste(pil_img)
+                            pil_img = rgb_img
+
+                        buffer = io.BytesIO()
+                        pil_img.save(buffer, format="JPEG", quality=90)  # Higher quality for verification
+                        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+                        data_uri = f"data:image/jpeg;base64,{encoded}"
+
+                    # Return multimodal: structured data + visual image
+                    import json
+                    return [
+                        {
+                            "type": "text",
+                            "text": f"Image generated successfully.\n{json.dumps(structured_data, indent=2)}"
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": data_uri}
+                        },
+                    ]
+            except Exception as img_err:
+                logger.warning(f"Could not load generated image for preview: {img_err}")
+
+            # Fallback to structured-only response if image load fails
             return build_success_response(result.model_dump())
         else:
             return {
@@ -598,60 +667,62 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
     return StructuredTool.from_function(
         func=_image_studio_impl,
         name="image_studio",
-        description="""Professional image processing with Gemini 3 Pro Image.
-
-IMAGES - REQUIRED (minimum 1):
-At least one labeled image required. Reference labels in your specs/instructions.
-- images: [{path: "inbox/thread/photo.jpg", label: "product"}]
-- Use [label] in your specs: "extract [product] from background"
-
-STRUCTURED SPECS - Use what applies:
-- extraction: Target in multi-product (target_description, position_hint, isolation, edge_treatment)
-- background: Background treatment (treatment, color, scene_description)
-- lighting: Light setup (type, direction, quality, color_temperature, shadows, special_requirements)
-- composition: Framing (product_coverage, position, camera_angle, negative_space, crop_instruction)
-- enhancement: Post-processing (sharpness, contrast, color_treatment, detail_enhancement, cleanup)
-- scene: Environment (environment, style, mood, time_of_day, props_and_context)
-- placement: Product in scene (position, scale, surface, interaction)
-- focus: Depth of field (focus_point, depth_of_field, falloff)
-- material_treatment: Material rendering (primary_material, rendering_notes, preserve_details)
-- custom_spec: OOTB ideas (instruction, style_reference, color_palette, special_effect, extra)
-- creative_direction: Free-form notes
-
-NOTE: Every spec has a "custom" field for spec-specific OOTB ideas.
-
-EXAMPLES:
-
-1. Hero shot extraction:
-{
-  "images": [{"path": "inbox/thread/group.jpg", "label": "source"}],
-  "extraction": {"target_description": "glass jar on left in [source]", "isolation": "complete"},
-  "background": {"treatment": "transparent"},
-  "material_treatment": {"primary_material": "clear glass", "rendering_notes": "preserve caustics"}
-}
-
-2. Lifestyle with style reference:
-{
-  "images": [
-    {"path": "inbox/thread/product.jpg", "label": "product"},
-    {"path": "inbox/thread/mood.jpg", "label": "style_ref"}
-  ],
-  "scene": {"environment": "modern kitchen", "style": "match [style_ref] mood"},
-  "placement": {"position": "place [product] on marble counter"},
-  "lighting": {"type": "natural window matching [style_ref]"}
-}
-
-3. Multi-product composition:
-{
-  "images": [
-    {"path": "inbox/thread/jar1.jpg", "label": "main"},
-    {"path": "inbox/thread/jar2.jpg", "label": "variant"}
-  ],
-  "composition": {"position": "[main] center hero, [variant] supporting right"},
-  "creative_direction": "Family shot - main variant hero, second supporting"
-}
-
-OUTPUT: Returns storage_path in pending/ for write_data.""",
+        description=(
+            "PURPOSE: Professional image processing (Gemini 3 Pro Image) - transform user uploads into catalog-ready assets. Extract products, generate lifestyle scenes, create hero shots, compose families. Your creative studio.\n\n"
+            "LABELED IMAGES ARCHITECTURE (key differentiator):\n"
+            "- Each image has label: [{path: 'inbox/thread/photo.jpg', label: 'product'}]\n"
+            "- Reference labels in specs: 'extract [product]', 'match [style_ref] lighting', 'place [product] on [background]'\n"
+            "- Model reasons: Gemini understands specs + labeled images, decides what to do\n"
+            "- Single powerful operation: prompt + labeled images -> new image\n"
+            "- Common labels: 'product'/'source' (main), 'style_ref' (mood/lighting), 'background' (scene), 'product_variant' (family shots)\n"
+            "- Max 15 images (Gemini constraint)\n\n"
+            "USE WHEN:\n"
+            "- Messy product photo: Extract clean product for catalog\n"
+            "- Hero shot needed: Transform phone photo to professional image\n"
+            "- Lifestyle scene: Place product in realistic environment\n"
+            "- Background removal: Transparent PNG or white background\n"
+            "- Family shot: Compose multiple variants together\n"
+            "- Material showcase: Highlight glass clarity, metal finish, texture\n\n"
+            "DON'T USE:\n"
+            "- Simple viewing (use view_image)\n"
+            "- When image already catalog-ready\n"
+            "- Text extraction/analysis (use view_image)\n\n"
+            "STRUCTURED SPECS (all optional - use what applies):\n"
+            "- extraction: {target_description: 'glass jar on left in [source]', isolation: 'complete', edge_treatment: 'sharp'}\n"
+            "- background: {treatment: 'transparent'/'solid_color'/'scene', color: 'white', scene_description: 'modern kitchen'}\n"
+            "- lighting: {type: 'natural_window'/'studio_3point', direction: 'front'/'side', special_requirements: 'match [style_ref]'}\n"
+            "- composition: {position: 'center'/'[main] center [variant] right', camera_angle: 'slight_top', negative_space: 'generous_top'}\n"
+            "- enhancement: {sharpness: 'tack_sharp', color_treatment: 'vibrant'}\n"
+            "- scene: {environment: 'modern_kitchen', style: 'match [style_ref]', mood: 'warm_inviting'}\n"
+            "- placement: {position: 'place [product] on marble counter', scale: 'prominent'}\n"
+            "- material_treatment: {primary_material: 'clear_glass', rendering_notes: 'preserve caustics'}\n"
+            "- custom_spec: {instruction: 'dramatic shot with water droplets', style_reference: 'Apple product photography'}\n"
+            "- creative_direction: Free-form notes ('Family shot - main hero, second supporting')\n"
+            "- output: {format: 'png'/'jpeg', size: '1K'/'2K', aspect_ratio: '1:1'/'16:9'}\n\n"
+            "CRITICAL:\n"
+            "- images parameter REQUIRED: Min 1 labeled image, max 15\n"
+            "- Labels enable composition: Model knows which image is which via labels\n"
+            "- Reference labels in specs: Use [label] syntax\n"
+            "- storage_path output: Use this for write_data product_images (pending/ path)\n"
+            "- View before and after: view_image to see input/output before cataloging\n"
+            "- Material matters: Glass, metal, plastic need different rendering (specify material_treatment)\n"
+            "- One output per call: Not batch processing\n\n"
+            "EXAMPLES:\n"
+            "# Extract with transparent background\n"
+            "image_studio(images=[{path: 'inbox/thread/photo.jpg', label: 'source'}], extraction={target_description: 'glass jar in [source]', isolation: 'complete'}, background={treatment: 'transparent'}, material_treatment={primary_material: 'clear_glass'})\n"
+            "Returns: Clean extracted jar, transparent PNG, caustics preserved\n\n"
+            "# Lifestyle with style reference\n"
+            "image_studio(images=[{path: 'inbox/t/product.jpg', label: 'product'}, {path: 'inbox/t/mood.jpg', label: 'style_ref'}], scene={environment: 'modern kitchen', style: 'match [style_ref]'}, placement={position: 'place [product] on counter'}, lighting={type: 'natural_window', special_requirements: 'match [style_ref]'})\n"
+            "Returns: Product in kitchen matching reference mood/lighting\n\n"
+            "ALSO CONSIDER:\n"
+            "- view_image: BEFORE image_studio - see what you're working with\n"
+            "- view_image: AFTER image_studio - verify output quality before cataloging\n"
+            "- write_data: Image ready? Create asset record with storage_path from output\n"
+            "- Pattern: view_image (diagnose) -> image_studio (process) -> view_image (verify) -> write_data (catalog)\n\n"
+            "RETURNS: Always a structured dict with success flag.\n"
+            "- success=True: ImageStudioOutput fields (outputs[] with storage_path in pending/, metadata, warnings, next_steps)\n"
+            "- success=False: {error, error_code, warnings, next_steps}"
+        ),
         args_schema=ImageStudioInput,
         return_direct=False,
     )

@@ -68,9 +68,16 @@
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",
       "Skill(workflow-evaluation)",
+      "Skill(agent-improvement)",
       "Bash(grep:*)",
       "Bash(uv sync:*)",
-      "Bash(move:*)"
+      "Bash(move:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:www.promptingguide.ai)",
+      "WebFetch(domain:docs.claude.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:patmcguinness.substack.com)",
+      "Bash(psql:*)"
     ],
     "deny": [],
     "ask": []

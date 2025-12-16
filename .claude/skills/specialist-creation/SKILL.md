@@ -60,7 +60,6 @@ def create_[domain]_specialist(storage: StorageInterface) -> dict[str, Any]:
         "name": "[domain]_specialist",
         "description": description,
         "tools": [
-            # Domain-specific tools
             create_read_data_tool(storage, tables=allowed_tables),
             create_inspect_schema_tool(storage, tables=allowed_tables),
         ],
@@ -83,11 +82,6 @@ def create_[domain]_specialist(storage: StorageInterface) -> dict[str, Any]:
 }
 ```
 
-**Key Points:**
-- `description` guides PM's delegation decision
-- `tools` are scoped (e.g., limited tables, read-only access)
-- `interrupt_on` only for specialists with write/modify tools
-
 ---
 
 ## Specialist Description Pattern
@@ -98,93 +92,43 @@ def create_[domain]_specialist(storage: StorageInterface) -> dict[str, Any]:
 
 | Quality | Example | Problem |
 |---------|---------|---------|
-| Bad | "Handles images" | Too vague - PM can't distinguish specialists |
-| Bad | "Does product stuff" | Overlaps with multiple domains |
+| Bad | "Handles images" | Too vague |
+| Bad | "Does product stuff" | Overlaps multiple domains |
 | Good | "Owns visual asset creation. Has image_studio, view_image. Returns asset IDs and storage paths." | Clear domain, tools, output |
-| Good | "Owns entity relationships and hierarchy. Has read_data, write_data scoped to X tables. Returns structured operation results." | Specific scope |
 
-**Test:** If PM could confuse this specialist with another, the description is too vague.
-
----
-
-## Prompt File Structure
-
-Location: `agents/src/autifyme_agents/prompts/specialists/[domain]_specialist.prompt`
-
-```xml
-<background_information>
-You [one-line role description].
-
-**Your Tools:**
-- tool_name: Purpose and when to use
-- another_tool: Purpose
-
-**Your Role:**
-- [Responsibility 1]
-- [Responsibility 2]
-- [What you return to PM]
-
-**Context:**
-Company brand voice and target audience are provided via middleware.
-</background_information>
-
-<instructions>
-**Workflow:**
-1. [First step - usually check existing data]
-2. [Analysis step]
-3. [Synthesis step]
-4. [Return to PM]
-
-**Key Principles:**
-- [Principle 1]
-- [Principle 2]
-- [Anti-hallucination rule]
-</instructions>
-
-<examples>
-<example>
-PM: "[Example input from PM]"
-
-Actions:
-1. [Tool call 1] -> [Result]
-2. [Tool call 2] -> [Result]
-3. Return: "[Structured output to PM]"
-</example>
-</examples>
-```
+**Test:** If PM could confuse this specialist with another, description is too vague.
 
 ---
 
 ## Scoping Patterns
 
-### Read-Only Specialist (Analyst Role)
+### Read-Only (Analyst)
 
 ```python
 return {
     "name": "market_intelligence_specialist",
     "tools": [
-        create_read_data_tool(storage),  # Full read access
+        create_read_data_tool(storage),  # Full read
         create_aggregate_data_tool(storage),
-        web_search_tool,
     ],
-    # No interrupt_on - no HITL needed for read operations
+    # No interrupt_on - read operations don't need HITL
 }
 ```
 
-### Write-Capable Specialist (Editor Role)
+### Write-Capable (Editor)
 
 ```python
 return {
     "name": "content_specialist",
     "tools": [
-        create_read_data_tool(storage, tables=["content", "templates"]),
-        create_write_data_tool(storage, tables=["content"]),  # Scoped write
+        create_read_data_tool(storage, tables=["content"]),
+        create_write_data_tool(storage, tables=["content"]),
     ],
     "interrupt_on": ["write_data"],  # HITL for writes
 }
 ```
 
-### External API Specialist
+### External API
 
 ```python
 return {
@@ -193,15 +137,13 @@ return {
         facebook_api_tool,
         create_read_data_tool(storage, tables=["campaigns"]),
     ],
-    "interrupt_on": ["publish_to_facebook"],  # HITL for external actions
+    "interrupt_on": ["publish_to_facebook"],  # HITL for external
 }
 ```
 
 ---
 
 ## Registration with PM
-
-Add to PM's subagents list in `project_manager.py`:
 
 ```python
 from autifyme_agents.specialists import (
@@ -215,70 +157,41 @@ def create_project_manager(storage: StorageInterface):
             create_cataloging_specialist(storage),
             create_[domain]_specialist(storage),  # Add here
         ],
-        # ... rest of PM config
     }
 ```
 
 ---
 
-## Domain Coherence Assessment
+## Domain Coherence Check
 
-**Before creating a new specialist or extending an existing one, apply the Domain Coherence Principle.**
-
-### The Core Question
-
-> Does this responsibility share reasoning patterns with existing specialists, or does it require a different mental model?
-
-### Decision Framework
+**Before creating/extending a specialist, answer these:**
 
 | Question | If YES | If NO |
 |----------|--------|-------|
-| Does this share vocabulary with an existing specialist? | Consider extending | Create new specialist |
-| Do examples for this compose naturally with existing examples? | Extend existing | Create new (permutation explosion) |
-| Would a domain expert naturally handle both? | Keep together | Split by expertise boundary |
-| Does adding this create O(2^n) example complexity? | Split out | Safe to extend |
+| Shares vocabulary with existing specialist? | Consider extending | New specialist |
+| Examples compose naturally? | Extend | New (permutation explosion) |
+| Same human expert would handle both? | Keep together | Split |
+| Adding this creates O(2^n) examples? | Split out | Safe to extend |
 
-### Signs You Need a NEW Specialist
-
-- **Different mental model:** Assembly thinking vs. taxonomy thinking vs. analytics thinking
-- **Different vocabulary:** Components/quantities vs. entities/relationships vs. metrics/trends
-- **Example permutations explode:** Adding responsibility D to A,B,C requires A+D, B+D, C+D examples
-- **Distinct expertise:** Different human experts would handle each domain
-
-### Signs You Should EXTEND an Existing Specialist
-
-- **Shared reasoning:** Both responsibilities answer the same fundamental question
-- **Examples reinforce:** Examples for A naturally illustrate patterns useful for B
-- **Natural workflow:** User flows through A -> B -> C without context switching
-
-### The Permutation Test
-
-If adding responsibility D to a specialist with A, B, C:
-- Will you need examples for A+D, B+D, C+D combinations?
-- Will the prompt grow by O(n) or O(2^n)?
-
-**O(n) growth = safe to extend.** Examples add linearly, concepts reinforce.
-**O(2^n) growth = split required.** Each combination needs its own example.
+**Full framework:** See CLAUDE.md "Agent Granularity Principle"
 
 ---
 
 ## Design Checklist
 
-Before implementing:
+**Before implementing:**
 
-- [ ] **Domain coherence:** Does this pass the Domain Coherence Assessment above?
-- [ ] **Domain clarity:** What single domain does this specialist own?
-- [ ] **Reusability:** Will multiple workflows use this specialist?
-- [ ] **Tool scoping:** What tables/APIs does it need? Minimum necessary.
-- [ ] **HITL boundary:** Does it write/modify data? External actions?
-- [ ] **Example complexity:** Will examples grow O(n) or O(2^n)?
+- [ ] Domain coherence check passed
+- [ ] Single domain ownership clear
+- [ ] Tool scoping defined (minimum necessary tables/APIs)
+- [ ] HITL boundary identified (write/external actions?)
 
-Implementation:
+**Implementation:**
 
 - [ ] Factory function returns SubAgent spec dict
-- [ ] Prompt file uses XML structure (see `prompt-engineering` skill)
+- [ ] Prompt file created (use `prompt-engineering` skill)
 - [ ] Tools scoped to domain tables only
-- [ ] Description helps PM delegate correctly
+- [ ] Description enables correct PM routing
 - [ ] Registered in PM's subagents list
 
 ---
@@ -287,4 +200,5 @@ Implementation:
 
 - **Specialists:** `agents/src/autifyme_agents/specialists/`
 - **Prompts:** `agents/src/autifyme_agents/prompts/specialists/`
-- **Prompt Engineering:** See `prompt-engineering` skill for prompt structure
+- **Prompt structure:** See `prompt-engineering` skill
+- **Tool creation:** See `tool-development` skill

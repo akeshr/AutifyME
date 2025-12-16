@@ -188,19 +188,19 @@ def create_write_data_tool(
                     {
                         "action": "update",
                         "table": "products",
-                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "sku": {"$like": "%-500ML%"}},
+                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "id": {"in": ["uuid-500ml-1", "uuid-500ml-2"]}},
                         "updates": {"base_price": 35.0}
                     },
                     {
                         "action": "update",
                         "table": "products",
-                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "sku": {"$like": "%-1L%"}},
+                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "id": {"in": ["uuid-1l-1", "uuid-1l-2"]}},
                         "updates": {"base_price": 35.0}
                     },
                     {
                         "action": "update",
                         "table": "products",
-                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "sku": {"$like": "%-2L%"}},
+                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "id": {"in": ["uuid-2l-1", "uuid-2l-2"]}},
                         "updates": {"base_price": 50.0}
                     }
                 ],
@@ -219,7 +219,7 @@ def create_write_data_tool(
                     {
                         "action": "update",
                         "table": "products",
-                        "filters": {"id": {"$in": ["uuid-1", "uuid-2", "uuid-3"]}, "is_active": True},
+                        "filters": {"id": {"in": ["uuid-1", "uuid-2", "uuid-3"]}, "is_active": True},
                         "updates": {"is_active": False, "discontinued_at": "2025-01-24T00:00:00Z"}
                     },
                     {
@@ -321,27 +321,73 @@ def create_write_data_tool(
         func=_write_data_impl,
         name="write_data",
         description=(
-            "Execute atomic multi-table transactions with dependency resolution and cross-table references.\n\n"
-            "REQUIRED FIELDS:\n"
-            "- goal: Human-readable intent ('Create parent record with child records')\n"
-            "- reasoning: Investigation results, duplicate checks, research findings, assumptions\n"
-            "- hitl_summary: Business user approval message (<1500 chars) ending with 'Reply *approve* to proceed or *reject* to cancel'\n"
-            "- operations: List of {action, table, data, returns?, dependencies?, filters?, updates?}\n"
-            "- impact: {creates: {table: count}, updates: {table: count}, deletes: {table: count}, warnings: [], examples: []}\n\n"
-            "REFERENCE SYNTAX (@name.field):\n"
-            "- Single result: '@parent.id' references operation with returns='family'\n"
-            "- Batch result: '@batch[0].id' references first item from batch operation\n"
-            "- Engine auto-resolves dependencies via topological sort\n\n"
-            "SCENARIOS:\n"
-            "- Create product family with variants: operations=[{create product_families, returns='family'}, {create variant_axes with '@parent.id', returns='axes'}, {create products with '@parent.id'}]\n"
-            "- Bulk update: Multiple update operations with different filter conditions\n"
-            "- Soft delete with cleanup: Update records is_active=False, then update related junction tables\n"
-            "- Asset upload + DB: asset_uploads=[{storage_path='pending/...', returns='asset', caption='...'}] then '@asset.public_url' in operations\n\n"
-            "MODES:\n"
-            "- dry_run=True: Validate and show impact without executing\n"
-            "- validate_only=True: Schema/constraint checks only\n\n"
-            "RETURNS: {success, operations_executed, results_by_name, execution_time_ms, rollback_performed?}\n\n"
-            "NOT FOR: Reading data (use read_data) or schema discovery (use inspect_schema)."
+            "PURPOSE: Execute atomic multi-table database transactions with HITL approval - ONLY way to create, update, or delete catalog data. All operations require user approval before execution.\n\n"
+            "WRITEINTENT PATTERN (5 required fields):\n"
+            "1. goal: What you're accomplishing (human-readable)\n"
+            "2. reasoning: How you got here (duplicate checks, validation, research, foreign keys)\n"
+            "3. hitl_summary: Business user approval message (<1500 chars, plain language, ends with 'Reply *approve* to proceed or *reject* to cancel.')\n"
+            "4. operations: Array of database operations (create/update/delete/upsert) with dependencies\n"
+            "5. impact: What changes (creates/updates/deletes counts, warnings, examples)\n\n"
+            "USE WHEN:\n"
+            "- Creating: Products, families, variants, pricing, images, BOM\n"
+            "- Updating: Prices, statuses, descriptions, relationships\n"
+            "- Deleting: Soft deletes (is_active=False), cleanup\n"
+            "- Upserting: Idempotent create-or-update when you have conflict keys\n"
+            "- Multi-table operations: Parent-child structures, junction tables\n"
+            "- Asset uploads: Images from pending/ to permanent storage\n"
+            "- Any database mutation: If it changes data, goes through write_data + HITL\n\n"
+            "DON'T USE:\n"
+            "- For reading (use read_data)\n"
+            "- For schema inspection (use inspect_schema)\n"
+            "- For analytics (use aggregate_data)\n"
+            "- Without validation (ALWAYS inspect_schema + read_data BEFORE write_data)\n\n"
+            "CRITICAL:\n"
+            "- operations: Array of {action: 'create'/'update'/'delete'/'upsert', table: 'table_name', data: {...}, filters: {...}, updates: {...}, returns: 'ref_name', dependencies: ['parent_ref']}\n"
+            "  * CREATE: {action: 'create', table: 'products', data: {sku: 'JAR-001', ...}, returns: 'product'}\n"
+            "  * UPDATE: {action: 'update', table: 'products', filters: {id: 'uuid-123'}, updates: {base_price: 45.0}}\n"
+            "  * DELETE: {action: 'delete', table: 'temp_records', filters: {id: 'uuid-123'}}\n"
+            "  * UPSERT: {action: 'upsert', table: 'products', data: {...}, on_conflict: 'skip'|'update', conflict_fields: ['sku']}\n"
+            "  * Batch: data can be array of dicts for multi-record creates\n"
+            "- filters support equality / IN / numeric comparisons. Operator dicts supported: in, eq, neq, gt, gte, lt, lte (NO LIKE/ILIKE).\n"
+            "  If you need fuzzy selection (e.g., SKU prefix), use read_data(search_patterns=...) first to get IDs, then update by id IN list.\n"
+            "- Reference syntax: @name.field for dependencies\n"
+            "  * Single: '@family.id' references family operation result\n"
+            "  * Batch: '@axes_batch[0].id' references first result in batch\n"
+            "  * dependencies: ['family'] ensures family created before products\n"
+            "- Dependency resolution: Automatic topological sort, cyclic dependencies rejected\n"
+            "- Atomic transaction: All-or-nothing, automatic rollback on any error (no partial commits)\n"
+            "- HITL required: User must approve via hitl_summary (plain language for business users)\n"
+            "- Validation: Always inspect_schema + read_data before write_data to verify structure and check duplicates\n\n"
+            "OPTIONAL:\n"
+            "- asset_uploads: [{storage_path: 'pending/thread_id/img.png', returns: 'asset'}] → reference '@asset.public_url' in operations\n"
+            "- dry_run: Preview without executing (no HITL required)\n"
+            "- validate_only: Check schemas without executing (no HITL required)\n\n"
+            "EXAMPLES:\n"
+            "# Multi-table create with dependencies\n"
+            "write_data(\n"
+            "    goal='Create PET Food Jars family with Size and Color variants (4 SKUs)',\n"
+            "    reasoning='Duplicate check: 0 matches. Research (0.85): food-grade PET, Rs 30-50. inspect_schema: required fields verified.',\n"
+            "    hitl_summary='Creating PET Food Jars family with 4 variants: JAR-PET-500ML-CLEAR (Rs 30), JAR-PET-500ML-AMBER (Rs 32), JAR-PET-1L-CLEAR (Rs 45), JAR-PET-1L-AMBER (Rs 48). Adds 1 family, 2 axes, 4 SKUs. Reply *approve* to proceed or *reject* to cancel.',\n"
+            "    operations=[\n"
+            "        {action: 'create', table: 'product_families', data: {name: 'PET Food Jars', sku_prefix: 'JAR-PET', base_price: 30.0}, returns: 'family'},\n"
+            "        {action: 'create', table: 'variant_axes', data: [{name: 'Size', product_family_id: '@family.id'}, {name: 'Color', product_family_id: '@family.id'}], dependencies: ['family'], returns: 'axes'},\n"
+            "        {action: 'create', table: 'variant_values', data: [{name: '500ml', variant_axis_id: '@axes[0].id'}, {name: '1L', variant_axis_id: '@axes[0].id'}, {name: 'Clear', variant_axis_id: '@axes[1].id'}, {name: 'Amber', variant_axis_id: '@axes[1].id'}], dependencies: ['axes']},\n"
+            "        {action: 'create', table: 'products', data: [{product_family_id: '@family.id', sku: 'JAR-PET-500ML-CLEAR', name: 'PET Food Jar 500ml Clear', base_price: 30.0}, ...], dependencies: ['family']}\n"
+            "    ],\n"
+            "    impact={creates: {product_families: 1, variant_axes: 2, variant_values: 4, products: 4}, warnings: ['SKU count +4'], examples: ['JAR-PET-500ML-CLEAR']}\n"
+            ")\n\n"
+            "# Bulk update pattern (safe): query first, then update by IDs\n"
+            "# 1) read_data(... search_patterns=...) to get product ids\n"
+            "# 2) write_data update with filters={'id': ['id1','id2',...]}\n\n"
+            "ALSO CONSIDER:\n"
+            "- inspect_schema: BEFORE write_data - verify required fields, enum values, constraints\n"
+            "- read_data: BEFORE write_data - check duplicates, lookup foreign key IDs\n"
+            "- Pattern: inspect_schema (structure) -> read_data (duplicates + FKs) -> write_data (execute)\n\n"
+            "RETURNS: Always a structured dict with success flag.\n"
+            "- success=True: {execution_time_ms, created_entities, updated_entities, deleted_entities, uploaded_assets?, summary, warnings?}\n"
+            "  * created_entities maps table -> list of created rows (includes generated IDs)\n"
+            "  * updated_entities/deleted_entities map table -> count\n"
+            "- success=False: {error, error_type, goal, rollback_performed, Agent Action: ...}"
         ),
         args_schema=WriteDataInput,
         coroutine=_write_data_impl,

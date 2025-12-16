@@ -27,13 +27,13 @@ from autifyme_agents.tools.research_tools import (
 def _get_analyst_llm() -> BaseChatModel:
     """Get fast, cheap LLM for analyst tasks.
 
-    Uses Gemini 2.5 Flash with minimal thinking for speed.
+    Uses Gemini 2.5 Flash Lite with minimal thinking for speed.
     Analysts are latency-sensitive (target <300ms).
     """
     return get_llm(
         provider="google",
-        model="gemini-2.5-flash",
-        temperature=0.3,  # Lower temperature for factual research
+        model="gemini-2.5-flash-lite",
+        temperature=1.0,  # Lower temperature for factual research
         max_retries=3,
     )
 
@@ -44,7 +44,7 @@ def create_product_analyst(
     """Create Product Analyst SubAgent spec.
 
     Args:
-        model: Optional LLM override. Defaults to Gemini 2.5 Flash.
+        model: Optional LLM override. Defaults to Gemini 2.5 Flash Lite.
 
     Returns:
         SubAgent spec dict for PM's subagents list.
@@ -57,11 +57,22 @@ def create_product_analyst(
     system_prompt = load_prompt("analysts/product_analyst.prompt")
 
     description = (
-        "Product Analyst - external product intelligence expert. "
-        "Reports: naming recommendations (family name, variant pattern, SKU convention), "
-        "HSN codes, specifications, BIS/FSSAI compliance, market positioning, competitive landscape. "
-        "Cross-domain reuse: serves catalog, marketing, quality, procurement workflows. "
-        "Read-only - researches and reports, does NOT execute actions."
+        "ROLE: Analyst (read-only)\n"
+        "MISSION: Convert an unknown product into market-grounded facts (name, specs, standards).\n\n"
+        "OWNERSHIP:\n"
+        "- External product knowledge: naming conventions, spec sheets, standards/compliance context\n"
+        "- Web research + source-backed summaries\n\n"
+        "INPUTS I NEED:\n"
+        "- Product cues: brand/model/keywords OR an image path to infer them\n"
+        "- Target market/jurisdiction if compliance matters (e.g., India)\n\n"
+        "OUTPUTS I PRODUCE:\n"
+        "- A concise, source-backed brief (with links)\n"
+        "- Clear unknowns/assumptions and what to confirm before writing data\n"
+        "- If long: write a report to the thread directory and return the file path\n\n"
+        "TOOLS I USE:\n"
+        "- research_product_tool, extract_web_content_tool, view_image\n\n"
+        "GUARDRAILS:\n"
+        "- No internal DB reads/writes; no record creation; no image editing"
     )
 
     tools: list[Any] = [

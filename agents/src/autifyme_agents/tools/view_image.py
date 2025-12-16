@@ -32,7 +32,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-MAX_DIMENSION = 512  # Optimized for efficient token usage
+MAX_DIMENSION = 1024  # Optimized for efficient token usage
 
 
 class ViewImageInput(BaseModel):
@@ -163,12 +163,37 @@ def create_view_image_tool() -> StructuredTool:
         func=_view_image_impl,
         name="view_image",
         description=(
-            "View an image. Returns the actual image so you can SEE it.\n\n"
-            "Use this to:\n"
-            "- Diagnose source images from inbox/ (download_media)\n"
-            "- Verify outputs from image_studio (pending/)\n"
-            "- Quality check before write_data\n\n"
-            "Example: view_image('inbox/thread_id/photo.jpg')"
+            "PURPOSE: View images directly in your context - this tool gives you EYES. Returns multimodal content so you SEE images like viewing a photo. The image appears visually in your LLM context for analysis.\n\n"
+            "USE WHEN:\n"
+            "- Analyzing user-provided images: What product? What materials? What features?\n"
+            "- Before write_data: Visual verification ensures accurate catalog entries (materials, colors, dimensions)\n"
+            "- After image_studio: Quality check before using generated images\n"
+            "- Duplicate detection: Visual comparison when names/SKUs ambiguous\n"
+            "- Material identification: See textures, finishes, transparency for accurate descriptions\n"
+            "- Product categorization: Visual features determine product_type, family\n"
+            "- Comparing variants: Side-by-side analysis to identify differences\n\n"
+            "DON'T USE:\n"
+            "- For metadata only (file size, dimensions)\n"
+            "- When you already know what's in the image from prior viewing\n"
+            "- Batch processing (call once per image)\n\n"
+            "CRITICAL:\n"
+            "- Accepts storage_path (inbox/, pending/) or local paths or URLs\n"
+            "- Auto-converts storage_path to URL internally for fetching\n"
+            "- Resizes to 512px max dimension for efficient tokens (faithful representation)\n"
+            "- download_media outputs to 'inbox/', image_studio outputs to 'pending/'\n"
+            "- Use proactively - when user mentions image, view it immediately\n"
+            "- Visual trumps assumptions - when uncertain, look at the image\n\n"
+            "EXAMPLES:\n"
+            "# Analyzing user upload for cataloging\n"
+            "view_image(image_path='inbox/thread_789/product_photo.jpg')\n"
+            "Returns: You SEE the product - identify 500ml PET jar, honeycomb texture, blue lid, clear body\n\n"
+            "# Verifying image_studio output quality\n"
+            "view_image(image_path='pending/thread_789/background_removed.png')\n"
+            "Returns: You SEE edited image - confirm background clean, product centered, quality acceptable\n\n"
+            "ALSO CONSIDER:\n"
+            "- image_studio: After viewing, need processing (extract, background, enhance)? Use image_studio\n"
+            "- write_data: After visual verification, ready to catalog? Use write_data\n\n"
+            "RETURNS: Multimodal content - text metadata (source type, size, format) + image block (you SEE it visually)"
         ),
         args_schema=ViewImageInput,
         return_direct=False,

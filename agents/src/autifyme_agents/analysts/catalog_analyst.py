@@ -53,15 +53,14 @@ CATALOG_ANALYST_TABLES = [
 def _get_analyst_llm() -> BaseChatModel:
     """Get fast, cheap LLM for analyst tasks.
 
-    Uses Gemini 2.5 Flash with minimal thinking for speed.
+    Uses Gemini 2.5 Flash Lite with thinking enabled for complex catalog reasoning.
     Analysts are latency-sensitive (target <200ms for DB queries).
     """
     return get_llm(
         provider="google",
-        model="gemini-2.5-flash",
-        temperature=0.3,  # Lower temperature for consistent analysis
+        model="gemini-2.5-flash-lite",
+        temperature=0.8,  # Lower temperature for consistent analysis
         max_retries=5,
-        thinking_budget=1024,
     )
 
 
@@ -73,7 +72,7 @@ def create_catalog_analyst(
 
     Args:
         storage: Storage interface for catalog queries (read-only)
-        model: Optional LLM override. Defaults to Gemini 2.5 Flash.
+        model: Optional LLM override. Defaults to Gemini 2.5 Flash Lite.
 
     Returns:
         SubAgent spec dict for PM's subagents list.
@@ -89,11 +88,22 @@ def create_catalog_analyst(
     system_prompt = load_prompt("analysts/catalog_analyst.prompt")
 
     description = (
-        "Catalog Analyst - internal catalog strategy analyst. "
-        "Reports: similar items, pricing patterns, family matches, gap analysis, "
-        "cannibalization risk, SKU recommendations, price recommendations, competitive positioning. "
-        "Cross-domain reuse: serves catalog, marketing, operations workflows. "
-        "Read-only - analyzes and reports, does NOT modify data."
+        "ROLE: Analyst (read-only)\n"
+        "MISSION: Answer 'What do we already have?' from our catalog database.\n\n"
+        "OWNERSHIP:\n"
+        "- Internal catalog intelligence: duplicates, family fit, pricing patterns, asset linkage context\n"
+        "- Scoped DB reads only (table access is enforced)\n\n"
+        "INPUTS I NEED:\n"
+        "- What to compare against (keywords/attributes), and any candidate IDs if known\n"
+        "- Optional image path(s) to visually match variants\n\n"
+        "OUTPUTS I PRODUCE:\n"
+        "- Ranked similar items + the evidence (IDs, fields, aggregates)\n"
+        "- A short recommendation-ready brief for the PM (still read-only)\n"
+        "- If long: write results to the thread directory and return the file path\n\n"
+        "TOOLS I USE:\n"
+        "- inspect_schema, read_data, aggregate_data, view_image\n\n"
+        "GUARDRAILS:\n"
+        "- No write_data; no external web research; no image editing"
     )
 
     # Import here to avoid circular imports
