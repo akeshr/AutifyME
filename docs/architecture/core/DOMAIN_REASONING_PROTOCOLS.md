@@ -2424,86 +2424,452 @@ The same patterns apply to all domains in AutifyME's multi-domain architecture.
 
 ## 11. Integration with Agent Architecture
 
-### 11.1 Protocol Location
+### 11.1 Dynamic Protocol Loading Architecture
 
-**Recommended:** Protocols embedded in agent prompts.
+> STATUS: APPROVED & REPL VERIFIED - Unified Tool + Middleware mechanism
 
+**Core Insight:** Protocols are INSTRUCTIONS, not DATA. They belong in the system prompt (operating instructions), not in tool results (retrieved data).
+
+**Architecture Principle:** All agents use the SAME unified mechanism:
+
+1. Agent calls `load_protocol(["family_fit", "pricing"])` - accepts list for batch loading
+2. Tool returns protocol CONTENT directly (identified by tool name, no markers)
+3. Middleware's `wrap_model_call` scans ToolMessages where `msg.name == 'load_protocol'`
+4. Middleware deduplicates by protocol name, injects into system prompt via `request.override()`
+5. Agent sees protocol as INSTRUCTIONS (semantically correct placement)
+
+**Why This Design:**
+
+- **Semantic correctness:** Protocols appear where instructions belong
+- **Tool name identification:** No markers - middleware checks `msg.name == 'load_protocol'`
+- **Batch loading:** Single tool call for multiple protocols prevents parallel call issues
+- **Deduplication:** Middleware tracks protocol names, injects each only once
+- **Unified mechanism:** PM, specialists, analysts all work the same way
+- **Agent autonomy:** Agent decides what protocols it needs
+- **Token efficiency:** Only load what's needed per task
+
+```text
++-------------------------------------------------------------------+
+|         MESSAGE-HISTORY BASED PROTOCOL ARCHITECTURE                |
++-------------------------------------------------------------------+
+|                                                                    |
+|  1. Agent calls load_protocol(["family_fit", "pricing"])          |
+|     |                                                              |
+|     v                                                              |
+|  2. Tool returns CONTENT in ToolMessage (name='load_protocol'):   |
+|     "## Protocol: family_fit\n<content>\n\n## Protocol: pricing"  |
+|     |                                                              |
+|     v                                                              |
+|  3. On NEXT LLM call, wrap_model_call() triggers                  |
+|     |                                                              |
+|     v                                                              |
+|  4. Middleware checks: msg.name == 'load_protocol' (no markers)   |
+|     |                                                              |
+|     v                                                              |
+|  5. Middleware DEDUPLICATES by protocol name (seen_protocols dict)|
+|     |                                                              |
+|     v                                                              |
+|  6. Middleware INJECTS via request.override(system_message=...):  |
+|     new_prompt = base_prompt + "\n\n<active_protocols>..."        |
+|     |                                                              |
+|     v                                                              |
+|  7. Agent sees protocols as INSTRUCTIONS (system prompt)          |
+|                                                                    |
+|  KEY INSIGHTS (REPL VERIFIED):                                     |
+|  - Config does NOT persist across tool calls (tested, broken)     |
+|  - ToolMessages DO persist in state.messages                      |
+|  - Tool name identification: msg.name == 'load_protocol'          |
+|  - New conversation = fresh messages = no protocols               |
+|  - SubAgents = fresh messages = isolated from parent              |
+|                                                                    |
++-------------------------------------------------------------------+
 ```
-agents/src/autifyme_agents/prompts/
-├── project_manager.prompt
-│   └── Orchestration Protocols
-├── analysts/
-│   └── [domain]_analyst.prompt
-│       └── Exploration Protocols for domain
-└── specialists/
-    └── [domain]_specialist.prompt
-        └── Decision Protocols for domain
-        └── Tool Mastery Protocols
-        └── Domain Orientation Protocol
-        └── Business Context
+
+### 11.2 Implementation
+
+> **REPL VERIFIED:** Config-based storage does NOT work (config doesn't persist across tool calls).
+> Message-history with tool name identification is the correct pattern.
+
+**Protocol Loading Tool:**
+
+```python
+# agents/src/autifyme_agents/tools/protocol_tools.py
+
+from functools import lru_cache
+from pathlib import Path
+from langchain_core.tools import tool
+
+PROTOCOL_BASE_PATH = Path(__file__).parent.parent / "prompts" / "protocols"
+
+
+@lru_cache(maxsize=64)
+def _load_protocol_content(agent_type: str, name: str) -> str:
+    """Load protocol content from filesystem with caching.
+
+    Resolution order:
+    1. Agent-specific: protocols/{agent_type}/{name}.protocol
+    2. Shared: protocols/shared/{name}.protocol
+    """
+    agent_path = PROTOCOL_BASE_PATH / agent_type / f"{name}.protocol"
+    if agent_path.exists():
+        return agent_path.read_text(encoding="utf-8")
+
+    shared_path = PROTOCOL_BASE_PATH / "shared" / f"{name}.protocol"
+    if shared_path.exists():
+        return shared_path.read_text(encoding="utf-8")
+
+    raise FileNotFoundError(f"Protocol '{name}' not found for {agent_type}")
+
+
+def create_load_protocol_tool(agent_type: str):
+    """Create load_protocol tool configured for specific agent type.
+
+    The tool returns protocol CONTENT directly. Middleware identifies it by
+    checking ToolMessage.name == 'load_protocol' (no markers needed).
+    """
+
+    @tool
+    def load_protocol(names: list[str]) -> str:
+        """Load one or more reasoning protocols to guide your next steps.
+
+        Call this when you need structured guidance for domain decisions.
+        Protocols will be injected into your instructions by middleware.
+
+        IMPORTANT: Load all needed protocols in ONE call to avoid parallel execution issues.
+
+        Args:
+            names: List of protocol names (e.g., ['family_fit', 'pricing'])
+
+        Returns:
+            Protocol content formatted for middleware injection.
+        """
+        results = []
+        errors = []
+
+        for name in names:
+            try:
+                content = _load_protocol_content(agent_type, name)
+                results.append(f"## Protocol: {name}\n{content}")
+            except FileNotFoundError as e:
+                errors.append(f"Error: {e}")
+
+        if errors and not results:
+            return "\n".join(errors)
+
+        output = "\n\n".join(results)
+        if errors:
+            output += "\n\n" + "\n".join(errors)
+
+        return output
+
+    return load_protocol
 ```
 
-### 11.2 Prompt Structure
+**Protocol Injection Middleware:**
+
+```python
+# agents/src/autifyme_agents/middleware/protocol_injection.py
+
+from typing import Callable
+from deepagents.graph import AgentMiddleware
+from langchain.agents.middleware.types import ModelRequest, ModelResponse
+from langchain_core.messages import SystemMessage, ToolMessage
+
+
+class ProtocolInjectionMiddleware(AgentMiddleware):
+    """Injects loaded protocols into system prompt before LLM call.
+
+    Uses wrap_model_call to:
+    1. Scan state.messages for ToolMessages where name == 'load_protocol'
+    2. Deduplicate protocols by name (prevents duplicate injection)
+    3. Inject protocol content into system prompt via request.override()
+
+    Why this design (REPL verified):
+    - config["configurable"] does NOT persist across tool calls
+    - ToolMessages DO persist in state.messages
+    - Tool name identification: msg.name == 'load_protocol' (no markers)
+    - Fresh messages per SubAgent = automatic isolation
+    """
+
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse],
+    ) -> ModelResponse:
+        """Scan for load_protocol results, deduplicate, inject into system prompt."""
+        # Collect protocols, deduplicate by name
+        seen_protocols: dict[str, str] = {}  # name -> formatted content
+
+        for msg in request.state.get("messages", []):
+            if not isinstance(msg, ToolMessage):
+                continue
+            if msg.name != "load_protocol":
+                continue
+            if str(msg.content).startswith("Error:"):
+                continue
+
+            # Parse protocol sections from tool output
+            # Format: "## Protocol: name\n<content>\n\n## Protocol: name2\n<content>"
+            content = str(msg.content)
+            for section in content.split("## Protocol: ")[1:]:
+                lines = section.split("\n", 1)
+                name = lines[0].strip()
+                body = lines[1] if len(lines) > 1 else ""
+                # Deduplicate - first occurrence wins
+                if name not in seen_protocols:
+                    seen_protocols[name] = f"## Protocol: {name}\n{body}"
+
+        # Inject if we found protocols
+        if seen_protocols:
+            protocol_section = (
+                "<active_protocols>\n"
+                + "\n\n".join(seen_protocols.values())
+                + "\n</active_protocols>"
+            )
+            current_prompt = request.system_prompt or ""
+            new_prompt = current_prompt + "\n\n" + protocol_section
+
+            # Use immutable override pattern (LangChain v1 best practice)
+            request = request.override(
+                system_message=SystemMessage(content=new_prompt)
+            )
+
+        return handler(request)
+```
+
+**Key Implementation Details:**
+
+| Aspect | Implementation |
+|--------|----------------|
+| Tool input | `list[str]` - load multiple protocols in single call |
+| Tool output | Protocol content directly (no markers) |
+| Identification | `msg.name == 'load_protocol'` on ToolMessage |
+| Deduplication | `seen_protocols` dict tracks by name |
+| Injection | `request.override(system_message=...)` - immutable |
+
+### 11.3 Protocol Lifecycle (Message-History Scoped, Zero Management)
+
+> STATUS: REPL VERIFIED - Message history provides natural lifecycle boundaries
+
+**Core Insight:** Protocol lifecycle is bounded by message history scope. ToolMessages from `load_protocol` persist as long as those messages are in the conversation.
+
+```text
++-------------------------------------------------------------------+
+|              MESSAGE-HISTORY BASED LIFECYCLE                       |
++-------------------------------------------------------------------+
+|                                                                    |
+|  SubAgents (Fresh Messages):                                      |
+|  +----------------------------------------+                       |
+|  | PM delegates task with NEW messages     |                       |
+|  |   -> SubAgent sees only delegation     |                       |
+|  |   -> NO PM's load_protocol results     |                       |
+|  |   -> SubAgent loads own protocols      |                       |
+|  |   -> Returns result to PM              |                       |
+|  |   -> SubAgent messages discarded       |                       |
+|  +----------------------------------------+                       |
+|  Lifecycle = Fresh messages = Automatic isolation                 |
+|                                                                    |
+|  PM (Persistent Messages):                                        |
+|  +----------------------------------------+                       |
+|  | User message arrives                    |                       |
+|  |   -> PM calls load_protocol([...])     |                       |
+|  |   -> ToolMessage stored in history     |                       |
+|  |   -> Multiple LLM calls within turn    |                       |
+|  |   -> Middleware scans, injects each    |                       |
+|  |   -> Dedup ensures single injection    |                       |
+|  +----------------------------------------+                       |
+|  New conversation = New messages = Fresh start                    |
+|                                                                    |
++-------------------------------------------------------------------+
+```
+
+**Why This Works (REPL Verified):**
+
+| Test | Result |
+|------|--------|
+| Config persistence across tool calls | **NO** - config resets per tool |
+| ToolMessage persistence in state.messages | **YES** - messages accumulate |
+| SubAgent sees parent's protocols | **NO** - fresh messages per SubAgent |
+| Same conversation sees protocols | **YES** - ToolMessages in history |
+| Duplicate protocol calls | **HANDLED** - middleware deduplicates |
+
+**Why Message-History Based:**
+
+- Config-based storage was tested and **DOES NOT WORK**
+- `config["configurable"]` resets between tool calls in LangGraph
+- `state.messages` naturally accumulates ToolMessages within conversation
+- Fresh messages per SubAgent provides automatic isolation
+- No explicit lifecycle management code needed
+
+**Why NOT use unload_protocol:**
+
+- Message-based lifecycle is automatic
+- Agents can't "unload" past tool results from history
+- New conversation = fresh start (natural cleanup)
+- Adding unload would require message manipulation (complex, fragile)
+
+### 11.4 Protocol Indexes by Agent Type
+
+Each agent has a lean base prompt with a protocol index telling it WHEN to load WHICH protocol.
+
+**PM Protocol Index:**
 
 ```xml
-<identity>
-[Agent identity and role]
-</identity>
+<protocol_index>
+When you need structured guidance, use load_protocol:
 
-<business_context>
-[Domain-specific tiers, relationships, misconceptions]
-</business_context>
+| Situation | Protocol |
+|-----------|----------|
+| Complex/unclear user intent | intent_understanding |
+| Multiple domains mentioned | domain_discovery |
+| Cross-domain dependencies | multi_domain_planning |
+| Entity passing between domains | cross_domain_coordination |
+| Choosing invocation pattern | multi_agent_patterns |
+| Multiple items to process | batch_processing |
 
-<tools>
-[Available tools]
-</tools>
+Simple, clear requests don't need protocols - delegate directly.
+</protocol_index>
+```
 
-<tool_mastery>
-[Tool Mastery Protocols - power patterns, efficiency rules]
-</tool_mastery>
+**Catalog Specialist Protocol Index:**
 
-<protocols>
-[Domain Decision Protocols]
-[Domain Orientation Protocol]
-</protocols>
+```xml
+<protocol_index>
+When you need structured guidance, use load_protocol:
 
-<protocol_usage>
-## How to Use Protocols
+| Situation | Protocol |
+|-----------|----------|
+| Which family does product belong to? | family_fit |
+| What should this product cost? | pricing |
+| Does this product already exist? | duplicate_prevention |
+| Understanding the catalog landscape | business_context |
+| No existing family matches | new_entity |
+| Cold start (empty/sparse catalog) | cold_start |
 
-1. Identify which protocol applies to current task
-2. Execute ALL steps in order - do not skip
-3. Document results of each step
-4. Reach conclusion based on step results
-5. If no protocol fits, state this and escalate
+For familiar tasks with clear paths, proceed without loading protocols.
+</protocol_index>
+```
 
-## The Balance: Protocols + Intelligence
+**Catalog Analyst Protocol Index:**
 
-You are an **AUTONOMOUS DOMAIN EXPERT** who uses protocols as your reasoning framework.
+```xml
+<protocol_index>
+When you need structured guidance, use load_protocol:
+
+| Situation | Protocol |
+|-----------|----------|
+| Exploring catalog for PM | catalog_exploration |
+| Understanding family characteristics | family_analysis |
+| Pricing pattern analysis | pricing_patterns |
+
+Quick lookups don't need protocols - query directly.
+</protocol_index>
+```
+
+### 11.5 Token Budget
+
+| Component | Tokens | Notes |
+|-----------|--------|-------|
+| Base PM prompt | ~1,500 | Identity + domain registry + protocol index |
+| Base Specialist prompt | ~1,500 | Identity + tools + protocol index |
+| Per protocol loaded | ~400-600 | Injected on demand |
+| Simple task total | ~1,500 | No protocols needed |
+| Complex domain task | ~2,500-3,000 | 2-3 protocols loaded |
+| Multi-domain task | ~3,500-4,500 | PM + specialist protocols |
+
+**Comparison to static prompts:**
+- Old approach: 5,000-8,000 tokens always loaded
+- New approach: 1,500 base + protocols on demand
+- Savings: 55-70% on typical tasks
+
+### 11.6 Protocol Library Structure
+
+```
+agents/src/autifyme_agents/prompts/protocols/
+├── pm/                              # PM orchestration protocols
+│   ├── intent_understanding.protocol
+│   ├── domain_discovery.protocol
+│   ├── multi_domain_planning.protocol
+│   ├── cross_domain_coordination.protocol
+│   ├── multi_agent_patterns.protocol
+│   └── batch_processing.protocol
+├── catalog_specialist/              # Catalog domain decisions
+│   ├── business_context.protocol
+│   ├── family_fit.protocol
+│   ├── pricing.protocol
+│   ├── duplicate_prevention.protocol
+│   ├── cold_start.protocol
+│   └── new_entity.protocol
+├── creative_specialist/             # Creative domain decisions
+│   ├── image_analysis.protocol
+│   └── asset_management.protocol
+├── catalog_analyst/                 # Catalog exploration
+│   ├── catalog_exploration.protocol
+│   ├── family_analysis.protocol
+│   └── pricing_patterns.protocol
+├── visual_analyst/                  # Visual extraction
+│   └── visual_extraction.protocol
+└── shared/                          # Cross-cutting protocols
+    ├── tool_mastery/
+    │   ├── read_data.protocol
+    │   ├── write_data.protocol
+    │   └── aggregate_data.protocol
+    └── generic_patterns/
+        ├── fit_assessment.protocol
+        └── value_discovery.protocol
+```
+
+### 11.7 Agent Integration Example
+
+**Catalog Specialist with Protocol Loading:**
+
+```python
+def create_catalog_specialist(storage: StorageInterface) -> dict[str, Any]:
+    """Create Catalog Specialist with protocol loading capability."""
+
+    tools = [
+        load_protocol,  # Unified protocol loading
+        create_read_data_tool(storage, tables=CATALOG_TABLES_ALL),
+        create_write_data_tool(storage, tables=CATALOG_TABLES_CRUD),
+        # ... other tools
+    ]
+
+    middleware = [
+        ProtocolInjectionMiddleware(
+            protocol_base_path=PROTOCOL_PATH,
+            agent_type="catalog_specialist"
+        ),
+        # ... other middleware
+    ]
+
+    return {
+        "name": "catalog_specialist",
+        "tools": tools,
+        "system_prompt": load_prompt("specialists/catalog_specialist_lean.prompt"),
+        "middleware": middleware,
+        "interrupt_on": {"write_data": True},
+    }
+```
+
+### 11.8 The Balance: Protocols + Intelligence
+
+Protocols are GUIDANCE, not SCRIPTS.
 
 **Protocols provide:**
 - WHAT to investigate (the steps)
 - WHICH queries to run (tool calls)
 - HOW to interpret data types (domain context)
 
-**Your intelligence provides:**
+**Agent intelligence provides:**
 - HOW to interpret specific results (judgment)
 - WHEN edge cases require escalation (recognition)
 - HOW to communicate findings (adaptation)
+- WHICH protocols to load (autonomy)
 
-**The balance:**
-- Protocol steps are MANDATORY - execute all of them
-- Interpretation is INTELLIGENT - apply domain expertise to actual results
-- Escalation is AUTONOMOUS - recognize when you're uncertain
-
-**Anti-pattern:** Skipping steps because "I already know the answer"
-**Anti-pattern:** Blindly following steps without intelligent interpretation
-**Correct:** Execute steps rigorously, interpret results intelligently
-</protocol_usage>
-
-<examples>
-[Examples showing protocol execution]
-</examples>
-```
+**Anti-pattern:** Loading protocols for simple tasks
+**Anti-pattern:** Skipping steps because "I already know"
+**Anti-pattern:** Blindly following without interpretation
+**Correct:** Load when needed, execute rigorously, interpret intelligently
 
 ---
 
@@ -3256,23 +3622,91 @@ everything that follows, so I'll ask for confirmation more often."
 
 ## 15. Protocol Delivery Strategy
 
-> STATUS: FUTURE - For now, protocols live directly in prompts
+> STATUS: APPROVED - Dynamic loading is the core mechanism
 
-**Problem:** Full document injection (~8,000 tokens) causes attention dilution.
+**Problem Solved:** Full document injection (~8,000 tokens) causes attention dilution.
 
-**Current Approach:** Embed relevant protocols directly in specialist prompts.
+**Solution:** Dynamic protocol loading - agents are lean, protocols loaded on demand.
 
-**Future Consideration:** When protocols grow, consider:
-- Layered architecture (always inject vs task-specific retrieval)
-- Agent-driven selection (agent picks which protocols to apply)
-- Semantic retrieval (match task to relevant protocols)
+### 15.1 Delivery Mechanisms
 
-**Protocol Location:** For now, protocols are embedded in:
+| Agent Type | Mechanism | Implementation |
+|------------|-----------|----------------|
+| **PM** | Tool-based loading | `load_protocol` tool returns protocol content |
+| **Specialists** | Middleware injection | `ProtocolInjectionMiddleware` parses task spec |
+| **Analysts** | Middleware injection | Lighter protocols for exploration |
+
+### 15.2 PM Tool-Based Loading
+
+```python
+# PM has this tool available
+@tool
+def load_protocol(name: str) -> str:
+    """Load orchestration protocol for complex tasks.
+
+    Available: intent_understanding, domain_discovery,
+    multi_domain_planning, cross_domain_coordination,
+    multi_agent_patterns, batch_processing
+    """
+    return protocol_loader.load_pm_protocol(name)
 ```
-agents/src/autifyme_agents/prompts/specialists/[domain]_specialist.prompt
+
+**When PM loads protocols:**
+
+- Complex/unclear user intent
+- Multi-domain requests
+- Batch processing needs
+- Cross-domain coordination
+
+**When PM delegates directly (no protocol):**
+
+- Clear single-domain intent
+- Simple requests
+- Continuation of existing workflow
+
+### 15.3 Specialist Middleware Injection
+
+```python
+class ProtocolInjectionMiddleware(AgentMiddleware):
+    """Inject protocols based on PM's task specification."""
+
+    def before_model(self, messages, config):
+        # Find task_specification in delegation
+        task_spec = self._parse_task_spec(messages)
+
+        if task_spec and task_spec.protocols:
+            # Load specified protocols
+            protocol_content = load_protocol_bundle(
+                protocols=task_spec.protocols,
+                domain=self.domain
+            )
+            # Inject into context
+            self._inject_protocols(messages, protocol_content)
+
+        return messages, config
 ```
 
-**When to revisit:** When prompt size becomes a performance/cost concern
+### 15.4 Token Budget Targets
+
+| Scenario | PM Tokens | Specialist Tokens |
+|----------|-----------|-------------------|
+| Simple task | ~1,500 (base only) | ~1,500 + ~500 (1 protocol) |
+| Standard task | ~2,000 (base + 1 protocol) | ~1,500 + ~1,000 (2 protocols) |
+| Complex multi-domain | ~3,000 (base + 2-3 protocols) | ~1,500 + ~1,500 (3 protocols) |
+
+**vs Static embedding:** 5,000-8,000 tokens always
+
+### 15.5 Protocol Library Location
+
+```
+agents/src/autifyme_agents/prompts/protocols/
+├── pm/           # PM orchestration (tool-loaded)
+├── specialists/  # Domain decisions (middleware-injected)
+├── analysts/     # Exploration (middleware-injected)
+└── shared/       # Tool mastery, generic patterns
+```
+
+See Section 11.5 for full structure.
 
 ---
 
@@ -3385,9 +3819,17 @@ Protocol improvement is handled through trace evaluation using the existing **Wo
 
 ---
 
-**Document Version:** 5.2
+**Document Version:** 5.3
 **Last Updated:** December 16, 2025
 **Revision:**
+
+- v5.3: Dynamic Protocol Loading Architecture - Major architectural shift:
+  - Section 11 rewritten: Dynamic protocol loading replaces static embedding
+  - PM uses `load_protocol` tool to load orchestration protocols on demand
+  - Specialists receive protocols via middleware injection based on task specification
+  - Section 15 updated: Protocol Delivery Strategy now APPROVED (was FUTURE)
+  - Token efficiency: Agents lean (~1,500 base) + dynamic loading vs static 5,000-8,000
+  - Protocol library structure defined for pm/, specialists/, analysts/, shared/
 - v5.2: Aggressive ULTRATHINK review - addressed all P0/P1/P2 gaps:
   - P0: Added grounding boundary clarification (2.4) - visual analysis is ungrounded interpretation
   - P0: Added cold start protocols (14.3) - bootstrap protocols for empty databases
