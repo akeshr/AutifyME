@@ -2509,6 +2509,8 @@ You are an **AUTONOMOUS DOMAIN EXPERT** who uses protocols as your reasoning fra
 
 ## 12. Protocol Composition Framework
 
+> STATUS: IMPLEMENTATION-READY - Core patterns for protocol chaining
+
 Tasks rarely require a single protocol. This section defines how protocols chain together.
 
 ### 12.1 The Problem
@@ -2718,6 +2720,8 @@ Decision:
 ---
 
 ## 13. Confidence Scoring Framework
+
+> STATUS: IMPLEMENTATION-READY - Rules for confidence levels and thresholds
 
 Protocols should conclude with confidence levels, not just binary outcomes.
 
