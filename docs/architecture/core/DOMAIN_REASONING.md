@@ -337,8 +337,8 @@ Use for: Positioning new product within established range
 | **write_data** | YES | Domain-specific validation before write |
 | **view_image** | YES | Domain-specific visual analysis focus |
 | **research_product_tool** | YES | Domain-specific research focus |
-| **inspect_schema** | NO | Mostly generic |
-| **image_studio** | NO | Creative domain handles this |
+| **inspect_schema** | NO | Mostly generic, same usage everywhere |
+| **image_studio** | NO | Domain-specific tool; handled within Creative domain protocols |
 
 ---
 
@@ -367,13 +367,13 @@ protocols/
 |   +-- product_research.protocol     # For product_analyst in Catalog context
 |   +-- tool_mastery.protocol         # How to use tools in Catalog
 |
-+-- creative/                         # CREATIVE DOMAIN (FUTURE)
++-- creative/                         # CREATIVE DOMAIN (FUTURE - Phase 3)
 |   +-- business_context.protocol
 |   +-- visual_analysis.protocol      # For visual_analyst in Creative context
 |   +-- style_consistency.protocol
 |   +-- asset_quality.protocol
 |
-+-- marketing/                        # MARKETING DOMAIN (FUTURE)
++-- marketing/                        # MARKETING DOMAIN (FUTURE - Phase 3)
 |   +-- business_context.protocol
 |   +-- visual_analysis.protocol
 |   +-- audience_fit.protocol
@@ -418,7 +418,7 @@ PM uses **lightweight coordination** rather than domain decision protocols.
 | **Domain Awareness** | Knowledge | Know which domains own which decisions |
 | **Context Schema** | Template | What to pass to each domain |
 | **Coordination Patterns** | Patterns | Multi-domain workflow orchestration |
-| **Escalation Protocol** | Protocol | Handle edge cases |
+| **Escalation Protocol** | Reference | Use Section 8 framework + escalate to user when ambiguous |
 
 ### 7.2 Domain Awareness
 
@@ -679,6 +679,10 @@ Agent sees steps --> Executes read_data() --> Gets REAL data --> Reasons about A
 
 ## PURPOSE
 Ground the decision: Does this product belong in this family?
+
+## PREREQUISITE
+Visual analysis must be complete (Step 4 depends on visual analysis findings).
+If visual analysis not available, delegate to visual_analyst first.
 
 ## EXPLORATION STEPS
 
