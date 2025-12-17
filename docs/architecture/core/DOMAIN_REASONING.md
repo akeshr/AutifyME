@@ -28,10 +28,10 @@ LLMs are general-purpose. Our domains require specific behavior. Fine-tuning is 
 3. [Catalog Domain](#3-catalog-domain)
 4. [Generic Patterns](#4-generic-patterns)
 5. [Protocol Composition](#5-protocol-composition)
-6. [Confidence Framework](#6-confidence-framework)
-7. [Implementation](#7-implementation)
-8. [Decision Log](#8-decision-log)
-9. [Success Metrics](#9-success-metrics)
+6. [Implementation](#6-implementation)
+7. [Decision Log](#7-decision-log)
+8. [Success Metrics](#8-success-metrics)
+9. [Risk Register](#9-risk-register)
 
 **Separate Documents:**
 - [PM_INTELLIGENCE_ROADMAP.md](./PM_INTELLIGENCE_ROADMAP.md) - Future PM capabilities (aspirational)
@@ -90,7 +90,7 @@ Tool grounding prevents DATA hallucination, not INTERPRETATION errors.
 | ANALYZE | NO | "This looks decorative" is inference |
 | COMPARE | PARTIAL | Data side grounded, interpretation not |
 
-**Visual analysis remains ungrounded.** Protocols structure the reasoning, but agents must apply genuine judgment on visual inference. Mitigation: structured criteria, comparison to grounded data, confidence signaling, HITL checkpoint.
+**Visual analysis remains ungrounded.** Protocols structure the reasoning, but agents must apply genuine judgment on visual inference. Mitigation: structured criteria, comparison to grounded data, HITL checkpoint.
 
 ### 1.6 Protocol Applicability: ALL Agents
 
@@ -139,8 +139,7 @@ Analyst exploring family fit:
 Specialist deciding family fit:
   [Executes full Fit Assessment Protocol]
   "Family: Decorative Ceramics
-   Confidence: HIGH
-   Evidence: Customer segment 85% match
+   Evidence: Customer segment query shows gift/decor buyers
    DECISION: Assign to Decorative Ceramics"
 ```
 
@@ -433,10 +432,10 @@ Compare Step 2 (family's customer) with Step 4 (product's customer):
 Would customer browsing the family naturally consider this product?
 
 ### Step 7: CONCLUDE
-- MATCH + Cohesive: FITS (HIGH confidence)
-- MATCH + Not Cohesive: FITS, consider sub-family (MEDIUM)
-- PARTIAL: Present options (MEDIUM)
-- MISMATCH: Needs DIFFERENT family (HIGH confidence of mismatch)
+- MATCH + Cohesive: FITS this family
+- MATCH + Not Cohesive: FITS, consider sub-family
+- PARTIAL/Ambiguous: Present options to user
+- MISMATCH: Needs DIFFERENT family
 
 ## VERIFICATION
 - [ ] Step 2 query executed (not assumed)
@@ -650,82 +649,23 @@ Tasks rarely need a single protocol. This section defines chaining rules.
 | Family Assignment | Orientation --> Fit --> (New Entity?) |
 | Price Recommendation | Orientation --> Value Discovery |
 
-### 5.3 PARTIAL Result Handling
+### 5.3 Ambiguous Results
 
-When Fit Assessment returns PARTIAL for multiple candidates:
+When protocol yields no clear answer (e.g., multiple families seem valid):
 
 | Scenario | Action |
 |----------|--------|
-| Single PARTIAL | Proceed with MEDIUM confidence, flag HITL |
-| Multiple PARTIAL, >10% gap | Use highest, note alternatives |
-| Multiple PARTIAL, <10% gap | STOP, present options to user |
-| All MISMATCH | Trigger New Entity protocol |
+| Clear winner | Proceed with decision |
+| Multiple valid options | Present options to user via HITL |
+| No valid options | Trigger alternative protocol (e.g., New Entity) |
 
-### 5.4 Scoring PARTIAL Results
-
-| Factor | Weight | Scoring |
-|--------|--------|---------|
-| Customer segment match | 40% | Evidence-based 0-100 |
-| Price range alignment | 25% | Within/outside range |
-| Product cohesion | 20% | Browse-together assessment |
-| Use case alignment | 15% | Purpose match |
-
-**Requirement:** Each factor must cite EVIDENCE from query results. No score without data.
+**Control mechanism:** HITL on writes catches all decisions. Agent expresses uncertainty in natural language, not percentages.
 
 ---
 
-## 6. Confidence Framework
+## 6. Implementation
 
-### 6.1 Confidence Levels
-
-| Level | Criteria | Action |
-|-------|----------|--------|
-| **HIGH (90%+)** | 5+ data points align, no contradictions | Proceed autonomously |
-| **MEDIUM (60-89%)** | 2-4 data points, minor gaps | Proceed with HITL flag |
-| **LOW (<60%)** | 0-1 data points, contradictions | STOP, present options |
-
-### 6.2 Confidence Determination
-
-**HIGH indicators:**
-- Query returned 5+ supporting records
-- All evidence aligns
-- Pattern matches precedent
-
-**MEDIUM indicators:**
-- Query returned 2-4 records
-- Most evidence aligns, minor gaps
-- Some inference required
-
-**LOW indicators:**
-- Query returned 0-1 records
-- Mixed or contradictory evidence
-- Significant inference required
-
-### 6.3 Chained Confidence Rules
-
-| Rule | Behavior |
-|------|----------|
-| Chain stops at LOW | STOP immediately, present options, user decides |
-| MEDIUM accumulates | Continue chain, accumulate flags, combined HITL at end |
-| HIGH continues | Proceed to next protocol |
-
-**Example:**
-```
-Duplicate: HIGH --> continue
-Fit: LOW --> STOP
-Pricing: not executed
-
-"I found possible matches but I'm uncertain:
- Option A: Decorative Ceramics (60%)
- Option B: Kitchen Storage (55%)
- Please select before I determine pricing."
-```
-
----
-
-## 7. Implementation
-
-### 7.1 Phase Overview
+### 6.1 Phase Overview
 
 | Phase | Focus | Duration | Status |
 |-------|-------|----------|--------|
@@ -734,7 +674,7 @@ Pricing: not executed
 | **Phase 3** | Token Optimization | 3-4 days | PENDING |
 | **Phase 4** | Multi-Domain | 2 weeks | FUTURE |
 
-### 7.2 Phase 1: Foundation
+### 6.2 Phase 1: Foundation
 
 **Deliverables:**
 - [ ] Protocol file structure created
@@ -744,17 +684,16 @@ Pricing: not executed
 - [ ] Specialist prompt updated with protocol index
 - [ ] Integration test: load --> inject --> verify in system prompt
 
-### 7.3 Phase 2: Core Protocols
+### 6.3 Phase 2: Core Protocols
 
 **Deliverables:**
 - [ ] `duplicate_prevention.protocol`
 - [ ] `family_fit.protocol`
 - [ ] `pricing.protocol`
 - [ ] `new_entity.protocol`
-- [ ] Confidence-enhanced output schema
 - [ ] Integration test: full protocol chain execution
 
-### 7.4 Phase 3: Token Optimization
+### 6.4 Phase 3: Token Optimization
 
 **Deliverables:**
 - [ ] Summary versions of protocols (~150-200 tokens)
@@ -762,7 +701,7 @@ Pricing: not executed
 - [ ] Token budget enforcement middleware
 - [ ] Metrics: token usage before/after
 
-### 7.5 Phase 4: Multi-Domain
+### 6.5 Phase 4: Multi-Domain
 
 **Deliverables:**
 - [ ] Generic patterns validated across domains
@@ -771,7 +710,7 @@ Pricing: not executed
 
 ---
 
-## 8. Decision Log
+## 7. Decision Log
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
@@ -784,10 +723,11 @@ Pricing: not executed
 | 2025-12-16 | Agent-driven selection | Agent autonomy preserved; PM provides defaults |
 | 2025-12-16 | Per-agent protocol directories | Resolution: agent-specific first, then shared |
 | 2025-12-17 | Consolidated documentation | Merged framework + implementation; eliminated redundancy |
+| 2025-12-17 | Removed confidence framework | HITL on writes is control mechanism; agent expresses uncertainty naturally |
 
 ---
 
-## 9. Success Metrics
+## 8. Success Metrics
 
 | Metric | Baseline | Target | Measurement |
 |--------|----------|--------|-------------|
@@ -799,7 +739,7 @@ Pricing: not executed
 
 ---
 
-## 10. Risk Register
+## 9. Risk Register
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
