@@ -92,6 +92,61 @@ Tool grounding prevents DATA hallucination, not INTERPRETATION errors.
 
 **Visual analysis remains ungrounded.** Protocols structure the reasoning, but agents must apply genuine judgment on visual inference. Mitigation: structured criteria, comparison to grounded data, confidence signaling, HITL checkpoint.
 
+### 1.6 Protocol Applicability: ALL Agents
+
+**Critical:** Protocols are NOT just for specialists. Every agent type needs domain grounding.
+
+| Agent Level | Protocol Types | Why |
+|-------------|----------------|-----|
+| **PM** | Routing, Intelligence | Must understand domains to route correctly |
+| **Analysts** | Exploration, Orientation, Tool Mastery | Must query comprehensively, discover patterns |
+| **Specialists** | Decision, Domain-Specific, Tool Mastery | Must make grounded decisions using business rules |
+| **Any SubAgent** | Tool Mastery | Must use tools efficiently |
+
+**Protocol coverage by agent:**
+
+| Protocol Category | PM | Analysts | Specialists |
+|-------------------|:--:|:--------:|:-----------:|
+| Tool Mastery | Y | Y | Y |
+| Domain Orientation | Y | Y | Y |
+| Business Context | Y | Y | Y |
+| Routing/Intelligence | Y | - | - |
+| Exploration Patterns | - | Y | - |
+| Decision Protocols | - | - | Y |
+
+### 1.7 Analyst vs Specialist Distinction
+
+The line is about **ACCOUNTABILITY**, not capability.
+
+| Aspect | Analyst | Specialist |
+|--------|---------|------------|
+| Primary function | Explore and suggest | Decide and commit |
+| Output type | Findings, options, recommendations | Decisions, actions, writes |
+| Accountability | "Here's what I found" | "This is the answer" |
+| HITL trigger | Never (read-only) | On writes and uncertain decisions |
+| Protocol usage | **IMPLICIT** (mental model) | **EXPLICIT** (documented execution) |
+
+**Example:**
+
+```
+Analyst exploring family fit:
+  "Product could fit in:
+   - Decorative Ceramics (material match)
+   - Kitchen Display (use case match)
+   - Gift Items (customer match)
+   Recommend evaluating each."
+
+Specialist deciding family fit:
+  [Executes full Fit Assessment Protocol]
+  "Family: Decorative Ceramics
+   Confidence: HIGH
+   Evidence: Customer segment 85% match
+   DECISION: Assign to Decorative Ceramics"
+```
+
+**Analysts use protocols IMPLICITLY** (guides what to explore).
+**Specialists use protocols EXPLICITLY** (documented step execution).
+
 ---
 
 ## 2. Architecture
@@ -244,6 +299,9 @@ agents/src/autifyme_agents/prompts/protocols/
 │   ├── pricing.protocol
 │   ├── duplicate_prevention.protocol
 │   └── new_entity.protocol
+├── catalog_analyst/                 # Catalog exploration (implicit use)
+│   ├── catalog_exploration.protocol
+│   └── family_analysis.protocol
 └── shared/                          # Cross-agent protocols
     ├── fit_assessment.protocol      # Generic pattern
     ├── value_discovery.protocol     # Generic pattern
@@ -251,6 +309,8 @@ agents/src/autifyme_agents/prompts/protocols/
         ├── read_data.protocol
         └── aggregate_data.protocol
 ```
+
+**Resolution order:** Agent-specific (`protocols/{agent_type}/`) first, then shared (`protocols/shared/`).
 
 ### 2.6 Token Budget
 
