@@ -173,6 +173,16 @@ Specialist deciding family fit:
 | Deduplication | Middleware tracks seen names, injects each once |
 | Agent autonomy | Agent decides what to load based on protocol index |
 
+**Protocol Selection Approach:**
+
+| Aspect | Approach |
+|--------|----------|
+| Selection | Pure agent autonomy - agent matches situation to protocol index |
+| Observability | Trace evaluation - `load_protocol` calls visible in LangSmith |
+| Enforcement | None - measure first, strengthen prompt if agents skip |
+
+Why not PM-specified protocols? Reduces autonomy, adds Task Specification complexity. Protocol index IS the domain grounding for selection. Trust agent to match, verify via traces.
+
 ### 2.2 Protocol Loading Tool
 
 ```python
