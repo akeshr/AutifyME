@@ -540,6 +540,8 @@ PM does NOT have:
 - Domain decision protocols (that's for specialists)
 - Fixed workflow templates (killed in AUTONOMY_PROBLEMS)
 
+**Future PM Intelligence:** Reference resolution, intent inference, user state tracking, correction flow. See [PM_INTELLIGENCE_ROADMAP.md](./PM_INTELLIGENCE_ROADMAP.md).
+
 ---
 
 ## 8. Escalation Framework

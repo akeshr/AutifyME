@@ -165,8 +165,6 @@ Before implementing any feature:
 
 Archived docs moved to `../historical/` (kept for reference, not active navigation):
 
-- `core/DOMAIN_REASONING_PROTOCOLS.md` - **[ARCHIVED]** Superseded by DOMAIN_REASONING.md
-- `core/DOMAIN_REASONING_IMPLEMENTATION_PLAN.md` - **[ARCHIVED]** Merged into DOMAIN_REASONING.md
 - `historical/bug-fixes/BUG_FIXES_CHANGELOG.md` - Consolidated bug fix changelog
 - `historical/migrations/v1-upgrade/V1_MIGRATION_COMPLETE.md` - LangChain v1 migration summary
 - `historical/research/deepagents/DEEPAGENTS_LIBRARY_LIMITATIONS.md` - Known library limitations
