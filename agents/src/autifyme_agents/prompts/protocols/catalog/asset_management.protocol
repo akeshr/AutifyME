@@ -179,6 +179,299 @@ Links assets to products OR product families (XOR constraint).
 
 ---
 
+## DETAILED ASSET WORKFLOWS
+
+### Scenario 1: New Product with Single Image
+
+Most common scenario. Create asset and junction in same transaction.
+
+```json
+{
+  "goal": "Create asset for new product",
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {
+        "name": "PET Jar 500ml Hero",
+        "storage_url": "pending/thread_xyz/20241217_studio_abc.png",
+        "storage_provider": "SUPABASE",
+        "file_name": "20241217_studio_abc.png",
+        "asset_type": "IMAGE",
+        "status": "ACTIVE",
+        "is_ai_generated": true,
+        "caption": "500ml PET jar with honeycomb texture"
+      },
+      "returns": "asset"
+    },
+    {
+      "action": "create",
+      "table": "product_assets",
+      "data": {
+        "product_id": "@product.id",
+        "product_family_id": null,
+        "asset_id": "@asset.id",
+        "asset_role": "PRIMARY",
+        "sort_order": 0
+      },
+      "dependencies": ["asset", "product"]
+    }
+  ]
+}
+```
+
+### Scenario 2: New Product with Multiple Images
+
+Multiple angles of same product. Create multiple assets with sort_order.
+
+```json
+{
+  "goal": "Create product with 4 angle shots",
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": [
+        {"name": "Front view", "storage_url": "pending/t/front.png", ...},
+        {"name": "Side view", "storage_url": "pending/t/side.png", ...},
+        {"name": "Back view", "storage_url": "pending/t/back.png", ...},
+        {"name": "Detail view", "storage_url": "pending/t/detail.png", ...}
+      ],
+      "returns": "assets_batch"
+    },
+    {
+      "action": "create",
+      "table": "product_assets",
+      "data": [
+        {"product_id": "@product.id", "product_family_id": null, "asset_id": "@assets_batch[0].id", "asset_role": "PRIMARY", "sort_order": 0},
+        {"product_id": "@product.id", "product_family_id": null, "asset_id": "@assets_batch[1].id", "asset_role": "GALLERY", "sort_order": 1},
+        {"product_id": "@product.id", "product_family_id": null, "asset_id": "@assets_batch[2].id", "asset_role": "GALLERY", "sort_order": 2},
+        {"product_id": "@product.id", "product_family_id": null, "asset_id": "@assets_batch[3].id", "asset_role": "ZOOM", "sort_order": 3}
+      ],
+      "dependencies": ["assets_batch", "product"]
+    }
+  ]
+}
+```
+
+### Scenario 3: Variant Set with Individual Images
+
+Each variant gets its own image. Create N assets + N junctions.
+
+```json
+{
+  "goal": "Create 4 size variants, each with own image",
+  "operations": [
+    // 4 products already created with returns: "products_batch"
+    {
+      "action": "create",
+      "table": "assets",
+      "data": [
+        {"name": "500ml variant", "storage_url": "pending/t/500ml.png", ...},
+        {"name": "1L variant", "storage_url": "pending/t/1L.png", ...},
+        {"name": "1.5L variant", "storage_url": "pending/t/1_5L.png", ...},
+        {"name": "2L variant", "storage_url": "pending/t/2L.png", ...}
+      ],
+      "returns": "assets_batch"
+    },
+    {
+      "action": "create",
+      "table": "product_assets",
+      "data": [
+        {"product_id": "@products_batch[0].id", "product_family_id": null, "asset_id": "@assets_batch[0].id", "asset_role": "PRIMARY", "sort_order": 0},
+        {"product_id": "@products_batch[1].id", "product_family_id": null, "asset_id": "@assets_batch[1].id", "asset_role": "PRIMARY", "sort_order": 0},
+        {"product_id": "@products_batch[2].id", "product_family_id": null, "asset_id": "@assets_batch[2].id", "asset_role": "PRIMARY", "sort_order": 0},
+        {"product_id": "@products_batch[3].id", "product_family_id": null, "asset_id": "@assets_batch[3].id", "asset_role": "PRIMARY", "sort_order": 0}
+      ],
+      "dependencies": ["products_batch", "assets_batch"]
+    }
+  ]
+}
+```
+
+### Scenario 4: Family-Level Shared Asset
+
+One lifestyle image shared by all products in family. Link to family, not products.
+
+```json
+{
+  "goal": "Create family lifestyle image",
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {
+        "name": "PET Storage Family Lifestyle",
+        "storage_url": "pending/t/family_lifestyle.png",
+        "asset_type": "IMAGE",
+        "status": "ACTIVE"
+      },
+      "returns": "lifestyle_asset"
+    },
+    {
+      "action": "create",
+      "table": "product_assets",
+      "data": {
+        "product_id": null,
+        "product_family_id": "existing-family-uuid",
+        "asset_id": "@lifestyle_asset.id",
+        "asset_role": "LIFESTYLE",
+        "sort_order": 0
+      },
+      "dependencies": ["lifestyle_asset"]
+    }
+  ]
+}
+```
+
+**When to use family-level assets:**
+- Lifestyle/contextual shots showing entire product line
+- Family size charts
+- Shared marketing banners
+- Technical diagrams applicable to all variants
+
+### Scenario 5: Add Image to Existing Product
+
+Check if PRIMARY exists before assigning role.
+
+```
+FLOW:
+1. read_data: Check existing product_assets for this product
+2. If PRIMARY exists -> new image is GALLERY
+3. If no PRIMARY -> new image is PRIMARY
+4. Create asset + junction
+```
+
+```json
+{
+  "goal": "Add secondary image to existing product",
+  "reasoning": "Product already has PRIMARY image. Adding as GALLERY.",
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {"name": "Additional angle", "storage_url": "...", ...},
+      "returns": "new_asset"
+    },
+    {
+      "action": "create",
+      "table": "product_assets",
+      "data": {
+        "product_id": "existing-product-uuid",
+        "product_family_id": null,
+        "asset_id": "@new_asset.id",
+        "asset_role": "GALLERY",
+        "sort_order": 1
+      },
+      "dependencies": ["new_asset"]
+    }
+  ]
+}
+```
+
+### Scenario 6: Replace Existing Image
+
+Archive old asset, create new one, update junction.
+
+```json
+{
+  "goal": "Replace PRIMARY image for product",
+  "reasoning": "User requested image replacement. Archiving old, creating new.",
+  "operations": [
+    {
+      "action": "update",
+      "table": "assets",
+      "filters": {"id": "old-asset-uuid"},
+      "updates": {"status": "ARCHIVED"}
+    },
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {"name": "Updated hero shot", "storage_url": "...", ...},
+      "returns": "new_asset"
+    },
+    {
+      "action": "update",
+      "table": "product_assets",
+      "filters": {"product_id": "product-uuid", "asset_id": "old-asset-uuid"},
+      "updates": {"asset_id": "@new_asset.id"},
+      "dependencies": ["new_asset"]
+    }
+  ]
+}
+```
+
+### Scenario 7: Multi-Product Image Extraction
+
+One source image contains multiple products. Extract each, create separate assets.
+
+```
+SOURCE: Image with 3 different products
+OUTPUT: 3 extracted images, 3 assets, 3 junctions
+
+FLOW:
+1. visual_analyst identifies 3 distinct products
+2. creative_specialist extracts each (3 image_studio calls)
+3. catalog_specialist creates 3 assets + 3 junctions
+```
+
+```json
+{
+  "goal": "Create assets from multi-product extraction",
+  "reasoning": "3 products extracted from single source image.",
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": [
+        {"name": "Product A extracted", "storage_url": "pending/t/extracted_1.png", "source_asset_ids": ["source-uuid"]},
+        {"name": "Product B extracted", "storage_url": "pending/t/extracted_2.png", "source_asset_ids": ["source-uuid"]},
+        {"name": "Product C extracted", "storage_url": "pending/t/extracted_3.png", "source_asset_ids": ["source-uuid"]}
+      ],
+      "returns": "extracted_assets"
+    },
+    {
+      "action": "create",
+      "table": "product_assets",
+      "data": [
+        {"product_id": "@product_a.id", "product_family_id": null, "asset_id": "@extracted_assets[0].id", "asset_role": "PRIMARY", "sort_order": 0},
+        {"product_id": "@product_b.id", "product_family_id": null, "asset_id": "@extracted_assets[1].id", "asset_role": "PRIMARY", "sort_order": 0},
+        {"product_id": "@product_c.id", "product_family_id": null, "asset_id": "@extracted_assets[2].id", "asset_role": "PRIMARY", "sort_order": 0}
+      ],
+      "dependencies": ["extracted_assets", "product_a", "product_b", "product_c"]
+    }
+  ]
+}
+```
+
+### Scenario 8: Asset Reuse (Link Existing Asset to New Product)
+
+Same asset used for multiple products (e.g., generic accessory image).
+
+```json
+{
+  "goal": "Link existing cap image to new bottle product",
+  "reasoning": "Same cap type used across product line. Reusing existing asset.",
+  "operations": [
+    {
+      "action": "create",
+      "table": "product_assets",
+      "data": {
+        "product_id": "new-product-uuid",
+        "product_family_id": null,
+        "asset_id": "existing-cap-asset-uuid",
+        "asset_role": "GALLERY",
+        "sort_order": 5
+      }
+    }
+  ]
+}
+```
+
+**Note:** No new asset created - just a new junction linking existing asset.
+
+---
+
 ## COMMON QUERIES
 
 | Query Need | Approach |
@@ -210,6 +503,34 @@ Links assets to products OR product families (XOR constraint).
 | XOR violation | Both product_id AND product_family_id set | Exactly ONE set, other explicitly null |
 | Skip processing | Raw user photo to catalog | Assess quality first, process if needed |
 | Invalid storage_url | Empty or incorrect URL | Use actual path from processing output |
+| Multiple PRIMARY | Second image assigned PRIMARY | Check existing junctions before role assignment |
+| Missing lineage | AI-generated asset without source_asset_ids | Track source for extracted/generated images |
+| Family asset for single-product use | Family-level asset when only one product | Use product_id unless truly shared |
+| Variant shared image via family | Sharing image across variants using family | Create one asset, multiple product_assets junctions |
+
+### Critical: Orphan Prevention
+
+**ALWAYS create asset and junction in same write_data transaction.**
+
+```
+WRONG:
+1. write_data: create asset
+2. write_data: create junction (separate transaction)
+// If step 2 fails, orphaned asset exists
+
+CORRECT:
+1. write_data: create asset + junction (same transaction)
+// Atomic - both succeed or both rollback
+```
+
+### Critical: Variant Image Decisions
+
+| Scenario | Approach |
+|----------|----------|
+| Same image for all variants | Create 1 asset + N junctions (one per product) |
+| Different image per variant | Create N assets + N junctions |
+| Lifestyle for family | Create 1 asset + 1 junction (to product_family_id) |
+| Mix: individual + shared | Individual PRIMARY per product, shared LIFESTYLE at family |
 
 ---
 
