@@ -174,8 +174,8 @@ def create_aggregate_data_tool(
             results = await storage.query_aggregate(
                 table=table,
                 aggregates=aggregates,
-                filters=filters or {},
-                search_patterns=search_patterns or {},
+                filters=filters,
+                search_patterns=search_patterns,
                 group_by=group_by,
                 having=having,
             )

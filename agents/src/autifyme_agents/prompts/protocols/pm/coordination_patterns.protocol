@@ -169,6 +169,61 @@ User wants data, not action. Single analyst, no execution.
 
 ---
 
+## RESEARCH-ONLY PATTERN
+
+User wants product information without cataloging action.
+
+```
+[Image + "What is this?" / "Tell me about this"]
+      |
+      v
+[1. visual_analyst] -> identifies product
+      |
+      v
+[2. product_analyst] -> comprehensive research
+      |
+      v
+[PM presents findings to user]
+```
+
+**Triggers:**
+- "Research this" (no "catalog" or "add")
+- "What can you tell me about this?"
+- "Find information about this product"
+- Image + question about the product
+
+**Key:** No catalog_analyst needed unless user asks about existing catalog data.
+
+---
+
+## CREATIVE-ONLY PATTERN
+
+User wants image processing without cataloging.
+
+```
+[Image + "Fix/Edit/Process this"]
+      |
+      v
+[1. visual_analyst] -> assess image quality, identify content (optional)
+      |
+      v
+[2. creative_specialist] -> process image
+      |
+      v
+[PM returns processed image to user]
+```
+
+**Triggers:**
+- "Process this image" (no "catalog" or "add")
+- "Fix the background"
+- "Make this catalog-ready" (but no "add to catalog")
+- "Remove background and clean up"
+
+**Key:** Skip catalog_analyst and product_analyst entirely.
+User may later say "now add to catalog" - then full flow kicks in.
+
+---
+
 ## UPDATE PATTERN
 
 Modify existing catalog data. May skip analysis.
@@ -260,6 +315,94 @@ PM: [catalog_analyst] "Verify family exists or recommend alternative"
 catalog_analyst: "Family doesn't exist. Recommend creating new family or using existing [X]"
 
 PM: "Options: 1) Create new family, 2) Use existing [X]"
+```
+
+---
+
+## PARTIAL SUCCESS HANDLING
+
+When some steps succeed but others fail mid-workflow.
+
+### Analyst Partial Success
+
+```
+[visual_analyst SUCCESS]
+[catalog_analyst SUCCESS]
+[product_analyst FAILED - timeout/error]
+```
+
+**Resolution:**
+1. DO NOT discard successful work
+2. Inform user of partial results
+3. Offer options: retry failed step, proceed without, or abort
+
+**Template:**
+```
+"I've completed visual and catalog analysis. Product research hit an issue.
+
+What I have so far:
+- [Visual findings summary]
+- [Catalog findings summary]
+
+Options:
+1. Retry product research
+2. Proceed to cataloging with available info (may miss HSN/specs)
+3. Wait and try again later"
+```
+
+### Execution Partial Success
+
+```
+[creative_specialist SUCCESS - 3/4 images processed]
+[creative_specialist FAILED - 1 image too low quality]
+```
+
+**Resolution:**
+1. Report successful outputs
+2. Explain failure reason
+3. Proceed with successful items; handle failure separately
+
+---
+
+## MULTI-IMAGE DECISION
+
+When user sends multiple images, decide processing strategy.
+
+### Batch vs Individual Decision Matrix
+
+| Signal | Strategy | Reasoning |
+|--------|----------|-----------|
+| Same product, multiple angles | **Single item** | One product entry, multiple assets |
+| Same product type, different sizes | **Variants** | One family, variant structure |
+| Different product types | **Individual** | Separate catalog entries |
+| User says "these products" (plural) | **Individual** | Explicit separate items |
+| User says "this product" (singular) | **Single/Variants** | Likely one item or variant set |
+
+### Processing Strategies
+
+**Single Item (Multiple Angles):**
+```
+[4 images of same bottle from different angles]
+-> visual_analyst: "4 angles of same product"
+-> creative_specialist: 4 processed images
+-> catalog_specialist: 1 product with 4 assets
+```
+
+**Variant Set:**
+```
+[4 images of same bottle in 4 sizes]
+-> visual_analyst: "4 size variants of same product"
+-> catalog_analyst: variant structure recommendation
+-> creative_specialist: 4 processed images
+-> catalog_specialist: 4 products with variant links
+```
+
+**Individual Products:**
+```
+[4 different products]
+-> visual_analyst: "4 distinct products"
+-> Process each through full flow
+-> catalog_specialist: 4 separate products
 ```
 
 ---

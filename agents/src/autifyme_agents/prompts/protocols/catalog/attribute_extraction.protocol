@@ -46,6 +46,35 @@ Extract from user messages:
 | use_case | "for food", "for cosmetics" |
 | price | "Rs 30", "around 50 rupees" |
 
+### 4. Product Research Files (From product_analyst)
+
+When PM provides `product_research_[item].md` file path, extract:
+
+| Attribute | Research File Section |
+|-----------|----------------------|
+| hsn_code | ## HSN Classification |
+| gst_rate | ## HSN Classification (derived) |
+| certifications | ## Certifications & Standards |
+| material_grade | ## Material Specifications |
+| capacity_exact | ## Technical Specifications |
+| dimensions | ## Technical Specifications |
+| typical_price_range | ## Market Context |
+| naming_convention | ## Industry Standards |
+
+**Integration Pattern:**
+```
+1. PM delegates: "Create catalog entry. Read product_research_abc.md for research findings."
+2. Read file: read_file(product_research_abc.md)
+3. Extract: HSN, certifications, specs from research
+4. Merge with visual analysis and user input
+5. Apply extraction priority (user > research > visual)
+```
+
+**Why this matters:**
+- product_analyst has research tools (catalog_specialist does NOT)
+- Research findings are persisted in markdown files
+- catalog_specialist must READ these files to use research data
+
 ---
 
 ## EXTRACTION PRIORITY

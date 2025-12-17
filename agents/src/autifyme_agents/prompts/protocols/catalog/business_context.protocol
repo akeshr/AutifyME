@@ -144,6 +144,39 @@ but because they serve the same customers (food packaging B2B buyers).
 
 ---
 
+## COLD START HANDLING
+
+When catalog is empty (new company, first products):
+
+### What Works Without Data
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Visual analysis | WORKS | Image analysis is independent |
+| Product research | WORKS | External research is independent |
+| Family fit check | RETURNS EMPTY | No families to match - proceed to NEW FAMILY |
+| Duplicate check | RETURNS EMPTY | No products to match - proceed safely |
+| Pricing inference | LIMITED | No family data - rely on research |
+
+### Cold Start Flow
+
+```
+1. Visual analysis -> identify product
+2. Family fit -> NO FAMILIES FOUND -> trigger new_family protocol
+3. Product research -> get market data for pricing
+4. Create family FIRST (no products yet)
+5. Create product in new family
+```
+
+### Key Principle
+
+Empty results are NOT errors. Adapt:
+- "No similar products found" = proceed with creation
+- "No families exist" = propose new family structure
+- "No pricing data" = rely on research or ask user
+
+---
+
 ## DOMAIN BOUNDARIES
 
 ### Catalog OWNS

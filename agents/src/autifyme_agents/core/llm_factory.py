@@ -10,7 +10,7 @@ from autifyme_agents.core.gemini_retry import GeminiWithRetry
 
 def get_llm(
     provider: str = "google",
-    model: str = "gemini-2.5-pro",
+    model: str = "gemini-3-flash-preview",
     temperature: float | None = None,  # None = model-specific default
     tags: list[str] | None = None,
     reasoning_effort: str = "low",
@@ -50,7 +50,9 @@ def get_llm(
             OpenAI models: 'gpt-4.1-mini', 'gpt-4.1', 'gpt-4.1-nano', 'gpt-5-mini-2025-08-07'
             Anthropic models: 'claude-3-5-sonnet-20241022'
             Google Gemini models:
-                - 3.0 Series (Latest): 'gemini-3-pro-preview' (1M/64K tokens, $2/$12)
+                - 3.0 Series (Latest):
+                  - 'gemini-3-flash-preview' (1M/65K tokens, fast+intelligent) - RECOMMENDED
+                  - 'gemini-3-pro-preview' (1M/64K tokens, $2/$12)
                 - 2.5 Series: 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'
                 - 2.0 Series: 'gemini-2.0-flash', 'gemini-2.0-flash-lite'
                 - Image Generation: 'gemini-3-pro-image-preview' (RECOMMENDED, 65K/32K tokens)

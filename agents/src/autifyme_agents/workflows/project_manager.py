@@ -47,20 +47,20 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
-    """Return configured LLM for PM. Defaults to gemini-2.5-flash-lite.
+    """Return configured LLM for PM. Defaults to gemini-3-flash-preview.
 
     Configuration rationale:
-    - thinking_budget=0: Disabled for Flash-Lite to optimize speed/cost.
-      PM is orchestrator so minimal thinking suffices.
+    - thinking_level='low': Gemini 3 uses thinking_level instead of thinking_budget.
+      PM is orchestrator so 'low' minimizes latency while retaining intelligence.
     - max_retries=5: Production resilience against Gemini's occasional blank responses.
-    - temperature=0.5: Balanced creativity for user communication.
+    - temperature=1.0: Gemini 3 default (below 1.0 may cause looping).
     """
     if model is not None:
         return model
     return get_llm(
         provider="google",
-        model="gemini-2.5-flash-lite",
-        temperature=1.0,  # PM orchestrates, specialists reason
+        model="gemini-3-flash-preview",
+        thinking_level="low",  # Fast orchestration
         max_retries=5,  # Increase resilience against blank responses
     )
 
@@ -123,7 +123,7 @@ async def create_project_manager(
 
     Args:
         company_profile: Company context for brand voice and positioning
-        model: LLM for orchestration (defaults to gemini-2.5-flash-lite)
+        model: LLM for orchestration (defaults to gemini-3-flash-preview)
         checkpointer: LangGraph checkpointer for state persistence
         storage: Storage adapter for database operations
         channel: Messaging channel for platform-specific operations
@@ -176,8 +176,8 @@ async def create_project_manager(
     # Specialist LLM configuration
     specialist_llm = get_llm(
         provider="google",
-        model="gemini-2.5-flash-lite",
-        temperature=0.5,
+        model="gemini-3-flash-preview",
+        thinking_level="high",  # Specialists need deeper reasoning
         max_retries=5,  # Match PM resilience for blank response handling
     )
 

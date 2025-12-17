@@ -641,7 +641,7 @@ class SupabaseStorageClient(StorageInterface):
         filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
         relations: list[str] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
         """
@@ -673,13 +673,14 @@ class SupabaseStorageClient(StorageInterface):
             limit=limit
         )
         # Type guaranteed by @overload: count_only=False → list
+        assert isinstance(result, list)  # Runtime assertion for type safety
         return result
 
     async def count_entities(
         self,
         table: str,
         filters: dict[str, Any] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
     ) -> int:
         """
         Count entities - always returns int count.
@@ -704,6 +705,7 @@ class SupabaseStorageClient(StorageInterface):
             count_only=True,  # Always return count
         )
         # Type guaranteed by @overload: count_only=True → int
+        assert isinstance(result, int)  # Runtime assertion for type safety
         return result
 
     async def check_existing_values(
@@ -895,7 +897,7 @@ class SupabaseStorageClient(StorageInterface):
         table: str,
         aggregates: dict[str, str],
         filters: dict[str, Any] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         group_by: list[str] | None = None,
         having: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
