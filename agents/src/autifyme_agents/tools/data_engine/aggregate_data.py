@@ -48,12 +48,13 @@ class AggregateDataInput(BaseModel):
             "CRITICAL: For text/name filtering, use search_patterns instead (fuzzy match)."
         )
     )
-    search_patterns: dict[str, str] = Field(
+    search_patterns: dict[str, str | list[str]] = Field(
         default_factory=dict,
         description=(
             "[FUZZY MATCH] Case-insensitive ILIKE patterns applied BEFORE aggregation.\n"
             "Use % as wildcard.\n"
-            "Examples: {'name': '%keyword%'} (contains), {'code': 'PREFIX-%'} (starts with), {'name': '%term1%term2%'} (contains both).\n"
+            "Single pattern (AND): {'name': '%keyword%'} (contains), {'code': 'PREFIX-%'} (starts with).\n"
+            "Multiple patterns (OR): {'name': ['%jar%', '%bottle%']} (matches any).\n"
             "Use for: name searches, code patterns, description matching."
         )
     )

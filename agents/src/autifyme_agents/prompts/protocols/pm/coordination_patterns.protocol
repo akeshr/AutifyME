@@ -438,6 +438,282 @@ When user provides NEW context AFTER analysis files written:
 
 ---
 
+## USER CORRECTION PATTERN
+
+When user contradicts analyst findings mid-workflow.
+
+### Triggers
+
+- "No, it's actually X" (contradicting visual/research)
+- "That's wrong, it should be Y"
+- "I told you it's Z" (implicit correction)
+
+### Resolution Flow
+
+```
+[Analyst completed]
+      |
+      v
+[User correction received]
+      |
+      v
+[PM Decision Point]
+      |
+      +---> Minor correction (price, size, name)
+      |         |
+      |         v
+      |    Include in specialist delegation:
+      |    "User clarified: [X]. Override analyst finding."
+      |
+      +---> Major correction (wrong product type, wrong family)
+      |         |
+      |         v
+      |    Re-delegate to analyst with correction:
+      |    "User says this is [X], not [Y]. Re-analyze."
+      |
+      +---> Contradicts multiple analysts
+              |
+              v
+         Pause workflow, clarify with user:
+         "Visual analysis identified [A], research found [B].
+         You're saying [C]. Please confirm so I can proceed correctly."
+```
+
+### Key Principle
+
+**User is authoritative for THEIR product.** When user corrects:
+- Their brand name -> trust user (they know their brand)
+- Their intended use -> trust user (they know their business)
+- Their pricing -> trust user (their decision)
+
+**Analyst is authoritative for EXTERNAL facts:**
+- HSN codes -> trust research (regulatory)
+- Compliance requirements -> trust research (legal)
+- Market conventions -> trust research (evidence-based)
+
+---
+
+## QUALITY REJECTION PATTERN
+
+When processed output doesn't meet quality standards.
+
+### Image Quality Rejection
+
+```
+[creative_specialist returns processed image]
+      |
+      v
+[PM views output - quality issue detected]
+      |
+      +---> Minor issue (slight crop, color)
+      |         |
+      |         v
+      |    Re-delegate with specific feedback:
+      |    "Output has [issue]. Please reprocess with [adjustment]."
+      |
+      +---> Major issue (wrong product, failed extraction)
+      |         |
+      |         v
+      |    Investigate root cause:
+      |    - Source image quality issue? -> inform user
+      |    - Processing instruction unclear? -> clarify and retry
+      |    - Tool limitation? -> inform user of constraint
+      |
+      +---> Repeated failures
+              |
+              v
+         Inform user:
+         "Image processing is having difficulty with this image.
+         Options: 1) Try different source image, 2) Proceed without processed image"
+```
+
+### Research Quality Rejection
+
+When research returns low confidence or incomplete data:
+- Flag gaps to user: "Research couldn't confirm [X]. Please provide or proceed without."
+- Don't guess on compliance/regulatory matters
+- User can proceed with incomplete data at their discretion
+
+---
+
+## CROSS-ANALYST CONTRADICTION PATTERN
+
+When analysts provide conflicting information about the same product.
+
+### Common Contradictions
+
+| Visual Says | Research Says | Resolution |
+|-------------|---------------|------------|
+| "PET plastic" | "HDPE based on product type" | Research wins - material analysis is more reliable |
+| "500ml capacity" | "Standard is 475ml" | Research wins - exact specs from standards |
+| "Premium positioning" | "Budget segment" | Neither wins - present both views to user |
+| "Blue color" | N/A | Visual wins - color is observation, not research topic |
+
+### Resolution Framework
+
+```
+[visual_analyst: Finding A]
+[product_analyst: Finding B (contradicts A)]
+      |
+      v
+[PM identifies contradiction type]
+      |
+      +---> Fact vs Estimate (capacity, dimensions)
+      |         |
+      |         v
+      |    Trust research (has sources)
+      |    Note: "Visual estimated X, research confirms Y"
+      |
+      +---> Observation vs Research (material, features)
+      |         |
+      |         v
+      |    Trust visual for observable facts
+      |    Trust research for non-observable specs
+      |
+      +---> Opinion vs Opinion (positioning, style)
+              |
+              v
+         Present both to user:
+         "Visual suggests [X], research indicates [Y].
+         Which positioning aligns with your intent?"
+```
+
+### File Handling
+
+When contradiction detected, the LATER file should acknowledge:
+```
+product_research_[item].md:
+"Note: Visual analysis identified material as [X].
+Research indicates [Y] based on [source].
+Using research finding due to [reasoning]."
+```
+
+---
+
+## WORKFLOW CANCELLATION PATTERN
+
+When user wants to abort or restart.
+
+### Triggers
+
+- "Cancel", "Stop", "Never mind"
+- "Start over", "Let's try again"
+- "Forget this, do [something else]"
+
+### Resolution
+
+```
+[User cancellation request]
+      |
+      v
+[PM assesses workflow state]
+      |
+      +---> Analysis phase (no execution yet)
+      |         |
+      |         v
+      |    Clean stop - no harm done:
+      |    "Understood. I've stopped the analysis.
+      |    Let me know when you want to continue or try something else."
+      |
+      +---> Execution phase (write_data pending/approved)
+      |         |
+      |         v
+      |    Warn about partial state:
+      |    "I've already [created X / processed images].
+      |    Options: 1) Continue and complete, 2) Undo what was created"
+      |
+      +---> Post-execution (records created)
+              |
+              v
+         Offer cleanup:
+         "Records have been created. Would you like me to:
+         1) Leave them and continue later
+         2) Archive/delete them (requires approval)"
+```
+
+### Key Principle
+
+**Never leave orphaned data.** If workflow creates partial records:
+- Assets without product links -> cleanup or complete
+- Products without prices -> complete or flag as draft
+- Families without products -> may be intentional (cold start)
+
+---
+
+## FILE NAMING CONVENTIONS
+
+Consistent file naming enables reliable file routing between agents.
+
+### Standard Patterns
+
+| Agent | Output File | Pattern |
+|-------|-------------|---------|
+| visual_analyst | Analysis | `visual_analysis_{image_basename}.md` |
+| catalog_analyst | Analysis | `catalog_analysis_{item_identifier}.md` |
+| product_analyst | Research | `product_research_{item_identifier}.md` |
+| creative_specialist | Processed | `pending/{thread_id}/{timestamp}_studio_{hash}.png` |
+
+### Item Identifier Rules
+
+- Use image basename when available: `20251217_152547_photo`
+- Use descriptive slug when no image: `pet_container_500ml`
+- For variants: `pet_containers_variant_set`
+- Never use generic names: `analysis.md`, `research.md` (will overwrite)
+
+### PM File Routing
+
+When delegating, PM includes file paths explicitly:
+```
+"Create catalog entry.
+Read visual analysis at: visual_analysis_20251217_photo.md
+Read product research at: product_research_pet_container.md
+Processed image at: pending/thread_xyz/20251217_studio_abc.png"
+```
+
+---
+
+## HITL TIMEOUT HANDLING
+
+When user doesn't respond to approval requests.
+
+### Timeout Thresholds
+
+| Context | Timeout | Reason |
+|---------|---------|--------|
+| WhatsApp conversation | 24 hours | User may be busy |
+| Active session | 30 minutes | User likely stepped away |
+| Bulk operation | 1 hour | User reviewing multiple items |
+
+### Resolution
+
+```
+[write_data submitted, awaiting HITL]
+      |
+      v
+[Timeout reached]
+      |
+      v
+[PM sends reminder]
+      |
+      +---> User responds -> continue workflow
+      |
+      +---> Second timeout
+              |
+              v
+         [Auto-save as DRAFT]
+         "I've saved this as a draft. When you're ready,
+         say 'continue with [item]' to resume."
+```
+
+### Draft Recovery
+
+When user returns after timeout:
+- "Continue cataloging" -> PM checks for pending drafts
+- Drafts stored in workflow state, not database
+- No orphaned DRAFT records in production tables
+
+---
+
 ## ANTI-PATTERNS
 
 | Anti-Pattern | Problem | Correct Approach |

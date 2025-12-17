@@ -179,6 +179,55 @@ When one domain's output feeds another:
 
 ---
 
+## UPDATE vs CREATE DECISION
+
+When user says "add this product", determine if it's NEW or UPDATE to existing.
+
+### Decision Flow
+
+```
+[User: "Add this product"]
+      |
+      v
+[catalog_analyst: duplicate check]
+      |
+      +---> No match found -> CREATE new product
+      |
+      +---> Exact match (same SKU/barcode)
+      |         |
+      |         v
+      |    Present to user:
+      |    "This product already exists as [SKU]. Update it instead?"
+      |
+      +---> Similar match (name/attributes similar)
+              |
+              v
+         Present to user:
+         "Found similar: [existing product].
+         Is this: 1) Same product (update), 2) Different product (create new)"
+```
+
+### Routing Based on Decision
+
+| Decision | Route To | Operation |
+|----------|----------|-----------|
+| CREATE new | catalog_specialist | Create product + variants + pricing |
+| UPDATE existing | catalog_specialist | Update specific fields |
+| Add variant to existing | catalog_specialist | Create product in existing family |
+| Reactivate discontinued | catalog_specialist | Update status to ACTIVE |
+
+### Key Signals
+
+| User Says | Likely Intent |
+|-----------|---------------|
+| "Add new product" | CREATE |
+| "Update the price of X" | UPDATE |
+| "Add another size to the family" | Add variant |
+| "This is different from X" | CREATE (confirmed by user) |
+| "Same product, just updating" | UPDATE (confirmed by user) |
+
+---
+
 ## COLD START HANDLING
 
 When catalog is empty (new company):
