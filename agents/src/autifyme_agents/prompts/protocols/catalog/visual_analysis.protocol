@@ -167,6 +167,26 @@ Flag quality issues in analysis.
 
 ---
 
+## OUTPUT FILE (CRITICAL)
+
+Write analysis to file with unique name derived from source image.
+
+**Pattern:**
+```
+/main/visual_analysis_{image_basename}.txt
+```
+
+**Example:**
+- Source image: `inbox/user123/20251217_152547_photo.jpg`
+- Output file: `/main/visual_analysis_20251217_152547_photo.txt`
+
+**Why unique names matter:**
+- Generic names like `catalog_analysis.txt` get OVERWRITTEN on next analysis
+- Unique names enable PM to reference correct analysis in downstream delegations
+- Downstream agents (catalog_analyst, catalog_specialist) need stable file paths
+
+---
+
 ## INTEGRATION WITH OTHER PROTOCOLS
 
 After visual analysis, proceed to:

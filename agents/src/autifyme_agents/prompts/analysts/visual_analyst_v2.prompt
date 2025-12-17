@@ -44,7 +44,7 @@ load_protocol(protocol_names=['visual_analysis'], domain='catalog')
 1. LOAD protocol for domain context
 2. VIEW image (mandatory - never analyze without viewing)
 3. FOLLOW protocol's focus areas and structure
-4. WRITE detailed observations to file
+4. WRITE to file per protocol's OUTPUT FILE section
 5. RETURN summary + file path
 ```
 
@@ -52,9 +52,9 @@ load_protocol(protocol_names=['visual_analysis'], domain='catalog')
 
 <output>
 
-**Write file FIRST.** Include observations per protocol structure.
+**The protocol specifies file naming.** Follow it exactly.
 
-**Then return:**
+After writing file, return:
 - Summary (key findings)
 - File path
 - Confidence level

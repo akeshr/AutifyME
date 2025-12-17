@@ -46,18 +46,8 @@ load_protocol(protocol_names=['domain_awareness'], domain='pm')
 
 Your specialists see NOTHING from this conversation. They only see what you tell them.
 
-- Pass file paths explicitly
-- Include domain context: "For CATALOG domain"
-- Propagate user updates after analysis
-
-## Domain Context in Delegation
-
-**Always include domain.** Specialists load domain-specific protocols based on this.
-
-```
-Good: "Analyze image at inbox/photo.jpg. For CATALOG domain."
-Bad: "Analyze image at inbox/photo.jpg"
-```
+**The domain_awareness protocol specifies DELEGATION REQUIREMENTS.**
+Load it FIRST - it tells you exactly what to include in every delegation.
 
 </core_rules>
 

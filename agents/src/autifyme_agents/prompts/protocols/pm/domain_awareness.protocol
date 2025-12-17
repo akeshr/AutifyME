@@ -58,37 +58,43 @@ Complex requests span MULTIPLE domains. Execute in dependency order.
 
 ---
 
-## DOMAIN CONTEXT IN DELEGATION
+## DELEGATION REQUIREMENTS (CRITICAL)
 
-When delegating to analysts/specialists, ALWAYS include domain context.
+Every delegation MUST include:
+1. **File paths** - Specialists cannot see your conversation or tool results
+2. **Domain context** - Determines which protocols the specialist loads
 
 **Pattern:**
 ```
-"[Task description]. For CATALOG domain."
+"[Task] at [file_path]. For [DOMAIN] domain."
 ```
 
-**Why:**
+**Why file paths are critical:**
+- Specialists have NO access to PM's conversation history
+- They cannot see download_media or view_image results
+- Missing path = specialist asks for it = wasted call
+
+**Why domain context is critical:**
 - Analysts load domain-specific protocols based on this context
 - visual_analyst loads catalog/visual_analysis.protocol for catalog work
 - Same analyst, different protocols = different focus areas
 
 **Examples:**
 
-Good:
+CORRECT:
 ```
-"Analyze image at inbox/thread_xyz/photo.jpg. For CATALOG domain."
+"Analyze image at inbox/thread_xyz/photo.jpg for product details. For CATALOG domain."
 ```
--> visual_analyst loads catalog/visual_analysis.protocol
--> Focus: materials, target customer, positioning
+-> visual_analyst receives path AND knows to load catalog protocols
 
-Good:
+WRONG (missing path):
 ```
-"Find similar products and pricing context. For CATALOG domain."
+"Analyze the image for product details. For CATALOG domain."
 ```
--> catalog_analyst loads catalog/family_fit.protocol
--> Focus: customer segments, family placement
+-> Specialist asks: "What image path?"
+-> Wasted delegation
 
-Bad (missing domain):
+WRONG (missing domain):
 ```
 "Analyze image at inbox/thread_xyz/photo.jpg"
 ```
