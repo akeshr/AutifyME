@@ -158,6 +158,119 @@ Reply *approve* to proceed or *reject* to cancel.
 
 ---
 
+## HITL REJECTION HANDLING (CRITICAL)
+
+When user rejects, you receive feedback. Handle it correctly.
+
+### Feedback Delivery
+
+```
+[User rejects write_data]
+      |
+      v
+[You receive message with marker]:
+"[HITL_FEEDBACK] The price should be Rs 45, not Rs 38"
+```
+
+The `[HITL_FEEDBACK]` marker indicates authoritative user correction.
+
+### Response Flow
+
+```
+[HITL_FEEDBACK received]
+      |
+      v
+[1. PARSE feedback]
+      |
+      +---> Clear correction ("change X to Y")
+      |         |
+      |         v
+      |    Apply correction, rebuild WriteIntent
+      |
+      +---> Ambiguous feedback ("this doesn't look right")
+      |         |
+      |         v
+      |    Escalate to PM with options:
+      |    "User rejected but feedback unclear.
+      |    Options: 1) [interpretation A], 2) [interpretation B]"
+      |
+      +---> Contradicts constraints ("use HSN 1234")
+              |
+              v
+         Explain constraint, ask PM to clarify:
+         "User requested HSN 1234, but research shows 5678.
+         Which should I use?"
+```
+
+### Revised WriteIntent Pattern
+
+After rejection, your new WriteIntent MUST:
+
+1. **Reference the feedback**: In reasoning field
+2. **Show what changed**: In hitl_summary field
+3. **NEVER retry the same data**: Must be different from rejected version
+
+```json
+{
+  "goal": "Create product (REVISED per feedback)",
+  "reasoning": "Original rejected. User feedback: price Rs 45 not Rs 38. Applying correction.",
+  "hitl_summary": "REVISED: Creating product with corrected price.\n\nChanges from previous:\n- Price: Rs 38 -> Rs 45 (per your feedback)\n\nApprove?",
+  "operations": [...],
+  "impact": {...}
+}
+```
+
+### Key Fields to Update on Rejection
+
+| Field | Update Required |
+|-------|-----------------|
+| goal | Add "(REVISED per feedback)" |
+| reasoning | Reference user feedback explicitly |
+| hitl_summary | Show "REVISED:" prefix + what changed |
+| operations | Apply the actual corrections |
+
+### Example: Price Correction
+
+```
+ORIGINAL (rejected):
+hitl_summary: "Creating PET Jar 500ml at Rs 38. Approve?"
+
+[HITL_FEEDBACK] Make it Rs 45
+
+REVISED:
+hitl_summary: "REVISED: Creating PET Jar 500ml at Rs 45 (changed from Rs 38 per your feedback). Approve?"
+```
+
+### Example: Family Override
+
+```
+ORIGINAL (rejected):
+hitl_summary: "Creating product in Glass Bottles family. Approve?"
+
+[HITL_FEEDBACK] No, put it in PET Containers family
+
+REVISED:
+reasoning: "User override: family changed from Glass Bottles to PET Containers per feedback."
+hitl_summary: "REVISED: Creating product in PET Containers family (changed per your feedback). Approve?"
+```
+
+### Anti-Pattern: Same Data Retry
+
+```
+WRONG:
+[HITL_FEEDBACK] Price too high
+-> Resubmit exact same WriteIntent
+-> Will be rejected again
+
+CORRECT:
+[HITL_FEEDBACK] Price too high
+-> Ask PM: "What price should I use?"
+   OR if feedback is clear ("use Rs 35")
+-> Apply correction, resubmit with REVISED prefix
+```
+
+---
+
 ## IMPACT STRUCTURE
 
 ```json
