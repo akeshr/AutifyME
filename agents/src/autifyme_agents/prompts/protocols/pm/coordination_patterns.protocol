@@ -224,6 +224,73 @@ User may later say "now add to catalog" - then full flow kicks in.
 
 ---
 
+## CREATIVE->CATALOG ASSET HANDOFF PATTERN
+
+**[CRITICAL]** For product catalog images, creative_specialist processes but catalog_specialist creates records.
+
+### Flow
+
+```
+[1. creative_specialist] -> processes image
+      |
+      v
+[Returns storage_path] (NOT asset record!)
+      |
+      v
+[2. PM receives storage_path]
+      |
+      v
+[3. PM delegates to catalog_specialist]:
+   "Create product with processed image at [storage_path].
+    Read analysis files for context.
+    Create asset record + product_assets junction atomically."
+      |
+      v
+[4. catalog_specialist] -> creates:
+   - Product record (if new)
+   - Asset record with storage_url
+   - product_assets junction linking them
+   [HITL approval for write_data]
+```
+
+### PM Delegation Template
+
+```
+"Create catalog entry for [product].
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+
+Processed image at: [storage_path from creative_specialist]
+
+For CATALOG domain. Create product, asset record, and product_assets link.
+This is {company_name}'s product."
+```
+
+### Why This Pattern
+
+| Concern | Resolution |
+|---------|------------|
+| Orphan prevention | catalog_specialist creates asset + junction atomically |
+| Domain ownership | catalog owns product_assets table |
+| Single HITL | User approves complete write (product + asset + link) |
+| Clean handoff | storage_path is the handoff artifact |
+
+### Anti-Pattern
+
+```
+WRONG:
+creative_specialist creates asset record
+-> catalog_specialist creates product + junction
+-> TWO HITL approvals, orphan risk if second fails
+
+CORRECT:
+creative_specialist returns storage_path
+-> catalog_specialist creates product + asset + junction atomically
+-> SINGLE HITL approval, no orphans
+```
+
+---
+
 ## UPDATE PATTERN
 
 Modify existing catalog data. May skip analysis.

@@ -20,7 +20,7 @@ Defines which domains own which decisions, enabling correct specialist routing.
 - Product CRUD: create, read, update, delete products and variants
 - Family management: product families, variant axes, variant values
 - Pricing: price lists, product prices, customer-specific pricing
-- Asset linking: connect processed images to products
+- **Product Asset Records: create asset + product_assets junction (atomic)**
 - Inventory context: product availability, stock status
 
 **CREATIVE Domain Scope (Visual Asset Production):**
@@ -29,6 +29,19 @@ Defines which domains own which decisions, enabling correct specialist routing.
 - Hero shots: marketplace-ready product images (Amazon, Shopify quality)
 - Lifestyle/contextual: scene generation, product in context
 - Multi-product: extraction, isolation, composite shots
+- **Campaign Asset Records: create asset + campaign_assets junction (atomic)**
+
+**[CRITICAL] Asset Record Ownership Split:**
+
+| Image Purpose | Who Processes | Who Creates DB Records |
+|---------------|---------------|----------------------|
+| Product catalog images | creative_specialist | catalog_specialist |
+| Campaign promotional images | creative_specialist | creative_specialist |
+
+**Why This Split:**
+- Product assets require `product_assets` junction (catalog_specialist has access)
+- Campaign assets require `campaign_assets` junction (creative_specialist has access)
+- Atomic transactions prevent orphaned assets
 
 **PRODUCT Domain Scope (Comprehensive Research):**
 - Technical specifications: capacity, dimensions, weight, materials
@@ -176,6 +189,86 @@ When one domain's output feeds another:
 - Route file paths between domains
 - Ensure all dependencies are met before delegating
 - Synthesize findings from multiple domains
+
+---
+
+## RETURNING PROCESSED IMAGES TO USER
+
+When creative_specialist returns a processed image and user should see it:
+
+### Storage Path Architecture
+
+```
+creative_specialist returns: "pending/thread_xyz/processed_hero.png"
+                                    |
+                                    v
+                          This is a STORAGE PATH (relative)
+                                    |
+                                    v
+                          PM can view with: view_image(storage_path)
+```
+
+### User Response Patterns
+
+**Pattern 1: Image Processing Only (No Catalog)**
+```
+User: "Fix the background of this image"
+Creative: Returns storage_path
+PM Response:
+1. Use view_image to see the result
+2. Respond with result description + offer next steps
+
+"Done! I've created a clean white background version of your product image.
+[Image is visible in the response - platform handles display]
+
+Would you like me to:
+- Add this to your catalog
+- Create more variations (lifestyle, different background)
+- Process another image"
+```
+
+**Pattern 2: Full Catalog Flow (Image + Record)**
+```
+User: "Add this product to catalog"
+Creative: Returns storage_path
+Catalog: Creates asset + product_assets (with storage_path as storage_url)
+PM Response:
+1. Confirm catalog entry created
+2. Reference the product (not the raw storage_path)
+
+"Your PET Storage Container (500ml) is now in your catalog!
+- SKU: CONT-PET-500
+- Price: Rs 38
+- Hero image: processed and linked
+
+View it: [product reference or link]"
+```
+
+### Key Principles
+
+| Scenario | PM Returns | Why |
+|----------|-----------|-----|
+| Image processing only | Confirmation + image visible | User wants to see result |
+| Catalog with image | Product reference | Asset is part of product, not standalone |
+| Campaign creative | Campaign reference | Asset is part of campaign |
+
+### Anti-Pattern
+
+```
+WRONG:
+"Here's your image: pending/thread_xyz/abc123.png"
+-> Raw storage path is not user-friendly
+-> User can't access pending/ directly
+
+CORRECT:
+"Done! Here's your processed image [image attachment/display].
+Ready to add to catalog?"
+-> Image is visible in response
+-> User sees the result, not technical path
+```
+
+**Note:** Platform integration (WhatsApp, web) handles how images are displayed.
+PM's role is to include the image in the response and provide context.
 
 ---
 
