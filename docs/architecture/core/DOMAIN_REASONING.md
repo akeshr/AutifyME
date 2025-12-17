@@ -1,85 +1,158 @@
 # Domain Reasoning Framework
 
 **Created:** December 15, 2025
-**Consolidated:** December 17, 2025
+**Rewritten:** December 17, 2025
 **Status:** Phase 1 Ready
-**Supersedes:** DOMAIN_REASONING_PROTOCOLS.md, DOMAIN_REASONING_IMPLEMENTATION_PLAN.md
+**Grounded In:** [ARCHITECTURAL_VISION.md](../ARCHITECTURAL_VISION.md), [AGENTS_DESIGN.md](./AGENTS_DESIGN.md), [AUTONOMY_PROBLEMS.md](../AUTONOMY_PROBLEMS.md)
 
 ---
 
-## Vision: Autonomous Agentic Organization
+## 1. Context: The AutifyME Vision
 
-AutifyME is an **autonomous agentic organization** - a system of intelligent agents that dynamically plan, adapt, and execute across business domains.
+> "AutifyME is not a cataloging system. It is a **multi-domain autonomous business operating system**."
+> -- ARCHITECTURAL_VISION.md
 
-**The 2-Level Architecture:**
+**The Domains:**
+- **Catalog:** Product information, inventory, pricing, manufacturing data
+- **Creative:** Image processing, visual assets, brand consistency
+- **Operations:** Quality control, compliance, fulfillment workflows
+- **Marketing:** Campaign assets, positioning, competitive analysis
+- **Procurement:** Supplier coordination, sourcing, cost analysis
+- **Quality:** Defect identification, standards compliance
+- **Future:** Customer service, analytics, forecasting
+
+**Each domain has deep expertise. Each domain performs with utmost quality. Each domain explores possibilities autonomously.**
+
+---
+
+## 2. The Architecture
+
+From [AGENTS_DESIGN.md](./AGENTS_DESIGN.md) - the 2-Level Model:
 
 ```
-                         USER
-                           |
-                           v
-+----------------------------------------------------------+
-|              PROJECT MANAGER (Orchestrator)               |
-|  - Understands all domains                                |
-|  - Routes to specialists dynamically                      |
-|  - Composes workflows on-the-fly                          |
-+----------------------------------------------------------+
-                           |
-         +-----------------+-----------------+
-         v                 v                 v
-+----------------+ +----------------+ +----------------+
-|   CATALOGING   | |   MARKETING    | |   OPERATIONS   |
-|   Specialist   | |   Specialist   | |   Specialist   |
-+----------------+ +----------------+ +----------------+
-         |                 |                 |
-         v                 v                 v
-      [Tools]           [Tools]           [Tools]
+[User Request]
+      |
+      v
++---------------------------+
+| PROJECT MANAGER           |
+| - Analyzes INTENT         |
+| - Routes dynamically      |
+| - Delegates with CONTEXT  |
+| - Synthesizes results     |
++---------------------------+
+      |
+      +---> [Analysts]      (Read-only exploration, cheap models)
+      |     - visual_analyst
+      |     - product_analyst
+      |     - catalog_analyst
+      |
+      +---> [Specialists]   (Domain experts, Explore->Reason->Output)
+            - catalog_specialist
+            - creative_specialist
+            - (future domains)
+                  |
+                  v
+               [Tools]
 ```
 
-**The Challenge:** LLMs are general-purpose. Each domain requires SPECIFIC expertise - your business rules, your data patterns, your decision criteria. Without domain grounding, agents apply generic knowledge and fail.
+### PM Role (from ARCHITECTURAL_VISION.md)
 
-**The Solution:** Domain Reasoning Protocols - executable examples that encode domain expertise as step-by-step reasoning processes. Protocols bridge the gap between general intelligence and specific domain mastery.
+**PM Does:**
+- Analyze user INTENT (not content)
+- Identify which domains are involved
+- Delegate to analysts for content analysis
+- Use analyst summaries to decide next steps dynamically
+- Synthesize multi-domain outputs into coherent narrative
 
-**Why This Matters:**
+**PM Does NOT:**
+- Analyze image content, research products, or query catalog
+- Follow fixed workflow templates
+- Tell subagents what to do (passes context, not instructions)
 
-| Without Protocols | With Protocols |
-|-------------------|----------------|
-| Agent uses generic retail knowledge | Agent queries YOUR catalog data |
-| Family assignment by material | Family assignment by customer segment |
-| Pricing from market assumptions | Pricing from YOUR established patterns |
-| Inconsistent decisions | Repeatable, grounded reasoning |
+### Analyst Role (from ARCHITECTURAL_VISION.md)
+
+Analysts are **PM's intelligence layer** for detailed content analysis:
+- **Read-only:** view_image, read_data, research_product_tool, aggregate_data
+- **No execution:** Never write_data, never persistence
+- **Cheap models:** Gemini 2.5 Flash (~$0.01/1K tokens)
+- **Output:** Write to workspace/thread_123/*.md, return summary + path to PM
+
+### Specialist Role (from ARCHITECTURAL_VISION.md)
+
+Specialists are **autonomous domain masters**:
+
+> "Explorative Problem-Solving (Explore -> Reason -> Output) **ALWAYS**"
+
+1. **EXPLORE** - Query data, inspect schema, view images, validate prerequisites
+2. **REASON** - Synthesize findings, apply domain expertise, evaluate options
+3. **OUTPUT** - Execute with validated information, verify outputs
+
+**Critical:** Analyst context is SUPPLEMENTARY. Specialists ALWAYS explore.
 
 ---
 
-## Table of Contents
+## 3. The Problem Protocols Solve
 
-1. [Core Mechanism](#1-core-mechanism)
-2. [Architecture](#2-architecture)
-3. [Generic Patterns](#3-generic-patterns)
-4. [Domain Instantiation: Catalog](#4-domain-instantiation-catalog)
-5. [Protocol Composition](#5-protocol-composition)
-6. [Implementation](#6-implementation)
-7. [Decision Log](#7-decision-log)
-8. [Success Metrics](#8-success-metrics)
-9. [Risk Register](#9-risk-register)
+From [AUTONOMY_PROBLEMS.md](../AUTONOMY_PROBLEMS.md):
 
-**Separate Documents:**
-- [PM_INTELLIGENCE_ROADMAP.md](./PM_INTELLIGENCE_ROADMAP.md) - Future PM capabilities (aspirational)
+> "LLMs are general-purpose - they DON'T know your tools, business rules, or domain expectations."
+
+**The Gap:**
+
+| What LLM Has | What Domain Needs |
+|--------------|-------------------|
+| Generic retail knowledge | YOUR catalog patterns |
+| Material-based reasoning | Customer-segment reasoning |
+| Market assumptions | YOUR pricing data |
+| Inconsistent heuristics | Repeatable domain logic |
+
+**The Solution:** Domain Reasoning Protocols - executable examples that ground the EXPLORE step in Explore->Reason->Output.
 
 ---
 
-## 1. Core Mechanism
+## 4. How Protocols Enable Autonomy
 
-### 1.1 The Protocol Solution
+Protocols **support** the Explore->Reason->Output pattern. They don't replace it.
 
-**Protocols are executable reasoning examples.** They show HOW to think through domain decisions, not just WHAT to conclude.
+```
+SPECIALIST RECEIVES TASK
+         |
+         v
++-------------------+
+| EXPLORE (Step 1)  |  <-- Protocols provide STRUCTURE here
+| - Load protocol   |
+| - Execute queries |
+| - Gather data     |
++-------------------+
+         |
+         v
++-------------------+
+| REASON (Step 2)   |  <-- Agent applies domain expertise
+| - Analyze results |
+| - Apply criteria  |
+| - Form conclusion |
++-------------------+
+         |
+         v
++-------------------+
+| OUTPUT (Step 3)   |  <-- Agent acts on reasoning
+| - Write decision  |
+| - HITL approval   |
+| - Verify output   |
++-------------------+
+```
 
-| Approach | What Agent Gets | Result |
-|----------|-----------------|--------|
-| Rules | Abstract principles | Applies inconsistently |
-| Output Examples | Final answers | Copies format, hallucinates data |
-| **Protocols** | Step-by-step process with tool calls | Executes each step, grounded in real data |
+### Core Principle Alignment
 
-### 1.2 Tool Grounding: Why Protocols Work
+From ARCHITECTURAL_VISION.md Core Design Principles:
+
+| Principle | How Protocols Align |
+|-----------|---------------------|
+| **P1: Intelligence-First** | Protocols give context, not step-by-step recipes |
+| **P3: Explorative Over Prescriptive** | Protocols structure exploration, not dictate conclusions |
+| **P5: Verification Over Hope** | Protocols force tool calls that return real data |
+
+### Tool Grounding: Why Protocols Work
 
 ```
 Protocol Step: "QUERY customer_segments for this family"
@@ -94,9 +167,9 @@ Protocol Step: "QUERY customer_segments for this family"
             Agent reasons about ACTUAL data
 ```
 
-**The agent can't fake query results.** When a protocol says "Execute read_data(...)", the tool returns actual database records. This grounds reasoning in reality.
+**The agent can't fake query results.** When a protocol says "Execute read_data(...)", the tool returns actual database records. This grounds exploration in reality.
 
-### 1.3 The Grounding Boundary
+### The Grounding Boundary
 
 | Step Type | Grounded? | Example |
 |-----------|-----------|---------|
@@ -107,58 +180,51 @@ Protocol Step: "QUERY customer_segments for this family"
 
 **Mitigation for ungrounded steps:** Structured criteria, comparison to grounded data, HITL checkpoint.
 
-### 1.4 Protocol Applicability: All Agent Types
-
-Protocols are NOT just for specialists. Every agent in the hierarchy needs domain grounding.
-
-| Agent Level | Protocol Types | Purpose |
-|-------------|----------------|---------|
-| **PM** | Routing, Multi-domain | Route correctly, coordinate across domains |
-| **Analysts** | Exploration, Orientation | Query comprehensively, discover patterns |
-| **Specialists** | Decision, Domain-specific | Make grounded decisions using business rules |
-
-**The distinction:**
-
-| Aspect | Analyst | Specialist |
-|--------|---------|------------|
-| Function | Explore and suggest | Decide and commit |
-| Output | Options, recommendations | Decisions, writes |
-| Protocol usage | IMPLICIT (mental model) | EXPLICIT (documented execution) |
-| HITL | Never (read-only) | On writes |
-
 ---
 
-## 2. Architecture
+## 5. Protocol Architecture
 
-### 2.1 Protocol Delivery
+### 5.1 Who Uses Protocols
 
-> STATUS: REPL VERIFIED
+| Agent | Protocol Usage | Purpose |
+|-------|----------------|---------|
+| **PM** | Rarely | PM delegates content analysis, doesn't do it |
+| **Analysts** | Implicitly | Mental model for comprehensive exploration |
+| **Specialists** | Explicitly | Structured exploration before decisions |
+
+**Key insight:** PM passes CONTEXT to specialists, not protocols. Specialists decide which protocols to load based on their domain expertise.
+
+### 5.2 Protocol Delivery
 
 ```
-1. Agent calls load_protocol(["family_fit", "pricing"])
-2. Tool returns protocol CONTENT
-3. Middleware injects into system prompt
-4. Agent sees protocol as INSTRUCTIONS
+1. Specialist receives task from PM (context, not instructions)
+2. Specialist assesses: "What exploration do I need?"
+3. Specialist calls load_protocol(["family_fit", "pricing"])
+4. Middleware injects protocol content into system prompt
+5. Specialist executes exploration steps
+6. Specialist reasons and outputs decision
 ```
 
-**Design Decisions:**
+### 5.3 Protocol Library Structure
 
-| Decision | Rationale |
-|----------|-----------|
-| Message-history based | ToolMessages persist; config doesn't |
-| Agent autonomy | Agent matches situation to protocol index |
-| Batch loading | Single call prevents parallel issues |
-| Deduplication | Middleware injects each protocol once |
+```
+protocols/
+├── catalog_specialist/      # Catalog domain
+│   ├── business_context.protocol
+│   ├── family_fit.protocol
+│   ├── pricing.protocol
+│   └── duplicate_prevention.protocol
+├── creative_specialist/     # Creative domain (FUTURE)
+├── marketing_specialist/    # Marketing domain (FUTURE)
+└── shared/                  # Cross-domain patterns
+    ├── fit_assessment.protocol
+    ├── value_discovery.protocol
+    └── new_entity.protocol
+```
 
-**Protocol Selection:**
+**Resolution:** Agent-specific first, then shared.
 
-| Aspect | Approach |
-|--------|----------|
-| Selection | Pure agent autonomy via protocol index |
-| Observability | Trace evaluation via LangSmith |
-| Enforcement | None - measure first, strengthen prompt if needed |
-
-### 2.2 Protocol Loading Tool
+### 5.4 Protocol Loading Tool
 
 ```python
 def create_load_protocol_tool(agent_type: str):
@@ -166,7 +232,11 @@ def create_load_protocol_tool(agent_type: str):
 
     @tool
     def load_protocol(names: list[str]) -> str:
-        """Load reasoning protocols for structured domain decisions."""
+        """Load reasoning protocols for structured domain decisions.
+
+        USE WHEN: You need structured exploration for domain decisions.
+        DON'T USE: For familiar tasks with clear paths.
+        """
         results = []
         for name in names:
             content = _load_protocol_content(agent_type, name)
@@ -176,99 +246,44 @@ def create_load_protocol_tool(agent_type: str):
     return load_protocol
 ```
 
-### 2.3 Protocol Injection Middleware
+### 5.5 Integration with Autonomy Pattern
 
-```python
-class ProtocolInjectionMiddleware(AgentMiddleware):
-    """Injects loaded protocols into system prompt."""
+From AUTONOMY_PROBLEMS.md, specialists now have:
 
-    def wrap_model_call(self, request, handler):
-        # Scan ToolMessages for load_protocol results
-        # Deduplicate by protocol name
-        # Inject into system prompt via request.override()
-        return handler(request)
+```xml
+**Your Autonomy:**
+- You EXPLORE first, regardless of what context PM provides
+- Analyst findings are SUPPLEMENTARY - validate through your own exploration
+- You decide HOW to accomplish the goal PM delegates
+- You are a domain MASTER, not a passive executor
 ```
 
-### 2.4 Protocol Library Structure
-
-```
-protocols/
-├── pm/                      # PM orchestration
-├── catalog_specialist/      # Catalog domain (FIRST DOMAIN)
-├── catalog_analyst/         # Catalog exploration
-├── marketing_specialist/    # Marketing domain (FUTURE)
-├── operations_specialist/   # Operations domain (FUTURE)
-└── shared/                  # Cross-domain patterns
-    ├── fit_assessment.protocol
-    ├── value_discovery.protocol
-    ├── duplicate_prevention.protocol
-    └── tool_mastery/
-```
-
-**Resolution:** Agent-specific first, then shared.
-
-### 2.5 Token Budget
-
-| Scenario | Tokens |
-|----------|--------|
-| Base prompt | ~1,500 |
-| Per protocol | ~400-600 |
-| Simple task | ~1,500 (no protocols) |
-| Complex task | ~2,500-3,000 (2-3 protocols) |
-
-**Savings:** 55-70% vs static 5,000-8,000 token prompts.
+Protocols serve this autonomy by providing structured exploration patterns when the specialist determines they're needed.
 
 ---
 
-## 3. Generic Patterns
+## 6. Generic Patterns
 
-Generic patterns are **domain-agnostic templates**. Each domain INSTANTIATES these with specific entities, relationships, and business rules.
+Generic patterns are **domain-agnostic templates**. Each domain instantiates with specific entities and business rules.
 
-### 3.1 Pattern Registry
+### 6.1 Pattern Registry
 
-| Pattern | Question It Answers | Domain Examples |
-|---------|---------------------|-----------------|
+| Pattern | Question | Examples |
+|---------|----------|----------|
 | **Fit Assessment** | Does X belong with Y? | Family fit, Audience fit, Supplier fit |
-| **Value Discovery** | What should X cost/value? | Pricing, Budgeting, Estimation |
-| **New Entity** | Should we create new Y? | New family, New segment, New category |
-| **Duplicate Prevention** | Does X already exist? | Product, Campaign, Order dedup |
-| **Domain Orientation** | What's the current state? | Catalog landscape, Market overview |
+| **Value Discovery** | What should X cost? | Pricing, Budgeting, Estimation |
+| **New Entity** | Should we create Y? | New family, New segment |
+| **Duplicate Prevention** | Does X exist? | Product, Campaign dedup |
 
-### 3.2 Instantiation Process
-
-```
-GENERIC PATTERN (domain-agnostic)
-         |
-         v
-+-------------------+
-| Replace:          |
-| [ENTITY] → family |
-| [SUBJECT] → product |
-| [VALUE] → price   |
-| [CRITERIA] → customer_segment |
-+-------------------+
-         |
-         v
-+-------------------+
-| Add Domain Context: |
-| - Why This Matters |
-| - How to Interpret |
-| - Anti-patterns    |
-+-------------------+
-         |
-         v
-DOMAIN PROTOCOL (Catalog-specific)
-```
-
-### 3.3 Fit Assessment Pattern
+### 6.2 Fit Assessment Pattern
 
 ```xml
 <pattern name="Fit Assessment" type="generic">
 
 ## PURPOSE
-Determine if [SUBJECT] belongs with [ENTITY].
+Ground the decision: Does [SUBJECT] belong with [ENTITY]?
 
-## STEPS
+## EXPLORATION STEPS
 
 ### Step 1: IDENTIFY - Target [ENTITY]
 Document: [ENTITY_ID], [ENTITY_NAME]
@@ -290,21 +305,21 @@ Determine [SUBJECT] profile based on attributes.
 
 ### Step 6: CONCLUDE
 - MATCH: [SUBJECT] FITS this [ENTITY]
-- PARTIAL: Present options to user
+- PARTIAL: Present options to user via HITL
 - MISMATCH: Needs DIFFERENT [ENTITY]
 
 </pattern>
 ```
 
-### 3.4 Value Discovery Pattern
+### 6.3 Value Discovery Pattern
 
 ```xml
 <pattern name="Value Discovery" type="generic">
 
 ## PURPOSE
-Determine appropriate [VALUE] for [SUBJECT] based on patterns.
+Ground the decision: What should [SUBJECT] cost/value?
 
-## STEPS
+## EXPLORATION STEPS
 
 ### Step 1: IDENTIFY - [SUBJECT] Category
 Classify into tier based on attributes.
@@ -325,24 +340,22 @@ Flag if outside range.
 </pattern>
 ```
 
-### 3.5 Multi-Domain Application
+### 6.4 Multi-Domain Application
 
 | Domain | Fit Assessment | Value Discovery |
 |--------|----------------|-----------------|
-| **Catalog** | Product → Family fit | Product pricing |
-| **Marketing** | Campaign → Audience fit | Campaign budgeting |
-| **Operations** | Order → Process fit | Task estimation |
-| **Procurement** | Supplier → Category fit | Cost estimation |
-
-**Same patterns, different instantiation.** This enables rapid domain expansion.
+| **Catalog** | Product -> Family fit | Product pricing |
+| **Marketing** | Campaign -> Audience fit | Campaign budgeting |
+| **Operations** | Order -> Process fit | Task estimation |
+| **Procurement** | Supplier -> Category fit | Cost estimation |
 
 ---
 
-## 4. Domain Instantiation: Catalog
+## 7. Domain Instantiation: Catalog
 
-Catalog is the **first domain** implemented. This section shows how generic patterns become domain-specific protocols.
+Catalog is the **first domain**. This shows how generic patterns become domain-specific protocols.
 
-### 4.1 Business Context
+### 7.1 Business Context
 
 ```xml
 <business_context domain="catalog">
@@ -353,8 +366,8 @@ Catalog is the **first domain** implemented. This section shows how generic patt
 - PREMIUM (Rs 150+): Luxury seekers, artisan products
 
 ## Key Relationships
-- product_families → customer_segments (WHO buys)
-- products → product_families (WHERE it belongs)
+- product_families -> customer_segments (WHO buys)
+- products -> product_families (WHERE it belongs)
 - customer_segments DETERMINES family fit (not material, not price)
 
 ## Common Misconceptions
@@ -364,7 +377,7 @@ Catalog is the **first domain** implemented. This section shows how generic patt
 </business_context>
 ```
 
-### 4.2 Protocol Index
+### 7.2 Protocol Index (In Specialist Prompt)
 
 ```xml
 <protocol_index>
@@ -380,15 +393,15 @@ For familiar tasks with clear paths, proceed without loading protocols.
 </protocol_index>
 ```
 
-### 4.3 Family Fit Protocol (Instantiated)
+### 7.3 Family Fit Protocol (Instantiated)
 
 ```xml
 <protocol name="Family Fit" domain="catalog">
 
 ## PURPOSE
-Determine if a product belongs in a candidate family.
+Ground the decision: Does this product belong in this family?
 
-## STEPS
+## EXPLORATION STEPS
 
 ### Step 1: IDENTIFY - Candidate Family
 Document: family_id, family_name
@@ -413,9 +426,9 @@ Based on visual style, materials, price point:
 - MISMATCH: Different customer type
 
 ### Step 6: CONCLUDE
-- MATCH + Cohesive: FITS this family
-- PARTIAL/Ambiguous: Present options to user
-- MISMATCH: Needs DIFFERENT family
+- MATCH: Product FITS this family
+- PARTIAL: Present options to user via HITL
+- MISMATCH: Needs DIFFERENT family -> Search or New Entity
 
 ## VERIFICATION
 - [ ] Step 2 query executed (not assumed)
@@ -428,149 +441,90 @@ Based on visual style, materials, price point:
 </protocol>
 ```
 
-### 4.4 Pricing Protocol (Instantiated)
-
-```xml
-<protocol name="Pricing" domain="catalog">
-
-## PURPOSE
-Determine appropriate price based on catalog patterns.
-
-## STEPS
-
-### Step 1: IDENTIFY - Product Positioning
-Classify: UTILITY / DECORATIVE / PREMIUM
-
-### Step 2: QUERY - Similar Products
-Execute: read_data(table="products", filters={"positioning": "[tier]"}, limit=15)
-
-### Step 3: AGGREGATE - Price Range
-Execute: aggregate_data(aggregations={"min": "price", "max": "price", "avg": "price"})
-
-### Step 4: POSITION - Within Range
-- Lower: Basic, simple
-- Middle: Standard for category
-- Upper: Premium features
-
-### Step 5: CONCLUDE
-Recommend specific price WITHIN discovered range.
-
-</protocol>
-```
-
-### 4.5 Execution Example
+### 7.4 Execution Example
 
 ```
 TASK: Determine family fit for printed floral PET jar
 
-STEP 1: IDENTIFY
-Candidate: "PET Kitchen Storage" (fam-001)
+EXPLORE (Protocol-guided):
+  Step 1: Candidate "PET Kitchen Storage" (fam-001)
+  Step 2: read_data(customer_segments) -> "Utility-focused buyers"
+  Step 3: read_data(products) -> Plain containers, Rs 25-60
 
-STEP 2: QUERY - Customer Segment
-Result: "Households organizing kitchen pantry - utility-focused buyers"
+REASON (Agent expertise):
+  Product has: Printed floral design, decorative finish
+  Target customer: Gift buyers, home decor enthusiasts
+  Family customer: Utility buyers
+  Assessment: MISMATCH
 
-STEP 3: QUERY - Family Products
-Result: Plain containers, bulk storage. Price Rs 25-60.
-
-STEP 4: ANALYZE
-Product: Printed floral design, decorative finish
-Target: Gift buyers, home decor enthusiasts
-
-STEP 5: COMPARE
-Family: Utility buyers | Product: Decorative buyers
-Assessment: MISMATCH
-
-STEP 6: CONCLUDE
-MISMATCH → Needs DIFFERENT FAMILY
-→ Search for decorative family or trigger New Entity protocol
+OUTPUT (Decision):
+  MISMATCH -> Needs DIFFERENT FAMILY
+  -> Search for decorative family or trigger New Entity protocol
 ```
 
 ---
 
-## 5. Protocol Composition
+## 8. Communication Protocol
 
-### 5.1 Composition Patterns
+From ARCHITECTURAL_VISION.md - filesystem-based coordination:
 
-| Pattern | When | Example |
-|---------|------|---------|
-| Sequential | Each depends on previous | Duplicate → Fit → Pricing |
-| Conditional | Branch on conclusion | If MISMATCH: New Entity |
-| Parallel | Independent checks | Duplicate ∥ Schema Validation |
+```
+workspace/thread_123/
+├── visual_analysis.md      # visual_analyst output
+├── catalog_analysis.md     # catalog_analyst output
+├── product_research.md     # product_analyst output
+└── catalog_results.md      # catalog_specialist output (includes protocol execution)
+```
 
-### 5.2 Standard Compositions
-
-| Task | Protocol Sequence |
-|------|-------------------|
-| New Product | Duplicate → Fit → (New Entity?) → Pricing → Write |
-| Update Product | Read Current → Validate → Write |
-| Family Assignment | Orientation → Fit → (New Entity?) |
-
-### 5.3 Ambiguous Results
-
-| Scenario | Action |
-|----------|--------|
-| Clear winner | Proceed with decision |
-| Multiple valid options | Present options to user via HITL |
-| No valid options | Trigger alternative protocol |
-
-**Control mechanism:** HITL on writes catches all decisions. Agent expresses uncertainty in natural language, not percentages.
+**Flow:**
+1. PM delegates with context (1-2 liner)
+2. Analyst/Specialist explores (using protocols when needed)
+3. Agent writes detailed findings to filesystem
+4. Agent returns summary + file path to PM
+5. PM reasons about next step from summary
 
 ---
 
-## 6. Implementation
+## 9. Implementation
 
-### 6.1 Phase Overview
+### 9.1 Phase Overview
 
 | Phase | Focus | Status |
 |-------|-------|--------|
-| **Phase 1** | Foundation (Catalog) | READY |
+| **Phase 1** | Foundation | READY |
 | **Phase 2** | Core Protocols | PENDING |
-| **Phase 3** | Token Optimization | PENDING |
-| **Phase 4** | Multi-Domain | FUTURE |
+| **Phase 3** | Multi-Domain | FUTURE |
 
-### 6.2 Phase 1: Foundation
+### 9.2 Phase 1: Foundation
 
 - [ ] Protocol file structure
 - [ ] `create_load_protocol_tool()`
 - [ ] `ProtocolInjectionMiddleware`
 - [ ] `business_context.protocol` for Catalog
-- [ ] Specialist prompt with protocol index
+- [ ] Add protocol index to catalog_specialist prompt
 
-### 6.3 Phase 2: Core Protocols
+### 9.3 Phase 2: Core Protocols
 
-- [ ] `duplicate_prevention.protocol`
 - [ ] `family_fit.protocol`
 - [ ] `pricing.protocol`
+- [ ] `duplicate_prevention.protocol`
 - [ ] `new_entity.protocol`
-
-### 6.4 Phase 3: Token Optimization
-
-- [ ] Summary protocol versions
-- [ ] `protocol_depth` parameter
-- [ ] Token budget enforcement
-
-### 6.5 Phase 4: Multi-Domain
-
-- [ ] Validate generic patterns across domains
-- [ ] Second domain protocols (when needed)
-- [ ] Cross-domain coordination
 
 ---
 
-## 7. Decision Log
+## 10. Decision Log
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2025-12-16 | Unified Tool + Middleware | All agents use same pattern |
 | 2025-12-16 | Message-history based | REPL verified: ToolMessages persist |
-| 2025-12-16 | Agent-driven selection | Pure autonomy; protocol index guides |
-| 2025-12-16 | Per-agent directories | Resolution: agent-specific first, then shared |
-| 2025-12-17 | Consolidated documentation | 77% reduction (4748 → 1090 lines) |
-| 2025-12-17 | Removed confidence framework | HITL is control mechanism |
+| 2025-12-16 | Agent-driven selection | Pure autonomy; specialists decide when to load |
+| 2025-12-17 | Protocols enable autonomy | Serve Explore->Reason->Output, don't replace it |
+| 2025-12-17 | HITL is control mechanism | No confidence scores; HITL catches decisions |
 
 ---
 
-## 8. Success Metrics
+## 11. Success Metrics
 
 | Metric | Target | Measurement |
 |--------|--------|-------------|
@@ -579,36 +533,30 @@ MISMATCH → Needs DIFFERENT FAMILY
 | Duplicate prevention | 99%+ | Zero duplicates |
 | Token usage | ~3,000 | LangSmith traces |
 
-**Verification:** Use `workflow-evaluation` skill for trace analysis and protocol testing.
+**Verification:** Use `workflow-evaluation` skill for trace analysis.
 
 ---
 
-## 9. Risk Register
+## 12. Risk Register
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Protocol attention dilution | High | Token budget, tiered depth |
+| Protocol attention dilution | High | Token budget, load only when needed |
 | Visual analysis ungrounded | Medium | Structured criteria, HITL |
 | Agent skips protocols | High | Trace monitoring, prompt strengthening |
-| Cold start errors | High | Heavy confirmation, warnings |
+| Protocols become prescriptive | High | Design review against P3 (Explorative Over Prescriptive) |
 
 ---
 
 ## References
 
+- [ARCHITECTURAL_VISION.md](../ARCHITECTURAL_VISION.md) - North star vision
+- [AGENTS_DESIGN.md](./AGENTS_DESIGN.md) - 2-Level architecture
+- [AUTONOMY_PROBLEMS.md](../AUTONOMY_PROBLEMS.md) - Autonomy fixes
+- [DOMAIN_DESIGN_GUIDELINES.md](./DOMAIN_DESIGN_GUIDELINES.md) - Domain design
 - [PM_INTELLIGENCE_ROADMAP.md](./PM_INTELLIGENCE_ROADMAP.md) - Future PM capabilities
-- [DOMAIN_DESIGN_GUIDELINES.md](./DOMAIN_DESIGN_GUIDELINES.md) - Design principles
-- [AGENTS_DESIGN.md](./AGENTS_DESIGN.md) - Agent hierarchy
 
 ---
 
-## Archived
-
-Superseded by this document:
-- `DOMAIN_REASONING_PROTOCOLS.md`
-- `DOMAIN_REASONING_IMPLEMENTATION_PLAN.md`
-
----
-
-**Version:** 3.0 (Vision-Aligned)
+**Version:** 4.0 (Properly Grounded)
 **Updated:** December 17, 2025
