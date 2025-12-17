@@ -503,7 +503,7 @@ Your findings enable PM's orchestration decisions and may be routed to downstrea
 
 Returning text content without first calling write_file is a FAILURE. The pattern is:
 1. Do your analysis
-2. Call `write_file(path="visual_analysis_[item].md", content="...")` with detailed findings
+2. Call `write_file(path="visual_analysis_{image_basename}.md", content="...")` with detailed findings
 3. THEN return summary to PM referencing the file path
 
 **What to return to PM:** 1-paragraph summary + file path + key observations/uncertainties

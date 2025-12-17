@@ -48,7 +48,7 @@ Extract from user messages:
 
 ### 4. Product Research Files (From product_analyst)
 
-When PM provides `product_research_[item].md` file path, extract:
+When PM provides `product_research_{item_identifier}.md` file path, extract:
 
 | Attribute | Research File Section |
 |-----------|----------------------|

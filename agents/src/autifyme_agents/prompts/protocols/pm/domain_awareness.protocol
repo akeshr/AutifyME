@@ -120,10 +120,10 @@ Every delegation MUST include:
 
 | Delegating To | MUST Include These Files | Why |
 |---------------|-------------------------|-----|
-| **catalog_analyst** | visual_analysis_[item].md | Needs product identification to search catalog |
-| **product_analyst** | visual_analysis_[item].md | Needs product identification for research |
-| **creative_specialist** | visual_analysis_[item].md | Needs material details for processing (glass, PET, metal) |
-| **catalog_specialist** | visual_analysis_[item].md, catalog_analysis_[item].md, product_research_[item].md, storage_path from creative | Needs ALL context for complete record creation |
+| **catalog_analyst** | visual_analysis_{image_basename}.md | Needs product identification to search catalog |
+| **product_analyst** | visual_analysis_{image_basename}.md | Needs product identification for research |
+| **creative_specialist** | visual_analysis_{image_basename}.md | Needs material details for processing (glass, PET, metal) |
+| **catalog_specialist** | visual_analysis_{image_basename}.md, catalog_analysis_{item_identifier}.md, product_research_{item_identifier}.md, storage_path from creative | Needs ALL context for complete record creation |
 
 ### Delegation Templates
 
@@ -262,11 +262,11 @@ When one domain's output feeds another:
 
 | From | To | Handoff Artifact |
 |------|-----|-----------------|
-| VISUAL | CATALOG | visual_analysis_[item].md |
-| VISUAL | PRODUCT | visual_analysis_[item].md |
-| CATALOG | SPECIALIST | catalog_analysis_[item].md |
-| PRODUCT | SPECIALIST | product_research_[item].md |
-| CREATIVE | CATALOG | pending/[thread]/processed_*.png |
+| VISUAL | CATALOG | visual_analysis_{image_basename}.md |
+| VISUAL | PRODUCT | visual_analysis_{image_basename}.md |
+| CATALOG | SPECIALIST | catalog_analysis_{item_identifier}.md |
+| PRODUCT | SPECIALIST | product_research_{item_identifier}.md |
+| CREATIVE | CATALOG | pending/{thread_id}/{timestamp}_studio_{hash}.png |
 
 **PM's Role:**
 - Route file paths between domains

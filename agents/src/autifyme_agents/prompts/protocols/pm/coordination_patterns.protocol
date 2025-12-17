@@ -97,7 +97,7 @@ Most common multi-domain workflow. Memorize this.
 [Image Received]
       |
       v
-[1. visual_analyst] -----> visual_analysis_[item].md
+[1. visual_analyst] -----> visual_analysis_{image_basename}.md
       |
       v (visual findings available)
       |
@@ -107,7 +107,7 @@ Most common multi-domain workflow. Memorize this.
 [2. catalog_analyst]  [3. product_analyst]
       |                 |
       v                 v
-catalog_analysis.md   product_research.md
+catalog_analysis_{item_identifier}.md   product_research_{item_identifier}.md
       |                 |
       +--------+--------+
                |
@@ -143,10 +143,10 @@ catalog_analysis.md   product_research.md
 
 | From | Artifact | Routes To | PM Action |
 |------|----------|-----------|-----------|
-| visual_analyst | visual_analysis_[item].md | catalog_analyst, product_analyst, creative_specialist | Include path in ALL subsequent delegations |
-| catalog_analyst | catalog_analysis_[item].md | catalog_specialist | Include path when delegating to catalog_specialist |
-| product_analyst | product_research_[item].md | catalog_specialist | Include path when delegating to catalog_specialist |
-| creative_specialist | pending/[thread]/*.png (storage_path) | catalog_specialist | Include storage_path when delegating catalog creation |
+| visual_analyst | visual_analysis_{image_basename}.md | catalog_analyst, product_analyst, creative_specialist | Include path in ALL subsequent delegations |
+| catalog_analyst | catalog_analysis_{item_identifier}.md | catalog_specialist | Include path when delegating to catalog_specialist |
+| product_analyst | product_research_{item_identifier}.md | catalog_specialist | Include path when delegating to catalog_specialist |
+| creative_specialist | pending/{thread_id}/{timestamp}_studio_{hash}.png | catalog_specialist | Include storage_path when delegating catalog creation |
 
 ### Example: Full Catalog Addition with File Routing
 
@@ -537,10 +537,10 @@ User context flows through PM, not through files.
 
 | Context Type | Where It Lives | How to Propagate |
 |--------------|---------------|------------------|
-| Visual analysis | visual_analysis_[item].md | Route file path |
-| Catalog findings | catalog_analysis_[item].md | Route file path |
-| Product research | product_research_[item].md | Route file path |
-| Processed images | pending/[thread]/*.png | Route file path |
+| Visual analysis | visual_analysis_{image_basename}.md | Route file path |
+| Catalog findings | catalog_analysis_{item_identifier}.md | Route file path |
+| Product research | product_research_{item_identifier}.md | Route file path |
+| Processed images | pending/{thread_id}/*.png | Route file path |
 
 ### The Critical Gap
 
@@ -695,7 +695,7 @@ When analysts provide conflicting information about the same product.
 
 When contradiction detected, the LATER file should acknowledge:
 ```
-product_research_[item].md:
+product_research_{item_identifier}.md:
 "Note: Visual analysis identified material as [X].
 Research indicates [Y] based on [source].
 Using research finding due to [reasoning]."

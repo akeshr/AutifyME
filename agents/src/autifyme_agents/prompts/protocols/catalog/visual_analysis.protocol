@@ -221,15 +221,15 @@ Write analysis to file with unique name derived from source image.
 
 **Pattern:**
 ```
-/main/visual_analysis_{image_basename}.txt
+/main/visual_analysis_{image_basename}.md
 ```
 
 **Example:**
 - Source image: `inbox/user123/20251217_152547_photo.jpg`
-- Output file: `/main/visual_analysis_20251217_152547_photo.txt`
+- Output file: `/main/visual_analysis_20251217_152547_photo.md`
 
 **Why unique names matter:**
-- Generic names like `catalog_analysis.txt` get OVERWRITTEN on next analysis
+- Generic names like `catalog_analysis.md` get OVERWRITTEN on next analysis
 - Unique names enable PM to reference correct analysis in downstream delegations
 - Downstream agents (catalog_analyst, catalog_specialist) need stable file paths
 
