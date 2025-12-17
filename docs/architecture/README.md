@@ -10,7 +10,8 @@ Timeless design blueprints and implementation ground truth.
 
 | Document | Purpose |
 | --- | --- |
-| **[DOMAIN_REASONING_PROTOCOLS.md](./core/DOMAIN_REASONING_PROTOCOLS.md)** | **[NEW]** Domain-specific reasoning protocols - encoding domain expertise as executable process |
+| **[DOMAIN_REASONING.md](./core/DOMAIN_REASONING.md)** | **[CANONICAL]** Domain reasoning framework - protocols, architecture, implementation |
+| **[PM_INTELLIGENCE_ROADMAP.md](./core/PM_INTELLIGENCE_ROADMAP.md)** | **[ROADMAP]** Future PM capabilities - reference resolution, intent inference |
 | **[DOMAIN_DESIGN_GUIDELINES.md](./core/DOMAIN_DESIGN_GUIDELINES.md)** | **[CRITICAL]** Architectural standards for designing new domains and workflows |
 | **[AGENTS_DESIGN.md](./core/AGENTS_DESIGN.md)** | **[CANONICAL]** Agent hierarchy, context engineering, specialist patterns |
 | **[ACTUAL_IMPLEMENTATION_ARCHITECTURE.md](./core/ACTUAL_IMPLEMENTATION_ARCHITECTURE.md)** | **[GROUND TRUTH]** As-built implementation verified from code |
@@ -154,7 +155,7 @@ Before implementing any feature:
 1. Review **[AGENTS_DESIGN.md](./core/AGENTS_DESIGN.md)** for hierarchy and specialist patterns
 2. Check **[DOMAIN_DESIGN_GUIDELINES.md](./core/DOMAIN_DESIGN_GUIDELINES.md)** for architectural standards
 3. **Writing prompts?** Follow **[PROMPT_ENGINEERING_STANDARDS.md](./tech/PROMPT_ENGINEERING_STANDARDS.md)**
-4. **Adding domain expertise?** Use **[DOMAIN_REASONING_PROTOCOLS.md](./core/DOMAIN_REASONING_PROTOCOLS.md)** to encode as executable protocols
+4. **Adding domain expertise?** Use **[DOMAIN_REASONING.md](./core/DOMAIN_REASONING.md)** to encode as executable protocols
 5. Check **[LANGCHAIN_V1_FEATURES.md](./tech/LANGCHAIN_V1_FEATURES.md)** for native solutions
 6. Follow Cursor rules in `../../.cursor/rules/`
 
@@ -164,6 +165,8 @@ Before implementing any feature:
 
 Archived docs moved to `../historical/` (kept for reference, not active navigation):
 
+- `core/DOMAIN_REASONING_PROTOCOLS.md` - **[ARCHIVED]** Superseded by DOMAIN_REASONING.md
+- `core/DOMAIN_REASONING_IMPLEMENTATION_PLAN.md` - **[ARCHIVED]** Merged into DOMAIN_REASONING.md
 - `historical/bug-fixes/BUG_FIXES_CHANGELOG.md` - Consolidated bug fix changelog
 - `historical/migrations/v1-upgrade/V1_MIGRATION_COMPLETE.md` - LangChain v1 migration summary
 - `historical/research/deepagents/DEEPAGENTS_LIBRARY_LIMITATIONS.md` - Known library limitations

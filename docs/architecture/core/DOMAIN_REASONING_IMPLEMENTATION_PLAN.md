@@ -1,8 +1,12 @@
 # Domain Reasoning Protocols - Implementation Plan
 
+> **ARCHIVED - December 17, 2025**
+> This document has been merged into **[DOMAIN_REASONING.md](./DOMAIN_REASONING.md)**
+> Kept for historical reference only. Do not update this document.
+
 **Created:** December 16, 2025
-**Status:** ACTIVE - Phase 1 Ready to Start
-**Framework:** [DOMAIN_REASONING_PROTOCOLS.md](./DOMAIN_REASONING_PROTOCOLS.md)
+**Status:** ARCHIVED - Merged into DOMAIN_REASONING.md
+**Framework:** [DOMAIN_REASONING.md](./DOMAIN_REASONING.md)
 **Purpose:** Staged implementation plan with progress tracking and decision log
 
 ---

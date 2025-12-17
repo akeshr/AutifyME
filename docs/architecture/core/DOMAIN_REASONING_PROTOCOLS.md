@@ -1,8 +1,12 @@
 # Domain-Specific Reasoning Protocols
 
+> **ARCHIVED - December 17, 2025**
+> This document has been superseded by **[DOMAIN_REASONING.md](./DOMAIN_REASONING.md)**
+> Kept for historical reference only. Do not update this document.
+
 **Created:** December 15, 2025
 **Updated:** December 16, 2025
-**Status:** APPROVED - Ready for Implementation
+**Status:** ARCHIVED - Superseded by DOMAIN_REASONING.md
 **Purpose:** Domain-agnostic framework for encoding domain expertise as executable reasoning protocols
 
 ---
