@@ -137,14 +137,60 @@ catalog_analysis.md   product_research.md
 | creative_specialist | User approval | Don't process if user will reject |
 | catalog_specialist | creative_specialist | Needs processed image paths for asset linking |
 
-### File Routing
+### File Routing (CRITICAL)
 
-| From | Artifact | Routes To |
-|------|----------|-----------|
-| visual_analyst | visual_analysis_[item].md | catalog_analyst, product_analyst, creative_specialist |
-| catalog_analyst | catalog_analysis_[item].md | catalog_specialist |
-| product_analyst | product_research_[item].md | catalog_specialist |
-| creative_specialist | pending/[thread]/*.png | catalog_specialist |
+**PM MUST include these files in each delegation. Agents cannot see your conversation.**
+
+| From | Artifact | Routes To | PM Action |
+|------|----------|-----------|-----------|
+| visual_analyst | visual_analysis_[item].md | catalog_analyst, product_analyst, creative_specialist | Include path in ALL subsequent delegations |
+| catalog_analyst | catalog_analysis_[item].md | catalog_specialist | Include path when delegating to catalog_specialist |
+| product_analyst | product_research_[item].md | catalog_specialist | Include path when delegating to catalog_specialist |
+| creative_specialist | pending/[thread]/*.png (storage_path) | catalog_specialist | Include storage_path when delegating catalog creation |
+
+### Example: Full Catalog Addition with File Routing
+
+```
+Step 1: visual_analyst
+PM: "Analyze image at inbox/thread_xyz/photo.jpg. For CATALOG domain."
+-> Returns: "Analysis written to visual_analysis_pet_jar.md"
+
+Step 2: catalog_analyst (receives visual file)
+PM: "Find catalog placement.
+     Read visual analysis at: visual_analysis_pet_jar.md
+     For CATALOG domain."
+-> Returns: "Analysis written to catalog_analysis_pet_jar.md"
+
+Step 3: product_analyst (receives visual file)
+PM: "Research specs and HSN.
+     Read visual analysis at: visual_analysis_pet_jar.md
+     For PRODUCT domain."
+-> Returns: "Research written to product_research_pet_jar.md"
+
+[USER APPROVAL]
+
+Step 4: creative_specialist (receives visual file)
+PM: "Create catalog hero shot.
+     Read visual analysis at: visual_analysis_pet_jar.md
+     Source image at: inbox/thread_xyz/photo.jpg
+     For CREATIVE domain."
+-> Returns: "Processed image at pending/thread_xyz/studio_abc.png"
+
+Step 5: catalog_specialist (receives ALL files)
+PM: "Create catalog entry.
+     Read visual analysis at: visual_analysis_pet_jar.md
+     Read catalog analysis at: catalog_analysis_pet_jar.md
+     Read product research at: product_research_pet_jar.md
+     Processed image at: pending/thread_xyz/studio_abc.png
+     For CATALOG domain. This is {company_name}'s product."
+-> Creates product + asset + junction
+```
+
+**Anti-Pattern:**
+```
+WRONG: "Create catalog entry for the PET jar"
+-> catalog_specialist has no files, no context, will fail or produce incomplete record
+```
 
 ---
 

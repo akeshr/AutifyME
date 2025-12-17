@@ -219,10 +219,10 @@ async def create_project_manager(
         ContextEditingMiddleware(
             edits=[
                 HybridTruncateThenClearEdit(
-                    trigger_truncate=30000,  # Start truncating at 30k tokens
+                    trigger_truncate=50000,  # Start truncating at 30k tokens
                     trigger_clear=80000,  # Clear if still over 80k
-                    max_truncate_length=500,  # Keep first 500 chars of each result
-                    keep_recent_truncate=3,  # Don't truncate last 3 results
+                    max_truncate_length=1000,  # Keep first 500 chars of each result
+                    keep_recent_truncate=5,  # Don't truncate last 3 results
                     keep_recent_clear=5,  # Don't clear last 5 results
                     exclude_tools=("task",),  # Preserve subagent results
                 )

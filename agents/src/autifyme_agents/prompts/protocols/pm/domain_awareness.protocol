@@ -110,6 +110,89 @@ Every delegation MUST include:
 1. **File paths** - Specialists cannot see your conversation or tool results
 2. **Domain context** - Determines which protocols the specialist loads
 3. **Company context** - When cataloging user's products, specify "This is {company_name}'s product"
+4. **Upstream analysis files** - Pass ALL relevant files from previous steps
+
+---
+
+## FILE ROUTING MATRIX (CRITICAL)
+
+**Agents CANNOT see PM's conversation.** You MUST pass upstream files explicitly.
+
+| Delegating To | MUST Include These Files | Why |
+|---------------|-------------------------|-----|
+| **catalog_analyst** | visual_analysis_[item].md | Needs product identification to search catalog |
+| **product_analyst** | visual_analysis_[item].md | Needs product identification for research |
+| **creative_specialist** | visual_analysis_[item].md | Needs material details for processing (glass, PET, metal) |
+| **catalog_specialist** | visual_analysis_[item].md, catalog_analysis_[item].md, product_research_[item].md, storage_path from creative | Needs ALL context for complete record creation |
+
+### Delegation Templates
+
+**To catalog_analyst:**
+```
+"Find catalog placement for this product.
+Read visual analysis at: visual_analysis_pet_jar.md
+Source image at: inbox/thread_xyz/photo.jpg
+For CATALOG domain. This is {company_name}'s product."
+```
+
+**To product_analyst:**
+```
+"Research specs, HSN, and certifications for this product.
+Read visual analysis at: visual_analysis_pet_jar.md
+For PRODUCT domain. This is {company_name}'s product."
+```
+
+**To creative_specialist:**
+```
+"Create catalog hero shot for this product.
+Read visual analysis at: visual_analysis_pet_jar.md (contains material: PET)
+Source image at: inbox/thread_xyz/photo.jpg
+For CREATIVE domain."
+```
+
+**To catalog_specialist:**
+```
+"Create catalog entry for this product.
+Read visual analysis at: visual_analysis_pet_jar.md
+Read catalog analysis at: catalog_analysis_pet_jar.md
+Read product research at: product_research_pet_jar.md
+Processed image at: pending/thread_xyz/studio_abc.png
+For CATALOG domain. This is {company_name}'s product."
+```
+
+### Anti-Pattern: Missing Upstream Files
+
+```
+WRONG:
+"Create catalog entry for the PET jar."
+-> catalog_specialist has NO context - doesn't know family, pricing, HSN
+
+WRONG:
+"Create hero shot for this product at inbox/thread_xyz/photo.jpg"
+-> creative_specialist doesn't know material type (glass? PET? metal?)
+-> Can't apply correct material_treatment specs
+
+CORRECT:
+"Create hero shot for this product.
+Read visual analysis at: visual_analysis_pet_jar.md (material: PET plastic)
+Source image at: inbox/thread_xyz/photo.jpg
+For CREATIVE domain."
+-> creative_specialist knows to use PET-specific processing
+```
+
+---
+
+## DELEGATION CHECKLIST
+
+Before EVERY delegation, verify:
+
+- [ ] Source image path included (if image task)
+- [ ] ALL upstream analysis files listed by path
+- [ ] Domain context specified ("For CATALOG domain")
+- [ ] Company context for cataloging tasks
+- [ ] Any user clarifications/corrections mentioned
+
+---
 
 **Pattern:**
 ```
