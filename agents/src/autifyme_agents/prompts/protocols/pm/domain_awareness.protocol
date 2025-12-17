@@ -11,10 +11,24 @@ Defines which domains own which decisions, enabling correct specialist routing.
 
 | Domain | Owns | Specialists/Analysts | Routing Trigger |
 |--------|------|---------------------|-----------------|
-| **CATALOG** | Product data, families, variants, pricing, assets | catalog_analyst, catalog_specialist | "add product", "update price", "find similar", "catalog" |
-| **CREATIVE** | Image processing, asset creation, visual output | creative_specialist | "process image", "create shot", "lifestyle", "campaign" |
-| **VISUAL** | Image analysis, visual identification | visual_analyst | "what is this", "identify", image without text |
-| **PRODUCT** | External product research: specs, materials, dimensions, certifications, HSN, standards, market context | product_analyst | "research", "find out", "look up", "HSN", "compliance", "specs", "capacity", "certifications", "what is" |
+| **CATALOG** | Product data, families, variants, pricing, assets, inventory context | catalog_analyst, catalog_specialist | "add product", "update", "delete", "remove", "find similar", "catalog", "list products", "show", "inventory", "variant", "family", "price", "pricing" |
+| **CREATIVE** | Image processing, asset creation, visual output, product photography | creative_specialist | "process image", "create shot", "lifestyle", "campaign", "edit image", "enhance", "fix background", "white background", "hero shot", "product photo", "remove background", "clean up image" |
+| **VISUAL** | Image analysis, visual identification, quality assessment | visual_analyst | "what is this", "identify", "analyze image", "describe", "inspect", "check quality", "compare", image without text |
+| **PRODUCT** | External product research: specs, materials, dimensions, certifications, HSN, standards, market context | product_analyst | "research", "find out", "look up", "HSN", "compliance", "specs", "capacity", "certifications", "what is", "materials", "dimensions" |
+
+**CATALOG Domain Scope (Internal Data Operations):**
+- Product CRUD: create, read, update, delete products and variants
+- Family management: product families, variant axes, variant values
+- Pricing: price lists, product prices, customer-specific pricing
+- Asset linking: connect processed images to products
+- Inventory context: product availability, stock status
+
+**CREATIVE Domain Scope (Visual Asset Production):**
+- Background processing: removal, replacement, white/transparent backgrounds
+- Image enhancement: color correction, sharpening, lighting adjustments
+- Hero shots: marketplace-ready product images (Amazon, Shopify quality)
+- Lifestyle/contextual: scene generation, product in context
+- Multi-product: extraction, isolation, composite shots
 
 **PRODUCT Domain Scope (Comprehensive Research):**
 - Technical specifications: capacity, dimensions, weight, materials
@@ -45,6 +59,15 @@ Most requests map to ONE domain. Route to that domain's specialist/analyst.
 | "Research this product" | PRODUCT | product_analyst |
 | "Find out specs/capacity" | PRODUCT | product_analyst |
 | "Research and catalog" | PRODUCT then CATALOG | product_analyst FIRST, then catalog_specialist |
+| "Delete this product" | CATALOG | catalog_specialist |
+| "Show me all bottles" | CATALOG | catalog_analyst |
+| "List products in family X" | CATALOG | catalog_analyst |
+| "Fix the background" | CREATIVE | creative_specialist |
+| "Remove background and make white" | CREATIVE | creative_specialist |
+| "Edit this image" | CREATIVE | creative_specialist |
+| "Analyze this image quality" | VISUAL | visual_analyst |
+| "Compare these two images" | VISUAL | visual_analyst |
+| "What materials is this made of?" | PRODUCT | product_analyst |
 
 ### Multi-Domain Routing
 
