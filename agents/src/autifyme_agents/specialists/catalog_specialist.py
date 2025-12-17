@@ -29,10 +29,9 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import MultimodalInjectionMiddleware
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
-from autifyme_agents.tools.research_tools import (
-    extract_web_content_tool,
-    research_product_tool,
-)
+
+# NOTE: Research tools removed - product_analyst handles all external research
+# catalog_specialist focuses on catalog CRUD operations only
 
 # =============================================================================
 # Domain Table Configuration
@@ -99,10 +98,9 @@ def create_catalog_specialist(
     system_prompt = load_prompt("specialists/catalog_specialist_v2.prompt")
 
     # Tools - load_protocol first for protocol-driven reasoning
+    # NOTE: No research tools - product_analyst handles external research
     tools: list[Any] = [
         create_load_protocol_tool(),
-        research_product_tool,
-        extract_web_content_tool,
     ]
 
     from autifyme_agents.tools.data_engine import (
@@ -130,7 +128,8 @@ def create_catalog_specialist(
         "INPUTS I NEED:\n"
         "- Target intent (create/update/delete) and business goal\n"
         "- IDs when possible (or enough attributes to look them up)\n"
-        "- Any processed image storage_path(s) in pending/... when linking assets\n\n"
+        "- Any processed image storage_path(s) in pending/... when linking assets\n"
+        "- External research findings from product_analyst (if needed)\n\n"
         "OUTPUTS I PRODUCE:\n"
         "- Protocol-grounded write plan with structured reasoning\n"
         "- After approval: executed write_data results + created/updated IDs\n"
@@ -138,7 +137,7 @@ def create_catalog_specialist(
         "TOOLS I USE:\n"
         "- load_protocol (FIRST - loads business_context, family_fit, pricing, etc.)\n"
         "- inspect_schema, read_data, aggregate_data, write_data (HITL), view_image\n"
-        "- research_product_tool, extract_web_content_tool (only when external facts needed)\n\n"
+        "- NO research tools - product_analyst handles external research\n\n"
         "GUARDRAILS:\n"
         "- Protocol steps are MANDATORY (e.g., family_fit requires customer_segments query)\n"
         "- No image processing (delegate to creative_specialist); no ad-hoc SQL; always read-before-write"

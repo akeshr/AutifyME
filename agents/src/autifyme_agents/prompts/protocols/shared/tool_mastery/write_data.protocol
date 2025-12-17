@@ -272,23 +272,23 @@ Some junctions require EXACTLY ONE of multiple FK options:
 
 ```json
 {
-  "goal": "Link asset to entity (product XOR family)",
-  "reasoning": "Asset uploaded. Linking to product. XOR: product_id OR family_id, never both.",
-  "hitl_summary": "Linking asset to product...",
+  "goal": "Link record to entity (type_a XOR type_b)",
+  "reasoning": "Record exists. Linking to type_a. XOR: type_a_id OR type_b_id, never both.",
+  "hitl_summary": "Linking record to type_a entity...",
   "operations": [
     {
       "action": "create",
-      "table": "entity_asset_junction",
+      "table": "polymorphic_junction",
       "data": {
-        "product_id": "existing-product-id",
-        "product_family_id": null,
-        "asset_id": "existing-asset-id",
+        "type_a_id": "existing-type-a-id",
+        "type_b_id": null,
+        "linked_record_id": "existing-record-id",
         "role": "PRIMARY",
         "sort_order": 0
       }
     }
   ],
-  "impact": {"creates": {"entity_asset_junction": 1}}
+  "impact": {"creates": {"polymorphic_junction": 1}}
 }
 ```
 
@@ -303,37 +303,35 @@ Create a record and immediately link it via junction:
 
 ```json
 {
-  "goal": "Create asset and link to product",
-  "reasoning": "New asset from storage. Product exists. Creating + linking.",
-  "hitl_summary": "Creating asset and linking to product...",
+  "goal": "Create new record and link to existing parent",
+  "reasoning": "New record data ready. Parent exists. Creating + linking.",
+  "hitl_summary": "Creating record and linking to parent...",
   "operations": [
     {
       "action": "create",
-      "table": "assets",
+      "table": "records_table",
       "data": {
-        "name": "Product Image",
-        "storage_url": "https://storage.example.com/images/file.jpg",
-        "file_name": "file.jpg",
-        "mime_type": "image/jpeg",
-        "asset_type": "IMAGE",
+        "name": "New Record",
+        "url": "https://storage.example.com/files/file.ext",
+        "file_name": "file.ext",
+        "type": "TYPE_A",
         "status": "ACTIVE"
       },
-      "returns": "asset"
+      "returns": "new_record"
     },
     {
       "action": "create",
-      "table": "entity_asset_junction",
+      "table": "record_parent_junction",
       "data": {
-        "product_id": "existing-product-id",
-        "product_family_id": null,
-        "asset_id": "@asset.id",
+        "parent_id": "existing-parent-id",
+        "record_id": "@new_record.id",
         "role": "PRIMARY",
         "sort_order": 0
       },
-      "dependencies": ["asset"]
+      "dependencies": ["new_record"]
     }
   ],
-  "impact": {"creates": {"assets": 1, "entity_asset_junction": 1}}
+  "impact": {"creates": {"records_table": 1, "record_parent_junction": 1}}
 }
 ```
 

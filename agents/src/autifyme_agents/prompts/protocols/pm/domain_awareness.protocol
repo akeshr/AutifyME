@@ -63,11 +63,17 @@ Complex requests span MULTIPLE domains. Execute in dependency order.
 Every delegation MUST include:
 1. **File paths** - Specialists cannot see your conversation or tool results
 2. **Domain context** - Determines which protocols the specialist loads
+3. **Company context** - When cataloging user's products, specify "This is {company_name}'s product"
 
 **Pattern:**
 ```
-"[Task] at [file_path]. For [DOMAIN] domain."
+"[Task] at [file_path]. For [DOMAIN] domain. This is {company_name}'s product (brand: {company_name})."
 ```
+
+**Why company context is critical:**
+- Without it, research tools search for competitor brands
+- User's products should NOT trigger brand identification research
+- Catalog entries should use company's brand, not guessed brand
 
 **Why file paths are critical:**
 - Specialists have NO access to PM's conversation history
@@ -83,7 +89,7 @@ Every delegation MUST include:
 
 CORRECT:
 ```
-"Analyze image at inbox/thread_xyz/photo.jpg for product details. For CATALOG domain."
+"Analyze image at inbox/thread_xyz/photo.jpg for product details. For CATALOG domain. This is {company_name}'s product."
 ```
 -> visual_analyst receives path AND knows to load catalog protocols
 

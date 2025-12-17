@@ -25,11 +25,31 @@ This is the #1 source of errors. Understand deeply.
 ### search_patterns (Fuzzy Match)
 - Case-insensitive ILIKE with % wildcards
 - Use for ALL name/text searches
+- **Supports OR via list values** - CRITICAL for efficiency!
 - Examples:
-  - `{'name': '%keyword%'}` - contains "keyword" anywhere
-  - `{'name': '%term1%term2%'}` - contains both terms
+  - `{'name': '%keyword%'}` - contains "keyword" anywhere (single pattern)
+  - `{'name': ['%term1%', '%term2%', '%term3%']}` - OR search: term1 OR term2 OR term3 (1 query!)
+  - `{'name': '%word1%word2%'}` - contains both words in sequence (single pattern with AND)
   - `{'code': 'PREFIX-%'}` - starts with "PREFIX-"
-  - `{'description': '%500%'}` - contains "500"
+
+### OR Patterns (EFFICIENCY - CRITICAL)
+
+Use list values to search for multiple patterns with OR logic in a single query.
+
+```python
+# EFFICIENT: 1 query for all keywords
+read_data(
+    table='table_name',
+    search_patterns={'name': ['%keyword1%', '%keyword2%', '%keyword3%']},
+    columns=['id', 'name', 'code']
+)
+# Returns: Records with ANY of these terms in name
+
+# INEFFICIENT (DON'T DO THIS): Multiple separate queries
+read_data(search_patterns={'name': '%keyword1%'})
+read_data(search_patterns={'name': '%keyword2%'})
+read_data(search_patterns={'name': '%keyword3%'})
+```
 
 ### Common Mistake
 
@@ -41,6 +61,10 @@ Result: Returns EMPTY if exact names don't exist
 CORRECT:
 search_patterns={'name': '%keyword%'}
 Result: Returns all records containing "keyword" (case-insensitive)
+
+ALSO CORRECT (OR search):
+search_patterns={'name': ['%term1%', '%term2%']}
+Result: Returns all records containing "term1" OR "term2"
 ```
 
 RULE: If you're matching human text and didn't include %, you probably meant search_patterns.

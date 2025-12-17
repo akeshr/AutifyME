@@ -769,7 +769,7 @@ class SupabaseStorageClient(StorageInterface):
         filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
         relations: list[str] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         count_only: Literal[True] = ...,
         limit: int | None = None,
     ) -> int: ...
@@ -781,7 +781,7 @@ class SupabaseStorageClient(StorageInterface):
         filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
         relations: list[str] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         count_only: Literal[False] = ...,
         limit: int | None = None,
     ) -> list[dict[str, Any]]: ...
@@ -792,7 +792,7 @@ class SupabaseStorageClient(StorageInterface):
         filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
         relations: list[str] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         count_only: bool = False,
         limit: int | None = None,
     ) -> list[dict[str, Any]] | int:
@@ -803,7 +803,9 @@ class SupabaseStorageClient(StorageInterface):
             filters: Exact match filters
             columns: Columns to select
             relations: Related tables using PostgREST syntax
-            search_patterns: ILIKE patterns for search
+            search_patterns: ILIKE patterns for search. Supports:
+                - Single pattern (AND): {'name': '%jar%'}
+                - Multiple patterns (OR): {'name': ['%jar%', '%container%']}
             count_only: Return count instead of rows
             limit: Maximum rows to return
 
@@ -848,10 +850,17 @@ class SupabaseStorageClient(StorageInterface):
                         # UUID, number, boolean - use exact match
                         query = query.eq(key, value)
 
-            # Apply ILIKE search patterns
+            # Apply ILIKE search patterns (supports OR via list values)
             if search_patterns:
-                for key, pattern in search_patterns.items():
-                    query = query.ilike(key, pattern)
+                for key, patterns in search_patterns.items():
+                    if isinstance(patterns, list):
+                        # OR between multiple patterns for same column
+                        # PostgREST syntax: column.ilike.pattern1,column.ilike.pattern2
+                        or_conditions = ",".join(f"{key}.ilike.{p}" for p in patterns)
+                        query = query.or_(or_conditions)
+                    else:
+                        # Single pattern - AND with other conditions
+                        query = query.ilike(key, patterns)
 
             # Apply limit
             if limit:
@@ -1076,7 +1085,7 @@ class SupabaseStorageClient(StorageInterface):
         self,
         table: str,
         filters: dict[str, Any] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         relations: list[str] | None = None,
         order_by: str | None = None,
         page: int = 1,
@@ -1136,10 +1145,14 @@ class SupabaseStorageClient(StorageInterface):
                     else:
                         query = query.eq(key, value)
 
-            # Apply search patterns
+            # Apply search patterns (supports OR via list values)
             if search_patterns:
-                for column, pattern in search_patterns.items():
-                    query = query.ilike(column, pattern)
+                for column, patterns in search_patterns.items():
+                    if isinstance(patterns, list):
+                        or_conditions = ",".join(f"{column}.ilike.{p}" for p in patterns)
+                        query = query.or_(or_conditions)
+                    else:
+                        query = query.ilike(column, patterns)
 
             # Apply ordering (default to id.asc for consistency)
             if order_by:
@@ -1193,8 +1206,12 @@ class SupabaseStorageClient(StorageInterface):
                             count_query = count_query.eq(key, value)
 
                 if search_patterns:
-                    for column, pattern in search_patterns.items():
-                        count_query = count_query.ilike(column, pattern)
+                    for column, patterns in search_patterns.items():
+                        if isinstance(patterns, list):
+                            or_conditions = ",".join(f"{column}.ilike.{p}" for p in patterns)
+                            count_query = count_query.or_(or_conditions)
+                        else:
+                            count_query = count_query.ilike(column, patterns)
 
                 count_response = await count_query.execute()
                 total = count_response.count if count_response.count is not None else 0

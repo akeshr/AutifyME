@@ -26,7 +26,7 @@ class AggregateDataInput(BaseModel):
 
     table: str = Field(
         ...,
-        description="Table name to aggregate (e.g., 'products', 'campaigns')"
+        description="Table name to aggregate (e.g., 'table_a', 'table_b')"
     )
     aggregates: dict[str, str] = Field(
         ...,
@@ -53,8 +53,8 @@ class AggregateDataInput(BaseModel):
         description=(
             "[FUZZY MATCH] Case-insensitive ILIKE patterns applied BEFORE aggregation.\n"
             "Use % as wildcard.\n"
-            "Examples: {'name': '%jar%'} (contains), {'sku': 'PET-%'} (starts with), {'name': '%PET%bottle%'} (contains both).\n"
-            "Use for: name searches, SKU patterns, description matching."
+            "Examples: {'name': '%keyword%'} (contains), {'code': 'PREFIX-%'} (starts with), {'name': '%term1%term2%'} (contains both).\n"
+            "Use for: name searches, code patterns, description matching."
         )
     )
     group_by: list[str] | None = Field(
@@ -91,13 +91,13 @@ def create_aggregate_data_tool(
         StructuredTool configured for aggregation queries
 
     Examples:
-        # Cataloging Specialist - Product analytics
+        # Specialist - Domain-scoped analytics
         aggregate_tool = create_aggregate_data_tool(
             storage,
-            tables=["products", "product_families"]
+            tables=["table_a", "table_b"]
         )
 
-        # Market Intelligence - Full analytics access
+        # Analyst - Full analytics access
         aggregate_tool = create_aggregate_data_tool(storage)  # No restrictions
     """
     allowed_tables = tables
@@ -127,19 +127,19 @@ def create_aggregate_data_tool(
             Aggregated results with all group columns and computed aggregates
 
         Examples:
-            # Count products per category
+            # Count records per group column
             aggregate_data(
-                table="products",
+                table="table_a",
                 aggregates={"count": "count(*)"},
-                group_by=["category_id"]
+                group_by=["column_1"]
             )
 
-            # Average price by brand, only active products
+            # Average value by grouping column, only active records
             aggregate_data(
-                table="products",
-                aggregates={"avg_val": "avg(amount)", "count": "count(*)"},
+                table="table_a",
+                aggregates={"avg_val": "avg(column_2)", "count": "count(*)"},
                 filters={"is_active": True},
-                group_by=["brand"],
+                group_by=["column_1"],
                 having={"count": {"gt": 5}}
             )
         """
@@ -218,13 +218,13 @@ def create_aggregate_data_tool(
         func=_aggregate_data_impl,
         name="aggregate_data",
         description=(
-            "PURPOSE: Analytics and statistics - count, sum, avg, min, max with GROUP BY and HAVING. Transform raw data into insights: product counts by family, pricing patterns, inventory distributions.\n\n"
+            "PURPOSE: Analytics and statistics - count, sum, avg, min, max with GROUP BY and HAVING. Transform raw data into insights: record counts by group, value patterns, distributions.\n\n"
             "USE WHEN:\n"
-            "- Distribution analysis: Products per family, SKUs per category, orders per customer\n"
-            "- Statistical calculations: Average prices, price ranges, total inventory values\n"
+            "- Distribution analysis: Records per group, items per category, orders per customer\n"
+            "- Statistical calculations: Average values, value ranges, total sums\n"
             "- Quality audits: Empty groups, sparse data, outliers\n"
-            "- Business intelligence: Revenue by category, inventory by warehouse\n"
-            "- Planning decisions: Which families need more variants?\n"
+            "- Business intelligence: Totals by category, counts by type\n"
+            "- Planning decisions: Which groups need attention?\n"
             "- Dashboard metrics: Total counts, averages, sums for reporting\n\n"
             "DON'T USE:\n"
             "- For individual records (use read_data - aggregate returns summaries, not rows)\n"
@@ -238,14 +238,14 @@ def create_aggregate_data_tool(
             "- filters/search_patterns: Applied BEFORE grouping (reduces dataset)\n"
             "- having: Applied AFTER grouping (filters computed aggregates) - alias must match aggregates key\n"
             "  Operators: gt, gte, lt, lte, eq, neq\n"
-            "- Multiple aggregates in one query: {'count': 'count(*)', 'avg_price': 'avg(base_price)', 'min_price': 'min(base_price)'}\n\n"
+            "- Multiple aggregates in one query: {'count': 'count(*)', 'avg_val': 'avg(column_1)', 'min_val': 'min(column_1)'}\n\n"
             "EXAMPLES:\n"
-            "# Distribution: Count products per family\n"
-            "aggregate_data(table='products', aggregates={'product_count': 'count(*)', 'avg_price': 'avg(base_price)'}, filters={'is_active': True}, group_by=['product_family_id'])\n"
-            "Returns: [{product_family_id: 'fam-1', product_count: 12, avg_price: 35.5}, {product_family_id: 'fam-2', product_count: 8, avg_price: 28.0}, ...]\n\n"
-            "# Quality audit: Find families with sparse variants\n"
-            "aggregate_data(table='products', aggregates={'variant_count': 'count(*)'}, filters={'is_active': True}, group_by=['product_family_id'], having={'variant_count': {'lt': 3}})\n"
-            "Returns: Only families with <3 active products - [{product_family_id: 'fam-5', variant_count: 1}, ...]\n\n"
+            "# Distribution: Count records per group\n"
+            "aggregate_data(table='table_a', aggregates={'record_count': 'count(*)', 'avg_val': 'avg(column_1)'}, filters={'is_active': True}, group_by=['parent_id'])\n"
+            "Returns: [{parent_id: 'id-1', record_count: 12, avg_val: 35.5}, {parent_id: 'id-2', record_count: 8, avg_val: 28.0}, ...]\n\n"
+            "# Quality audit: Find groups with sparse records\n"
+            "aggregate_data(table='table_a', aggregates={'item_count': 'count(*)'}, filters={'is_active': True}, group_by=['parent_id'], having={'item_count': {'lt': 3}})\n"
+            "Returns: Only groups with <3 active records - [{parent_id: 'id-5', item_count: 1}, ...]\n\n"
             "ALSO CONSIDER:\n"
             "- read_data: Need actual records, not summaries? Use read_data\n"
             "- read_data count_only=True: Simple total count without grouping? More efficient\n"
