@@ -124,57 +124,23 @@ but because they serve the same customers (food packaging B2B buyers).
 
 ---
 
-## QUERY PATTERNS FOR THIS DOMAIN
+## COMMON QUERY PATTERNS
 
-### Understand a Family
-
-```
-1. Read family: read_data(table='product_families', ids=['family-id'])
-2. Read segments: read_data(table='customer_segments', filters={'product_family_id': 'family-id'})
-3. Read products: read_data(table='products', filters={'product_family_id': 'family-id'})
-4. Read variants: read_data(table='variant_axes', filters={'product_family_id': 'family-id'}, relations=['variant_values(*)'])
-```
-
-### Check Family Fit
-
-```
-1. Query customer_segments for candidate family
-2. Compare target customer of new product vs segment
-3. If match -> same family; if not -> different family
-```
-
-### Duplicate Check
-
-```
-1. search_patterns on sku, name
-2. Visual comparison if names similar
-3. Attribute comparison (size, material, color)
-```
+| Pattern | Tables to Query | Purpose |
+|---------|----------------|---------|
+| Understand a family | product_families -> customer_segments -> variant_axes/values | Full family context |
+| Check family fit | customer_segments for candidate family | Compare target customer |
+| Duplicate check | products by sku/name patterns | Visual + attribute comparison |
 
 ---
 
 ## ANTI-PATTERNS IN THIS DOMAIN
 
-### Wrong: Material-Only Family Assignment
-
-```
-WRONG: "This is PET plastic, so it goes in PET family"
-RIGHT: "This serves food packaging B2B, same as PET Food Jars family"
-```
-
-### Wrong: Skipping customer_segments
-
-```
-WRONG: Assume family fit based on product name similarity
-RIGHT: Query customer_segments, compare target customer
-```
-
-### Wrong: Querying products for family fit
-
-```
-WRONG: read_data(table='products') to understand family purpose
-RIGHT: read_data(table='customer_segments') - segments define WHO family serves
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Material-only assignment | "PET plastic = PET family" | "Serves food packaging B2B, same as PET Food Jars family" |
+| Skipping customer_segments | Assume fit based on name similarity | Query customer_segments, compare target customer |
+| Querying products for family fit | Products table to understand family purpose | customer_segments defines WHO family serves |
 
 ---
 

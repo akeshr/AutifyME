@@ -169,251 +169,47 @@ Links assets to products OR product families (XOR constraint).
 
 ---
 
-## WRITE_DATA PATTERNS
+## CATALOG ASSET SCENARIOS
 
-### Pattern 1: Create Asset + Link to Product
-
-```json
-{
-  "goal": "Create asset and link to product",
-  "reasoning": "Image processed. Product exists. Creating asset + link.",
-  "hitl_summary": "Adding product image...",
-  "operations": [
-    {
-      "action": "create",
-      "table": "assets",
-      "data": {
-        "name": "PET Jar 500ml Hero",
-        "storage_url": "pending/thread-123/hero.png",
-        "storage_provider": "SUPABASE",
-        "file_name": "hero.png",
-        "mime_type": "image/png",
-        "asset_type": "IMAGE",
-        "status": "ACTIVE",
-        "width": 1024,
-        "height": 1024,
-        "is_ai_generated": true,
-        "generation_prompt": "Extract product, white background"
-      },
-      "returns": "asset"
-    },
-    {
-      "action": "create",
-      "table": "product_assets",
-      "data": {
-        "product_id": "existing-product-uuid",
-        "product_family_id": null,
-        "asset_id": "@asset.id",
-        "asset_role": "PRIMARY",
-        "sort_order": 0,
-        "alt_text": "PET Jar 500ml Clear"
-      },
-      "dependencies": ["asset"]
-    }
-  ],
-  "impact": {"creates": {"assets": 1, "product_assets": 1}}
-}
-```
-
-### Pattern 2: Link Asset to Family
-
-```json
-{
-  "goal": "Link asset to product family",
-  "reasoning": "Family-level asset. Links to all products in family.",
-  "hitl_summary": "Adding family lifestyle image...",
-  "operations": [
-    {
-      "action": "create",
-      "table": "assets",
-      "data": {
-        "name": "PET Jars Family Lifestyle",
-        "storage_url": "pending/thread-123/family.png",
-        "storage_provider": "SUPABASE",
-        "file_name": "family.png",
-        "mime_type": "image/png",
-        "asset_type": "IMAGE",
-        "status": "ACTIVE"
-      },
-      "returns": "asset"
-    },
-    {
-      "action": "create",
-      "table": "product_assets",
-      "data": {
-        "product_id": null,
-        "product_family_id": "existing-family-uuid",
-        "asset_id": "@asset.id",
-        "asset_role": "LIFESTYLE",
-        "sort_order": 0
-      },
-      "dependencies": ["asset"]
-    }
-  ],
-  "impact": {"creates": {"assets": 1, "product_assets": 1}}
-}
-```
-
-### Pattern 3: Multiple Assets for Product
-
-```json
-{
-  "goal": "Add multiple images to product",
-  "reasoning": "Hero + gallery images ready.",
-  "hitl_summary": "Adding 3 product images...",
-  "operations": [
-    {
-      "action": "create",
-      "table": "assets",
-      "data": [
-        {"name": "Hero", "storage_url": "pending/t/hero.png", ...},
-        {"name": "Side View", "storage_url": "pending/t/side.png", ...},
-        {"name": "Detail", "storage_url": "pending/t/detail.png", ...}
-      ],
-      "returns": "assets_batch"
-    },
-    {
-      "action": "create",
-      "table": "product_assets",
-      "data": [
-        {"product_id": "uuid", "product_family_id": null, "asset_id": "@assets_batch[0].id", "asset_role": "PRIMARY", "sort_order": 0},
-        {"product_id": "uuid", "product_family_id": null, "asset_id": "@assets_batch[1].id", "asset_role": "GALLERY", "sort_order": 1},
-        {"product_id": "uuid", "product_family_id": null, "asset_id": "@assets_batch[2].id", "asset_role": "GALLERY", "sort_order": 2}
-      ],
-      "dependencies": ["assets_batch"]
-    }
-  ],
-  "impact": {"creates": {"assets": 3, "product_assets": 3}}
-}
-```
+| Scenario | Tables Involved | Key Data |
+|----------|-----------------|----------|
+| Single asset to product | assets + product_assets | XOR: product_id set, product_family_id null |
+| Asset to family | assets + product_assets | XOR: product_family_id set, product_id null |
+| Multiple assets to product | Batch assets + batch junctions | Sort_order for display order |
 
 ---
 
-## READ_DATA PATTERNS
+## COMMON QUERIES
 
-### Query Product with Assets
-
-```python
-read_data(
-    table='products',
-    ids=['product-uuid'],
-    relations=['product_assets(*, assets(id, name, storage_url, asset_type, status))']
-)
-```
-
-### Query Family with Assets
-
-```python
-read_data(
-    table='product_families',
-    ids=['family-uuid'],
-    relations=['product_assets(*, assets(*))']
-)
-```
-
-### Find Products with PRIMARY Image
-
-```python
-read_data(
-    table='product_assets',
-    filters={'asset_role': 'PRIMARY'},
-    relations=['products(id, name, sku)', 'assets(storage_url)']
-)
-```
-
-### Find Products Missing Images
-
-```python
-# Get products, check for empty product_assets
-read_data(
-    table='products',
-    filters={'is_active': True},
-    relations=['product_assets(id)'],
-    columns=['id', 'name', 'sku']
-)
-# Filter results where product_assets is empty
-```
+| Query Need | Approach |
+|------------|----------|
+| Product with its assets | Query products with relations to product_assets, assets |
+| Family with assets | Query product_families with relations through product_assets |
+| Products with PRIMARY image | Query product_assets filtered by asset_role |
+| Products missing images | Query products with product_assets relation, filter empty |
 
 ---
 
 ## WORKFLOW: IMAGE TO CATALOG
 
-```
-1. USER UPLOADS IMAGE
-   - download_media saves to inbox/{thread_id}/
-   - Returns storage_path
-
-2. VISUAL ANALYSIS
-   - view_image(storage_path)
-   - Assess quality, identify product
-
-3. IMAGE PROCESSING (if needed)
-   - image_studio(images=[{path: storage_path, label: 'source'}], ...)
-   - Returns new storage_path in pending/
-
-4. QUALITY VERIFICATION
-   - view_image(new_storage_path)
-   - Verify extraction/composition quality
-
-5. CATALOG ENTRY
-   - write_data creates:
-     a. Asset record with storage_url
-     b. Product_assets junction linking to product/family
-   - HITL approval required
-
-6. DONE
-   - Asset is ACTIVE
-   - Linked to product/family
-   - Visible in catalog
-```
+| Stage | Purpose | Output |
+|-------|---------|--------|
+| 1. Upload | User sends media | Storage path in inbox/ |
+| 2. Visual Analysis | Assess quality, identify product | Quality assessment |
+| 3. Processing (if needed) | Background removal, enhancement | Storage path in pending/ |
+| 4. Quality Verification | Verify extraction quality | Ready for catalog |
+| 5. Catalog Entry | Create asset + junction (HITL) | Asset ACTIVE, linked |
 
 ---
 
 ## ANTI-PATTERNS
 
-### Wrong: Creating Asset Without Link
-
-```
-WRONG:
-Create asset record only (orphaned asset)
-
-CORRECT:
-Create asset + product_assets junction in same transaction
-```
-
-### Wrong: Violating XOR Constraint
-
-```
-WRONG:
-product_assets with both product_id AND product_family_id
-
-CORRECT:
-Exactly ONE of product_id or product_family_id
-Set the other to null explicitly
-```
-
-### Wrong: Skipping Image Processing
-
-```
-WRONG:
-User photo directly to catalog (messy background, poor lighting)
-
-CORRECT:
-view_image -> assess quality
-image_studio -> process if needed
-write_data -> catalog clean asset
-```
-
-### Wrong: Missing storage_path
-
-```
-WRONG:
-Create asset with empty or incorrect storage_url
-
-CORRECT:
-Use storage_path from image_studio output
-Format: "pending/{thread_id}/filename.ext"
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Orphaned asset | Asset without product_assets junction | Create asset + junction in same transaction |
+| XOR violation | Both product_id AND product_family_id set | Exactly ONE set, other explicitly null |
+| Skip processing | Raw user photo to catalog | Assess quality first, process if needed |
+| Invalid storage_url | Empty or incorrect URL | Use actual path from processing output |
 
 ---
 
@@ -432,17 +228,6 @@ Format: "pending/{thread_id}/filename.ext"
 
 ### Single Product Rule
 
-Each product should have exactly ONE PRIMARY asset.
-Query existing before assigning:
-
-```python
-read_data(
-    table='product_assets',
-    filters={'product_id': 'uuid', 'asset_role': 'PRIMARY'},
-    count_only=True
-)
-```
-
-If exists, new image should be GALLERY, not PRIMARY.
+Each product should have exactly ONE PRIMARY asset. Before assigning PRIMARY role, check if product already has one. If exists, new image should be GALLERY, not PRIMARY.
 
 </protocol>

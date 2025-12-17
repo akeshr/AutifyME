@@ -30,22 +30,15 @@ Family fit IS determined by:
 
 Based on visual analysis and product name, identify 1-3 candidate families.
 
-```
-inspect_schema(tables=['product_families'], details=['structure', 'samples'])
-read_data(table='product_families', search_patterns={'name': '%keyword%'}, columns=['id', 'name', 'sku_prefix', 'brand'])
-```
+**Query:** product_families table by name pattern
 
 ### Step 2: QUERY Customer Segments (CRITICAL)
 
 For each candidate family, query customer_segments. This is MANDATORY - no exceptions.
 
-```
-read_data(
-    table='customer_segments',
-    filters={'product_family_id': 'candidate-family-id'},
-    columns=['segment_type', 'segment_label', 'tone', 'key_benefits', 'pain_points']
-)
-```
+**Query:** customer_segments table filtered by product_family_id
+
+**Required columns:** segment_type, segment_label, tone, key_benefits, pain_points
 
 ### Step 3: ANALYZE Target Customer
 
@@ -115,15 +108,10 @@ Do NOT conclude fit based on:
 - Candidate: "PET Food Jars" family
 
 **Step 2: QUERY**
-```
-read_data(table='customer_segments', filters={'product_family_id': 'pet-food-jars-id'})
-Result:
-- segment_type: b2b
-- segment_label: Food Packaging Manufacturers
-- tone: professional
-- key_benefits: [food-safe, BPA-free, clear visibility]
-- pain_points: [product freshness, shelf appeal, cost efficiency]
-```
+- Query customer_segments for candidate family
+- Result: segment_type=b2b, segment_label="Food Packaging Manufacturers"
+- key_benefits: food-safe, BPA-free, clear visibility
+- pain_points: product freshness, shelf appeal, cost efficiency
 
 **Step 3: ANALYZE**
 - WHO: B2B food packaging manufacturers
@@ -144,39 +132,12 @@ Result:
 
 ## ANTI-PATTERNS
 
-### Wrong: Material-Based Assignment
-
-```
-WRONG:
-"This is PET plastic, so it goes in PET Containers family"
-No customer_segments query was made!
-
-RIGHT:
-Query customer_segments for PET Containers family.
-Compare: Does this product serve the same customer?
-```
-
-### Wrong: Skipping Step 2
-
-```
-WRONG:
-"PET Food Jar sounds like it fits PET Food Jars family"
-Conclusion reached without querying customer_segments!
-
-RIGHT:
-Always execute Step 2 - query customer_segments is MANDATORY
-```
-
-### Wrong: Assuming Fit from Product Name
-
-```
-WRONG:
-"Both have 'Jar' in the name, so they're in the same family"
-
-RIGHT:
-Name similarity is a starting hint, not evidence.
-Query customer_segments to verify customer match.
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Material-based assignment | "PET = PET family" without customer query | Query customer_segments, compare customer match |
+| Skipping Step 2 | Conclusion without customer_segments query | Always query customer_segments - MANDATORY |
+| Name-based assumption | "Both have 'Jar' = same family" | Name is a hint, customer_segments is evidence |
+| Visual similarity only | "Looks similar = same family" | Visual is not enough, verify customer match |
 
 ---
 

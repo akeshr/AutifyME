@@ -151,56 +151,13 @@ Map to variant_values when attribute varies within family:
 
 ---
 
-## COMMON EXTRACTION PATTERNS
+## COMMON EXTRACTION SCENARIOS
 
-### Pattern 1: Image-First Extraction
-
-```
-1. view_image -> Get visual attributes
-   - Material: PET (transparent, glossy)
-   - Size: ~500ml (estimate)
-   - Color: Clear
-   - Texture: Honeycomb
-   - Closure: Screw cap
-
-2. research_product -> Verify and enrich
-   - Query: "PET jar 500ml honeycomb food grade"
-   - Confirm: 500ml exact, food-grade certification
-
-3. Merge:
-   - material: PET (visual confirmed)
-   - capacity_ml: 500 (research confirmed)
-   - texture: honeycomb (visual)
-   - certifications: [food-grade] (research)
-```
-
-### Pattern 2: User-Input Extraction
-
-```
-User: "Add this 500ml PET jar to the catalog, it's Rs 30"
-
-Extracted:
-- capacity: 500ml
-- material: PET
-- price: 30
-- product_type: jar
-
-Missing (need visual/research):
-- color
-- texture
-- certifications
-```
-
-### Pattern 3: Research-Heavy Extraction
-
-```
-User: "What's the HSN code for this product?"
-
-1. view_image -> Identify: Plastic jar, food packaging
-2. research_product -> Query: "HSN code plastic food containers India"
-3. Extract: HSN 3923 (plastic containers)
-4. Derive: GST 18% (standard rate)
-```
+| Scenario | Primary Source | Secondary Source | Example Output |
+|----------|---------------|------------------|----------------|
+| Image-first | Visual analysis | Research verification | Material: PET (visual) -> Confirm 500ml (research) |
+| User-input | User message parsing | Visual/research for gaps | "500ml PET jar Rs 30" -> Need color, texture from image |
+| Research-heavy | Web research | Visual identification | HSN lookup -> 3923 (plastic containers), GST 18% |
 
 ---
 
@@ -248,40 +205,10 @@ Never create catalog entry with missing required attributes.
 
 ## ANTI-PATTERNS
 
-### Wrong: Guessing Without Source
-
-```
-WRONG:
-material: "probably PET"
-capacity: "looks like 500ml"
-(No visual analysis or research)
-
-RIGHT:
-1. view_image -> "transparent, glossy" -> likely PET
-2. research_product -> "500ml PET jar specs" -> confirmed
-```
-
-### Wrong: Ignoring Conflicts
-
-```
-WRONG:
-User says 500ml, image looks like 750ml -> use 500ml anyway
-
-RIGHT:
-Flag conflict: "User specified 500ml, but visual estimate suggests 750ml.
-Please confirm capacity."
-```
-
-### Wrong: Putting Variant Data in custom_attributes
-
-```
-WRONG:
-custom_attributes: {"size": "500ml", "color": "blue"}
-(When family has these as variant axes)
-
-RIGHT:
-Link to variant_values for size=500ml, color=blue
-custom_attributes for non-variant attributes
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Guessing without source | "probably PET", "looks like 500ml" | Visual analysis -> infer, then research to confirm |
+| Ignoring conflicts | User says 500ml, image suggests 750ml -> use 500ml | Flag conflict, ask user to confirm |
+| Variant data in custom_attributes | {size: 500ml, color: blue} when family has axes | Link to variant_values; custom_attributes for non-variant only |
 
 </protocol>

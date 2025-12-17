@@ -200,37 +200,10 @@ After visual analysis, proceed to:
 
 ## ANTI-PATTERNS
 
-### Wrong: Surface-Level Analysis
-
-```
-WRONG:
-"This is a plastic bottle"
-
-RIGHT:
-"This is a 500ml PET bottle with honeycomb texture, screw cap, clear body.
-Target customer appears to be B2B food packaging based on clarity and utilitarian design."
-```
-
-### Wrong: Material-Only Focus
-
-```
-WRONG:
-Focus only on identifying PET vs Glass
-
-RIGHT:
-Material + Form + Features + Target Customer
-All four inform catalog decisions
-```
-
-### Wrong: Ignoring Target Customer
-
-```
-WRONG:
-"PET jar, should go in PET family"
-
-RIGHT:
-"PET jar with premium finish, suggests D2C cosmetic customer.
-Should check cosmetic packaging families, not just PET families."
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Surface-level analysis | "This is a plastic bottle" | Full detail: "500ml PET bottle, honeycomb texture, screw cap, clear, B2B food positioning" |
+| Material-only focus | Only identify PET vs Glass | Material + Form + Features + Target Customer - all four inform decisions |
+| Ignoring target customer | "PET jar = PET family" | Consider finish and positioning: "Premium finish suggests D2C cosmetic, check cosmetic families" |
 
 </protocol>

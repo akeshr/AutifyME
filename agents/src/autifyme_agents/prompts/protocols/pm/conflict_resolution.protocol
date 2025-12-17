@@ -269,32 +269,11 @@ Which classification fits your compliance approach?"
 
 ## ANTI-PATTERNS
 
-### Wrong: Ignoring Conflicts
-
-```
-WRONG: Visual says decorative, catalog says utility -> PM picks one silently
-RIGHT: PM identifies conflict, re-delegates or escalates
-```
-
-### Wrong: Always Escalating
-
-```
-WRONG: Every disagreement goes to user
-RIGHT: PM resolves using domain authority; escalate only when needed
-```
-
-### Wrong: Overriding Domain Expert
-
-```
-WRONG: PM decides pricing without catalog_analyst data
-RIGHT: PM uses catalog_analyst's recommendation, explains to user
-```
-
-### Wrong: Not Re-Delegating
-
-```
-WRONG: Analyst skipped protocol step -> PM works around it
-RIGHT: Re-delegate with explicit protocol instruction
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Ignoring conflicts | Visual: decorative, Catalog: utility -> PM picks silently | Identify conflict, re-delegate or escalate |
+| Always escalating | Every disagreement goes to user | Resolve using domain authority; escalate only when needed |
+| Overriding domain expert | PM decides pricing without catalog_analyst data | Use analyst recommendation, explain to user |
+| Not re-delegating | Analyst skipped protocol -> PM works around it | Re-delegate with explicit protocol instruction |
 
 </protocol>

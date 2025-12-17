@@ -48,31 +48,15 @@ product_families
 | Title Case display | Cap Type | `display_label` column |
 | Schema.org mapping | size, color | `schema_property` column |
 
-### Creating Axes
+### Axis Record Structure
 
-```json
-{
-  "action": "create",
-  "table": "variant_axes",
-  "data": [
-    {
-      "product_family_id": "@family.id",
-      "name": "size",
-      "display_label": "Size",
-      "sort_order": 1,
-      "schema_property": "size"
-    },
-    {
-      "product_family_id": "@family.id",
-      "name": "color",
-      "display_label": "Color",
-      "sort_order": 2,
-      "schema_property": "color"
-    }
-  ],
-  "returns": "axes"
-}
-```
+| Field | Required | Purpose |
+|-------|----------|---------|
+| product_family_id | Yes | FK to owning family |
+| name | Yes | snake_case identifier (size, cap_type) |
+| display_label | Yes | Human-readable (Size, Cap Type) |
+| sort_order | Yes | Position in SKU generation |
+| schema_property | No | Schema.org mapping for SEO |
 
 ---
 
@@ -97,33 +81,16 @@ product_families
 | cap_type | diamond | DIA |
 | cap_type | ribbed | RIB |
 
-### Creating Values
+### Value Record Structure
 
-```json
-{
-  "action": "create",
-  "table": "variant_values",
-  "data": [
-    {
-      "variant_axis_id": "@axes[0].id",
-      "value": "500ml",
-      "display_label": "500 ML",
-      "sku_code": "500ML",
-      "price_adjustment": 0,
-      "sort_order": 1
-    },
-    {
-      "variant_axis_id": "@axes[0].id",
-      "value": "1l",
-      "display_label": "1 Liter",
-      "sku_code": "1L",
-      "price_adjustment": 15,
-      "sort_order": 2
-    }
-  ],
-  "returns": "size_values"
-}
-```
+| Field | Required | Purpose |
+|-------|----------|---------|
+| variant_axis_id | Yes | FK to owning axis |
+| value | Yes | lowercase identifier (500ml, blue) |
+| display_label | Yes | Human-readable (500 ML, Blue) |
+| sku_code | Yes | UPPERCASE, short for SKU generation |
+| price_adjustment | No | Price delta from base (default 0) |
+| sort_order | Yes | Display ordering |
 
 ---
 
@@ -158,101 +125,34 @@ product_families
 
 ## PRODUCT-VARIANT LINKING
 
-Each product must link to exactly ONE value per axis:
-
-```json
-{
-  "action": "create",
-  "table": "product_variant_values",
-  "data": [
-    {"product_id": "@product.id", "variant_value_id": "@size_values[0].id"},
-    {"product_id": "@product.id", "variant_value_id": "@color_values[2].id"}
-  ],
-  "dependencies": ["product", "size_values", "color_values"]
-}
-```
+Each product must link to exactly ONE value per axis via `product_variant_values` junction.
 
 ### Validation Rules
 
-- Product has value for each axis in family
-- Product has exactly ONE value per axis
-- No duplicate combinations within family
+| Rule | Constraint |
+|------|------------|
+| Complete coverage | Product has value for each axis in family |
+| Single selection | Product has exactly ONE value per axis |
+| Unique combinations | No duplicate variant combinations within family |
 
 ---
 
 ## QUERYING VARIANTS
 
-### Get Family Variant Structure
-
-```
-read_data(
-    table='product_families',
-    ids=['family-id'],
-    relations=['variant_axes(*, variant_values(*))']
-)
-```
-
-### Get Product's Variant Values
-
-```
-read_data(
-    table='products',
-    ids=['product-id'],
-    relations=['product_variant_values(variant_values(*, variant_axes(*)))']
-)
-```
-
-### Find Products by Variant Value
-
-```
-read_data(
-    table='product_variant_values',
-    filters={'variant_value_id': 'value-id'},
-    relations=['products(id, sku, name)']
-)
-```
+| Query Need | Approach |
+|------------|----------|
+| Family variant structure | Query product_families with relations: variant_axes, variant_values |
+| Product's variant values | Query products with relations through product_variant_values |
+| Products by variant value | Query product_variant_values filtered by variant_value_id |
 
 ---
 
 ## ADDING NEW VARIANTS
 
-### Adding Value to Existing Axis
-
-When a new size needs to be added:
-
-```json
-{
-  "action": "create",
-  "table": "variant_values",
-  "data": {
-    "variant_axis_id": "existing-axis-id",
-    "value": "2l",
-    "display_label": "2 Liters",
-    "sku_code": "2L",
-    "price_adjustment": 30,
-    "sort_order": 3
-  }
-}
-```
-
-### Adding New Axis to Family
-
-When family needs a new dimension:
-
-```json
-{
-  "action": "create",
-  "table": "variant_axes",
-  "data": {
-    "product_family_id": "family-id",
-    "name": "finish",
-    "display_label": "Finish",
-    "sort_order": 4
-  }
-}
-```
-
-**Impact:** All existing products will need finish values assigned.
+| Scenario | Action | Impact |
+|----------|--------|--------|
+| New value to existing axis | Create variant_values record linked to axis | New SKU combinations available |
+| New axis to family | Create variant_axes record linked to family | All existing products need values for new axis |
 
 ---
 
@@ -293,40 +193,10 @@ Example: 1L Blue = Base + 15 + 5 = Base + 20
 
 ## ANTI-PATTERNS
 
-### Wrong: Flat Product List Without Variants
-
-```
-WRONG:
-- "PET Jar 500ml Clear"
-- "PET Jar 500ml Blue"
-- "PET Jar 1L Clear"
-(No variant structure, harder to manage)
-
-RIGHT:
-Family "PET Jars" with axes [size, color]
-Products linked to variant values
-```
-
-### Wrong: Inconsistent SKU Codes
-
-```
-WRONG:
-sku_codes: "500", "500ml", "500ML", "HALF-LITER"
-(Multiple patterns for same axis)
-
-RIGHT:
-sku_codes: "500ML", "1L", "2L"
-(Consistent uppercase pattern)
-```
-
-### Wrong: Missing Variant Links
-
-```
-WRONG:
-Create product without product_variant_values
-
-RIGHT:
-Always create product_variant_values when product belongs to family with axes
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Flat product list | "PET Jar 500ml Clear", "PET Jar 500ml Blue" as separate items | Family with axes [size, color], products linked via variant values |
+| Inconsistent SKU codes | "500", "500ml", "500ML", "HALF-LITER" mixed | Consistent pattern: "500ML", "1L", "2L" (UPPERCASE) |
+| Missing variant links | Product without product_variant_values | Always create junction records for family with axes |
 
 </protocol>

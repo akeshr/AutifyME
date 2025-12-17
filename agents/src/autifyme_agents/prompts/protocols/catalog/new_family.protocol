@@ -93,140 +93,34 @@ Example: DRUM-HDPE-50L-CG-BLU
 
 ## CREATION ORDER (Dependencies)
 
-Operations must be ordered for proper FK references:
+Tables must be created in dependency order:
 
-```
-1. Create product_families record (returns: family)
-2. Create customer_segments records (uses: @family.id)
-3. Create variant_axes records (uses: @family.id, returns: axes_batch)
-4. Create variant_values records (uses: @axes_batch[n].id)
-5. Create products records (uses: @family.id)
-6. Create product_variant_values junctions (uses: product_id, variant_value_id)
-```
-
----
-
-## WRITE_DATA STRUCTURE
-
-```json
-{
-  "goal": "Create new HDPE Industrial Drums family with customer segments and variant structure",
-  "reasoning": "Family fit evaluation: No existing family serves B2B chemical manufacturers. 3 families evaluated, all serve different customer segments.",
-  "hitl_summary": "Creating new product family 'HDPE Industrial Drums'...",
-  "operations": [
-    {
-      "action": "create",
-      "table": "product_families",
-      "data": {
-        "name": "HDPE Industrial Drums",
-        "sku_prefix": "DRUM-HDPE",
-        "description": "Heavy-duty HDPE drums for industrial chemical storage",
-        "brand": null,
-        "is_configurable": false
-      },
-      "returns": "family"
-    },
-    {
-      "action": "create",
-      "table": "customer_segments",
-      "data": {
-        "product_family_id": "@family.id",
-        "segment_type": "b2b",
-        "segment_label": "Chemical Manufacturers",
-        "tone": "technical",
-        "key_benefits": ["Chemical resistant", "Leak-proof"],
-        "pain_points": ["Storage safety", "Regulatory compliance"]
-      },
-      "dependencies": ["family"]
-    },
-    {
-      "action": "create",
-      "table": "variant_axes",
-      "data": [
-        {"product_family_id": "@family.id", "name": "size", "display_label": "Size", "sort_order": 1},
-        {"product_family_id": "@family.id", "name": "color", "display_label": "Color", "sort_order": 2}
-      ],
-      "dependencies": ["family"],
-      "returns": "axes"
-    }
-  ],
-  "impact": {
-    "creates": {
-      "product_families": 1,
-      "customer_segments": 1,
-      "variant_axes": 2
-    }
-  }
-}
-```
+1. **product_families** - Root entity
+2. **customer_segments** - Requires family_id
+3. **variant_axes** - Requires family_id
+4. **variant_values** - Requires axis_id
+5. **products** - Requires family_id
+6. **product_variant_values** - Junction requiring product_id + variant_value_id
 
 ---
 
 ## VALIDATION BEFORE CREATION
 
-### Check 1: No Duplicate Family
-
-```
-read_data(
-    table='product_families',
-    search_patterns={'name': '%HDPE%Drum%'},
-    columns=['id', 'name', 'sku_prefix']
-)
-```
-
-### Check 2: No Duplicate SKU Prefix
-
-```
-read_data(
-    table='product_families',
-    search_patterns={'sku_prefix': 'DRUM-HDPE%'},
-    columns=['id', 'name', 'sku_prefix']
-)
-```
-
-### Check 3: Customer Segment Uniqueness
-
-No other family should serve the exact same customer with same benefits.
+| Check | What to Verify |
+|-------|----------------|
+| No duplicate family | Search product_families by name pattern |
+| No duplicate SKU prefix | Search product_families by sku_prefix pattern |
+| Customer segment uniqueness | No other family serves exact same customer with same benefits |
 
 ---
 
 ## ANTI-PATTERNS
 
-### Wrong: Creating Family Per Material
-
-```
-WRONG:
-- "PET 500ml Family"
-- "PET 1L Family"
-- "PET 2L Family"
-(Same customer, should be one family with size variant)
-
-RIGHT:
-- "PET Food Jars" (all sizes as variant values)
-```
-
-### Wrong: Creating Without Customer Definition
-
-```
-WRONG:
-Create family without customer_segments
-
-RIGHT:
-Always create customer_segments with family
-This defines WHO the family serves
-```
-
-### Wrong: Skipping Family Fit Check
-
-```
-WRONG:
-Product looks different -> create new family
-
-RIGHT:
-1. Evaluate 3 candidate families with family_fit protocol
-2. Document NO FIT for each
-3. Only then create new family
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Family per size | "PET 500ml Family", "PET 1L Family" | One family "PET Food Jars" with size as variant |
+| No customer definition | Family without customer_segments | Always create customer_segments - defines WHO family serves |
+| Skipping family_fit | "Looks different" -> new family | Evaluate 3 candidates first, document NO FIT for each |
 
 ---
 

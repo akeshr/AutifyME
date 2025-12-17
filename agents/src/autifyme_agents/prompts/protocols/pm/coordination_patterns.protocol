@@ -297,32 +297,11 @@ When user provides NEW context AFTER analysis files written:
 
 ## ANTI-PATTERNS
 
-### Wrong: Parallel When Sequential Needed
-
-```
-WRONG: catalog_analyst and visual_analyst in parallel
-RIGHT: visual_analyst FIRST, then catalog_analyst (needs identification)
-```
-
-### Wrong: Execution Before Approval
-
-```
-WRONG: creative_specialist immediately after analysis
-RIGHT: User approval GATE before creative_specialist
-```
-
-### Wrong: Missing File Routes
-
-```
-WRONG: catalog_specialist without product_research.md
-RIGHT: Include ALL three analyst files for complete records
-```
-
-### Wrong: User Context Not Propagated
-
-```
-WRONG: "Read visual_analysis.md" (user said utilities differ)
-RIGHT: "User clarified: tall jars for dry storage, short for spices. Read visual_analysis.md and REVISE."
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Parallel when sequential needed | visual_analyst and catalog_analyst parallel | visual_analyst FIRST, catalog_analyst needs identification |
+| Execution before approval | creative_specialist immediately after analysis | User approval GATE before creative_specialist |
+| Missing file routes | catalog_specialist without product_research.md | Include ALL analyst files for complete records |
+| Context not propagated | "Read visual_analysis.md" without user clarifications | Include user context: "User clarified X. Read file and REVISE." |
 
 </protocol>

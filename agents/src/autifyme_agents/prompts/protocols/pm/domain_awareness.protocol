@@ -159,25 +159,10 @@ When catalog is empty (new company):
 
 ## ANTI-PATTERNS
 
-### Wrong: Skipping Domain Context
-
-```
-WRONG: "Analyze this image"
-RIGHT: "Analyze image at [path]. For CATALOG domain."
-```
-
-### Wrong: Cross-Domain Delegation
-
-```
-WRONG: catalog_specialist creates images
-RIGHT: creative_specialist creates images -> catalog_specialist links them
-```
-
-### Wrong: Assuming Domain Knowledge
-
-```
-WRONG: PM decides pricing without catalog_analyst
-RIGHT: PM routes to catalog_analyst, uses THEIR pricing recommendation
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Skipping domain context | "Analyze this image" (no path/domain) | "Analyze image at [path]. For CATALOG domain." |
+| Cross-domain delegation | catalog_specialist creates images | creative_specialist creates -> catalog_specialist links |
+| Assuming domain knowledge | PM decides pricing without analyst | Route to catalog_analyst, use THEIR recommendation |
 
 </protocol>

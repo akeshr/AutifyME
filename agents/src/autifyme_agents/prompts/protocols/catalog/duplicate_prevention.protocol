@@ -25,33 +25,18 @@ A product is a duplicate if ANY of these match:
 
 Check for exact identifier matches first - fastest and most certain.
 
-```
-read_data(
-    table='products',
-    filters={'sku': 'EXACT-SKU'},
-    columns=['id', 'sku', 'name', 'status']
-)
-
-read_data(
-    table='products',
-    filters={'barcode': 'EXACT-BARCODE'},
-    columns=['id', 'sku', 'name', 'status']
-)
-```
+**Query:** products table by SKU or barcode (exact match via filters)
 
 **Result:** If found, STOP - this is an exact duplicate.
 
 ### Layer 2: Name Pattern Check (Fuzzy Match)
 
-Search for similar names using key terms.
+Search for similar names using BROAD pattern, then filter results in memory.
 
-```
-read_data(
-    table='products',
-    search_patterns={'name': '%500ml%PET%jar%'},
-    columns=['id', 'sku', 'name', 'product_family_id']
-)
-```
+**Strategy:**
+1. Extract keywords from product name (material, size, form factor)
+2. Single fuzzy query with OR patterns for all keywords
+3. Filter results in memory for specific attribute combinations
 
 **Keywords to extract:**
 - Material (PET, glass, HDPE)
@@ -78,12 +63,7 @@ For potential matches from Layer 2, compare key attributes:
 
 ### Layer 4: Visual Comparison (When Needed)
 
-If Layer 2/3 indicate possible duplicate, compare images:
-
-```
-view_image(image_path='inbox/thread_123/new_product.jpg')
-view_image(image_path='existing_product_asset_url')
-```
+If Layer 2/3 indicate possible duplicate, compare images side-by-side.
 
 **Visual indicators:**
 - Shape identical?
@@ -160,78 +140,37 @@ After checking, return structured result:
 
 ---
 
-## SEARCH PATTERNS FOR COMMON SCENARIOS
+## SCENARIOS
 
 ### Scenario 1: New Product with Full Details
 
-```
-# SKU known
-read_data(table='products', filters={'sku': 'JAR-PET-500ML-CLR'})
-
-# Name search
-read_data(table='products', search_patterns={'name': '%PET%500%jar%'})
-```
+1. Check exact SKU match first
+2. Fuzzy search name with key terms (material, size, form factor)
+3. Compare attributes of matches
 
 ### Scenario 2: Product from Image Only
 
-```
-# Visual analysis first
-view_image(image_path='inbox/...')
-# Identify: PET jar, ~500ml, clear, honeycomb texture
-
-# Search by extracted attributes
-read_data(table='products', search_patterns={'name': '%PET%jar%honeycomb%'})
-read_data(table='products', search_patterns={'name': '%500%PET%'})
-```
+1. Visual analysis to identify: material, size, form factor, features
+2. Broad fuzzy search on form factor (e.g., "jar")
+3. Filter results in memory for specific attributes
+4. Visual comparison if potential matches found
 
 ### Scenario 3: Family Creation
 
-```
-# Check family name
-read_data(table='product_families', search_patterns={'name': '%PET%Food%Jar%'})
-
-# Check SKU prefix
-read_data(table='product_families', search_patterns={'sku_prefix': 'JAR-PET%'})
-```
+1. Check family name for similar patterns
+2. Check SKU prefix for conflicts
+3. Review existing families in same category
 
 ---
 
 ## ANTI-PATTERNS
 
-### Wrong: Creating Without Checking
-
-```
-WRONG:
-write_data(operations=[{action: 'create', table: 'products', data: {...}}])
-# No duplicate check!
-
-RIGHT:
-read_data(search_patterns={'name': '%keyword%'})  # Check first
-# If no duplicates, then write_data
-```
-
-### Wrong: Exact Name Match Only
-
-```
-WRONG:
-read_data(filters={'name': 'PET Food Jar 500ml'})
-# Only finds exact match - misses "PET Jar 500 ML Food Grade"
-
-RIGHT:
-read_data(search_patterns={'name': '%PET%500%jar%'})
-# Fuzzy search catches variations
-```
-
-### Wrong: Ignoring Status
-
-```
-WRONG:
-Found match with status='ARCHIVED', created new product anyway
-
-RIGHT:
-Check status - ARCHIVED products may be reactivatable
-DISCONTINUED products may have replacement SKU
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Creating without checking | Duplicates created | Always run duplicate check before write_data |
+| Exact name match only | Misses variations like "PET Jar 500 ML" vs "PET Food Jar 500ml" | Use fuzzy search with key terms |
+| Ignoring product status | May create duplicate of archived/discontinued product | Check status - consider reactivation |
+| Single keyword search | Misses products with different naming | Extract multiple keywords, use OR patterns |
 
 ---
 

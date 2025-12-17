@@ -17,19 +17,7 @@ If user explicitly provides price, use it after validation:
 
 ### 2. Family Price Inference
 
-Query existing products in same family:
-
-```
-aggregate_data(
-    table='products',
-    aggregates={
-        'avg_price': 'avg(price)',
-        'min_price': 'min(price)',
-        'max_price': 'max(price)'
-    },
-    filters={'product_family_id': 'family-id', 'is_active': true}
-)
-```
+Query existing products in same family for price statistics (avg, min, max).
 
 Use family average as baseline, adjust for:
 - Size difference (larger = higher price)
@@ -38,11 +26,7 @@ Use family average as baseline, adjust for:
 
 ### 3. Market Research
 
-If no family context or user price:
-
-```
-research_product(query='[product type] [size] wholesale price [market]')
-```
+If no family context or user price, research market pricing.
 
 Use confidence signals:
 - >= 0.7: Trust research pricing
@@ -68,15 +52,7 @@ Products may have different prices in different contexts:
 | TRANSFER | Internal transfers | At cost |
 | PROMOTIONAL | Temporary discounts | Varies |
 
-Check which price list to use:
-
-```
-read_data(
-    table='price_lists',
-    filters={'list_type': 'SALES', 'is_active': true},
-    columns=['id', 'code', 'currency', 'is_tax_inclusive']
-)
-```
+Check which price list to use by querying price_lists table for active lists of the target type.
 
 ---
 
@@ -90,27 +66,20 @@ For products with variants, pricing may be:
 Final Price = Family Base Price + Sum(Variant Adjustments)
 ```
 
-Query variant adjustments:
-
-```
-read_data(
-    table='variant_values',
-    filters={'variant_axis_id': 'axis-id'},
-    columns=['value', 'display_label', 'price_adjustment']
-)
-```
+Query variant_values table for price_adjustment by axis.
 
 ### Example Calculation
 
-```
-Family Base: Rs 100
-Size 500ml adjustment: +Rs 0 (base size)
-Size 1L adjustment: +Rs 20
-Color Blue adjustment: +Rs 5
+| Variant | Adjustment |
+|---------|------------|
+| Family Base | Rs 100 |
+| Size 500ml | +Rs 0 (base) |
+| Size 1L | +Rs 20 |
+| Color Blue | +Rs 5 |
 
-500ml Clear: Rs 100 + 0 + 0 = Rs 100
-1L Blue: Rs 100 + 20 + 5 = Rs 125
-```
+**Results:**
+- 500ml Clear: Rs 100 + 0 + 0 = Rs 100
+- 1L Blue: Rs 100 + 20 + 5 = Rs 125
 
 ---
 
@@ -192,56 +161,20 @@ User Price Provided?
 
 ## ANTI-PATTERNS
 
-### Wrong: Arbitrary Pricing
-
-```
-WRONG:
-price: 100  # Just picked a number
-
-RIGHT:
-1. Query family products for average
-2. Apply variant adjustments
-3. Validate against family range
-```
-
-### Wrong: Ignoring Variant Adjustments
-
-```
-WRONG:
-All variants priced at family base
-
-RIGHT:
-Query variant_values for price_adjustment
-Apply adjustments to base price
-```
-
-### Wrong: Single Source Reliance
-
-```
-WRONG:
-Use market research alone without family context
-
-RIGHT:
-Family context first (most accurate for existing catalog)
-Market research for new families or validation
-```
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Arbitrary pricing | Picking numbers without data | Query family stats, apply adjustments, validate range |
+| Ignoring variant adjustments | All variants at base price | Check variant_values for price_adjustment per axis |
+| Single source reliance | Market research alone | Family context first (most accurate), market for validation |
 
 ---
 
 ## PRICE UPDATE PROTOCOL
 
-When updating prices:
+When updating prices across a family:
 
-1. **Query affected products:**
-   ```
-   read_data(table='products', filters={'product_family_id': 'family-id'})
-   ```
-
-2. **Calculate impact:**
-   - Count affected products
-   - Calculate percentage change
-   - Identify outliers
-
+1. **Query affected products** in the target family
+2. **Calculate impact:** count affected, percentage change, identify outliers
 3. **HITL summary must include:**
    - Number of products affected
    - Before/after prices
