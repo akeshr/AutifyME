@@ -107,7 +107,7 @@ def create_aggregate_data_tool(
         table: str,
         aggregates: dict[str, str],
         filters: dict[str, Any] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         group_by: list[str] | None = None,
         having: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
