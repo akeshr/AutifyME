@@ -1,0 +1,289 @@
+<protocol name="view_image" type="tool_mastery" domain="shared">
+
+## PURPOSE
+
+Master the view_image tool - multimodal image viewing for visual analysis.
+This tool gives you EYES. Returns multimodal content so you SEE images directly.
+
+## CRITICAL CONCEPT
+
+view_image returns the actual image in your context. You don't get a description -
+you SEE the image visually, like looking at a photograph. This enables:
+
+- Direct visual analysis (materials, colors, textures, dimensions)
+- Feature identification (patterns, labels, defects)
+- Item categorization based on appearance
+- Quality verification before data operations
+
+---
+
+## WHEN TO USE
+
+| Situation | Action |
+|-----------|--------|
+| User provides image | view_image IMMEDIATELY |
+| Before write_data | Visual verification of attributes |
+| After image processing | Quality check before using output |
+| Material identification | See textures, finishes, transparency |
+| Duplicate detection | Visual comparison when names ambiguous |
+| Item categorization | Visual features determine type |
+
+---
+
+## PARAMETERS
+
+### image_path (required)
+
+Image source - accepts multiple formats:
+
+| Format | Example | Source |
+|--------|---------|--------|
+| Storage path | `inbox/thread_id/photo.jpg` | download_media output |
+| Storage path | `pending/thread_id/edit.png` | image processing output |
+| Local path | `/path/to/image.jpg` | Local files |
+| URL | `https://example.com/image.jpg` | Direct URLs |
+
+**Storage Path Convention:**
+- `inbox/` - User uploads via download_media
+- `pending/` - Processed images from image tools
+
+---
+
+## WHAT YOU SEE
+
+When you call view_image, you receive:
+
+1. **Text metadata**: Source type, original size, format
+2. **Image block**: The actual image rendered in your context
+
+You can then analyze:
+- Item type (shape, form factor)
+- Material (texture, transparency, finish)
+- Features (patterns, labels, markings)
+- Size estimates (relative proportions)
+- Quality (lighting, clarity, condition)
+- Style (premium, standard, industrial)
+
+---
+
+## COMMON PATTERNS
+
+### Pattern 1: Data Entry Analysis
+
+User sends image for data entry. View first, then enrich.
+
+```python
+# Step 1: SEE the item
+view_image(image_path="inbox/thread_123/item.jpg")
+# You see: [visual details - type, material, features]
+
+# Step 2: Research enrichment (based on what you saw)
+research_product(query="[item type] [material] specifications")
+
+# Step 3: Duplicate check
+read_data(table="items", search_patterns={"name": "%keyword%"})
+
+# Step 4: Create entry
+write_data(...)
+```
+
+### Pattern 2: Image Processing Quality Check
+
+After processing, verify output quality.
+
+```python
+# Step 1: Process image
+image_tool(operation="process", source="inbox/thread_123/raw.jpg")
+# Output: pending/thread_123/processed.png
+
+# Step 2: Verify quality
+view_image(image_path="pending/thread_123/processed.png")
+# You see: [processing result - verify quality acceptable]
+
+# Step 3: Use in data entry (if quality good)
+write_data(...)
+```
+
+### Pattern 3: Visual Comparison for Duplicates
+
+Names similar, need visual confirmation.
+
+```python
+# Query returns potential duplicate
+read_data(table="items", search_patterns={"name": "%keyword%"})
+# Found: "Similar Item" - is this the same?
+
+# Visual comparison
+view_image(image_path="inbox/thread_123/new_item.jpg")
+# You see: [visual details of new item]
+
+# Existing item image (from asset_url)
+view_image(image_path="https://storage.example.com/items/existing.jpg")
+# You see: [visual details of existing item - compare]
+```
+
+### Pattern 4: Material Identification
+
+Need to identify material from visual appearance.
+
+```python
+view_image(image_path="inbox/thread_123/unknown.jpg")
+# You see: [visual characteristics]
+# Analysis: Based on transparency, texture, finish - likely [material type]
+```
+
+---
+
+## VISUAL ANALYSIS FOCUS AREAS
+
+When viewing images, focus on:
+
+### Material Indicators
+- Transparency level (clear, translucent, opaque)
+- Surface finish (glossy, matte, textured)
+- Color characteristics (natural, pigmented)
+- Flexibility cues (rigid, semi-flexible)
+
+### Item Features
+- Shape (cylindrical, rectangular, custom)
+- Components (closures, attachments)
+- Labels/branding (text, logos)
+- Textures (smooth, patterned, ribbed)
+
+### Quality Signals
+- Image clarity (sharp vs blurry)
+- Lighting (even, shadows, reflections)
+- Background (clean, cluttered)
+- Item condition (new, damaged, dirty)
+
+### Size Estimation
+- Proportions relative to known objects
+- Hand-scale if present
+- Label text size as reference
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Assuming Without Viewing
+
+```
+WRONG:
+User: "Here's my item image" [inbox/thread_123/item.jpg]
+Agent: "I'll process this as a [assumed type]..."
+# Never viewed the image - assumption may be wrong!
+
+CORRECT:
+User: "Here's my item image" [inbox/thread_123/item.jpg]
+Agent: view_image(image_path="inbox/thread_123/item.jpg")
+# Now I SEE: [actual visual details]
+Agent: "I can see this is a [actual type] with..."
+```
+
+### Wrong: Metadata Only
+
+```
+WRONG:
+# Skipping view_image, just reading filename
+"Based on 'item_type_500.jpg' filename, this is [assumption]"
+# Filename could be wrong!
+
+CORRECT:
+view_image(image_path="inbox/thread_123/item_type_500.jpg")
+# You SEE: [actual content - verify filename accuracy]
+```
+
+### Wrong: Batch Viewing
+
+```
+WRONG:
+# Trying to view multiple images at once
+view_image(image_path=["img1.jpg", "img2.jpg", "img3.jpg"])
+
+CORRECT:
+# View one at a time
+view_image(image_path="inbox/thread_123/img1.jpg")
+# Analyze first image...
+view_image(image_path="inbox/thread_123/img2.jpg")
+# Analyze second image...
+```
+
+### Wrong: Repeated Viewing
+
+```
+WRONG:
+view_image(image_path="inbox/thread_123/item.jpg")
+# ... later in same conversation ...
+view_image(image_path="inbox/thread_123/item.jpg")  # Same image again!
+
+CORRECT:
+view_image(image_path="inbox/thread_123/item.jpg")
+# Remember what you saw, don't re-view unless image changed
+```
+
+---
+
+## IMAGE SIZE HANDLING
+
+- Original images auto-resized to 1024px max dimension
+- Quality preserved (LANCZOS resampling)
+- RGBA/LA converted to RGB (white background)
+- Output: JPEG at 80% quality for efficient tokens
+
+This means you see a faithful representation, but:
+- Fine text may be harder to read
+- Very small details may be lost
+- Good enough for identification and material analysis
+
+---
+
+## RETURN STRUCTURE
+
+### Success
+
+Returns multimodal content blocks:
+
+```json
+[
+  {
+    "type": "text",
+    "text": "Image (url): 1024x768, JPEG"
+  },
+  {
+    "type": "image_url",
+    "image_url": {"url": "data:image/jpeg;base64,..."}
+  }
+]
+```
+
+You SEE the image in your context after the text metadata.
+
+### Error
+
+```json
+[
+  {
+    "type": "text",
+    "text": "Error: Image not found at inbox/thread_123/missing.jpg"
+  }
+]
+```
+
+---
+
+## PROACTIVE VIEWING
+
+When user mentions an image, VIEW IT IMMEDIATELY:
+
+```
+User: "I uploaded a photo to inbox/thread_789/new.jpg"
+Agent: [IMMEDIATELY calls view_image before any other action]
+Agent: "I can see your item - it's a [description]..."
+```
+
+DO NOT:
+- Ask "can you describe the image?"
+- Wait for explicit "please view the image"
+- Make assumptions without viewing
+
+</protocol>

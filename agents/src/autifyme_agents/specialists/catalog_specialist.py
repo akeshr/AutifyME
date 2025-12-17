@@ -13,6 +13,11 @@ Architecture:
 - Schema-driven CRUD with HITL approval
 - Autonomous research and enrichment
 - Does NOT process images (Creative Specialist does that)
+
+Protocol Integration (v2):
+- Loads domain protocols at task start (business_context, family_fit, pricing, etc.)
+- Protocol-driven decision making with structured reasoning
+- Protocols ground specialist in validated domain patterns
 """
 
 from typing import Any
@@ -23,6 +28,7 @@ from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import MultimodalInjectionMiddleware
 from autifyme_agents.tools import create_view_image_tool
+from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
 from autifyme_agents.tools.research_tools import (
     extract_web_content_tool,
     research_product_tool,
@@ -90,10 +96,11 @@ def create_catalog_specialist(
     if storage is None:
         raise ValueError("storage is required for Catalog Specialist")
 
-    system_prompt = load_prompt("specialists/catalog_specialist_lean.prompt")
+    system_prompt = load_prompt("specialists/catalog_specialist_v2.prompt")
 
-    # Tools
+    # Tools - load_protocol first for protocol-driven reasoning
     tools: list[Any] = [
+        create_load_protocol_tool(),
         research_product_tool,
         extract_web_content_tool,
     ]
@@ -114,24 +121,26 @@ def create_catalog_specialist(
     tools.append(create_view_image_tool())
 
     description = (
-        "ROLE: Specialist (execution)\n"
-        "MISSION: Safely mutate the product catalog (schema-driven CRUD) with HITL approval.\n\n"
+        "ROLE: Specialist (execution, protocol-integrated)\n"
+        "MISSION: Safely mutate the product catalog with protocol-driven CRUD and HITL approval.\n\n"
         "OWNERSHIP:\n"
         "- Product families, products/SKUs, variants, taxonomy links, pricing, BOM\n"
-        "- Asset metadata + links between assets and products (not image editing)\n\n"
+        "- Asset metadata + links between assets and products (not image editing)\n"
+        "- Protocol-driven decisions (family_fit, pricing, duplicate_prevention)\n\n"
         "INPUTS I NEED:\n"
         "- Target intent (create/update/delete) and business goal\n"
         "- IDs when possible (or enough attributes to look them up)\n"
         "- Any processed image storage_path(s) in pending/... when linking assets\n\n"
         "OUTPUTS I PRODUCE:\n"
-        "- A write plan (what tables/rows change) + a minimal write_data intent proposal\n"
+        "- Protocol-grounded write plan with structured reasoning\n"
         "- After approval: executed write_data results + created/updated IDs\n"
-        "- On rejection: revised write_data intent based on user feedback (often prefixed [HITL_FEEDBACK])\n"
-        "- If long: write a change log to the thread directory and return the file path\n\n"
+        "- On rejection: revised write_data intent based on user feedback\n\n"
         "TOOLS I USE:\n"
+        "- load_protocol (FIRST - loads business_context, family_fit, pricing, etc.)\n"
         "- inspect_schema, read_data, aggregate_data, write_data (HITL), view_image\n"
-        "- research_product_tool, extract_web_content_tool (only when external facts are needed)\n\n"
+        "- research_product_tool, extract_web_content_tool (only when external facts needed)\n\n"
         "GUARDRAILS:\n"
+        "- Protocol steps are MANDATORY (e.g., family_fit requires customer_segments query)\n"
         "- No image processing (delegate to creative_specialist); no ad-hoc SQL; always read-before-write"
     )
 

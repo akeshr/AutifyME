@@ -1,0 +1,171 @@
+<protocol name="domain_awareness" type="routing" agent="pm">
+
+## PURPOSE
+
+Domain ownership matrix for PM routing decisions.
+Defines which domains own which decisions, enabling correct specialist routing.
+
+---
+
+## DOMAIN OWNERSHIP MATRIX
+
+| Domain | Owns | Specialists/Analysts | Routing Trigger |
+|--------|------|---------------------|-----------------|
+| **CATALOG** | Product data, families, variants, pricing, assets | catalog_analyst, catalog_specialist | "add product", "update price", "find similar", "catalog" |
+| **CREATIVE** | Image processing, asset creation, visual output | creative_specialist | "process image", "create shot", "lifestyle", "campaign" |
+| **VISUAL** | Image analysis, visual identification | visual_analyst | "what is this", "identify", image without text |
+| **PRODUCT** | External knowledge, HSN, compliance, naming | product_analyst | "HSN code", "compliance", "market price", "naming" |
+
+---
+
+## ROUTING RULES
+
+### Single-Domain Routing
+
+Most requests map to ONE domain. Route to that domain's specialist/analyst.
+
+**Pattern Matching:**
+
+| User Request | Primary Domain | Route To |
+|--------------|----------------|----------|
+| Image + no text | VISUAL | visual_analyst |
+| "Add this to catalog" | CATALOG | (after analysis) catalog_specialist |
+| "What's the HSN code?" | PRODUCT | product_analyst |
+| "Make catalog-ready" | CREATIVE | creative_specialist |
+| "Find similar products" | CATALOG | catalog_analyst |
+| "Update price of SKU-001" | CATALOG | catalog_specialist |
+| "Create Diwali promotional" | CREATIVE | creative_specialist |
+
+### Multi-Domain Routing
+
+Complex requests span MULTIPLE domains. Execute in dependency order.
+
+**Catalog Addition Flow (most common):**
+```
+1. VISUAL -> visual_analyst (identify product)
+2. CATALOG -> catalog_analyst (find family, pricing)
+3. PRODUCT -> product_analyst (HSN, naming)
+4. [User Approval]
+5. CREATIVE -> creative_specialist (process images)
+6. CATALOG -> catalog_specialist (create records)
+```
+
+**Why This Order:**
+- Visual identification informs catalog search
+- Catalog context informs product research (family, positioning)
+- User approval before expensive image processing
+- Processed images required for catalog records
+
+---
+
+## DOMAIN CONTEXT IN DELEGATION
+
+When delegating to analysts/specialists, ALWAYS include domain context.
+
+**Pattern:**
+```
+"[Task description]. For CATALOG domain."
+```
+
+**Why:**
+- Analysts load domain-specific protocols based on this context
+- visual_analyst loads catalog/visual_analysis.protocol for catalog work
+- Same analyst, different protocols = different focus areas
+
+**Examples:**
+
+Good:
+```
+"Analyze image at inbox/thread_xyz/photo.jpg. For CATALOG domain."
+```
+-> visual_analyst loads catalog/visual_analysis.protocol
+-> Focus: materials, target customer, positioning
+
+Good:
+```
+"Find similar products and pricing context. For CATALOG domain."
+```
+-> catalog_analyst loads catalog/family_fit.protocol
+-> Focus: customer segments, family placement
+
+Bad (missing domain):
+```
+"Analyze image at inbox/thread_xyz/photo.jpg"
+```
+-> Analyst doesn't know which protocols to load
+-> Generic analysis instead of domain-grounded
+
+---
+
+## DOMAIN BOUNDARIES
+
+Each domain has clear boundaries. Respect them.
+
+| Domain | IN Scope | OUT of Scope |
+|--------|----------|--------------|
+| CATALOG | Product CRUD, pricing, families, assets linking | Image creation, HSN research |
+| CREATIVE | Image processing, scene generation, style transfer | Catalog records, pricing |
+| VISUAL | Image analysis, identification, comparison | Catalog queries, image editing |
+| PRODUCT | External research, HSN, compliance, naming | Catalog data, image work |
+
+**When domains overlap:**
+- Catalog specialist creates records; creative specialist creates images
+- Catalog analyst finds pricing; product analyst researches market
+- Visual analyst identifies; creative specialist processes
+
+---
+
+## DOMAIN HANDOFFS
+
+When one domain's output feeds another:
+
+| From | To | Handoff Artifact |
+|------|-----|-----------------|
+| VISUAL | CATALOG | visual_analysis_[item].md |
+| VISUAL | PRODUCT | visual_analysis_[item].md |
+| CATALOG | SPECIALIST | catalog_analysis_[item].md |
+| PRODUCT | SPECIALIST | product_research_[item].md |
+| CREATIVE | CATALOG | pending/[thread]/processed_*.png |
+
+**PM's Role:**
+- Route file paths between domains
+- Ensure all dependencies are met before delegating
+- Synthesize findings from multiple domains
+
+---
+
+## COLD START HANDLING
+
+When catalog is empty (new company):
+
+1. **VISUAL** domain still works (image analysis is independent)
+2. **CATALOG** domain returns "no data" - PM adapts
+3. **PRODUCT** domain works (external research independent)
+4. **PM** bootstraps: proposes new families alongside first products
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Skipping Domain Context
+
+```
+WRONG: "Analyze this image"
+RIGHT: "Analyze image at [path]. For CATALOG domain."
+```
+
+### Wrong: Cross-Domain Delegation
+
+```
+WRONG: catalog_specialist creates images
+RIGHT: creative_specialist creates images -> catalog_specialist links them
+```
+
+### Wrong: Assuming Domain Knowledge
+
+```
+WRONG: PM decides pricing without catalog_analyst
+RIGHT: PM routes to catalog_analyst, uses THEIR pricing recommendation
+```
+
+</protocol>

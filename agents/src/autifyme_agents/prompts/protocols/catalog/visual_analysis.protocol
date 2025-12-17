@@ -1,0 +1,216 @@
+<protocol name="visual_analysis" type="exploration" domain="catalog">
+
+## PURPOSE
+
+Domain-specific visual analysis protocol for catalog products.
+Guides what to observe, extract, and how to use visual data for catalog decisions.
+
+---
+
+## ANALYSIS FOCUS AREAS
+
+When viewing product images for catalog purposes, systematically analyze:
+
+### 1. Material Identification
+
+| Visual Cue | Material Indicator |
+|------------|-------------------|
+| High transparency, glossy | PET, Glass |
+| Translucent, matte | HDPE, PP |
+| Opaque, smooth | LDPE, PP |
+| Rigid, heavy appearance | Glass, Metal |
+| Flexible appearance | LDPE, Flexible packaging |
+
+**Key Questions:**
+- Is it transparent, translucent, or opaque?
+- Is the surface glossy or matte?
+- Does it appear rigid or flexible?
+
+### 2. Form Factor Classification
+
+| Shape | Typical Products |
+|-------|------------------|
+| Cylindrical, wide mouth | Jars (food, cosmetic) |
+| Cylindrical, narrow neck | Bottles (beverage, chemical) |
+| Rectangular | Containers (storage, industrial) |
+| Pouches/bags | Flexible packaging |
+| Custom shapes | Specialty packaging |
+
+### 3. Size Estimation
+
+Estimate capacity from visual cues:
+- Hand-scale if present (typical hand ~18cm)
+- Label text size as reference
+- Proportion relative to known objects
+- Closure size (caps are standard sizes)
+
+**Common sizes by category:**
+- Food jars: 100ml, 250ml, 500ml, 1L
+- Beverage bottles: 200ml, 500ml, 1L, 2L
+- Industrial containers: 5L, 20L, 50L, 200L
+
+### 4. Feature Extraction
+
+| Feature Type | Examples |
+|--------------|----------|
+| Texture | Honeycomb, ribbed, smooth, diamond |
+| Closure | Screw cap, flip-top, pump, cork |
+| Color | Clear, blue, amber, green, white |
+| Branding | Labels, embossing, printing |
+| Handles | None, integrated, bail handle |
+
+### 5. Target Customer Indicators
+
+Visual cues about market positioning:
+
+| Indicator | Customer Signal |
+|-----------|-----------------|
+| Premium finish, elegant shape | B2C high-end, D2C |
+| Standard industrial look | B2B industrial |
+| Food-grade clarity, clean design | Food packaging B2B |
+| Child-safe features | Consumer safety-focused |
+| Bulk sizing, utilitarian | Wholesale, industrial |
+
+---
+
+## ANALYSIS TEMPLATE
+
+When analyzing a product image, structure your observations:
+
+```
+MATERIAL:
+- Type: [PET/Glass/HDPE/PP/etc.]
+- Evidence: [Transparency, finish, appearance]
+
+FORM FACTOR:
+- Shape: [Jar/Bottle/Container/etc.]
+- Dimensions estimate: [Height x Width or Capacity]
+
+FEATURES:
+- Texture: [Smooth/Honeycomb/Ribbed/etc.]
+- Closure: [Screw cap/Flip-top/etc.]
+- Color: [Clear/Blue/Amber/etc.]
+- Special: [Handle/Label/Embossing/etc.]
+
+TARGET CUSTOMER:
+- Market positioning: [Premium/Standard/Industrial]
+- Likely segment: [B2B/B2C/D2C/Wholesale]
+- Use case: [Food/Cosmetic/Industrial/etc.]
+
+CATALOG IMPLICATIONS:
+- Suggested family: [Based on customer, not material]
+- Key attributes for SKU: [Size, Color, Feature]
+- Research needs: [What to verify via web search]
+```
+
+---
+
+## EXTRACTION FOR CATALOG FIELDS
+
+Map visual observations to catalog fields:
+
+| Observation | Catalog Field | Table |
+|-------------|---------------|-------|
+| Material type | custom_attributes.material | products |
+| Size estimate | name (include size) | products |
+| Color | variant value | variant_values |
+| Texture | variant value or tag | variant_values / products.tags |
+| Market positioning | customer_segments.tone | customer_segments |
+
+---
+
+## QUALITY SIGNALS
+
+Assess image quality for catalog use:
+
+| Quality Aspect | Good | Needs Improvement |
+|----------------|------|-------------------|
+| Lighting | Even, no harsh shadows | Dark, overexposed |
+| Focus | Sharp, details visible | Blurry, soft |
+| Background | Clean, neutral | Cluttered, distracting |
+| Angle | Shows product clearly | Obscured features |
+| Resolution | Details readable | Pixelated |
+
+Flag quality issues in analysis.
+
+---
+
+## COMMON PRODUCT PATTERNS
+
+### Food Packaging
+
+- Materials: PET (transparency), Glass (premium), PP (versatility)
+- Features: Food-safe, clear visibility, tamper-evident
+- Customer: B2B food manufacturers, D2C premium brands
+- Sizes: 100ml-2L typical
+
+### Cosmetic Packaging
+
+- Materials: PET, Glass (premium), Acrylic
+- Features: Elegant finish, pump dispensers, airless technology
+- Customer: B2C cosmetic brands, D2C beauty
+- Sizes: 30ml-500ml typical
+
+### Industrial Containers
+
+- Materials: HDPE, Metal, Fiber drums
+- Features: Chemical resistant, handles, stacking design
+- Customer: B2B industrial, chemical
+- Sizes: 5L-200L typical
+
+### Beverage Bottles
+
+- Materials: PET (most common), Glass (premium)
+- Features: Lightweight, pressure-resistant, tamper-evident
+- Customer: B2B beverage manufacturers
+- Sizes: 200ml-2L typical
+
+---
+
+## INTEGRATION WITH OTHER PROTOCOLS
+
+After visual analysis, proceed to:
+
+1. **research_product** - Verify material specs, pricing
+2. **family_fit** - Use target customer insight for family matching
+3. **duplicate_prevention** - Use visual details for comparison
+4. **pricing** - Use market positioning for price range
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Surface-Level Analysis
+
+```
+WRONG:
+"This is a plastic bottle"
+
+RIGHT:
+"This is a 500ml PET bottle with honeycomb texture, screw cap, clear body.
+Target customer appears to be B2B food packaging based on clarity and utilitarian design."
+```
+
+### Wrong: Material-Only Focus
+
+```
+WRONG:
+Focus only on identifying PET vs Glass
+
+RIGHT:
+Material + Form + Features + Target Customer
+All four inform catalog decisions
+```
+
+### Wrong: Ignoring Target Customer
+
+```
+WRONG:
+"PET jar, should go in PET family"
+
+RIGHT:
+"PET jar with premium finish, suggests D2C cosmetic customer.
+Should check cosmetic packaging families, not just PET families."
+```
+
+</protocol>

@@ -1,0 +1,287 @@
+<protocol name="attribute_extraction" type="exploration" domain="catalog">
+
+## PURPOSE
+
+Protocol for extracting product attributes from various sources.
+Ensures consistent attribute identification from images, research, and user input.
+
+---
+
+## ATTRIBUTE SOURCES
+
+### 1. Visual Analysis (view_image)
+
+Extract from product images:
+
+| Attribute | Visual Cue |
+|-----------|------------|
+| material | Transparency, finish, texture |
+| color | Visible color |
+| size_estimate | Proportions, reference objects |
+| texture | Surface pattern |
+| closure_type | Cap/lid appearance |
+| shape | Overall form factor |
+
+### 2. Web Research (research_product)
+
+Extract from research results:
+
+| Attribute | Research Source |
+|-----------|-----------------|
+| exact_capacity | Product specifications |
+| material_grade | Technical documentation |
+| certifications | Compliance info |
+| hsn_code | Classification databases |
+| typical_price | Market data |
+
+### 3. User Input
+
+Extract from user messages:
+
+| Attribute | Input Pattern |
+|-----------|---------------|
+| brand | "from [Brand]", "[Brand] product" |
+| capacity | "500ml", "1 liter", "half kg" |
+| material | "PET", "glass", "plastic" |
+| use_case | "for food", "for cosmetics" |
+| price | "Rs 30", "around 50 rupees" |
+
+---
+
+## EXTRACTION PRIORITY
+
+When attributes conflict between sources:
+
+1. **User-provided** (highest) - Explicit user data
+2. **Research-confirmed** - Verified specifications
+3. **Visual-inferred** (lowest) - Estimates from images
+
+Flag conflicts for user resolution.
+
+---
+
+## CATALOG ATTRIBUTE MAPPING
+
+Map extracted attributes to catalog fields:
+
+### products Table
+
+| Extracted | Catalog Field | Notes |
+|-----------|---------------|-------|
+| sku | sku | Generate or user-provided |
+| name | name | Material + Size + Type |
+| description | description | Features, use case |
+| product_type | product_type | FINISHED_GOOD default |
+| hsn_code | hsn_code | From research |
+| gst_rate | gst_rate | Based on HSN |
+| barcode | barcode | If provided |
+
+### custom_attributes JSONB
+
+For attributes not in standard columns:
+
+```json
+{
+  "material": "PET",
+  "material_grade": "food_grade",
+  "capacity_ml": 500,
+  "texture": "honeycomb",
+  "closure_type": "screw_cap",
+  "certifications": ["BPA-free", "FDA approved"]
+}
+```
+
+### Variant Values
+
+Map to variant_values when attribute varies within family:
+
+| Attribute | Maps To | Condition |
+|-----------|---------|-----------|
+| size | variant_value | If family has size axis |
+| color | variant_value | If family has color axis |
+| cap_type | variant_value | If family has cap_type axis |
+
+---
+
+## EXTRACTION WORKFLOW
+
+```
+1. VIEW IMAGE (if available)
+   |
+   +-- Extract visual attributes
+   |
+2. RESEARCH PRODUCT (for gaps)
+   |
+   +-- Extract specification attributes
+   |
+3. MERGE ATTRIBUTES
+   |
+   +-- Prioritize: User > Research > Visual
+   |
+4. MAP TO CATALOG
+   |
+   +-- Standard fields
+   +-- custom_attributes
+   +-- variant_values
+```
+
+---
+
+## ATTRIBUTE VALIDATION
+
+### Required Attributes (Catalog Entry)
+
+| Attribute | Required | Source |
+|-----------|----------|--------|
+| name | YES | Generate from attributes |
+| product_type | YES | Default FINISHED_GOOD |
+| material | Recommended | Visual or user |
+| capacity | Recommended | Visual or user |
+| price | YES for pricing | User or research |
+
+### Validation Rules
+
+| Attribute | Validation |
+|-----------|------------|
+| capacity | Numeric, standard units (ml, L, g, kg) |
+| hsn_code | 4-8 digits |
+| gst_rate | 0, 5, 12, 18, or 28 |
+| color | Standard color name or hex |
+| material | Known material type |
+
+---
+
+## COMMON EXTRACTION PATTERNS
+
+### Pattern 1: Image-First Extraction
+
+```
+1. view_image -> Get visual attributes
+   - Material: PET (transparent, glossy)
+   - Size: ~500ml (estimate)
+   - Color: Clear
+   - Texture: Honeycomb
+   - Closure: Screw cap
+
+2. research_product -> Verify and enrich
+   - Query: "PET jar 500ml honeycomb food grade"
+   - Confirm: 500ml exact, food-grade certification
+
+3. Merge:
+   - material: PET (visual confirmed)
+   - capacity_ml: 500 (research confirmed)
+   - texture: honeycomb (visual)
+   - certifications: [food-grade] (research)
+```
+
+### Pattern 2: User-Input Extraction
+
+```
+User: "Add this 500ml PET jar to the catalog, it's Rs 30"
+
+Extracted:
+- capacity: 500ml
+- material: PET
+- price: 30
+- product_type: jar
+
+Missing (need visual/research):
+- color
+- texture
+- certifications
+```
+
+### Pattern 3: Research-Heavy Extraction
+
+```
+User: "What's the HSN code for this product?"
+
+1. view_image -> Identify: Plastic jar, food packaging
+2. research_product -> Query: "HSN code plastic food containers India"
+3. Extract: HSN 3923 (plastic containers)
+4. Derive: GST 18% (standard rate)
+```
+
+---
+
+## NAME GENERATION
+
+Generate product names from attributes:
+
+### Pattern
+
+```
+{Material} {Type} {Capacity} [{Color}] [{Feature}]
+```
+
+### Examples
+
+| Attributes | Generated Name |
+|------------|----------------|
+| PET, Jar, 500ml, Clear, Honeycomb | PET Food Jar 500ml Clear Honeycomb |
+| Glass, Bottle, 750ml, Green | Glass Bottle 750ml Green |
+| HDPE, Container, 20L, Blue | HDPE Container 20L Blue |
+
+### Rules
+
+- Material first (classification)
+- Type second (form factor)
+- Size third (key variant)
+- Color optional (if non-default)
+- Feature optional (if distinctive)
+
+---
+
+## HANDLING MISSING ATTRIBUTES
+
+| Missing | Action |
+|---------|--------|
+| Size | Estimate from image, flag uncertainty |
+| Material | Identify from visual, verify with research |
+| Price | Research market, or request from user |
+| HSN Code | Research classification |
+| Color | Identify from image, default "Clear/Natural" |
+
+Never create catalog entry with missing required attributes.
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Guessing Without Source
+
+```
+WRONG:
+material: "probably PET"
+capacity: "looks like 500ml"
+(No visual analysis or research)
+
+RIGHT:
+1. view_image -> "transparent, glossy" -> likely PET
+2. research_product -> "500ml PET jar specs" -> confirmed
+```
+
+### Wrong: Ignoring Conflicts
+
+```
+WRONG:
+User says 500ml, image looks like 750ml -> use 500ml anyway
+
+RIGHT:
+Flag conflict: "User specified 500ml, but visual estimate suggests 750ml.
+Please confirm capacity."
+```
+
+### Wrong: Putting Variant Data in custom_attributes
+
+```
+WRONG:
+custom_attributes: {"size": "500ml", "color": "blue"}
+(When family has these as variant axes)
+
+RIGHT:
+Link to variant_values for size=500ml, color=blue
+custom_attributes for non-variant attributes
+```
+
+</protocol>

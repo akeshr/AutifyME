@@ -1,0 +1,328 @@
+<protocol name="coordination_patterns" type="orchestration" agent="pm">
+
+## PURPOSE
+
+Multi-domain orchestration patterns for PM coordination.
+Defines how PM sequences domain work and handles dependencies.
+
+---
+
+## COORDINATION MODES
+
+### Mode 1: Sequential Chain
+
+Domains execute in strict order, each depending on previous.
+
+```
+Domain A -> Domain B -> Domain C
+```
+
+**Use When:**
+- Each step depends on previous output
+- Data flows forward through chain
+- Example: Catalog addition (visual -> catalog -> product -> creative -> specialist)
+
+**Pattern:**
+```
+1. Delegate to Domain A
+2. Wait for A's result
+3. Include A's output file in Domain B delegation
+4. Wait for B's result
+5. Continue chain...
+```
+
+### Mode 2: Parallel Fan-Out
+
+Multiple domains execute simultaneously, then converge.
+
+```
+         -> Domain A -+
+        /             |
+Start ---> Domain B --+--> Converge
+        \             |
+         -> Domain C -+
+```
+
+**Use When:**
+- Domains are independent
+- Results will be synthesized later
+- Example: After visual analysis, catalog and product can run parallel
+
+**Pattern:**
+```
+1. visual_analyst (required first - identifies product)
+2. PARALLEL:
+   - catalog_analyst (uses visual findings)
+   - product_analyst (uses visual findings)
+3. CONVERGE: PM synthesizes both for user
+```
+
+### Mode 3: Approval Gate
+
+Sequential chain with user checkpoint before expensive operations.
+
+```
+Analysis -> [USER APPROVAL] -> Execution
+```
+
+**Use When:**
+- Expensive operations follow analysis
+- User might reject or modify
+- Example: Image processing only after user approves catalog addition
+
+**Pattern:**
+```
+PHASE 1 - ANALYSIS (raw image sufficient):
+1. visual_analyst -> visual_analysis.md
+2. catalog_analyst -> catalog_analysis.md (parallel with 3)
+3. product_analyst -> product_research.md (parallel with 2)
+4. PM presents to user
+
+[USER APPROVAL GATE]
+
+PHASE 2 - EXECUTION (only after approval):
+5. creative_specialist -> processed images
+6. catalog_specialist -> catalog records
+```
+
+---
+
+## CATALOG ADDITION PATTERN
+
+Most common multi-domain workflow. Memorize this.
+
+### Full Flow
+
+```
+[Image Received]
+      |
+      v
+[1. visual_analyst] -----> visual_analysis_[item].md
+      |
+      v (visual findings available)
+      |
+      +--------+--------+
+      |                 |
+      v                 v
+[2. catalog_analyst]  [3. product_analyst]
+      |                 |
+      v                 v
+catalog_analysis.md   product_research.md
+      |                 |
+      +--------+--------+
+               |
+               v
+[4. PM synthesizes, presents to user]
+               |
+               v
+      [USER APPROVAL GATE]
+               |
+               v
+[5. creative_specialist] -> pending/[thread]/processed.png
+               |
+               v
+[6. catalog_specialist] -> catalog records created
+               |
+               v
+[HITL APPROVAL] -> published
+```
+
+### Key Dependencies
+
+| Step | Depends On | Why |
+|------|------------|-----|
+| catalog_analyst | visual_analyst | Needs product identification to search catalog |
+| product_analyst | visual_analyst | Needs product identification for research |
+| PM synthesis | All analysts | Needs all findings for complete recommendation |
+| creative_specialist | User approval | Don't process if user will reject |
+| catalog_specialist | creative_specialist | Needs processed image paths for asset linking |
+
+### File Routing
+
+| From | Artifact | Routes To |
+|------|----------|-----------|
+| visual_analyst | visual_analysis_[item].md | catalog_analyst, product_analyst, creative_specialist |
+| catalog_analyst | catalog_analysis_[item].md | catalog_specialist |
+| product_analyst | product_research_[item].md | catalog_specialist |
+| creative_specialist | pending/[thread]/*.png | catalog_specialist |
+
+---
+
+## INFORMATION-ONLY PATTERN
+
+User wants data, not action. Single analyst, no execution.
+
+```
+[User Question]
+      |
+      v
+[Appropriate Analyst] -> findings
+      |
+      v
+[PM summarizes for user]
+```
+
+**Examples:**
+- "Show me products without images" -> catalog_analyst only
+- "What HSN code for this?" -> product_analyst only
+- "Is this damaged?" -> visual_analyst only
+
+---
+
+## UPDATE PATTERN
+
+Modify existing catalog data. May skip analysis.
+
+### Simple Update (Clear Instruction)
+
+```
+"Update SKU-001 price to Rs 45"
+
+[catalog_specialist directly] -> updated
+```
+
+No analysis needed - user provided complete instruction.
+
+### Ambiguous Update (Needs Context)
+
+```
+"Update the blue bottle price"
+
+[1. catalog_analyst] -> find product, current price
+[2. PM confirms with user] -> "You mean BOTTLE-GLASS-250ML-BLUE at Rs 95?"
+[3. catalog_specialist] -> update after confirmation
+```
+
+---
+
+## BULK OPERATION PATTERN
+
+Multiple items, single operation type.
+
+### Homogeneous Bulk (Same Product Type)
+
+```
+[4 images of PET containers]
+
+[1. visual_analyst] -> identifies all as variants
+[2. catalog_analyst] -> variant structure recommendation
+[3. product_analyst] -> single HSN for family
+[4. User approval] -> structure confirmed
+[5. creative_specialist] -> 4 processed images
+[6. catalog_specialist] -> 4 products + variant structure
+```
+
+### Heterogeneous Bulk (Different Products)
+
+```
+[5 images: glass, PET, metal, wood, ceramic]
+
+[1. visual_analyst] -> identifies 5 distinct products
+[2. catalog_analyst] -> 5 family placements, may need new families
+[3. product_analyst] -> 5 HSN codes
+[4. User approval] -> all 5 confirmed
+[5. creative_specialist] -> 5 processed images
+[6. catalog_specialist] -> 5 products, possibly new families
+```
+
+---
+
+## ERROR RECOVERY PATTERN
+
+When specialist fails, PM investigates and recovers.
+
+```
+[Specialist Error]
+      |
+      v
+[PM identifies error type]
+      |
+      +---> Data Error (missing FK, invalid data)
+      |         |
+      |         v
+      |    [Delegate to analyst to investigate]
+      |         |
+      |         v
+      |    [Present options to user]
+      |
+      +---> System Error (timeout, service down)
+              |
+              v
+         [Retry or inform user of delay]
+```
+
+**Example: Missing Family**
+```
+catalog_specialist: "Error: family_id 'fam-xyz' not found"
+
+PM: [catalog_analyst] "Verify family exists or recommend alternative"
+
+catalog_analyst: "Family doesn't exist. Recommend creating new family or using existing [X]"
+
+PM: "Options: 1) Create new family, 2) Use existing [X]"
+```
+
+---
+
+## CONTEXT PROPAGATION
+
+User context flows through PM, not through files.
+
+### User Context (PM's Responsibility)
+
+| Context Type | Where It Lives | How to Propagate |
+|--------------|---------------|------------------|
+| Business requirements | PM's conversation state | Include in task description |
+| User preferences | PM's conversation state | Include in task description |
+| User feedback | PM's conversation state | Include in task description |
+| User clarifications | PM's conversation state | Include in task description |
+
+### Research Context (File-Based)
+
+| Context Type | Where It Lives | How to Propagate |
+|--------------|---------------|------------------|
+| Visual analysis | visual_analysis_[item].md | Route file path |
+| Catalog findings | catalog_analysis_[item].md | Route file path |
+| Product research | product_research_[item].md | Route file path |
+| Processed images | pending/[thread]/*.png | Route file path |
+
+### The Critical Gap
+
+When user provides NEW context AFTER analysis files written:
+- Files do NOT contain user's new context
+- PM MUST include user context in task description
+- "Read the files" alone is INSUFFICIENT
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Parallel When Sequential Needed
+
+```
+WRONG: catalog_analyst and visual_analyst in parallel
+RIGHT: visual_analyst FIRST, then catalog_analyst (needs identification)
+```
+
+### Wrong: Execution Before Approval
+
+```
+WRONG: creative_specialist immediately after analysis
+RIGHT: User approval GATE before creative_specialist
+```
+
+### Wrong: Missing File Routes
+
+```
+WRONG: catalog_specialist without product_research.md
+RIGHT: Include ALL three analyst files for complete records
+```
+
+### Wrong: User Context Not Propagated
+
+```
+WRONG: "Read visual_analysis.md" (user said utilities differ)
+RIGHT: "User clarified: tall jars for dry storage, short for spices. Read visual_analysis.md and REVISE."
+```
+
+</protocol>

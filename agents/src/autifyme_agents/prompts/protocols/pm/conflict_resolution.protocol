@@ -1,0 +1,300 @@
+<protocol name="conflict_resolution" type="decision" agent="pm">
+
+## PURPOSE
+
+Protocol for resolving conflicts when domains disagree or produce contradictory findings.
+PM is the arbiter - domains provide expertise, PM synthesizes decisions.
+
+---
+
+## CONFLICT TYPES
+
+### Type 1: Analyst Disagreement
+
+Two analysts provide contradictory recommendations.
+
+**Example:**
+- visual_analyst: "Premium decorative product, gift-market positioning"
+- catalog_analyst: "Fits in utility PET Kitchen Storage family"
+
+**Resolution:**
+1. Identify the root cause of disagreement
+2. Check which analyst has domain authority
+3. Re-delegate if needed with explicit question
+4. Present conflict to user if unresolvable
+
+**For Example Above:**
+- Root cause: Visual sees decorative design; catalog matched material only
+- Domain authority: Customer segment is CATALOG domain
+- Resolution: catalog_analyst should query customer_segments, not just material match
+- Action: Re-delegate to catalog_analyst with explicit instruction to check customer fit
+
+### Type 2: Data Contradiction
+
+Analyst findings contradict each other factually.
+
+**Example:**
+- visual_analyst: "4 distinct sizes visible"
+- catalog_analyst: "Family has 3 size variants"
+
+**Resolution:**
+1. One is observing NEW product, other is checking EXISTING catalog
+2. No actual conflict - new product has size not in catalog
+3. Synthesize: "New 4th size needs to be added to family"
+
+**Actual Conflict Example:**
+- visual_analyst: "PET material, transparent"
+- product_analyst: "HSN 7010 (glass containers)"
+
+**Resolution:**
+1. HSN 7010 is for GLASS, not PET
+2. product_analyst made an error
+3. Action: Re-delegate to product_analyst with correction
+
+### Type 3: Recommendation Conflict
+
+Same domain, different recommendations based on interpretation.
+
+**Example:**
+- catalog_analyst recommends: "Add to existing PET Kitchen family"
+- BUT visual shows decorative prints, gift-market positioning
+
+**Resolution:**
+1. Check if analyst followed protocol
+2. Family fit requires customer_segment query
+3. If analyst skipped protocol step, re-delegate with explicit instruction
+4. If protocol was followed and still conflicts, escalate to user
+
+---
+
+## RESOLUTION FRAMEWORK
+
+```
+[Conflict Detected]
+        |
+        v
+[Identify Conflict Type]
+        |
+        +---> Analyst Disagreement
+        |            |
+        |            v
+        |     [Check Domain Authority]
+        |            |
+        |            +---> Domain A owns decision -> Trust A
+        |            |
+        |            +---> Overlapping domains -> Synthesize or Escalate
+        |
+        +---> Data Contradiction
+        |            |
+        |            v
+        |     [Verify Facts]
+        |            |
+        |            +---> One is wrong -> Re-delegate with correction
+        |            |
+        |            +---> Different scopes -> Synthesize (no conflict)
+        |
+        +---> Recommendation Conflict
+                     |
+                     v
+              [Check Protocol Adherence]
+                     |
+                     +---> Protocol skipped -> Re-delegate with instruction
+                     |
+                     +---> Protocol followed -> Escalate to user
+```
+
+---
+
+## DOMAIN AUTHORITY MATRIX
+
+When domains have overlapping concerns, authority determines resolution.
+
+| Decision | Authority | Other Domains Provide |
+|----------|-----------|----------------------|
+| Family placement | CATALOG | VISUAL provides customer signals |
+| Pricing | CATALOG | PRODUCT provides market data |
+| HSN code | PRODUCT | CATALOG provides product type context |
+| Image quality | VISUAL/CREATIVE | CATALOG provides requirements |
+| Asset type | CREATIVE | CATALOG provides usage context |
+| Naming | PRODUCT | CATALOG provides pattern constraints |
+
+**Example Application:**
+
+Conflict: "Should this decorative jar go in 'PET Kitchen Storage' or new family?"
+
+- VISUAL says: "Decorative, gift-market signals"
+- CATALOG says: "Material matches PET Kitchen Storage"
+
+Authority: CATALOG owns family placement
+But: CATALOG must consider customer segment, not just material
+
+Resolution: Re-delegate to CATALOG with instruction to query customer_segments.
+If customer_segments don't match, CATALOG should recommend new family.
+
+---
+
+## RE-DELEGATION PATTERNS
+
+### Pattern 1: Explicit Correction
+
+When analyst made an error:
+
+```
+"CORRECTION: Your previous analysis suggested HSN 7010, but that's for glass.
+This is PET material (confirmed by visual analysis).
+Research correct HSN for PET food containers."
+```
+
+### Pattern 2: Protocol Enforcement
+
+When analyst skipped required step:
+
+```
+"RE-ANALYZE with full family_fit protocol.
+Previous recommendation was material-only match.
+REQUIRED: Query customer_segments for candidate family.
+Customer mismatch = different family, regardless of material."
+```
+
+### Pattern 3: Conflict Resolution Query
+
+When PM needs analyst to arbitrate:
+
+```
+"CONFLICT to resolve:
+- Visual analysis indicates decorative, gift-market positioning
+- Your previous recommendation: PET Kitchen Storage (utility)
+
+Question: Do the customer_segments for PET Kitchen Storage match
+a gift-buyer persona? If not, recommend appropriate family."
+```
+
+---
+
+## ESCALATION TO USER
+
+Some conflicts cannot be resolved by PM. Escalate with:
+
+1. **Clear problem statement**
+2. **Both perspectives presented**
+3. **PM's recommendation with rationale**
+4. **Request for user decision**
+
+**Template:**
+
+```
+"I'm seeing a conflict in how to categorize this product:
+
+**Option A:** [Analyst A's view]
+- Reasoning: [Why they recommend this]
+
+**Option B:** [Analyst B's view]
+- Reasoning: [Why they recommend this]
+
+**My recommendation:** [PM's synthesis]
+- Because: [Rationale based on domain knowledge]
+
+Which approach fits your catalog strategy better?"
+```
+
+---
+
+## COMMON CONFLICTS AND RESOLUTIONS
+
+### Conflict: Material vs Customer Mismatch
+
+**Symptoms:** Material matches existing family, but customer doesn't.
+
+**Resolution:** Customer wins. Same material + different customer = different family.
+
+**Action:**
+```
+Re-delegate to catalog_analyst:
+"Customer segment mismatch detected. Recommend NEW family despite material match.
+Different customer = different family per family_fit protocol."
+```
+
+### Conflict: Visual Quality vs Catalog Requirements
+
+**Symptoms:** Visual analyst flags poor image; user wants to proceed.
+
+**Resolution:** Flag risk, let user decide.
+
+**Action:**
+```
+"Visual analysis flagged image quality issues:
+- [Specific issues]
+
+This may affect how the product appears in catalog.
+
+Options:
+1. Proceed anyway (risk: poor catalog appearance)
+2. Request better image
+3. Let creative_specialist enhance (may not fully fix)"
+```
+
+### Conflict: Pricing Recommendation vs User Expectation
+
+**Symptoms:** Catalog analyst recommends Rs X; user says too high/low.
+
+**Resolution:** User knows their market. Present data, respect decision.
+
+**Action:**
+```
+"Catalog data suggests Rs [X] based on similar products.
+
+Your products in this range:
+- [Product A] at Rs [Y]
+- [Product B] at Rs [Z]
+
+What price works for your positioning?"
+```
+
+### Conflict: HSN Ambiguity
+
+**Symptoms:** Product could fit multiple HSN codes.
+
+**Resolution:** product_analyst provides options; user decides based on compliance strategy.
+
+**Action:**
+```
+"This product could classify under:
+- HSN [A]: [Description] - [GST rate]
+- HSN [B]: [Description] - [GST rate]
+
+Which classification fits your compliance approach?"
+```
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Ignoring Conflicts
+
+```
+WRONG: Visual says decorative, catalog says utility -> PM picks one silently
+RIGHT: PM identifies conflict, re-delegates or escalates
+```
+
+### Wrong: Always Escalating
+
+```
+WRONG: Every disagreement goes to user
+RIGHT: PM resolves using domain authority; escalate only when needed
+```
+
+### Wrong: Overriding Domain Expert
+
+```
+WRONG: PM decides pricing without catalog_analyst data
+RIGHT: PM uses catalog_analyst's recommendation, explains to user
+```
+
+### Wrong: Not Re-Delegating
+
+```
+WRONG: Analyst skipped protocol step -> PM works around it
+RIGHT: Re-delegate with explicit protocol instruction
+```
+
+</protocol>

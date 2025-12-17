@@ -1,0 +1,279 @@
+<protocol name="research_product" type="tool_mastery" domain="shared">
+
+## PURPOSE
+
+Master the research_product_tool - web search (Tavily API) for data enrichment.
+Use to fill knowledge gaps that visual analysis and internal data cannot answer.
+
+## WHEN TO USE
+
+| Situation | Action |
+|-----------|--------|
+| Minimal input data | Research specifications, standards, typical values |
+| Unknown item type | Identify from context + web search |
+| Value/pricing needed | Market baseline research |
+| Compliance gaps | Codes, certifications, regulatory requirements |
+| Source verification | Legitimacy, contact info |
+| Specification validation | Claims vs market standards |
+
+---
+
+## PARAMETERS
+
+### query (required)
+
+Natural language research query - BE SPECIFIC:
+
+**Good Queries:**
+- `[item type] [material] specifications [market]`
+- `[classification code] [item category] [region]`
+- `[material] [size] [certification] requirements`
+
+**Bad Queries:**
+- `containers` (too broad, generic results)
+- `items` (no material, size, or market context)
+- `specifications` (meaningless without context)
+
+RULE: Include item type + material/category + size/specs + market context.
+
+### max_results (optional)
+
+How many sources to return (1-10, default 5):
+
+| Value | Use Case |
+|-------|----------|
+| 1-3 | Quick checks, simple facts |
+| 5 | Standard enrichment (recommended) |
+| 8-10 | Complex items, multiple data points needed |
+
+### include_answer (optional)
+
+Whether to include AI-generated summary (default True):
+
+- `True`: Get concise answer + sources (recommended)
+- `False`: Only sources (when you need raw data)
+
+---
+
+## QUALITY SIGNALS
+
+### Confidence Score
+
+Returned confidence indicates research quality:
+
+| Score | Meaning | Action |
+|-------|---------|--------|
+| >= 0.7 | Good research | Trust findings |
+| 0.5-0.7 | Moderate | Proceed with caution, verify critical data |
+| < 0.5 | Weak | May need follow-up query or continue without |
+
+### Source Relevance
+
+Per-source relevance_score:
+
+| Score | Meaning |
+|-------|---------|
+| >= 0.8 | Highly relevant - candidate for extract_web_content |
+| 0.5-0.8 | Relevant - useful but may need verification |
+| < 0.5 | Tangential - likely not worth deep-diving |
+
+---
+
+## COMMON PATTERNS
+
+### Pattern 1: Enrich Minimal Input
+
+User provides image + basic description. Need specifications.
+
+```json
+{
+  "query": "[item type] [size] [material] specifications [market]",
+  "max_results": 5,
+  "include_answer": true
+}
+```
+
+Returns: Material details, standard specs, typical values, sources.
+
+### Pattern 2: Classification/Code Research
+
+Need regulatory classification for item.
+
+```json
+{
+  "query": "[classification system] code [item category] [region]",
+  "max_results": 3,
+  "include_answer": true
+}
+```
+
+Returns: Classification code, requirements, regulatory context.
+
+### Pattern 3: Value Validation
+
+User-provided value seems off. Verify market rates.
+
+```json
+{
+  "query": "[item type] [size] wholesale [value type] [region]",
+  "max_results": 5,
+  "include_answer": true
+}
+```
+
+Returns: Market values, typical ranges, bulk rates.
+
+### Pattern 4: Unknown Item Identification
+
+Visual analysis identifies shape/material but not item type.
+
+```json
+{
+  "query": "[shape] [material] [distinguishing features] [use context]",
+  "max_results": 5,
+  "include_answer": true
+}
+```
+
+Returns: Item type identification, common uses, specifications.
+
+---
+
+## WORKFLOW INTEGRATION
+
+### Research -> Extract -> Action
+
+1. **research_product**: Broad search, identify high-value sources
+2. **extract_web_content**: Deep-dive on 0.8+ relevance sources (1-2 max)
+3. **read_data**: Check internal data for duplicates/similar items
+4. **write_data**: Create with enriched specifications
+
+### Research After Visual Analysis
+
+```
+1. view_image -> Identify item visually (type, material, size estimate)
+2. research_product -> Enrich with specs (exact details, standards, values)
+3. read_data -> Duplicate check
+4. write_data -> Create with complete data
+```
+
+---
+
+## COST AWARENESS
+
+| Metric | Value |
+|--------|-------|
+| Cost per search | ~$0.008 (paid tier) |
+| Free tier | 1000 searches/month |
+| Expected usage | 2-3 searches per item |
+| Monthly estimate | ~150 searches (well within free tier) |
+
+**Efficiency Rules:**
+- Be specific - avoid multiple searches for same item
+- Use include_answer=True - get synthesis, not just links
+- Don't research what visual analysis already confirmed
+- One good query > three vague queries
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Exploratory Searches
+
+```
+WRONG:
+query="containers" (too broad, wastes credits)
+
+CORRECT:
+query="[specific item type] [material] [size] specifications [market]"
+```
+
+### Wrong: Research Before Visual
+
+```
+WRONG:
+1. research_product (don't know what item is)
+2. view_image
+
+CORRECT:
+1. view_image (identify item type, material, size)
+2. research_product (enrich with specs based on what you saw)
+```
+
+### Wrong: Researching Internal Data
+
+```
+WRONG:
+research_product(query="items in category X in our system")
+# Research is for EXTERNAL knowledge, not your internal data
+
+CORRECT:
+read_data(table="items", search_patterns={"name": "%keyword%"})
+```
+
+### Wrong: Extracting Every Source
+
+```
+WRONG:
+research_product -> extract_web_content on ALL 5 sources (expensive)
+
+CORRECT:
+research_product -> identify 0.8+ relevance sources -> extract 1-2 best
+```
+
+---
+
+## RETURN STRUCTURE
+
+### Success
+
+```json
+{
+  "success": true,
+  "query": "[query text]",
+  "search_type": "product_search",
+  "answer": "Summary of findings...",
+  "sources": [
+    {
+      "title": "Source Title",
+      "url": "https://...",
+      "content": "...",
+      "relevance_score": 0.85,
+      "published_date": "2024-01-15"
+    }
+  ],
+  "confidence": 0.72,
+  "total_sources_found": 5,
+  "key_findings": [
+    "Finding 1",
+    "Finding 2"
+  ]
+}
+```
+
+### Error
+
+```json
+{
+  "success": false,
+  "error": "API rate limit exceeded",
+  "error_type": "API_ERROR",
+  "query": "...",
+  "Agent Action": "Continue workflow without research, inform user."
+}
+```
+
+---
+
+## GRACEFUL DEGRADATION
+
+Research is OPTIONAL enrichment. On failure:
+
+1. **API Error**: Log, inform user, continue without research
+2. **No Results**: Try refined query OR continue with visual data only
+3. **Low Confidence**: Flag uncertainty, proceed with caution
+4. **Network Issues**: Retry once, then continue without
+
+NEVER block a workflow because research failed.
+
+</protocol>

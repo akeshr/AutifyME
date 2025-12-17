@@ -554,7 +554,8 @@ PM does NOT have:
 | **Missing data** | Required query returns empty | Cold Start | Use fallback then HITL |
 | **Tool failure** | API error, timeout | Retry then PM | Retry 3x with backoff |
 | **Quality not met** | N iterations without success | PM + HITL | Flag for human review |
-| **Cross-domain conflict** | Domain A says X, Domain B says Y | PM | Synthesize and present |
+| **Cross-domain conflict** | Domain A says X, Domain B says Y | PM | Use Conflict Resolution Protocol |
+| **Compound failure** | Multiple failure conditions | Highest handler | HITL > PM > Retry priority |
 
 ### 8.2 Iteration Bounds
 
@@ -586,6 +587,71 @@ DONE  HITL COLD  RETRY(3)
              |      v
              v   ESCALATE
            HITL   TO PM
+```
+
+### 8.4 Conflict Resolution Protocol
+
+When domains produce conflicting recommendations, PM resolves using this protocol:
+
+```xml
+<conflict_resolution>
+
+## DETECTION
+- Two or more domains return contradictory recommendations
+- Example: Marketing says "price at Rs 50 for positioning" vs Catalog says "family pricing demands Rs 100"
+
+## RESOLUTION STEPS
+
+### Step 1: IDENTIFY Conflict Type
+| Type | Example | Resolution Owner |
+|------|---------|------------------|
+| Data conflict | Different facts from different sources | Query authoritative source |
+| Priority conflict | Both valid, different business priorities | Domain ownership matrix |
+| Interpretation conflict | Same data, different conclusions | Owning domain decides |
+
+### Step 2: APPLY Domain Ownership
+- Check Domain Ownership Matrix (Section 2.3)
+- Owning domain's recommendation takes precedence
+- Non-owning domain's input becomes "consideration" not "decision"
+
+### Step 3: SYNTHESIZE for User
+If ownership unclear OR stakes high:
+- Present both perspectives via HITL
+- Include: Domain A recommendation + reasoning, Domain B recommendation + reasoning
+- Let user decide
+
+## CRITICAL RULES
+- NEVER silently pick one domain over another
+- ALWAYS document which domain "won" and why
+- High-stakes conflicts (pricing, family creation) ALWAYS go to HITL
+
+</conflict_resolution>
+```
+
+### 8.5 Compound Failure Handling
+
+When multiple failure conditions occur simultaneously:
+
+```xml
+<compound_failure_handling>
+
+## PRIORITY ORDER (Highest to Lowest)
+1. HITL - Any condition requiring human judgment
+2. PM Escalation - Cross-domain or architectural decisions
+3. Cold Start - Missing foundational data
+4. Retry - Transient failures
+
+## RESOLUTION
+- Identify ALL active failure conditions
+- Escalate to HIGHEST priority handler
+- Handler addresses all conditions, not just its primary concern
+- Example: Tool failure + Cold start = Cold start handler (includes retry logic)
+
+## NEVER
+- Handle failures independently (creates inconsistent state)
+- Retry if HITL condition also present (human judgment first)
+
+</compound_failure_handling>
 ```
 
 ---
@@ -624,6 +690,55 @@ DONE  HITL COLD  RETRY(3)
 - ALWAYS flag first-of-kind for human review
 
 </cold_start_handling>
+```
+
+### 9.3 Bootstrap Phase
+
+The Bootstrap Phase defines when a domain transitions from LEARNING mode to AUTONOMOUS mode.
+
+```xml
+<bootstrap_phase>
+
+## DEFINITION
+Bootstrap Phase = Period when domain lacks sufficient data for autonomous decisions.
+During bootstrap, ALL decisions require HITL approval to establish foundational patterns.
+
+## BOOTSTRAP THRESHOLDS (Per Domain)
+
+| Domain | Bootstrap Ends When | Rationale |
+|--------|---------------------|-----------|
+| **Catalog** | 3+ product families with 5+ products each | Enough pattern diversity |
+| **Creative** | 10+ approved image generations | Style preferences established |
+| **Marketing** | 5+ approved campaigns | Positioning patterns learned |
+| **Quality** | 20+ quality assessments reviewed | Standards calibrated |
+| **Procurement** | 5+ supplier evaluations | Evaluation criteria validated |
+
+## BOOTSTRAP MODE BEHAVIOR
+
+### During Bootstrap (LEARNING)
+- ALL domain decisions require HITL approval
+- System explicitly flags: "Bootstrap mode: Building foundational patterns"
+- Each approval trains the system on user preferences
+- No autonomous execution, even for "obvious" decisions
+
+### After Bootstrap (AUTONOMOUS)
+- Standard escalation rules apply (Section 8)
+- HITL only for ambiguous/high-stakes decisions
+- Cold start protocol only for genuinely new categories
+- System operates with learned patterns
+
+## BOOTSTRAP TRACKING
+- Track per-domain: decisions_made, decisions_approved, approval_rate
+- Transition requires: threshold met AND approval_rate > 80%
+- If approval_rate < 80% at threshold, extend bootstrap by 50%
+
+## CRITICAL
+- Bootstrap thresholds are MINIMUMS, not guarantees
+- User can extend bootstrap manually ("stay in learning mode")
+- New business = ALL domains in bootstrap simultaneously
+- Bootstrap reset if business rules change significantly
+
+</bootstrap_phase>
 ```
 
 ---
@@ -993,16 +1108,54 @@ Key relationships: customer_segments.family_id -> product_families.id
 
 ## 12. Implementation
 
-### 12.1 Phase Overview
+### 12.1 Implementation Approach
+
+**[CRITICAL] FRESH BUILD - NOT PATCHWORK**
+
+Phase 1 is a complete rebuild from first principles, not patches on existing agents:
+
+| Component | Approach |
+|-----------|----------|
+| **PM** | Rebuild with domain awareness, coordination patterns, conflict resolution |
+| **Analysts** | Build fresh with protocol-driven exploration |
+| **Specialists** | Rebuild with protocol-driven decisions |
+| **Protocols** | New structure from scratch |
+| **Middleware** | New ProtocolInjectionMiddleware |
+
+**Rationale:** Existing agents were built before the Domain Reasoning Framework. Patchwork creates architectural debt. Clean slate ensures framework principles are foundational, not bolted-on.
+
+**Existing code:** Reference for patterns learned, but implementation is unconstrained by it.
+
+### 12.2 Phase Overview
 
 | Phase | Focus | Status |
 |-------|-------|--------|
-| **Phase 1** | Foundation + Catalog Protocols | READY |
+| **Phase 1** | Foundation + Catalog (PM, Analysts, Specialist, Protocols) | READY |
 | **Phase 2** | Cross-Domain Protocols | PENDING |
 | **Phase 3** | Additional Domains | FUTURE |
 
-### 12.2 Phase 1: Foundation + Catalog
+### 12.3 Phase 1: Foundation + Catalog (Fresh Build)
 
+**Build Order:** PM -> Analysts -> Specialist -> Protocols -> Middleware
+
+#### Stage 1: PM (Domain-Aware Orchestrator)
+- [ ] PM prompt with domain awareness
+- [ ] Domain ownership knowledge
+- [ ] Coordination patterns (single-domain, multi-domain)
+- [ ] Conflict resolution protocol integration
+- [ ] Bootstrap phase awareness
+
+#### Stage 2: Analysts (Protocol-Driven Exploration)
+- [ ] visual_analyst - cross-domain visual analysis
+- [ ] catalog_analyst - catalog-specific exploration
+- [ ] Protocol loading mechanism for domain context
+
+#### Stage 3: Catalog Specialist (Protocol-Driven Decisions)
+- [ ] catalog_specialist with protocol integration
+- [ ] HITL checkpoints for decisions
+- [ ] Bootstrap mode behavior
+
+#### Stage 4: Protocol Infrastructure
 - [ ] Protocol file structure (`protocols/catalog/`, `protocols/shared/`)
 - [ ] `create_load_protocol_tool()` factory
 - [ ] `ProtocolInjectionMiddleware`
@@ -1014,10 +1167,13 @@ Key relationships: customer_segments.family_id -> product_families.id
   - [ ] new_family.protocol
   - [ ] visual_analysis.protocol
   - [ ] tool_mastery.protocol
-- [ ] Update catalog_specialist prompt with protocol index
-- [ ] Update catalog_analyst prompt with exploration protocol
 
-### 12.3 Phase 2: Cross-Domain
+#### Stage 5: Validation
+- [ ] Before/after trace comparison
+- [ ] Bootstrap phase verification
+- [ ] Conflict resolution testing
+
+### 12.4 Phase 2: Cross-Domain
 
 - [ ] Visual analysis protocols for other domains (Quality, Marketing)
 - [ ] Product research protocols for other domains (Marketing, Procurement)
@@ -1038,6 +1194,10 @@ Key relationships: customer_segments.family_id -> product_families.id
 | 2025-12-17 | PM uses coordination patterns, not decision protocols | PM coordinates, doesn't decide domain matters |
 | 2025-12-17 | Explicit iteration bounds | Prevent infinite loops |
 | 2025-12-17 | Cold start always escalates to HITL | First-of-kind needs human judgment |
+| 2025-12-17 | Conflict Resolution Protocol added | Multi-domain conflicts need explicit resolution mechanism |
+| 2025-12-17 | Bootstrap Phase defined | Explicit transition from LEARNING to AUTONOMOUS mode |
+| 2025-12-17 | Compound Failure Handling added | Multiple failures escalate to highest priority handler |
+| 2025-12-17 | Fresh build approach | Rebuild from scratch, not patchwork on existing agents |
 
 ---
 
@@ -1078,5 +1238,5 @@ Key relationships: customer_segments.family_id -> product_families.id
 
 ---
 
-**Version:** 5.0 (ULTRATHINK - Complete Model)
+**Version:** 6.0 (ULTRATHINK - Fresh Build Ready)
 **Updated:** December 17, 2025

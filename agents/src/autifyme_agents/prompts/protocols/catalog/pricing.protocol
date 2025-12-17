@@ -1,0 +1,251 @@
+<protocol name="pricing" type="decision" domain="catalog">
+
+## PURPOSE
+
+Price determination protocol for catalog entries.
+Ensures pricing is grounded in market research, family context, and business rules.
+
+---
+
+## PRICING SOURCES (Priority Order)
+
+### 1. User-Provided Price (Highest Priority)
+
+If user explicitly provides price, use it after validation:
+- Is it within reasonable range for this product type?
+- Does it align with family pricing patterns?
+
+### 2. Family Price Inference
+
+Query existing products in same family:
+
+```
+aggregate_data(
+    table='products',
+    aggregates={
+        'avg_price': 'avg(price)',
+        'min_price': 'min(price)',
+        'max_price': 'max(price)'
+    },
+    filters={'product_family_id': 'family-id', 'is_active': true}
+)
+```
+
+Use family average as baseline, adjust for:
+- Size difference (larger = higher price)
+- Feature premium (special texture, color)
+- Variant adjustments (from variant_values.price_adjustment)
+
+### 3. Market Research
+
+If no family context or user price:
+
+```
+research_product(query='[product type] [size] wholesale price [market]')
+```
+
+Use confidence signals:
+- >= 0.7: Trust research pricing
+- 0.5-0.7: Use with caution
+- < 0.5: Flag uncertainty
+
+### 4. Cost-Plus (If Cost Known)
+
+If manufacturing/purchase cost available:
+- Apply standard margin (industry typical: 30-50%)
+- Adjust for market positioning
+
+---
+
+## PRICE LIST CONTEXT
+
+Products may have different prices in different contexts:
+
+| List Type | Use Case | Tax Treatment |
+|-----------|----------|---------------|
+| SALES | Customer-facing | Usually inclusive |
+| PURCHASE | Supplier pricing | Usually exclusive |
+| TRANSFER | Internal transfers | At cost |
+| PROMOTIONAL | Temporary discounts | Varies |
+
+Check which price list to use:
+
+```
+read_data(
+    table='price_lists',
+    filters={'list_type': 'SALES', 'is_active': true},
+    columns=['id', 'code', 'currency', 'is_tax_inclusive']
+)
+```
+
+---
+
+## VARIANT PRICING
+
+For products with variants, pricing may be:
+
+### Base + Adjustment Model
+
+```
+Final Price = Family Base Price + Sum(Variant Adjustments)
+```
+
+Query variant adjustments:
+
+```
+read_data(
+    table='variant_values',
+    filters={'variant_axis_id': 'axis-id'},
+    columns=['value', 'display_label', 'price_adjustment']
+)
+```
+
+### Example Calculation
+
+```
+Family Base: Rs 100
+Size 500ml adjustment: +Rs 0 (base size)
+Size 1L adjustment: +Rs 20
+Color Blue adjustment: +Rs 5
+
+500ml Clear: Rs 100 + 0 + 0 = Rs 100
+1L Blue: Rs 100 + 20 + 5 = Rs 125
+```
+
+---
+
+## VALIDATION RULES
+
+Before finalizing price, validate:
+
+| Check | Rule |
+|-------|------|
+| Minimum | Price > 0 |
+| Maximum | Price < family max * 2 (flag if exceeds) |
+| GST alignment | Price allows for GST calculation |
+| Currency | Matches price list currency |
+
+### GST Considerations (India)
+
+| GST Rate | Common Products |
+|----------|-----------------|
+| 0% | Basic food items |
+| 5% | Essential goods |
+| 12% | Processed foods |
+| 18% | Most manufactured goods |
+| 28% | Luxury items |
+
+---
+
+## DECISION FLOW
+
+```
+User Price Provided?
+    |
+    +-- Yes -> Validate against family range
+    |           |
+    |           +-- Within range? -> USE USER PRICE
+    |           |
+    |           +-- Out of range? -> Flag warning, use if confirmed
+    |
+    +-- No -> Check Family Context
+              |
+              +-- Family exists? -> Calculate family-based price
+              |                     (avg + variant adjustments)
+              |
+              +-- No family? -> Research market price
+                                |
+                                +-- Research confident? -> Use research
+                                |
+                                +-- Low confidence? -> Flag for user input
+```
+
+---
+
+## OUTPUT STRUCTURE
+
+```json
+{
+  "recommended_price": 100.00,
+  "currency": "INR",
+  "price_source": "family_inference | user_provided | market_research | cost_plus",
+  "confidence": "high | medium | low",
+  "breakdown": {
+    "base_price": 95.00,
+    "variant_adjustments": [
+      {"axis": "size", "value": "500ml", "adjustment": 0},
+      {"axis": "color", "value": "blue", "adjustment": 5}
+    ],
+    "total_adjustments": 5.00
+  },
+  "validation": {
+    "within_family_range": true,
+    "family_avg": 98.00,
+    "family_min": 80.00,
+    "family_max": 120.00
+  },
+  "warnings": []
+}
+```
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Arbitrary Pricing
+
+```
+WRONG:
+price: 100  # Just picked a number
+
+RIGHT:
+1. Query family products for average
+2. Apply variant adjustments
+3. Validate against family range
+```
+
+### Wrong: Ignoring Variant Adjustments
+
+```
+WRONG:
+All variants priced at family base
+
+RIGHT:
+Query variant_values for price_adjustment
+Apply adjustments to base price
+```
+
+### Wrong: Single Source Reliance
+
+```
+WRONG:
+Use market research alone without family context
+
+RIGHT:
+Family context first (most accurate for existing catalog)
+Market research for new families or validation
+```
+
+---
+
+## PRICE UPDATE PROTOCOL
+
+When updating prices:
+
+1. **Query affected products:**
+   ```
+   read_data(table='products', filters={'product_family_id': 'family-id'})
+   ```
+
+2. **Calculate impact:**
+   - Count affected products
+   - Calculate percentage change
+   - Identify outliers
+
+3. **HITL summary must include:**
+   - Number of products affected
+   - Before/after prices
+   - Percentage change
+   - Warnings for large changes (>20%)
+
+</protocol>

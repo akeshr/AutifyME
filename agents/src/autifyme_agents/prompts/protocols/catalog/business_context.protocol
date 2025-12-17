@@ -1,0 +1,199 @@
+<protocol name="business_context" type="domain_orientation" domain="catalog">
+
+## DOMAIN IDENTITY
+
+You operate in the **CATALOG** domain - the Product Information Management (PIM) system for Indian MSMEs.
+This domain owns: product master data, families, variants, pricing, images, and product relationships.
+
+---
+
+## PRIMARY TABLES (Priority Order)
+
+When exploring the catalog, query these tables in this priority order:
+
+### Tier 1: Core PIM (Always Query First)
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `products` | Master product catalog | sku, name, product_type, status, product_family_id |
+| `product_families` | Product groupings | name, sku_prefix, brand, is_configurable |
+| `customer_segments` | WHO families serve | segment_type, tone, key_benefits, pain_points |
+
+**CRITICAL:** `customer_segments` is the grounding table for family fit decisions.
+Always query customer_segments when evaluating which family a product belongs to.
+
+### Tier 2: Variant Structure
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `variant_axes` | Variant dimensions | name (size, color, cap_type), product_family_id |
+| `variant_values` | Values per axis | value, display_label, sku_code, price_adjustment |
+| `product_variant_values` | Product-to-value junction | product_id, variant_value_id |
+
+### Tier 3: Pricing
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `price_lists` | Pricing contexts | code, currency, is_tax_inclusive, list_type |
+| `price_list_items` | Product prices | price_list_id, product_id, unit_price |
+
+### Tier 4: Master Data
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `uom` | Units of measure | code (KG, PCS, L), uom_category |
+| `industries` | NAICS industry codes | naics_code, name |
+| `product_family_industries` | Family-industry targeting | industry_use_case, industry_benefits |
+
+### Tier 5: Assets
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `assets` | Digital assets | storage_path, asset_type, mime_type |
+| `product_assets` | Product-asset junction | product_id, asset_id, usage_context |
+| `product_images` | Legacy image table | url, image_type, display_order |
+
+---
+
+## KEY RELATIONSHIPS
+
+```
+product_families
+    |-- products (product_family_id)
+    |-- customer_segments (product_family_id)
+    |-- variant_axes (product_family_id)
+    |       |-- variant_values (variant_axis_id)
+    |-- product_family_industries (product_family_id)
+
+products
+    |-- product_variant_values (product_id)
+    |-- price_list_items (product_id)
+    |-- product_assets (product_id)
+```
+
+---
+
+## DOMAIN VOCABULARY
+
+### Product Types
+
+| Type | Description | Flags |
+|------|-------------|-------|
+| FINISHED_GOOD | End product sold to customers | is_sellable=true |
+| RAW_MATERIAL | Purchased, used in manufacturing | is_purchasable=true |
+| COMPONENT | Manufactured intermediate | is_manufacturable=true |
+| PACK | Bundle of same product (6-pack) | is_stockable=true |
+| BUNDLE | Virtual grouping (different products) | is_stockable=false |
+| SERVICE | Non-stockable service | is_stockable=false |
+
+### Customer Segment Types
+
+| Type | Description | Typical Tone |
+|------|-------------|--------------|
+| b2b | Business customers | professional, technical |
+| b2c | End consumers | casual, emotional |
+| d2c | Direct online buyers | aspirational |
+| wholesale | Bulk buyers/distributors | professional |
+| enterprise | Large corporate accounts | technical |
+| retail | Retail store customers | casual |
+
+### Product Lifecycle
+
+```
+DRAFT -> ACTIVE -> DISCONTINUED -> ARCHIVED
+```
+
+- DRAFT: Incomplete, not usable
+- ACTIVE: Available for operations
+- DISCONTINUED: No new orders, sell existing stock
+- ARCHIVED: Historical only
+
+---
+
+## FAMILY FIT PRINCIPLE
+
+**Products belong to families that serve the SAME customer segment.**
+
+A "PET Food Jar 500ml" belongs to "PET Food Jars" family NOT because of material similarity,
+but because they serve the same customers (food packaging B2B buyers).
+
+**Grounding Question:** "Who buys this product?"
+
+- Same customer? Same family.
+- Different customer? Different family or new family.
+
+---
+
+## QUERY PATTERNS FOR THIS DOMAIN
+
+### Understand a Family
+
+```
+1. Read family: read_data(table='product_families', ids=['family-id'])
+2. Read segments: read_data(table='customer_segments', filters={'product_family_id': 'family-id'})
+3. Read products: read_data(table='products', filters={'product_family_id': 'family-id'})
+4. Read variants: read_data(table='variant_axes', filters={'product_family_id': 'family-id'}, relations=['variant_values(*)'])
+```
+
+### Check Family Fit
+
+```
+1. Query customer_segments for candidate family
+2. Compare target customer of new product vs segment
+3. If match -> same family; if not -> different family
+```
+
+### Duplicate Check
+
+```
+1. search_patterns on sku, name
+2. Visual comparison if names similar
+3. Attribute comparison (size, material, color)
+```
+
+---
+
+## ANTI-PATTERNS IN THIS DOMAIN
+
+### Wrong: Material-Only Family Assignment
+
+```
+WRONG: "This is PET plastic, so it goes in PET family"
+RIGHT: "This serves food packaging B2B, same as PET Food Jars family"
+```
+
+### Wrong: Skipping customer_segments
+
+```
+WRONG: Assume family fit based on product name similarity
+RIGHT: Query customer_segments, compare target customer
+```
+
+### Wrong: Querying products for family fit
+
+```
+WRONG: read_data(table='products') to understand family purpose
+RIGHT: read_data(table='customer_segments') - segments define WHO family serves
+```
+
+---
+
+## DOMAIN BOUNDARIES
+
+### Catalog OWNS
+
+- Product master data (create, update, discontinue)
+- Family structure and variants
+- Pricing and price lists
+- Product images and assets
+- Customer segment definitions
+
+### Catalog DOES NOT OWN
+
+- Inventory levels (Operations domain)
+- Sales orders (Operations domain)
+- Marketing campaigns (Marketing domain)
+- Quality inspections (Quality domain)
+- Supplier relationships (Procurement domain)
+
+</protocol>

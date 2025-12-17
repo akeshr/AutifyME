@@ -8,6 +8,10 @@ Cross-domain reuse:
 - Marketing: Visual quality, composition analysis
 - Operations: Damage detection, quality control
 - Quality: Defect identification, compliance checking
+
+Protocol Integration (v2):
+- Loads domain-specific visual_analysis protocols when domain context provided
+- Protocol grounds observations in domain-specific focus areas
 """
 
 from typing import Any
@@ -18,6 +22,7 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import MultimodalInjectionMiddleware
 from autifyme_agents.tools import create_view_image_tool
+from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
 
 
 def _get_analyst_llm() -> BaseChatModel:
@@ -50,25 +55,30 @@ def create_visual_analyst(
         >>> # Add to PM subagents
         >>> subagents = [analyst, catalog_specialist, ...]
     """
-    system_prompt = load_prompt("analysts/visual_analyst.prompt")
+    system_prompt = load_prompt("analysts/visual_analyst_v2.prompt")
 
     description = (
-        "ROLE: Analyst (read-only)\n"
+        "ROLE: Analyst (read-only, protocol-integrated)\n"
         "MISSION: Describe what is visible in images with high precision.\n\n"
         "OWNERSHIP:\n"
-        "- Visual facts only: items, materials, colors, text/labels, defects, counts\n\n"
+        "- Visual facts only: items, materials, colors, text/labels, defects, counts\n"
+        "- Domain-grounded analysis when domain context provided\n\n"
         "INPUTS I NEED:\n"
-        "- Image path(s) when available (e.g., inbox/... or pending/...)\n\n"
+        "- Image path(s) when available (e.g., inbox/... or pending/...)\n"
+        "- Domain context if applicable (e.g., 'for CATALOG domain')\n\n"
         "OUTPUTS I PRODUCE:\n"
         "- Observations + uncertainties (no recommendations)\n"
+        "- Domain-specific focus areas when protocol loaded\n"
         "- If long: write a short report to the thread directory and return the file path\n\n"
         "TOOLS I USE:\n"
+        "- load_protocol (for domain-specific analysis)\n"
         "- view_image\n\n"
         "GUARDRAILS:\n"
         "- No DB reads/writes; no pricing/taxonomy/action recommendations; no image editing"
     )
 
     tools: list[Any] = [
+        create_load_protocol_tool(),
         create_view_image_tool(),
     ]
 

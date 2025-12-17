@@ -1,0 +1,154 @@
+<protocol name="aggregate_data" type="tool_mastery" domain="shared">
+
+## PURPOSE
+
+Master the aggregate_data tool - analytics queries with GROUP BY, HAVING, and aggregation functions.
+Use for counts, sums, averages, min/max - NOT for fetching records.
+
+## WHEN TO USE
+
+| Use aggregate_data | Use read_data |
+|-------------------|---------------|
+| "How many records per category?" | "Get records in category X" |
+| "Average value by group" | "Get all records with value > 50" |
+| "Total amount by period" | "Get records from January" |
+| COUNT, SUM, AVG, MIN, MAX | Actual records |
+
+---
+
+## PARAMETERS
+
+### aggregates (required)
+
+Aggregation functions as `{alias: 'function(column)'}`:
+
+```json
+{
+  "total": "count(*)",
+  "avg_value": "avg(numeric_column)",
+  "min_value": "min(numeric_column)",
+  "max_value": "max(numeric_column)",
+  "total_amount": "sum(amount_column)"
+}
+```
+
+Supported functions: `count`, `sum`, `avg`, `min`, `max`
+
+### group_by (optional)
+
+Columns to group results by:
+
+```json
+["parent_id", "is_active"]
+```
+
+Without group_by, aggregates apply to entire dataset.
+
+### having (optional)
+
+Filters on aggregated results (after GROUP BY):
+
+```json
+{
+  "total": {"gt": 10},
+  "avg_value": {"gte": 100, "lte": 500}
+}
+```
+
+Operators: `gt`, `gte`, `lt`, `lte`, `eq`, `neq`
+
+### filters / search_patterns
+
+Same as read_data - applied BEFORE aggregation:
+- `filters`: Exact match (IDs, booleans)
+- `search_patterns`: Fuzzy match with % wildcards
+
+---
+
+## COMMON PATTERNS
+
+### Pattern 1: Records per Category
+
+```json
+{
+  "table": "child_table",
+  "aggregates": {"record_count": "count(*)"},
+  "filters": {"is_active": true},
+  "group_by": ["parent_id"]
+}
+```
+
+### Pattern 2: Value Range by Group
+
+```json
+{
+  "table": "table_name",
+  "aggregates": {
+    "min_value": "min(numeric_column)",
+    "max_value": "max(numeric_column)",
+    "avg_value": "avg(numeric_column)"
+  },
+  "group_by": ["category_id"]
+}
+```
+
+### Pattern 3: Groups with Many Records
+
+```json
+{
+  "table": "child_table",
+  "aggregates": {"count": "count(*)"},
+  "group_by": ["parent_id"],
+  "having": {"count": {"gt": 5}}
+}
+```
+
+### Pattern 4: Total Count (No Grouping)
+
+```json
+{
+  "table": "table_name",
+  "aggregates": {"total": "count(*)"},
+  "filters": {"is_active": true}
+}
+```
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Using read_data for counting
+
+```
+WRONG:
+results = read_data(table='table_name', filters={...})
+count = len(results)  # Inefficient, fetches all data
+
+CORRECT:
+aggregate_data(table='table_name', aggregates={'count': 'count(*)'}, filters={...})
+```
+
+### Wrong: Complex aggregation without group_by
+
+```
+WRONG: "Get average value" returns single row - probably want per-category
+CORRECT: Include group_by=['category_id'] for meaningful breakdown
+```
+
+---
+
+## RETURN STRUCTURE
+
+```json
+{
+  "success": true,
+  "table": "table_name",
+  "results": [
+    {"parent_id": "uuid-1", "record_count": 15, "avg_value": 45.50},
+    {"parent_id": "uuid-2", "record_count": 8, "avg_value": 32.00}
+  ],
+  "count": 2
+}
+```
+
+</protocol>
