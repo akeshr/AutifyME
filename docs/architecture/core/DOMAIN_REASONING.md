@@ -337,7 +337,7 @@ Use for: Positioning new product within established range
 | **write_data** | YES | Domain-specific validation before write |
 | **view_image** | YES | Domain-specific visual analysis focus |
 | **research_product_tool** | YES | Domain-specific research focus |
-| **inspect_schema** | NO | Mostly generic, same usage everywhere |
+| **inspect_schema** | YES | Domain-specific table priorities and relationship interpretation |
 | **image_studio** | NO | Domain-specific tool; handled within Creative domain protocols |
 
 ---
