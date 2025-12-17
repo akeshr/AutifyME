@@ -35,7 +35,7 @@ Always query customer_segments when evaluating which family a product belongs to
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
 | `price_lists` | Pricing contexts | code, currency, is_tax_inclusive, list_type |
-| `price_list_items` | Product prices | price_list_id, product_id, unit_price |
+| `product_prices` | Product prices | price_list_id, product_id, unit_price |
 
 ### Tier 4: Master Data
 
@@ -67,7 +67,7 @@ product_families
 
 products
     |-- product_variant_values (product_id)
-    |-- price_list_items (product_id)
+    |-- product_prices (product_id)
     |-- product_assets (product_id)
 ```
 
