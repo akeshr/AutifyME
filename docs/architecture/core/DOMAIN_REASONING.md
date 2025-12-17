@@ -720,7 +720,7 @@ When protocol yields no clear answer (e.g., multiple families seem valid):
 | 2025-12-16 | Batch loading (list input) | Prevents parallel tool call race conditions |
 | 2025-12-16 | Middleware deduplication | Prevents duplicate injection |
 | 2025-12-16 | No unload_protocol tool | Natural scope boundaries; adds complexity with no benefit |
-| 2025-12-16 | Agent-driven selection | Agent autonomy preserved; PM provides defaults |
+| 2025-12-16 | Agent-driven selection | Pure autonomy; agent matches situation to protocol index |
 | 2025-12-16 | Per-agent protocol directories | Resolution: agent-specific first, then shared |
 | 2025-12-17 | Consolidated documentation | Merged framework + implementation; eliminated redundancy |
 | 2025-12-17 | Removed confidence framework | HITL on writes is control mechanism; agent expresses uncertainty naturally |
