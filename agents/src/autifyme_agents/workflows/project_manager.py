@@ -153,9 +153,14 @@ async def create_project_manager(
 
     instructions = _load_prompt(company_profile, base_context, channel)
 
-    # PM Tools - Media access + view_image for conversational context
+    # PM Tools - Protocol loading, media access, view_image for conversational context
     # PM can SEE images for routing decisions; detailed analysis delegated to analysts
     pm_tools: list[Any] = []
+
+    # load_protocol for PM to load coordination protocols (domain_awareness, coordination_patterns)
+    # PM uses this for: understanding domain boundaries, conflict resolution, multi-domain coordination
+    from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
+    pm_tools.append(create_load_protocol_tool())
 
     # view_image for PM to see user images and understand conversational context
     # PM uses this for: initial understanding, conversational references ("the blue one")
