@@ -68,6 +68,60 @@ DOMAIN (e.g., Catalog)
 | Quality assessment | Quality | Visual analysis |
 | Supplier evaluation | Procurement | Product specs from Catalog |
 
+### 2.4 Domain Boundary Scenarios
+
+Understanding how tasks map to domains:
+
+**Scenario 1: Single-Domain Task**
+```
+User: "Add this product to catalog"
+
+Analysis:
+- Domain: Catalog (clear ownership)
+- Agents: visual_analyst -> catalog_analyst -> catalog_specialist
+- Cross-domain input: None needed
+- Result: Single domain handles entirely
+```
+
+**Scenario 2: Multi-Domain Task**
+```
+User: "Create marketing images for product X"
+
+Analysis:
+- Domains: Catalog + Creative (+ Catalog again)
+- Flow:
+  1. Catalog: Get product details (product_id, attributes)
+  2. Creative: Generate images (needs product context)
+  3. Catalog: Link assets to product (needs asset_ids)
+- Dependencies: Sequential (each step needs prior output)
+- PM Role: Coordinate handoffs, pass context between domains
+```
+
+**Scenario 3: Cross-Domain Decision**
+```
+User: "Is this product quality good enough to catalog?"
+
+Analysis:
+- Primary: Quality domain (assessment)
+- Secondary: Catalog domain (final decision)
+- Flow:
+  1. Quality: Assess defects, compliance, standards
+  2. Catalog: Use quality assessment to decide cataloging
+- Decision owner: Catalog (Quality provides input)
+```
+
+**Scenario 4: Ambiguous Domain**
+```
+User: "Generate product description"
+
+Analysis:
+- Could be: Catalog (product data) OR Marketing (positioning)
+- Resolution: PM analyzes INTENT
+  - If for catalog listing -> Catalog domain
+  - If for campaign -> Marketing domain
+- PM asks if ambiguous, doesn't guess
+```
+
 ---
 
 ## 3. Agents Within Domains
@@ -127,6 +181,60 @@ Same agent, different domain context, different focus:
 | **Marketing** | Appeal and positioning | Eye-catching? Message clarity? |
 | **Quality** | Defects and issues | Damage? Flaws? Standards met? |
 | **Operations** | Condition assessment | Shipping damage? Compliance? |
+
+#### visual_analyst Output: Generic vs Domain-Specific
+
+**WITHOUT Domain Context (Generic - Not Useful):**
+```
+PM: "Analyze this product image"
+
+visual_analyst output:
+"I see a blue cylindrical jar with floral pattern printed on it.
+The jar appears to be made of plastic (PET material).
+It has a screw-top lid in matching blue color.
+Approximate size: 500ml capacity.
+The surface has a glossy finish with pink and white flower designs."
+```
+*Problem: Generic description. Doesn't answer domain-specific questions.*
+
+**WITH Catalog Domain Context:**
+```
+PM: "Analyze this product image for CATALOG domain"
+
+visual_analyst output:
+"MATERIALS: PET plastic, printed surface
+STYLE: Decorative (floral print, not plain)
+TARGET CUSTOMER: Gift buyers / Home decor enthusiasts
+  - Reasoning: Decorative floral pattern elevates beyond utility
+  - NOT utility buyers (too ornate for everyday kitchen use)
+POSITIONING TIER: DECORATIVE (Rs 50-150 range)
+CATALOG NOTES:
+  - Should NOT go in 'Plain PET Storage' family (different customer)
+  - Look for 'Decorative Kitchen' or 'Gift Storage' families
+  - Print quality suggests mid-range pricing within tier"
+```
+*Result: Directly feeds family_fit protocol. Answers the right questions.*
+
+**WITH Quality Domain Context:**
+```
+PM: "Analyze this product image for QUALITY domain"
+
+visual_analyst output:
+"DEFECTS: None visible
+PRINT QUALITY:
+  - Alignment: Centered, no skew
+  - Color consistency: Even, no fading
+  - Registration: Clean edges, no bleeding
+SURFACE FINISH:
+  - Glossy coating: Uniform, no bubbles or scratches
+  - No visible dust particles under coating
+LID SEAL: Appears intact, threads visible and clean
+COMPLIANCE NOTES:
+  - Food-grade marking not visible in image (check physical)
+  - No visible BPA-free certification mark
+ASSESSMENT: PASS for visual quality check"
+```
+*Result: Quality-specific assessment. Completely different focus.*
 
 ### 4.3 How Cross-Domain Agents Know Context
 
@@ -363,7 +471,49 @@ User wants product cataloged with marketing images
 </coordination_pattern>
 ```
 
-### 7.5 PM Does NOT Have
+### 7.5 Design Decision: Why PM Uses Coordination, Not Decision Protocols
+
+**The Question:** Does PM need full protocols like specialists?
+
+**Option A: PM Has Full Routing Protocols**
+```
+PM loads: routing_protocol.protocol
+Protocol says: "For cataloging tasks, delegate to catalog_analyst then catalog_specialist"
+```
+- Pro: Consistent routing
+- Con: Becomes RIGID WORKFLOW TEMPLATES (we killed this in AUTONOMY_PROBLEMS)
+- Con: PM stops reasoning, just follows recipe
+- **REJECTED**
+
+**Option B: PM Has No Protocols At All**
+```
+PM receives task -> Reasons from scratch -> Delegates
+```
+- Pro: Maximum flexibility
+- Con: PM doesn't understand domain boundaries
+- Con: May route incorrectly (original problem!)
+- **REJECTED**
+
+**Option C: PM Has Lightweight Coordination (SELECTED)**
+```
+PM has:
+- Domain Awareness (knowledge of what each domain owns)
+- Context Schemas (what to pass to each domain)
+- Coordination Patterns (how to orchestrate multi-domain)
+- Escalation Protocol (edge case handling)
+
+PM does NOT have:
+- Routing protocols (uses reasoning)
+- Domain decision protocols (delegates to specialists)
+```
+- Pro: PM understands boundaries without rigid templates
+- Pro: Maintains dynamic reasoning (AUTONOMY_PROBLEMS fix preserved)
+- Pro: Specialists own domain decisions
+- **SELECTED**
+
+**Key Insight:** PM's job is COORDINATION, not DOMAIN DECISIONS. PM needs to know domain boundaries to route correctly, but shouldn't make domain-specific decisions itself.
+
+### 7.6 PM Does NOT Have
 
 - Routing protocols (uses dynamic reasoning)
 - Domain decision protocols (that's for specialists)
