@@ -424,9 +424,9 @@ Based on visual style, materials, price point:
 
 ### Step 5: COMPARE - Customer Match
 Compare Step 2 (family's customer) with Step 4 (product's customer):
-- MATCH: Same customer type (90%+)
-- PARTIAL: Overlapping (60-89%)
-- MISMATCH: Different type (<60%)
+- MATCH: Same customer type
+- PARTIAL: Overlapping but distinct
+- MISMATCH: Different customer type
 
 ### Step 6: COMPARE - Product Cohesion
 Would customer browsing the family naturally consider this product?
@@ -736,6 +736,8 @@ When protocol yields no clear answer (e.g., multiple families seem valid):
 | Duplicate prevention | TBD | 99%+ | Zero duplicates created |
 | Token usage per call | ~8,000 | ~3,000 | LangSmith traces |
 | Protocol step completion | TBD | 100% | Trace analysis |
+
+**Verification:** Use `workflow-evaluation` skill for trace analysis, protocol testing, and observability. No separate testing infrastructure needed.
 
 ---
 
