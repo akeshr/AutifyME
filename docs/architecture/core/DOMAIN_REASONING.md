@@ -153,6 +153,7 @@ Analysis:
 |--------|--------------------------|----------------------------|
 | **Catalog** | catalog_analyst | catalog_specialist |
 | **Creative** | (uses visual_analyst) | creative_specialist |
+| **Operations** | operations_analyst (FUTURE) | operations_specialist (FUTURE) |
 | **Marketing** | marketing_analyst (FUTURE) | marketing_specialist (FUTURE) |
 | **Quality** | quality_analyst (FUTURE) | quality_specialist (FUTURE) |
 | **Procurement** | procurement_analyst (FUTURE) | procurement_specialist (FUTURE) |
@@ -338,6 +339,8 @@ Use for: Positioning new product within established range
 | **view_image** | YES | Domain-specific visual analysis focus |
 | **research_product_tool** | YES | Domain-specific research focus |
 | **inspect_schema** | YES | Domain-specific table priorities and relationship interpretation |
+| **download_media** | NO | Generic download; same usage everywhere |
+| **extract_web_content** | YES | Domain-specific extraction focus |
 | **image_studio** | NO | Domain-specific tool; handled within Creative domain protocols |
 
 ---
@@ -377,6 +380,22 @@ protocols/
 |   +-- business_context.protocol
 |   +-- visual_analysis.protocol
 |   +-- audience_fit.protocol
+|
++-- quality/                          # QUALITY DOMAIN (FUTURE - Phase 3)
+|   +-- business_context.protocol
+|   +-- visual_analysis.protocol      # For visual_analyst in Quality context
+|   +-- defect_assessment.protocol
+|   +-- compliance_check.protocol
+|
++-- operations/                       # OPERATIONS DOMAIN (FUTURE - Phase 3)
+|   +-- business_context.protocol
+|   +-- visual_analysis.protocol      # For visual_analyst in Operations context
+|   +-- condition_assessment.protocol
+|
++-- procurement/                      # PROCUREMENT DOMAIN (FUTURE - Phase 3)
+|   +-- business_context.protocol
+|   +-- product_research.protocol     # For product_analyst in Procurement context
+|   +-- supplier_evaluation.protocol
 |
 +-- shared/                           # CROSS-DOMAIN
     +-- patterns/
@@ -428,8 +447,10 @@ PM uses **lightweight coordination** rather than domain decision protocols.
 |--------|------|--------------|
 | Catalog | Product data, families, pricing | Image generation, marketing content |
 | Creative | Image processing, visual assets | Product data, pricing |
+| Operations | Fulfillment workflows, condition assessment | Product creation, pricing |
 | Marketing | Campaigns, positioning | Product data, image processing |
-| Quality | Defect assessment, compliance | Product creation, marketing |
+| Quality | Defect assessment, standards compliance | Product creation, marketing |
+| Procurement | Supplier evaluation, sourcing | Product creation, quality assessment |
 </domain_awareness>
 ```
 
@@ -940,6 +961,20 @@ aggregate_data(table="products", filters={"family_id": [id]}, aggregations={"cou
 ```
 Returns: Number of products in family
 Use: Understanding family size
+
+## inspect_schema PATTERNS
+
+### Schema Discovery for Catalog
+```
+inspect_schema(table="customer_segments")
+```
+Priority tables: customer_segments, product_families, products
+Key relationships: customer_segments.family_id -> product_families.id
+
+### When to Use
+- Cold start: Unknown table structure
+- New feature: Verify column exists before query
+- Debugging: Query returning unexpected results
 
 ## COMMON MISTAKES
 | Mistake | Why Wrong | Correct Approach |
