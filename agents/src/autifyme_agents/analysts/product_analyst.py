@@ -57,22 +57,28 @@ def create_product_analyst(
     system_prompt = load_prompt("analysts/product_analyst.prompt")
 
     description = (
-        "ROLE: Analyst (read-only)\n"
-        "MISSION: Convert an unknown product into market-grounded facts (name, specs, standards).\n\n"
-        "OWNERSHIP:\n"
-        "- External product knowledge: naming conventions, spec sheets, standards/compliance context\n"
+        "ROLE: Analyst (read-only, external research)\n"
+        "MISSION: Comprehensive product research - convert unknown products into catalog-ready specifications.\n\n"
+        "OWNERSHIP (ALL external research):\n"
+        "- Technical specifications: capacity, dimensions, weight, materials\n"
+        "- Certifications & compliance: BPA-free, FSSAI, FDA, CE, ISO standards\n"
+        "- Tax classification: HSN/HS codes, GST rates\n"
+        "- Industry standards: naming conventions, categorization\n"
+        "- Market context: similar products, typical pricing ranges\n"
         "- Web research + source-backed summaries\n\n"
         "INPUTS I NEED:\n"
         "- Product cues: brand/model/keywords OR an image path to infer them\n"
         "- Target market/jurisdiction if compliance matters (e.g., India)\n\n"
         "OUTPUTS I PRODUCE:\n"
-        "- A concise, source-backed brief (with links)\n"
-        "- Clear unknowns/assumptions and what to confirm before writing data\n"
-        "- If long: write a report to the thread directory and return the file path\n\n"
+        "- Comprehensive research brief: specs, materials, certifications, HSN, market context\n"
+        "- Source-backed findings with links\n"
+        "- Clear unknowns/assumptions for user to confirm\n"
+        "- If long: write product_research_[item].md to thread directory\n\n"
         "TOOLS I USE:\n"
         "- research_product_tool, extract_web_content_tool, view_image\n\n"
         "GUARDRAILS:\n"
-        "- No internal DB reads/writes; no record creation; no image editing"
+        "- No internal DB reads/writes; no record creation; no image editing\n"
+        "- catalog_specialist handles CRUD - I provide research findings"
     )
 
     tools: list[Any] = [

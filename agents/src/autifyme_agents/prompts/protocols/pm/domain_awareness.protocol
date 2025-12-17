@@ -14,7 +14,14 @@ Defines which domains own which decisions, enabling correct specialist routing.
 | **CATALOG** | Product data, families, variants, pricing, assets | catalog_analyst, catalog_specialist | "add product", "update price", "find similar", "catalog" |
 | **CREATIVE** | Image processing, asset creation, visual output | creative_specialist | "process image", "create shot", "lifestyle", "campaign" |
 | **VISUAL** | Image analysis, visual identification | visual_analyst | "what is this", "identify", image without text |
-| **PRODUCT** | External knowledge, HSN, compliance, naming | product_analyst | "HSN code", "compliance", "market price", "naming" |
+| **PRODUCT** | External product research: specs, materials, dimensions, certifications, HSN, standards, market context | product_analyst | "research", "find out", "look up", "HSN", "compliance", "specs", "capacity", "certifications", "what is" |
+
+**PRODUCT Domain Scope (Comprehensive Research):**
+- Technical specifications: capacity, dimensions, weight, materials
+- Certifications & compliance: BPA-free, FSSAI, FDA, CE, ISO
+- Tax classification: HSN/HS codes, GST rates
+- Industry standards: naming conventions, categorization
+- Market context: similar products, typical pricing ranges
 
 ---
 
@@ -35,6 +42,9 @@ Most requests map to ONE domain. Route to that domain's specialist/analyst.
 | "Find similar products" | CATALOG | catalog_analyst |
 | "Update price of SKU-001" | CATALOG | catalog_specialist |
 | "Create Diwali promotional" | CREATIVE | creative_specialist |
+| "Research this product" | PRODUCT | product_analyst |
+| "Find out specs/capacity" | PRODUCT | product_analyst |
+| "Research and catalog" | PRODUCT then CATALOG | product_analyst FIRST, then catalog_specialist |
 
 ### Multi-Domain Routing
 
@@ -42,12 +52,12 @@ Complex requests span MULTIPLE domains. Execute in dependency order.
 
 **Catalog Addition Flow (most common):**
 ```
-1. VISUAL -> visual_analyst (identify product)
-2. CATALOG -> catalog_analyst (find family, pricing)
-3. PRODUCT -> product_analyst (HSN, naming)
+1. VISUAL -> visual_analyst (identify product visually)
+2. CATALOG -> catalog_analyst (find family, existing pricing)
+3. PRODUCT -> product_analyst (comprehensive research: specs, materials, certifications, HSN, market context)
 4. [User Approval]
 5. CREATIVE -> creative_specialist (process images)
-6. CATALOG -> catalog_specialist (create records)
+6. CATALOG -> catalog_specialist (create records using research findings)
 ```
 
 **Why This Order:**
@@ -115,10 +125,10 @@ Each domain has clear boundaries. Respect them.
 
 | Domain | IN Scope | OUT of Scope |
 |--------|----------|--------------|
-| CATALOG | Product CRUD, pricing, families, assets linking | Image creation, HSN research |
+| CATALOG | Product CRUD, pricing, families, assets linking | Image creation, external research |
 | CREATIVE | Image processing, scene generation, style transfer | Catalog records, pricing |
 | VISUAL | Image analysis, identification, comparison | Catalog queries, image editing |
-| PRODUCT | External research, HSN, compliance, naming | Catalog data, image work |
+| PRODUCT | ALL external research: specs, materials, certifications, HSN, standards, market | Catalog data, image work |
 
 **When domains overlap:**
 - Catalog specialist creates records; creative specialist creates images
@@ -164,5 +174,7 @@ When catalog is empty (new company):
 | Skipping domain context | "Analyze this image" (no path/domain) | "Analyze image at [path]. For CATALOG domain." |
 | Cross-domain delegation | catalog_specialist creates images | creative_specialist creates -> catalog_specialist links |
 | Assuming domain knowledge | PM decides pricing without analyst | Route to catalog_analyst, use THEIR recommendation |
+| Research via catalog | "Research and catalog" -> catalog_specialist | product_analyst FIRST (has research tools), THEN catalog_specialist (CRUD only) |
+| Conflating research + CRUD | Single delegation for "research and create" | Sequential: PRODUCT domain (research) -> CATALOG domain (create records) |
 
 </protocol>
