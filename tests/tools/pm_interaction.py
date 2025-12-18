@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -44,6 +45,9 @@ logger = logging.getLogger(__name__)
 # Session storage (in-memory for testing)
 _sessions: dict[str, dict[str, Any]] = {}
 
+# Cached PM instance for reuse within same process
+_pm_cache: dict[str, Any] = {}
+
 
 def _get_or_create_session(thread_id: str | None) -> tuple[str, dict[str, Any]]:
     """Get existing session or create new one.
@@ -53,26 +57,39 @@ def _get_or_create_session(thread_id: str | None) -> tuple[str, dict[str, Any]]:
 
     Returns:
         Tuple of (thread_id, session_dict)
+
+    Note: Session state is in-memory for turn counting only.
+          Actual conversation state is in PM's checkpointer (PostgreSQL).
+          So passing a thread_id will continue the PM conversation even if
+          local session is lost.
     """
-    if thread_id and thread_id in _sessions:
+    # If thread_id provided, use it (PM checkpointer has the real state)
+    if thread_id:
+        if thread_id not in _sessions:
+            # Recreate local session tracking for existing thread
+            _sessions[thread_id] = {
+                "turn_count": 0,  # Will increment to 1 on first use
+                "messages": [],
+            }
         return thread_id, _sessions[thread_id]
 
-    # Create new session
+    # Create new session with new thread_id
     new_thread_id = f"test_{uuid.uuid4().hex[:12]}"
     _sessions[new_thread_id] = {
         "turn_count": 0,
         "messages": [],
-        "pm_instance": None,
     }
     return new_thread_id, _sessions[new_thread_id]
 
 
-async def _invoke_pm_async(
+def _invoke_pm(
     message: str,
     thread_id: str,
     media_path: str | None = None,
 ) -> tuple[str, bool, list[dict[str, Any]] | None, bool]:
-    """Invoke PM asynchronously and return response details.
+    """Invoke PM and return response details.
+
+    Uses sync checkpointer for Windows stability.
 
     Args:
         message: User message to send
@@ -82,25 +99,31 @@ async def _invoke_pm_async(
     Returns:
         Tuple of (response_text, is_approval_request, approval_products, workflow_complete)
     """
-    # Load environment and imports inside function to avoid import issues
+    # Load environment
     load_dotenv()
 
-    from autifyme_agents.core.ports import StorageInterface
     from autifyme_agents.integrations.storage.postgres_saver_factory import get_checkpointer
     from autifyme_agents.integrations.storage.storage_factory import get_storage
     from autifyme_agents.workflows.project_manager import create_project_manager
 
     # Setup
-    storage: StorageInterface = get_storage()
+    storage = get_storage()
     company_profile = storage.get_company_profile()
     pm_checkpointer = get_checkpointer()
 
-    # Create PM
-    pm = await create_project_manager(
-        company_profile=company_profile,
-        checkpointer=pm_checkpointer,
-        storage=storage,
-    )
+    # Create PM (async factory requires event loop)
+    async def _create_pm():
+        return await create_project_manager(
+            company_profile=company_profile,
+            checkpointer=pm_checkpointer,
+            storage=storage,
+        )
+
+    # Windows event loop setup
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # type: ignore
+
+    pm = asyncio.run(_create_pm())
 
     # Build message content
     content = message
@@ -111,7 +134,7 @@ async def _invoke_pm_async(
         else:
             logger.warning(f"Media file not found: {media_path}")
 
-    # Invoke PM
+    # Invoke PM (sync with sync checkpointer)
     result = pm.invoke(
         {"messages": [HumanMessage(content=content)]},
         config={"configurable": {"thread_id": thread_id}},
@@ -136,6 +159,8 @@ async def _invoke_pm_async(
             "look good",
             "ready to save",
             "batch approval",
+            "await",
+            "proceed",
         ]
         is_approval_request = any(
             indicator in response_text.lower() for indicator in approval_indicators
@@ -148,6 +173,7 @@ async def _invoke_pm_async(
             "done",
             "created",
             "added to catalog",
+            "has been saved",
         ]
         workflow_complete = any(
             indicator in response_text.lower() for indicator in completion_indicators
@@ -172,21 +198,34 @@ def _get_trace_info(thread_id: str) -> tuple[str | None, str | None]:
     """
     try:
         # Brief delay for trace to be available
-        time.sleep(1)
+        time.sleep(2)
 
         client = Client()
+
+        # Get recent root traces
         runs = list(
             client.list_runs(
                 project_name="autifyme-dev",
-                filter=f'has(metadata, "thread_id") and eq(metadata["thread_id"], "{thread_id}")',
-                limit=1,
+                limit=5,
+                is_root=True,
             )
         )
 
+        # Find the run with matching thread_id in metadata
+        for run in runs:
+            metadata = run.metadata or {}
+            # Check both thread_id and langsmith.thread_id
+            if metadata.get("thread_id") == thread_id or metadata.get("langsmith.thread_id") == thread_id:
+                trace_id = str(run.trace_id)
+                trace_url = f"https://smith.langchain.com/public/{run.id}"
+                return trace_id, trace_url
+
+        # If no match by thread_id, return the most recent trace
         if runs:
-            trace_id = str(runs[0].trace_id)
-            session_id = runs[0].session_id
-            trace_url = f"https://smith.langchain.com/public/{session_id}/r/{trace_id}"
+            run = runs[0]
+            trace_id = str(run.trace_id)
+            trace_url = f"https://smith.langchain.com/public/{run.id}"
+            logger.info(f"Returning most recent trace (thread_id not matched): {trace_id}")
             return trace_id, trace_url
 
     except Exception as e:
@@ -238,15 +277,10 @@ def chat_with_pm(
     )
 
     try:
-        # Run async PM invocation
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            response_text, is_approval, products, complete = loop.run_until_complete(
-                _invoke_pm_async(message, actual_thread_id, media_path)
-            )
-        finally:
-            loop.close()
+        # Invoke PM
+        response_text, is_approval, products, complete = _invoke_pm(
+            message, actual_thread_id, media_path
+        )
 
         # Calculate timing
         elapsed_ms = int((time.time() - start_time) * 1000)

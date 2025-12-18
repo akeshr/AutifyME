@@ -56,15 +56,15 @@ CATALOG_ANALYST_TABLES = [
 
 
 def _get_analyst_llm() -> BaseChatModel:
-    """Get fast, intelligent LLM for analyst tasks.
+    """Get LLM for analyst tasks with deep reasoning.
 
-    Uses Gemini 3 Flash with 'high' thinking for complex catalog reasoning.
-    Analysts are latency-sensitive (target <200ms for DB queries).
+    Uses Gemini 3 Flash with 'high' thinking for behavioral discipline
+    (think-before-acting, stop conditions, self-verification).
     """
     return get_llm(
         provider="google",
         model="gemini-3-flash-preview",
-        thinking_level="low",  # Complex catalog reasoning
+        thinking_level="high",  # Behavioral discipline requires reasoning depth
         max_retries=5,
     )
 
