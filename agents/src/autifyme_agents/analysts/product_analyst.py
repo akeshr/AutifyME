@@ -25,15 +25,15 @@ from autifyme_agents.tools.research_tools import (
 
 
 def _get_analyst_llm() -> BaseChatModel:
-    """Get fast, intelligent LLM for analyst tasks.
+    """Get LLM for product research tasks with balanced reasoning.
 
-    Uses Gemini 3 Flash with 'low' thinking for speed + intelligence.
-    Analysts are latency-sensitive (target <300ms).
+    Uses Gemini 3 Flash with 'medium' thinking - enough for iterative research
+    discipline (when to stop researching) without excessive latency.
     """
     return get_llm(
         provider="google",
         model="gemini-3-flash-preview",
-        thinking_level="low",  # Fast analysis
+        thinking_level="medium",  # Balanced: research discipline + speed
         max_retries=3,
     )
 

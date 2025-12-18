@@ -120,10 +120,11 @@ def create_creative_specialist(
         "- No product/pricing/taxonomy CRUD; if a catalog change is needed, delegate to catalog_specialist"
     )
     # Use provided model or default to Gemini 3 Flash (multimodal)
+    # Medium thinking: creative tasks are structured (HITL safety net), don't need deep reasoning
     specialist_model = model if model is not None else get_llm(
         provider="google",
         model=CREATIVE_SPECIALIST_MODEL,
-        thinking_level="high",  # Creative tasks benefit from deeper reasoning
+        thinking_level="medium",  # Balanced: creative quality + speed (HITL provides safety)
     )
 
     spec: dict[str, Any] = {

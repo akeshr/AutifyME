@@ -22,7 +22,7 @@ def get_llm(
     max_output_tokens: int | None = None,
     # Thinking control (model-dependent)
     thinking_budget: int | None = None,  # Gemini 2.5: token count (0=disable, -1=dynamic)
-    thinking_level: Literal["low", "high"] | None = None,  # Gemini 3+: reasoning depth
+    thinking_level: Literal["minimal", "low", "medium", "high"] | None = None,  # Gemini 3+
     include_thoughts: bool = False,
     safety_settings: dict[HarmCategory, HarmBlockThreshold] | None = None,
     response_modalities: list[Literal["TEXT", "IMAGE", "AUDIO"]] | None = None,
@@ -83,8 +83,12 @@ def get_llm(
         thinking_budget: Token budget for Gemini 2.5 adaptive thinking.
             Default: 2048 tokens. Set 0 to disable (Flash/Flash-Lite only, Pro min=128).
             Use for Gemini 2.5 models only.
-        thinking_level: Reasoning depth for Gemini 3+ models ('low' or 'high').
+        thinking_level: Reasoning depth for Gemini 3+ models.
+            Gemini 3 Flash supports: 'minimal', 'low', 'medium', 'high'
+            Gemini 3 Pro supports: 'low', 'high' only
+            'minimal': Near-zero thinking, max speed (Flash only). Note: doesn't guarantee off.
             'low': Minimizes latency/cost. Best for simple tasks, chat, high-throughput.
+            'medium': Balanced thinking for moderate complexity (Flash only).
             'high': Maximizes reasoning depth. Higher first-token latency but better quality.
             Default: 'high' for Gemini 3 (Google default). Cannot combine with thinking_budget.
 
@@ -153,9 +157,13 @@ def get_llm(
         - Knowledge cutoff: January 2025 (all current models)
 
         **Gemini 3 Thinking Control:**
-        - Uses thinking_level ('low'/'high') instead of thinking_budget
+        - Uses thinking_level instead of thinking_budget
+        - Flash supports: 'minimal', 'low', 'medium', 'high'
+        - Pro supports: 'low', 'high' only
         - 'high' (default): Deep reasoning, higher latency, better quality
-        - 'low': Fast responses, lower cost, suitable for simple tasks
+        - 'medium': Balanced (Flash only)
+        - 'low': Fast responses, lower cost
+        - 'minimal': Near-zero thinking (Flash only, doesn't guarantee off)
         - Cannot combine thinking_level with thinking_budget in same request
         - Gemini 2.5 still uses thinking_budget (token count)
 
@@ -259,7 +267,9 @@ def get_llm(
         # Thinking control: Route based on model generation
         # CRITICAL: Cannot combine thinking_level with thinking_budget
         if is_gemini_3:
-            # Gemini 3+: Use thinking_level ('low' or 'high')
+            # Gemini 3+: Use thinking_level
+            # Flash: 'minimal', 'low', 'medium', 'high'
+            # Pro: 'low', 'high' only
             # Default is 'high' per Google, but we allow override
             if thinking_level is not None:
                 gemini_kwargs["thinking_level"] = thinking_level
@@ -268,7 +278,7 @@ def get_llm(
                 import logging
                 logging.getLogger(__name__).warning(
                     f"thinking_budget ignored for Gemini 3 model '{model}'. "
-                    "Use thinking_level='low'/'high' instead."
+                    "Use thinking_level instead (Flash: minimal/low/medium/high, Pro: low/high)."
                 )
         else:
             # Gemini 2.5/2.0: Use thinking_budget (token count)
