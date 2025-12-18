@@ -44,11 +44,11 @@ class LoadProtocolInput(BaseModel):
     protocol_names: list[str] = Field(
         ...,
         description=(
-            "Protocol names to load. Can be:\n"
-            "- Simple name: 'family_fit' (resolved by domain)\n"
-            "- Tool mastery: 'tool_mastery/read_data' (shared tools)\n"
-            "- Full path: 'catalog/family_fit' (explicit domain)\n"
-            "Examples: ['family_fit', 'pricing'], ['tool_mastery/read_data', 'business_context']"
+            "Protocol names to load. Resolution:\n"
+            "- Simple name: 'read_data' -> auto-resolves to shared/tool_mastery/\n"
+            "- Domain protocol: 'family_fit' + domain='catalog' -> catalog/family_fit\n"
+            "- Explicit path: 'catalog/family_fit' (rarely needed)\n"
+            "Examples: ['read_data'], ['business_context', 'family_fit'] with domain='catalog'"
         ),
     )
     domain: str | None = Field(
@@ -147,11 +147,11 @@ def create_load_protocol_tool() -> StructuredTool:
         - Simple, straightforward tasks with no domain complexity
         - Protocols already in your system prompt
 
-        PROTOCOL TYPES:
-        - tool_mastery/*: How to use tools (read_data, write_data, etc.)
-        - business_context: Domain vocabulary, relationships, rules
-        - Decision protocols: family_fit, pricing, duplicate_prevention
-        - Exploration protocols: visual_analysis, attribute_extraction
+        PROTOCOL TYPES (use simple names - resolution is automatic):
+        - Tool mastery: read_data, write_data, aggregate_data
+        - Business context: business_context
+        - Decision: family_fit, pricing, duplicate_prevention
+        - Exploration: visual_analysis, attribute_extraction
 
         RESOLUTION ORDER:
         1. Domain-specific: {domain}/{protocol}.protocol
@@ -258,14 +258,14 @@ def create_load_protocol_tool() -> StructuredTool:
             "- Simple tasks with no domain complexity\n"
             "- Protocols already present in your system prompt\n\n"
             "PROTOCOL TYPES:\n"
-            "- tool_mastery/*: How to use tools (read_data, write_data, aggregate_data, etc.)\n"
-            "- business_context: Domain vocabulary, relationships, business rules\n"
-            "- Decision protocols: family_fit, pricing, duplicate_prevention, new_family\n"
-            "- Exploration protocols: visual_analysis, attribute_extraction\n\n"
-            "RESOLUTION ORDER:\n"
-            "1. Domain-specific: {domain}/{protocol}.protocol\n"
+            "- Tool mastery: read_data, write_data, aggregate_data (use simple name)\n"
+            "- Business context: business_context (domain vocabulary, rules)\n"
+            "- Decision: family_fit, pricing, duplicate_prevention, new_family\n"
+            "- Exploration: visual_analysis, attribute_extraction\n\n"
+            "RESOLUTION (automatic, just use simple names):\n"
+            "1. Domain-specific: {domain}/{protocol}.protocol (if domain provided)\n"
             "2. Shared: shared/{protocol}.protocol\n"
-            "3. Tool mastery: shared/tool_mastery/{protocol}.protocol\n\n"
+            "3. Tool mastery: shared/tool_mastery/{protocol}.protocol (auto-fallback)\n\n"
             "EXAMPLES:\n"
             "# Load tool mastery for data operations (auto-resolves to shared/tool_mastery)\n"
             "load_protocol(protocol_names=['read_data', 'write_data'])\n\n"
