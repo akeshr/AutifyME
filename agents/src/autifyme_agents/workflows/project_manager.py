@@ -47,18 +47,19 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
-    """Return configured LLM for PM. Defaults to gemini-2.0-flash.
+    """Return configured LLM for PM. Defaults to gemini-3-flash-preview.
 
     Configuration rationale:
+    - thinking_level='low': Fast orchestration with Gemini 3.
     - max_retries=5: Production resilience against Gemini's occasional blank responses.
-    - temperature=1.0: Balanced for user communication.
+    - temperature=1.0: Gemini 3 default (below 1.0 may cause looping).
     """
     if model is not None:
         return model
     return get_llm(
         provider="google",
-        model="gemini-2.0-flash",
-        temperature=1.0,  # PM orchestrates, specialists reason
+        model="gemini-3-flash-preview",
+        thinking_level="low",  # Fast orchestration
         max_retries=5,  # Increase resilience against blank responses
     )
 
@@ -121,7 +122,7 @@ async def create_project_manager(
 
     Args:
         company_profile: Company context for brand voice and positioning
-        model: LLM for orchestration (defaults to gemini-2.0-flash)
+        model: LLM for orchestration (defaults to gemini-3-flash-preview)
         checkpointer: LangGraph checkpointer for state persistence
         storage: Storage adapter for database operations
         channel: Messaging channel for platform-specific operations
@@ -174,8 +175,8 @@ async def create_project_manager(
     # Specialist LLM configuration
     specialist_llm = get_llm(
         provider="google",
-        model="gemini-2.0-flash",
-        temperature=0.5,
+        model="gemini-3-flash-preview",
+        thinking_level="high",  # Specialists need deeper reasoning
         max_retries=5,  # Match PM resilience for blank response handling
     )
 

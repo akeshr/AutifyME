@@ -56,15 +56,15 @@ CATALOG_ANALYST_TABLES = [
 
 
 def _get_analyst_llm() -> BaseChatModel:
-    """Get fast LLM for analyst tasks.
+    """Get fast, intelligent LLM for analyst tasks.
 
-    Uses Gemini 2.0 Flash for complex catalog reasoning.
+    Uses Gemini 3 Flash with 'high' thinking for complex catalog reasoning.
     Analysts are latency-sensitive (target <200ms for DB queries).
     """
     return get_llm(
         provider="google",
-        model="gemini-2.0-flash",
-        temperature=0.8,
+        model="gemini-3-flash-preview",
+        thinking_level="low",  # Complex catalog reasoning
         max_retries=5,
     )
 
@@ -77,7 +77,7 @@ def create_catalog_analyst(
 
     Args:
         storage: Storage interface for catalog queries (read-only)
-        model: Optional LLM override. Defaults to Gemini 2.0 Flash.
+        model: Optional LLM override. Defaults to Gemini 3 Flash.
 
     Returns:
         SubAgent spec dict for PM's subagents list.

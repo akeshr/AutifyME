@@ -26,15 +26,15 @@ from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
 
 
 def _get_analyst_llm() -> BaseChatModel:
-    """Get fast LLM for analyst tasks.
+    """Get fast, intelligent LLM for analyst tasks.
 
-    Uses Gemini 2.0 Flash for visual analysis.
+    Uses Gemini 3 Flash with 'low' thinking for speed + intelligence.
     Analysts are latency-sensitive (target <300ms).
     """
     return get_llm(
         provider="google",
-        model="gemini-2.0-flash",
-        temperature=0.7,
+        model="gemini-3-flash-preview",
+        thinking_level="low",  # Fast visual analysis
         max_retries=3,
     )
 
@@ -45,7 +45,7 @@ def create_visual_analyst(
     """Create Visual Analyst SubAgent spec.
 
     Args:
-        model: Optional LLM override. Defaults to Gemini 2.0 Flash.
+        model: Optional LLM override. Defaults to Gemini 3 Flash.
 
     Returns:
         SubAgent spec dict for PM's subagents list.
