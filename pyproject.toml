@@ -35,7 +35,7 @@ dependencies = [
     # LLM Providers (v1 stable)
     "langchain-openai>=1.1.1",
     "langchain-anthropic>=1.2.0",
-    "langchain-google-genai>=4.0.0",
+    "langchain-google-genai>=4.1.0",  # 4.1.0+ required for thinking_level='medium'
     # Research & Web Tools
     "langchain-tavily>=0.2.13",  # Web search & content extraction (Tavily API)
     # Database & Storage
