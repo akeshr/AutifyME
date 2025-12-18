@@ -20,7 +20,7 @@ from langchain.chat_models import BaseChatModel
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.middleware import MultimodalInjectionMiddleware
+from autifyme_agents.middleware import MultimodalInjectionMiddleware, create_execution_limits
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
 
@@ -130,7 +130,20 @@ def create_catalog_analyst(
     ]
 
     # Multimodal middleware injects images from paths in delegation message
-    middleware = [MultimodalInjectionMiddleware()]
+    # Execution limits: read-only analyst with catalog query limits
+    middleware = [
+        *create_execution_limits(
+            model_call_limit=15,
+            tool_limits={
+                "load_protocol": 10,
+                "inspect_schema": 10,
+                "read_data": 10,
+                "aggregate_data": 10,
+                "view_image": 10,
+            },
+        ),
+        MultimodalInjectionMiddleware(),
+    ]
 
     spec: dict[str, Any] = {
         "name": "catalog_analyst",

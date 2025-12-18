@@ -34,6 +34,7 @@ from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
+from autifyme_agents.middleware import create_execution_limits
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.image_studio import create_image_studio_tool
 
@@ -127,12 +128,27 @@ def create_creative_specialist(
         thinking_level="medium",  # Balanced: creative quality + speed (HITL provides safety)
     )
 
+    middleware = [
+        *create_execution_limits(
+            model_call_limit=15,
+            tool_limits={
+                "load_protocol": 10,
+                "image_studio": 10,
+                "write_data": 10,
+                "read_data": 10,
+                "inspect_schema": 10,
+                "view_image": 10,
+            },
+        ),
+    ]
+
     spec: dict[str, Any] = {
         "name": "creative_specialist",
         "description": description,
         "tools": tools,
         "system_prompt": system_prompt,
         "model": specialist_model,
+        "middleware": middleware,
         "interrupt_on": {"write_data": True},  # HITL approval before write_data execution
     }
 

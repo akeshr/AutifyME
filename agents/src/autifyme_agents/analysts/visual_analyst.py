@@ -20,7 +20,7 @@ from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.middleware import MultimodalInjectionMiddleware
+from autifyme_agents.middleware import MultimodalInjectionMiddleware, create_execution_limits
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
 
@@ -85,7 +85,17 @@ def create_visual_analyst(
     # Multimodal middleware injects images from paths in delegation message
     # When PM includes image paths in the task description, the middleware
     # loads and injects the images so the analyst's LLM can see them directly
-    middleware = [MultimodalInjectionMiddleware()]
+    # Execution limits: analysts are read-only with tight limits
+    middleware = [
+        *create_execution_limits(
+            model_call_limit=15,
+            tool_limits={
+                "load_protocol": 10,
+                "view_image": 10,
+            },
+        ),
+        MultimodalInjectionMiddleware(),
+    ]
 
     spec: dict[str, Any] = {
         "name": "visual_analyst",

@@ -28,6 +28,7 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.integrations.storage import get_store
+from autifyme_agents.middleware import create_execution_limits
 from autifyme_agents.middleware.context_management import HybridTruncateThenClearEdit
 from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
@@ -215,6 +216,14 @@ async def create_project_manager(
     # Task tool (subagent calls) preserved - contains specialist decisions
     # Other tools (schema, read_data, etc.) truncated - raw data can be re-fetched
     pm_middleware = [
+        *create_execution_limits(
+            model_call_limit=15,
+            tool_limits={
+                "task": 10,
+                "load_protocol": 10,
+                "view_image": 10,
+            },
+        ),
         ContextEditingMiddleware(
             edits=[
                 HybridTruncateThenClearEdit(
@@ -226,7 +235,7 @@ async def create_project_manager(
                     exclude_tools=("task",),  # Preserve subagent results
                 )
             ]
-        )
+        ),
     ]
 
     project_manager = create_deep_agent(

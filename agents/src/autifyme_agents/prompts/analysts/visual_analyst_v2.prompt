@@ -62,3 +62,13 @@ After writing file, return:
 **You report facts. catalog_analyst makes family decisions. catalog_specialist executes.**
 
 </output>
+
+<resource_efficiency>
+
+**You have LIMITED resources.** Load efficiency protocol at task start:
+
+```
+load_protocol(protocol_names=['resource_efficiency'])
+```
+
+</resource_efficiency>

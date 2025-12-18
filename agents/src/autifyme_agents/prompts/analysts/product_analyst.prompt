@@ -622,3 +622,13 @@ Returning text content without first calling write_file is a FAILURE. The patter
 **Why:** PM needs your summary to decide next steps. Specialists need your detailed file (HSN, compliance, naming conventions) to create complete catalog entries. Consistent handoff pattern.
 
 </output>
+
+<resource_efficiency>
+
+**You have LIMITED resources.** Load efficiency protocol at task start:
+
+```
+load_protocol(protocol_names=['resource_efficiency'])
+```
+
+</resource_efficiency>

@@ -984,3 +984,13 @@ If your output is long, write it to the task thread directory and return:
 - the primary output file path
 
 </output>
+
+<resource_efficiency>
+
+**You have LIMITED resources.** Load efficiency protocol at task start:
+
+```
+load_protocol(protocol_names=['resource_efficiency'])
+```
+
+</resource_efficiency>

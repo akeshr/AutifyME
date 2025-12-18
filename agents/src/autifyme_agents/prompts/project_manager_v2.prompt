@@ -74,3 +74,13 @@ load_protocol(protocol_names=['hitl'], domain='pm')
 **await_feedback**: When you need user input (optional)
 
 </output>
+
+<resource_efficiency>
+
+**You have LIMITED resources.** Load efficiency protocol at task start:
+
+```
+load_protocol(protocol_names=['resource_efficiency'])
+```
+
+</resource_efficiency>
