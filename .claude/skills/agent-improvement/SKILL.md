@@ -1,6 +1,6 @@
 ---
 name: agent-improvement
-description: Diagnose and fix underperforming agents using systematic analysis. Bridges the general-purpose LLM gap with canonical examples and domain grounding. (project)
+description: Diagnose and fix underperforming agents using systematic analysis. Bridges the general-purpose LLM gap with canonical examples and domain grounding. (project) (project)
 ---
 
 # Agent Improvement Skill
@@ -33,11 +33,21 @@ description: Diagnose and fix underperforming agents using systematic analysis. 
 | Agent reasons poorly | Too many responsibilities | Split by domain coherence |
 | Need 6+ examples | Wrong agent boundaries | Decompose agent |
 
+**Protocol-Related Issues (Domain Reasoning Framework):**
+
+| Symptom | Root Cause | Fix |
+|---------|------------|-----|
+| Agent reasoning is generic | No protocols loaded | Add protocol loading guidance |
+| Agent ignores domain patterns | Wrong protocols loaded | Fix domain context in delegation |
+| Agent violates anti-patterns | Protocol not followed | Strengthen protocol adherence in prompt |
+| Agent doesn't know tables/schema | Missing business_context | Load business_context protocol |
+| Agent uses tool incorrectly for domain | Missing tool_mastery | Load domain-specific tool_mastery |
+
 ---
 
 ## Gap Analysis Checklist
 
-```
+```text
 AGENT: [name]
 =============
 
@@ -64,6 +74,13 @@ AGENT: [name]
 5. WORKFLOW: Does agent know WHERE it fits?
    [ ] Relationship to other agents
    [ ] What it receives / returns
+
+6. PROTOCOLS (Domain Reasoning Framework):
+   [ ] Agent has load_protocol tool
+   [ ] Agent knows WHEN to load protocols (task triggers)
+   [ ] Agent knows WHICH protocols to load (by domain)
+   [ ] Prompt guides protocol loading early in execution
+   [ ] Domain context flows from PM delegations
 ```
 
 ---
@@ -78,17 +95,45 @@ AGENT: [name]
 | Judgment unclear | Add 2-3 canonical examples | `prompt-engineering` |
 | Agent scope wrong | Decompose by domain | `specialist-creation` |
 
+**Protocol-Related Fixes:**
+
+| Gap Found | Fix | Location |
+|-----------|-----|----------|
+| No protocol loading | Add load_protocol to agent tools | Agent implementation |
+| Wrong protocols loaded | Fix PM delegation domain context | PM prompt |
+| Protocol not followed | Add protocol adherence guidance to prompt | Agent prompt |
+| Missing domain patterns | Create new protocol | `prompts/protocols/{domain}/` |
+| Tool_mastery gap | Create/update tool_mastery protocol | `prompts/protocols/shared/tool_mastery/` |
+
 ---
 
 ## Process
 
-```
-1. DIAGNOSE: Run Gap Analysis checklist
-2. FIX: Route to appropriate skill (see table above)
+```text
+1. DIAGNOSE: Run Gap Analysis checklist (including Protocol section)
+2. FIX: Route to appropriate skill (see tables above)
 3. VERIFY: Re-run scenario, compare traces
 ```
 
 For deep trace analysis, use `workflow-evaluation` skill first.
+
+### Protocol-Specific Process
+
+```text
+1. CHECK TRACE: Did agent call load_protocol?
+   |
+   +-- No -> Add protocol loading to agent prompt/tools
+   |
+   +-- Yes -> Did agent load CORRECT protocols?
+              |
+              +-- No -> Fix PM delegation domain context
+              |
+              +-- Yes -> Did agent FOLLOW protocol patterns?
+                         |
+                         +-- No -> Strengthen adherence guidance in prompt
+                         |
+                         +-- Yes -> Protocol is working, issue is elsewhere
+```
 
 ---
 
@@ -105,17 +150,32 @@ For deep trace analysis, use `workflow-evaluation` skill first.
 
 ## Quick Decision Tree
 
-```
+```text
 Agent underperforming?
          |
     Gap Analysis
          |
-    +----+----+----+----+
-    |    |    |    |    |
-  ID   Tool  Domain Judgment Workflow
-  gap? gap?  gap?   gap?     gap?
-    |    |    |      |        |
-    v    v    v      v        v
-  prompt- tool- prompt- prompt- specialist-
-  engineering development engineering engineering creation
+    +----+----+----+----+----+
+    |    |    |    |    |    |
+  ID   Tool  Domain Judgment Workflow Protocol
+  gap? gap?  gap?   gap?     gap?     gap?
+    |    |    |      |        |        |
+    v    v    v      v        v        v
+  prompt- tool- prompt- prompt- specialist- See Protocol
+  engineering development engineering engineering creation  Process above
 ```
+
+### Protocol Reference
+
+For protocol types, structure templates, and design guidance: invoke `prompt-engineering` skill.
+For expected protocols by agent and verification: see `workflow-evaluation` skill.
+
+---
+
+## Related Skills
+
+| Skill | When |
+|-------|------|
+| `workflow-evaluation` | Deep trace analysis before diagnosis |
+| `prompt-engineering` | Fixing prompts and creating protocols |
+| `specialist-creation` | Decomposing agents by domain |

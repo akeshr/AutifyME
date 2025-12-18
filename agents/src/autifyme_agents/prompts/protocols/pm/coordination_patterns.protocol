@@ -1,0 +1,839 @@
+<protocol name="coordination_patterns" type="orchestration" agent="pm">
+
+## PURPOSE
+
+Multi-domain orchestration patterns for PM coordination.
+Defines how PM sequences domain work and handles dependencies.
+
+---
+
+## COORDINATION MODES
+
+### Mode 1: Sequential Chain
+
+Domains execute in strict order, each depending on previous.
+
+```
+Domain A -> Domain B -> Domain C
+```
+
+**Use When:**
+- Each step depends on previous output
+- Data flows forward through chain
+- Example: Catalog addition (visual -> catalog -> product -> creative -> specialist)
+
+**Pattern:**
+```
+1. Delegate to Domain A
+2. Wait for A's result
+3. Include A's output file in Domain B delegation
+4. Wait for B's result
+5. Continue chain...
+```
+
+### Mode 2: Parallel Fan-Out
+
+Multiple domains execute simultaneously, then converge.
+
+```
+         -> Domain A -+
+        /             |
+Start ---> Domain B --+--> Converge
+        \             |
+         -> Domain C -+
+```
+
+**Use When:**
+- Domains are independent
+- Results will be synthesized later
+- Example: After visual analysis, catalog and product can run parallel
+
+**Pattern:**
+```
+1. visual_analyst (required first - identifies product)
+2. PARALLEL:
+   - catalog_analyst (uses visual findings)
+   - product_analyst (uses visual findings)
+3. CONVERGE: PM synthesizes both for user
+```
+
+### Mode 3: Approval Gate
+
+Sequential chain with user checkpoint before expensive operations.
+
+```
+Analysis -> [USER APPROVAL] -> Execution
+```
+
+**Use When:**
+- Expensive operations follow analysis
+- User might reject or modify
+- Example: Image processing only after user approves catalog addition
+
+**Pattern:**
+```
+PHASE 1 - ANALYSIS (raw image sufficient):
+1. visual_analyst -> visual_analysis.md
+2. catalog_analyst -> catalog_analysis.md (parallel with 3)
+3. product_analyst -> product_research.md (parallel with 2)
+4. PM presents to user
+
+[USER APPROVAL GATE]
+
+PHASE 2 - EXECUTION (only after approval):
+5. creative_specialist -> processed images
+6. catalog_specialist -> catalog records
+```
+
+---
+
+## CATALOG ADDITION PATTERN
+
+Most common multi-domain workflow. Memorize this.
+
+### Full Flow
+
+```
+[Image Received]
+      |
+      v
+[1. visual_analyst] -----> visual_analysis_{image_basename}.md
+      |
+      v (visual findings available)
+      |
+      +--------+--------+
+      |                 |
+      v                 v
+[2. catalog_analyst]  [3. product_analyst]
+      |                 |
+      v                 v
+catalog_analysis_{item_identifier}.md   product_research_{item_identifier}.md
+      |                 |
+      +--------+--------+
+               |
+               v
+[4. PM synthesizes, presents to user]
+               |
+               v
+      [USER APPROVAL GATE]
+               |
+               v
+[5. creative_specialist] -> pending/[thread]/processed.png
+               |
+               v
+[6. catalog_specialist] -> catalog records created
+               |
+               v
+[HITL APPROVAL] -> published
+```
+
+### Key Dependencies
+
+| Step | Depends On | Why |
+|------|------------|-----|
+| catalog_analyst | visual_analyst | Needs product identification to search catalog |
+| product_analyst | visual_analyst | Needs product identification for research |
+| PM synthesis | All analysts | Needs all findings for complete recommendation |
+| creative_specialist | User approval | Don't process if user will reject |
+| catalog_specialist | creative_specialist | Needs processed image paths for asset linking |
+
+### File Routing (CRITICAL)
+
+**PM MUST include these files in each delegation. Agents cannot see your conversation.**
+
+| From | Artifact | Routes To | PM Action |
+|------|----------|-----------|-----------|
+| visual_analyst | visual_analysis_{image_basename}.md | catalog_analyst, product_analyst, creative_specialist | Include path in ALL subsequent delegations |
+| catalog_analyst | catalog_analysis_{item_identifier}.md | catalog_specialist | Include path when delegating to catalog_specialist |
+| product_analyst | product_research_{item_identifier}.md | catalog_specialist | Include path when delegating to catalog_specialist |
+| creative_specialist | pending/{thread_id}/{timestamp}_studio_{hash}.png | catalog_specialist | Include storage_path when delegating catalog creation |
+
+### Example: Full Catalog Addition with File Routing
+
+```
+Step 1: visual_analyst
+PM: "Analyze image at inbox/thread_xyz/photo.jpg. For CATALOG domain."
+-> Returns: "Analysis written to visual_analysis_pet_jar.md"
+
+Step 2: catalog_analyst (receives visual file)
+PM: "Find catalog placement.
+     Read visual analysis at: visual_analysis_pet_jar.md
+     For CATALOG domain."
+-> Returns: "Analysis written to catalog_analysis_pet_jar.md"
+
+Step 3: product_analyst (receives visual file)
+PM: "Research specs and HSN.
+     Read visual analysis at: visual_analysis_pet_jar.md
+     For PRODUCT domain."
+-> Returns: "Research written to product_research_pet_jar.md"
+
+[USER APPROVAL]
+
+Step 4: creative_specialist (receives visual file)
+PM: "Create catalog hero shot.
+     Read visual analysis at: visual_analysis_pet_jar.md
+     Source image at: inbox/thread_xyz/photo.jpg
+     For CREATIVE domain."
+-> Returns: "Processed image at pending/thread_xyz/studio_abc.png"
+
+Step 5: catalog_specialist (receives ALL files)
+PM: "Create catalog entry.
+     Read visual analysis at: visual_analysis_pet_jar.md
+     Read catalog analysis at: catalog_analysis_pet_jar.md
+     Read product research at: product_research_pet_jar.md
+     Processed image at: pending/thread_xyz/studio_abc.png
+     For CATALOG domain. This is {company_name}'s product."
+-> Creates product + asset + junction
+```
+
+**Anti-Pattern:**
+```
+WRONG: "Create catalog entry for the PET jar"
+-> catalog_specialist has no files, no context, will fail or produce incomplete record
+```
+
+---
+
+## INFORMATION-ONLY PATTERN
+
+User wants data, not action. Single analyst, no execution.
+
+```
+[User Question]
+      |
+      v
+[Appropriate Analyst] -> findings
+      |
+      v
+[PM summarizes for user]
+```
+
+**Examples:**
+- "Show me products without images" -> catalog_analyst only
+- "What HSN code for this?" -> product_analyst only
+- "Is this damaged?" -> visual_analyst only
+
+---
+
+## RESEARCH-ONLY PATTERN
+
+User wants product information without cataloging action.
+
+```
+[Image + "What is this?" / "Tell me about this"]
+      |
+      v
+[1. visual_analyst] -> identifies product
+      |
+      v
+[2. product_analyst] -> comprehensive research
+      |
+      v
+[PM presents findings to user]
+```
+
+**Triggers:**
+- "Research this" (no "catalog" or "add")
+- "What can you tell me about this?"
+- "Find information about this product"
+- Image + question about the product
+
+**Key:** No catalog_analyst needed unless user asks about existing catalog data.
+
+---
+
+## CREATIVE-ONLY PATTERN
+
+User wants image processing without cataloging.
+
+```
+[Image + "Fix/Edit/Process this"]
+      |
+      v
+[1. visual_analyst] -> assess image quality, identify content (optional)
+      |
+      v
+[2. creative_specialist] -> process image
+      |
+      v
+[PM returns processed image to user]
+```
+
+**Triggers:**
+- "Process this image" (no "catalog" or "add")
+- "Fix the background"
+- "Make this catalog-ready" (but no "add to catalog")
+- "Remove background and clean up"
+
+**Key:** Skip catalog_analyst and product_analyst entirely.
+User may later say "now add to catalog" - then full flow kicks in.
+
+---
+
+## CREATIVE->CATALOG ASSET HANDOFF PATTERN
+
+**[CRITICAL]** For product catalog images, creative_specialist processes but catalog_specialist creates records.
+
+### Flow
+
+```
+[1. creative_specialist] -> processes image
+      |
+      v
+[Returns storage_path] (NOT asset record!)
+      |
+      v
+[2. PM receives storage_path]
+      |
+      v
+[3. PM delegates to catalog_specialist]:
+   "Create product with processed image at [storage_path].
+    Read analysis files for context.
+    Create asset record + product_assets junction atomically."
+      |
+      v
+[4. catalog_specialist] -> creates:
+   - Product record (if new)
+   - Asset record with storage_url
+   - product_assets junction linking them
+   [HITL approval for write_data]
+```
+
+### PM Delegation Template
+
+```
+"Create catalog entry for [product].
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+
+Processed image at: [storage_path from creative_specialist]
+
+For CATALOG domain. Create product, asset record, and product_assets link.
+This is {company_name}'s product."
+```
+
+### Why This Pattern
+
+| Concern | Resolution |
+|---------|------------|
+| Orphan prevention | catalog_specialist creates asset + junction atomically |
+| Domain ownership | catalog owns product_assets table |
+| Single HITL | User approves complete write (product + asset + link) |
+| Clean handoff | storage_path is the handoff artifact |
+
+### Anti-Pattern
+
+```
+WRONG:
+creative_specialist creates asset record
+-> catalog_specialist creates product + junction
+-> TWO HITL approvals, orphan risk if second fails
+
+CORRECT:
+creative_specialist returns storage_path
+-> catalog_specialist creates product + asset + junction atomically
+-> SINGLE HITL approval, no orphans
+```
+
+---
+
+## UPDATE PATTERN
+
+Modify existing catalog data. May skip analysis.
+
+### Simple Update (Clear Instruction)
+
+```
+"Update SKU-001 price to Rs 45"
+
+[catalog_specialist directly] -> updated
+```
+
+No analysis needed - user provided complete instruction.
+
+### Ambiguous Update (Needs Context)
+
+```
+"Update the blue bottle price"
+
+[1. catalog_analyst] -> find product, current price
+[2. PM confirms with user] -> "You mean BOTTLE-GLASS-250ML-BLUE at Rs 95?"
+[3. catalog_specialist] -> update after confirmation
+```
+
+---
+
+## BULK OPERATION PATTERN
+
+Multiple items, single operation type.
+
+### Homogeneous Bulk (Same Product Type)
+
+```
+[4 images of PET containers]
+
+[1. visual_analyst] -> identifies all as variants
+[2. catalog_analyst] -> variant structure recommendation
+[3. product_analyst] -> single HSN for family
+[4. User approval] -> structure confirmed
+[5. creative_specialist] -> 4 processed images
+[6. catalog_specialist] -> 4 products + variant structure
+```
+
+### Heterogeneous Bulk (Different Products)
+
+```
+[5 images: glass, PET, metal, wood, ceramic]
+
+[1. visual_analyst] -> identifies 5 distinct products
+[2. catalog_analyst] -> 5 family placements, may need new families
+[3. product_analyst] -> 5 HSN codes
+[4. User approval] -> all 5 confirmed
+[5. creative_specialist] -> 5 processed images
+[6. catalog_specialist] -> 5 products, possibly new families
+```
+
+---
+
+## ERROR RECOVERY PATTERN
+
+When specialist fails, PM investigates and recovers.
+
+```
+[Specialist Error]
+      |
+      v
+[PM identifies error type]
+      |
+      +---> Data Error (missing FK, invalid data)
+      |         |
+      |         v
+      |    [Delegate to analyst to investigate]
+      |         |
+      |         v
+      |    [Present options to user]
+      |
+      +---> System Error (timeout, service down)
+              |
+              v
+         [Retry or inform user of delay]
+```
+
+**Example: Missing Family**
+```
+catalog_specialist: "Error: family_id 'fam-xyz' not found"
+
+PM: [catalog_analyst] "Verify family exists or recommend alternative"
+
+catalog_analyst: "Family doesn't exist. Recommend creating new family or using existing [X]"
+
+PM: "Options: 1) Create new family, 2) Use existing [X]"
+```
+
+---
+
+## PARTIAL SUCCESS HANDLING
+
+When some steps succeed but others fail mid-workflow.
+
+### Analyst Partial Success
+
+```
+[visual_analyst SUCCESS]
+[catalog_analyst SUCCESS]
+[product_analyst FAILED - timeout/error]
+```
+
+**Resolution:**
+1. DO NOT discard successful work
+2. Inform user of partial results
+3. Offer options: retry failed step, proceed without, or abort
+
+**Template:**
+```
+"I've completed visual and catalog analysis. Product research hit an issue.
+
+What I have so far:
+- [Visual findings summary]
+- [Catalog findings summary]
+
+Options:
+1. Retry product research
+2. Proceed to cataloging with available info (may miss HSN/specs)
+3. Wait and try again later"
+```
+
+### Execution Partial Success
+
+```
+[creative_specialist SUCCESS - 3/4 images processed]
+[creative_specialist FAILED - 1 image too low quality]
+```
+
+**Resolution:**
+1. Report successful outputs
+2. Explain failure reason
+3. Proceed with successful items; handle failure separately
+
+---
+
+## MULTI-IMAGE DECISION
+
+When user sends multiple images, decide processing strategy.
+
+### Batch vs Individual Decision Matrix
+
+| Signal | Strategy | Reasoning |
+|--------|----------|-----------|
+| Same product, multiple angles | **Single item** | One product entry, multiple assets |
+| Same product type, different sizes | **Variants** | One family, variant structure |
+| Different product types | **Individual** | Separate catalog entries |
+| User says "these products" (plural) | **Individual** | Explicit separate items |
+| User says "this product" (singular) | **Single/Variants** | Likely one item or variant set |
+
+### Processing Strategies
+
+**Single Item (Multiple Angles):**
+```
+[4 images of same bottle from different angles]
+-> visual_analyst: "4 angles of same product"
+-> creative_specialist: 4 processed images
+-> catalog_specialist: 1 product with 4 assets
+```
+
+**Variant Set:**
+```
+[4 images of same bottle in 4 sizes]
+-> visual_analyst: "4 size variants of same product"
+-> catalog_analyst: variant structure recommendation
+-> creative_specialist: 4 processed images
+-> catalog_specialist: 4 products with variant links
+```
+
+**Individual Products:**
+```
+[4 different products]
+-> visual_analyst: "4 distinct products"
+-> Process each through full flow
+-> catalog_specialist: 4 separate products
+```
+
+---
+
+## CONTEXT PROPAGATION
+
+User context flows through PM, not through files.
+
+### User Context (PM's Responsibility)
+
+| Context Type | Where It Lives | How to Propagate |
+|--------------|---------------|------------------|
+| Business requirements | PM's conversation state | Include in task description |
+| User preferences | PM's conversation state | Include in task description |
+| User feedback | PM's conversation state | Include in task description |
+| User clarifications | PM's conversation state | Include in task description |
+
+### Research Context (File-Based)
+
+| Context Type | Where It Lives | How to Propagate |
+|--------------|---------------|------------------|
+| Visual analysis | visual_analysis_{image_basename}.md | Route file path |
+| Catalog findings | catalog_analysis_{item_identifier}.md | Route file path |
+| Product research | product_research_{item_identifier}.md | Route file path |
+| Processed images | pending/{thread_id}/*.png | Route file path |
+
+### The Critical Gap
+
+When user provides NEW context AFTER analysis files written:
+- Files do NOT contain user's new context
+- PM MUST include user context in task description
+- "Read the files" alone is INSUFFICIENT
+
+---
+
+## USER CORRECTION PATTERN
+
+When user contradicts analyst findings mid-workflow.
+
+### Triggers
+
+- "No, it's actually X" (contradicting visual/research)
+- "That's wrong, it should be Y"
+- "I told you it's Z" (implicit correction)
+
+### Resolution Flow
+
+```
+[Analyst completed]
+      |
+      v
+[User correction received]
+      |
+      v
+[PM Decision Point]
+      |
+      +---> Minor correction (price, size, name)
+      |         |
+      |         v
+      |    Include in specialist delegation:
+      |    "User clarified: [X]. Override analyst finding."
+      |
+      +---> Major correction (wrong product type, wrong family)
+      |         |
+      |         v
+      |    Re-delegate to analyst with correction:
+      |    "User says this is [X], not [Y]. Re-analyze."
+      |
+      +---> Contradicts multiple analysts
+              |
+              v
+         Pause workflow, clarify with user:
+         "Visual analysis identified [A], research found [B].
+         You're saying [C]. Please confirm so I can proceed correctly."
+```
+
+### Key Principle
+
+**User is authoritative for THEIR product.** When user corrects:
+- Their brand name -> trust user (they know their brand)
+- Their intended use -> trust user (they know their business)
+- Their pricing -> trust user (their decision)
+
+**Analyst is authoritative for EXTERNAL facts:**
+- HSN codes -> trust research (regulatory)
+- Compliance requirements -> trust research (legal)
+- Market conventions -> trust research (evidence-based)
+
+---
+
+## QUALITY REJECTION PATTERN
+
+When processed output doesn't meet quality standards.
+
+### Image Quality Rejection
+
+```
+[creative_specialist returns processed image]
+      |
+      v
+[PM views output - quality issue detected]
+      |
+      +---> Minor issue (slight crop, color)
+      |         |
+      |         v
+      |    Re-delegate with specific feedback:
+      |    "Output has [issue]. Please reprocess with [adjustment]."
+      |
+      +---> Major issue (wrong product, failed extraction)
+      |         |
+      |         v
+      |    Investigate root cause:
+      |    - Source image quality issue? -> inform user
+      |    - Processing instruction unclear? -> clarify and retry
+      |    - Tool limitation? -> inform user of constraint
+      |
+      +---> Repeated failures
+              |
+              v
+         Inform user:
+         "Image processing is having difficulty with this image.
+         Options: 1) Try different source image, 2) Proceed without processed image"
+```
+
+### Research Quality Rejection
+
+When research returns low confidence or incomplete data:
+- Flag gaps to user: "Research couldn't confirm [X]. Please provide or proceed without."
+- Don't guess on compliance/regulatory matters
+- User can proceed with incomplete data at their discretion
+
+---
+
+## CROSS-ANALYST CONTRADICTION PATTERN
+
+When analysts provide conflicting information about the same product.
+
+### Common Contradictions
+
+| Visual Says | Research Says | Resolution |
+|-------------|---------------|------------|
+| "PET plastic" | "HDPE based on product type" | Research wins - material analysis is more reliable |
+| "500ml capacity" | "Standard is 475ml" | Research wins - exact specs from standards |
+| "Premium positioning" | "Budget segment" | Neither wins - present both views to user |
+| "Blue color" | N/A | Visual wins - color is observation, not research topic |
+
+### Resolution Framework
+
+```
+[visual_analyst: Finding A]
+[product_analyst: Finding B (contradicts A)]
+      |
+      v
+[PM identifies contradiction type]
+      |
+      +---> Fact vs Estimate (capacity, dimensions)
+      |         |
+      |         v
+      |    Trust research (has sources)
+      |    Note: "Visual estimated X, research confirms Y"
+      |
+      +---> Observation vs Research (material, features)
+      |         |
+      |         v
+      |    Trust visual for observable facts
+      |    Trust research for non-observable specs
+      |
+      +---> Opinion vs Opinion (positioning, style)
+              |
+              v
+         Present both to user:
+         "Visual suggests [X], research indicates [Y].
+         Which positioning aligns with your intent?"
+```
+
+### File Handling
+
+When contradiction detected, the LATER file should acknowledge:
+```
+product_research_{item_identifier}.md:
+"Note: Visual analysis identified material as [X].
+Research indicates [Y] based on [source].
+Using research finding due to [reasoning]."
+```
+
+---
+
+## WORKFLOW CANCELLATION PATTERN
+
+When user wants to abort or restart.
+
+### Triggers
+
+- "Cancel", "Stop", "Never mind"
+- "Start over", "Let's try again"
+- "Forget this, do [something else]"
+
+### Resolution
+
+```
+[User cancellation request]
+      |
+      v
+[PM assesses workflow state]
+      |
+      +---> Analysis phase (no execution yet)
+      |         |
+      |         v
+      |    Clean stop - no harm done:
+      |    "Understood. I've stopped the analysis.
+      |    Let me know when you want to continue or try something else."
+      |
+      +---> Execution phase (write_data pending/approved)
+      |         |
+      |         v
+      |    Warn about partial state:
+      |    "I've already [created X / processed images].
+      |    Options: 1) Continue and complete, 2) Undo what was created"
+      |
+      +---> Post-execution (records created)
+              |
+              v
+         Offer cleanup:
+         "Records have been created. Would you like me to:
+         1) Leave them and continue later
+         2) Archive/delete them (requires approval)"
+```
+
+### Key Principle
+
+**Never leave orphaned data.** If workflow creates partial records:
+- Assets without product links -> cleanup or complete
+- Products without prices -> complete or flag as draft
+- Families without products -> may be intentional (cold start)
+
+---
+
+## FILE NAMING CONVENTIONS
+
+Consistent file naming enables reliable file routing between agents.
+
+### Standard Patterns
+
+| Agent | Output File | Pattern |
+|-------|-------------|---------|
+| visual_analyst | Analysis | `visual_analysis_{image_basename}.md` |
+| catalog_analyst | Analysis | `catalog_analysis_{item_identifier}.md` |
+| product_analyst | Research | `product_research_{item_identifier}.md` |
+| creative_specialist | Processed | `pending/{thread_id}/{timestamp}_studio_{hash}.png` |
+
+### Item Identifier Rules
+
+- Use image basename when available: `20251217_152547_photo`
+- Use descriptive slug when no image: `pet_container_500ml`
+- For variants: `pet_containers_variant_set`
+- Never use generic names: `analysis.md`, `research.md` (will overwrite)
+
+### PM File Routing
+
+When delegating, PM includes file paths explicitly:
+```
+"Create catalog entry.
+Read visual analysis at: visual_analysis_20251217_photo.md
+Read product research at: product_research_pet_container.md
+Processed image at: pending/thread_xyz/20251217_studio_abc.png"
+```
+
+---
+
+## HITL TIMEOUT HANDLING
+
+When user doesn't respond to approval requests.
+
+### Timeout Thresholds
+
+| Context | Timeout | Reason |
+|---------|---------|--------|
+| WhatsApp conversation | 24 hours | User may be busy |
+| Active session | 30 minutes | User likely stepped away |
+| Bulk operation | 1 hour | User reviewing multiple items |
+
+### Resolution
+
+```
+[write_data submitted, awaiting HITL]
+      |
+      v
+[Timeout reached]
+      |
+      v
+[PM sends reminder]
+      |
+      +---> User responds -> continue workflow
+      |
+      +---> Second timeout
+              |
+              v
+         [Auto-save as DRAFT]
+         "I've saved this as a draft. When you're ready,
+         say 'continue with [item]' to resume."
+```
+
+### Draft Recovery
+
+When user returns after timeout:
+- "Continue cataloging" -> PM checks for pending drafts
+- Drafts stored in workflow state, not database
+- No orphaned DRAFT records in production tables
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Parallel when sequential needed | visual_analyst and catalog_analyst parallel | visual_analyst FIRST, catalog_analyst needs identification |
+| Execution before approval | creative_specialist immediately after analysis | User approval GATE before creative_specialist |
+| Missing file routes | catalog_specialist without product_research.md | Include ALL analyst files for complete records |
+| Context not propagated | "Read visual_analysis.md" without user clarifications | Include user context: "User clarified X. Read file and REVISE." |
+
+</protocol>

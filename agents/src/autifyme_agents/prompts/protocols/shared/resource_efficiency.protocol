@@ -1,0 +1,301 @@
+<protocol name="resource_efficiency" type="cross_cutting" domain="shared">
+
+## PURPOSE
+
+Work efficiently within execution limits. Every agent has finite resources:
+- **Model calls**: LLM invocations (thinking steps)
+- **Tool calls**: Individual tool executions (per tool type)
+
+Limits exist to prevent runaway loops and control costs. This protocol teaches
+you to maximize value within constraints.
+
+---
+
+## CORE PRINCIPLE: PLAN BEFORE ACT
+
+```
+[Task Received]
+      |
+      v
+[1. Understand goal completely]
+      |
+      v
+[2. Identify minimum tools needed]
+      |
+      v
+[3. Plan sequence (batch where possible)]
+      |
+      v
+[4. Execute plan efficiently]
+      |
+      v
+[5. Verify completion, wrap up]
+```
+
+**Anti-pattern:** Tool-call-per-thought. Each thought leading to a tool call wastes resources.
+
+**Correct pattern:** Think comprehensively, then execute batch of related calls.
+
+---
+
+## RESOURCE ALLOCATION MINDSET
+
+### Mental Model: Budget Not Unlimited
+
+Think of each task as having a budget:
+- You have ~15 model calls to complete the task
+- You have ~10 calls per tool type
+- Exceeding limits terminates your work
+
+**Implication:** Prioritize high-value actions. Skip low-value exploration.
+
+### Value Hierarchy
+
+| Priority | Action Type | Example |
+|----------|-------------|---------|
+| 1 (Highest) | Core task execution | The primary deliverable |
+| 2 | Essential research | Required data gathering |
+| 3 | Quality assurance | Verification of output |
+| 4 | Nice-to-have exploration | Additional context |
+| 5 (Lowest) | Redundant verification | Re-checking same data |
+
+**Rule:** Complete priorities 1-2 before spending on 3-5.
+
+---
+
+## EFFICIENT TOOL USAGE PATTERNS
+
+### Pattern 1: Batch Related Operations
+
+```
+INEFFICIENT (4 tool calls):
+- query(id=1)
+- query(id=2)
+- query(id=3)
+- query(id=4)
+
+EFFICIENT (1 tool call):
+- query(ids=[1,2,3,4])
+```
+
+### Pattern 2: Learn Once, Use Many
+
+```
+INEFFICIENT:
+- inspect_schema(table="X")
+- query(table="X", ...)
+- inspect_schema(table="X")  # Re-learning!
+- query(table="X", ...)
+
+EFFICIENT:
+- inspect_schema(table="X")
+- [Mental note: structure is A, B, C]
+- query(table="X", ...)
+- query(table="X", ...)  # No re-inspect
+```
+
+### Pattern 3: Aggregate Before Detail
+
+```
+INEFFICIENT (exploring blindly):
+- read_data(limit=100)
+- [Manually analyze all rows]
+
+EFFICIENT:
+- aggregate_data(count, group_by)
+- [Get summary first]
+- read_data(specific_filter)  # Drill into what matters
+```
+
+### Pattern 4: Combine View Operations
+
+```
+INEFFICIENT:
+- view_image(path="img1.jpg")
+- [Analyze]
+- view_image(path="img2.jpg")
+- [Analyze]
+
+EFFICIENT:
+- view_image(paths=["img1.jpg", "img2.jpg"])
+- [Analyze all together, compare]
+```
+
+### Pattern 5: Bounded Research
+
+```
+INEFFICIENT (unbounded):
+- search(query="X specs")
+- search(query="X dimensions")
+- search(query="X materials")
+- search(query="X certifications")
+- ... [continues until limit hit]
+
+EFFICIENT (bounded):
+- search(query="X complete specifications materials certifications")
+- [Extract what's needed from comprehensive search]
+- [Stop when sufficient for task]
+```
+
+---
+
+## AVOIDING RESOURCE WASTE
+
+### Anti-Pattern 1: Redundant Operations
+
+```
+WRONG:
+- read_data(id=123)
+- [Use data]
+- read_data(id=123)  # Same query!
+
+RIGHT:
+- read_data(id=123)
+- [Store mentally, reference without re-query]
+```
+
+### Anti-Pattern 2: Exploratory Loops
+
+```
+WRONG:
+- inspect_schema(table="A")
+- inspect_schema(table="B")
+- inspect_schema(table="C")
+- inspect_schema(table="D")
+- [Finally start actual work...]
+
+RIGHT:
+- [Think: what tables do I NEED?]
+- inspect_schema(table="A")  # Only what's needed
+- [Proceed with task]
+```
+
+### Anti-Pattern 3: Re-viewing/Re-loading
+
+```
+WRONG:
+- view_image(path="X")
+- [Analyze]
+- view_image(path="X")  # Same image!
+
+RIGHT:
+- view_image(path="X")
+- [Complete analysis in one pass]
+- [Reference analysis, no re-view]
+```
+
+### Anti-Pattern 4: Protocol Re-loading
+
+```
+WRONG:
+- load_protocol(names=["X"])
+- [Work]
+- load_protocol(names=["X"])  # Already loaded!
+
+RIGHT:
+- load_protocol(names=["X", "Y", "Z"])  # All needed upfront
+- [Reference throughout, no re-load]
+```
+
+---
+
+## TASK COMPLETION EFFICIENCY
+
+### Know When You're Done
+
+```
+DONE CONDITIONS:
+- Primary deliverable complete
+- Required data gathered
+- User approval obtained (if HITL)
+
+NOT DONE:
+- Unanswered questions remain
+- Waiting for approval
+- Error needs retry
+
+OVER-ENGINEERING (STOP):
+- Checking "just one more thing"
+- Adding unrequested extras
+- Verifying already-verified data
+```
+
+### Wrap Up Cleanly
+
+```
+INEFFICIENT WRAP-UP:
+- [Task complete]
+- verify(what we just did)
+- count(to be sure)
+- check(again)
+- [Lengthy summary]
+
+EFFICIENT WRAP-UP:
+- [Task complete]
+- [Concise summary: Did X, result Y]
+- [Done]
+```
+
+---
+
+## HANDLING APPROACHING LIMITS
+
+### Signs You're Using Resources Fast
+
+- Same tool called many times for similar data
+- Exploring without clear goal
+- Re-verifying completed work
+- Long chains without conclusions
+
+### Recovery Strategies
+
+```
+[Realize you've made many calls]
+      |
+      v
+[STOP - No more speculative calls]
+      |
+      v
+[Synthesize what you've learned]
+      |
+      v
+[Complete task with available information]
+      |
+      v
+[Flag gaps: "Did not verify X due to resource constraints"]
+```
+
+### Graceful Degradation
+
+If you can't complete fully within limits:
+
+1. **Complete core task** - The must-have deliverable
+2. **Skip nice-to-haves** - Additional verification, extra details
+3. **Document gaps** - "Note: Did not research X, recommend follow-up"
+4. **Don't fail silently** - Make clear what wasn't done
+
+---
+
+## CHECKLIST: BEFORE EACH TOOL CALL
+
+- [ ] Is this call necessary for the task?
+- [ ] Have I already retrieved this data?
+- [ ] Can I batch this with other calls?
+- [ ] Will this call move me toward completion?
+
+**If any check fails, reconsider the call.**
+
+---
+
+## SUMMARY
+
+1. **Plan before acting** - Think comprehensively, then execute
+2. **Batch related operations** - One call > many calls
+3. **Learn once, use many** - Load/inspect upfront, reference throughout
+4. **Aggregate before detail** - Summaries before full data
+5. **Know when done** - Stop when task complete
+6. **Degrade gracefully** - Complete core task if limits approach
+
+**Your goal:** Maximum task value per resource spent.
+
+</protocol>

@@ -1,0 +1,151 @@
+<protocol name="new_family" type="decision" domain="catalog">
+
+## PURPOSE
+
+Decision protocol for when to create a NEW product family vs using an existing one.
+Ensures families are created purposefully, not proliferated unnecessarily.
+
+---
+
+## WHEN TO CREATE NEW FAMILY
+
+Create a new family ONLY when:
+
+1. **Different customer segment** - Product serves fundamentally different buyers
+2. **No existing family fits** - After checking 3 candidates with family_fit protocol
+3. **Different variant structure** - Product needs axes that don't exist in any family
+
+---
+
+## PRE-REQUISITES
+
+Before creating a new family, you MUST have:
+
+1. **Completed family_fit protocol** for at least 3 candidate families
+2. **Evidence of NO FIT** for each candidate (customer segment mismatch)
+3. **Clear customer segment definition** for the new family
+
+Do NOT create new family if:
+- Only one family was evaluated
+- Family fit was based on material, not customer
+- Similar family exists but wasn't found
+
+---
+
+## NEW FAMILY CHECKLIST
+
+### Required Information
+
+| Field | Source | Example |
+|-------|--------|---------|
+| name | User + context | "HDPE Industrial Drums" |
+| sku_prefix | Generate from name | "DRUM-HDPE" |
+| description | User + research | "Heavy-duty drums for chemical storage" |
+| brand | User-provided or null | "IndustroPack" |
+
+### Required Related Data
+
+| Data | Why | Query |
+|------|-----|-------|
+| Customer segment(s) | Defines WHO family serves | Create with family |
+| Variant axes | Defines HOW products vary | Create based on product needs |
+
+---
+
+## FAMILY STRUCTURE PLANNING
+
+Before creating, plan the complete structure:
+
+### 1. Customer Segments
+
+Who will buy products from this family?
+
+```json
+{
+  "segment_type": "b2b",
+  "segment_label": "Chemical Manufacturers",
+  "tone": "technical",
+  "key_benefits": ["Chemical resistant", "Leak-proof", "Regulatory compliant"],
+  "pain_points": ["Storage safety", "Transport regulations", "Durability"]
+}
+```
+
+### 2. Variant Axes
+
+How will products in this family vary?
+
+| Axis | Typical Values | SKU Code Pattern |
+|------|----------------|------------------|
+| size | 20L, 50L, 100L, 200L | 20L, 50L, 100L, 200L |
+| material_grade | standard, food_grade, chemical_grade | STD, FG, CG |
+| color | blue, natural, black | BLU, NAT, BLK |
+
+### 3. SKU Pattern
+
+Define SKU generation pattern:
+
+```
+{sku_prefix}-{size}-{material_grade}-{color}
+Example: DRUM-HDPE-50L-CG-BLU
+```
+
+---
+
+## CREATION ORDER (Dependencies)
+
+Tables must be created in dependency order:
+
+1. **product_families** - Root entity
+2. **customer_segments** - Requires family_id
+3. **variant_axes** - Requires family_id
+4. **variant_values** - Requires axis_id
+5. **products** - Requires family_id
+6. **product_variant_values** - Junction requiring product_id + variant_value_id
+
+---
+
+## VALIDATION BEFORE CREATION
+
+| Check | What to Verify |
+|-------|----------------|
+| No duplicate family | Search product_families by name pattern |
+| No duplicate SKU prefix | Search product_families by sku_prefix pattern |
+| Customer segment uniqueness | No other family serves exact same customer with same benefits |
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Family per size | "PET 500ml Family", "PET 1L Family" | One family "PET Food Jars" with size as variant |
+| No customer definition | Family without customer_segments | Always create customer_segments - defines WHO family serves |
+| Skipping family_fit | "Looks different" -> new family | Evaluate 3 candidates first, document NO FIT for each |
+
+---
+
+## OUTPUT STRUCTURE
+
+After new family creation decision:
+
+```json
+{
+  "decision": "CREATE_NEW_FAMILY",
+  "family_name": "HDPE Industrial Drums",
+  "evidence": {
+    "families_evaluated": 3,
+    "fit_results": [
+      {"family": "PET Food Jars", "fit": false, "reason": "Different customer - food vs chemical"},
+      {"family": "Glass Industrial", "fit": false, "reason": "Different material requirements"},
+      {"family": "Plastic Containers", "fit": false, "reason": "Consumer vs industrial customer"}
+    ]
+  },
+  "new_family_definition": {
+    "customer_segment": "B2B Chemical Manufacturers",
+    "variant_axes": ["size", "color"],
+    "sku_prefix": "DRUM-HDPE"
+  }
+}
+```
+
+</protocol>

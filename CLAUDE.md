@@ -40,16 +40,19 @@ Modern LLMs are highly capable: massive context windows (200K+ tokens), strong r
 **[CRITICAL] The Domain Grounding Reality:**
 LLMs are general-purpose - they DON'T know your tools, business rules, or domain expectations. Canonical examples (2-4 complex, pattern-illustrative) bridge this gap. Use `agent-improvement` skill to diagnose and fix underperforming agents.
 
-### **[CRITICAL] ULTRATHINK: First-Principles Engineering**
+### **[CRITICAL] ULTRATHINK: First-Principles Engineering - Clean Slate, Not Frankenstein**
+
 Every change—whether design, architecture, or code—must meet this standard:
 
-- **Clean, production-ready from first principles:** No shortcuts, no "we'll fix it later"
-- **Dynamic, future-proof architecture:** Design for extensibility and evolution, not just current requirements
+- **Analyze deeply before proposing:** Research all viable options, explore the problem space, verify assumptions with REPL/docs/code inspection—never jump to implementation
+- **Present options, recommend best:** Surface trade-offs honestly, then give a clear recommendation with conviction and rationale
+- **Clean slate, not Frankenstein patches:** Design the ideal solution from first principles—never layer band-aids on broken foundations
+- **Zero tolerance for patchwork:** No shortcuts, no workarounds, no "we'll fix it later"—if it's worth doing, it's worth doing right
 - **From-scratch mindset:** Approach every change as if building fresh—question existing patterns, refactor fearlessly, eliminate technical debt
-- **Zero tolerance for compromise:** Architecture integrity is non-negotiable; if existing code violates principles, fix the foundation
-- **Without any constraints:** Ignore legacy code limitations, existing patterns, or "how it's done now"—design the ideal solution first, then implement it
+- **Fix the foundation first:** If existing code violates principles, refactor to the right architecture before adding features
+- **Unconstrained design:** Ignore legacy limitations, existing patterns, or "how it's done now"—design the ideal solution first, then implement it
 
-**ULTRATHINK means:** Before every implementation, pause and ask: "If I were designing this from scratch with everything I know now, would I build it this way?" If not, refactor to the right architecture first. Operate unconstrained—the right architecture justifies any necessary refactoring.
+**ULTRATHINK means:** Before every implementation, pause and ask: "If I were designing this from scratch with everything I know now, would I build it this way?" If not, refactor to the right architecture first. The right architecture justifies any necessary refactoring—never compromise with Frankenstein patches.
 
 ### Design-First Process
 - Create/update specs under `docs/architecture/` before implementation (user flow, agent interplay, components, schemas)

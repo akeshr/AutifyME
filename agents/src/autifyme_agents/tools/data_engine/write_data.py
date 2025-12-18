@@ -71,19 +71,19 @@ def create_write_data_tool(
         StructuredTool configured for multi-operation write intents
 
     Examples:
-        # Cataloging Specialist - Full CRUD on product domain
+        # Specialist - Domain-scoped CRUD
         write_tool = create_write_data_tool(
             storage,
-            tables=["products", "product_families", "categories", "variant_axes", "variant_values"]
+            tables=["entities", "parent_entities", "categories", "attribute_types", "attributes"]
         )
 
-        # Campaign Specialist - Campaign tables only
+        # Specialist - Alternate domain
         write_tool = create_write_data_tool(
             storage,
-            tables=["campaigns", "ad_copies"]
+            tables=["records", "metadata"]
         )
 
-        # Project Manager - All tables
+        # Manager - All tables
         write_tool = create_write_data_tool(storage)  # No restrictions
     """
     allowed_tables = tables
@@ -102,8 +102,8 @@ def create_write_data_tool(
         Execute multi-operation write intent atomically.
 
         USE WHEN:
-        - Creating multi-table entities (product family + variants)
-        - Atomic operations with dependencies (create family, then products)
+        - Creating multi-table entities (parent + children)
+        - Atomic operations with dependencies (create parent, then children)
         - Operations requiring cross-table references (@parent.id)
         - Complex database mutations with ACID guarantees
 
@@ -121,124 +121,124 @@ def create_write_data_tool(
             Execution result with created/updated/deleted entities
 
         Examples:
-            # Complex: Create product family with multi-axis variants and products
+            # Complex: Create parent entity with multi-axis attributes and children
             write_data(
-                goal="Create PET Food Jars family with Size and Color variants (6 SKUs)",
-                reasoning="Duplicate check: 0 matches. Web research (confidence 0.85): food-grade PET, transparent/amber common. Creating 2 axes (Size, Color), 4 variant values (500ml, 1L, Clear, Amber), 4 product combinations.",
-                hitl_summary="Creating PET Food Jars family with 4 product variants.\n\nProducts:\n- JAR-PET-500ML-CLEAR (Rs 30)\n- JAR-PET-500ML-AMBER (Rs 32)\n- JAR-PET-1L-CLEAR (Rs 45)\n- JAR-PET-1L-AMBER (Rs 48)\n\nThis will add 1 product family, 2 variant axes, and 4 new SKUs to your catalog.\n\nReply *approve* to proceed or *reject* to cancel.",
+                goal="Create parent entity with Axis A and Axis B attributes (6 children)",
+                reasoning="Duplicate check: 0 matches. Research complete. Creating 2 axes, 4 attribute values, 4 child combinations.",
+                hitl_summary="Creating parent entity with 4 child entities.\n\nEntities:\n- CODE-A1-B1 (value 30)\n- CODE-A1-B2 (value 32)\n- CODE-A2-B1 (value 45)\n- CODE-A2-B2 (value 48)\n\nThis will add 1 parent, 2 attribute axes, and 4 new children.\n\nReply *approve* to proceed or *reject* to cancel.",
                 operations=[
                     {
                         "action": "create",
-                        "table": "product_families",
+                        "table": "parent_entities",
                         "data": {
-                            "name": "PET Food Jars",
-                            "sku_prefix": "JAR-PET",
-                            "base_price": 30.0,
-                            "material": "Polyethylene Terephthalate (PET)",
+                            "name": "Parent Entity A",
+                            "code_prefix": "CODE-A",
+                            "base_value": 30.0,
+                            "type": "Type A",
                             "is_active": True
                         },
-                        "returns": "family"
+                        "returns": "parent"
                     },
                     {
                         "action": "create",
-                        "table": "variant_axes",
+                        "table": "attribute_types",
                         "data": [
-                            {"name": "Size", "product_family_id": "@parent.id", "is_active": True},
-                            {"name": "Color", "product_family_id": "@parent.id", "is_active": True}
+                            {"name": "Axis A", "parent_id": "@parent.id", "is_active": True},
+                            {"name": "Axis B", "parent_id": "@parent.id", "is_active": True}
                         ],
-                        "dependencies": ["family"],
+                        "dependencies": ["parent"],
                         "returns": "axes_batch"
                     },
                     {
                         "action": "create",
-                        "table": "variant_values",
+                        "table": "attributes",
                         "data": [
-                            {"name": "500ml", "variant_axis_id": "@batch[0].id"},
-                            {"name": "1L", "variant_axis_id": "@batch[0].id"},
-                            {"name": "Clear", "variant_axis_id": "@axes_batch[1].id"},
-                            {"name": "Amber", "variant_axis_id": "@axes_batch[1].id"}
+                            {"name": "Value A1", "type_id": "@batch[0].id"},
+                            {"name": "Value A2", "type_id": "@batch[0].id"},
+                            {"name": "Value B1", "type_id": "@axes_batch[1].id"},
+                            {"name": "Value B2", "type_id": "@axes_batch[1].id"}
                         ],
                         "dependencies": ["axes_batch"],
                         "returns": "values_batch"
                     },
                     {
                         "action": "create",
-                        "table": "products",
+                        "table": "entities",
                         "data": [
-                            {"product_family_id": "@parent.id", "sku": "JAR-PET-500ML-CLEAR", "name": "PET Food Jar 500ml Clear", "base_price": 30.0},
-                            {"product_family_id": "@parent.id", "sku": "JAR-PET-500ML-AMBER", "name": "PET Food Jar 500ml Amber", "base_price": 32.0},
-                            {"product_family_id": "@parent.id", "sku": "JAR-PET-1L-CLEAR", "name": "PET Food Jar 1L Clear", "base_price": 45.0},
-                            {"product_family_id": "@parent.id", "sku": "JAR-PET-1L-AMBER", "name": "PET Food Jar 1L Amber", "base_price": 48.0}
+                            {"parent_id": "@parent.id", "code": "CODE-A1-B1", "name": "Entity A1 B1", "value": 30.0},
+                            {"parent_id": "@parent.id", "code": "CODE-A1-B2", "name": "Entity A1 B2", "value": 32.0},
+                            {"parent_id": "@parent.id", "code": "CODE-A2-B1", "name": "Entity A2 B1", "value": 45.0},
+                            {"parent_id": "@parent.id", "code": "CODE-A2-B2", "name": "Entity A2 B2", "value": 48.0}
                         ],
-                        "dependencies": ["family"]
+                        "dependencies": ["parent"]
                     }
                 ],
                 impact={
-                    "creates": {"product_families": 1, "variant_axes": 2, "variant_values": 4, "products": 4},
-                    "warnings": ["SKU count +4 (current: 45 → new: 49)", "Amber variants +6% price premium"],
-                    "examples": ["JAR-PET-500ML-CLEAR", "JAR-PET-1L-AMBER"]
+                    "creates": {"parent_entities": 1, "attribute_types": 2, "attributes": 4, "entities": 4},
+                    "warnings": ["Entity count +4 (current: 45 - new: 49)", "B2 variants +6% value premium"],
+                    "examples": ["CODE-A1-B1", "CODE-A2-B2"]
                 }
             )
 
-            # Complex: Tiered bulk price update with conditional logic
+            # Complex: Tiered bulk value update with conditional logic
             write_data(
-                goal="Update PET Bottles pricing with size-based tiers (Rs 35 for small/medium, Rs 50 for large)",
-                reasoning="User requests tiered pricing. Query shows 6 active products (2x 500ml, 2x 1L, 2x 2L). Current avg Rs 28.50. New tiered pricing reflects volume premium. Three separate operations for atomic consistency.",
+                goal="Update entities with tier-based values (35 for tier 1, 50 for tier 2)",
+                reasoning="User requests tiered values. Query shows 6 active entities. Three separate operations for atomic consistency.",
                 operations=[
                     {
                         "action": "update",
-                        "table": "products",
-                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "id": {"in": ["uuid-500ml-1", "uuid-500ml-2"]}},
-                        "updates": {"base_price": 35.0}
+                        "table": "entities",
+                        "filters": {"parent_id": "uuid-parent", "is_active": True, "id": {"in": ["uuid-1", "uuid-2"]}},
+                        "updates": {"value": 35.0}
                     },
                     {
                         "action": "update",
-                        "table": "products",
-                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "id": {"in": ["uuid-1l-1", "uuid-1l-2"]}},
-                        "updates": {"base_price": 35.0}
+                        "table": "entities",
+                        "filters": {"parent_id": "uuid-parent", "is_active": True, "id": {"in": ["uuid-3", "uuid-4"]}},
+                        "updates": {"value": 35.0}
                     },
                     {
                         "action": "update",
-                        "table": "products",
-                        "filters": {"product_family_id": "uuid-pet-123", "is_active": True, "id": {"in": ["uuid-2l-1", "uuid-2l-2"]}},
-                        "updates": {"base_price": 50.0}
+                        "table": "entities",
+                        "filters": {"parent_id": "uuid-parent", "is_active": True, "id": {"in": ["uuid-5", "uuid-6"]}},
+                        "updates": {"value": 50.0}
                     }
                 ],
                 impact={
-                    "updates": {"products": 6},
-                    "warnings": ["CRITICAL: 6 products affected", "2L products: +56% increase", "Avg price: Rs 28.50 → Rs 40.00 (+40%)"],
-                    "examples": ["BOTTLE-PET-500ML: Rs 25→35 (+40%)", "BOTTLE-PET-2L: Rs 32→50 (+56%)"]
+                    "updates": {"entities": 6},
+                    "warnings": ["CRITICAL: 6 entities affected", "Tier 2: +56% increase", "Avg value: 28.50 - 40.00 (+40%)"],
+                    "examples": ["CODE-T1-A: 25-35 (+40%)", "CODE-T2-A: 32-50 (+56%)"]
                 }
             )
 
             # Complex: Soft delete with junction table cleanup
             write_data(
-                goal="Remove 250ml size from PET Bottles (discontinued) with junction cleanup",
-                reasoning="250ml discontinued per business decision. Found 3 products via product_variant_values junction. Soft deleting products, junction records, and variant value to preserve order history. No hard deletes.",
+                goal="Remove attribute value (discontinued) with junction cleanup",
+                reasoning="Value discontinued per business decision. Found 3 entities via entity_attributes junction. Soft deleting entities, junction records, and attribute to preserve history. No hard deletes.",
                 operations=[
                     {
                         "action": "update",
-                        "table": "products",
+                        "table": "entities",
                         "filters": {"id": {"in": ["uuid-1", "uuid-2", "uuid-3"]}, "is_active": True},
                         "updates": {"is_active": False, "discontinued_at": "2025-01-24T00:00:00Z"}
                     },
                     {
                         "action": "update",
-                        "table": "product_variant_values",
-                        "filters": {"variant_value_id": "uuid-250ml-val", "is_active": True},
+                        "table": "entity_attributes",
+                        "filters": {"attribute_id": "uuid-attr", "is_active": True},
                         "updates": {"is_active": False}
                     },
                     {
                         "action": "update",
-                        "table": "variant_values",
-                        "filters": {"id": "uuid-250ml-val"},
+                        "table": "attributes",
+                        "filters": {"id": "uuid-attr"},
                         "updates": {"is_active": False}
                     }
                 ],
                 impact={
-                    "updates": {"products": 3, "product_variant_values": 3, "variant_values": 1},
-                    "warnings": ["CRITICAL: 3 products discontinued", "Soft delete preserves order history", "SKU count -3 (45 → 42)"],
-                    "examples": ["BOTTLE-PET-250ML-CLEAR", "BOTTLE-PET-250ML-AMBER"]
+                    "updates": {"entities": 3, "entity_attributes": 3, "attributes": 1},
+                    "warnings": ["CRITICAL: 3 entities discontinued", "Soft delete preserves history", "Entity count -3 (45 - 42)"],
+                    "examples": ["CODE-A-1", "CODE-A-2"]
                 }
             )
 
@@ -329,12 +329,12 @@ def create_write_data_tool(
             "4. operations: Array of database operations (create/update/delete/upsert) with dependencies\n"
             "5. impact: What changes (creates/updates/deletes counts, warnings, examples)\n\n"
             "USE WHEN:\n"
-            "- Creating: Products, families, variants, pricing, images, BOM\n"
-            "- Updating: Prices, statuses, descriptions, relationships\n"
+            "- Creating: Entities, parents, children, attributes, assets\n"
+            "- Updating: Values, statuses, descriptions, relationships\n"
             "- Deleting: Soft deletes (is_active=False), cleanup\n"
             "- Upserting: Idempotent create-or-update when you have conflict keys\n"
             "- Multi-table operations: Parent-child structures, junction tables\n"
-            "- Asset uploads: Images from pending/ to permanent storage\n"
+            "- Asset uploads: Files from pending/ to permanent storage\n"
             "- Any database mutation: If it changes data, goes through write_data + HITL\n\n"
             "DON'T USE:\n"
             "- For reading (use read_data)\n"
@@ -343,41 +343,41 @@ def create_write_data_tool(
             "- Without validation (ALWAYS inspect_schema + read_data BEFORE write_data)\n\n"
             "CRITICAL:\n"
             "- operations: Array of {action: 'create'/'update'/'delete'/'upsert', table: 'table_name', data: {...}, filters: {...}, updates: {...}, returns: 'ref_name', dependencies: ['parent_ref']}\n"
-            "  * CREATE: {action: 'create', table: 'products', data: {sku: 'JAR-001', ...}, returns: 'product'}\n"
-            "  * UPDATE: {action: 'update', table: 'products', filters: {id: 'uuid-123'}, updates: {base_price: 45.0}}\n"
+            "  * CREATE: {action: 'create', table: 'entities', data: {code: 'CODE-001', ...}, returns: 'entity'}\n"
+            "  * UPDATE: {action: 'update', table: 'entities', filters: {id: 'uuid-123'}, updates: {value: 45.0}}\n"
             "  * DELETE: {action: 'delete', table: 'temp_records', filters: {id: 'uuid-123'}}\n"
-            "  * UPSERT: {action: 'upsert', table: 'products', data: {...}, on_conflict: 'skip'|'update', conflict_fields: ['sku']}\n"
+            "  * UPSERT: {action: 'upsert', table: 'entities', data: {...}, on_conflict: 'skip'|'update', conflict_fields: ['code']}\n"
             "  * Batch: data can be array of dicts for multi-record creates\n"
             "- filters support equality / IN / numeric comparisons. Operator dicts supported: in, eq, neq, gt, gte, lt, lte (NO LIKE/ILIKE).\n"
-            "  If you need fuzzy selection (e.g., SKU prefix), use read_data(search_patterns=...) first to get IDs, then update by id IN list.\n"
+            "  If you need fuzzy selection (e.g., code prefix), use read_data(search_patterns=...) first to get IDs, then update by id IN list.\n"
             "- Reference syntax: @name.field for dependencies\n"
-            "  * Single: '@family.id' references family operation result\n"
-            "  * Batch: '@axes_batch[0].id' references first result in batch\n"
-            "  * dependencies: ['family'] ensures family created before products\n"
+            "  * Single: '@parent.id' references parent operation result\n"
+            "  * Batch: '@types_batch[0].id' references first result in batch\n"
+            "  * dependencies: ['parent'] ensures parent created before children\n"
             "- Dependency resolution: Automatic topological sort, cyclic dependencies rejected\n"
             "- Atomic transaction: All-or-nothing, automatic rollback on any error (no partial commits)\n"
             "- HITL required: User must approve via hitl_summary (plain language for business users)\n"
             "- Validation: Always inspect_schema + read_data before write_data to verify structure and check duplicates\n\n"
             "OPTIONAL:\n"
-            "- asset_uploads: [{storage_path: 'pending/thread_id/img.png', returns: 'asset'}] → reference '@asset.public_url' in operations\n"
+            "- asset_uploads: [{storage_path: 'pending/thread_id/file.png', returns: 'asset'}] - reference '@asset.public_url' in operations\n"
             "- dry_run: Preview without executing (no HITL required)\n"
             "- validate_only: Check schemas without executing (no HITL required)\n\n"
             "EXAMPLES:\n"
             "# Multi-table create with dependencies\n"
             "write_data(\n"
-            "    goal='Create PET Food Jars family with Size and Color variants (4 SKUs)',\n"
-            "    reasoning='Duplicate check: 0 matches. Research (0.85): food-grade PET, Rs 30-50. inspect_schema: required fields verified.',\n"
-            "    hitl_summary='Creating PET Food Jars family with 4 variants: JAR-PET-500ML-CLEAR (Rs 30), JAR-PET-500ML-AMBER (Rs 32), JAR-PET-1L-CLEAR (Rs 45), JAR-PET-1L-AMBER (Rs 48). Adds 1 family, 2 axes, 4 SKUs. Reply *approve* to proceed or *reject* to cancel.',\n"
+            "    goal='Create parent entity with Axis A and Axis B attributes (4 children)',\n"
+            "    reasoning='Duplicate check: 0 matches. Research complete. inspect_schema: required fields verified.',\n"
+            "    hitl_summary='Creating parent entity with 4 children: CODE-A1-B1 (30), CODE-A1-B2 (32), CODE-A2-B1 (45), CODE-A2-B2 (48). Adds 1 parent, 2 axes, 4 children. Reply *approve* to proceed or *reject* to cancel.',\n"
             "    operations=[\n"
-            "        {action: 'create', table: 'product_families', data: {name: 'PET Food Jars', sku_prefix: 'JAR-PET', base_price: 30.0}, returns: 'family'},\n"
-            "        {action: 'create', table: 'variant_axes', data: [{name: 'Size', product_family_id: '@family.id'}, {name: 'Color', product_family_id: '@family.id'}], dependencies: ['family'], returns: 'axes'},\n"
-            "        {action: 'create', table: 'variant_values', data: [{name: '500ml', variant_axis_id: '@axes[0].id'}, {name: '1L', variant_axis_id: '@axes[0].id'}, {name: 'Clear', variant_axis_id: '@axes[1].id'}, {name: 'Amber', variant_axis_id: '@axes[1].id'}], dependencies: ['axes']},\n"
-            "        {action: 'create', table: 'products', data: [{product_family_id: '@family.id', sku: 'JAR-PET-500ML-CLEAR', name: 'PET Food Jar 500ml Clear', base_price: 30.0}, ...], dependencies: ['family']}\n"
+            "        {action: 'create', table: 'parent_entities', data: {name: 'Parent A', code_prefix: 'CODE-A', value: 30.0}, returns: 'parent'},\n"
+            "        {action: 'create', table: 'attribute_types', data: [{name: 'Axis A', parent_id: '@parent.id'}, {name: 'Axis B', parent_id: '@parent.id'}], dependencies: ['parent'], returns: 'axes'},\n"
+            "        {action: 'create', table: 'attributes', data: [{name: 'A1', type_id: '@axes[0].id'}, {name: 'A2', type_id: '@axes[0].id'}, {name: 'B1', type_id: '@axes[1].id'}, {name: 'B2', type_id: '@axes[1].id'}], dependencies: ['axes']},\n"
+            "        {action: 'create', table: 'entities', data: [{parent_id: '@parent.id', code: 'CODE-A1-B1', name: 'Entity A1 B1', value: 30.0}, ...], dependencies: ['parent']}\n"
             "    ],\n"
-            "    impact={creates: {product_families: 1, variant_axes: 2, variant_values: 4, products: 4}, warnings: ['SKU count +4'], examples: ['JAR-PET-500ML-CLEAR']}\n"
+            "    impact={creates: {parent_entities: 1, attribute_types: 2, attributes: 4, entities: 4}, warnings: ['Entity count +4'], examples: ['CODE-A1-B1']}\n"
             ")\n\n"
             "# Bulk update pattern (safe): query first, then update by IDs\n"
-            "# 1) read_data(... search_patterns=...) to get product ids\n"
+            "# 1) read_data(... search_patterns=...) to get entity ids\n"
             "# 2) write_data update with filters={'id': ['id1','id2',...]}\n\n"
             "ALSO CONSIDER:\n"
             "- inspect_schema: BEFORE write_data - verify required fields, enum values, constraints\n"

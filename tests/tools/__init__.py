@@ -1,33 +1,32 @@
-"""Autonomous Testing Framework tools for Claude.
+"""Testing Tools for Claude Code.
 
-This package provides information-gathering tools for Claude to orchestrate
-testing, analysis, and improvement of the AutifyME agentic system.
+This package provides tools for Claude Code to test and evaluate the AutifyME
+PM agent. The architecture is simple:
 
-Core Philosophy: Tools provide visibility, Claude provides intelligence.
+1. **PM Interaction** - chat_with_pm() sends messages and gets structured responses
+2. **Trace Analysis** - Hierarchical lazy-loading tools for deep debugging
 
-Tool count: 7 essential observation tools
-- execute_scenario: Run workflow tests
+Philosophy: Claude Code IS the intelligence. These tools provide visibility.
+
+Tool Inventory:
+- chat_with_pm: Send message to PM, get structured response for evaluation
 - get_trace_overview: Level 0 hierarchical trace analysis (~500 tokens)
-- get_run_details: Level 1 specific run analysis (~1,500 tokens)
+- get_run_details: Level 1 specific run with inputs/outputs (~1,500 tokens)
 - get_run_messages: Level 2 full conversation (~5K+ tokens, rare)
-- get_workflow_story: Multi-trace HITL workflow analysis (~500 tokens per trace)
-- get_llm_trace_tree: LLM-only trace tree for prompt analysis (~2-5k tokens)
-- list_recent_tests: Test history for progress tracking
+- get_workflow_story: Multi-trace HITL workflow analysis
+- get_llm_trace_tree: LLM-only trace for prompt analysis (~2-5k tokens)
 """
 
-# Execution tools
-from .execution import execute_scenario
-from .intelligent_execution import intelligent_execute_scenario
+# PM Interaction
+from .pm_interaction import chat_with_pm, clear_all_sessions, clear_session
 
-# Models (for type hints and return types)
+# Models
 from .models import (
-    ExecutionHistory,
-    ExecutionRecord,
-    ExecutionResult,
     HITLDecision,
     LLMCallNode,
     LLMTraceTree,
     Message,
+    PMChatResult,
     RunDetails,
     RunMessages,
     RunMetadata,
@@ -39,10 +38,7 @@ from .models import (
     WorkflowTrace,
 )
 
-# Test history tools
-from .test_history import clear_test_history, list_recent_tests, record_test_execution
-
-# Trace analysis tools
+# Trace Analysis
 from .trace_analysis import (
     get_llm_trace_tree,
     get_run_details,
@@ -52,16 +48,18 @@ from .trace_analysis import (
 )
 
 __all__ = [
-    # Execution
-    "execute_scenario",
-    "intelligent_execute_scenario",
-    "ExecutionResult",
+    # PM Interaction
+    "chat_with_pm",
+    "clear_session",
+    "clear_all_sessions",
+    "PMChatResult",
     # Trace Analysis
     "get_trace_overview",
     "get_run_details",
     "get_run_messages",
     "get_workflow_story",
     "get_llm_trace_tree",
+    # Models
     "TraceOverview",
     "RunNode",
     "RunDetails",
@@ -75,10 +73,4 @@ __all__ = [
     "HITLDecision",
     "LLMCallNode",
     "LLMTraceTree",
-    # Test History
-    "list_recent_tests",
-    "record_test_execution",
-    "clear_test_history",
-    "ExecutionHistory",
-    "ExecutionRecord",
 ]

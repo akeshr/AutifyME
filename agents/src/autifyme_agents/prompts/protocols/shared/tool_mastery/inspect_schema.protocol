@@ -1,0 +1,195 @@
+<protocol name="inspect_schema" type="tool_mastery" domain="shared">
+
+## PURPOSE
+
+Master the inspect_schema tool - database schema discovery without fetching data.
+Use BEFORE read_data/write_data to understand structure, relationships, and constraints.
+
+## WHEN TO USE
+
+| Situation | Action |
+|-----------|--------|
+| Unknown table structure | inspect_schema first |
+| Before complex queries | Verify columns, types |
+| Need foreign key targets | Check relationships |
+| Unknown enum values | Check constraints |
+| Debugging query errors | Verify column types |
+
+---
+
+## PARAMETERS
+
+### tables (required)
+
+Tables to inspect:
+
+```json
+["table_a", "table_b", "table_c"]
+```
+
+### details (optional)
+
+What information to retrieve:
+
+| Detail | Returns |
+|--------|---------|
+| `structure` | Columns, types, nullable, defaults, descriptions |
+| `relationships` | Foreign keys, cascades, target tables |
+| `constraints` | Enum values, regex patterns, JSONB schemas |
+| `stats` | Row counts, index info |
+| `samples` | Real data examples (up to sample_limit) |
+
+Default: `["structure"]`
+
+### sample_limit (optional)
+
+How many sample rows per table. Default: 3, Max: 10
+
+---
+
+## COMMON PATTERNS
+
+### Pattern 1: Before First Query
+
+```json
+{
+  "tables": ["table_name"],
+  "details": ["structure", "relationships"]
+}
+```
+
+Understand: What columns exist? What are the foreign keys?
+
+### Pattern 2: Check Valid Enum Values
+
+```json
+{
+  "tables": ["table_name"],
+  "details": ["constraints"]
+}
+```
+
+Returns: Valid values for enum columns (status, type, etc.)
+
+### Pattern 3: Debug Query Failure
+
+```json
+{
+  "tables": ["table_name"],
+  "details": ["structure", "samples"]
+}
+```
+
+See actual column names and sample data to fix query.
+
+### Pattern 4: Understand Relationships
+
+```json
+{
+  "tables": ["table_a", "table_b", "table_c"],
+  "details": ["relationships"]
+}
+```
+
+Returns: FK relationships, join paths, cascade behavior.
+
+---
+
+## CRITICAL INSIGHTS
+
+### Column Types Matter
+
+- **text vs text[]**: search_patterns works on text, NOT text[]
+- **uuid vs text**: Use exact match for UUIDs
+- **jsonb**: May need special query syntax
+
+### Relationship Discovery
+
+Before using `relations` in read_data:
+
+1. inspect_schema with `details=["relationships"]`
+2. Note FK target tables (singular vs plural naming)
+3. Verify relationship direction
+
+### Enum Constraints
+
+Before filtering by enum:
+
+1. inspect_schema with `details=["constraints"]`
+2. Get valid enum values
+3. Use exact values in filters
+
+---
+
+## ITERATIVE EXPLORATION
+
+Schema discovery is iterative:
+
+1. **First call**: High-level structure
+
+```json
+{"tables": ["table_name"], "details": ["structure"]}
+```
+
+2. **Follow relationships**: Discover connected tables
+
+```json
+{"tables": ["related_table_a", "related_table_b"], "details": ["structure", "relationships"]}
+```
+
+3. **Deep dive constraints**: When needed
+
+```json
+{"tables": ["table_name"], "details": ["constraints", "samples"]}
+```
+
+---
+
+## RETURN STRUCTURE
+
+```json
+{
+  "success": true,
+  "tables": {
+    "table_name": {
+      "structure": [
+        {"column": "id", "type": "uuid", "nullable": false},
+        {"column": "name", "type": "text", "nullable": false},
+        {"column": "value", "type": "numeric", "nullable": true}
+      ],
+      "relationships": [
+        {"column": "parent_id", "references": "parent_table.id"}
+      ],
+      "constraints": {
+        "status": ["draft", "active", "archived"]
+      }
+    }
+  }
+}
+```
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Querying without schema knowledge
+
+```
+WRONG:
+read_data(table='table_name', search_patterns={'tags': '%keyword%'})
+# Fails if tags is text[] (array)
+
+CORRECT:
+1. inspect_schema(tables=['table_name'], details=['structure'])
+2. See that tags is text[] (array type)
+3. Use filters with exact array match, or different approach
+```
+
+### Wrong: Assuming column names
+
+```
+WRONG: Assume column is 'category_id'
+CORRECT: inspect_schema first, see it's 'category_type_id'
+```
+
+</protocol>

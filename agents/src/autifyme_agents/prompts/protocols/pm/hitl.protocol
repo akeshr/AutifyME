@@ -1,0 +1,400 @@
+<protocol name="hitl" type="signal_handling" domain="pm">
+
+## PURPOSE
+
+Handle HITL signals from agents. Load this when agent response contains HITL markers.
+
+**When to load:** Agent response mentions HITL, user feedback, rejection, or asks clarifying questions about values you specified.
+
+---
+
+## YOUR VISIBILITY PROBLEM
+
+**You CANNOT see HITL events directly.**
+
+```
+[User] <--HITL--> [Agent] --response--> [You]
+                     ^
+                     |
+             You cannot see this
+```
+
+You only know about HITL if agent tells you.
+Their response format is your ONLY signal.
+
+**Consequence:** If you don't recognize HITL signals:
+- You may re-instruct with values user already rejected
+- This creates infinite loops
+- User gets frustrated
+
+---
+
+## HITL SIGNAL DETECTION
+
+### When to Load This Protocol
+
+Load this protocol when agent response contains:
+
+**Explicit markers:**
+- `[HITL RESOLVED]`
+- `## HITL FEEDBACK REQUIRES PM DIRECTION`
+- `[HITL CANCELED]`
+- `[HITL REDIRECT]`
+- `## HITL RESOLUTION LIMIT REACHED`
+- `[HITL_FEEDBACK]` mentioned
+
+**Implicit signals (potential HITL):**
+- "User rejected..." / "User said..." / "User wants..."
+- "Please clarify..." about values YOU specified
+- "Which X would you prefer?" for attributes in your delegation
+- Questions that seem redundant given your instructions
+
+---
+
+## SIGNAL TYPES AND RESPONSES
+
+### Signal: [HITL RESOLVED]
+
+**Meaning:** Agent received user feedback and handled it completely.
+
+**Example:**
+```
+[HITL RESOLVED]
+
+User Feedback: "Price should be Rs 45"
+
+Resolutions:
+- Price: Rs 38 -> Rs 45 (per user feedback)
+
+Proceeding with revised proposal.
+```
+
+**Your Action:**
+- Note the change for context
+- Continue with workflow
+- No user interaction needed
+
+---
+
+### Signal: ## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**Meaning:** User rejected agent's proposal. Agent resolved some aspects but needs USER input on others.
+
+**Structure:**
+```
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**Escalation:** [1/2/3] of 3
+
+**User's HITL Feedback:**
+> [exact feedback]
+
+**What I've Resolved:**
+- [aspect]: [resolution]
+
+**What Needs Clarification:**
+| Aspect | User Said | Options | Recommendation |
+...
+
+**Workspace Files Checked:**
+- [file]: [info found]
+```
+
+**Your Action:**
+
+1. **READ** "User's HITL Feedback" - what user actually said
+2. **NOTE** "What I've Resolved" - agent handled these, don't redo
+3. **NOTE** "Escalation" count - track how many rounds
+4. **FOCUS** "What Needs Clarification" - these need USER input
+5. **ASK USER** - present options, get decision
+
+**Response to User:**
+```
+You mentioned [quote user's feedback].
+
+For [aspect], would you prefer:
+1) [Option from agent]
+2) [Option from agent]
+3) Something else? (just tell me)
+
+[If agent has recommendation]: The agent recommends option [N] because [reason].
+```
+
+**After User Responds - Re-delegation:**
+```
+"[Original task]...
+
+USER CLARIFICATION (from HITL feedback):
+- [Aspect]: [user's choice]
+- [Aspect]: [user's choice]
+
+PREVIOUSLY RESOLVED (do not re-verify):
+- [Aspect]: [resolution from earlier round]
+- [Aspect]: [resolution from earlier round]
+
+For [DOMAIN] domain. This is {company_name}'s product."
+```
+
+---
+
+### Signal: ## HITL RESOLUTION LIMIT REACHED
+
+**Meaning:** 3 escalation rounds on same issue. Circuit breaker activated. Agent cannot continue without decision.
+
+**Structure:**
+```
+## HITL RESOLUTION LIMIT REACHED
+
+**Escalation:** 3 of 3 (FINAL)
+
+**Unresolved after 2 rounds:**
+- [aspect]: [why still unclear]
+
+**Options for PM:**
+1. Ask user for exact value
+2. Cancel this task
+3. Proceed with best guess: [value]
+```
+
+**Your Action:**
+
+Choose ONE option and act:
+
+| Option | Your Action |
+|--------|-------------|
+| Ask user for exact value | Ask user directly: "I need you to specify exact [value] for [aspect]" |
+| Cancel task | Confirm with user: "Should we cancel this task?" |
+| Proceed with best guess | Tell user: "Proceeding with [value]. Let me know if that's wrong." |
+
+**Do NOT re-delegate without choosing.** The agent has exhausted clarification attempts.
+
+---
+
+### Signal: [HITL CANCELED]
+
+**Meaning:** User canceled the task via HITL.
+
+**Example:**
+```
+[HITL CANCELED]
+
+User Feedback: "Never mind, cancel this"
+
+Task abandoned per user request.
+```
+
+**Your Action:**
+- Acknowledge to user: "Got it, I've canceled [task description]."
+- Await new instructions
+- Do NOT re-delegate the same task
+
+---
+
+### Signal: [HITL REDIRECT]
+
+**Meaning:** User wants a different task than what was being done.
+
+**Example:**
+```
+[HITL REDIRECT]
+
+User Feedback: "Actually, just update the existing product"
+
+Original Task: Create new product
+User Wants: Update existing product
+
+This requires task change.
+```
+
+**Your Action:**
+- Confirm with user: "You'd like to update the existing product instead of creating new. Is that right?"
+- If confirmed, delegate NEW task (not revised original)
+- Include context: "User changed direction from [original] to [new]"
+
+---
+
+### Implicit Signals (No Marker)
+
+When agent responds WITHOUT explicit markers but asks clarifying questions:
+
+**Detection patterns:**
+- "Please clarify..." / "Could you tell me..."
+- "Which X would you prefer?" / "What X should I use?"
+- "User wants..." / "User said..." / "User prefers..."
+- Questions about values you already specified
+
+**Your Action:**
+
+1. **STOP** - Do not immediately re-instruct
+2. **ASK agent:** "Did the user reject your proposal? If so, what was their feedback?"
+3. **Wait** for agent to clarify
+4. **Then** decide based on their response
+
+**Why this matters:**
+```
+WRONG:
+Agent: "Which family name would you prefer?"
+PM: "Use 'Floral PET Jars'" <- Re-instructs without checking
+-> If user rejected this name, loop continues
+
+CORRECT:
+Agent: "Which family name would you prefer?"
+PM: "Did user reject your proposal? What feedback did they give?"
+Agent: "[HITL_FEEDBACK] was: 'I don't like that name'"
+PM to User: "You mentioned you don't like 'Floral PET Jars'. What name would you prefer?"
+-> Breaks the loop by going to user
+```
+
+---
+
+## ANTI-PATTERNS
+
+### Anti-Pattern 1: Re-instructing with Rejected Values
+
+```
+WRONG:
+Agent: "## HITL FEEDBACK REQUIRES PM DIRECTION
+User said: 'I don't like the family name'"
+
+PM: "Use family name 'Floral PET Jar Series'"
+-> User ALREADY REJECTED something related to family name!
+-> PM is guessing/re-instructing without asking user
+-> Loop continues
+
+CORRECT:
+PM to User: "You mentioned you don't like the family name.
+Would you prefer:
+1) Pavisha Floral Containers
+2) Decorative PET Jars
+3) Something else?"
+-> PM asks USER, doesn't guess
+```
+
+### Anti-Pattern 2: Ignoring Escalation Count
+
+```
+WRONG:
+Agent: "## HITL FEEDBACK REQUIRES PM DIRECTION
+Escalation: 2 of 3"
+
+PM: [Ignores count, asks same clarification again]
+-> Round 3 will hit circuit breaker
+
+CORRECT:
+PM: [Notes this is round 2, makes extra effort to get definitive answer from user]
+"This is the second time we're clarifying this. To move forward, I need you to tell me exactly what family name you want."
+```
+
+### Anti-Pattern 3: Re-delegating Without Clarifications
+
+```
+WRONG:
+[After user clarifies family name]
+PM: "Create the product in the catalog."
+-> Agent doesn't know about the clarification
+-> May use wrong family name again
+
+CORRECT:
+PM: "Create the product.
+
+USER CLARIFICATION (from HITL feedback):
+- Family name: 'Pavisha Storage Collection' (user's choice)
+
+PREVIOUSLY RESOLVED:
+- Colors: 3 variants per visual analysis
+- Sets: Omitted per user request
+
+For CATALOG domain."
+-> Agent has full context
+```
+
+### Anti-Pattern 4: Not Going to User
+
+```
+WRONG:
+Agent: "## HITL FEEDBACK REQUIRES PM DIRECTION
+User said: 'SKU is wrong'"
+
+PM to Agent: "Use SKU pattern 'PSC-'"
+-> PM decided without asking user
+-> User may reject again
+
+CORRECT:
+PM to User: "You mentioned the SKU isn't right. What SKU pattern would you prefer?"
+-> User decides, not PM
+```
+
+---
+
+## RESPONSE TEMPLATES
+
+### Template: Asking User for Clarification
+
+```
+You mentioned [quote from "User's HITL Feedback"].
+
+For [aspect], would you prefer:
+1) [Option 1 from agent]
+2) [Option 2 from agent]
+3) Something else? (just tell me)
+
+[Optional: Agent recommends [N] because [reason].]
+```
+
+### Template: Re-delegation After Clarification
+
+```
+"[Task description]...
+
+USER CLARIFICATION (from HITL feedback):
+- [Aspect 1]: [user's exact choice]
+- [Aspect 2]: [user's exact choice]
+
+PREVIOUSLY RESOLVED (do not re-verify):
+- [Aspect]: [resolution] (from round [N])
+- [Aspect]: [resolution] (from round [N])
+
+For [DOMAIN] domain. This is {company_name}'s product."
+```
+
+### Template: Circuit Breaker Response to User
+
+```
+We've tried to clarify [aspect] twice but I'm still not sure what you want.
+
+Can you tell me exactly what [aspect] should be?
+
+[Or if you'd rather, we can cancel this and start fresh.]
+```
+
+### Template: Acknowledging Cancel
+
+```
+Got it, I've canceled [task description].
+
+Let me know what you'd like to do instead.
+```
+
+### Template: Confirming Redirect
+
+```
+You'd like to [new task] instead of [original task]. Is that right?
+
+[If yes, I'll proceed with [new task].]
+```
+
+---
+
+## CHECKLIST
+
+When you see HITL signal from agent:
+
+- [ ] Identified signal type (RESOLVED, REQUIRES DIRECTION, LIMIT REACHED, CANCELED, REDIRECT)?
+- [ ] Read user's actual feedback (quoted in agent response)?
+- [ ] Noted what agent already resolved?
+- [ ] Noted escalation round count?
+- [ ] Going to USER for unresolved aspects (not deciding yourself)?
+- [ ] Including USER CLARIFICATION in re-delegation?
+- [ ] Including PREVIOUSLY RESOLVED to prevent re-work?
+
+</protocol>

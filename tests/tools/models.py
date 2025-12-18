@@ -1,11 +1,56 @@
 """Pydantic models for autonomous testing framework tools.
 
-All return types for the 5 essential observation tools.
+Return types for:
+- PM interaction tool (chat_with_pm)
+- Trace analysis tools (get_trace_overview, get_run_details, etc.)
 """
 from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+
+# ============================================================================
+# PM Interaction Models
+# ============================================================================
+
+
+class PMChatResult(BaseModel):
+    """Result of sending a message to PM via chat_with_pm().
+
+    This is the primary interface for Claude Code to interact with the PM
+    and evaluate its behavior in real-time.
+    """
+
+    thread_id: str
+    """Thread ID for conversation continuity and trace lookup."""
+
+    pm_response: str
+    """The PM's response text."""
+
+    is_approval_request: bool = False
+    """Whether PM is requesting user approval (HITL interrupt)."""
+
+    approval_products: list[dict[str, Any]] | None = None
+    """Products awaiting approval if is_approval_request is True."""
+
+    conversation_turn: int
+    """Which turn in the conversation (1-indexed)."""
+
+    response_time_ms: int
+    """PM response time in milliseconds."""
+
+    trace_id: str | None = None
+    """LangSmith trace ID if available (may require brief delay to populate)."""
+
+    trace_url: str | None = None
+    """LangSmith trace URL for browser viewing."""
+
+    workflow_complete: bool = False
+    """Whether the workflow has completed (PM sent completion message)."""
+
+    error: str | None = None
+    """Error message if something went wrong."""
 
 # ============================================================================
 # Execution Tool Models

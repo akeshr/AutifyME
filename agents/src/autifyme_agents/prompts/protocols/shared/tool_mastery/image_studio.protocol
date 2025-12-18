@@ -1,0 +1,380 @@
+<protocol name="image_studio" type="tool_mastery" domain="shared">
+
+## PURPOSE
+
+Master the image_studio tool - professional image processing with Gemini 3 Pro Image.
+Transform user uploads into catalog-ready assets: extract products, generate lifestyle scenes, create hero shots, compose product families.
+
+---
+
+## LABELED IMAGES ARCHITECTURE
+
+The key differentiator of this tool: **labeled images + structured specs = intelligent composition**.
+
+### Image Labels
+
+```json
+{
+  "images": [
+    {"path": "inbox/thread/photo.jpg", "label": "product"},
+    {"path": "inbox/thread/mood.jpg", "label": "style_ref"}
+  ]
+}
+```
+
+Common labels:
+| Label | Purpose |
+|-------|---------|
+| `product` / `source` | Main product to feature |
+| `style_ref` | Lighting/mood reference - match its atmosphere |
+| `background` | Background/scene reference |
+| `product_variant` | Additional product for family shots |
+
+### Label References in Specs
+
+Reference labels using `[label]` syntax in specs:
+
+```json
+{
+  "extraction": {"target_description": "glass jar in [source]"},
+  "lighting": {"special_requirements": "match [style_ref]"},
+  "placement": {"position": "place [product] on [background]"}
+}
+```
+
+**Max 15 images** per call (Gemini constraint).
+
+---
+
+## STRUCTURED SPECS (All Optional)
+
+Use what applies to your use case:
+
+### extraction
+
+```json
+{
+  "target_description": "glass jar on left in [source]",
+  "isolation": "complete",
+  "edge_treatment": "sharp"
+}
+```
+Purpose: Extract product from messy background.
+
+### background
+
+```json
+{
+  "treatment": "transparent | solid_color | scene",
+  "color": "white",
+  "scene_description": "modern kitchen counter"
+}
+```
+Purpose: Set the background after extraction or for compositing.
+
+### lighting
+
+```json
+{
+  "type": "natural_window | studio_3point",
+  "direction": "front | side | top",
+  "special_requirements": "match [style_ref]"
+}
+```
+Purpose: Control lighting style and direction.
+
+### composition
+
+```json
+{
+  "position": "center | [main] center [variant] right",
+  "camera_angle": "slight_top | eye_level | three_quarter",
+  "negative_space": "generous_top | balanced"
+}
+```
+Purpose: Control framing and arrangement.
+
+### scene
+
+```json
+{
+  "environment": "modern_kitchen | outdoor_garden",
+  "style": "match [style_ref]",
+  "mood": "warm_inviting | clean_minimal"
+}
+```
+Purpose: Lifestyle scene generation.
+
+### placement
+
+```json
+{
+  "position": "place [product] on marble counter",
+  "scale": "prominent | natural"
+}
+```
+Purpose: Position product in scene.
+
+### material_treatment
+
+```json
+{
+  "primary_material": "clear_glass | metal | plastic",
+  "rendering_notes": "preserve caustics and internal reflections"
+}
+```
+Purpose: Material-specific rendering instructions.
+
+### enhancement
+
+```json
+{
+  "sharpness": "tack_sharp",
+  "color_treatment": "vibrant | natural | desaturated"
+}
+```
+Purpose: Post-processing enhancements.
+
+### custom_spec
+
+```json
+{
+  "instruction": "dramatic shot with water droplets",
+  "style_reference": "Apple product photography"
+}
+```
+Purpose: Fully open-ended creative direction.
+
+### output
+
+```json
+{
+  "format": "png | jpeg | webp",
+  "size": "1K | 2K",
+  "aspect_ratio": "1:1 | 16:9 | 4:3",
+  "filename": "product_hero"
+}
+```
+Purpose: Output specifications.
+
+---
+
+## USE PATTERNS
+
+### Pattern 1: Extract with Transparent Background
+
+```python
+image_studio(
+    images=[{"path": "inbox/thread/photo.jpg", "label": "source"}],
+    extraction={"target_description": "glass jar in [source]", "isolation": "complete"},
+    background={"treatment": "transparent"},
+    material_treatment={"primary_material": "clear_glass"}
+)
+```
+Result: Clean extracted jar, transparent PNG, caustics preserved.
+
+### Pattern 2: Extract with White Background
+
+```python
+image_studio(
+    images=[{"path": "inbox/thread/photo.jpg", "label": "source"}],
+    extraction={"target_description": "product in [source]"},
+    background={"treatment": "solid_color", "color": "white"}
+)
+```
+Result: Product on pure white background.
+
+### Pattern 3: Lifestyle Scene with Style Reference
+
+```python
+image_studio(
+    images=[
+        {"path": "inbox/t/product.jpg", "label": "product"},
+        {"path": "inbox/t/mood.jpg", "label": "style_ref"}
+    ],
+    scene={"environment": "modern kitchen", "style": "match [style_ref]"},
+    placement={"position": "place [product] on counter"},
+    lighting={"type": "natural_window", "special_requirements": "match [style_ref]"}
+)
+```
+Result: Product in kitchen matching reference mood/lighting.
+
+### Pattern 4: Product Family Composition
+
+```python
+image_studio(
+    images=[
+        {"path": "pending/t/jar_500ml.png", "label": "main"},
+        {"path": "pending/t/jar_1L.png", "label": "variant"}
+    ],
+    composition={"position": "[main] center front, [variant] right behind"},
+    background={"treatment": "solid_color", "color": "white"}
+)
+```
+Result: Family shot with main product prominent, variant supporting.
+
+### Pattern 5: Hero Shot Enhancement
+
+```python
+image_studio(
+    images=[{"path": "inbox/thread/photo.jpg", "label": "source"}],
+    extraction={"target_description": "product in [source]"},
+    background={"treatment": "solid_color", "color": "#f5f5f5"},
+    lighting={"type": "studio_3point", "direction": "front"},
+    enhancement={"sharpness": "tack_sharp"},
+    material_treatment={"primary_material": "clear_glass", "rendering_notes": "edge definition"}
+)
+```
+Result: Professional catalog-ready hero shot.
+
+---
+
+## WORKFLOW INTEGRATION
+
+### Complete Pattern: Upload to Catalog
+
+```
+1. view_image (diagnose)
+   - Assess quality, identify issues
+   - Understand what needs processing
+
+2. image_studio (process)
+   - Apply appropriate specs
+   - Returns storage_path in pending/
+
+3. view_image (verify)
+   - Check output quality
+   - Verify extraction/composition
+
+4. write_data (catalog)
+   - Create asset record with storage_path
+   - Link to product via junction table
+```
+
+### Storage Path Flow
+
+```
+User upload -> inbox/{thread_id}/filename.jpg
+     |
+     v
+image_studio processing
+     |
+     v
+Output -> pending/{thread_id}/generated.png
+     |
+     v
+write_data creates asset with storage_url
+     |
+     v
+Asset linked to product via product_assets junction
+```
+
+---
+
+## OUTPUT STRUCTURE
+
+### Success
+
+```json
+{
+  "success": true,
+  "storage_path": "pending/thread-123/20241217_studio_abc12345.png",
+  "local_path": "/tmp/media_downloads/20241217_studio_abc12345.png",
+  "metadata": {
+    "width": 1024,
+    "height": 1024,
+    "format": "png",
+    "size_bytes": 245678,
+    "aspect_ratio": "1024:1024"
+  },
+  "warnings": []
+}
+```
+
+Key field: `storage_path` - use this for creating asset records.
+
+### Error
+
+```json
+{
+  "success": false,
+  "error": "Failed to load any images",
+  "error_code": "FILE_NOT_FOUND",
+  "warnings": ["Attempted paths: [...]"],
+  "next_steps": [
+    "Verify file paths exist in storage",
+    "Check if paths were copied correctly",
+    "Use view_image tool first to confirm path works"
+  ]
+}
+```
+
+---
+
+## ANTI-PATTERNS
+
+### Anti-Pattern 1: No view_image Before Processing
+
+```
+WRONG:
+Directly call image_studio without seeing the input
+
+CORRECT:
+1. view_image to assess input quality
+2. image_studio with appropriate specs
+3. view_image to verify output
+```
+
+### Anti-Pattern 2: Missing Material Treatment for Glass/Metal
+
+```
+WRONG:
+image_studio(images=[...], extraction={...})
+# Glass looks flat, no caustics
+
+CORRECT:
+image_studio(
+    images=[...],
+    extraction={...},
+    material_treatment={"primary_material": "clear_glass", "rendering_notes": "preserve caustics"}
+)
+```
+
+### Anti-Pattern 3: Simple View When Processing Needed
+
+```
+WRONG:
+Use image_studio just to look at an image
+
+CORRECT:
+Use view_image for viewing
+Use image_studio only when transformation needed
+```
+
+### Anti-Pattern 4: Ignoring storage_path
+
+```
+WRONG:
+Call image_studio but not use storage_path for write_data
+
+CORRECT:
+Capture storage_path from output
+Use it when creating asset record:
+write_data(..., data={"storage_url": storage_path, ...})
+```
+
+---
+
+## BEFORE image_studio
+
+1. **view_image**: See what you're working with
+2. **Check storage**: Verify image path exists (inbox/ or pending/)
+3. **Identify material**: Glass? Metal? Plastic? (affects rendering)
+
+## AFTER image_studio
+
+1. **view_image**: Verify output quality
+2. **write_data**: Create asset record with storage_path
+3. **Link to product**: Create product_assets junction record
+
+</protocol>

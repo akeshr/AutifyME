@@ -1,106 +1,135 @@
 ---
 name: autonomous-testing
-description: Execute autonomous testing where AI monitors PM behavior and triggers debugging when issues arise
+description: Execute autonomous testing where AI monitors PM behavior and triggers debugging when issues arise (project)
 ---
 
 # Autonomous Testing
 
 ## Your Role
 
-**AI monitors AI, you debug root causes.**
+**You ARE the intelligent tester.** You interact with the PM like a real user, evaluate each response in real-time, and trigger deep analysis when issues arise.
 
-AI (gpt-4.1-nano) acts as real user, reads PM messages, responds contextually (answers questions, approves/rejects), and triggers debug mode when PM violates architecture (doesn't call save_product_family, gets stuck, repeats).
+No external AI monitors - you understand the architecture, you know what violations look like, you reason about quality.
 
-## Workflow
+## Core Workflow
 
-**1. Execute Test**
+**1. Interact with PM**
 ```python
-from tests.tools import intelligent_execute_scenario
+from tests.tools import chat_with_pm
 
-result = intelligent_execute_scenario(
-    scenario_id="user scenario or request",
-    media_path="path/to/image.jpg",  # optional
-    max_turns=10
+# Start conversation
+result = chat_with_pm(
+    message="Catalog these sneakers for $79.99",
+    media_path="test_images/sneaker.jpg"  # optional
 )
+
+# Evaluate response
+print(f"PM Response: {result.pm_response}")
+print(f"Approval Request: {result.is_approval_request}")
+print(f"Turn: {result.conversation_turn}")
 ```
 
-**2. Check Result**
+**2. Evaluate Each Response**
+
+As you receive each response, evaluate:
+- **Intent understanding**: Did PM correctly understand what user wants?
+- **Routing decision**: Did PM delegate to appropriate specialist?
+- **Response quality**: Is the response helpful and accurate?
+- **Architectural compliance**: Does PM follow HITL protocol?
+
+**3. Continue Conversation**
 ```python
-if result.success:
-    print(f"Success in {result.execution_time_seconds}s")
-    print(f"HITL: {result.interrupt_occurred}")
-    print(f"Trace: {result.trace_url}")
-else:
-    print(f"Debug triggered: {result.errors[0]}")
-    print(f"Trace: {result.trace_url}")
-    # Proceed to analysis
+# PM asks clarifying question
+result = chat_with_pm("It's a Nike Air Max, size 10", thread_id=result.thread_id)
+
+# PM requests approval
+result = chat_with_pm("Approved", thread_id=result.thread_id)
+
+# Check completion
+if result.workflow_complete:
+    print("Workflow completed successfully")
 ```
 
-**3. Analyze Trace (When Debug Triggered)**
+**4. Deep Analysis (When Issues Detected)**
 
-Always start with Level 0 (overview), then drill Level 1 (details) only for failures:
-
+Use trace analysis when you detect problems:
 ```python
-from tests.tools import get_trace_overview, get_llm_trace_tree
+from tests.tools import get_trace_overview, get_llm_trace_tree, get_run_details
 
-# Level 0: Check tool calls (~500 tokens)
+# Level 0: Overview (~500 tokens)
 overview = get_trace_overview(result.trace_id)
 
-def find_tool(node, tool_name):
-    if tool_name in node.name:
-        return True
-    return any(find_tool(c, tool_name) for c in node.children)
+# Find failures
+def find_issues(node, issues=[]):
+    if node.status == "error":
+        issues.append(f"{node.name}: {node.error}")
+    for child in node.children:
+        find_issues(child, issues)
+    return issues
 
-if not find_tool(overview.run_tree[0], "save_product_family"):
-    print("Root cause: PM never called save_product_family")
-
-# Level 1: Check PM reasoning (~2-5k tokens)
+# Level 1: LLM reasoning (~2-5k tokens)
 llm_tree = get_llm_trace_tree(result.trace_id)
 for node in llm_tree.llm_tree:
     if "project_manager" in node.agent_name.lower():
-        print("PM System Prompt (excerpt):", node.system_prompt[:300])
-        print("PM Output:", node.assistant_output)
+        print("PM reasoning:", node.assistant_output)
 ```
 
-**4. Fix Root Cause**
+**5. Fix and Validate**
 
-Common issues:
-- **PM didn't call save_product_family**: Update PM prompt with explicit tool calling example
-- **PM stuck in loop**: Add termination condition to PM prompt
-- **Tool configuration issue**: Verify save_product_family in pm_tools, check interrupt_on config
-
-**5. Validate Fix**
-
-Re-run same test after fix:
+After fixing issues:
 ```python
-result2 = intelligent_execute_scenario(scenario_id, media_path)
-assert result2.success, f"Still failing: {result2.errors}"
-assert result2.interrupt_occurred, "PM should trigger HITL"
+# Re-run same scenario
+result = chat_with_pm("Catalog these sneakers for $79.99", media_path="test_images/sneaker.jpg")
+# Evaluate: Is the issue fixed?
 ```
+
+## What to Evaluate
+
+| Aspect | What to Check |
+|--------|---------------|
+| **Intent** | Did PM understand the request correctly? |
+| **Routing** | Right specialist for the task? |
+| **HITL** | Approval requested when required? |
+| **Quality** | Response helpful, accurate, complete? |
+| **Completion** | Workflow finished properly? |
+
+## Architectural Violations to Catch
+
+- **PM says "complete" but didn't persist**: Check trace for save_product tool call
+- **PM stuck/silent**: Conversation stalled, no meaningful response
+- **PM looping**: Repeating same response without progress
+- **Skipped HITL**: PM saved without user approval
+- **Wrong specialist**: Task delegated to incorrect domain expert
 
 ## Available Tools
 
-- `intelligent_execute_scenario(scenario_id, media_path, max_turns)` - Execute test with AI monitoring
-- `get_trace_overview(trace_id)` - Level 0: Check tool calls, failures (~500 tokens)
-- `get_llm_trace_tree(trace_id)` - Level 1: LLM reasoning, prompts (~2-5k tokens)
-- `get_run_details(run_id)` - Level 1: Drill into specific run (~1,500 tokens)
-- `get_workflow_story(trace_ids)` - Multi-trace analysis (~500 tokens/trace)
-- `list_recent_tests(limit)` - Test execution history
+| Tool | Purpose | Tokens |
+|------|---------|--------|
+| `chat_with_pm(message, thread_id?, media_path?)` | Send message, get response | N/A |
+| `get_trace_overview(trace_id)` | Hierarchical trace structure | ~500 |
+| `get_run_details(run_id)` | Specific run inputs/outputs | ~1,500 |
+| `get_llm_trace_tree(trace_id)` | LLM reasoning and prompts | ~2-5k |
+| `get_workflow_story(trace_ids)` | Multi-trace HITL analysis | ~500/trace |
+
+## Testing Protocol
+
+1. **Start with a scenario** - Real user request with clear intent
+2. **Evaluate first response** - Did PM understand? Right direction?
+3. **Continue naturally** - Respond as user would to PM's questions/requests
+4. **Approve or reject** - When HITL requested, make informed decision
+5. **Verify completion** - Check workflow_complete, validate in database
+6. **Analyze if issues** - Use trace tools for deep debugging
 
 ## Success Criteria
 
-✅ Always start with `get_trace_overview()` before drilling deeper
-✅ When debug triggered, analyze trace → identify root cause → fix → re-test
-✅ Validate database persistence with Supabase MCP after successful tests
-✅ Track progress with `list_recent_tests()`
+- PM correctly understands user intent
+- PM routes to appropriate specialists
+- PM requests approval before persisting (HITL compliance)
+- Workflow completes successfully
+- Data persisted correctly (verify with Supabase MCP)
 
 ## Related Skills
 
-- **Deep trace analysis:** Use `workflow-evaluation` skill for systematic node-by-node analysis
-- **Prompt fixes:** Use `prompt-engineering` skill when updating PM/specialist prompts
-- **Diagnosing issues:** Use `agent-improvement` skill for gap analysis
-
-## References
-
-- **Architecture**: `docs/architecture/testing/AUTONOMOUS_TESTING_FRAMEWORK.md`
-- **Implementation**: `tests/tools/intelligent_execution.py`
+- **Deep trace analysis**: Use `workflow-evaluation` for systematic investigation
+- **Prompt fixes**: Use `prompt-engineering` when updating prompts
+- **Agent diagnosis**: Use `agent-improvement` for gap analysis
