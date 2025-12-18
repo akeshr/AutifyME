@@ -5,6 +5,45 @@ description: Create domain specialists for AutifyME using SubAgent pattern with 
 
 # Specialist Creation Guide
 
+## Action Sequence (MANDATORY)
+
+**When this skill is invoked, you MUST execute these steps in order:**
+
+### Step 1: Domain Coherence Check
+Before creating anything, verify this specialist makes sense:
+- [ ] Single domain ownership clear
+- [ ] No overlap with existing specialists
+- [ ] Tool scoping defined
+
+### Step 2: Create Specialist Factory
+**WRITE** the factory file using the Write tool:
+```
+Path: agents/src/autifyme_agents/specialists/[domain]_specialist.py
+```
+Use the template below, customizing for the domain.
+
+### Step 3: Create Specialist Prompt
+**WRITE** the prompt file using the Write tool:
+```
+Path: agents/src/autifyme_agents/prompts/specialists/[domain]_specialist.prompt
+```
+Use the `prompt-engineering` skill for prompt structure.
+
+### Step 4: Register with PM
+**EDIT** the project_manager.py to import and add the specialist:
+```
+Path: agents/src/autifyme_agents/workflows/project_manager.py
+```
+Add to imports and subagents list.
+
+### Step 5: Verify
+- Run `uv run ruff check agents/src/autifyme_agents/specialists/`
+- Confirm all files exist
+
+**CRITICAL: Do NOT just show templates. Actually WRITE the files.**
+
+---
+
 ## Architecture Context
 
 **2-Level Hierarchy:** PM -> Specialists -> Tools
@@ -186,13 +225,14 @@ def create_project_manager(storage: StorageInterface):
 - [ ] Tool scoping defined (minimum necessary tables/APIs)
 - [ ] HITL boundary identified (write/external actions?)
 
-**Implementation:**
+**Implementation (use Write/Edit tools for each):**
 
-- [ ] Factory function returns SubAgent spec dict
-- [ ] Prompt file created (use `prompt-engineering` skill)
+- [ ] **WRITE** factory file to `specialists/[domain]_specialist.py`
+- [ ] **WRITE** prompt file to `prompts/specialists/[domain]_specialist.prompt`
+- [ ] **EDIT** PM to import and register specialist
+- [ ] **RUN** `uv run ruff check` to verify syntax
 - [ ] Tools scoped to domain tables only
 - [ ] Description enables correct PM routing
-- [ ] Registered in PM's subagents list
 
 ---
 

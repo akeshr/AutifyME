@@ -1,9 +1,40 @@
 ---
 name: prompt-engineering
-description: Design world-class prompts using domain expert voice, professional vocabulary, and versatility through principles. Frame agents as top 0.01% practitioners, not AI assistants. (project) (project)
+description: Design world-class prompts using domain expert voice, professional vocabulary, and versatility through principles. Frame agents as top 0.01% practitioners, not AI assistants.
 ---
 
 # Prompt Engineering Standards
+
+## Action Sequence (MANDATORY)
+
+**When this skill is invoked to CREATE/UPDATE a prompt, you MUST execute these steps:**
+
+### Step 1: Determine Prompt Type
+- **Agent Prompt**: Identity, capabilities, tools, examples
+- **Protocol**: Domain-specific reasoning patterns (loaded dynamically)
+
+### Step 2: Create/Update Prompt File
+**WRITE** the prompt file using the Write tool:
+```
+Agent Prompts: agents/src/autifyme_agents/prompts/[role]/[name].prompt
+Protocols: agents/src/autifyme_agents/prompts/protocols/[domain]/[name].protocol
+```
+
+### Step 3: Validate Structure
+Ensure prompt contains required sections:
+- [ ] `<background_information>` with identity
+- [ ] `<available_tools>` with tool mastery
+- [ ] `<instructions>` with process framework
+- [ ] `<examples>` with 2-4 complex examples
+- [ ] `<output_format>` with completion rules
+
+### Step 4: Verify
+- Check prompt loads: `load_prompt("[path]")`
+- Review for ruthless conciseness
+
+**CRITICAL: Do NOT just discuss prompt design. Actually WRITE the prompt file.**
+
+---
 
 ## The Prime Directive
 

@@ -5,6 +5,36 @@ description: Build ATOMIC tools using StructuredTool with Pydantic schemas. Use 
 
 # Tool Development Standards
 
+## Action Sequence (MANDATORY)
+
+**When this skill is invoked to CREATE a tool, you MUST execute these steps:**
+
+### Step 1: Design Review
+- [ ] Tool does ONE thing (ATOMIC)
+- [ ] Clear distinction from existing tools
+- [ ] Factory pattern if access control needed
+
+### Step 2: Create Tool File
+**WRITE** the tool file using the Write tool:
+```
+Path: agents/src/autifyme_agents/tools/[domain]/[tool_name].py
+```
+Use the template below.
+
+### Step 3: Export from Package
+**EDIT** the `__init__.py` to export the tool:
+```
+Path: agents/src/autifyme_agents/tools/[domain]/__init__.py
+```
+
+### Step 4: Verify
+- Run `uv run ruff check agents/src/autifyme_agents/tools/`
+- Run `uv run mypy agents/src/autifyme_agents/tools/[domain]/[tool_name].py`
+
+**CRITICAL: Do NOT just show templates. Actually WRITE the files.**
+
+---
+
 ## Core Principles
 
 **ATOMIC Tools:** Each tool does ONE thing powerfully and completely.
