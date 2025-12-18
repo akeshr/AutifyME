@@ -90,7 +90,7 @@ MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
 MAX_DIMENSION = 2048
 JPEG_QUALITY = 85
-GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
+GEMINI_3_IMAGE_MODEL = "gemini-2.5-flash-image"
 
 # Professional product photography system prompt
 TOOL_SYSTEM_PROMPT = """You are a master commercial photographer whose work appears in Vogue, Apple campaigns, and luxury brand catalogs.

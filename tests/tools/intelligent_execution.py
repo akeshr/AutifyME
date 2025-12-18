@@ -178,9 +178,8 @@ CRITICAL: Stay consistent with your initial request "{initial_request}". Never c
 
     try:
         llm = ChatGoogleGenerativeAI(
-            model="gemini-3-flash-preview",
-            temperature=1.0,  # Gemini 3 default (below 1.0 may cause looping)
-            thinking_level="low",  # Fast test orchestration
+            model="gemini-2.5-flash-lite",
+            temperature=0,
             max_output_tokens=500,
             response_mime_type="application/json"
         )

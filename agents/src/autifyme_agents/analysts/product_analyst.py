@@ -25,15 +25,15 @@ from autifyme_agents.tools.research_tools import (
 
 
 def _get_analyst_llm() -> BaseChatModel:
-    """Get fast, intelligent LLM for analyst tasks.
+    """Get fast, cheap LLM for analyst tasks.
 
-    Uses Gemini 3 Flash with 'low' thinking for speed + intelligence.
+    Uses Gemini 2.5 Flash Lite with minimal thinking for speed.
     Analysts are latency-sensitive (target <300ms).
     """
     return get_llm(
         provider="google",
-        model="gemini-3-flash-preview",
-        thinking_level="low",  # Fast analysis
+        model="gemini-2.5-flash-lite",
+        temperature=1.0,  # Lower temperature for factual research
         max_retries=3,
     )
 
@@ -44,7 +44,7 @@ def create_product_analyst(
     """Create Product Analyst SubAgent spec.
 
     Args:
-        model: Optional LLM override. Defaults to Gemini 3 Flash.
+        model: Optional LLM override. Defaults to Gemini 2.5 Flash Lite.
 
     Returns:
         SubAgent spec dict for PM's subagents list.
