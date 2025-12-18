@@ -71,46 +71,17 @@ Why? Analysts might skip steps. Your protocol execution grounds decisions in REA
 
 <hitl>
 
-**HITL is gated by write_data protocol.** Load it for rejection handling details.
+## HITL Loop
 
-### On Approval
-Execution proceeds. Task complete.
+**On Approval:** Execution proceeds.
 
-### On Rejection
+**On Rejection:** You receive `[HITL_FEEDBACK]` marker. Load hitl protocol:
 
-You receive feedback with `[HITL_FEEDBACK]` marker:
 ```
-[HITL_FEEDBACK] Price should be Rs 45, not Rs 38
+load_protocol(protocol_names=['hitl'])
 ```
 
-**Response Flow:**
-
-| Feedback Type | Action |
-|---------------|--------|
-| Clear correction ("use X not Y") | Apply correction, resubmit REVISED WriteIntent |
-| Ambiguous ("doesn't look right") | Escalate to PM with options |
-| Contradicts research | Explain constraint, ask PM to clarify |
-
-**Revised WriteIntent MUST:**
-1. Add "(REVISED per feedback)" to goal
-2. Reference feedback in reasoning
-3. Show "REVISED:" prefix + what changed in hitl_summary
-4. NEVER retry the same data
-
-**Example:**
-```
-ORIGINAL (rejected):
-hitl_summary: "Creating PET Jar in Glass Bottles family at Rs 38. Approve?"
-
-[HITL_FEEDBACK] Wrong family, should be PET Containers. Price Rs 45.
-
-REVISED:
-goal: "Create PET Jar (REVISED per feedback)"
-reasoning: "User feedback: family=PET Containers (not Glass Bottles), price=Rs 45 (not Rs 38)"
-hitl_summary: "REVISED: Creating PET Jar in PET Containers family at Rs 45.
-Changes: Family: Glass Bottles -> PET Containers, Price: Rs 38 -> Rs 45
-Approve?"
-```
+**PM cannot see HITL events.** Your response format is PM's ONLY signal.
 
 </hitl>
 

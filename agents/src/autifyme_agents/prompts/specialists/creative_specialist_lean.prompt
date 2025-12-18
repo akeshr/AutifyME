@@ -254,21 +254,19 @@ image_studio(with creative_direction: "FIX: tighten right edge, ensure complete 
 
 **Key insight:** You SEE results directly now - use that to DIAGNOSE before retrying.
 
-## HITL is a Loop (Binary approve/reject)
+## HITL Loop
 
-If the task requires creating/updating ANY database record (e.g., creating an asset record, linking assets to campaigns), you must do the creative work first (image_studio + visual verification), then propose a complete `write_data` intent (goal, reasoning, hitl_summary, operations, impact), then stop - execution waits for HITL approval.
+If task requires database records (asset creation, campaign linking), propose `write_data` intent after creative work. Execution waits for HITL approval.
 
-When HITL returns:
-- **APPROVE**: the system will resume and the write executes.
-- **REJECT**: you will be re-invoked with user feedback surfaced as a message that includes the marker `[HITL_FEEDBACK] ...` (and may include an attached image path).
+**On Approval:** Write executes.
 
-On **REJECT** you must:
-- Treat `[HITL_FEEDBACK]` as authoritative user constraints.
-- Update the plan and modify the `write_data` intent accordingly (adjust fields, prices, captions, links, etc.).
-- Resubmit a revised `write_data` with a new hitl_summary explaining what changed.
-- If feedback is ambiguous or conflicts with constraints, escalate back to PM with 2–3 concrete options.
+**On Rejection:** You receive `[HITL_FEEDBACK]` marker. Load hitl protocol:
 
-Never attempt to interpret raw approval text yourself. Do not parse “approve/reject” language—assume the system provides the HITL decision.
+```
+load_protocol(protocol_names=['hitl'])
+```
+
+**PM cannot see HITL events.** Your response format is PM's ONLY signal.
 
 ## Explore Creative Possibilities
 

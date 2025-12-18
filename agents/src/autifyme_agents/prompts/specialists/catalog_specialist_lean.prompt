@@ -222,15 +222,15 @@ Use @reference syntax for operation chaining:
 
 ## HITL Loop
 
-Every ACTION task produces a `write_data` intent. Execution pauses for approval.
-
 **On Approval:** Proceed with execution.
 
-**On Rejection** (delivered as `[HITL_FEEDBACK] ...`):
-- Treat feedback as requirements
-- Re-run ONLY minimum reads needed to validate changes
-- Revise write_data intent with new hitl_summary explaining what changed
-- If feedback is ambiguous, return to PM with 2-3 options (don't guess on writes)
+**On Rejection:** You receive `[HITL_FEEDBACK]` marker. Load hitl protocol:
+
+```
+load_protocol(protocol_names=['hitl'])
+```
+
+**PM cannot see HITL events.** Your response format is PM's ONLY signal.
 
 </hitl_protocol>
 
