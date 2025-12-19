@@ -1,0 +1,474 @@
+<protocol name="generate_rich_output" type="tool_mastery" domain="shared">
+
+## PURPOSE
+
+Master the generate_rich_output tool - transform complex structured data into branded visual HTML pages.
+Use when text output would be insufficient: large datasets, hierarchical structures, verification needs, comparisons.
+
+The core question: **"Can the user understand and verify this information as text?"**
+- No -> Use rich output
+- Yes -> Use text
+
+---
+
+## DECISION FRAMEWORK
+
+### Use Rich Output When
+
+| Scenario | Why Rich Output |
+|----------|-----------------|
+| 5+ items requiring verification | Text walls are unreadable |
+| Hierarchical/nested data | Structure needs visual hierarchy |
+| Multiple validation errors (3+) | Error cards easier than lists |
+| Large query results (10+) | Browsable view > truncated text |
+| Comparisons between entities | Side-by-side tables needed |
+| Data with images | Images need visual display |
+
+### Stay with Text When
+
+| Scenario | Why Text |
+|----------|----------|
+| Simple confirmations | "Created 1 product" is clear |
+| Short lists (< 5 items) | Easy to read inline |
+| Conversational responses | Natural flow matters |
+| Single error with clear message | No visual overhead needed |
+
+### Edge Cases (Judgment Required)
+
+| Scenario | Decision | Reasoning |
+|----------|----------|-----------|
+| 5 items, simple fields | TEXT | Borderline - text is sufficient |
+| 5 items, with images | RICH | Images need visual display |
+| 3 errors, simple | TEXT | Few enough to list inline |
+| 3 errors, complex (nested) | RICH | Nested details need structure |
+| Hierarchy, 2 levels | TEXT | Simple tree can be shown inline |
+| Hierarchy, 3+ levels | RICH | Deep nesting needs visual |
+| Comparison, 2 items | TEXT | Side-by-side text works |
+| Comparison, 3+ items | RICH | Table needed for clarity |
+
+---
+
+## FIELD HINTS ARCHITECTURE
+
+The key differentiator: **field_hints enable domain-agnostic rendering with smart labels**.
+
+Without field_hints, the LLM converts snake_case to Title Case (e.g., "sku_code" -> "Sku Code").
+With field_hints, you control exactly how fields appear.
+
+### FieldHint Structure
+
+```json
+{
+  "field_hints": {
+    "sku_code": {"label": "SKU", "format": "code"},
+    "unit_price": {"label": "Price", "format": "currency", "currency": "USD"},
+    "moq": {"label": "Min Order Qty", "format": "number"},
+    "created_at": {"label": "Created", "format": "date"},
+    "product_url": {"label": "Link", "format": "url"},
+    "thumbnail": {"label": "Image", "format": "image"}
+  }
+}
+```
+
+### Format Types
+
+| Format | Rendering |
+|--------|-----------|
+| `text` | Default - plain text |
+| `code` | Monospace font, subtle background |
+| `currency` | Currency symbol, 2 decimals, right-aligned |
+| `number` | Thousands separators |
+| `date` | Human-readable format |
+| `url` | Clickable link |
+| `image` | Render as <img> |
+
+---
+
+## PARAMETERS
+
+### Required Parameters
+
+```python
+generate_rich_output(
+    title="New Product Line - Preview",           # Page title (appears in header, OG tags)
+    data=[{"sku": "ABC-001", "name": "..."}],    # Structured data (dict or list)
+    context="Preview for verification",           # WHY this page exists
+    company_profile=self.company_profile,         # From agent's middleware context
+)
+```
+
+### Optional Parameters
+
+```python
+generate_rich_output(
+    # ... required ...
+    field_hints={                                 # Human-friendly labels
+        "sku_code": {"label": "SKU", "format": "code"},
+        "unit_price": {"label": "Price", "format": "currency"}
+    },
+    images=["https://..."],                       # Image URLs (first = OG preview)
+    layout_hint="grid",                           # Layout suggestion: grid|table|hierarchy|comparison|timeline
+    highlight_fields=["price", "status"],         # Fields to emphasize visually
+    ttl_days=30,                                  # Days until expiration (0 = permanent)
+)
+```
+
+---
+
+## USE PATTERNS
+
+### Pattern 1: Product Creation Preview
+
+```python
+generate_rich_output(
+    title="New Product Line - Preview",
+    data=[
+        {"sku_code": "ABC-001", "name": "Standard Black", "unit_price": 499.00, "status": "active"},
+        {"sku_code": "ABC-002", "name": "Standard Red", "unit_price": 529.00, "status": "active"},
+        {"sku_code": "ABC-003", "name": "Pro Black", "unit_price": 799.00, "status": "draft"},
+    ],
+    context="Preview of products to be created. User needs to verify structure and details before approval.",
+    company_profile=self.company_profile,
+    field_hints={
+        "sku_code": {"label": "SKU", "format": "code"},
+        "unit_price": {"label": "Price", "format": "currency"},
+        "status": {"label": "Status", "format": "text"}
+    },
+    highlight_fields=["unit_price", "status"]
+)
+```
+
+Response pattern:
+```
+Here's the new product line I've prepared:
+
+**3 items | $499 - $799**
+
+https://supabase.../outputs/abc123.html
+
+Please review the structure and details. Let me know if everything looks correct.
+```
+
+### Pattern 2: Validation Errors
+
+```python
+generate_rich_output(
+    title="Validation Issues Found",
+    data={
+        "errors": [
+            {"field": "sku", "message": "SKU already exists", "suggestion": "Use ABC-001-V2"},
+            {"field": "price", "message": "Price below minimum", "suggestion": "Set to at least $99"},
+            {"field": "category", "message": "Category not found", "suggestion": "Create category first"}
+        ]
+    },
+    context="Validation errors requiring user resolution before operation can proceed.",
+    company_profile=self.company_profile,
+    layout_hint="table"
+)
+```
+
+Response pattern:
+```
+I found 3 issues that need resolution:
+
+https://supabase.../outputs/def456.html
+
+Please review each issue and let me know how to proceed.
+```
+
+### Pattern 3: Query Results
+
+```python
+generate_rich_output(
+    title="Search Results: Glass Jars",
+    data=products,  # List of 25 products
+    context="Search results for user's query. User can review and select items for further action.",
+    company_profile=self.company_profile,
+    field_hints={
+        "sku": {"label": "SKU", "format": "code"},
+        "name": {"label": "Product Name", "format": "text"},
+        "unit_price": {"label": "Price", "format": "currency"},
+        "stock_quantity": {"label": "Stock", "format": "number"}
+    },
+    layout_hint="table"
+)
+```
+
+### Pattern 4: Hierarchical Data (Category Tree)
+
+```python
+generate_rich_output(
+    title="Category Structure",
+    data={
+        "name": "Packaging",
+        "children": [
+            {"name": "Glass Containers", "children": [
+                {"name": "Jars"},
+                {"name": "Bottles"}
+            ]},
+            {"name": "Plastic Containers", "children": [
+                {"name": "Tubs"},
+                {"name": "Bottles"}
+            ]}
+        ]
+    },
+    context="Category hierarchy for review. User requested to see the full structure.",
+    company_profile=self.company_profile,
+    layout_hint="hierarchy"
+)
+```
+
+### Pattern 5: Comparison View
+
+```python
+generate_rich_output(
+    title="Product Comparison",
+    data=[
+        {"name": "Standard", "price": 499, "capacity": "500ml", "material": "Glass"},
+        {"name": "Pro", "price": 799, "capacity": "1L", "material": "Glass"},
+        {"name": "Elite", "price": 1299, "capacity": "2L", "material": "Crystal"}
+    ],
+    context="Side-by-side comparison requested by user.",
+    company_profile=self.company_profile,
+    field_hints={
+        "price": {"label": "Price", "format": "currency"}
+    },
+    layout_hint="comparison"
+)
+```
+
+### Pattern 6: With Images
+
+```python
+generate_rich_output(
+    title="Product Family Overview",
+    data=products_with_images,
+    context="Product family overview with visual reference.",
+    company_profile=self.company_profile,
+    images=[
+        "https://storage.../product_hero.jpg",
+        "https://storage.../variant_1.jpg"
+    ],
+    layout_hint="grid"
+)
+```
+
+---
+
+## OUTPUT STRUCTURE
+
+### Success
+
+```json
+{
+  "success": true,
+  "url": "https://project.supabase.co/storage/v1/object/public/assets/outputs/20251219_123456_abc12345.html",
+  "filename": "20251219_123456_abc12345.html",
+  "summary": "12 items | $499 - $1,299",
+  "expires_at": "2026-01-18T00:00:00Z",
+  "error": null
+}
+```
+
+Key fields:
+- `url` - Public URL to share with user
+- `summary` - Text summary for chat context
+- `expires_at` - When the page will be deleted
+
+### Error
+
+```json
+{
+  "success": false,
+  "url": null,
+  "filename": null,
+  "summary": "",
+  "expires_at": null,
+  "error": "HTML generation failed: timeout"
+}
+```
+
+On error, fall back to text summary.
+
+---
+
+## RESPONSE PATTERN
+
+Always include BOTH the URL AND summary in your response:
+
+```
+Here's the [what] I've prepared:
+
+[Summary from tool - e.g., "12 items | $499-$1,299"]
+
+[URL from tool]
+
+[What you want user to do next]
+```
+
+### Example Responses
+
+**Creation preview:**
+```
+Here's the new product line I've prepared:
+
+**3 categories, 12 items | $499 - $1,399**
+
+https://supabase.../outputs/abc123.html
+
+Please review the structure and details. Let me know if everything looks correct or if you'd like any changes.
+```
+
+**Validation errors:**
+```
+I found 5 issues that need resolution:
+
+https://supabase.../outputs/def456.html
+
+Please review each issue and let me know how to proceed.
+```
+
+**Query results:**
+```
+Found 47 products matching "glass jar":
+
+https://supabase.../outputs/ghi789.html
+
+Would you like me to filter these further or take action on specific items?
+```
+
+---
+
+## ANTI-PATTERNS
+
+### Anti-Pattern 1: Rich Output for Simple Confirmations
+
+```
+WRONG:
+User: "Create one product"
+Agent: generate_rich_output(data=[{single_product}], ...)
+
+CORRECT:
+Agent: "Created the product: Red Variant at $799. Ready to proceed?"
+```
+
+### Anti-Pattern 2: No Field Hints for Domain Data
+
+```
+WRONG:
+generate_rich_output(data=[{"sku_code": "..."}], ...)
+# Renders as "Sku Code" instead of "SKU"
+
+CORRECT:
+generate_rich_output(
+    data=[{"sku_code": "..."}],
+    field_hints={"sku_code": {"label": "SKU", "format": "code"}},
+    ...
+)
+```
+
+### Anti-Pattern 3: URL Without Summary
+
+```
+WRONG:
+"Here's the preview: https://..."
+
+CORRECT:
+"Here's the preview:
+
+**12 items | $499 - $1,299**
+
+https://..."
+```
+
+### Anti-Pattern 4: Missing company_profile
+
+```
+WRONG:
+generate_rich_output(data=..., context=..., company_profile=None)
+# Output won't be branded correctly
+
+CORRECT:
+generate_rich_output(..., company_profile=self.company_profile)
+# Always pass from agent's middleware context
+```
+
+### Anti-Pattern 5: Using for Non-Structured Data
+
+```
+WRONG:
+generate_rich_output(
+    title="Message",
+    data="Here's some text explanation...",  # Plain string
+    ...
+)
+
+CORRECT:
+# Just respond with text directly
+"Here's the explanation: ..."
+```
+
+---
+
+## BEFORE generate_rich_output
+
+1. **Evaluate complexity**: Is text truly insufficient?
+2. **Get company_profile**: Ensure you have it from middleware context
+3. **Prepare field_hints**: Map domain fields to human labels
+4. **Validate images**: Ensure all image URLs are HTTPS
+
+## AFTER generate_rich_output
+
+1. **Check success**: Handle error case with text fallback
+2. **Include summary**: Never just send URL
+3. **Prompt action**: Tell user what to do next
+4. **Track expiration**: Note if TTL is short
+
+---
+
+## COMPANY BRANDING
+
+The output is automatically branded for the client company (NOT AutifyME).
+
+From `company_profile`:
+- **name** -> Appears in header
+- **brand_voice** -> Influences visual tone
+- **industry** -> Influences color palette
+- **style_preferences** -> Influences design style
+
+Example: "Pavisha Packaging" with brand_voice="Professional, innovative, eco-conscious" gets clean lines, earth tones, professional typography.
+
+---
+
+## INTEGRATION WITH WORKFLOW
+
+### For Catalog Specialist
+
+```python
+# After preparing data for creation
+if len(items) >= 5:
+    result = generate_rich_output(
+        title="Products to Create",
+        data=items,
+        context="Preview for HITL approval",
+        company_profile=self.company_profile,
+        field_hints={...}
+    )
+    # Include URL in WriteIntent hitl_summary
+```
+
+### For PM
+
+```python
+# When presenting complex results
+if complex_output:
+    result = generate_rich_output(
+        title="Operation Summary",
+        data=results,
+        context="Summary of completed operations",
+        company_profile=self.base_context.company_profile,
+        field_hints={...}
+    )
+```
+
+</protocol>
