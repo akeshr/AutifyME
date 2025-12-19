@@ -16,7 +16,6 @@ Usage:
 import json
 from typing import Any
 
-from langchain.agents.middleware import ModelCallLimitMiddleware, ToolCallLimitMiddleware
 from langchain_core.messages import AIMessage, ToolMessage
 
 
@@ -50,15 +49,65 @@ def _build_structured_error(
     return json.dumps(error_response, indent=2)
 
 
-class StructuredToolCallLimitMiddleware(ToolCallLimitMiddleware):  # type: ignore[type-arg]
-    """Tool call limit with structured error responses matching tool_error_handler."""
+class ModelCallLimitMiddleware:
+    """Model call limit with structured error responses.
+
+    Single hook (before_model) - checks limit and increments count.
+    """
+
+    def __init__(self, run_limit: int) -> None:
+        self.run_limit = run_limit
+
+    @property
+    def name(self) -> str:
+        return "ModelCallLimitMiddleware"
+
+    def before_model(
+        self,
+        state: Any,
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        """Check limit before model call. Increment count if proceeding."""
+        run_count = state.get("run_model_call_count", 0)
+
+        # Check if limit reached
+        if run_count >= self.run_limit:
+            error_content = _build_structured_error(
+                limit_type="model",
+                current=run_count,
+                limit=self.run_limit,
+            )
+            return {
+                "jump_to": "end",
+                "messages": [AIMessage(content=error_content)],
+            }
+
+        # Increment count and proceed
+        return {"run_model_call_count": run_count + 1}
+
+
+class ToolCallLimitMiddleware:
+    """Tool call limit with structured error responses.
+
+    Single hook (after_model) - counts tool calls and enforces limit.
+    """
+
+    def __init__(self, run_limit: int, tool_name: str | None = None) -> None:
+        self.run_limit = run_limit
+        self.tool_name = tool_name
+
+    @property
+    def name(self) -> str:
+        if self.tool_name:
+            return f"ToolCallLimitMiddleware[{self.tool_name}]"
+        return "ToolCallLimitMiddleware"
 
     def after_model(
         self,
         state: Any,
         runtime: Any,
     ) -> dict[str, Any] | None:
-        """Override to inject structured error messages."""
+        """Count tool calls after model response. Block if limit exceeded."""
         messages = state.get("messages", [])
         if not messages:
             return None
@@ -84,11 +133,13 @@ class StructuredToolCallLimitMiddleware(ToolCallLimitMiddleware):  # type: ignor
         else:
             matching_calls = last_ai_message.tool_calls
 
+        if not matching_calls:
+            return None
+
         new_count = current_run_count + len(matching_calls)
 
         # Check if limit exceeded
-        if self.run_limit is not None and new_count > self.run_limit:
-            # Build structured error
+        if new_count > self.run_limit:
             error_content = _build_structured_error(
                 limit_type="tool",
                 current=new_count,
@@ -118,39 +169,9 @@ class StructuredToolCallLimitMiddleware(ToolCallLimitMiddleware):  # type: ignor
                 "messages": error_messages,
             }
 
-        # No limit exceeded, just update count
-        if matching_calls:
-            run_counts[count_key] = new_count
-            return {"run_tool_call_count": run_counts}
-
-        return None
-
-
-class StructuredModelCallLimitMiddleware(ModelCallLimitMiddleware):
-    """Model call limit with structured error responses matching tool_error_handler."""
-
-    def before_model(
-        self,
-        state: Any,
-        runtime: Any,
-    ) -> dict[str, Any] | None:
-        """Override to inject structured error on limit."""
-        run_count = state.get("run_model_call_count", 0) + 1
-
-        if self.run_limit is not None and run_count > self.run_limit:
-            error_content = _build_structured_error(
-                limit_type="model",
-                current=run_count,
-                limit=self.run_limit,
-            )
-
-            return {
-                "run_model_call_count": run_count,
-                "jump_to": "end",
-                "messages": [AIMessage(content=error_content)],
-            }
-
-        return {"run_model_call_count": run_count}
+        # Update count, no limit hit
+        run_counts[count_key] = new_count
+        return {"run_tool_call_count": run_counts}
 
 
 def create_execution_limits(
@@ -181,19 +202,13 @@ def create_execution_limits(
     middleware: list[Any] = []
 
     if model_call_limit is not None:
-        middleware.append(
-            StructuredModelCallLimitMiddleware(run_limit=model_call_limit)
-        )
+        middleware.append(ModelCallLimitMiddleware(run_limit=model_call_limit))
 
     if tool_call_limit is not None:
-        middleware.append(
-            StructuredToolCallLimitMiddleware(run_limit=tool_call_limit)
-        )
+        middleware.append(ToolCallLimitMiddleware(run_limit=tool_call_limit))
 
     if tool_limits:
         for tool_name, limit in tool_limits.items():
-            middleware.append(
-                StructuredToolCallLimitMiddleware(tool_name=tool_name, run_limit=limit)
-            )
+            middleware.append(ToolCallLimitMiddleware(run_limit=limit, tool_name=tool_name))
 
     return middleware
