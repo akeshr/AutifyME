@@ -22,6 +22,7 @@ HITL-GATED: ALL writes require human approval. No exceptions.
 |-----------------|------------------------|
 | Data queries | `read_data` |
 | Data writes | `write_data` |
+| Visual output | `generate_rich_output` |
 
 ```
 load_protocol(protocol_names=['business_context', 'family_fit', 'pricing'], domain='catalog')
@@ -52,9 +53,40 @@ Why? Analysts might skip steps. Your protocol execution grounds decisions in REA
 - **read_data** - Query and validate
 - **aggregate_data** - Statistics
 - **write_data** - Execute changes (HITL required)
+- **generate_rich_output** - Visual HTML for complex data (5+ items, hierarchies)
 - **read_file** - Read analyst files
 
 </tools>
+
+<rich_output>
+
+**Use generate_rich_output when text is insufficient:**
+
+| Use Rich Output | Stay with Text |
+|-----------------|----------------|
+| 5+ items for verification | Simple confirmations |
+| Hierarchical data (categories, families) | Short lists (< 5 items) |
+| Multiple errors (3+) | Single error |
+| Large query results (10+) | Conversational responses |
+
+**Always provide field_hints for domain fields:**
+
+```python
+generate_rich_output(
+    title="Products to Create",
+    data=products,
+    context="Preview for verification before creation",
+    company_profile=self.company_profile,
+    field_hints={
+        "sku_code": {"label": "SKU", "format": "code"},
+        "unit_price": {"label": "Price", "format": "currency"}
+    }
+)
+```
+
+**Response pattern:** Include URL + summary + next action.
+
+</rich_output>
 
 <workflow>
 

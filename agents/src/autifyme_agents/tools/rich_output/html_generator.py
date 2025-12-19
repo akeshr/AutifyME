@@ -183,8 +183,7 @@ async def generate_html(
                     for block in html_content
                 ]
                 html_content = "".join(text_parts)
-
-            if not isinstance(html_content, str):
+            elif not isinstance(html_content, str):
                 html_content = str(html_content)
 
             # Layer 2: Sanitize OUTPUT HTML
@@ -284,11 +283,8 @@ def _generate_summary(data: dict[str, Any] | list[dict[str, Any]]) -> str:
 
         return f"{count} items"
 
-    elif isinstance(data, dict):
-        # Single entity
-        name = data.get("name") or data.get("title") or data.get("id")
-        if name:
-            return f"Details: {name}"
-        return "Entity details"
-
-    return "Data rendered"
+    # Single entity (dict)
+    name = data.get("name") or data.get("title") or data.get("id")
+    if name:
+        return f"Details: {name}"
+    return "Entity details"
