@@ -71,7 +71,8 @@ def _build_user_prompt(
 
     if field_hints:
         prompt_data["field_hints"] = {
-            k: v.model_dump() for k, v in field_hints.items()
+            k: v.model_dump() if hasattr(v, "model_dump") else v
+            for k, v in field_hints.items()
         }
 
     if images:
