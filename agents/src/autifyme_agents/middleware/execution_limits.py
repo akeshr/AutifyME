@@ -16,6 +16,7 @@ Usage:
 import json
 from typing import Any
 
+from langchain.agents.middleware.types import AgentMiddleware
 from langchain_core.messages import AIMessage, ToolMessage
 
 
@@ -49,7 +50,7 @@ def _build_structured_error(
     return json.dumps(error_response, indent=2)
 
 
-class ModelCallLimitMiddleware:
+class ModelCallLimitMiddleware(AgentMiddleware):  # type: ignore[type-arg]
     """Model call limit with structured error responses.
 
     Single hook (before_model) - checks limit and increments count.
@@ -86,7 +87,7 @@ class ModelCallLimitMiddleware:
         return {"run_model_call_count": run_count + 1}
 
 
-class ToolCallLimitMiddleware:
+class ToolCallLimitMiddleware(AgentMiddleware):  # type: ignore[type-arg]
     """Tool call limit with structured error responses.
 
     Single hook (after_model) - counts tool calls and enforces limit.
