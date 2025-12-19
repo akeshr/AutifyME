@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any, Protocol
+from typing import Any
 
 from langchain_core.tools import StructuredTool
 
@@ -29,22 +29,13 @@ from autifyme_agents.tools.rich_output.utils.validation import validate_image_ur
 logger = logging.getLogger(__name__)
 
 
-class StorageUploader(Protocol):
-    """Minimal interface for storage upload to outputs folder.
-
-    Matches SupabaseStorageClient._ensure_client for direct storage access.
-    """
-
-    def _ensure_client(self) -> Any:
-        """Get the underlying Supabase client for storage operations."""
-        ...
-
-
 # Module-level storage reference (set by tool factory)
-_storage_client: StorageUploader | None = None
+# Uses Any because we access _ensure_client() which is an implementation
+# detail of SupabaseStorageClient, not part of StorageInterface
+_storage_client: Any = None
 
 
-def _set_storage_client(storage: StorageUploader | None) -> None:
+def _set_storage_client(storage: Any) -> None:
     """Set the storage client for uploads."""
     global _storage_client
     _storage_client = storage
@@ -255,7 +246,7 @@ async def _generate_rich_output_impl(
         )
 
 
-def create_rich_output_tool(storage: StorageUploader | None = None) -> StructuredTool:
+def create_rich_output_tool(storage: Any = None) -> StructuredTool:
     """Create the generate_rich_output tool.
 
     The tool generates branded HTML pages from structured data,

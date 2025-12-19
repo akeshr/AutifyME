@@ -50,7 +50,7 @@ def _build_structured_error(
     return json.dumps(error_response, indent=2)
 
 
-class ModelCallLimitMiddleware(AgentMiddleware):  # type: ignore[type-arg]
+class ModelCallLimitMiddleware(AgentMiddleware):
     """Model call limit with structured error responses.
 
     Single hook (before_model) - checks limit and increments count.
@@ -87,7 +87,7 @@ class ModelCallLimitMiddleware(AgentMiddleware):  # type: ignore[type-arg]
         return {"run_model_call_count": run_count + 1}
 
 
-class ToolCallLimitMiddleware(AgentMiddleware):  # type: ignore[type-arg]
+class ToolCallLimitMiddleware(AgentMiddleware):
     """Tool call limit with structured error responses.
 
     Single hook (after_model) - counts tool calls and enforces limit.
