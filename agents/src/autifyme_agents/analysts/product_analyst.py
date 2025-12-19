@@ -90,14 +90,7 @@ def create_product_analyst(
     # Multimodal middleware injects images from paths in delegation message
     # Execution limits: read-only analyst with web research limits
     middleware = [
-        *create_execution_limits(
-            model_call_limit=15,
-            tool_limits={
-                "research_product_tool": 10,
-                "extract_web_content_tool": 10,
-                "view_image": 10,
-            },
-        ),
+        *create_execution_limits(model_call_limit=15, tool_call_limit=10),
         MultimodalInjectionMiddleware(),
     ]
 

@@ -150,17 +150,7 @@ def create_catalog_specialist(
     # When PM includes image paths in the task description, the middleware
     # loads and injects the images so the specialist's LLM can see them
     middleware = [
-        *create_execution_limits(
-            model_call_limit=15,
-            tool_limits={
-                "load_protocol": 10,
-                "write_data": 10,
-                "read_data": 10,
-                "aggregate_data": 10,
-                "inspect_schema": 10,
-                "view_image": 10,
-            },
-        ),
+        *create_execution_limits(model_call_limit=15, tool_call_limit=10),
         MultimodalInjectionMiddleware(),
     ]
 

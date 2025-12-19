@@ -6,25 +6,16 @@ runaway agent loops. Each agent configures its own limits based on its role.
 Usage:
     from autifyme_agents.middleware.execution_limits import create_execution_limits
 
-    # PM - orchestrator with task tool limit
-    pm_middleware = create_execution_limits(
-        model_call_limit=100,
-        tool_limits={"task": 15},
+    # Simple: uniform limit for all tools (2 middlewares total)
+    middleware = create_execution_limits(
+        model_call_limit=15,
+        tool_call_limit=10,
     )
 
-    # Catalog specialist - granular CRUD limits
-    spec_middleware = create_execution_limits(
-        model_call_limit=50,
-        tool_limits={
-            "write_data": 15,
-            "read_data": 100,
-        },
-    )
-
-    # Analyst - tight limits for research
-    analyst_middleware = create_execution_limits(
-        model_call_limit=30,
-        total_tool_limit=50,
+    # Granular: different limits per tool (N+1 middlewares)
+    middleware = create_execution_limits(
+        model_call_limit=15,
+        tool_limits={"write_data": 5, "read_data": 20},
     )
 """
 
@@ -37,51 +28,28 @@ ExitBehavior = Literal["end", "error"]
 
 def create_execution_limits(
     model_call_limit: int | None = None,
+    tool_call_limit: int | None = None,
     tool_limits: dict[str, int] | None = None,
-    total_tool_limit: int | None = None,
     exit_behavior: ExitBehavior = "end",
 ) -> list[Any]:
-    """Create execution limit middleware with granular per-tool control.
+    """Create execution limit middleware.
 
     Args:
-        model_call_limit: Max LLM calls per run. None to disable.
-        tool_limits: Dict mapping tool_name -> max_calls. Each tool gets its
-            own limit. Example: {"write_data": 10, "task": 15}
-        total_tool_limit: Global tool call limit (applies to ALL tools,
-            including those in tool_limits). None to disable.
-        exit_behavior: How to handle limit exceeded:
-            - "end": Graceful termination with message (default)
-            - "error": Raise exception
+        model_call_limit: Max LLM calls per run.
+        tool_call_limit: Uniform limit for ALL tools (single middleware).
+        tool_limits: Per-tool limits (creates one middleware per tool).
+            Use only when different tools need different limits.
+        exit_behavior: "end" (graceful) or "error" (exception).
 
     Returns:
-        List of middleware to add to agent's middleware stack.
+        List of middleware (typically 1-2 entries).
 
-    Examples:
-        # PM - limit specialist spawns
-        create_execution_limits(
-            model_call_limit=100,
-            tool_limits={"task": 15},
-        )
-
-        # Specialist - limit writes, generous reads
-        create_execution_limits(
-            model_call_limit=50,
-            tool_limits={
-                "write_data": 15,
-                "read_data": 100,
-                "image_studio": 10,
-            },
-        )
-
-        # Analyst - simple global limits
-        create_execution_limits(
-            model_call_limit=30,
-            total_tool_limit=50,
-        )
+    Note:
+        Prefer tool_call_limit over tool_limits for cleaner traces.
+        Only use tool_limits when granular control is needed.
     """
     middleware: list[Any] = []
 
-    # Model call limit
     if model_call_limit is not None:
         middleware.append(
             ModelCallLimitMiddleware(
@@ -90,7 +58,16 @@ def create_execution_limits(
             )
         )
 
-    # Per-tool limits
+    # Uniform tool limit (single middleware for all tools)
+    if tool_call_limit is not None:
+        middleware.append(
+            ToolCallLimitMiddleware(
+                run_limit=tool_call_limit,
+                exit_behavior=exit_behavior,
+            )
+        )
+
+    # Per-tool limits (one middleware per tool - use sparingly)
     if tool_limits:
         for tool_name, limit in tool_limits.items():
             middleware.append(
@@ -100,14 +77,5 @@ def create_execution_limits(
                     exit_behavior=exit_behavior,
                 )
             )
-
-    # Global tool limit
-    if total_tool_limit is not None:
-        middleware.append(
-            ToolCallLimitMiddleware(
-                run_limit=total_tool_limit,
-                exit_behavior=exit_behavior,
-            )
-        )
 
     return middleware
