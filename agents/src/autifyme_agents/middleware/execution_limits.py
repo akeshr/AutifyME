@@ -50,7 +50,7 @@ def _build_structured_error(
     return json.dumps(error_response, indent=2)
 
 
-class StructuredToolCallLimitMiddleware(ToolCallLimitMiddleware):
+class StructuredToolCallLimitMiddleware(ToolCallLimitMiddleware):  # type: ignore[type-arg]
     """Tool call limit with structured error responses matching tool_error_handler."""
 
     def after_model(
@@ -74,30 +74,30 @@ class StructuredToolCallLimitMiddleware(ToolCallLimitMiddleware):
             return None
 
         # Get count key and current counts
-        count_key = self._tool_name if self._tool_name else "__all__"
+        count_key = self.tool_name if self.tool_name else "__all__"
         run_counts = state.get("run_tool_call_count", {}).copy()
         current_run_count = run_counts.get(count_key, 0)
 
         # Count matching tool calls
-        if self._tool_name:
-            matching_calls = [tc for tc in last_ai_message.tool_calls if tc["name"] == self._tool_name]
+        if self.tool_name:
+            matching_calls = [tc for tc in last_ai_message.tool_calls if tc["name"] == self.tool_name]
         else:
             matching_calls = last_ai_message.tool_calls
 
         new_count = current_run_count + len(matching_calls)
 
         # Check if limit exceeded
-        if self._run_limit is not None and new_count > self._run_limit:
+        if self.run_limit is not None and new_count > self.run_limit:
             # Build structured error
             error_content = _build_structured_error(
                 limit_type="tool",
                 current=new_count,
-                limit=self._run_limit,
-                tool_name=self._tool_name,
+                limit=self.run_limit,
+                tool_name=self.tool_name,
             )
 
             # Create error tool messages for blocked calls
-            blocked_calls = matching_calls[max(0, self._run_limit - current_run_count):]
+            blocked_calls = matching_calls[max(0, self.run_limit - current_run_count):]
             error_messages: list[ToolMessage | AIMessage] = [
                 ToolMessage(
                     content=error_content,
@@ -137,11 +137,11 @@ class StructuredModelCallLimitMiddleware(ModelCallLimitMiddleware):
         """Override to inject structured error on limit."""
         run_count = state.get("run_model_call_count", 0) + 1
 
-        if self._run_limit is not None and run_count > self._run_limit:
+        if self.run_limit is not None and run_count > self.run_limit:
             error_content = _build_structured_error(
                 limit_type="model",
                 current=run_count,
-                limit=self._run_limit,
+                limit=self.run_limit,
             )
 
             return {
