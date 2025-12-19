@@ -216,7 +216,7 @@ async def create_project_manager(
     # Task tool (subagent calls) preserved - contains specialist decisions
     # Other tools (schema, read_data, etc.) truncated - raw data can be re-fetched
     pm_middleware = [
-        *create_execution_limits(model_call_limit=15, tool_call_limit=10),
+        *create_execution_limits(model_call_limit=15, tool_call_limit=20),
         ContextEditingMiddleware(
             edits=[
                 HybridTruncateThenClearEdit(

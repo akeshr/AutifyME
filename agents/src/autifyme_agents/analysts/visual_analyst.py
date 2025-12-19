@@ -87,7 +87,7 @@ def create_visual_analyst(
     # loads and injects the images so the analyst's LLM can see them directly
     # Execution limits: analysts are read-only with tight limits
     middleware = [
-        *create_execution_limits(model_call_limit=15, tool_call_limit=10),
+        *create_execution_limits(model_call_limit=15, tool_call_limit=20),
         MultimodalInjectionMiddleware(),
     ]
 
