@@ -28,12 +28,11 @@ Usage:
     )
 """
 
-from typing import Literal
+from typing import Any, Literal
 
 from langchain.agents.middleware import ModelCallLimitMiddleware, ToolCallLimitMiddleware
-from langchain.agents.middleware.types import AgentMiddleware
 
-ExitBehavior = Literal["end", "error", "continue"]
+ExitBehavior = Literal["end", "error"]
 
 
 def create_execution_limits(
@@ -41,7 +40,7 @@ def create_execution_limits(
     tool_limits: dict[str, int] | None = None,
     total_tool_limit: int | None = None,
     exit_behavior: ExitBehavior = "end",
-) -> list[AgentMiddleware]:
+) -> list[Any]:
     """Create execution limit middleware with granular per-tool control.
 
     Args:
@@ -53,7 +52,6 @@ def create_execution_limits(
         exit_behavior: How to handle limit exceeded:
             - "end": Graceful termination with message (default)
             - "error": Raise exception
-            - "continue": Block exceeded tool, continue execution
 
     Returns:
         List of middleware to add to agent's middleware stack.
@@ -81,14 +79,14 @@ def create_execution_limits(
             total_tool_limit=50,
         )
     """
-    middleware: list[AgentMiddleware] = []
+    middleware: list[Any] = []
 
     # Model call limit
     if model_call_limit is not None:
         middleware.append(
             ModelCallLimitMiddleware(
                 run_limit=model_call_limit,
-                exit_behavior="end" if exit_behavior == "end" else exit_behavior,
+                exit_behavior=exit_behavior,
             )
         )
 
