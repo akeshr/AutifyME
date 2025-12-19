@@ -30,10 +30,13 @@ logger = logging.getLogger(__name__)
 
 
 class StorageUploader(Protocol):
-    """Minimal interface for storage upload capability."""
+    """Minimal interface for storage upload to outputs folder.
+
+    Matches SupabaseStorageClient._ensure_client for direct storage access.
+    """
 
     def _ensure_client(self) -> Any:
-        """Get the Supabase client."""
+        """Get the underlying Supabase client for storage operations."""
         ...
 
 

@@ -175,7 +175,7 @@ async def generate_html(
             response = await llm.ainvoke(messages)
             html_content = response.content
 
-            # Handle AIMessage content types
+            # Handle AIMessage content types (str | list[str | dict])
             if isinstance(html_content, list):
                 # Extract text from content blocks
                 text_parts = [
@@ -183,8 +183,9 @@ async def generate_html(
                     for block in html_content
                 ]
                 html_content = "".join(text_parts)
-            elif not isinstance(html_content, str):
-                html_content = str(html_content)
+            else:
+                # Ensure string type
+                html_content = str(html_content) if html_content else ""
 
             # Layer 2: Sanitize OUTPUT HTML
             html_content = sanitize_llm_html_output(html_content)
