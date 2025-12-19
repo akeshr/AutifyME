@@ -411,36 +411,35 @@ OUTPUT: 3 extracted images, 3 assets, 3 junctions
 
 FLOW:
 1. visual_analyst identifies 3 distinct products
-2. creative_specialist extracts each (3 image_studio calls)
-3. catalog_specialist creates 3 assets + 3 junctions
+2. creative_specialist extracts each (3 image_studio calls), creates 3 asset records (HITL for image quality)
+3. catalog_specialist creates 3 product_assets junctions (links to existing assets)
 ```
 
+**creative_specialist creates 3 assets** (via Pattern 10 - Batch Asset Creation):
+Returns: asset_a_id, asset_b_id, asset_c_id
+
+**catalog_specialist links assets to products:**
 ```json
 {
-  "goal": "Create assets from multi-product extraction",
-  "reasoning": "3 products extracted from single source image.",
+  "goal": "Link extracted assets to products",
+  "reasoning": "3 products extracted by creative_specialist. Assets already created and approved. Now linking to products.",
+  "hitl_summary": "Linking 3 extracted images to products.\\n\\n- Product A -> asset_a_id\\n- Product B -> asset_b_id\\n- Product C -> asset_c_id\\n\\nReply *approve* to proceed.",
   "operations": [
-    {
-      "action": "create",
-      "table": "assets",
-      "data": [
-        {"name": "Product A extracted", "storage_url": "pending/t/extracted_1.png", "source_asset_ids": ["source-uuid"]},
-        {"name": "Product B extracted", "storage_url": "pending/t/extracted_2.png", "source_asset_ids": ["source-uuid"]},
-        {"name": "Product C extracted", "storage_url": "pending/t/extracted_3.png", "source_asset_ids": ["source-uuid"]}
-      ],
-      "returns": "extracted_assets"
-    },
     {
       "action": "create",
       "table": "product_assets",
       "data": [
-        {"product_id": "@product_a.id", "product_family_id": null, "asset_id": "@extracted_assets[0].id", "asset_role": "PRIMARY", "sort_order": 0},
-        {"product_id": "@product_b.id", "product_family_id": null, "asset_id": "@extracted_assets[1].id", "asset_role": "PRIMARY", "sort_order": 0},
-        {"product_id": "@product_c.id", "product_family_id": null, "asset_id": "@extracted_assets[2].id", "asset_role": "PRIMARY", "sort_order": 0}
+        {"product_id": "@product_a.id", "asset_id": "asset_a_id", "asset_role": "PRIMARY", "sort_order": 0},
+        {"product_id": "@product_b.id", "asset_id": "asset_b_id", "asset_role": "PRIMARY", "sort_order": 0},
+        {"product_id": "@product_c.id", "asset_id": "asset_c_id", "asset_role": "PRIMARY", "sort_order": 0}
       ],
-      "dependencies": ["extracted_assets", "product_a", "product_b", "product_c"]
+      "dependencies": ["product_a", "product_b", "product_c"]
     }
-  ]
+  ],
+  "impact": {
+    "creates": {"product_assets": 3},
+    "warnings": ["Linking pre-approved assets to products"]
+  }
 }
 ```
 
@@ -485,13 +484,17 @@ Same asset used for multiple products (e.g., generic accessory image).
 
 ## WORKFLOW: IMAGE TO CATALOG
 
-| Stage | Purpose | Output |
-|-------|---------|--------|
-| 1. Upload | User sends media | Storage path in inbox/ |
-| 2. Visual Analysis | Assess quality, identify product | Quality assessment |
-| 3. Processing (if needed) | Background removal, enhancement | Storage path in pending/ |
-| 4. Quality Verification | Verify extraction quality | Ready for catalog |
-| 5. Catalog Entry | Create asset + junction (HITL) | Asset ACTIVE, linked |
+| Stage | Owner | Purpose | Output |
+|-------|-------|---------|--------|
+| 1. Upload | PM | User sends media | Storage path in inbox/ |
+| 2. Visual Analysis | visual_analyst | Assess quality, identify product | Quality assessment |
+| 3. Processing | creative_specialist | Background removal, enhancement | Storage path in pending/ |
+| 4. Asset Creation | creative_specialist | Create asset record (HITL for image) | asset_id (approved) |
+| 5. Catalog Entry | catalog_specialist | Create product + junction (HITL for catalog) | Product linked to asset |
+
+**Two-Stage HITL:**
+- Stage 4 HITL: User approves/rejects image quality (creative iterates)
+- Stage 5 HITL: User approves/rejects catalog data (catalog iterates)
 
 ---
 
@@ -499,7 +502,7 @@ Same asset used for multiple products (e.g., generic accessory image).
 
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
-| Orphaned asset | Asset without product_assets junction | Create asset + junction in same transaction |
+| Product without image | Product created but no asset linked | Link asset_id from creative before creating product |
 | XOR violation | Both product_id AND product_family_id set | Exactly ONE set, other explicitly null |
 | Skip processing | Raw user photo to catalog | Assess quality first, process if needed |
 | Invalid storage_url | Empty or incorrect URL | Use actual path from processing output |
@@ -508,19 +511,26 @@ Same asset used for multiple products (e.g., generic accessory image).
 | Family asset for single-product use | Family-level asset when only one product | Use product_id unless truly shared |
 | Variant shared image via family | Sharing image across variants using family | Create one asset, multiple product_assets junctions |
 
-### Critical: Orphan Prevention
+### Critical: Asset Ownership (Two-Stage HITL)
 
-**ALWAYS create asset and junction in same write_data transaction.**
+**creative_specialist creates assets. catalog_specialist links them to products.**
 
 ```
-WRONG:
-1. write_data: create asset
-2. write_data: create junction (separate transaction)
-// If step 2 fails, orphaned asset exists
+NEW ARCHITECTURE:
+1. creative_specialist: create asset (HITL for image quality)
+   -> User approves/rejects image -> asset_id returned
+2. catalog_specialist: create product + junction (HITL for catalog data)
+   -> User approves/rejects catalog data -> product linked
 
-CORRECT:
-1. write_data: create asset + junction (same transaction)
-// Atomic - both succeed or both rollback
+WHY:
+- Image feedback goes to image expert (can iterate)
+- Catalog feedback goes to catalog expert (can iterate)
+- No back-and-forth between specialists for image issues
+
+ORPHAN HANDLING:
+- If catalog entry rejected, asset still exists (intentional)
+- Asset can be reused or linked to different product
+- Standalone assets are valid (e.g., campaign images, user downloads)
 ```
 
 ### Critical: Variant Image Decisions
