@@ -14,10 +14,22 @@ Usage:
 """
 
 import json
-from typing import Any
+from typing import Any, NotRequired
 
-from langchain.agents.middleware.types import AgentMiddleware
+from langchain.agents.middleware.types import AgentMiddleware, AgentState
 from langchain_core.messages import AIMessage, ToolMessage
+
+
+class ModelCallLimitState(AgentState):
+    """State schema extension for model call counting."""
+
+    run_model_call_count: NotRequired[int]
+
+
+class ToolCallLimitState(AgentState):
+    """State schema extension for tool call counting."""
+
+    run_tool_call_count: NotRequired[dict[str, int]]
 
 
 def _build_structured_error(
@@ -53,8 +65,12 @@ def _build_structured_error(
 class ModelCallLimitMiddleware(AgentMiddleware):
     """Model call limit with structured error responses.
 
-    Single hook (before_model) - checks limit and increments count.
+    Hooks:
+    - before_agent: Reset count at start of each agent run (handles subagent state inheritance)
+    - before_model: Check limit and increment count
     """
+
+    state_schema = ModelCallLimitState
 
     def __init__(self, run_limit: int) -> None:
         self.run_limit = run_limit
@@ -62,6 +78,18 @@ class ModelCallLimitMiddleware(AgentMiddleware):
     @property
     def name(self) -> str:
         return "ModelCallLimitMiddleware"
+
+    def before_agent(
+        self,
+        state: Any,
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        """Reset count at start of agent run.
+
+        Subagents inherit parent state (except messages/todos), so we must
+        reset to ensure each agent run starts fresh at 0.
+        """
+        return {"run_model_call_count": 0}
 
     def before_model(
         self,
@@ -90,8 +118,12 @@ class ModelCallLimitMiddleware(AgentMiddleware):
 class ToolCallLimitMiddleware(AgentMiddleware):
     """Tool call limit with structured error responses.
 
-    Single hook (after_model) - counts tool calls and enforces limit.
+    Hooks:
+    - before_agent: Reset count at start of each agent run (handles subagent state inheritance)
+    - after_model: Count tool calls and enforce limit
     """
+
+    state_schema = ToolCallLimitState
 
     def __init__(self, run_limit: int, tool_name: str | None = None) -> None:
         self.run_limit = run_limit
@@ -102,6 +134,18 @@ class ToolCallLimitMiddleware(AgentMiddleware):
         if self.tool_name:
             return f"ToolCallLimitMiddleware[{self.tool_name}]"
         return "ToolCallLimitMiddleware"
+
+    def before_agent(
+        self,
+        state: Any,
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        """Reset count at start of agent run.
+
+        Subagents inherit parent state (except messages/todos), so we must
+        reset to ensure each agent run starts fresh at 0.
+        """
+        return {"run_tool_call_count": {}}
 
     def after_model(
         self,
