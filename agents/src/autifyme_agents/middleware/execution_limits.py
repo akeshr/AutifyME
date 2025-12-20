@@ -20,13 +20,13 @@ from langchain.agents.middleware.types import AgentMiddleware, AgentState
 from langchain_core.messages import AIMessage, ToolMessage
 
 
-class ModelCallLimitState(AgentState):
+class ModelCallLimitState(AgentState[Any]):
     """State schema extension for model call counting."""
 
     run_model_call_count: NotRequired[int]
 
 
-class ToolCallLimitState(AgentState):
+class ToolCallLimitState(AgentState[Any]):
     """State schema extension for tool call counting."""
 
     run_tool_call_count: NotRequired[dict[str, int]]
