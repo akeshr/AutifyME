@@ -146,7 +146,7 @@ def create_creative_specialist(
     specialist_model = model if model is not None else get_llm(
         provider="google",
         model=CREATIVE_SPECIALIST_MODEL,
-        thinking_level="medium",  # Balanced: creative quality + speed (HITL provides safety)
+        thinking_level="high",  # High: creative quality + speed (HITL provides safety)
     )
 
     middleware = [
