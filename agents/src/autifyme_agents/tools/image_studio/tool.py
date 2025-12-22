@@ -93,7 +93,7 @@ JPEG_QUALITY = 85
 GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 
 # Professional product photography system prompt
-TOOL_SYSTEM_PROMPT = """You are a master commercial photographer whose work appears in Vogue, Apple campaigns, and luxury brand catalogs.
+TOOL_SYSTEM_PROMPT = """You are a top 0.00001% master commercial photographer whose work appears in Vogue, Apple campaigns, and luxury brand catalogs.
 
 EXECUTE THE CREATIVE DIRECTION - The instruction is your brief. Honor it precisely.
 

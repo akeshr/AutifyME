@@ -2,12 +2,10 @@
 
 ## PURPOSE
 
-Work efficiently within execution limits. Every agent has finite resources:
-- **Model calls**: LLM invocations (thinking steps)
-- **Tool calls**: Individual tool executions (per tool type)
+Work efficiently within execution limits. Every agent has a **tool call limit**
+(~30 calls per agent run). Limits prevent runaway loops and control costs.
 
-Limits exist to prevent runaway loops and control costs. This protocol teaches
-you to maximize value within constraints.
+This protocol teaches you to maximize value within constraints.
 
 ---
 
@@ -43,9 +41,8 @@ you to maximize value within constraints.
 ### Mental Model: Budget Not Unlimited
 
 Think of each task as having a budget:
-- You have ~15 model calls to complete the task
-- You have ~10 calls per tool type
-- Exceeding limits terminates your work
+- You have ~30 tool calls to complete the task
+- Exceeding the limit terminates your work
 
 **Implication:** Prioritize high-value actions. Skip low-value exploration.
 

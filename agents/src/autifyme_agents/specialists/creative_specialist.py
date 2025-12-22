@@ -150,7 +150,7 @@ def create_creative_specialist(
     )
 
     middleware = [
-        *create_execution_limits(model_call_limit=50, tool_call_limit=30),
+        *create_execution_limits(limit=30),
     ]
 
     spec: dict[str, Any] = {
