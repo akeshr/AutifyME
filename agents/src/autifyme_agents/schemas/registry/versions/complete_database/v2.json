@@ -4392,11 +4392,17 @@
           "nullable": true,
           "description": "Target audience description"
         },
+        "industry": {
+          "name": "industry",
+          "type": "text",
+          "nullable": true,
+          "description": "Company industry vertical (e.g., Industrial B2B PET packaging)"
+        },
         "brand_attributes": {
           "name": "brand_attributes",
           "type": "jsonb",
           "nullable": true,
-          "description": "Brand attributes JSONB"
+          "description": "Brand attributes JSONB including: certifications[], quality_standards{}, market_positioning{}, competitive_advantages[], sku_naming{prefix, separator, uppercase, pattern, examples[]}"
         },
         "target_markets": {
           "name": "target_markets",
@@ -4474,6 +4480,19 @@
           "default": "'Asia/Kolkata'",
           "description": "Default timezone"
         },
+        "currency_symbol": {
+          "name": "currency_symbol",
+          "type": "varchar(10)",
+          "nullable": true,
+          "default": "'₹'",
+          "description": "Currency symbol for display (e.g., ₹, $)"
+        },
+        "default_retail_price_list_id": {
+          "name": "default_retail_price_list_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Default retail price list FK"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamptz",
@@ -4483,7 +4502,17 @@
         }
       },
       "primary_key": "id",
-      "relationships": [],
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "price_lists",
+          "foreign_key": "default_retail_price_list_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Default retail price list"
+        }
+      ],
       "business_rules": [],
       "indexes": []
     },

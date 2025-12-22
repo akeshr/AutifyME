@@ -20,7 +20,7 @@ Protocol Integration (v2):
 - Protocols ground specialist in validated domain patterns
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain.chat_models import BaseChatModel
 
@@ -33,6 +33,9 @@ from autifyme_agents.middleware import (
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
 from autifyme_agents.tools.rich_output import create_rich_output_tool
+
+if TYPE_CHECKING:
+    from autifyme_agents.schemas.models import CompanyProfile
 
 # NOTE: Research tools removed - product_analyst handles all external research
 # catalog_specialist focuses on catalog CRUD operations only
@@ -85,12 +88,14 @@ CATALOG_TABLES_ALL = CATALOG_TABLES_CRUD + CATALOG_TABLES_READ_ONLY
 
 def create_catalog_specialist(
     storage: StorageInterface,
+    company_profile: "CompanyProfile",
     model: str | BaseChatModel | None = None,
 ) -> dict[str, Any]:
     """Create Catalog Specialist SubAgent spec.
 
     Args:
         storage: Storage interface for catalog operations
+        company_profile: Company context for prompt formatting (currency, SKU naming, etc.)
         model: Optional LLM (string or instance). None uses PM's default.
 
     Returns:
@@ -98,8 +103,26 @@ def create_catalog_specialist(
     """
     if storage is None:
         raise ValueError("storage is required for Catalog Specialist")
+    if company_profile is None:
+        raise ValueError("company_profile is required for Catalog Specialist (single-tenant)")
 
-    system_prompt = load_prompt("specialists/catalog_specialist_v2.prompt")
+    # Load and format prompt with company context
+    prompt_template = load_prompt("specialists/catalog_specialist_v2.prompt")
+    sku_conv = company_profile.sku_naming_convention
+
+    system_prompt = prompt_template.format(
+        company_name=company_profile.name,
+        currency_symbol=company_profile.currency_symbol,
+        default_currency=company_profile.default_currency,
+        price_positioning=company_profile.price_positioning,
+        business_models=", ".join(company_profile.business_models) if company_profile.business_models else "B2B",
+        target_markets=", ".join(company_profile.target_markets) if company_profile.target_markets else "India",
+        sku_prefix=sku_conv.prefix if sku_conv else "SKU",
+        sku_separator=sku_conv.separator if sku_conv else "-",
+        sku_uppercase=str(sku_conv.uppercase) if sku_conv else "True",
+        sku_examples=", ".join(sku_conv.examples[:3]) if sku_conv and sku_conv.examples else "SKU-001",
+        default_price_list_id=company_profile.default_price_list_id or "Query from price_lists",
+    )
 
     # Tools - load_protocol first for protocol-driven reasoning
     # NOTE: No research tools - product_analyst handles external research

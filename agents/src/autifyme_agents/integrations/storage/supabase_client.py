@@ -14,7 +14,13 @@ from supabase.lib.client_options import AsyncClientOptions, SyncClientOptions
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.exceptions import ConfigurationError, StorageError
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.schemas.models import CompanyProfile, Product, WorkflowOutcome
+from autifyme_agents.schemas.models import (
+    CompanyProfile,
+    Product,
+    SKUNamingConvention,
+    VisualIdentity,
+    WorkflowOutcome,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -320,17 +326,102 @@ class SupabaseStorageClient(StorageInterface):
         return self._async_client
 
     def get_company_profile(self) -> CompanyProfile:
-        """Return the single-tenant company profile from storage."""
+        """Return the single-tenant company profile from storage.
 
+        Loads data from:
+        - companies: Core company info, brand voice, currency
+        - company_intelligence: Visual identity, competitive intel
+        - assets: Logo storage path (if logo_asset_id in visual_identity)
+
+        Returns:
+            Enriched CompanyProfile with visual identity and all context
+        """
         client = self._ensure_client()
-        response = client.table("companies").select("*").limit(1).single().execute()
 
-        if not response.data:
+        # Load core company data
+        company_response = client.table("companies").select("*").limit(1).single().execute()
+        if not company_response.data:
             raise ValueError(
                 "No company profile found in storage. Populate the `companies` table before running workflows."
             )
+        company_data = company_response.data
 
-        return CompanyProfile.model_validate(response.data)
+        # Load company intelligence (visual identity, brand values, etc.)
+        intel_response = client.table("company_intelligence").select("*").limit(1).execute()
+        intel_data = intel_response.data[0] if intel_response.data else {}
+
+        # Build VisualIdentity from company_intelligence.visual_identity JSONB
+        visual_identity = VisualIdentity()
+        if intel_data.get("visual_identity"):
+            vi = intel_data["visual_identity"]
+            logo_asset_path: str | None = None
+
+            # Resolve logo_asset_id to storage path
+            if vi.get("logo_asset_id"):
+                try:
+                    asset_response = client.table("assets").select("storage_url").eq(
+                        "id", vi["logo_asset_id"]
+                    ).limit(1).single().execute()
+                    if asset_response.data and asset_response.data.get("storage_url"):
+                        # Extract relative path from full URL
+                        # URL: https://...supabase.co/storage/v1/object/public/assets/brands/file.jpg
+                        # Path: brands/file.jpg
+                        storage_url = asset_response.data["storage_url"]
+                        if "/assets/" in storage_url:
+                            logo_asset_path = storage_url.split("/assets/", 1)[1]
+                except Exception as e:
+                    logger.warning(f"Failed to resolve logo asset: {e}")
+
+            visual_identity = VisualIdentity(
+                primary_color=vi.get("primary_color", "#d32f2f"),
+                secondary_color=vi.get("secondary_color", "#000000"),
+                accent_color=vi.get("accent_color"),
+                font_family=vi.get("font_family", "sans-serif"),
+                logo_asset_path=logo_asset_path,
+            )
+
+        # Build SKUNamingConvention from brand_attributes.sku_naming
+        sku_naming: SKUNamingConvention | None = None
+        brand_attrs = company_data.get("brand_attributes") or {}
+        if brand_attrs.get("sku_naming"):
+            sku_data = brand_attrs["sku_naming"]
+            sku_naming = SKUNamingConvention(
+                prefix=sku_data.get("prefix", "SKU"),
+                pattern=sku_data.get("pattern", "PREFIX-CATEGORY-SIZE-VARIANT"),
+                separator=sku_data.get("separator", "-"),
+                uppercase=sku_data.get("uppercase", True),
+                examples=sku_data.get("examples", []),
+            )
+
+        # Extract style_preferences from brand_attributes or brand_values
+        style_preferences: list[str] = []
+        if brand_attrs.get("competitive_advantages"):
+            style_preferences = brand_attrs["competitive_advantages"][:5]
+        elif intel_data.get("brand_values"):
+            style_preferences = intel_data["brand_values"][:5]
+
+        # Extract business context from company_intelligence
+        business_models: list[str] = intel_data.get("business_models", [])
+        target_markets: list[str] = company_data.get("target_markets") or []
+        price_positioning: str = intel_data.get("price_positioning", "mid-range")
+
+        # Build enriched CompanyProfile
+        return CompanyProfile(
+            id=company_data["id"],
+            name=company_data["name"],
+            brand_voice=company_data.get("brand_voice", ""),
+            target_audience=company_data.get("target_audience", ""),
+            style_preferences=style_preferences,
+            industry=company_data.get("industry") or brand_attrs.get("industry_focus"),
+            business_models=business_models,
+            target_markets=target_markets,
+            price_positioning=price_positioning,
+            sku_naming_convention=sku_naming,
+            visual_identity=visual_identity,
+            default_currency=company_data.get("default_currency", "INR"),
+            currency_symbol=company_data.get("currency_symbol", "₹"),
+            default_price_list_id=company_data.get("default_retail_price_list_id"),
+        )
 
     def save_product(self, product: Product) -> Product:
         """Persist a product record using insert for new products or update for existing."""

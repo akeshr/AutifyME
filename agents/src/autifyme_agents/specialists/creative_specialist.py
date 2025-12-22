@@ -37,9 +37,11 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import create_execution_limits
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.image_studio import create_image_studio_tool
+from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
 
 if TYPE_CHECKING:
     from autifyme_agents.core.ports import StorageInterface
+    from autifyme_agents.schemas.models import CompanyProfile
 
 # Creative Specialist uses Gemini 3 Flash for multimodal reasoning (can see images)
 CREATIVE_SPECIALIST_MODEL = "gemini-3-flash-preview"
@@ -61,6 +63,7 @@ CREATIVE_WRITE_TABLES = [
 
 
 def create_creative_specialist(
+    company_profile: "CompanyProfile",
     model: str | BaseChatModel | None = None,
     storage: "StorageInterface | None" = None,
 ) -> dict[str, Any]:
@@ -72,13 +75,31 @@ def create_creative_specialist(
     Args:
         model: Optional LLM override. Defaults to Gemini 3 Flash (multimodal).
         storage: Optional storage client for image persistence to Supabase.
+        company_profile: Company context for brand colors, logo, etc.
 
     Returns:
         SubAgent spec dict: {name, description, tools, system_prompt, model}
     """
-    system_prompt = load_prompt("specialists/creative_specialist_lean.prompt")
+    if company_profile is None:
+        raise ValueError("company_profile is required for Creative Specialist (single-tenant)")
 
+    # Load and format prompt with company context
+    prompt_template = load_prompt("specialists/creative_specialist_lean.prompt")
+    vi = company_profile.visual_identity
+
+    system_prompt = prompt_template.format(
+        company_name=company_profile.name,
+        industry=company_profile.industry or "Product Manufacturing",
+        primary_color=vi.primary_color,
+        secondary_color=vi.secondary_color,
+        accent_color=vi.accent_color or "None",
+        font_family=vi.font_family,
+        logo_asset_path=vi.logo_asset_path or "Not configured",
+    )
+
+    # Tools - load_protocol first for protocol-driven reasoning
     tools: list[Any] = [
+        create_load_protocol_tool(),  # Protocol loading for domain grounding
         create_view_image_tool(),  # Quick inspection without processing
         create_image_studio_tool(storage=storage),  # Professional image processing with persistence
     ]
@@ -99,26 +120,26 @@ def create_creative_specialist(
 
 
     description = (
-        "ROLE: Specialist (execution)\n"
-        "MISSION: Turn raw product photos into marketplace-ready visuals (and optionally persist asset records).\n\n"
+        "ROLE: Specialist (execution) - World-class visual artist\n"
+        "MISSION: Transform raw product photos into portfolio-worthy visual assets.\n\n"
+        "OPERATING MODE: ASSESS -> ENVISION -> PROPOSE -> EXECUTE -> CRITIQUE -> ITERATE\n"
+        "- ASSESS: View image, see current state AND potential\n"
+        "- ENVISION: Form creative vision before touching tools\n"
+        "- PROPOSE: Proactively suggest beyond the brief\n"
+        "- EXECUTE: Apply 12-spec creative palette\n"
+        "- CRITIQUE: Score against excellence rubric (all 8+ to ship)\n"
+        "- ITERATE: Fix weak dimensions, never ship mediocre\n\n"
         "OWNERSHIP:\n"
-        "- Image processing & generation: extraction, cleanup, enhancement, hero shots, lifestyle creatives\n"
-        "- Visual QA on outputs (before downstream catalog linking)\n\n"
-        "INPUTS I NEED:\n"
-        "- Source image storage_path(s) (typically inbox/...)\n"
-        "- Creative intent (hero vs lifestyle), output aspect ratio/format if constrained\n\n"
-        "OUTPUTS I PRODUCE:\n"
-        "- Processed image outputs with paths (always local temp path; storage_path in pending/ when storage is configured)\n"
-        "- Notes on what was changed + any visual risks/uncertainties\n"
-        "- If long: write a production note to the thread directory and return the file path\n\n"
-        "HITL LOOP (when write_data is enabled):\n"
-        "- Propose write_data intents for DB changes and wait for approval\n"
-        "- On rejection, you will receive user feedback (often prefixed [HITL_FEEDBACK]); revise and resubmit\n\n"
-        "TOOLS I USE:\n"
-        "- view_image, image_studio\n"
-        "- If storage is provided: inspect_schema, read_data, write_data (scoped to creative/asset tables; HITL for writes)\n\n"
+        "- Visual asset creation: extraction, enhancement, hero shots, lifestyle scenes\n"
+        "- Visual QA with quality scoring (composition, lighting, material, edges)\n"
+        "- Asset records with HITL approval\n\n"
+        "TOOLS:\n"
+        "- load_protocol (domain expertise when needed)\n"
+        "- view_image (ALWAYS before and after processing)\n"
+        "- image_studio (12-spec creative palette)\n"
+        "- If storage: inspect_schema, read_data, write_data (HITL for writes)\n\n"
         "GUARDRAILS:\n"
-        "- No product/pricing/taxonomy CRUD; if a catalog change is needed, delegate to catalog_specialist"
+        "- No catalog CRUD; delegate to catalog_specialist for product records"
     )
     # Use provided model or default to Gemini 3 Flash (multimodal)
     # Medium thinking: creative tasks are structured (HITL safety net), don't need deep reasoning

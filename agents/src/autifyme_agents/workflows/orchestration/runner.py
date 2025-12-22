@@ -712,13 +712,33 @@ class WorkflowRunner:
         # Build typed company context for v1.0 context_schema
         from autifyme_agents.schemas.context import CompanyContext
 
+        # Extract visual identity and SKU naming convention
+        visual = self.company_profile.visual_identity
+        sku_conv = self.company_profile.sku_naming_convention
+
         company_context = CompanyContext(
+            # Core identification
             company_id=self.company_profile.id,
             company_name=self.company_profile.name,
+            # Brand guidelines
             brand_voice=self.company_profile.brand_voice,
             target_audience=self.company_profile.target_audience,
             style_preferences=self.company_profile.style_preferences or [],
             industry=self.company_profile.industry,
+            # Visual identity (for creative specialist)
+            primary_color=visual.primary_color,
+            secondary_color=visual.secondary_color,
+            accent_color=visual.accent_color,
+            font_family=visual.font_family,
+            logo_asset_path=visual.logo_asset_path,
+            # Catalog defaults
+            default_currency=self.company_profile.default_currency,
+            currency_symbol=self.company_profile.currency_symbol,
+            default_price_list_id=None,  # TODO: Load from company settings
+            # SKU naming
+            sku_prefix=sku_conv.prefix if sku_conv else None,
+            sku_separator=sku_conv.separator if sku_conv else "-",
+            sku_uppercase=sku_conv.uppercase if sku_conv else True,
         )
 
         config = {

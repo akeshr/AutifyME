@@ -12,7 +12,7 @@ Defines which domains own which decisions, enabling correct specialist routing.
 | Domain | Owns | Specialists/Analysts | Routing Trigger |
 |--------|------|---------------------|-----------------|
 | **CATALOG** | Product data, families, variants, pricing, assets, inventory context | catalog_analyst, catalog_specialist | "add product", "update", "delete", "remove", "find similar", "catalog", "list products", "show", "inventory", "variant", "family", "price", "pricing" |
-| **CREATIVE** | Image processing, asset creation, visual output, product photography | creative_specialist | "process image", "create shot", "lifestyle", "campaign", "edit image", "enhance", "fix background", "white background", "hero shot", "product photo", "remove background", "clean up image" |
+| **CREATIVE** | Image processing, asset creation, visual output, product photography, data-driven graphics | creative_specialist | "process image", "create shot", "lifestyle", "campaign", "edit image", "enhance", "fix background", "white background", "hero shot", "product photo", "remove background", "clean up image", "price post", "price graphic", "show prices", "offer graphic", "sale post", "size comparison", "variant comparison" |
 | **VISUAL** | Image analysis, visual identification, quality assessment | visual_analyst | "what is this", "identify", "analyze image", "describe", "inspect", "check quality", "compare", image without text |
 | **PRODUCT** | External product research: specs, materials, dimensions, certifications, HSN, standards, market context | product_analyst | "research", "find out", "look up", "HSN", "compliance", "specs", "capacity", "certifications", "what is", "materials", "dimensions" |
 
@@ -31,6 +31,7 @@ Defines which domains own which decisions, enabling correct specialist routing.
 - Multi-product: extraction, isolation, composite shots
 - Style transfer: match reference images for lighting, color, mood
 - Batch processing: consistent treatment across variant families
+- **Data-driven graphics: price posts, offer graphics, variant comparisons (PM provides data)**
 - **Asset Records: create asset record (HITL for image quality)**
 - **Campaign Asset Records: create asset + campaign_assets junction (until campaign_specialist exists)**
 
@@ -178,6 +179,38 @@ Remove background, white background.
 Standalone - no asset record needed."
 ```
 -> Creative processes, returns storage_path only (no HITL)
+
+**To creative_specialist (Data-Driven Graphics):**
+```
+"Create [graphic type] for [product/family].
+Platform: [Instagram Feed/Story/WhatsApp Status] ([aspect ratio]).
+
+Product data:
+- [Variant 1]: Rs [Price], [Size]
+- [Variant 2]: Rs [Price], [Size]
+- [Variant 3]: Rs [Price], [Size]
+
+[If offer]:
+- Original price: Rs X
+- Offer price: Rs Y
+- Discount: Z%
+
+Source images at: [asset paths]
+[Badge if needed]: "NEW LAUNCH" / "LIMITED OFFER" / "BEST SELLER"
+
+For DATA-DRIVEN domain."
+```
+-> First delegate to analyst for data (see below), then pass to creative
+-> Creative receives data, designs visually, verifies accuracy
+-> Creative creates asset (HITL)
+
+**Data Source Decision:**
+
+| Data Needed | Delegate To | Why |
+|-------------|-------------|-----|
+| Prices, sizes, variants (in DB) | catalog_analyst | Has read_data for products/families |
+| Market prices, competitor info | product_analyst | Has web research tools |
+| Both internal + external | catalog_analyst THEN product_analyst | Chain: DB data + market context |
 
 **To catalog_specialist (After Creative):**
 ```

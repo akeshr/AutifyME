@@ -14,7 +14,7 @@ Protocol Integration (v2):
 - Protocol grounds observations in domain-specific focus areas
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain.chat_models import BaseChatModel
 
@@ -23,6 +23,9 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import MultimodalInjectionMiddleware, create_execution_limits
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
+
+if TYPE_CHECKING:
+    from autifyme_agents.schemas.models import CompanyProfile
 
 
 def _get_analyst_llm() -> BaseChatModel:
@@ -40,22 +43,32 @@ def _get_analyst_llm() -> BaseChatModel:
 
 
 def create_visual_analyst(
+    company_profile: "CompanyProfile",
     model: BaseChatModel | None = None,
 ) -> dict[str, Any]:
     """Create Visual Analyst SubAgent spec.
 
     Args:
+        company_profile: Company context for prompt formatting.
         model: Optional LLM override. Defaults to Gemini 3 Flash.
 
     Returns:
         SubAgent spec dict for PM's subagents list.
 
     Example:
-        >>> analyst = create_visual_analyst()
+        >>> analyst = create_visual_analyst(company_profile)
         >>> # Add to PM subagents
         >>> subagents = [analyst, catalog_specialist, ...]
     """
-    system_prompt = load_prompt("analysts/visual_analyst_v2.prompt")
+    if company_profile is None:
+        raise ValueError("company_profile is required for Visual Analyst (single-tenant)")
+
+    prompt_template = load_prompt("analysts/visual_analyst_v2.prompt")
+
+    system_prompt = prompt_template.format(
+        company_name=company_profile.name,
+        industry=company_profile.industry or "Product Manufacturing",
+    )
 
     description = (
         "ROLE: Analyst (read-only, protocol-integrated)\n"
