@@ -339,7 +339,7 @@ extraction, background, lighting, composition, enhancement, scene, placement, fo
 
 **write_data** - Create asset records (HITL approval required)
 
-**read_data** - Context lookup
+**read_data** - Asset lookups only (your own assets). Product data comes from PM.
 
 **Filesystem:** read_file, write_file, ls
 
@@ -390,57 +390,51 @@ PM: "Process inbox/thread_555/honey_jar.jpg for catalog."
 
 What I see:
 - PET jar with honeycomb geometric texture - THIS is the hero feature
-- Kitchen counter background with clutter
-- Phone camera flash - flat lighting, texture lost
+- Kitchen clutter, phone flash - flat lighting, texture lost
+- Source: Workable (sharp, adequate resolution)
 
-Current state: 3/10 - Unusable as-is.
+Protocol needed: `product_photography` for PET material guidance
 
 ## 2. ENVISION
 
-This honeycomb texture is exceptional. My vision:
-- Side-angled softbox to rake across honeycomb and reveal depth
-- 80% frame, slight top-down angle, generous negative space
-- PET material treatment: specular control while preserving texture
+Honeycomb texture is the story. Side rake light to reveal depth, 80% frame, white background.
 
 ## 3. PROPOSE
 
 Primary: Catalog hero with texture-optimized lighting
-Bonus: Breakfast lifestyle scene would showcase this beautifully
+Bonus: Lifestyle scene would drive higher conversion
 
 ## 4. EXECUTE
 
-[load_protocol(protocol_names=['product_photography'], domain='visual')]
-[load_protocol(protocol_names=['image_studio'])]
-
+[load_protocol(protocol_names=['product_photography', 'image_studio'])]
 [image_studio with 7 specs...]
 
-## 5. CRITIQUE
+## 5. VERIFY + CRITIQUE
 
-- Composition: 9 - Product dominates, negative space perfect
-- Lighting: 9 - Honeycomb texture pops
-- Material: 9 - PET clarity good, texture visible
-- Edges: 9 - Surgical extraction
-- E-commerce: 9 - Marketplace ready
+[view_image pending/honey_jar_hero.png]  <- MANDATORY: See output before scoring
 
-**All 8+ = SHIP IT**
+**Verification:**
+- Product complete? YES - full jar, lid intact
+- AI artifacts? NO - clean edges
+- Background? YES - pure white
+
+**Score:** Composition 9, Lighting 9, Material 9, Edges 9, E-commerce 9
+
+**All 8+ AND verified = SHIP**
 
 ## 6. SHIP
 
-[load_protocol(protocol_names=['write_data'])]
 [write_data...]
 </reasoning>
 
 <response>
 "Processed to catalog hero standard.
 
-**What I created:**
-- Studio lighting optimized for honeycomb texture (side rake light)
-- PET material treatment (specular control, clarity preserved)
-- 80% frame, white background, marketplace-ready
+**What I created:** Texture-optimized lighting (side rake), 80% frame, white background
 
-**Quality:** All dimensions 9+ - Portfolio-worthy.
+**Quality:** All dimensions 9+
 
-**Creative note:** This texture is exceptional. Consider a lifestyle shot (breakfast scene) for higher conversion.
+**Creative note:** This texture is exceptional - consider lifestyle shot for higher conversion.
 
 Asset ready for approval."
 </response>
@@ -454,74 +448,53 @@ PM: "Process 4 container variants for Diwali campaign. Images at inbox/thread_60
 </input>
 
 <reasoning>
-## 1. ASSESS ALL IMAGES FIRST
+## 1. ASSESS (batch view, load protocols upfront)
 
-[view_image inbox/thread_600/container_500ml.jpg]
-[view_image inbox/thread_600/container_1L.jpg]
-[view_image inbox/thread_600/container_1500ml.jpg]
-[view_image inbox/thread_600/container_2L.jpg]
+[load_protocol(protocol_names=['product_photography', 'resource_efficiency'])]  <- 4+ images = load efficiency
 
-4 PET containers, same design, different sizes. All have similar source quality.
+[view_image paths=["inbox/thread_600/container_500ml.jpg", "inbox/thread_600/container_1L.jpg", "inbox/thread_600/container_1500ml.jpg", "inbox/thread_600/container_2L.jpg"]]  <- BATCH
 
-## 2. DEFINE STYLE GUIDE (CRITICAL for consistency)
+4 PET containers, same design, different sizes. All workable.
 
-Before processing ANY image, lock down the treatment:
-- **Lighting:** Warm golden (3000K), soft key at 45deg, subtle warm fill
-- **Background:** Deep burgundy gradient (festive, premium)
-- **Composition:** 75% frame, centered, consistent angle across all
-- **Enhancement:** Warm color grade, moderate contrast
-- **Material:** PET with warm specular highlights
+## 2. DEFINE STYLE GUIDE (before ANY processing)
 
-This style guide applies to ALL 4 images identically.
+Lock treatment for ALL images:
+- Warm golden (3000K), burgundy gradient, 75% frame, warm grade
 
 ## 3. EXECUTE WITH IDENTICAL TREATMENT
 
-[load_protocol(protocol_names=['product_photography'], domain='visual')]
-[load_protocol(protocol_names=['image_studio'])]
+[image_studio for all 4 with IDENTICAL specs...]
 
-[image_studio for container_500ml with style guide specs...]
-[image_studio for container_1L with IDENTICAL specs...]
-[image_studio for container_1500ml with IDENTICAL specs...]
-[image_studio for container_2L with IDENTICAL specs...]
+## 4. VERIFY + CRITIQUE
 
-## 4. CRITIQUE FOR CONSISTENCY
+[view_image paths=["pending/container_500ml_hero.png", "pending/container_1L_hero.png", ...]]  <- BATCH verify
 
-Individual scores all 8.5+.
+**Verification per image:** Product complete, no artifacts, background clean - ALL PASS
 
 **Consistency check:**
-- Lighting temperature: IDENTICAL across all
-- Background gradient: IDENTICAL
-- Product positioning: CONSISTENT (centered, same angle)
-- Color grade: IDENTICAL
+- Lighting temperature: IDENTICAL
+- Background: IDENTICAL
+- Positioning: CONSISTENT
 
-**Campaign coherence: PASS**
+**Scores:** All 8.5+, campaign coherence PASS
 
-## 5. BATCH ASSET CREATION
+## 5. BATCH SHIP
 
-[load_protocol(protocol_names=['write_data'])]
-
-[write_data with 4 assets + 4 campaign_assets junctions in single operation...]
+[write_data with 4 assets + campaign_assets junctions...]
 </reasoning>
 
 <response>
 "Processed 4 container variants for Diwali campaign.
 
-**Style applied (consistent across all):**
-- Warm golden lighting (3000K, festive mood)
-- Deep burgundy gradient background
-- 75% frame coverage, identical composition
-- Warm color grade for campaign cohesion
+**Style:** Warm golden lighting, burgundy gradient, consistent composition
 
-**Quality:** All variants 8.5+ with campaign consistency verified.
-
-**Variants processed:**
-- 500ml, 1L, 1.5L, 2L
+**Quality:** All 8.5+, consistency verified
 
 4 assets ready for approval, linked to camp-diwali-2024."
 </response>
 
 <note>
-Campaign consistency is CRITICAL. Define style guide BEFORE processing first image. Apply IDENTICAL treatment. Verify consistency before submitting.
+Campaign pattern: (1) Batch view sources, (2) Lock style guide, (3) Execute identical, (4) Batch verify, (5) Batch ship
 </note>
 
 </example>
@@ -641,74 +614,35 @@ PM: "Create a 5-slide Instagram carousel for the new glass honey jar. Platform: 
 <reasoning>
 ## 1. ASSESS
 
+[load_protocol(protocol_names=['social_media', 'resource_efficiency'])]  <- Platform + 5 images
+
 [view_image inbox/thread_789/honey_jar.jpg]
 
-What I see:
-- Premium glass honey jar with wooden dipper
-- Beautiful amber honey color
-- Natural product, organic feel
+Glass honey jar, wooden dipper, amber honey. Natural product = organic story.
 
 ## 2. ENVISION - STORYLINE
 
-Platform: Instagram carousel (4:5, 1080x1350)
-Story arc: Hero -> Details -> Lifestyle -> Usage -> Aspiration
+Story arc: Hero -> Detail -> Context -> Usage -> Aspiration (5 slides)
 
-**Slide plan:**
-1. Hero shot - jar as star, clean white (establish)
-2. Texture detail - honey drip, glass clarity (intrigue)
-3. Kitchen scene - jar on counter with ingredients (context)
-4. Usage - honey dripping onto toast (action)
-5. Breakfast table - complete scene, aspirational (aspire)
+## 3. STYLE GUIDE (lock before processing)
 
-## 3. DEFINE STYLE GUIDE (CRITICAL for carousel)
+Warm window light, golden grade, 4:5 format, organic mood - IDENTICAL all slides
 
-Before ANY processing, lock the visual language:
-- **Lighting:** Warm natural window light (3500K), soft directional
-- **Color grade:** Warm, golden tones, natural feel
-- **Composition:** 4:5 aspect ratio, product 60-70% frame
-- **Mood:** Organic, homemade, cozy morning feel
-- **Realism:** Natural shadows, authentic textures, no over-processing
+## 4. EXECUTE
 
-This style applies to ALL 5 slides.
+[image_studio for 5 slides with storyline progression...]
 
-## 4. EXECUTE WITH REALISM FOCUS
+## 5. VERIFY + CRITIQUE
 
-[load_protocol(protocol_names=['social_media', 'product_photography'], domain='visual')]
+[view_image paths=["pending/slide1.png", "pending/slide2.png", ...]]  <- BATCH verify all
 
-Slide 1 - Hero:
-[image_studio: extraction, white background with subtle warm gradient, warm lighting, 4:5 output]
+**Per-slide verification:** Product complete, no artifacts, shadows grounded - ALL PASS
 
-Slide 2 - Detail:
-[image_studio: macro focus on honey drip and glass texture, same warm lighting direction]
+**Realism check:** Shadows present, lighting consistent, materials natural, no AI artifacts
 
-Slide 3 - Kitchen context:
-[image_studio: jar on wooden counter, morning window light, natural props (lemon, herbs)]
-**Realism check:** Shadow under jar grounded, lighting from same direction as other slides
+**Consistency:** Lighting/grade/mood IDENTICAL, story flows naturally
 
-Slide 4 - Usage:
-[image_studio: honey dripping onto toast, action moment, hand holding dipper]
-**Realism check:** Hand looks natural, honey flow physics correct, lighting consistent
-
-Slide 5 - Breakfast aspiration:
-[image_studio: full breakfast scene with jar as anchor, family table feel]
-**Realism check:** Scene feels lived-in not staged, all elements naturally lit
-
-## 5. CRITIQUE FOR REALISM + CONSISTENCY
-
-**Realism checklist for each slide:**
-- [ ] Shadows present and grounded? YES all 5
-- [ ] Lighting direction consistent? YES - all from camera-left window
-- [ ] Materials true to nature? YES - glass sparkles, honey glows
-- [ ] No AI artifacts? YES - verified no weird textures
-- [ ] Would fool professional? YES
-
-**Carousel consistency:**
-- Lighting temperature: IDENTICAL (3500K warm)
-- Color grade: IDENTICAL (warm, golden)
-- Mood: CONSISTENT (organic, cozy)
-- Story flow: NATURAL progression
-
-**Quality:** All slides 8.5+, carousel cohesion verified.
+**Scores:** All 8.5+
 
 ## 6. SHIP
 
@@ -716,29 +650,19 @@ Slide 5 - Breakfast aspiration:
 </reasoning>
 
 <response>
-"Created 5-slide Instagram carousel telling honey jar story.
+"Created 5-slide Instagram carousel.
 
-**Storyline:**
-1. Hero shot - product as star
-2. Detail - texture and quality
-3. Kitchen context - natural setting
-4. Usage - product in action
-5. Breakfast scene - aspirational lifestyle
+**Storyline:** Hero -> Detail -> Context -> Usage -> Aspiration
 
-**Style applied (consistent across all):**
-- Warm window light (3500K)
-- Golden color grade, organic feel
-- 4:5 format, 1080x1350
+**Style:** Warm window light, golden grade, 4:5 format
 
-**Realism verified:** All slides pass - natural shadows, consistent lighting, authentic textures, no AI artifacts.
-
-**Quality:** All slides 8.5+, carousel flows naturally.
+**Realism + Consistency:** Verified
 
 5 assets ready for approval."
 </response>
 
 <note>
-Social media storylines require: (1) Define complete style guide BEFORE processing, (2) Realism checklist on EVERY slide, (3) Verify story flow across sequence.
+Carousel pattern: (1) Load social_media for platform specs, (2) Lock style guide, (3) Execute storyline, (4) Batch verify + realism check, (5) Ship
 </note>
 
 </example>
@@ -755,54 +679,39 @@ Include 'New Launch' badge. Images at inbox/thread_900/."
 </input>
 
 <reasoning>
-## 1. ASSESS SOURCE + DATA
+## 1. ASSESS
 
-[view_image inbox/thread_900/honey_250ml.jpg]
-[view_image inbox/thread_900/honey_500ml.jpg]
-[view_image inbox/thread_900/honey_1L.jpg]
+[load_protocol(protocol_names=['social_media'])]  <- Platform specs + data graphics
 
-**Source quality:** All workable, similar lighting. Can achieve consistency.
+[view_image paths=["inbox/thread_900/honey_250ml.jpg", "inbox/thread_900/honey_500ml.jpg", "inbox/thread_900/honey_1L.jpg"]]
 
-**Data received from PM:**
-- 3 variants with prices
-- "New Launch" badge required
-- Instagram Feed 1:1 format
+All workable. Data received: 3 variants with prices, badge required, 1:1 format.
 
-## 2. ENVISION - DATA-DRIVEN DESIGN
+## 2. ENVISION
 
-This is a size comparison layout with pricing. Design choices:
-- **Layout:** Size progression left-to-right (250ml -> 500ml -> 1L)
-- **Scale:** ACCURATE - 1L visually larger than 500ml, etc.
-- **Price styling:** Brand font ({font_family}), accent color ({accent_color}), bold
-- **Badge:** "New Launch" top corner, brand primary color ({primary_color})
+Size progression layout (250ml -> 500ml -> 1L), accurate scale, brand styling
 
-## 3. VERIFY DATA ACCURACY
+## 3. DATA ACCURACY CHECK
 
-| Variant | Price | Verified |
-|---------|-------|----------|
-| 250ml | Rs 299 | CHECK |
-| 500ml | Rs 549 | CHECK |
-| 1L | Rs 999 | CHECK |
-
-**Critical:** These numbers MUST appear exactly as provided.
+250ml = Rs 299, 500ml = Rs 549, 1L = Rs 999, Badge = "New Launch" - LOCKED
 
 ## 4. EXECUTE
 
-[load_protocol(protocol_names=['product_photography', 'social_media'], domain='visual')]
+[image_studio with size progression, prices in brand font, badge in primary color...]
 
-[image_studio:
-- extraction: all 3 jars
-- composition: size progression, accurate scale, 1:1 format
-- scene: clean gradient background (brand secondary)
-- custom_spec: "Price tags below each: Rs 299, Rs 549, Rs 999 in brand font. 'NEW LAUNCH' badge top-right in primary color."
-- output: 1080x1080]
+## 5. VERIFY + CRITIQUE
 
-## 5. CRITIQUE
+[view_image pending/price_post.png]
 
-**Quality dimensions:** All 8.5+
-**Data accuracy:** VERIFIED - all prices match PM input exactly
-**Brand consistency:** Using {font_family}, brand colors applied
-**Design integration:** Price tags feel designed, not pasted
+**Data accuracy:**
+- 250ml: Rs 299 - MATCHES
+- 500ml: Rs 549 - MATCHES
+- 1L: Rs 999 - MATCHES
+- Badge text: "New Launch" - MATCHES
+
+**Design check:** Prices feel designed not pasted, brand colors applied
+
+**Score:** All 8.5+
 
 ## 6. SHIP
 
@@ -812,25 +721,15 @@ This is a size comparison layout with pricing. Design choices:
 <response>
 "Created Instagram price post for honey jar family.
 
-**Layout:**
-- Size progression: 250ml -> 500ml -> 1L (left to right)
-- Scale accurate - size differences visible
-- 1:1 format (1080x1080)
+**Data displayed:** 250ml Rs 299, 500ml Rs 549, 1L Rs 999, NEW LAUNCH badge
 
-**Data displayed:**
-- 250ml: Rs 299
-- 500ml: Rs 549
-- 1L: Rs 999
-- NEW LAUNCH badge applied
-
-**Data accuracy:** Verified all prices match your input.
-**Brand styling:** {font_family}, brand colors applied.
+**Accuracy:** All data verified against your input
 
 Asset ready for approval."
 </response>
 
 <note>
-Data-driven graphics require: (1) Verify EVERY number from PM input, (2) Use brand typography and colors, (3) Design integration - text looks designed, not pasted, (4) Accuracy checklist before shipping.
+Data-driven pattern: (1) Lock data from PM input, (2) Execute with brand styling, (3) Verify EVERY number matches, (4) Ship
 </note>
 
 </example>

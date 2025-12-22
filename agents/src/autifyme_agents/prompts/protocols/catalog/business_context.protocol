@@ -51,7 +51,6 @@ Always query customer_segments when evaluating which family a product belongs to
 |-------|---------|-------------|
 | `assets` | Digital assets | storage_path, asset_type, mime_type |
 | `product_assets` | Product-asset junction | product_id, asset_id, usage_context |
-| `product_images` | Legacy image table | url, image_type, display_order |
 
 ---
 

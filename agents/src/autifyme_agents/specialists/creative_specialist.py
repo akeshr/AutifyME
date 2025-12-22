@@ -11,9 +11,9 @@ Domain Ownership ("How We Present"):
 Architecture:
 - SubAgent spec dict for PM delegation
 - Owns image_studio tool (Gemini 3 Pro Image)
-- Has inspect_schema (scoped to assets/product_images) for schema discovery
+- Has inspect_schema (scoped to assets/product_assets) for schema discovery
 - Has write_data (scoped to assets) for persisting processed images
-- Has read_data (scoped to assets + product images) for reference
+- Has read_data (scoped to assets + product_assets) for reference
 - Uses view_image tool to see images from storage_path
 
 Storage Architecture:

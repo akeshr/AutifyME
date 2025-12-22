@@ -58,7 +58,6 @@ CATALOG_TABLES_CRUD = [
     "assets",
     "product_assets",
     "asset_composition_rules",
-    "product_images",
     # Pricing
     "price_lists",
     "product_prices",

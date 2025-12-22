@@ -703,7 +703,7 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- images parameter REQUIRED: Min 1 labeled image, max 15\n"
             "- Labels enable composition: Model knows which image is which via labels\n"
             "- Reference labels in specs: Use [label] syntax\n"
-            "- storage_path output: Use this for write_data product_images (pending/ path)\n"
+            "- storage_path output: Use this for write_data assets (pending/ path)\n"
             "- View before and after: view_image to see input/output before cataloging\n"
             "- Material matters: Glass, metal, plastic need different rendering (specify material_treatment)\n"
             "- One output per call: Not batch processing\n\n"
