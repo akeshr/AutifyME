@@ -228,11 +228,11 @@ async def load_company_patterns(storage: StorageInterface) -> CompanyPatterns:
         # Query 2: Price range
         prices = await storage.query_entities(
             table="product_prices",
-            columns=["price"]
+            columns=["unit_price"]
         )
 
         if prices:
-            price_values = [float(p["price"]) for p in prices if p.get("price")]
+            price_values = [float(p["unit_price"]) for p in prices if p.get("unit_price")]
             if price_values:
                 typical_price_range = (min(price_values), max(price_values))
             else:
