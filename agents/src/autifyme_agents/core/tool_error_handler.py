@@ -14,6 +14,11 @@ from typing import Any
 
 # Error type classification rules
 ERROR_PATTERNS = {
+    # Execution limit errors (check first - these come from middleware)
+    "limit exceeded": {
+        "type": "LIMIT_EXCEEDED",
+        "action": "Execution limit reached. Prioritize remaining work and provide final response with available findings.",
+    },
     # Access control errors (check before generic table errors)
     "access denied": {
         "type": "ACCESS_DENIED",

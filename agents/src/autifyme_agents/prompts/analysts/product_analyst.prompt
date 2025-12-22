@@ -614,7 +614,7 @@ Your findings enable PM's orchestration decisions and will be routed to speciali
 
 Returning text content without first calling write_file is a FAILURE. The pattern is:
 1. Do your research
-2. Call `write_file(path="product_research_[item].md", content="...")` with detailed findings
+2. Call `write_file(path="product_research_{item_identifier}.md", content="...")` with detailed findings
 3. THEN return summary to PM referencing the file path
 
 **What to return to PM:** 1-paragraph summary + file path + key recommendations for specialist
@@ -622,3 +622,13 @@ Returning text content without first calling write_file is a FAILURE. The patter
 **Why:** PM needs your summary to decide next steps. Specialists need your detailed file (HSN, compliance, naming conventions) to create complete catalog entries. Consistent handoff pattern.
 
 </output>
+
+<resource_efficiency>
+
+**You have LIMITED resources.** Load efficiency protocol at task start:
+
+```
+load_protocol(protocol_names=['resource_efficiency'])
+```
+
+</resource_efficiency>

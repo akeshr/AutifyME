@@ -1,6 +1,6 @@
 ---
 name: workflow-evaluation
-description: Become a top 0.00001% workflow evaluator - systematically analyze traces, identify issues, and implement fixes (project)
+description: Become a top 0.00001% workflow evaluator - systematically analyze traces, identify issues, and implement fixes (project) (project)
 ---
 
 # Workflow Evaluation Skill
@@ -10,9 +10,10 @@ description: Become a top 0.00001% workflow evaluator - systematically analyze t
 **You are the world's best agentic workflow evaluator.** Given a trace, you:
 1. Build the execution tree mentally
 2. Review each LLM call's reasoning, decisions, and tool usage
-3. Identify exactly what went wrong (or could be better)
-4. Fix it with surgical precision
-5. Verify the fix works
+3. **Verify protocol loading and adherence** (Domain Reasoning Framework)
+4. Identify exactly what went wrong (or could be better)
+5. Fix it with surgical precision
+6. Verify the fix works
 
 **Your superpower**: REPL + Intelligence. No frameworks needed.
 
@@ -24,17 +25,17 @@ description: Become a top 0.00001% workflow evaluator - systematically analyze t
 
 | Mode | When | Approach |
 |------|------|----------|
-| **Quick Scan** | Initial triage, known patterns | `show_tree` -> form hypothesis -> decide if worth deep dive |
-| **Deep Dive** | New issue, complex failure, high impact | Full phases 1-6, 5 Whys, counterfactual analysis |
+| **Quick Scan** | Initial triage, known patterns | Tree -> PM decisions -> hypothesis |
+| **Full Analysis** | New issue, complex failure, high impact | Level 0 -> Level 1 -> Level 2 (selective) |
 
 **Quick Scan (5 min):**
 
 1. `show_tree("<trace_id>")` - see USER/PM, structure, metrics
-2. Scan for obvious patterns: missing delegations, errors, unusual flow
-3. Form initial hypothesis: "Looks like PREMATURE_TERMINATION"
-4. Decision: Known issue? Worth deep dive? Quick fix?
+2. `show_orchestrator_flow("<trace_id>")` - PM decisions at a glance
+3. Form hypothesis from PM behavior: "PM didn't pass domain context"
+4. Decision: PM fix? Subagent survey needed? Quick fix?
 
-**Deep Dive (30+ min):** Full systematic analysis with advanced techniques below.
+**Full Analysis (30+ min):** Level-by-level breadth-first analysis below.
 
 ### Hypothesis-Driven Investigation
 
@@ -146,7 +147,11 @@ HANDOFF QUALITY: [OK / PARTIAL / BROKEN]
 
 **Only after completing this checklist, recurse into the child node.**
 
-### Rule 4: Complete Analysis Before Moving On
+### Rule 4: Protocol Verification
+
+**Include protocol check in node analysis.** See Phase 3 for full protocol verification process.
+
+### Rule 5: Complete Analysis Before Moving On
 
 For each node, you MUST fill out the analysis template BEFORE moving to the next node:
 
@@ -260,25 +265,144 @@ Copy any UUID directly: `show_node("<full-uuid>")`
 
 ---
 
-## Phase 2: Systematic Node Analysis
+## Phase 2: Level-by-Level Analysis (Breadth-First)
 
-### The Three-Layer Analysis (PER NODE)
+> **Analyze ALL behavior at each level before diving deeper.**
 
+The key insight: PM issues cascade to subagents. Analyzing PM completely FIRST reveals patterns that explain subagent failures.
+
+### Strategy: Top-Down, Level-by-Level
+
+```text
+LEVEL 0: PM (Orchestrator)
+==========================
+Analyze ALL PM LLM calls across the trace:
+- What did PM receive? (user input, context)
+- What decisions did PM make? (routing, delegations)
+- What did PM pass to each subagent? (handoffs)
+- What did PM do with subagent results? (synthesis)
+- What did PM return to user? (final output)
+
+ONLY AFTER Level 0 is complete, move to Level 1.
+
+LEVEL 1: Subagent Input/Output Survey
+=====================================
+For EACH subagent, check input vs output (don't dive into internals yet):
+- What did subagent receive? (from PM delegation)
+- What did subagent return? (to PM)
+- Does output quality match input quality?
+- Any obvious gaps? (asked for missing info, errors)
+
+ONLY AFTER Level 1 survey, decide which subagents need deep dive.
+
+LEVEL 2: Subagent Deep Dive (Selective)
+=======================================
+For subagents with issues identified in Level 1:
+- Analyze internal reasoning
+- Check protocol loading
+- Trace tool call chains
 ```
+
+### 2.1 Level 0: Complete PM Analysis
+
+**Analyze PM across the ENTIRE trace before touching subagents.**
+
+```python
+# Get all PM decisions in order
+show_orchestrator_flow("<trace_id>")
+```
+
+**PM Analysis Template:**
+
+```text
+PM COMPLETE ANALYSIS
+====================
+
+USER INPUT:
+- Message: ___
+- Media: [Y/N] - paths: ___
+- Intent: ___ (what user wants)
+
+PM DECISIONS (in order):
+1. [timestamp] Decision: ___ | Tool/Delegation: ___ | Args: ___
+2. [timestamp] Decision: ___ | Tool/Delegation: ___ | Args: ___
+...
+
+DELEGATION SUMMARY:
+| # | Subagent | Task Description | Domain Passed? | Paths Passed? | Company Context? |
+|---|----------|------------------|----------------|---------------|------------------|
+| 1 | ___ | ___ | Y/N | Y/N | Y/N |
+| 2 | ___ | ___ | Y/N | Y/N | Y/N |
+
+PM SYNTHESIS:
+- How did PM combine subagent results? ___
+- Did PM add value or just pass through? ___
+
+FINAL OUTPUT TO USER:
+- What PM returned: ___
+- Matches user intent? Y/N
+- Quality: [Good/Acceptable/Poor]
+
+PM-LEVEL ISSUES FOUND:
+- [ ] PREMATURE_TERMINATION: Responded without exhausting research
+- [ ] WRONG_ROUTING: Delegated to wrong subagent
+- [ ] MISSING_DELEGATION: PM did work subagent should do
+- [ ] CONTEXT_NOT_PASSED: Domain/paths/company missing in delegation
+- [ ] POOR_SYNTHESIS: Subagent results not properly combined
+- [ ] Other: ___
+```
+
+### 2.2 Level 1: Subagent Input/Output Survey
+
+**For EACH subagent, compare input vs output WITHOUT diving into internals.**
+
+```text
+SUBAGENT SURVEY: [agent_name]
+=============================
+RECEIVED FROM PM:
+- Task description: ___
+- Domain context: [present/missing]
+- File paths: [present/missing]
+- Company context: [present/missing]
+
+RETURNED TO PM:
+- Result type: [analysis/action/error/question]
+- Output quality: [complete/partial/failed]
+- Asked for missing info? [Y/N] - what: ___
+
+INPUT->OUTPUT ASSESSMENT:
+- Could subagent succeed with given input? [Y/N]
+- If No, what was missing? ___
+- If Yes but failed, needs deep dive? [Y/N]
+
+VERDICT: [PM_HANDOFF_ISSUE / SUBAGENT_ISSUE / OK]
+```
+
+**Survey all subagents, then decide:**
+
+| Subagent | Verdict | Deep Dive Needed? |
+|----------|---------|-------------------|
+| ___ | ___ | Y/N |
+| ___ | ___ | Y/N |
+
+### 2.3 Level 2: Selective Deep Dive
+
+**Only dive into subagents marked for deep dive in Level 1.**
+
+For each subagent needing deep dive, use the Three-Layer Analysis:
+
+```text
 +------------------+     +------------------+     +------------------+
 |   1. INPUT       | --> |   2. REASONING   | --> |   3. OUTPUT      |
 |   (from CODE)    |     |   (from TRACE)   |     |   (from TRACE)   |
 +------------------+     +------------------+     +------------------+
 | - System prompt  |     | - What did LLM   |     | - Tool call?     |
-| - Tools + desc   |     |   think/decide?  |     |   -> HANDOFF     |
-| - User context   |     | - Is logic sound?|     |      CHECK then  |
-| - Schema         |     | - Any gaps?      |     |      RECURSE     |
+| - Tools + desc   |     |   think/decide?  |     | - Final answer?  |
+| - Context from PM|     | - Protocol used? |     | - Quality?       |
 +------------------+     +------------------+     +------------------+
 ```
 
-### Step 2.1: Reconstruct INPUT from Codebase
-
-**DO NOT rely solely on trace for input.** Read the source files:
+**Deep Dive Checklist:**
 
 ```python
 # 1. Read the agent's prompt file
@@ -287,49 +411,76 @@ Read("prompts/<agent_name>.prompt")
 # 2. Read tool definitions this agent can use
 Read("tools/<tool_name>.py")
 
-# 3. Read the agent implementation (for tool bindings, schema)
-Read("workflows/<agent_name>.py")
+# 3. Analyze the subagent's trace
+show_node(ids['<subagent_id>'])
 ```
 
-**Input Checklist**:
-
-| Component | Source | Status |
-|-----------|--------|--------|
-| System prompt | `prompts/*.prompt` | [ ] Read |
-| Tool definitions | `tools/*.py` | [ ] Read |
-| Output schema | Agent implementation | [ ] Read |
-| User context | Trace inputs | [ ] Checked |
-
-### Step 2.2: Analyze REASONING from Trace
-
-Get what the LLM actually thought:
-
-```python
-run = client.read_run(id_map['<short_id>'])  # Use full UUID from map
-# Parse run.outputs for the LLM's reasoning and decisions
-```
-
-**Reasoning Checklist**:
-
+**Reasoning Analysis:**
 - [ ] LLM acknowledged input correctly?
+- [ ] Protocol loaded? Which ones?
 - [ ] Reasoning chain is logical?
-- [ ] No jumps or unfounded assumptions?
 - [ ] If followed prompt but outcome wrong - is the prompt flawed?
-
-### Step 2.3: Analyze OUTPUT from Trace
-
-**If OUTPUT is a TOOL CALL:**
-
-1. **STOP** - Do not immediately recurse
-2. **Complete Context Handoff Checklist** (see Rule 3)
-3. **Only then** recurse into child node
-
-**If OUTPUT is a FINAL ANSWER:**
-- Validate correctness against expected outcome
 
 ---
 
-## Phase 3: Context Handoff Analysis
+## Phase 3: Protocol-Aware Analysis (Domain Reasoning Framework)
+
+**After building context, before diving into handoffs, verify protocol usage.**
+
+### 3.1 Protocol Loading Check
+
+For each agent in the trace, verify:
+
+```text
+AGENT: [name]
+TASK CONTEXT: [from PM delegation or user input]
+
+EXPECTED PROTOCOLS:
+- Domain: [CATALOG/CREATIVE/VISUAL/PRODUCT based on task]
+- Required: [business_context, relevant decision/exploration protocols]
+- Tool mastery: [read_data, write_data if data operations]
+
+ACTUAL LOADING:
+- load_protocol called: [Yes/No]
+- Protocols requested: [list]
+- Domain param: [value or missing]
+
+GAP: [None / List missing protocols]
+IMPACT: [How gap affected reasoning]
+```
+
+### 3.2 Protocol Adherence Analysis
+
+Once protocols are loaded, verify the agent FOLLOWED them:
+
+| Protocol Type | Check For |
+|---------------|-----------|
+| `business_context` | Domain vocabulary in reasoning, correct table priorities |
+| `decision` (family_fit, pricing) | Decision flow followed, scoring applied |
+| `exploration` (visual_analysis) | Template used, all focus areas covered |
+| `tool_mastery` | Correct tool patterns, anti-patterns avoided |
+
+**Key question:** Did the agent reason FROM the protocol, or ignore it?
+
+### 3.3 PM Domain Context Propagation
+
+For PM -> Analyst/Specialist delegations:
+
+```text
+PM DELEGATION CHECK:
+- Task description contains "For X domain": [Yes/No]
+- File paths included: [Yes/No]
+- Company context included: [Yes/No for catalog]
+
+CONSEQUENCE:
+- If domain missing: Analyst loads wrong/no protocols
+- If paths missing: Specialist asks "what file?"
+- If company missing: Research tool searches competitor brands
+```
+
+---
+
+## Phase 4: Context Handoff Analysis (Enhanced)
 
 ### [CRITICAL] Before Every Recursion
 
@@ -374,7 +525,7 @@ ISSUE: [None / Describe what was lost]
 
 ---
 
-## Phase 4: Diagnosis (AFTER Full Analysis)
+## Phase 5: Diagnosis (AFTER Full Analysis)
 
 ### Only Now Consider Metrics
 
@@ -432,6 +583,16 @@ Use these patterns when diagnosing and describing issues:
 | HIGH_TOKENS | >50k tokens in single call | Unbounded context or loop |
 | TOOL_LOOP | Same tool called 3+ times | Missing termination condition |
 
+**Protocol-Specific Patterns (Domain Reasoning Framework):**
+
+| Pattern | Detection | Typical Root Cause |
+|---------|-----------|-------------------|
+| PROTOCOL_NOT_LOADED | No `load_protocol` call when domain task | Agent prompt missing protocol guidance |
+| WRONG_PROTOCOL_DOMAIN | Domain param doesn't match task context | PM didn't pass domain in delegation |
+| PROTOCOL_VIOLATION | Agent did opposite of protocol anti-pattern | Protocol not loaded or ignored |
+| MISSING_DOMAIN_CONTEXT | PM delegation lacks "For X domain" | PM prompt missing delegation requirements |
+| GENERIC_REASONING | Agent reasoning lacks domain vocabulary | No business_context protocol loaded |
+
 **Orchestrator-Specific Patterns:**
 
 | Pattern | What Happened | Look For |
@@ -443,7 +604,7 @@ Use these patterns when diagnosing and describing issues:
 
 ---
 
-## Phase 5: Implement Fix
+## Phase 6: Implement Fix
 
 ### [CRITICAL] For Prompt Changes
 
@@ -470,7 +631,7 @@ skill: prompt-engineering
 
 ---
 
-## Phase 6: Verify Fix
+## Phase 7: Verify Fix
 
 ```python
 # Re-run scenario
@@ -505,34 +666,50 @@ compare_traces(old_trace_id, result.trace_id)
 ## Execution Tree
 [Paste tree with full UUIDs in lookup]
 
-## Node-by-Node Analysis
+## Level 0: PM Analysis
 
-### Node 1: [name] [full_uuid]
+### User Input
+- Message: ___
+- Media: [Y/N] - paths: ___
+- Intent: ___
 
-**INPUT** (from codebase):
-- Prompt: [file] - Key rules: ___
-- Tools: [list]
-- Context received: ___
+### PM Decisions (chronological)
+| # | Decision | Tool/Delegation | Key Args |
+|---|----------|-----------------|----------|
+| 1 | ___ | ___ | ___ |
+| 2 | ___ | ___ | ___ |
 
-**REASONING** (from trace):
+### Delegation Summary
+| Subagent | Task Description | Domain? | Paths? | Company? |
+|----------|------------------|---------|--------|----------|
+| ___ | ___ | Y/N | Y/N | Y/N |
+
+### PM-Level Issues
+- [ ] PREMATURE_TERMINATION
+- [ ] WRONG_ROUTING
+- [ ] CONTEXT_NOT_PASSED
+- [ ] POOR_SYNTHESIS
+
+## Level 1: Subagent Survey
+
+| Subagent | Input Quality | Output Quality | Verdict | Deep Dive? |
+|----------|---------------|----------------|---------|------------|
+| ___ | ___ | ___ | PM_ISSUE/SUBAGENT_ISSUE/OK | Y/N |
+
+## Level 2: Deep Dive (if needed)
+
+### [subagent_name] Deep Dive
+
+**Protocol Check**:
+- load_protocol called: [Y/N]
+- Protocols: [list]
+- Adherence: [Followed/Violated]
+
+**Reasoning Analysis**:
 - Decision: ___
-- Logic: [sound/flawed] - ___
-
-**OUTPUT** (from trace):
-- Action: ___
-- Args: ___
-
-**CONTEXT HANDOFF** (if tool call):
-- Parent had: ___
-- Parent passed: ___
-- Child received: ___
-- Child output: ___
-- Handoff quality: [OK/PARTIAL/BROKEN]
+- Logic: [sound/flawed]
 
 **Issues**: [None / List]
-
-### Node 2: [name] [full_uuid]
-[Repeat structure]
 
 ## Diagnosis Summary
 
@@ -553,23 +730,26 @@ compare_traces(old_trace_id, result.trace_id)
 
 ## Anti-Patterns (DO NOT)
 
-1. **DO NOT jump to token analysis first** - Follow execution flow, metrics come last
-2. **DO NOT skip the handoff checklist** - Context loss is a common root cause
-3. **DO NOT use truncated IDs for API calls** - Keep full UUID mapping
-4. **DO NOT move to next node without completing template** - Prevents drift
+1. **DO NOT dive into subagents before completing PM analysis** - PM issues cascade
+2. **DO NOT deep dive subagents before surveying all I/O** - Survey first, dive selectively
+3. **DO NOT jump to token analysis first** - Behavioral analysis reveals causes
+4. **DO NOT use truncated IDs for API calls** - Keep full UUID mapping
 5. **DO NOT fix symptoms** - Trace to root cause first
 6. **DO NOT assume prompt is correct** - Gap could be in any layer
+7. **DO NOT skip protocol verification** - Missing protocols cause generic reasoning
+8. **DO NOT ignore domain context in delegations** - Drives protocol selection
 
 ---
 
 ## The Mindset
 
-1. **Execution flow first** - Top to bottom, depth-first
-2. **User intent is truth** - Prompt tells you what system does, not what it should do
-3. **Handoffs are fragile** - Always verify context passing
-4. **Metrics are symptoms** - Behavioral analysis reveals causes
-5. **Template prevents drift** - Fill it completely before moving on
-6. **Verify always** - Never assume fix worked
+1. **Breadth before depth** - Complete PM analysis before touching subagents
+2. **PM issues cascade** - Most subagent failures trace back to PM handoffs
+3. **User intent is truth** - Prompt tells you what system does, not what it should do
+4. **Survey before dive** - Check all subagent I/O before deep diving any
+5. **Protocols enable domain reasoning** - Without protocols, agents reason generically
+6. **Template prevents drift** - Fill it completely before moving on
+7. **Verify always** - Never assume fix worked
 
 ---
 
@@ -653,27 +833,27 @@ Use these **after** systematic analysis to cross-check findings, or to quickly s
 
 **Note**: `show_handoff` is optimized for orchestrator -> task delegations. For agent LLM -> tool handoffs, "WHAT PARENT PASSED" may be empty but "WHAT CHILD RECEIVED" will show correct data.
 
-### Typical Workflow
+### Typical Workflow (Level-by-Level)
 
 ```python
-# 1. Build tree, get ID lookup
-ids = show_tree("<trace_id>")
+# LEVEL 0: Complete PM Analysis
+ids = show_tree("<trace_id>")           # Get structure + ID lookup
+show_orchestrator_flow("<trace_id>")    # ALL PM decisions chronologically
+scan_all_handoffs("<trace_id>")         # Quick view of ALL delegations
 
-# 2. See orchestrator's decisions
-show_orchestrator_flow("<trace_id>")
+# Form hypothesis: PM issue? Context not passed?
 
-# 3. Analyze first orchestrator LLM call
-show_node(ids['<short_id>'])
+# LEVEL 1: Subagent I/O Survey (if PM looks OK)
+# For each subagent, check input vs output:
+show_handoff(ids['<pm_id>'], ids['<subagent1_id>'])
+show_handoff(ids['<pm_id>'], ids['<subagent2_id>'])
+# Verdict: PM_HANDOFF_ISSUE or SUBAGENT_ISSUE?
 
-# 4. Before recursing into task, check handoff
-show_handoff(ids['<parent_id>'], ids['<child_id>'])
+# LEVEL 2: Selective Deep Dive (only for SUBAGENT_ISSUE verdicts)
+show_node(ids['<subagent_id>'])         # Full internal analysis
 
-# 5. Then analyze child node
-show_node(ids['<child_id>'])
-
-# 6. (Optional) Cross-check with automated detection
-detect_issues("<trace_id>")       # Verify no issues missed
-scan_all_handoffs("<trace_id>")   # Overview of all delegations
+# Cross-check
+detect_issues("<trace_id>")             # Verify no issues missed
 ```
 
 ---
@@ -688,6 +868,47 @@ scan_all_handoffs("<trace_id>")   # Overview of all delegations
 | Agent implementations | `workflows/*.py`, `agents/*.py` |
 | Shared state/workspace | Application-specific |
 | **Evaluation helpers** | `tests/tools/evaluation/helpers.py` |
+| **Protocols** | `prompts/protocols/` |
+| **Protocol loader** | `tools/protocol_loader.py` |
+
+---
+
+## Quick Reference: Protocol Framework
+
+### Protocol Types
+
+| Type | Purpose | Examples |
+|------|---------|----------|
+| `tool_mastery` | How to use tools correctly | read_data, write_data, view_image |
+| `decision` | Structured reasoning patterns | family_fit, pricing, duplicate_prevention |
+| `exploration` | What to investigate | visual_analysis, attribute_extraction |
+| `domain_orientation` | Business context, vocabulary | business_context |
+| `routing` | PM routing decisions | domain_awareness |
+| `orchestration` | Multi-domain coordination | coordination_patterns |
+
+### Protocol Resolution Order
+
+1. Domain-specific: `{domain}/{protocol}.protocol`
+2. Shared: `shared/{protocol}.protocol`
+3. Tool mastery: `shared/tool_mastery/{protocol}.protocol`
+
+### Expected Protocols by Agent Type
+
+| Agent | Domain Context | Expected Protocols |
+|-------|----------------|-------------------|
+| visual_analyst | CATALOG | business_context, visual_analysis |
+| catalog_analyst | CATALOG | business_context, family_fit, duplicate_prevention |
+| catalog_specialist | CATALOG | business_context, duplicate_prevention, variant_management |
+| product_analyst | PRODUCT | research_product |
+| PM | - | domain_awareness, coordination_patterns |
+
+### Protocol Verification Questions
+
+1. Did PM pass domain context in delegation?
+2. Did agent call `load_protocol` early in execution?
+3. Did agent load correct protocols for the domain?
+4. Did agent follow protocol patterns in reasoning?
+5. Did agent avoid protocol anti-patterns?
 
 ---
 

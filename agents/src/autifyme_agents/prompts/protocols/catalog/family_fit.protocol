@@ -1,0 +1,164 @@
+<protocol name="family_fit" type="decision" domain="catalog">
+
+## PURPOSE
+
+Structured decision protocol for assigning a product to an existing family.
+Ensures family fit is grounded in CUSTOMER SEGMENT match, not just material similarity.
+
+---
+
+## CORE PRINCIPLE
+
+**Products belong to families that serve the SAME CUSTOMER.**
+
+Family fit is NOT determined by:
+- Material (PET, glass, HDPE)
+- Shape (jar, bottle, container)
+- Size similarity
+
+Family fit IS determined by:
+- Target customer segment
+- Pain points addressed
+- Benefits offered
+- Tone of communication
+
+---
+
+## DECISION STEPS
+
+### Step 1: IDENTIFY Candidate Family
+
+Based on visual analysis and product name, identify 1-3 candidate families.
+
+**Query:** product_families table by name pattern
+
+### Step 2: QUERY Customer Segments (CRITICAL)
+
+For each candidate family, query customer_segments. This is MANDATORY - no exceptions.
+
+**Query:** customer_segments table filtered by product_family_id
+
+**Required columns:** segment_type, segment_label, tone, key_benefits, pain_points
+
+### Step 3: ANALYZE Target Customer
+
+From customer_segments data, understand:
+
+| Question | Source Column |
+|----------|---------------|
+| WHO buys from this family? | segment_type, segment_label |
+| WHAT do they care about? | key_benefits, pain_points |
+| HOW do we talk to them? | tone |
+
+### Step 4: COMPARE Customer Match
+
+Compare your product's target customer with family's customer:
+
+| Factor | Match Criteria |
+|--------|----------------|
+| segment_type | Same type (b2b, b2c, d2c, etc.) |
+| pain_points | Product solves similar problems |
+| key_benefits | Product offers similar value |
+
+**Scoring:**
+- 3/3 matches: Strong fit
+- 2/3 matches: Moderate fit (verify with pain_points)
+- 1/3 or 0/3 matches: Weak fit - consider different family
+
+### Step 5: CONCLUDE
+
+Based on analysis, reach one of three conclusions:
+
+| Conclusion | Condition | Next Action |
+|------------|-----------|-------------|
+| **FIT** | Customer segment matches | Proceed with family assignment |
+| **NO FIT** | Customer segment doesn't match | Check other candidate families |
+| **NEW FAMILY** | No existing family serves this customer | Load new_family protocol |
+
+---
+
+## ITERATION BOUNDS
+
+- Maximum 3 candidate families evaluated
+- If no fit after 3 families, conclude NEW FAMILY needed
+- Never loop indefinitely
+
+---
+
+## REQUIRED EVIDENCE
+
+Before concluding FIT, you MUST have:
+
+1. `customer_segments` query result for the family
+2. Explicit comparison: product's customer vs family's customer
+3. Match score (3/3, 2/3, etc.)
+
+Do NOT conclude fit based on:
+- Material similarity alone
+- Name pattern matching alone
+- Visual appearance alone
+
+---
+
+## EXAMPLE DECISION TRACE
+
+### Input: "PET Food Jar 500ml with honeycomb texture"
+
+**Step 1: IDENTIFY**
+- Candidate: "PET Food Jars" family
+
+**Step 2: QUERY**
+- Query customer_segments for candidate family
+- Result: segment_type=b2b, segment_label="Food Packaging Manufacturers"
+- key_benefits: food-safe, BPA-free, clear visibility
+- pain_points: product freshness, shelf appeal, cost efficiency
+
+**Step 3: ANALYZE**
+- WHO: B2B food packaging manufacturers
+- WHAT: Food safety, shelf appeal, cost
+- HOW: Professional tone
+
+**Step 4: COMPARE**
+- Product target: Food packaging buyers (B2B) - MATCH
+- Product solves: Freshness, visibility - MATCH
+- Product benefits: Food-safe, clear - MATCH
+- Score: 3/3
+
+**Step 5: CONCLUDE**
+- Conclusion: FIT
+- Reasoning: Same B2B customer segment, same pain points, same benefits
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Material-based assignment | "PET = PET family" without customer query | Query customer_segments, compare customer match |
+| Skipping Step 2 | Conclusion without customer_segments query | Always query customer_segments - MANDATORY |
+| Name-based assumption | "Both have 'Jar' = same family" | Name is a hint, customer_segments is evidence |
+| Visual similarity only | "Looks similar = same family" | Visual is not enough, verify customer match |
+
+---
+
+## OUTPUT STRUCTURE
+
+After completing steps, return structured conclusion:
+
+```json
+{
+  "decision": "FIT | NO_FIT | NEW_FAMILY",
+  "family_id": "uuid or null",
+  "family_name": "name or null",
+  "evidence": {
+    "customer_segment_queried": true,
+    "segment_type_match": true,
+    "pain_points_match": true,
+    "benefits_match": true,
+    "match_score": "3/3"
+  },
+  "reasoning": "Same B2B food packaging customer, same pain points around freshness and visibility"
+}
+```
+
+</protocol>

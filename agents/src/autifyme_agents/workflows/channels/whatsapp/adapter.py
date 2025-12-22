@@ -268,6 +268,12 @@ class WhatsAppChannel:
             ChannelError: If upload or send fails
         """
         try:
+            from autifyme_agents.core.storage_utils import build_storage_url, is_storage_path
+
+            # Convert storage paths to full URLs before processing
+            if is_storage_path(image_source):
+                image_source = build_storage_url(image_source)
+
             is_url = image_source.startswith(("http://", "https://"))
 
             logger.debug(

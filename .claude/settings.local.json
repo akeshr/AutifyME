@@ -77,10 +77,19 @@
       "WebFetch(domain:docs.claude.com)",
       "WebFetch(domain:gist.github.com)",
       "WebFetch(domain:patmcguinness.substack.com)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(cmd /c \"tree /F /A c:\\Abhi\\personal\\self\\AutifyME\\agents\\src\\autifyme_agents\\prompts\")",
+      "Skill(autonomous-testing)"
     ],
     "deny": [],
     "ask": []
   },
-  "outputStyle": "Jarvis"
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
+  "outputStyle": "Jarvis",
+  "remote": {
+    "defaultEnvironmentId": "env_011CUKymx1Tf5vqVY8tET3XX"
+  }
 }

@@ -27,7 +27,7 @@ class InspectSchemaInput(BaseModel):
 
     tables: list[str] = Field(
         ...,
-        description="List of tables to inspect (e.g., ['products', 'product_families'])"
+        description="List of tables to inspect (e.g., ['entities', 'parent_entities'])"
     )
     details: list[Literal["structure", "relationships", "constraints", "stats", "samples"]] = Field(
         default=["structure"],
@@ -87,19 +87,19 @@ def create_inspect_schema_tool(
         StructuredTool configured for this specialist
 
     Examples:
-        # Cataloging Specialist - Full access to product domain
+        # Specialist - Domain-scoped access
         inspect_schema_tool = create_inspect_schema_tool(
             storage,
-            tables=["product_families", "products", "variant_axes", "variant_values"]
+            tables=["parent_entities", "entities", "attribute_types", "attributes"]
         )
 
-        # Market Intelligence - Read-only, all tables
+        # Analyst - Read-only, all tables
         inspect_schema_tool = create_inspect_schema_tool(storage)  # No restrictions
 
-        # Campaign Specialist - Campaign domain only
+        # Specialist - Alternate domain only
         inspect_schema_tool = create_inspect_schema_tool(
             storage,
-            tables=["campaigns", "ad_copies"]
+            tables=["records", "metadata"]
         )
     """
     config = InspectSchemaToolConfig(
@@ -130,9 +130,9 @@ def create_inspect_schema_tool(
             Schema information for requested tables with requested details
 
         Examples:
-            # Complex: Multi-table schema verification before creating product family
+            # Complex: Multi-table schema verification before creating parent entity
             inspect_schema(
-                tables=["product_families", "variant_axes", "variant_values", "products", "product_variant_values"],
+                tables=["parent_entities", "attribute_types", "attributes", "entities", "entity_attributes"],
                 details=["structure", "relationships"],
                 sample_limit=0
             )
@@ -140,23 +140,23 @@ def create_inspect_schema_tool(
 
             # Complex: Deep inspection with samples for duplicate detection strategy
             inspect_schema(
-                tables=["product_families"],
+                tables=["parent_entities"],
                 details=["structure", "stats", "samples"],
                 sample_limit=10
             )
             # Returns: Column types, row count, 10 real examples to understand naming patterns for fuzzy matching
 
-            # Complex: Junction table analysis for variant value relationships
+            # Complex: Junction table analysis for attribute relationships
             inspect_schema(
-                tables=["product_variant_values", "variant_values", "variant_axes"],
+                tables=["entity_attributes", "attributes", "attribute_types"],
                 details=["structure", "relationships"],
                 sample_limit=5
             )
-            # Returns: M:N relationship structure between products and variant values via junction table
+            # Returns: M:N relationship structure between entities and attributes via junction table
 
-            # Complex: Full catalog structure with cascade behavior for delete operations
+            # Complex: Full structure with cascade behavior for delete operations
             inspect_schema(
-                tables=["products", "product_images", "product_family_industries"],
+                tables=["entities", "entity_assets", "entity_categories"],
                 details=["structure", "relationships", "stats"],
                 sample_limit=3
             )
@@ -164,7 +164,7 @@ def create_inspect_schema_tool(
 
             # Quick structure check (no relationships, no samples)
             inspect_schema(
-                tables=["products"],
+                tables=["entities"],
                 details=["structure"]
             )
             # Returns: Columns, types, constraints only (fastest query)
@@ -385,12 +385,12 @@ def create_inspect_schema_tool(
             "- Use 'relationships' detail for any multi-table operation to see foreign keys and cascade rules\n"
             "- Samples help fuzzy matching - see how humans name things (set sample_limit for count)\n\n"
             "EXAMPLES:\n"
-            "# Before creating product - discover required fields and enum values\n"
-            "inspect_schema(tables=['products'], details=['structure','constraints'])\n"
-            "Returns: required fields (sku, name, product_type), optional fields, valid product_type values\n\n"
+            "# Before creating entity - discover required fields and enum values\n"
+            "inspect_schema(tables=['entities'], details=['structure','constraints'])\n"
+            "Returns: required fields (code, name, type), optional fields, valid type enum values\n\n"
             "# Multi-table operation - understand relationships\n"
-            "inspect_schema(tables=['products','product_families','variant_axes'], details=['structure','relationships'])\n"
-            "Returns: Foreign keys (products.product_family_id -> product_families.id), cascade behavior\n\n"
+            "inspect_schema(tables=['entities','parent_entities','attribute_types'], details=['structure','relationships'])\n"
+            "Returns: Foreign keys (entities.parent_id -> parent_entities.id), cascade behavior\n\n"
             "ALSO CONSIDER:\n"
             "- read_data: After inspecting schema, use read_data to fetch actual records\n"
             "- aggregate_data: After schema discovery, use aggregate_data for distribution analysis\n"

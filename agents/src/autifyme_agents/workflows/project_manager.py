@@ -28,6 +28,7 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.integrations.storage import get_store
+from autifyme_agents.middleware import create_execution_limits
 from autifyme_agents.middleware.context_management import HybridTruncateThenClearEdit
 from autifyme_agents.middleware.context_middleware import load_base_context
 from autifyme_agents.schemas.context import CompanyContext
@@ -47,20 +48,19 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
-    """Return configured LLM for PM. Defaults to gemini-2.5-flash-lite.
+    """Return configured LLM for PM. Defaults to gemini-3-flash-preview.
 
     Configuration rationale:
-    - thinking_budget=0: Disabled for Flash-Lite to optimize speed/cost.
-      PM is orchestrator so minimal thinking suffices.
+    - thinking_level='low': Fast orchestration with Gemini 3.
     - max_retries=5: Production resilience against Gemini's occasional blank responses.
-    - temperature=0.5: Balanced creativity for user communication.
+    - temperature=1.0: Gemini 3 default (below 1.0 may cause looping).
     """
     if model is not None:
         return model
     return get_llm(
         provider="google",
-        model="gemini-2.5-flash-lite",
-        temperature=1.0,  # PM orchestrates, specialists reason
+        model="gemini-3-flash-preview",
+        thinking_level="low",  # Fast orchestration
         max_retries=5,  # Increase resilience against blank responses
     )
 
@@ -71,7 +71,7 @@ def _load_prompt(
     channel: MessagingChannel | None = None,
 ) -> str:
     """Load and format PM prompt with company context."""
-    prompt_template = load_prompt("project_manager.prompt")
+    prompt_template = load_prompt("project_manager_v2.prompt")
 
     platform_name = "unknown"
     if channel is not None:
@@ -123,7 +123,7 @@ async def create_project_manager(
 
     Args:
         company_profile: Company context for brand voice and positioning
-        model: LLM for orchestration (defaults to gemini-2.5-flash-lite)
+        model: LLM for orchestration (defaults to gemini-3-flash-preview)
         checkpointer: LangGraph checkpointer for state persistence
         storage: Storage adapter for database operations
         channel: Messaging channel for platform-specific operations
@@ -153,9 +153,14 @@ async def create_project_manager(
 
     instructions = _load_prompt(company_profile, base_context, channel)
 
-    # PM Tools - Media access + view_image for conversational context
+    # PM Tools - Protocol loading, media access, view_image for conversational context
     # PM can SEE images for routing decisions; detailed analysis delegated to analysts
     pm_tools: list[Any] = []
+
+    # load_protocol for PM to load coordination protocols (domain_awareness, coordination_patterns)
+    # PM uses this for: understanding domain boundaries, conflict resolution, multi-domain coordination
+    from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
+    pm_tools.append(create_load_protocol_tool())
 
     # view_image for PM to see user images and understand conversational context
     # PM uses this for: initial understanding, conversational references ("the blue one")
@@ -171,8 +176,8 @@ async def create_project_manager(
     # Specialist LLM configuration
     specialist_llm = get_llm(
         provider="google",
-        model="gemini-2.5-flash-lite",
-        temperature=0.5,
+        model="gemini-3-flash-preview",
+        thinking_level="high",  # Specialists need deeper reasoning
         max_retries=5,  # Match PM resilience for blank response handling
     )
 
@@ -211,18 +216,19 @@ async def create_project_manager(
     # Task tool (subagent calls) preserved - contains specialist decisions
     # Other tools (schema, read_data, etc.) truncated - raw data can be re-fetched
     pm_middleware = [
+        *create_execution_limits(model_call_limit=15, tool_call_limit=20),
         ContextEditingMiddleware(
             edits=[
                 HybridTruncateThenClearEdit(
-                    trigger_truncate=30000,  # Start truncating at 30k tokens
+                    trigger_truncate=50000,  # Start truncating at 30k tokens
                     trigger_clear=80000,  # Clear if still over 80k
-                    max_truncate_length=500,  # Keep first 500 chars of each result
-                    keep_recent_truncate=3,  # Don't truncate last 3 results
+                    max_truncate_length=1000,  # Keep first 500 chars of each result
+                    keep_recent_truncate=5,  # Don't truncate last 3 results
                     keep_recent_clear=5,  # Don't clear last 5 results
                     exclude_tools=("task",),  # Preserve subagent results
                 )
             ]
-        )
+        ),
     ]
 
     project_manager = create_deep_agent(

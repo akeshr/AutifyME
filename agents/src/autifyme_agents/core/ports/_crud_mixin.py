@@ -18,7 +18,7 @@ class CRUDMixin(ABC):
         filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
         relations: list[str] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
         """
@@ -29,7 +29,9 @@ class CRUDMixin(ABC):
             filters: WHERE conditions as dict (e.g., {"is_active": True})
             columns: Columns to select (default: all columns)
             relations: Related tables to include (e.g., ["categories(*)", "variant_axes(*)"])
-            search_patterns: Case-insensitive LIKE patterns (e.g., {"name": "%bottle%"})
+            search_patterns: Case-insensitive LIKE patterns. Supports:
+                - Single pattern (AND): {"name": "%bottle%"}
+                - Multiple patterns (OR): {"name": ["%bottle%", "%jar%"]}
             limit: Maximum rows to return
 
         Returns:
@@ -42,7 +44,7 @@ class CRUDMixin(ABC):
         self,
         table: str,
         filters: dict[str, Any] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
     ) -> int:
         """
         Count entities matching filters.
@@ -88,7 +90,7 @@ class CRUDMixin(ABC):
         filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
         relations: list[str] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         count_only: Literal[True] = ...,
         limit: int | None = None,
     ) -> int: ...
@@ -100,7 +102,7 @@ class CRUDMixin(ABC):
         filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
         relations: list[str] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         count_only: Literal[False] = ...,
         limit: int | None = None,
     ) -> list[dict[str, Any]]: ...
@@ -112,7 +114,7 @@ class CRUDMixin(ABC):
         filters: dict[str, Any] | None = None,
         columns: list[str] | None = None,
         relations: list[str] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         count_only: bool = False,
         limit: int | None = None,
     ) -> list[dict[str, Any]] | int:
@@ -139,7 +141,7 @@ class CRUDMixin(ABC):
         table: str,
         aggregates: dict[str, str],
         filters: dict[str, Any] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         group_by: list[str] | None = None,
         having: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
@@ -184,7 +186,7 @@ class CRUDMixin(ABC):
         self,
         table: str,
         filters: dict[str, Any] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         relations: list[str] | None = None,
         order_by: str | None = None,
         page: int = 1,

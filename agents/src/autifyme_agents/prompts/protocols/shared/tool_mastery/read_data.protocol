@@ -1,0 +1,393 @@
+<protocol name="read_data" type="tool_mastery" domain="shared">
+
+## PURPOSE
+
+Master the read_data tool - universal database read for queries, batch reads, pagination, and counts.
+
+## CRITICAL DISTINCTION: filters vs search_patterns
+
+This is the #1 source of errors. Understand deeply.
+
+| Parameter | Match Type | Use For | Wildcards |
+|-----------|------------|---------|-----------|
+| **filters** | EXACT (case-sensitive) | IDs, booleans, enums, FKs | NO |
+| **search_patterns** | FUZZY (case-insensitive ILIKE) | Names, text, descriptions | YES (%) |
+
+### filters (Exact Match)
+- Equality or IN matching - no wildcards
+- Use when you have EXACT values
+- Examples:
+  - `{'is_active': True}` - boolean
+  - `{'id': 'uuid-123'}` - exact ID
+  - `{'status': ['draft', 'published']}` - IN operator for lists
+  - `{'parent_id': 'parent-123'}` - foreign key
+
+### search_patterns (Fuzzy Match)
+- Case-insensitive ILIKE with % wildcards
+- Use for ALL name/text searches
+- **Supports OR via list values** - CRITICAL for efficiency!
+- Examples:
+  - `{'name': '%keyword%'}` - contains "keyword" anywhere (single pattern)
+  - `{'name': ['%term1%', '%term2%', '%term3%']}` - OR search: term1 OR term2 OR term3 (1 query!)
+  - `{'name': '%word1%word2%'}` - contains both words in sequence (single pattern with AND)
+  - `{'code': 'PREFIX-%'}` - starts with "PREFIX-"
+
+### OR Patterns (EFFICIENCY - CRITICAL)
+
+Use list values to search for multiple patterns with OR logic in a single query.
+
+```python
+# EFFICIENT: 1 query for all keywords
+read_data(
+    table='table_name',
+    search_patterns={'name': ['%keyword1%', '%keyword2%', '%keyword3%']},
+    columns=['id', 'name', 'code']
+)
+# Returns: Records with ANY of these terms in name
+
+# INEFFICIENT (DON'T DO THIS): Multiple separate queries
+read_data(search_patterns={'name': '%keyword1%'})
+read_data(search_patterns={'name': '%keyword2%'})
+read_data(search_patterns={'name': '%keyword3%'})
+```
+
+### Common Mistake
+
+```
+WRONG:
+filters={'name': ['Item A', 'Item B']}
+Result: Returns EMPTY if exact names don't exist
+
+CORRECT:
+search_patterns={'name': '%keyword%'}
+Result: Returns all records containing "keyword" (case-insensitive)
+
+ALSO CORRECT (OR search):
+search_patterns={'name': ['%term1%', '%term2%']}
+Result: Returns all records containing "term1" OR "term2"
+```
+
+RULE: If you're matching human text and didn't include %, you probably meant search_patterns.
+
+---
+
+## PARAMETERS
+
+### table (required)
+- Table name - use inspect_schema to discover available tables
+- Check singular vs plural naming conventions
+
+### filters (optional)
+- Exact match only - no wildcards
+- Good for: IDs, booleans, enums, foreign keys
+- NOT for text search
+
+### search_patterns (optional)
+- ILIKE patterns with % wildcards
+- Good for: names, descriptions, codes, text columns
+- ONLY works on TEXT columns, NOT on array columns (text[])
+
+### columns (optional)
+- Columns to select (None = all)
+- Use to reduce payload: `['id', 'name', 'value']`
+- Always prefer selecting specific columns
+
+### relations (optional)
+- PostgREST syntax for related data
+- CRITICAL SYNTAX:
+  - Basic: `'related_table(col1,col2)'`
+  - Nested: `'parent(*,child(*))'` (CORRECT)
+  - WRONG: `'parent.child(*)'` - dot notation does NOT work
+- Use inspect_schema with details=['relationships'] to verify FK targets
+
+### ids (optional)
+- Batch fetch by specific IDs
+- Overrides filters/search_patterns
+- Example: `['id1', 'id2', 'id3']`
+
+### limit (default: 50)
+- Maximum rows to return
+- Defaults to 50 for token efficiency
+- Increase only when needed
+
+### offset (optional)
+- Skip N rows for pagination
+- Use with limit for pages
+
+### count_only (default: False)
+- Return only count, not records
+- Efficient for "how many" queries
+
+---
+
+## USE PATTERNS
+
+### Pattern 1: Duplicate Check (CRITICAL - Before Create)
+
+```python
+read_data(
+    table='table_name',
+    search_patterns={'code': '%KEYWORD%'},
+    columns=['id', 'code', 'name']
+)
+```
+Purpose: Check if record exists before creating duplicate.
+When: ALWAYS before write_data create operations.
+
+### Pattern 2: Foreign Key Lookup
+
+```python
+read_data(
+    table='parent_table',
+    search_patterns={'name': '%keyword%'},
+    columns=['id', 'name']
+)
+```
+Purpose: Get IDs for relationships.
+When: Before write_data that needs foreign key values.
+
+### Pattern 3: Combined Filters + Search + Relations
+
+```python
+read_data(
+    table='main_table',
+    filters={'is_active': True, 'parent_id': ['id-1', 'id-2']},
+    search_patterns={'code': '%500%'},
+    relations=['parent_table(name)'],
+    columns=['id', 'code', 'name', 'value'],
+    limit=50
+)
+```
+Purpose: Complex query with exact + fuzzy + joins.
+When: Context gathering, data analysis.
+
+### Pattern 4: Nested Relations (2+ Levels Deep)
+
+```python
+read_data(
+    table='parent_table',
+    ids=['uuid-parent'],
+    relations=[
+        'children(*)',
+        'categories(*, subcategories(*))'  # CORRECT nested syntax
+    ]
+)
+```
+Purpose: Full hierarchy with nested children.
+When: Need complete structure.
+CRITICAL: Use `parent(*, child(*))` NOT `parent.child(*)`.
+
+### Pattern 5: Query Through Junction Table
+
+Get entities with their linked data via junction:
+
+```python
+# Get items with their linked assets via junction
+read_data(
+    table='main_table',
+    ids=['uuid-item'],
+    relations=[
+        'item_asset_junction(*, assets(id, name, storage_url, asset_type))'
+    ]
+)
+```
+
+Response structure:
+```json
+{
+  "id": "uuid-item",
+  "name": "Item Name",
+  "item_asset_junction": [
+    {
+      "id": "junction-id",
+      "role": "PRIMARY",
+      "sort_order": 0,
+      "assets": {
+        "id": "asset-id",
+        "name": "Image Name",
+        "storage_url": "https://...",
+        "asset_type": "IMAGE"
+      }
+    }
+  ]
+}
+```
+
+### Pattern 6: Reverse Junction Query (Find Links to Entity)
+
+Find all items linked to a specific entity:
+
+```python
+# Find all items linked to a category
+read_data(
+    table='item_category_junction',
+    filters={'category_id': 'uuid-category'},
+    relations=['items(id, name, status)'],
+    columns=['id', 'sort_order']
+)
+```
+
+### Pattern 7: Complex Multi-Level Join
+
+Query with 3+ levels of relations:
+
+```python
+read_data(
+    table='grandparent_table',
+    ids=['uuid-grandparent'],
+    relations=[
+        'parent_table(id, name, child_table(id, name, metadata))'
+    ]
+)
+```
+
+Response structure:
+```json
+{
+  "id": "uuid-grandparent",
+  "name": "Grandparent",
+  "parent_table": [
+    {
+      "id": "parent-id",
+      "name": "Parent A",
+      "child_table": [
+        {"id": "child-1", "name": "Child A1", "metadata": {}},
+        {"id": "child-2", "name": "Child A2", "metadata": {}}
+      ]
+    }
+  ]
+}
+```
+
+### Pattern 8: Filtered Relations
+
+Filter the related data, not just the parent:
+
+```python
+# Get items with only their active child records
+read_data(
+    table='parent_table',
+    ids=['uuid-parent'],
+    relations=[
+        'children!inner(id, name)'  # INNER JOIN
+    ],
+    filters={'children.is_active': True}  # Filter on relation
+)
+```
+
+Note: PostgREST supports `!inner` for INNER JOIN semantics.
+
+### Pattern 9: Count Query
+
+```python
+read_data(
+    table='table_name',
+    filters={'is_active': True},
+    count_only=True
+)
+```
+Purpose: Efficient counting without fetching records.
+When: Need "how many" without data.
+
+---
+
+## ANTI-PATTERNS (Don't Do This)
+
+### Anti-Pattern 1: Using filters for name search
+
+```python
+# WRONG - Returns empty if exact match doesn't exist
+read_data(
+    table='parent_table',
+    filters={'name': ['Exact Name 1', 'Exact Name 2']}
+)
+
+# CORRECT - Fuzzy match finds variations
+read_data(
+    table='parent_table',
+    search_patterns={'name': '%keyword%'}
+)
+```
+
+### Anti-Pattern 2: search_patterns on array columns
+
+```python
+# WRONG - Arrays don't support ILIKE
+read_data(
+    table='table_name',
+    search_patterns={'tags': '%value%'}  # ERROR: operator does not exist
+)
+
+# CORRECT - Use filters with exact array or check column type first
+# First: inspect_schema to verify column type
+```
+
+### Anti-Pattern 3: Wrong relation syntax
+
+```python
+# WRONG - Dot notation doesn't work
+read_data(
+    table='child_table',
+    relations=['parent_table.grandparent(name)']
+)
+
+# CORRECT - Nested parentheses
+read_data(
+    table='child_table',
+    relations=['parent_table(grandparent(name))']
+)
+```
+
+### Anti-Pattern 4: Fetching all columns when only ID needed
+
+```python
+# INEFFICIENT - Fetches entire record
+read_data(table='table_name', filters={'code': 'CODE-001'})
+
+# EFFICIENT - Only what you need
+read_data(table='table_name', filters={'code': 'CODE-001'}, columns=['id'])
+```
+
+---
+
+## BEFORE read_data
+
+- **Schema unknown?** Use inspect_schema first to discover tables, columns, relationships
+- **Column type unknown?** inspect_schema tells you if column is text, text[], boolean, etc.
+
+## AFTER read_data
+
+- **Found duplicates?** Consider update instead of create
+- **Got foreign keys?** Ready for write_data
+- **No results?** Check: search_patterns vs filters? Column type? Table name?
+
+---
+
+## RETURN STRUCTURE
+
+### Success
+
+```json
+{
+  "success": true,
+  "table": "table_name",
+  "operation": "query",
+  "results": [...],
+  "count": 10,
+  "pagination": {"limit": 50, "offset": 0, "has_more": false}
+}
+```
+
+### Error
+
+```json
+{
+  "success": false,
+  "error": "Human-readable error message",
+  "error_type": "QUERY_ERROR",
+  "table": "table_name",
+  "Agent Action": "Steps to fix..."
+}
+```
+
+</protocol>

@@ -1,0 +1,202 @@
+<protocol name="variant_management" type="decision" domain="catalog">
+
+## PURPOSE
+
+Protocol for managing product variants within families.
+Ensures consistent variant structure, SKU generation, and parent-child relationships.
+
+---
+
+## VARIANT ARCHITECTURE
+
+```
+product_families
+    |
+    +-- variant_axes (size, color, cap_type)
+    |       |
+    |       +-- variant_values (500ml, Blue, Diamond)
+    |
+    +-- products (individual SKUs)
+            |
+            +-- product_variant_values (links product to its variant values)
+```
+
+**Key Relationships:**
+- Family has 1-N axes (how products vary)
+- Axis has 1-N values (what variations exist)
+- Product has 1 value per axis (specific combination)
+
+---
+
+## VARIANT AXES DESIGN
+
+### Common Axes by Product Type
+
+| Product Type | Typical Axes |
+|--------------|--------------|
+| Food Jars | size, color, cap_type |
+| Beverage Bottles | size, color, neck_type |
+| Industrial Containers | size, material_grade, color |
+| Cosmetic Packaging | size, color, finish |
+| Apparel | size, color, fit |
+
+### Axis Naming Conventions
+
+| Convention | Example | Usage |
+|------------|---------|-------|
+| snake_case internal | cap_type | `name` column |
+| Title Case display | Cap Type | `display_label` column |
+| Schema.org mapping | size, color | `schema_property` column |
+
+### Axis Record Structure
+
+| Field | Required | Purpose |
+|-------|----------|---------|
+| product_family_id | Yes | FK to owning family |
+| name | Yes | snake_case identifier (size, cap_type) |
+| display_label | Yes | Human-readable (Size, Cap Type) |
+| sort_order | Yes | Position in SKU generation |
+| schema_property | No | Schema.org mapping for SEO |
+
+---
+
+## VARIANT VALUES DESIGN
+
+### Value Conventions
+
+| Field | Convention | Example |
+|-------|------------|---------|
+| value | lowercase, identifier | 500ml, blue, diamond |
+| display_label | Human-readable | 500 ML, Blue, Diamond Cap |
+| sku_code | UPPERCASE, short | 500ML, BLU, DIA |
+
+### SKU Code Patterns
+
+| Axis | Value | SKU Code |
+|------|-------|----------|
+| size | 500ml | 500ML |
+| size | 1L | 1L |
+| color | clear | CLR |
+| color | blue | BLU |
+| cap_type | diamond | DIA |
+| cap_type | ribbed | RIB |
+
+### Value Record Structure
+
+| Field | Required | Purpose |
+|-------|----------|---------|
+| variant_axis_id | Yes | FK to owning axis |
+| value | Yes | lowercase identifier (500ml, blue) |
+| display_label | Yes | Human-readable (500 ML, Blue) |
+| sku_code | Yes | UPPERCASE, short for SKU generation |
+| price_adjustment | No | Price delta from base (default 0) |
+| sort_order | Yes | Display ordering |
+
+---
+
+## SKU GENERATION
+
+### Pattern
+
+```
+{family_sku_prefix}-{axis1_sku_code}-{axis2_sku_code}-...
+```
+
+### Examples
+
+| Family Prefix | Size | Color | Cap | Generated SKU |
+|---------------|------|-------|-----|---------------|
+| JAR-PET | 500ML | CLR | DIA | JAR-PET-500ML-CLR-DIA |
+| JAR-PET | 1L | BLU | RIB | JAR-PET-1L-BLU-RIB |
+| BTL-GLASS | 750ML | GRN | - | BTL-GLASS-750ML-GRN |
+
+### SKU Generation Logic
+
+```
+1. Get family sku_prefix
+2. For each axis (in sort_order):
+   a. Get product's variant_value for this axis
+   b. Get variant_value.sku_code
+   c. Append to SKU with separator
+3. Result: {prefix}-{code1}-{code2}-{code3}
+```
+
+---
+
+## PRODUCT-VARIANT LINKING
+
+Each product must link to exactly ONE value per axis via `product_variant_values` junction.
+
+### Validation Rules
+
+| Rule | Constraint |
+|------|------------|
+| Complete coverage | Product has value for each axis in family |
+| Single selection | Product has exactly ONE value per axis |
+| Unique combinations | No duplicate variant combinations within family |
+
+---
+
+## QUERYING VARIANTS
+
+| Query Need | Approach |
+|------------|----------|
+| Family variant structure | Query product_families with relations: variant_axes, variant_values |
+| Product's variant values | Query products with relations through product_variant_values |
+| Products by variant value | Query product_variant_values filtered by variant_value_id |
+
+---
+
+## ADDING NEW VARIANTS
+
+| Scenario | Action | Impact |
+|----------|--------|--------|
+| New value to existing axis | Create variant_values record linked to axis | New SKU combinations available |
+| New axis to family | Create variant_axes record linked to family | All existing products need values for new axis |
+
+---
+
+## VARIANT MATRIX
+
+For a family with 3 sizes and 2 colors, the variant matrix is:
+
+| Size | Color | SKU |
+|------|-------|-----|
+| 500ML | CLR | JAR-PET-500ML-CLR |
+| 500ML | BLU | JAR-PET-500ML-BLU |
+| 1L | CLR | JAR-PET-1L-CLR |
+| 1L | BLU | JAR-PET-1L-BLU |
+| 2L | CLR | JAR-PET-2L-CLR |
+| 2L | BLU | JAR-PET-2L-BLU |
+
+Not all combinations may be valid - sparse matrices are common.
+
+---
+
+## PRICE ADJUSTMENTS
+
+Each variant value can have a price adjustment:
+
+| Axis | Value | Adjustment |
+|------|-------|------------|
+| size | 500ml | Rs 0 (base) |
+| size | 1L | +Rs 15 |
+| size | 2L | +Rs 30 |
+| color | clear | Rs 0 (base) |
+| color | blue | +Rs 5 |
+
+**Final Price = Base Price + Sum(Adjustments)**
+
+Example: 1L Blue = Base + 15 + 5 = Base + 20
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Flat product list | "PET Jar 500ml Clear", "PET Jar 500ml Blue" as separate items | Family with axes [size, color], products linked via variant values |
+| Inconsistent SKU codes | "500", "500ml", "500ML", "HALF-LITER" mixed | Consistent pattern: "500ML", "1L", "2L" (UPPERCASE) |
+| Missing variant links | Product without product_variant_values | Always create junction records for family with axes |
+
+</protocol>

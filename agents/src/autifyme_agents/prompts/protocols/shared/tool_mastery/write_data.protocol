@@ -1,0 +1,627 @@
+<protocol name="write_data" type="tool_mastery" domain="shared">
+
+## PURPOSE
+
+Master the write_data tool - atomic multi-table database transactions with HITL approval.
+This is the ONLY way to create, update, or delete data.
+
+## WRITEINTENT PATTERN (5 Required Fields + Optional asset_uploads)
+
+Every write_data call requires this structure:
+
+| Field | Purpose | Example |
+|-------|---------|---------|
+| **goal** | What you're accomplishing | "Create parent record with 4 child records" |
+| **reasoning** | How you got here (validation, research) | "Duplicate check: 0 matches. Research confirms..." |
+| **hitl_summary** | Business user approval message | "Creating new records...\n\nReply *approve* to proceed..." |
+| **operations** | Array of database operations | [{action: 'create', table: 'table_name', data: {...}}] |
+| **impact** | What changes (counts, warnings) | {creates: {table_name: 4}, warnings: [...]} |
+| **asset_uploads** | (Optional) Images to show user in HITL | [{storage_path: '...', returns: 'img', caption: '...'}] |
+
+---
+
+## ASSET_UPLOADS (For Image HITL Preview)
+
+Use `asset_uploads` when you need the user to SEE an image during HITL approval.
+
+```json
+"asset_uploads": [
+  {
+    "storage_path": "pending/thread_xyz/image.png",
+    "returns": "product_image",
+    "caption": "PET Jar 500ml - catalog hero",
+    "target_folder": "products"
+  }
+]
+```
+
+| Field | Purpose |
+|-------|---------|
+| **storage_path** | Path from image_studio output (in pending/) |
+| **returns** | Name to reference in operations (@name.public_url) |
+| **caption** | What user sees with the image (keep under 200 chars) |
+| **target_folder** | Where to move file on approval (products, campaigns, etc.) |
+
+**Reference in operations:**
+- `@name.public_url` - Final public URL after upload
+- `@name.storage_path` - Path within bucket
+- `@name.size_bytes` - File size
+- `@name.content_type` - MIME type
+- `@name.caption` - Caption text
+
+See **Pattern 8-10** for creative specialist asset creation examples.
+
+---
+
+## OPERATIONS STRUCTURE
+
+### CREATE
+
+```json
+{
+  "action": "create",
+  "table": "table_name",
+  "data": {
+    "code": "CODE-001",
+    "name": "Record Name",
+    "value": 30.0
+  },
+  "returns": "record_ref"
+}
+```
+- `data`: Single object or array of objects
+- `returns`: Name for referencing this result later (optional)
+
+### UPDATE
+
+```json
+{
+  "action": "update",
+  "table": "table_name",
+  "filters": {"id": "uuid-123"},
+  "updates": {"value": 45.0}
+}
+```
+- `filters`: Which records to update (required)
+- `updates`: What to change (required)
+
+### DELETE
+
+```json
+{
+  "action": "delete",
+  "table": "table_name",
+  "filters": {"id": "uuid-123"}
+}
+```
+- Prefer soft delete (update is_active=False) over hard delete
+- Hard delete for temporary/junction records only
+
+### UPSERT
+
+```json
+{
+  "action": "upsert",
+  "table": "table_name",
+  "data": {"code": "CODE-001", "name": "..."},
+  "on_conflict": "update",
+  "conflict_fields": ["code"]
+}
+```
+- `on_conflict`: "skip" or "update"
+- `conflict_fields`: Which columns define uniqueness
+
+---
+
+## DEPENDENCIES AND REFERENCES
+
+### Reference Syntax
+
+Use `@name.field` to reference values from previous operations:
+
+```json
+{
+  "action": "create",
+  "table": "parent_table",
+  "data": {"name": "Parent Record"},
+  "returns": "parent"
+},
+{
+  "action": "create",
+  "table": "child_table",
+  "data": {"parent_id": "@parent.id", "code": "CHILD-001"},
+  "dependencies": ["parent"]
+}
+```
+
+### Batch References
+
+For batch creates, use `@name[index].field`:
+
+```json
+{
+  "action": "create",
+  "table": "category_table",
+  "data": [
+    {"name": "Category A"},
+    {"name": "Category B"}
+  ],
+  "returns": "categories_batch"
+},
+{
+  "action": "create",
+  "table": "item_table",
+  "data": [
+    {"name": "Item 1", "category_id": "@categories_batch[0].id"},
+    {"name": "Item 2", "category_id": "@categories_batch[1].id"}
+  ],
+  "dependencies": ["categories_batch"]
+}
+```
+
+### Dependency Resolution
+
+- Operations with dependencies wait for referenced operations
+- Topological sorting ensures correct order
+- Circular dependencies cause errors
+
+---
+
+## HITL SUMMARY GUIDELINES
+
+The hitl_summary is what the business user sees for approval. Make it:
+
+1. **Clear**: Plain language, no technical jargon
+2. **Complete**: What's being created/changed
+3. **Actionable**: End with approval instructions
+4. **Concise**: Under 1500 characters
+
+### Template
+
+```
+Creating [WHAT] for [CONTEXT].
+
+[DETAILS]:
+- [Item 1] (value: [x])
+- [Item 2] (value: [y])
+
+This will add [N] new [entities] to your system.
+
+Reply *approve* to proceed or *reject* to cancel.
+```
+
+---
+
+## IMPACT STRUCTURE
+
+```json
+{
+  "creates": {"table_a": 4, "table_b": 2},
+  "updates": {"table_a": 6},
+  "deletes": {"temp_table": 1},
+  "warnings": [
+    "CRITICAL: 6 records affected",
+    "Value increase: +40%"
+  ],
+  "examples": ["CODE-001", "CODE-002"]
+}
+```
+
+- Include CRITICAL warnings for bulk operations
+- Provide before/after for value changes
+- List example codes for clarity
+
+---
+
+## COMMON PATTERNS
+
+### Pattern 1: Create Parent with Children (2 Tables)
+
+```json
+{
+  "goal": "Create parent record with 4 child records",
+  "reasoning": "Duplicate check: 0 matches. Research confirms specifications.",
+  "hitl_summary": "Creating new parent with children...",
+  "operations": [
+    {"action": "create", "table": "parent_table", "data": {...}, "returns": "parent"},
+    {"action": "create", "table": "child_table", "data": [...], "dependencies": ["parent"]}
+  ],
+  "impact": {"creates": {"parent_table": 1, "child_table": 4}}
+}
+```
+
+### Pattern 2: Multi-Table Chain (3+ Tables)
+
+Create hierarchical structures with proper dependency ordering:
+
+```json
+{
+  "goal": "Create complete hierarchy: grandparent -> parent -> children",
+  "reasoning": "New category structure needed. No conflicts found.",
+  "hitl_summary": "Creating 3-level hierarchy...",
+  "operations": [
+    {
+      "action": "create",
+      "table": "grandparent_table",
+      "data": {"name": "Top Level", "code": "GP-001"},
+      "returns": "grandparent"
+    },
+    {
+      "action": "create",
+      "table": "parent_table",
+      "data": [
+        {"name": "Parent A", "grandparent_id": "@grandparent.id"},
+        {"name": "Parent B", "grandparent_id": "@grandparent.id"}
+      ],
+      "dependencies": ["grandparent"],
+      "returns": "parents"
+    },
+    {
+      "action": "create",
+      "table": "child_table",
+      "data": [
+        {"name": "Child A1", "parent_id": "@parents[0].id"},
+        {"name": "Child A2", "parent_id": "@parents[0].id"},
+        {"name": "Child B1", "parent_id": "@parents[1].id"}
+      ],
+      "dependencies": ["parents"]
+    }
+  ],
+  "impact": {"creates": {"grandparent_table": 1, "parent_table": 2, "child_table": 3}}
+}
+```
+
+Key points:
+- Each level depends on the previous
+- Batch creates return array, use `@name[index].id`
+- Operations execute in dependency order
+
+### Pattern 3: Junction Table Links (Many-to-Many)
+
+Link existing records through a junction table:
+
+```json
+{
+  "goal": "Link 3 items to 2 categories via junction",
+  "reasoning": "Items exist. Categories exist. Creating associations.",
+  "hitl_summary": "Linking items to categories...",
+  "operations": [
+    {
+      "action": "create",
+      "table": "item_category_junction",
+      "data": [
+        {"item_id": "existing-item-1", "category_id": "existing-cat-A", "sort_order": 1},
+        {"item_id": "existing-item-2", "category_id": "existing-cat-A", "sort_order": 2},
+        {"item_id": "existing-item-3", "category_id": "existing-cat-B", "sort_order": 1}
+      ]
+    }
+  ],
+  "impact": {"creates": {"item_category_junction": 3}}
+}
+```
+
+### Pattern 4: XOR Junction (Polymorphic Link)
+
+Some junctions require EXACTLY ONE of multiple FK options:
+
+```json
+{
+  "goal": "Link record to entity (type_a XOR type_b)",
+  "reasoning": "Record exists. Linking to type_a. XOR: type_a_id OR type_b_id, never both.",
+  "hitl_summary": "Linking record to type_a entity...",
+  "operations": [
+    {
+      "action": "create",
+      "table": "polymorphic_junction",
+      "data": {
+        "type_a_id": "existing-type-a-id",
+        "type_b_id": null,
+        "linked_record_id": "existing-record-id",
+        "role": "PRIMARY",
+        "sort_order": 0
+      }
+    }
+  ],
+  "impact": {"creates": {"polymorphic_junction": 1}}
+}
+```
+
+XOR constraint rules:
+- Set ONE FK to a value, set OTHERS to null explicitly
+- Never set both, never set neither
+- Database constraint enforces this
+
+### Pattern 5: Create with Junction in Same Transaction
+
+Create a record and immediately link it via junction:
+
+```json
+{
+  "goal": "Create new record and link to existing parent",
+  "reasoning": "New record data ready. Parent exists. Creating + linking.",
+  "hitl_summary": "Creating record and linking to parent...",
+  "operations": [
+    {
+      "action": "create",
+      "table": "records_table",
+      "data": {
+        "name": "New Record",
+        "url": "https://storage.example.com/files/file.ext",
+        "file_name": "file.ext",
+        "type": "TYPE_A",
+        "status": "ACTIVE"
+      },
+      "returns": "new_record"
+    },
+    {
+      "action": "create",
+      "table": "record_parent_junction",
+      "data": {
+        "parent_id": "existing-parent-id",
+        "record_id": "@new_record.id",
+        "role": "PRIMARY",
+        "sort_order": 0
+      },
+      "dependencies": ["new_record"]
+    }
+  ],
+  "impact": {"creates": {"records_table": 1, "record_parent_junction": 1}}
+}
+```
+
+### Pattern 6: Bulk Value Update
+
+```json
+{
+  "goal": "Update values for records (+15%)",
+  "reasoning": "User requested. 6 records affected. Current avg: 30.",
+  "hitl_summary": "Updating values for 6 records...",
+  "operations": [
+    {"action": "update", "table": "table_name", "filters": {"parent_id": "..."}, "updates": {"value": 34.5}}
+  ],
+  "impact": {"updates": {"table_name": 6}, "warnings": ["Value +15%"]}
+}
+```
+
+### Pattern 7: Soft Delete with Junction Cleanup
+
+```json
+{
+  "goal": "Deactivate selected records",
+  "reasoning": "Business decision. 3 records found.",
+  "hitl_summary": "Deactivating 3 records...",
+  "operations": [
+    {"action": "update", "table": "table_name", "filters": {"id": {"in": [...]}}, "updates": {"is_active": false}},
+    {"action": "update", "table": "junction_table", "filters": {...}, "updates": {"is_active": false}}
+  ],
+  "impact": {"updates": {"table_name": 3, "junction_table": 3}}
+}
+```
+
+### Pattern 8: Asset Creation (Creative Specialist)
+
+Create asset record with image preview for HITL. Junction created later by domain specialist.
+
+**CRITICAL:** Use `asset_uploads` to show image to user during HITL approval.
+
+```json
+{
+  "goal": "Create asset for processed image",
+  "reasoning": "Processed [product] image. Quality verified: clean extraction, proper lighting, portfolio-worthy.",
+  "hitl_summary": "Processed image ready for your catalog.\n\n[What was done]: Background removed, lighting enhanced, hero shot created.\n\nApprove this image?",
+  "asset_uploads": [
+    {
+      "storage_path": "pending/thread_xyz/20251217_studio_abc.png",
+      "returns": "product_image",
+      "caption": "PET Jar 500ml - catalog hero shot",
+      "target_folder": "products"
+    }
+  ],
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {
+        "name": "[Product Name] Hero",
+        "storage_url": "@product_image.public_url",
+        "storage_provider": "SUPABASE",
+        "file_name": "[filename].png",
+        "asset_type": "IMAGE",
+        "status": "ACTIVE",
+        "is_ai_generated": true,
+        "caption": "@product_image.caption"
+      },
+      "returns": "asset"
+    }
+  ],
+  "impact": {"creates": {"assets": 1}, "asset_uploads": 1}
+}
+```
+
+Key fields:
+- `asset_uploads.storage_path`: From image_studio output
+- `asset_uploads.caption`: What user sees with image in HITL
+- `@product_image.public_url`: Reference in operations after upload
+
+### Pattern 9: Asset with Campaign Junction
+
+When campaign domain has no specialist, creative creates both asset and campaign_assets junction.
+
+```json
+{
+  "goal": "Create campaign asset with campaign link",
+  "reasoning": "Processed campaign image for [campaign_name]. Style: [festive/seasonal]. Quality verified.",
+  "hitl_summary": "Campaign image ready.\n\n[Campaign]: [name]\n[Style]: [treatment applied]\n\nApprove for campaign?",
+  "asset_uploads": [
+    {
+      "storage_path": "pending/thread_xyz/diwali_promo.png",
+      "returns": "campaign_image",
+      "caption": "Diwali promotional - festive product shot",
+      "target_folder": "campaigns"
+    }
+  ],
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {
+        "name": "[Campaign] - [Product/Theme]",
+        "storage_url": "@campaign_image.public_url",
+        "storage_provider": "SUPABASE",
+        "file_name": "[filename].png",
+        "asset_type": "IMAGE",
+        "status": "ACTIVE",
+        "is_ai_generated": true,
+        "caption": "@campaign_image.caption"
+      },
+      "returns": "asset"
+    },
+    {
+      "action": "create",
+      "table": "campaign_assets",
+      "data": {
+        "campaign_id": "[campaign_id from PM context]",
+        "asset_id": "@asset.id",
+        "usage_type": "[social_media|banner|email]",
+        "placement": "[platform/location]"
+      },
+      "dependencies": ["asset"]
+    }
+  ],
+  "impact": {"creates": {"assets": 1, "campaign_assets": 1}, "asset_uploads": 1}
+}
+```
+
+### Pattern 10: Batch Asset Creation
+
+Multiple assets with image previews for variant families.
+
+```json
+{
+  "goal": "Create assets for [N] variant images",
+  "reasoning": "Processed [N] variants with consistent treatment. All verified.",
+  "hitl_summary": "Created [N] product images:\n- [variant 1]\n- [variant 2]\n...\n\nApprove batch?",
+  "asset_uploads": [
+    {"storage_path": "pending/t/variant_500ml.png", "returns": "img_500ml", "caption": "500ml variant"},
+    {"storage_path": "pending/t/variant_1L.png", "returns": "img_1L", "caption": "1L variant"}
+  ],
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": [
+        {"name": "Variant 500ml Hero", "storage_url": "@img_500ml.public_url", "asset_type": "IMAGE", "status": "ACTIVE", "caption": "@img_500ml.caption"},
+        {"name": "Variant 1L Hero", "storage_url": "@img_1L.public_url", "asset_type": "IMAGE", "status": "ACTIVE", "caption": "@img_1L.caption"}
+      ],
+      "returns": "assets_batch"
+    }
+  ],
+  "impact": {"creates": {"assets": "[N]"}, "asset_uploads": "[N]"}
+}
+```
+
+---
+
+## VALIDATION MODES
+
+### dry_run: true
+- Validates operations without executing
+- Shows what WOULD happen
+- Use before complex operations
+
+### validate_only: true
+- Checks schema and constraints only
+- No execution, no side effects
+- Use to verify structure
+
+---
+
+## BEFORE write_data
+
+**ALWAYS do these first:**
+
+1. **inspect_schema**: Know the table structure
+2. **read_data (duplicate check)**: Verify no duplicates
+3. **read_data (foreign keys)**: Get IDs for relationships
+4. **view_image (if applicable)**: Verify visual attributes
+
+Never write_data without validation.
+
+---
+
+## ANTI-PATTERNS
+
+### Anti-Pattern 1: No duplicate check
+
+```
+WRONG: Create record without checking if code exists
+
+CORRECT:
+1. read_data(search_patterns={'code': '%KEYWORD%'})
+2. If no matches, proceed with write_data
+```
+
+### Anti-Pattern 2: Missing dependencies
+
+```
+WRONG:
+operations=[
+  {table: 'child_table', data: {parent_id: '@parent.id'}}  # No parent operation!
+]
+
+CORRECT:
+operations=[
+  {table: 'parent_table', data: {...}, returns: 'parent'},
+  {table: 'child_table', data: {parent_id: '@parent.id'}, dependencies: ['parent']}
+]
+```
+
+### Anti-Pattern 3: Hard delete of business data
+
+```
+WRONG:
+{action: 'delete', table: 'business_table', filters: {...}}
+
+CORRECT (soft delete):
+{action: 'update', table: 'business_table', filters: {...}, updates: {is_active: false}}
+```
+
+### Anti-Pattern 4: Vague hitl_summary
+
+```
+WRONG:
+hitl_summary: "Creating some records. Approve?"
+
+CORRECT:
+hitl_summary: "Creating 4 new records:\n- CODE-001 (value: 30)\n- CODE-002 (value: 32)\n\nReply *approve* to proceed or *reject* to cancel."
+```
+
+---
+
+## RETURN STRUCTURE
+
+### Success
+
+```json
+{
+  "success": true,
+  "goal": "Create parent with children...",
+  "operation_results": [...],
+  "execution_time_ms": 150
+}
+```
+
+### Error
+
+```json
+{
+  "success": false,
+  "error": "Duplicate code: CODE-001",
+  "error_type": "EXECUTION_ERROR",
+  "rollback_performed": true
+}
+```
+
+All operations are atomic - on error, everything is rolled back.
+
+</protocol>

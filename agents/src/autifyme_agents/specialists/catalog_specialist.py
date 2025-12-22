@@ -13,6 +13,11 @@ Architecture:
 - Schema-driven CRUD with HITL approval
 - Autonomous research and enrichment
 - Does NOT process images (Creative Specialist does that)
+
+Protocol Integration (v2):
+- Loads domain protocols at task start (business_context, family_fit, pricing, etc.)
+- Protocol-driven decision making with structured reasoning
+- Protocols ground specialist in validated domain patterns
 """
 
 from typing import Any
@@ -21,12 +26,16 @@ from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.middleware import MultimodalInjectionMiddleware
-from autifyme_agents.tools import create_view_image_tool
-from autifyme_agents.tools.research_tools import (
-    extract_web_content_tool,
-    research_product_tool,
+from autifyme_agents.middleware import (
+    MultimodalInjectionMiddleware,
+    create_execution_limits,
 )
+from autifyme_agents.tools import create_view_image_tool
+from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
+from autifyme_agents.tools.rich_output import create_rich_output_tool
+
+# NOTE: Research tools removed - product_analyst handles all external research
+# catalog_specialist focuses on catalog CRUD operations only
 
 # =============================================================================
 # Domain Table Configuration
@@ -90,12 +99,12 @@ def create_catalog_specialist(
     if storage is None:
         raise ValueError("storage is required for Catalog Specialist")
 
-    system_prompt = load_prompt("specialists/catalog_specialist_lean.prompt")
+    system_prompt = load_prompt("specialists/catalog_specialist_v2.prompt")
 
-    # Tools
+    # Tools - load_protocol first for protocol-driven reasoning
+    # NOTE: No research tools - product_analyst handles external research
     tools: list[Any] = [
-        research_product_tool,
-        extract_web_content_tool,
+        create_load_protocol_tool(),
     ]
 
     from autifyme_agents.tools.data_engine import (
@@ -113,32 +122,42 @@ def create_catalog_specialist(
     # Image viewing - verify processed images before creating asset records
     tools.append(create_view_image_tool())
 
+    # Rich output - visual HTML pages for complex data presentation
+    tools.append(create_rich_output_tool(storage))
+
     description = (
-        "ROLE: Specialist (execution)\n"
-        "MISSION: Safely mutate the product catalog (schema-driven CRUD) with HITL approval.\n\n"
+        "ROLE: Specialist (execution, protocol-integrated)\n"
+        "MISSION: Safely mutate the product catalog with protocol-driven CRUD and HITL approval.\n\n"
         "OWNERSHIP:\n"
         "- Product families, products/SKUs, variants, taxonomy links, pricing, BOM\n"
-        "- Asset metadata + links between assets and products (not image editing)\n\n"
+        "- Asset metadata + links between assets and products (not image editing)\n"
+        "- Protocol-driven decisions (family_fit, pricing, duplicate_prevention)\n\n"
         "INPUTS I NEED:\n"
         "- Target intent (create/update/delete) and business goal\n"
         "- IDs when possible (or enough attributes to look them up)\n"
-        "- Any processed image storage_path(s) in pending/... when linking assets\n\n"
+        "- Any processed image storage_path(s) in pending/... when linking assets\n"
+        "- External research findings from product_analyst (if needed)\n\n"
         "OUTPUTS I PRODUCE:\n"
-        "- A write plan (what tables/rows change) + a minimal write_data intent proposal\n"
+        "- Protocol-grounded write plan with structured reasoning\n"
         "- After approval: executed write_data results + created/updated IDs\n"
-        "- On rejection: revised write_data intent based on user feedback (often prefixed [HITL_FEEDBACK])\n"
-        "- If long: write a change log to the thread directory and return the file path\n\n"
+        "- On rejection: revised write_data intent based on user feedback\n\n"
         "TOOLS I USE:\n"
+        "- load_protocol (FIRST - loads business_context, family_fit, pricing, etc.)\n"
         "- inspect_schema, read_data, aggregate_data, write_data (HITL), view_image\n"
-        "- research_product_tool, extract_web_content_tool (only when external facts are needed)\n\n"
+        "- generate_rich_output (visual HTML for complex data - 5+ items, hierarchies, comparisons)\n"
+        "- NO research tools - product_analyst handles external research\n\n"
         "GUARDRAILS:\n"
+        "- Protocol steps are MANDATORY (e.g., family_fit requires customer_segments query)\n"
         "- No image processing (delegate to creative_specialist); no ad-hoc SQL; always read-before-write"
     )
 
     # Multimodal middleware injects images from paths in delegation message
     # When PM includes image paths in the task description, the middleware
     # loads and injects the images so the specialist's LLM can see them
-    middleware = [MultimodalInjectionMiddleware()]
+    middleware = [
+        *create_execution_limits(model_call_limit=15, tool_call_limit=20),
+        MultimodalInjectionMiddleware(),
+    ]
 
     spec: dict[str, Any] = {
         "name": "catalog_specialist",

@@ -1,6 +1,6 @@
 ---
 name: prompt-engineering
-description: Design world-class prompts using domain expert voice, professional vocabulary, and versatility through principles. Frame agents as top 0.01% practitioners, not AI assistants. (project)
+description: Design world-class prompts using domain expert voice, professional vocabulary, and versatility through principles. Frame agents as top 0.01% practitioners, not AI assistants. (project) (project)
 ---
 
 # Prompt Engineering Standards
@@ -154,6 +154,128 @@ ACTION -> VERIFY -> (iterate if needed) -> PERSIST
 
 ---
 
+## Protocol Design (Domain Reasoning Framework)
+
+> **Protocols are dynamically-loaded domain expertise. Prompts are static identity.**
+
+### Prompts vs Protocols: The Boundary
+
+| Put in PROMPT | Put in PROTOCOL |
+|---------------|-----------------|
+| Agent identity ("You are...") | Domain-specific reasoning patterns |
+| Core capabilities and tools | Tool mastery patterns for specific domain |
+| Process framework (DIAGNOSE -> EXECUTE) | Decision flows (family_fit scoring) |
+| Quality standards as identity | Anti-patterns for specific scenarios |
+| 2-4 canonical examples | Domain vocabulary and tables |
+
+**The key insight:** Prompts define WHO the agent is. Protocols define HOW to reason in specific domains.
+
+### Protocol Types
+
+| Type | Purpose | When Agent Loads |
+|------|---------|------------------|
+| `tool_mastery` | How to use tools correctly | Before data operations |
+| `decision` | Structured reasoning patterns | Before making domain decisions |
+| `exploration` | What to investigate | Before analysis tasks |
+| `domain_orientation` | Business context, vocabulary | At start of domain work |
+| `routing` | PM routing decisions | PM system prompt (static) |
+| `orchestration` | Multi-domain coordination | PM system prompt (static) |
+
+### Protocol Structure Template
+
+```xml
+<protocol name="protocol_name" type="decision|exploration|tool_mastery" domain="catalog|pm|shared">
+
+## PURPOSE
+
+One sentence: what decision/task this protocol guides.
+
+---
+
+## CORE PRINCIPLE
+
+The fundamental insight that drives all patterns below.
+
+---
+
+## DECISION FLOW / ANALYSIS FOCUS / TOOL PATTERNS
+
+[Type-specific content]
+
+For decision protocols:
+- Scoring criteria
+- Decision tree
+- Threshold definitions
+
+For exploration protocols:
+- Focus areas with tables
+- Analysis template
+- Output structure
+
+For tool_mastery protocols:
+- Correct patterns with examples
+- Parameter guidance
+- Chaining patterns
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: [Description]
+
+WRONG: [Bad pattern]
+RIGHT: [Correct pattern]
+
+---
+
+## OUTPUT STRUCTURE (if applicable)
+
+[JSON/markdown template for structured output]
+
+</protocol>
+```
+
+### Protocol Design Principles
+
+1. **Authoritative instruction** - Protocols are not suggestions, they're expert guidance
+2. **Patterns over procedures** - Show reasoning patterns, not step-by-step recipes
+3. **Anti-patterns are critical** - Show what NOT to do (from real failures)
+4. **Tables for quick reference** - Decision matrices, scoring criteria, mappings
+5. **Domain vocabulary** - Use actual terms experts use
+
+### When to Create a New Protocol
+
+| Signal | Action |
+|--------|--------|
+| Agent makes same mistake repeatedly | Create decision protocol with anti-pattern |
+| Tool usage patterns are domain-specific | Create tool_mastery protocol |
+| Analysis misses key focus areas | Create exploration protocol |
+| Agent lacks domain vocabulary | Create business_context protocol |
+| PM routes incorrectly | Update domain_awareness protocol |
+
+### Protocol vs Prompt Decision Tree
+
+```text
+Need to add guidance?
+        |
+        v
+Is it about WHO the agent is?
+        |
+    Yes -> Add to PROMPT (identity, capabilities, quality)
+        |
+    No  -> Is it domain-specific reasoning?
+                |
+            Yes -> Create/update PROTOCOL
+                |
+            No  -> Is it a proven confusion?
+                        |
+                    Yes -> Add "NEVER" to PROMPT
+                        |
+                    No  -> Probably don't need it
+```
+
+---
+
 ## Examples: The Teaching Mechanism
 
 > **Complex examples teach simple scenarios. Simple examples do NOT teach complex.**
@@ -272,11 +394,13 @@ ACTION -> VERIFY -> (iterate if needed) -> PERSIST
 ## Validation Checklist
 
 ### Prime Directive
+
 - [ ] Identity worth inhabiting (not "AI assistant")
 - [ ] Senior Partner behavior (proposes, not asks)
 - [ ] Every token earns its place
 
 ### Domain Expert Voice
+
 - [ ] Professional credentials
 - [ ] Actual domain vocabulary
 - [ ] Domain doctrine (knowledge to reason FROM)
@@ -284,12 +408,22 @@ ACTION -> VERIFY -> (iterate if needed) -> PERSIST
 - [ ] Principles enable full range
 
 ### Tool Mastery
+
 - [ ] Purpose documented (WHY)
 - [ ] Exclusivity patterns ("Only way to X")
 - [ ] Chaining patterns
 - [ ] Verification loop visible
 
+### Protocol Integration (Domain Reasoning Framework)
+
+- [ ] Agent knows WHEN to load protocols (domain task triggers)
+- [ ] Agent knows WHICH protocols to load (by domain context)
+- [ ] Protocol loading guidance in prompt (or agent has load_protocol tool)
+- [ ] Domain-specific reasoning delegated to protocols (not hardcoded in prompt)
+- [ ] Anti-patterns in protocols, not prompt (unless proven confusion)
+
 ### Examples
+
 - [ ] 2-4 COMPLEX examples
 - [ ] Multi-step reasoning
 - [ ] Ambiguity handled with suggestions
@@ -300,4 +434,28 @@ ACTION -> VERIFY -> (iterate if needed) -> PERSIST
 
 ## Reference
 
-Full standards: `docs/architecture/tech/PROMPT_ENGINEERING_STANDARDS.md`
+### File Locations
+
+| What | Where |
+|------|-------|
+| Prompts | `prompts/*.prompt` |
+| Protocols | `prompts/protocols/{domain}/*.protocol` |
+| Protocol loader | `tools/protocol_loader.py` |
+| Full standards | `docs/architecture/tech/PROMPT_ENGINEERING_STANDARDS.md` |
+
+### Protocol Domains
+
+| Domain | Path | Contents |
+|--------|------|----------|
+| `catalog` | `prompts/protocols/catalog/` | business_context, family_fit, pricing, duplicate_prevention, visual_analysis |
+| `pm` | `prompts/protocols/pm/` | domain_awareness, coordination_patterns, conflict_resolution |
+| `shared` | `prompts/protocols/shared/` | Shared protocols |
+| `shared/tool_mastery` | `prompts/protocols/shared/tool_mastery/` | read_data, write_data, view_image, etc. |
+
+### Related Skills
+
+| Skill | When |
+|-------|------|
+| `workflow-evaluation` | Diagnosing protocol issues in traces |
+| `agent-improvement` | Adding protocol guidance to agents |
+| `specialist-creation` | Creating agents with protocol awareness |

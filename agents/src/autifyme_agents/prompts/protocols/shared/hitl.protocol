@@ -1,0 +1,781 @@
+<protocol name="hitl" type="cross_cutting" domain="shared">
+
+## PURPOSE
+
+Handle Human-in-the-Loop (HITL) feedback across ALL agents and ALL tools.
+This protocol is domain-agnostic and tool-agnostic.
+
+**When to load:** ANY tool response contains `[HITL_FEEDBACK]` marker.
+
+---
+
+## CRITICAL CONTEXT: PM VISIBILITY
+
+**PM has NO independent visibility into HITL events.**
+
+```
+[User] <--HITL--> [You] --response--> [PM]
+                    ^
+                    |
+            PM cannot see this
+```
+
+PM only knows about HITL if YOU tell them explicitly.
+Your response format is the ONLY signal PM receives.
+
+**Consequence:** If you respond without proper markers, PM will:
+- Think you're confused (not responding to user feedback)
+- Re-instruct with values USER ALREADY REJECTED
+- Create infinite loops
+
+**Your responsibility:** ALWAYS signal HITL context in your response.
+
+---
+
+## HITL TRIGGER DETECTION
+
+### Recognizing HITL Feedback
+
+HITL feedback arrives as a message containing `[HITL_FEEDBACK]` marker:
+
+```
+[HITL_FEEDBACK] I don't like the family name
+```
+
+```
+[HITL_FEEDBACK] Price should be Rs 45, not Rs 38
+```
+
+```
+[HITL_FEEDBACK] Reject
+```
+
+**On detection:** Load and follow this protocol BEFORE taking any action.
+
+---
+
+## FEEDBACK TYPE RECOGNITION
+
+### Type Matrix
+
+| Pattern | Type | Meaning | Action |
+|---------|------|---------|--------|
+| "Reject" / empty / no reason | **BARE_REJECT** | User rejected but didn't say why | Escalate asking WHAT was wrong |
+| "There is X" / "X as well" / "X exists" | **FACT** | User is informing you of information | Check workspace, accept if not found |
+| "I don't like X" / "X is wrong" / "not X" | **REJECTION** | User wants different value | Propose alternatives OR escalate |
+| "Change X to Y" / "Use Y" / "Make it Y" | **CLEAR** | User specifies exact change | Apply directly |
+| "Seems off" / "Check X" / "doesn't look right" | **AMBIGUOUS** | User unsure what's wrong | Escalate with diagnostic options |
+| "I like X but not Y" / "X is fine, but Y" | **PARTIAL** | Some approved, some rejected | Apply approved, handle rejected |
+| "Approve if you X" / "OK but change X" | **CONDITIONAL** | Approval with required change | Apply condition, resubmit |
+| "Actually, do Z instead" / "No, I want Z" | **REDIRECT** | User wants different action | Escalate for task change |
+| "Never mind" / "Cancel" / "Stop" | **CANCEL** | User abandoning task | Confirm cancellation |
+
+### Type Identification Flow
+
+```
+[HITL_FEEDBACK received]
+      |
+      v
+[1. Is feedback empty or just "Reject"?]
+      |
+      +---> YES -> BARE_REJECT
+      |
+      v
+[2. Does feedback specify exact values?]
+      |
+      +---> YES ("use X", "change to Y") -> CLEAR
+      |
+      v
+[3. Does feedback approve some, reject others?]
+      |
+      +---> YES ("X is fine but Y") -> PARTIAL
+      |
+      v
+[4. Does feedback have a condition?]
+      |
+      +---> YES ("approve if", "OK but") -> CONDITIONAL
+      |
+      v
+[5. Does feedback redirect to different task?]
+      |
+      +---> YES ("actually do Z", "no I want") -> REDIRECT
+      |
+      v
+[6. Does feedback cancel entirely?]
+      |
+      +---> YES ("never mind", "cancel") -> CANCEL
+      |
+      v
+[7. Does feedback state facts ("there is X")?]
+      |
+      +---> YES -> FACT
+      |
+      v
+[8. Does feedback express dislike without alternative?]
+      |
+      +---> YES ("don't like", "wrong") -> REJECTION
+      |
+      v
+[9. Default] -> AMBIGUOUS
+```
+
+---
+
+## PARSING COMPOUND FEEDBACK
+
+Real user feedback often contains multiple types:
+
+**Example:**
+> "I don't like the family name and sku and don't create the set and combo for now and there is a colour variation as well"
+
+### Parsing Steps
+
+1. **Split into distinct statements** (by "and", commas, periods)
+2. **Classify each statement** by type
+3. **Process in priority order:** CANCEL > REDIRECT > CLEAR > CONDITIONAL > FACT > PARTIAL > REJECTION > AMBIGUOUS
+
+### Example Parse
+
+| Statement | Type | Priority |
+|-----------|------|----------|
+| "don't like the family name" | REJECTION | 6 |
+| "don't like...sku" | REJECTION | 6 |
+| "don't create the set and combo" | CLEAR | 3 |
+| "there is a colour variation as well" | FACT | 5 |
+
+**Processing order:**
+1. CLEAR: Omit sets/combos (RESOLVED)
+2. FACT: Check workspace for colors (RESOLVED if found)
+3. REJECTION x2: Family + SKU (ESCALATE with options)
+
+---
+
+## HANDLING EACH TYPE
+
+### BARE_REJECT
+
+User rejected without explanation. You have NO information about what's wrong.
+
+**Action:** Escalate to PM asking user to specify.
+
+```
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**User's HITL Feedback:**
+> "Reject"
+
+**What I Know:**
+- User rejected the proposal
+- User did NOT specify what was wrong
+
+**What Was Proposed:**
+- Family: [proposed family]
+- SKU: [proposed SKU]
+- Price: [proposed price]
+- [other key attributes]
+
+**Request:**
+Please ask user what specifically needs to change.
+
+**I cannot guess.** Re-submitting without knowing the issue will likely be rejected again.
+```
+
+### FACT
+
+User is stating information exists. They are INFORMING you, not ASKING.
+
+**Critical insight:** "There is X" is NOT a question. NEVER respond with "Which X do you want?"
+
+**Action:** Check workspace files, then decide.
+
+```
+[FACT detected: "there is colour variation"]
+      |
+      v
+[Check workspace files for colors]
+      |
+      +---> FOUND exact match
+      |         |
+      |         v
+      |    Use workspace values (RESOLVED)
+      |
+      +---> FOUND partial (user adding more)
+      |         |
+      |         v
+      |    Workspace has 3, user implies more
+      |    Accept as: workspace values + user's addition
+      |
+      +---> NOT FOUND
+              |
+              v
+         User is telling you NEW information
+         Accept it and incorporate into plan
+```
+
+**Signals user is ADDING (not just reminding):**
+- "also" / "as well" / "too"
+- "another" / "more" / "additional"
+- Specific new value mentioned
+
+### REJECTION
+
+User doesn't like something but didn't specify alternative.
+
+**Action:** Propose alternatives OR escalate if you can't.
+
+**Can propose alternatives when:**
+- Domain knowledge suggests clear options
+- Workspace has alternative values
+- Pattern from similar items exists
+
+**Must escalate when:**
+- No clear alternatives exist
+- Multiple valid options with no obvious winner
+- User preference is subjective
+
+### CLEAR
+
+User specified exact change.
+
+**Action:** Apply directly, resubmit with REVISED marker.
+
+```
+ORIGINAL: price = Rs 38
+FEEDBACK: "Make it Rs 45"
+REVISED: price = Rs 45
+
+hitl_summary: "REVISED: Price changed from Rs 38 to Rs 45 per your feedback. Approve?"
+```
+
+### PARTIAL
+
+User approved some aspects, rejected others.
+
+**Action:** Lock approved aspects, handle rejected.
+
+```
+FEEDBACK: "Family is fine, but change the SKU"
+
+APPROVED (do not change):
+- Family: [keep as proposed]
+
+REJECTED (handle):
+- SKU: Apply REJECTION handling
+```
+
+### CONDITIONAL
+
+User will approve if you make a specific change.
+
+**Action:** Apply the condition, resubmit.
+
+```
+FEEDBACK: "Approve if you add the barcode"
+
+Action: Add barcode, resubmit with:
+hitl_summary: "REVISED: Added barcode [value] per your condition. Approve?"
+```
+
+### REDIRECT
+
+User wants a different action entirely.
+
+**Action:** Escalate to PM for task change.
+
+```
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**User's HITL Feedback:**
+> "Actually, just update the existing product instead of creating new"
+
+**Original Task:** Create new product
+**User Wants:** Update existing product
+
+This is a TASK CHANGE, not a revision.
+Please confirm new task direction.
+```
+
+### CANCEL
+
+User wants to abandon the task.
+
+**Action:** Confirm and return to PM.
+
+```
+[HITL CANCELED]
+
+**User's HITL Feedback:**
+> "Never mind, cancel this"
+
+Task abandoned per user request.
+No action taken.
+```
+
+---
+
+## WORKSPACE CHECK PROTOCOL
+
+Before escalating FACT or REJECTION feedback, check available context.
+
+### Files to Check
+
+| Domain | Workspace Files |
+|--------|-----------------|
+| CATALOG | visual_analysis_*.md, catalog_analysis_*.md, product_research_*.md |
+| CREATIVE | visual_analysis_*.md, style guides, mood references |
+| PRODUCT | product_research_*.md, external research results |
+| ANY | Files mentioned in PM's delegation, thread workspace |
+
+### Check Decision Tree
+
+```
+[Feedback mentions attribute X]
+      |
+      v
+[Search workspace files for X]
+      |
+      +---> FOUND and sufficient
+      |         |
+      |         v
+      |    Use workspace values
+      |    Mark as RESOLVED
+      |
+      +---> FOUND but user implies MORE
+      |         |
+      |         v
+      |    Combine: workspace + user's addition
+      |    Mark as RESOLVED
+      |
+      +---> FOUND but CONFLICTS with user
+      |         |
+      |         v
+      |    User's statement overrides workspace
+      |    (user is correcting stale data)
+      |
+      +---> NOT FOUND
+              |
+              v
+         If FACT: Accept as new info
+         If REJECTION: Escalate for alternatives
+```
+
+---
+
+## RESPONSE FORMATS
+
+### Format 1: Fully Resolved
+
+When you resolved ALL feedback items:
+
+```
+[HITL RESOLVED]
+
+**User Feedback:** "[exact feedback]"
+
+**Resolutions:**
+- [aspect]: [original] -> [new] (reason)
+- [aspect]: [original] -> [new] (reason)
+
+Proceeding with revised proposal.
+
+---
+
+[Your revised WriteIntent or action]
+```
+
+### Format 2: Requires PM Direction
+
+When you need PM to clarify with user:
+
+```
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**Escalation:** [1/2/3] of 3 max
+
+**User's HITL Feedback:**
+> "[exact feedback - quote verbatim]"
+
+**What I've Resolved:**
+- [aspect]: [resolution] (source: feedback/workspace)
+- [aspect]: [resolution] (source: feedback/workspace)
+
+**What Needs Clarification:**
+| Aspect | User Said | Options | Recommendation |
+|--------|-----------|---------|----------------|
+| [aspect] | "[quote]" | 1) X, 2) Y, 3) Ask user | [your pick] |
+
+**Workspace Files Checked:**
+- [file]: [found/not found] - [relevant info]
+
+**Request for PM:**
+Please ask user about: [specific questions]
+```
+
+### Format 3: Canceled
+
+When user canceled the task:
+
+```
+[HITL CANCELED]
+
+**User Feedback:** "[exact feedback]"
+
+Task abandoned per user request.
+Awaiting new instructions.
+```
+
+### Format 4: Redirected
+
+When user wants different task:
+
+```
+[HITL REDIRECT]
+
+**User Feedback:** "[exact feedback]"
+
+**Original Task:** [what you were doing]
+**User Wants:** [what they asked for instead]
+
+This requires task change. Awaiting PM direction.
+```
+
+---
+
+## ESCALATION STATE TRACKING
+
+Track escalation rounds to prevent infinite loops.
+
+### State to Maintain
+
+```
+Escalation Round: [1/2/3]
+Previously Resolved: [list of aspects resolved in earlier rounds]
+Pending Resolution: [aspects still needing clarification]
+```
+
+### Round Progression
+
+```
+Round 1: Initial HITL feedback
+  - Resolve what you can
+  - Escalate unclear aspects
+
+Round 2: PM clarified, re-delegated
+  - Apply PM's clarifications
+  - If still unclear, escalate remaining
+  - Include "Previously Resolved" to avoid re-work
+
+Round 3 (FINAL): Circuit breaker
+  - If still unresolved, DO NOT escalate again
+  - Return with: "Unable to resolve after 2 clarification rounds"
+  - Offer: exact value request, cancel, or proceed with best guess
+```
+
+### Circuit Breaker Response
+
+```
+## HITL RESOLUTION LIMIT REACHED
+
+**Escalation:** 3 of 3 (FINAL)
+
+**Unresolved after 2 rounds:**
+- [aspect]: Still unclear
+
+**Options for PM:**
+1. Ask user to provide exact value for [aspect]
+2. Cancel this task
+3. Proceed with best guess: [value] (may need revision)
+
+I cannot continue escalating. Please choose an option.
+```
+
+---
+
+## ANTI-PATTERNS
+
+### Anti-Pattern 1: Asking User to Specify FACT
+
+```
+WRONG:
+[HITL_FEEDBACK] "there is colour variation as well"
+Response: "Which colors would you like?"
+-> User was TELLING you colors exist, not ASKING
+
+CORRECT:
+[HITL_FEEDBACK] "there is colour variation as well"
+Action: Check workspace -> Found 3 colors
+Response: "Using documented colors: Blue, Yellow, Pink"
+```
+
+### Anti-Pattern 2: Responding Without HITL Marker
+
+```
+WRONG:
+[HITL_FEEDBACK] "I don't like the family name"
+Response: "What family name would you prefer?"
+-> PM has NO IDEA this is HITL-driven
+
+CORRECT:
+Response: "## HITL FEEDBACK REQUIRES PM DIRECTION
+User's HITL Feedback: 'I don't like the family name'
+..."
+-> PM knows this is HITL escalation
+```
+
+### Anti-Pattern 3: Re-submitting Same Values
+
+```
+WRONG:
+[HITL_FEEDBACK] "Price is wrong"
+Action: Resubmit with same price
+-> Will be rejected again
+
+CORRECT:
+[HITL_FEEDBACK] "Price is wrong"
+Action: Escalate asking what price user wants
+OR: Propose alternatives based on research
+```
+
+### Anti-Pattern 4: Ignoring Compound Feedback
+
+```
+WRONG:
+[HITL_FEEDBACK] "Wrong family, wrong price, and add barcode"
+Action: Only fix the family
+-> Other issues ignored, will be rejected again
+
+CORRECT:
+Action: Parse all three, resolve each:
+- Family: escalate for alternative
+- Price: escalate for correct value
+- Barcode: apply if known, else escalate
+```
+
+### Anti-Pattern 5: Infinite Escalation
+
+```
+WRONG:
+Round 1: Escalate
+Round 2: Still unclear, escalate
+Round 3: Still unclear, escalate
+Round 4: Still unclear, escalate...
+-> Infinite loop
+
+CORRECT:
+Round 3: "Unable to resolve after 2 rounds. Options: 1) exact value, 2) cancel, 3) best guess"
+-> Circuit breaker stops the loop
+```
+
+---
+
+## EXAMPLES
+
+### Example 1: Clear Correction (Simple)
+
+```
+[HITL_FEEDBACK] Price should be Rs 45, not Rs 38
+
+Type: CLEAR
+Action: Apply directly
+
+Response:
+[HITL RESOLVED]
+
+**User Feedback:** "Price should be Rs 45, not Rs 38"
+
+**Resolutions:**
+- Price: Rs 38 -> Rs 45 (per user feedback)
+
+Proceeding with revised proposal.
+
+---
+[Revised WriteIntent with price = 45]
+```
+
+### Example 2: FACT with Workspace Check
+
+```
+[HITL_FEEDBACK] ...and there is colour variation as well
+
+Type: FACT
+Action: Check workspace
+
+[Check visual_analysis_storage_jars.md]
+-> Found: "Colors: Blossoms (Blue), Charming Flowers (Yellow), Spring Flowers (Pink)"
+
+Response:
+[HITL RESOLVED]
+
+**User Feedback:** "there is colour variation as well"
+
+**Resolutions:**
+- Colors: Added 3 variants per visual analysis (Blossoms, Charming Flowers, Spring Flowers)
+
+Proceeding with revised proposal including color variants.
+
+---
+[Revised WriteIntent with color variants]
+```
+
+### Example 3: Compound Feedback (Multi-type)
+
+```
+[HITL_FEEDBACK] I don't like the family name and sku and don't create the set and combo for now and there is a colour variation as well
+
+Parsing:
+- "don't like family name" -> REJECTION
+- "don't like sku" -> REJECTION
+- "don't create set and combo" -> CLEAR
+- "there is colour variation" -> FACT
+
+Processing:
+1. CLEAR: Omit sets/combos -> RESOLVED
+2. FACT: Check workspace for colors -> Found 3 -> RESOLVED
+3. REJECTION x2: Family + SKU -> ESCALATE
+
+Response:
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**Escalation:** 1 of 3
+
+**User's HITL Feedback:**
+> "I don't like the family name and sku and don't create the set and combo for now and there is a colour variation as well"
+
+**What I've Resolved:**
+- Sets/Combos: Will NOT create (source: user feedback - "don't create")
+- Color Variants: Will include Blossoms, Charming Flowers, Spring Flowers (source: visual_analysis_storage_jars.md)
+
+**What Needs Clarification:**
+| Aspect | User Said | Options | Recommendation |
+|--------|-----------|---------|----------------|
+| Family Name | "don't like the family name" | 1) "Pavisha Floral Collection", 2) "Decorative PET Storage", 3) Ask user | Option 1 - matches brand |
+| SKU Pattern | "don't like...sku" | 1) "PFC-" prefix, 2) "DPS-" prefix, 3) Ask user | Option 1 - aligns with family |
+
+**Workspace Files Checked:**
+- visual_analysis_storage_jars.md: Found 3 color variants
+- catalog_analysis_pet_containers.md: Found existing SKU patterns (PAV-*)
+
+**Request for PM:**
+Please ask user to choose family name and SKU pattern, or confirm my recommendations.
+```
+
+### Example 4: Bare Reject
+
+```
+[HITL_FEEDBACK] Reject
+
+Type: BARE_REJECT
+Action: Escalate (no information to act on)
+
+Response:
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**Escalation:** 1 of 3
+
+**User's HITL Feedback:**
+> "Reject"
+
+**What I Know:**
+- User rejected the proposal
+- User did NOT specify what was wrong
+
+**What Was Proposed:**
+- Family: Floral PET Jar Series
+- SKU: FPJ-500ML-BLOSSOMS (and 11 variants)
+- Price Range: Rs 40-95
+- Products: 12 variants (4 sizes x 3 designs)
+
+**Request for PM:**
+Please ask user what specifically needs to change.
+
+I cannot guess what's wrong. Re-submitting without knowing will likely be rejected again.
+```
+
+### Example 5: Circuit Breaker (Round 3)
+
+```
+[Previous: 2 escalations about family name, still unclear]
+
+Response:
+## HITL RESOLUTION LIMIT REACHED
+
+**Escalation:** 3 of 3 (FINAL)
+
+**Unresolved after 2 rounds:**
+- Family Name: User rejected "Floral PET Series" and "Pavisha Floral Collection" without specifying preferred name
+
+**Options for PM:**
+1. Ask user to provide exact family name they want
+2. Cancel this cataloging task
+3. Proceed with "Decorative Storage Jars" (generic, may need revision)
+
+I cannot continue escalating the same issue. Please choose an option.
+```
+
+### Example 6: Redirect
+
+```
+[HITL_FEEDBACK] Actually, don't create new - just update the existing 500ml jar
+
+Type: REDIRECT
+Action: Escalate for task change
+
+Response:
+[HITL REDIRECT]
+
+**User Feedback:** "Actually, don't create new - just update the existing 500ml jar"
+
+**Original Task:** Create new product family with 12 variants
+**User Wants:** Update existing product
+
+This requires task change, not revision.
+Please confirm: Should I update the existing 500ml jar instead?
+If yes, which attributes should I update?
+```
+
+---
+
+## INTEGRATION WITH TOOLS
+
+This protocol is tool-agnostic. Any tool can trigger HITL.
+
+### Common HITL-Enabled Tools
+
+| Tool | HITL Trigger | Domain |
+|------|--------------|--------|
+| write_data | Database changes | All |
+| image_studio | Asset creation (campaigns) | Creative |
+| send_message | Outbound communications | All |
+| execute_action | External system changes | All |
+
+### When Tool Returns HITL Feedback
+
+```
+1. Detect [HITL_FEEDBACK] marker in tool response
+2. Load this protocol: load_protocol(protocol_names=['hitl'])
+3. Parse feedback type(s)
+4. Check workspace if applicable
+5. Resolve or escalate per protocol
+6. Respond with appropriate format
+```
+
+---
+
+## SUMMARY CHECKLIST
+
+Before responding to ANY HITL feedback:
+
+- [ ] Detected feedback type(s)?
+- [ ] Parsed compound feedback if multiple statements?
+- [ ] Checked workspace files for resolvable items?
+- [ ] Used correct response format?
+- [ ] Included HITL marker so PM knows?
+- [ ] Tracked escalation round?
+- [ ] Applied circuit breaker if round 3?
+- [ ] Quoted user's exact feedback?
+- [ ] Listed what was resolved vs pending?
+- [ ] Provided options/recommendations for unresolved?
+
+**If any check fails, fix before responding.**
+
+</protocol>

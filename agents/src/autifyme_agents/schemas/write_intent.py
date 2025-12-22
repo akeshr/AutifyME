@@ -43,9 +43,9 @@ class AssetUpload(BaseModel):
                 action="create",
                 table="assets",
                 data={
-                    "file_url": "@product_image.public_url",
-                    "file_type": "image/png",
-                    "file_size": "@product_image.size_bytes"
+                    "storage_url": "@product_image.public_url",
+                    "mime_type": "image/png",
+                    "file_size_bytes": "@product_image.size_bytes"
                 },
                 returns="asset"
             )

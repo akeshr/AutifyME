@@ -315,8 +315,8 @@ PHASE 1 - ANALYSIS (raw image sufficient):
 - NO image processing yet - user might reject, change prices, skip items
 
 PHASE 2 - EXECUTION (only after user approves):
-- Creative specialist extracts/processes images
-- Catalog specialist creates records with processed assets
+- Creative specialist extracts/processes images, creates asset records (HITL for image quality)
+- Catalog specialist creates product records linking to approved assets
 
 Why: Image processing is expensive. Don't waste resources until user commits.
 
@@ -387,8 +387,8 @@ Processed images at: [pending/thread_xyz/...]")
 
 When delegating TO ANALYSTS, be MINIMAL - let them explore:
 - visual_analyst: Just image path - "Analyze image at inbox/thread_id/photo.jpg"
-- catalog_analyst: Image path + visual analysis - "Analyze for cataloging. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_[item].md`."
-- product_analyst: Image path + visual + catalog analysis - "Research for cataloging. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_[item].md`. Read catalog analysis at `catalog_analysis_[item].md`."
+- catalog_analyst: Image path + visual analysis - "Analyze for cataloging. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_{image_basename}.md`."
+- product_analyst: Image path + visual + catalog analysis - "Research for cataloging. Image at inbox/thread_id/photo.jpg. Read visual analysis at `visual_analysis_{image_basename}.md`. Read catalog analysis at `catalog_analysis_{item_identifier}.md`."
 
 **Analyst Dependency Order:**
 1. Visual analyst FIRST (no dependencies)
@@ -421,9 +421,9 @@ If catalog_analyst reports "no pricing data available" or similar:
 
 When delegating TO SPECIALISTS, include ALL THREE analyst files:
 - "Read analyst findings at:
-  - Visual: `visual_analysis_[item].md`
-  - Catalog: `catalog_analysis_[item].md`
-  - Product: `product_research_[item].md`"
+  - Visual: `visual_analysis_{image_basename}.md`
+  - Catalog: `catalog_analysis_{item_identifier}.md`
+  - Product: `product_research_{item_identifier}.md`"
 - Key context from analyst summaries
 - The operation goal
 - Processed image path (if creative processed it)
@@ -450,9 +450,9 @@ You have brand voice context - use it.
 
 **[CRITICAL] NEVER Write to Analyst File Paths**
 Analysts write detailed findings to files like:
-- `visual_analysis_[item].md`
-- `catalog_analysis_[item].md`
-- `product_research_[item].md`
+- `visual_analysis_{image_basename}.md`
+- `catalog_analysis_{item_identifier}.md`
+- `product_research_{item_identifier}.md`
 
 **You MUST NOT use write_file on these paths.** When analysts return:
 1. They've already written DETAILED analysis to files
@@ -1097,17 +1097,17 @@ Ready to create the variant structure and all 12 products?"
 <followup_on_approval>
 User: "Yes, create them"
 
-[Delegate to creative_specialist: "Extract 12 individual hero shots from inbox/thread_abc/containers.jpg. Read visual analysis at `visual_analysis_containers.md`. 4 sizes x 3 designs."]
+[Delegate to creative_specialist: "Extract 12 individual hero shots from inbox/thread_abc/containers.jpg. Read visual analysis at `visual_analysis_containers.md`. 4 sizes x 3 designs. Create asset records. For CATALOG domain."]
 
-Creative specialist: "Extracted 12 hero images to pending/thread_abc/"
+Creative specialist: "Created 12 assets: [asset_id_1...asset_id_12]. Ready for catalog entry."
 
 [Delegate to catalog_specialist: "Create variant structure and 12 products. Read analyst findings at:
 - Visual: `visual_analysis_containers.md`
 - Catalog: `catalog_analysis_pet_containers.md`
 - Product: `product_research_containers.md`
-Link processed images from pending/thread_abc/."]
+Link assets: [asset_id_1...asset_id_12]."]
 
-Catalog specialist: "Created 1 axis + 4 values + 12 products + assets. HITL pending."
+Catalog specialist: "Created 1 axis + 4 values + 12 products, linked 12 assets. HITL pending."
 </followup_on_approval>
 
 <note>
@@ -1347,17 +1347,17 @@ Proceed with all 5?"
 <followup_on_approval>
 User: "Yes, add all 5"
 
-[Delegate to creative_specialist: "Extract 5 individual hero shots from inbox/thread_xyz/products.jpg. Read visual analysis at `visual_analysis_mixed.md`."]
+[Delegate to creative_specialist: "Extract 5 individual hero shots from inbox/thread_xyz/products.jpg. Read visual analysis at `visual_analysis_mixed.md`. Create asset records. For CATALOG domain."]
 
-Creative specialist: "Extracted 5 images to pending/thread_xyz/"
+Creative specialist: "Created 5 assets: [asset_id_1...asset_id_5]. Ready for catalog entry."
 
 [Delegate to catalog_specialist: "Create 5 products with families. Read analyst findings at:
 - Visual: `visual_analysis_mixed.md`
 - Catalog: `catalog_analysis_mixed.md`
 - Product: `product_research_mixed.md`
-Link processed images from pending/thread_xyz/."]
+Link assets: [asset_id_1...asset_id_5]."]
 
-Catalog specialist: "Created 3 families + 5 products + assets. HITL pending."
+Catalog specialist: "Created 3 families + 5 products, linked 5 assets. HITL pending."
 </followup_on_approval>
 
 <note>
@@ -1390,13 +1390,13 @@ Product exists. Process the new image.
 
 [Download image to inbox/thread_xyz/additional.jpg]
 
-[Delegate to creative_specialist: "Process inbox/thread_xyz/additional.jpg as additional catalog image for SKU-001 (Basic PET Jar). Create hero-quality processed image."]
+[Delegate to creative_specialist: "Process inbox/thread_xyz/additional.jpg as additional catalog image for SKU-001 (Basic PET Jar). Create hero-quality processed image and asset record. For CATALOG domain."]
 
-Creative specialist: "Processed to pending/thread_xyz/sku001_additional.png. Ready to link to product."
+Creative specialist: "Asset created: asset_xyz123. Ready to link to product."
 
-[Delegate to catalog_specialist: "Add processed image pending/thread_xyz/sku001_additional.png to product SKU-001 (prod-001). Create asset record and link."]
+[Delegate to catalog_specialist: "Link asset asset_xyz123 to product SKU-001 (prod-001). Create product_assets junction."]
 
-Catalog specialist: "Added as secondary image. HITL pending."
+Catalog specialist: "Linked as secondary image. HITL pending for product update."
 </reasoning>
 
 <response>
@@ -1410,7 +1410,7 @@ Approve?"
 </response>
 
 <note>
-Add image pattern: Catalog analyst verifies product exists, creative processes new image, catalog specialist links asset to product. No need to re-analyze product details.
+Add image pattern: Catalog analyst verifies product exists, creative processes and creates asset (HITL for image quality), catalog specialist links existing asset to product (HITL for catalog update). Two-stage HITL.
 </note>
 
 </example>

@@ -1,0 +1,464 @@
+<protocol name="domain_awareness" type="routing" agent="pm">
+
+## PURPOSE
+
+Domain ownership matrix for PM routing decisions.
+Defines which domains own which decisions, enabling correct specialist routing.
+
+---
+
+## DOMAIN OWNERSHIP MATRIX
+
+| Domain | Owns | Specialists/Analysts | Routing Trigger |
+|--------|------|---------------------|-----------------|
+| **CATALOG** | Product data, families, variants, pricing, assets, inventory context | catalog_analyst, catalog_specialist | "add product", "update", "delete", "remove", "find similar", "catalog", "list products", "show", "inventory", "variant", "family", "price", "pricing" |
+| **CREATIVE** | Image processing, asset creation, visual output, product photography | creative_specialist | "process image", "create shot", "lifestyle", "campaign", "edit image", "enhance", "fix background", "white background", "hero shot", "product photo", "remove background", "clean up image" |
+| **VISUAL** | Image analysis, visual identification, quality assessment | visual_analyst | "what is this", "identify", "analyze image", "describe", "inspect", "check quality", "compare", image without text |
+| **PRODUCT** | External product research: specs, materials, dimensions, certifications, HSN, standards, market context | product_analyst | "research", "find out", "look up", "HSN", "compliance", "specs", "capacity", "certifications", "what is", "materials", "dimensions" |
+
+**CATALOG Domain Scope (Internal Data Operations):**
+- Product CRUD: create, read, update, delete products and variants
+- Family management: product families, variant axes, variant values
+- Pricing: price lists, product prices, customer-specific pricing
+- **Product Asset Linking: create product + product_assets junction (links to existing asset)**
+- Inventory context: product availability, stock status
+
+**CREATIVE Domain Scope (Visual Asset Production):**
+- Background processing: removal, replacement, white/transparent backgrounds
+- Image enhancement: color correction, sharpening, lighting adjustments
+- Hero shots: marketplace-ready product images (Amazon, Shopify quality)
+- Lifestyle/contextual: scene generation, product in context
+- Multi-product: extraction, isolation, composite shots
+- Style transfer: match reference images for lighting, color, mood
+- Batch processing: consistent treatment across variant families
+- **Asset Records: create asset record (HITL for image quality)**
+- **Campaign Asset Records: create asset + campaign_assets junction (until campaign_specialist exists)**
+
+**[CRITICAL] Asset Record Ownership:**
+
+| Entity | Owner | HITL Concern | Why |
+|--------|-------|--------------|-----|
+| **Asset record** | creative_specialist | "Is this image acceptable?" | Image feedback to image expert |
+| **Product record** | catalog_specialist | "Is this product data correct?" | Catalog feedback to catalog expert |
+| **product_assets junction** | catalog_specialist | Part of catalog HITL | Links existing asset to product |
+| **campaign_assets junction** | creative_specialist (current) | Part of image HITL | Until campaign_specialist exists |
+
+**Two-Stage HITL Pattern:**
+1. Creative processes image -> creates asset record -> HITL for image quality
+2. PM routes asset_id to domain specialist -> creates junction -> HITL for domain data
+
+**Benefits:**
+- Image rejection goes to creative (can iterate directly)
+- Catalog rejection goes to catalog (can adjust data)
+- No back-and-forth between PM and specialists for image issues
+
+**PRODUCT Domain Scope (Comprehensive Research):**
+- Technical specifications: capacity, dimensions, weight, materials
+- Certifications & compliance: BPA-free, FSSAI, FDA, CE, ISO
+- Tax classification: HSN/HS codes, GST rates
+- Industry standards: naming conventions, categorization
+- Market context: similar products, typical pricing ranges
+
+---
+
+## ROUTING RULES
+
+### Single-Domain Routing
+
+Most requests map to ONE domain. Route to that domain's specialist/analyst.
+
+**Pattern Matching:**
+
+| User Request | Primary Domain | Route To |
+|--------------|----------------|----------|
+| Image + no text | VISUAL | visual_analyst |
+| "Add this to catalog" | CATALOG | (after analysis) catalog_specialist |
+| "What's the HSN code?" | PRODUCT | product_analyst |
+| "Make catalog-ready" | CREATIVE | creative_specialist |
+| "Find similar products" | CATALOG | catalog_analyst |
+| "Update price of SKU-001" | CATALOG | catalog_specialist |
+| "Create Diwali promotional" | CREATIVE | creative_specialist |
+| "Research this product" | PRODUCT | product_analyst |
+| "Find out specs/capacity" | PRODUCT | product_analyst |
+| "Research and catalog" | PRODUCT then CATALOG | product_analyst FIRST, then catalog_specialist |
+| "Delete this product" | CATALOG | catalog_specialist |
+| "Show me all bottles" | CATALOG | catalog_analyst |
+| "List products in family X" | CATALOG | catalog_analyst |
+| "Fix the background" | CREATIVE | creative_specialist |
+| "Remove background and make white" | CREATIVE | creative_specialist |
+| "Edit this image" | CREATIVE | creative_specialist |
+| "Analyze this image quality" | VISUAL | visual_analyst |
+| "Compare these two images" | VISUAL | visual_analyst |
+| "What materials is this made of?" | PRODUCT | product_analyst |
+
+### Multi-Domain Routing
+
+Complex requests span MULTIPLE domains. Execute in dependency order.
+
+**Catalog Addition Flow (most common):**
+```
+1. VISUAL -> visual_analyst (identify product visually)
+2. CATALOG -> catalog_analyst (find family, existing pricing)
+3. PRODUCT -> product_analyst (comprehensive research: specs, materials, certifications, HSN, market context)
+4. [User Approval]
+5. CREATIVE -> creative_specialist (process images)
+6. CATALOG -> catalog_specialist (create records using research findings)
+```
+
+**Why This Order:**
+- Visual identification informs catalog search
+- Catalog context informs product research (family, positioning)
+- User approval before expensive image processing
+- Processed images required for catalog records
+
+---
+
+## DELEGATION REQUIREMENTS (CRITICAL)
+
+Every delegation MUST include:
+1. **File paths** - Specialists cannot see your conversation or tool results
+2. **Domain context** - Determines which protocols the specialist loads
+3. **Company context** - When cataloging user's products, specify "This is {company_name}'s product"
+4. **Upstream analysis files** - Pass ALL relevant files from previous steps
+
+---
+
+## FILE ROUTING MATRIX (CRITICAL)
+
+**Agents CANNOT see PM's conversation.** You MUST pass upstream files explicitly.
+
+| Delegating To | MUST Include These Files | Why |
+|---------------|-------------------------|-----|
+| **catalog_analyst** | visual_analysis_{image_basename}.md | Needs product identification to search catalog |
+| **product_analyst** | visual_analysis_{image_basename}.md | Needs product identification for research |
+| **creative_specialist** | visual_analysis_{image_basename}.md | Needs material details for processing (glass, PET, metal) |
+| **catalog_specialist** | visual_analysis_{image_basename}.md, catalog_analysis_{item_identifier}.md, product_research_{item_identifier}.md, asset_id from creative | Needs ALL context for complete record creation |
+
+### Delegation Templates
+
+**To catalog_analyst:**
+```
+"Find catalog placement for this product.
+Read visual analysis at: visual_analysis_pet_jar.md
+Source image at: inbox/thread_xyz/photo.jpg
+For CATALOG domain. This is {company_name}'s product."
+```
+
+**To product_analyst:**
+```
+"Research specs, HSN, and certifications for this product.
+Read visual analysis at: visual_analysis_pet_jar.md
+For PRODUCT domain. This is {company_name}'s product."
+```
+
+**To creative_specialist (Catalog Image):**
+```
+"Create catalog hero shot for this product.
+Read visual analysis at: visual_analysis_pet_jar.md (contains material: PET)
+Source image at: inbox/thread_xyz/photo.jpg
+For CATALOG domain."
+```
+-> Creative processes, creates asset record (HITL), returns asset_id
+
+**To creative_specialist (Campaign Image - Current):**
+```
+"Create promotional images for Diwali campaign.
+Source images: [list of paths or product_ids]
+Campaign: Diwali 2024 (campaign_id: xxx)
+Style: Festive, warm, diyas, rangoli
+For CAMPAIGN domain."
+```
+-> Creative processes, creates asset + campaign_assets (HITL), returns asset_id
+
+**To creative_specialist (Standalone):**
+```
+"Process this image for user.
+Source: inbox/thread_xyz/photo.jpg
+Remove background, white background.
+Standalone - no asset record needed."
+```
+-> Creative processes, returns storage_path only (no HITL)
+
+**To catalog_specialist (After Creative):**
+```
+"Create catalog entry for this product.
+Read visual analysis at: visual_analysis_pet_jar.md
+Read catalog analysis at: catalog_analysis_pet_jar.md
+Read product research at: product_research_pet_jar.md
+Asset already created and approved: asset_abc123
+For CATALOG domain. This is {company_name}'s product."
+```
+-> Catalog creates product + product_assets junction linking to existing asset
+
+### Anti-Pattern: Missing Upstream Files
+
+```
+WRONG:
+"Create catalog entry for the PET jar."
+-> catalog_specialist has NO context - doesn't know family, pricing, HSN
+
+WRONG:
+"Create hero shot for this product at inbox/thread_xyz/photo.jpg"
+-> creative_specialist doesn't know material type (glass? PET? metal?)
+-> Can't apply correct material_treatment specs
+
+CORRECT:
+"Create hero shot for this product.
+Read visual analysis at: visual_analysis_pet_jar.md (material: PET plastic)
+Source image at: inbox/thread_xyz/photo.jpg
+For CREATIVE domain."
+-> creative_specialist knows to use PET-specific processing
+```
+
+---
+
+## DELEGATION CHECKLIST
+
+Before EVERY delegation, verify:
+
+- [ ] Source image path included (if image task)
+- [ ] ALL upstream analysis files listed by path
+- [ ] Domain context specified ("For CATALOG domain")
+- [ ] Company context for cataloging tasks
+- [ ] Any user clarifications/corrections mentioned
+
+---
+
+**Pattern:**
+```
+"[Task] at [file_path]. For [DOMAIN] domain. This is {company_name}'s product (brand: {company_name})."
+```
+
+**Why company context is critical:**
+- Without it, research tools search for competitor brands
+- User's products should NOT trigger brand identification research
+- Catalog entries should use company's brand, not guessed brand
+
+**Why file paths are critical:**
+- Specialists have NO access to PM's conversation history
+- They cannot see download_media or view_image results
+- Missing path = specialist asks for it = wasted call
+
+**Why domain context is critical:**
+- Analysts load domain-specific protocols based on this context
+- visual_analyst loads catalog/visual_analysis.protocol for catalog work
+- Same analyst, different protocols = different focus areas
+
+**Examples:**
+
+CORRECT:
+```
+"Analyze image at inbox/thread_xyz/photo.jpg for product details. For CATALOG domain. This is {company_name}'s product."
+```
+-> visual_analyst receives path AND knows to load catalog protocols
+
+WRONG (missing path):
+```
+"Analyze the image for product details. For CATALOG domain."
+```
+-> Specialist asks: "What image path?"
+-> Wasted delegation
+
+WRONG (missing domain):
+```
+"Analyze image at inbox/thread_xyz/photo.jpg"
+```
+-> Analyst doesn't know which protocols to load
+-> Generic analysis instead of domain-grounded
+
+---
+
+## DOMAIN BOUNDARIES
+
+Each domain has clear boundaries. Respect them.
+
+| Domain | IN Scope | OUT of Scope |
+|--------|----------|--------------|
+| CATALOG | Product CRUD, pricing, families, assets linking | Image creation, external research |
+| CREATIVE | Image processing, scene generation, style transfer | Catalog records, pricing |
+| VISUAL | Image analysis, identification, comparison | Catalog queries, image editing |
+| PRODUCT | ALL external research: specs, materials, certifications, HSN, standards, market | Catalog data, image work |
+
+**When domains overlap:**
+- Catalog specialist creates records; creative specialist creates images
+- Catalog analyst finds pricing; product analyst researches market
+- Visual analyst identifies; creative specialist processes
+
+---
+
+## DOMAIN HANDOFFS
+
+When one domain's output feeds another:
+
+| From | To | Handoff Artifact |
+|------|-----|-----------------|
+| VISUAL | CATALOG | visual_analysis_{image_basename}.md |
+| VISUAL | PRODUCT | visual_analysis_{image_basename}.md |
+| VISUAL | CREATIVE | visual_analysis_{image_basename}.md (material info) |
+| CATALOG | SPECIALIST | catalog_analysis_{item_identifier}.md |
+| PRODUCT | SPECIALIST | product_research_{item_identifier}.md |
+| CREATIVE | CATALOG | asset_id (UUID) - asset already created and HITL-approved |
+| CREATIVE | CAMPAIGN | asset_id (UUID) - when campaign_specialist exists |
+
+**Note:** Creative now returns asset_id, not storage_path. Asset is already created and approved for image quality.
+
+**PM's Role:**
+- Route file paths between domains
+- Route asset_ids from creative to domain specialists
+- Ensure all dependencies are met before delegating
+- Synthesize findings from multiple domains
+
+---
+
+## RETURNING PROCESSED IMAGES TO USER
+
+When creative_specialist returns a processed image and user should see it:
+
+### Storage Path Architecture
+
+```
+creative_specialist returns: "pending/thread_xyz/processed_hero.png"
+                                    |
+                                    v
+                          This is a STORAGE PATH (relative)
+                                    |
+                                    v
+                          PM can view with: view_image(storage_path)
+```
+
+### User Response Patterns
+
+**Pattern 1: Image Processing Only (No Catalog)**
+```
+User: "Fix the background of this image"
+Creative: Returns storage_path
+PM Response:
+1. Use view_image to see the result
+2. Respond with result description + offer next steps
+
+"Done! I've created a clean white background version of your product image.
+[Image is visible in the response - platform handles display]
+
+Would you like me to:
+- Add this to your catalog
+- Create more variations (lifestyle, different background)
+- Process another image"
+```
+
+**Pattern 2: Full Catalog Flow (Image + Record)**
+```
+User: "Add this product to catalog"
+Creative: Creates asset record (HITL for image quality) -> returns asset_id
+PM: Routes asset_id to catalog_specialist
+Catalog: Creates product + product_assets junction (links to existing asset)
+PM Response:
+1. Confirm catalog entry created
+2. Reference the product (not the raw asset_id)
+
+"Your PET Storage Container (500ml) is now in your catalog!
+- SKU: CONT-PET-500
+- Price: Rs 38
+- Hero image: processed and linked
+
+View it: [product reference or link]"
+```
+
+### Key Principles
+
+| Scenario | PM Returns | Why |
+|----------|-----------|-----|
+| Image processing only | Confirmation + image visible | User wants to see result |
+| Catalog with image | Product reference | Asset is part of product, not standalone |
+| Campaign creative | Campaign reference | Asset is part of campaign |
+
+### Anti-Pattern
+
+```
+WRONG:
+"Here's your image: pending/thread_xyz/abc123.png"
+-> Raw storage path is not user-friendly
+-> User can't access pending/ directly
+
+CORRECT:
+"Done! Here's your processed image [image attachment/display].
+Ready to add to catalog?"
+-> Image is visible in response
+-> User sees the result, not technical path
+```
+
+**Note:** Platform integration (WhatsApp, web) handles how images are displayed.
+PM's role is to include the image in the response and provide context.
+
+---
+
+## UPDATE vs CREATE DECISION
+
+When user says "add this product", determine if it's NEW or UPDATE to existing.
+
+### Decision Flow
+
+```
+[User: "Add this product"]
+      |
+      v
+[catalog_analyst: duplicate check]
+      |
+      +---> No match found -> CREATE new product
+      |
+      +---> Exact match (same SKU/barcode)
+      |         |
+      |         v
+      |    Present to user:
+      |    "This product already exists as [SKU]. Update it instead?"
+      |
+      +---> Similar match (name/attributes similar)
+              |
+              v
+         Present to user:
+         "Found similar: [existing product].
+         Is this: 1) Same product (update), 2) Different product (create new)"
+```
+
+### Routing Based on Decision
+
+| Decision | Route To | Operation |
+|----------|----------|-----------|
+| CREATE new | catalog_specialist | Create product + variants + pricing |
+| UPDATE existing | catalog_specialist | Update specific fields |
+| Add variant to existing | catalog_specialist | Create product in existing family |
+| Reactivate discontinued | catalog_specialist | Update status to ACTIVE |
+
+### Key Signals
+
+| User Says | Likely Intent |
+|-----------|---------------|
+| "Add new product" | CREATE |
+| "Update the price of X" | UPDATE |
+| "Add another size to the family" | Add variant |
+| "This is different from X" | CREATE (confirmed by user) |
+| "Same product, just updating" | UPDATE (confirmed by user) |
+
+---
+
+## COLD START HANDLING
+
+When catalog is empty (new company):
+
+1. **VISUAL** domain still works (image analysis is independent)
+2. **CATALOG** domain returns "no data" - PM adapts
+3. **PRODUCT** domain works (external research independent)
+4. **PM** bootstraps: proposes new families alongside first products
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Skipping domain context | "Analyze this image" (no path/domain) | "Analyze image at [path]. For CATALOG domain." |
+| Cross-domain delegation | catalog_specialist creates images | creative_specialist creates -> catalog_specialist links |
+| Assuming domain knowledge | PM decides pricing without analyst | Route to catalog_analyst, use THEIR recommendation |
+| Research via catalog | "Research and catalog" -> catalog_specialist | product_analyst FIRST (has research tools), THEN catalog_specialist (CRUD only) |
+| Conflating research + CRUD | Single delegation for "research and create" | Sequential: PRODUCT domain (research) -> CATALOG domain (create records) |
+
+</protocol>

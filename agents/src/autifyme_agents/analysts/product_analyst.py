@@ -16,7 +16,7 @@ from langchain.chat_models import BaseChatModel
 
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
-from autifyme_agents.middleware import MultimodalInjectionMiddleware
+from autifyme_agents.middleware import MultimodalInjectionMiddleware, create_execution_limits
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.research_tools import (
     extract_web_content_tool,
@@ -25,15 +25,15 @@ from autifyme_agents.tools.research_tools import (
 
 
 def _get_analyst_llm() -> BaseChatModel:
-    """Get fast, cheap LLM for analyst tasks.
+    """Get LLM for product research tasks with balanced reasoning.
 
-    Uses Gemini 2.5 Flash Lite with minimal thinking for speed.
-    Analysts are latency-sensitive (target <300ms).
+    Uses Gemini 3 Flash with 'medium' thinking - enough for iterative research
+    discipline (when to stop researching) without excessive latency.
     """
     return get_llm(
         provider="google",
-        model="gemini-2.5-flash-lite",
-        temperature=1.0,  # Lower temperature for factual research
+        model="gemini-3-flash-preview",
+        thinking_level="medium",  # Balanced: research discipline + speed
         max_retries=3,
     )
 
@@ -44,7 +44,7 @@ def create_product_analyst(
     """Create Product Analyst SubAgent spec.
 
     Args:
-        model: Optional LLM override. Defaults to Gemini 2.5 Flash Lite.
+        model: Optional LLM override. Defaults to Gemini 3 Flash.
 
     Returns:
         SubAgent spec dict for PM's subagents list.
@@ -57,22 +57,28 @@ def create_product_analyst(
     system_prompt = load_prompt("analysts/product_analyst.prompt")
 
     description = (
-        "ROLE: Analyst (read-only)\n"
-        "MISSION: Convert an unknown product into market-grounded facts (name, specs, standards).\n\n"
-        "OWNERSHIP:\n"
-        "- External product knowledge: naming conventions, spec sheets, standards/compliance context\n"
+        "ROLE: Analyst (read-only, external research)\n"
+        "MISSION: Comprehensive product research - convert unknown products into catalog-ready specifications.\n\n"
+        "OWNERSHIP (ALL external research):\n"
+        "- Technical specifications: capacity, dimensions, weight, materials\n"
+        "- Certifications & compliance: BPA-free, FSSAI, FDA, CE, ISO standards\n"
+        "- Tax classification: HSN/HS codes, GST rates\n"
+        "- Industry standards: naming conventions, categorization\n"
+        "- Market context: similar products, typical pricing ranges\n"
         "- Web research + source-backed summaries\n\n"
         "INPUTS I NEED:\n"
         "- Product cues: brand/model/keywords OR an image path to infer them\n"
         "- Target market/jurisdiction if compliance matters (e.g., India)\n\n"
         "OUTPUTS I PRODUCE:\n"
-        "- A concise, source-backed brief (with links)\n"
-        "- Clear unknowns/assumptions and what to confirm before writing data\n"
-        "- If long: write a report to the thread directory and return the file path\n\n"
+        "- Comprehensive research brief: specs, materials, certifications, HSN, market context\n"
+        "- Source-backed findings with links\n"
+        "- Clear unknowns/assumptions for user to confirm\n"
+        "- If long: write product_research_[item].md to thread directory\n\n"
         "TOOLS I USE:\n"
         "- research_product_tool, extract_web_content_tool, view_image\n\n"
         "GUARDRAILS:\n"
-        "- No internal DB reads/writes; no record creation; no image editing"
+        "- No internal DB reads/writes; no record creation; no image editing\n"
+        "- catalog_specialist handles CRUD - I provide research findings"
     )
 
     tools: list[Any] = [
@@ -82,7 +88,11 @@ def create_product_analyst(
     ]
 
     # Multimodal middleware injects images from paths in delegation message
-    middleware = [MultimodalInjectionMiddleware()]
+    # Execution limits: read-only analyst with web research limits
+    middleware = [
+        *create_execution_limits(model_call_limit=15, tool_call_limit=20),
+        MultimodalInjectionMiddleware(),
+    ]
 
     spec: dict[str, Any] = {
         "name": "product_analyst",

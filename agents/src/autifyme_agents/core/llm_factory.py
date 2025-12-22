@@ -10,7 +10,7 @@ from autifyme_agents.core.gemini_retry import GeminiWithRetry
 
 def get_llm(
     provider: str = "google",
-    model: str = "gemini-2.5-pro",
+    model: str = "gemini-3-flash-preview",
     temperature: float | None = None,  # None = model-specific default
     tags: list[str] | None = None,
     reasoning_effort: str = "low",
@@ -22,7 +22,7 @@ def get_llm(
     max_output_tokens: int | None = None,
     # Thinking control (model-dependent)
     thinking_budget: int | None = None,  # Gemini 2.5: token count (0=disable, -1=dynamic)
-    thinking_level: Literal["low", "high"] | None = None,  # Gemini 3+: reasoning depth
+    thinking_level: Literal["low", "medium", "high"] | None = None,  # Gemini 3+ (library 4.1.0+)
     include_thoughts: bool = False,
     safety_settings: dict[HarmCategory, HarmBlockThreshold] | None = None,
     response_modalities: list[Literal["TEXT", "IMAGE", "AUDIO"]] | None = None,
@@ -50,7 +50,9 @@ def get_llm(
             OpenAI models: 'gpt-4.1-mini', 'gpt-4.1', 'gpt-4.1-nano', 'gpt-5-mini-2025-08-07'
             Anthropic models: 'claude-3-5-sonnet-20241022'
             Google Gemini models:
-                - 3.0 Series (Latest): 'gemini-3-pro-preview' (1M/64K tokens, $2/$12)
+                - 3.0 Series (Latest):
+                  - 'gemini-3-flash-preview' (1M/65K tokens, fast+intelligent) - RECOMMENDED
+                  - 'gemini-3-pro-preview' (1M/64K tokens, $2/$12)
                 - 2.5 Series: 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'
                 - 2.0 Series: 'gemini-2.0-flash', 'gemini-2.0-flash-lite'
                 - Image Generation: 'gemini-3-pro-image-preview' (RECOMMENDED, 65K/32K tokens)
@@ -81,9 +83,11 @@ def get_llm(
         thinking_budget: Token budget for Gemini 2.5 adaptive thinking.
             Default: 2048 tokens. Set 0 to disable (Flash/Flash-Lite only, Pro min=128).
             Use for Gemini 2.5 models only.
-        thinking_level: Reasoning depth for Gemini 3+ models ('low' or 'high').
+        thinking_level: Reasoning depth for Gemini 3+ models ('low', 'medium', 'high').
+            LangChain 4.1.0+ supports: 'low', 'medium', 'high' (Google API also has 'minimal' for Flash)
             'low': Minimizes latency/cost. Best for simple tasks, chat, high-throughput.
-            'high': Maximizes reasoning depth. Higher first-token latency but better quality.
+            'medium': Balanced reasoning for moderate complexity.
+            'high': Maximizes reasoning depth. Higher first-token latency but best quality.
             Default: 'high' for Gemini 3 (Google default). Cannot combine with thinking_budget.
 
         include_thoughts: Whether to include chain-of-thought reasoning in response.
@@ -151,8 +155,10 @@ def get_llm(
         - Knowledge cutoff: January 2025 (all current models)
 
         **Gemini 3 Thinking Control:**
-        - Uses thinking_level ('low'/'high') instead of thinking_budget
-        - 'high' (default): Deep reasoning, higher latency, better quality
+        - Uses thinking_level ('low'/'medium'/'high') instead of thinking_budget
+        - LangChain 4.1.0+ supports: low, medium, high (Google API also has 'minimal' for Flash)
+        - 'high' (default): Deep reasoning, higher latency, best quality
+        - 'medium': Balanced reasoning for moderate complexity
         - 'low': Fast responses, lower cost, suitable for simple tasks
         - Cannot combine thinking_level with thinking_budget in same request
         - Gemini 2.5 still uses thinking_budget (token count)
@@ -257,7 +263,7 @@ def get_llm(
         # Thinking control: Route based on model generation
         # CRITICAL: Cannot combine thinking_level with thinking_budget
         if is_gemini_3:
-            # Gemini 3+: Use thinking_level ('low' or 'high')
+            # Gemini 3+: Use thinking_level ('low'/'medium'/'high')
             # Default is 'high' per Google, but we allow override
             if thinking_level is not None:
                 gemini_kwargs["thinking_level"] = thinking_level
@@ -266,7 +272,7 @@ def get_llm(
                 import logging
                 logging.getLogger(__name__).warning(
                     f"thinking_budget ignored for Gemini 3 model '{model}'. "
-                    "Use thinking_level='low'/'high' instead."
+                    "Use thinking_level instead (Flash: minimal/low/medium/high, Pro: low/high)."
                 )
         else:
             # Gemini 2.5/2.0: Use thinking_budget (token count)

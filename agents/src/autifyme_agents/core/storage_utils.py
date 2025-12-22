@@ -85,6 +85,11 @@ def build_storage_url(
     # Normalize: remove leading slashes (LLMs sometimes add them)
     path = normalize_storage_path(path)
 
+    # Strip bucket prefix if accidentally included (e.g., "assets/pending/..." -> "pending/...")
+    # This prevents double-bucket paths in the final URL
+    if path.startswith(f"{bucket}/"):
+        path = path[len(bucket) + 1:]
+
     # Get Supabase URL from param or env
     base_url = supabase_url or os.getenv("SUPABASE_URL")
     if not base_url:
@@ -134,5 +139,5 @@ def is_storage_path(path: str) -> bool:
         return False
 
     # Relative paths starting with known folders are storage paths
-    storage_prefixes = ("pending/", "inbox/", "products/")
+    storage_prefixes = ("pending/", "inbox/", "products/", "brands/", "assets/")
     return normalized.startswith(storage_prefixes)

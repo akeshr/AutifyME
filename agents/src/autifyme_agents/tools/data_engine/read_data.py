@@ -40,18 +40,21 @@ class ReadDataInput(BaseModel):
             "CRITICAL: Do NOT use '%' wildcards here. For text/name searching, use search_patterns."
         )
     )
-    search_patterns: dict[str, str] | None = Field(
+    search_patterns: dict[str, str | list[str]] | None = Field(
         None,
         description=(
             "[FUZZY MATCH] Case-insensitive ILIKE pattern matching. "
-            "Use for searching TEXT columns (names, descriptions, codes, SKUs). "
-            "Examples: "
-            "{'name': '%search%'} (contains), "
-            "{'code': 'PREFIX-%'} (starts with), "
-            "{'name': '%term1%term2%'} (contains both). "
+            "Use for searching TEXT columns (names, descriptions, codes). "
+            "SYNTAX:\n"
+            "- Single pattern (AND with other keys): {'name': '%keyword%'}\n"
+            "- Multiple patterns (OR within same key): {'name': ['%term1%', '%term2%', '%term3%']}\n"
+            "EXAMPLES:\n"
+            "- {'name': '%keyword%'} - contains 'keyword' (single pattern)\n"
+            "- {'name': ['%term1%', '%term2%']} - contains 'term1' OR 'term2' (1 query, not 2!)\n"
+            "- {'name': '%word1%word2%'} - contains both word1 AND word2 (single pattern)\n"
             "Use % as wildcard. RECOMMENDED for all name/text searches. "
             "CRITICAL: Only works on TEXT columns, NOT on array columns (text[]). "
-            "For array columns like 'tags', use filters with exact array values or query differently. "
+            "For array columns, use filters with exact array values or query differently. "
             "Use inspect_schema to check column types before querying."
         )
     )
@@ -129,13 +132,13 @@ def create_read_data_tool(
         StructuredTool configured for read operations
 
     Examples:
-        # Cataloging Specialist - Product domain only
+        # Specialist - Domain-scoped access
         read_tool = create_read_data_tool(
             storage,
-            tables=["products", "product_families", "categories"]
+            tables=["entities", "parent_entities", "categories"]
         )
 
-        # Market Intelligence - Full read access
+        # Analyst - Full read access
         read_tool = create_read_data_tool(storage)  # No restrictions
     """
     allowed_tables = tables
@@ -143,7 +146,7 @@ def create_read_data_tool(
     async def _read_data_impl(
         table: str,
         filters: dict[str, Any] | None = None,
-        search_patterns: dict[str, str] | None = None,
+        search_patterns: dict[str, str | list[str]] | None = None,
         columns: list[str] | None = None,
         relations: list[str] | None = None,
         ids: list[str] | None = None,
@@ -176,14 +179,14 @@ def create_read_data_tool(
         - Returns 0 results if name doesn't match exactly (case, spacing, etc.)
 
         search_patterns = FUZZY MATCH (case-insensitive ILIKE)
-        - Use for: Names, descriptions, SKUs, any text search
-        - Examples: {'name': '%jar%'}, {'name': '%PET%bottle%'}
+        - Use for: Names, descriptions, codes, any text search
+        - Examples: {'name': '%keyword%'}, {'name': '%term1%term2%'}
         - Matches partial strings, case-insensitive
         - RECOMMENDED for all name/text searches
 
         Common Mistake:
-        ❌ filters={'name': ['PET Jar', 'PET Bottles']}  # Returns 0 if exact name doesn't exist
-        ✅ search_patterns={'name': '%PET%'}  # Returns all products with 'PET' in name
+        filters={'name': ['Name A', 'Name B']}  # Returns 0 if exact name doesn't exist
+        search_patterns={'name': '%keyword%'}  # Returns all records with 'keyword' in name
 
         Returns:
             Query results with metadata (count, pagination info)
@@ -191,99 +194,99 @@ def create_read_data_tool(
         Examples:
             # CRITICAL: Exact vs Fuzzy Match - Understanding the difference
 
-            # ❌ WRONG: Using filters for name search (returns 0 if names don't match exactly)
+            # WRONG: Using filters for name search (returns 0 if names don't match exactly)
             read_data(
-                table="product_families",
-                filters={"name": ["PET Jar", "PET Bottles"]},  # Requires EXACT match
+                table="parent_entities",
+                filters={"name": ["Name A", "Name B"]},  # Requires EXACT match
                 columns=["id", "name"]
             )
-            # Returns: [] (empty) if actual names are "PET Food Jars" or "PET Water Bottles"
+            # Returns: [] (empty) if actual names differ
 
-            # ✅ CORRECT: Using search_patterns for name search (fuzzy match)
+            # CORRECT: Using search_patterns for name search (fuzzy match)
             read_data(
-                table="product_families",
-                search_patterns={"name": "%PET%"},  # Matches any name containing "PET"
+                table="parent_entities",
+                search_patterns={"name": "%keyword%"},  # Matches any name containing keyword
                 columns=["id", "name"]
             )
-            # Returns: ["PET Food Jars", "PET Water Bottles", "PET Containers", etc.]
+            # Returns: All matching records
 
-            # ✅ CORRECT: Combining exact filters with fuzzy search
+            # CORRECT: Combining exact filters with fuzzy search
             read_data(
-                table="products",
-                filters={"is_active": True, "product_family_id": ["fam-1", "fam-2", "fam-3"]},
-                search_patterns={"sku": "%500ML%"},
-                columns=["id", "sku", "name", "base_price", "product_family_id"],
-                relations=["product_families(name,sku_prefix)"],
+                table="entities",
+                filters={"is_active": True, "parent_id": ["id-1", "id-2", "id-3"]},
+                search_patterns={"code": "%pattern%"},
+                columns=["id", "code", "name", "value", "parent_id"],
+                relations=["parent_entities(name,code_prefix)"],
                 limit=50
             )
-            # Returns: 500ml products from 3 families with family metadata
+            # Returns: Matching entities from 3 parents with parent metadata
 
             # Complex: Duplicate check across name variations with fuzzy matching
             read_data(
-                table="product_families",
+                table="parent_entities",
                 search_patterns={
-                    "name": "%PET%bottle%",
-                    "description": "%polyethylene%terephthalate%"
+                    "name": "%keyword1%keyword2%",
+                    "description": "%term1%term2%"
                 },
-                columns=["id", "name", "sku_prefix", "base_price", "created_at"]
+                columns=["id", "name", "code_prefix", "value", "created_at"]
             )
-            # Returns: Potential duplicate families for deduplication workflow
+            # Returns: Potential duplicates for deduplication workflow
 
-            # Complex: Paginated product catalog with full relationship graph
+            # Complex: Paginated data with full relationship graph
             read_data(
-                table="products",
+                table="entities",
                 filters={"is_active": True},
                 relations=[
-                    "product_families(name,sku_prefix,material)",
-                    "product_variant_values(variant_value(name,variant_axis(name)))",
-                    "product_images(image_url,display_order)"
+                    "parent_entities(name,code_prefix,type)",
+                    "entity_attributes(attribute(name,attribute_type(name)))",
+                    "entity_assets(url,sort_order)"
                 ],
-                columns=["id", "sku", "name", "base_price"],
+                columns=["id", "code", "name", "value"],
                 limit=25,
                 offset=50
             )
-            # Returns: Page 3 (items 51-75) with nested variant data and images
+            # Returns: Page 3 (items 51-75) with nested attribute data and assets
 
-            # Complex: Junction table query for multi-axis product variants
+            # Complex: Junction table query for entity attributes
             read_data(
-                table="product_variant_values",
-                filters={"product_id": "prod-uuid-123"},
+                table="entity_attributes",
+                filters={"entity_id": "uuid-123"},
                 relations=[
-                    "variant_value(name,variant_axis(name,product_family_id))"
+                    "attribute(name,attribute_type(name,parent_id))"
                 ]
             )
-            # Returns: All variant dimensions for a product (e.g., Size=500ml, Color=Clear)
+            # Returns: All attribute dimensions for an entity
 
-            # Complex: Analytics query for inventory planning
+            # Complex: Analytics query
             read_data(
-                table="products",
-                filters={"is_active": True, "product_family_id": "fam-pet-bottles"},
-                columns=["id", "sku", "base_price", "created_at"],
-                relations=["product_families(name)"],
+                table="entities",
+                filters={"is_active": True, "parent_id": "parent-uuid"},
+                columns=["id", "code", "value", "created_at"],
+                relations=["parent_entities(name)"],
                 count_only=False
             )
-            # Returns: Full product list with metadata for SKU count analysis
+            # Returns: Full entity list with metadata for analysis
 
-            # Complex: Batch fetch products by ID for impact calculation
+            # Complex: Batch fetch entities by ID for impact calculation
             read_data(
-                table="products",
+                table="entities",
                 ids=["uuid-1", "uuid-2", "uuid-3", "uuid-4", "uuid-5", "uuid-6"],
-                columns=["id", "sku", "base_price", "is_active"],
-                relations=["product_families(name)"]
+                columns=["id", "code", "value", "is_active"],
+                relations=["parent_entities(name)"]
             )
-            # Returns: Specific products for bulk price update verification
+            # Returns: Specific entities for bulk update verification
 
-            # Complex: Full product family with nested variant structure
+            # Complex: Full parent with nested child structure
             read_data(
-                table="product_families",
-                ids=["uuid-pet-jars"],
+                table="parent_entities",
+                ids=["uuid-parent"],
                 relations=[
-                    "products(*)",
-                    "variant_axes(*, variant_values(*))"  # CORRECT nested syntax
+                    "entities(*)",
+                    "attribute_types(*, attributes(*))"  # CORRECT nested syntax
                 ]
             )
-            # Returns: Product family with all products and complete variant axis hierarchy
-            # CRITICAL: Use variant_axes(*, variant_values(*)) NOT variant_axes.variant_values(*)
+            # Returns: Parent with all children and complete attribute hierarchy
+            # CRITICAL: Use parent(*, child(*)) NOT parent.child(*)
             )
         """
         try:
@@ -425,14 +428,16 @@ def create_read_data_tool(
             "CRITICAL DISTINCTION - filters vs search_patterns (most common source of errors):\n"
             "- filters: equality / IN matching (no wildcards) - use for IDs, booleans, enums/statuses\n"
             "  Example: {'id': 'uuid-123'}, {'is_active': True}, {'status': ['draft','published']}\n"
-            "- search_patterns: wildcard patterns using % (case-insensitive ILIKE) - use for names, text, SKUs\n"
-            "  Example: {'name': '%PET%Jars%'}, {'sku': 'JAR-%'}, {'name': '%PET%500ML%'}\n"
+            "- search_patterns: wildcard patterns using % (case-insensitive ILIKE) - use for names, text, codes\n"
+            "  * Single pattern (AND with other keys): {'name': '%keyword%'}\n"
+            "  * Multiple patterns (OR within same key): {'name': ['%term1%', '%term2%', '%term3%']}\n"
+            "  * EFFICIENCY: Use list for OR - 1 query instead of 15+ separate queries!\n"
             "RULE: If you're matching human text and you didn't include %, you probably meant search_patterns.\n\n"
             "USE WHEN:\n"
-            "- Duplicate check (CRITICAL before create): Does this product/SKU/entity exist?\n"
-            "- Foreign key lookup: Get IDs for relationships (family_id, uom_id, price_list_id)\n"
-            "- Context gathering: Current state (products in family, pricing patterns)\n"
-            "- Verification: Confirm assumptions (family exists? product active?)\n"
+            "- Duplicate check (CRITICAL before create): Does this record/code/entity exist?\n"
+            "- Foreign key lookup: Get IDs for relationships (parent_id, type_id, etc.)\n"
+            "- Context gathering: Current state (records in parent, patterns)\n"
+            "- Verification: Confirm assumptions (parent exists? record active?)\n"
             "- Batch fetch: Get multiple records by IDs\n"
             "- Relationship exploration: Load related data via joins (relations parameter)\n\n"
             "DON'T USE:\n"
@@ -451,14 +456,17 @@ def create_read_data_tool(
             "- Use columns=['id',...] whenever possible to reduce payload\n\n"
             "EXAMPLES:\n"
             "# Duplicate check before create (CRITICAL workflow)\n"
-            "read_data(table='products', search_patterns={'sku': '%HONEYCOMB%'}, columns=['id','sku'])\n"
-            "Returns: Any products with 'HONEYCOMB' in SKU (case-insensitive)\n\n"
+            "read_data(table='entities', search_patterns={'code': '%KEYWORD%'}, columns=['id','code'])\n"
+            "Returns: Any entities with 'KEYWORD' in code (case-insensitive)\n\n"
+            "# EFFICIENT OR search (1 query instead of 15+ queries!)\n"
+            "read_data(table='entities', search_patterns={'name': ['%term1%', '%term2%', '%term3%']}, columns=['id','name'])\n"
+            "Returns: Entities with 'term1' OR 'term2' OR 'term3' in name - SINGLE query\n\n"
             "# Foreign key lookup for relationships\n"
-            "read_data(table='product_families', search_patterns={'name': '%PET%Jars%'}, columns=['id','name'])\n"
-            "Returns: Family IDs matching 'PET Jars' (fuzzy match)\n\n"
+            "read_data(table='parent_entities', search_patterns={'name': '%keyword%'}, columns=['id','name'])\n"
+            "Returns: Parent IDs matching keyword (fuzzy match)\n\n"
             "# Combined: exact filters + fuzzy search + relations\n"
-            "read_data(table='products', filters={'is_active': True, 'product_family_id': ['fam-1','fam-2']}, search_patterns={'sku': '%500ML%'}, relations=['product_families(name)'], limit=50)\n"
-            "Returns: Active 500ml products from 2 families with family names\n\n"
+            "read_data(table='entities', filters={'is_active': True, 'parent_id': ['id-1','id-2']}, search_patterns={'code': '%pattern%'}, relations=['parent_entities(name)'], limit=50)\n"
+            "Returns: Active entities from 2 parents with parent names\n\n"
             "ALSO CONSIDER:\n"
             "- inspect_schema: Need structure/columns/enums BEFORE querying? Use inspect_schema first\n"
             "- aggregate_data: Need GROUP BY, SUM, AVG, COUNT by category? Use aggregate_data\n"
