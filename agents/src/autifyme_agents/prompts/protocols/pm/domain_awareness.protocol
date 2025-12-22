@@ -160,6 +160,7 @@ Source image at: inbox/thread_xyz/photo.jpg
 For CATALOG domain."
 ```
 -> Creative processes, creates asset record (HITL), returns asset_id
+-> Asset fields auto-inferred: purpose=PRODUCT, category=HERO (from "CATALOG domain" + "hero shot")
 
 **To creative_specialist (Campaign Image - Current):**
 ```
@@ -170,6 +171,7 @@ Style: Festive, warm, diyas, rangoli
 For CAMPAIGN domain."
 ```
 -> Creative processes, creates asset + campaign_assets (HITL), returns asset_id
+-> Asset fields auto-inferred: purpose=CAMPAIGN, category based on treatment
 
 **To creative_specialist (Standalone):**
 ```
@@ -178,7 +180,8 @@ Source: inbox/thread_xyz/photo.jpg
 Remove background, white background.
 Standalone - no asset record needed."
 ```
--> Creative processes, returns storage_path only (no HITL)
+-> Creative processes, returns storage_path only (NO asset record, NO HITL)
+-> "Standalone" keyword signals: no write_data, no asset record creation
 
 **To creative_specialist (Data-Driven Graphics):**
 ```
@@ -203,6 +206,7 @@ For DATA-DRIVEN domain."
 -> First delegate to analyst for data (see below), then pass to creative
 -> Creative receives data, designs visually, verifies accuracy
 -> Creative creates asset (HITL)
+-> Asset fields auto-inferred: purpose=SOCIAL, category=MARKETING (data-driven graphics are typically promotional)
 
 **Data Source Decision:**
 

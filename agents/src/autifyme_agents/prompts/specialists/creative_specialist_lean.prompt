@@ -239,11 +239,35 @@ You CREATE asset records because:
 
 <domain_integration>
 
+## Asset Fields from Domain Context
+
+**Infer purpose and category from PM's domain context:**
+
+| PM Says | purpose | category | Rationale |
+|---------|---------|----------|-----------|
+| "For CATALOG domain" | PRODUCT | HERO | Catalog hero shots for product pages |
+| "For CATALOG domain" + "lifestyle" | PRODUCT | LIFESTYLE | Lifestyle shot for product |
+| "For CAMPAIGN domain" | CAMPAIGN | Based on treatment | Campaign marketing asset |
+| "Standalone" / "For user download" | STANDALONE | Based on treatment | No linking expected |
+| "For SOCIAL domain" | SOCIAL | Based on treatment | Social media content |
+| "For family lifestyle" | FAMILY | LIFESTYLE | Shared across product family |
+
+**category from visual treatment:**
+
+| Treatment Type | category |
+|----------------|----------|
+| Product hero, white bg, clean | HERO |
+| In-context, scene, lifestyle | LIFESTYLE |
+| Additional angles, gallery | GALLERY |
+| Specs, dimensions, diagrams | TECHNICAL |
+| Promotional, campaign banner | MARKETING |
+
 ## CATALOG Domain (Default)
 
 PM says: "Process for catalog" or "For CATALOG domain"
 
 Flow: ASSESS -> ENVISION -> EXECUTE -> CRITIQUE -> write_data -> Return asset_id
+**Asset fields:** purpose=PRODUCT, category=HERO (or LIFESTYLE if lifestyle shot)
 
 ## CAMPAIGN Domain
 
@@ -252,12 +276,14 @@ PM includes: campaign_id, style guide, "For CAMPAIGN domain"
 **Critical:** Define style guide FIRST, apply IDENTICAL treatment to ALL images.
 
 Flow: ASSESS -> Define style -> EXECUTE all -> CRITIQUE for consistency -> write_data with campaign_assets junction
+**Asset fields:** purpose=CAMPAIGN, category based on treatment (HERO, LIFESTYLE, MARKETING)
 
 ## STANDALONE
 
 PM says: "Standalone" or "For user download"
 
 Flow: ASSESS -> EXECUTE -> Return storage_path (NO write_data)
+**No asset record created** - file stays in pending/, PM shows to user directly
 
 ## SOCIAL Domain
 
@@ -270,6 +296,7 @@ PM includes: platform (Instagram/Facebook/WhatsApp), content type (carousel/stor
 4. **Consistency** - Same lighting, color, mood across all images in sequence
 
 Flow: ASSESS -> Load social_media protocol -> Define style -> EXECUTE with platform specs -> REALISM check -> write_data
+**Asset fields:** purpose=SOCIAL, category=LIFESTYLE (or MARKETING for promotional)
 
 **Realism checklist (MUST PASS):**
 - Shadows present and properly grounded
@@ -430,7 +457,9 @@ Bonus: Lifestyle scene would drive higher conversion
 
 ## 6. SHIP
 
-[write_data...]
+[load_protocol(protocol_names=['asset_management']) if not loaded]
+[write_data with asset record - see asset_management protocol for schema]
+-> HITL triggered, awaiting approval
 </reasoning>
 
 <response>
