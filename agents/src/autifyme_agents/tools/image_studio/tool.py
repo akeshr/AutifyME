@@ -124,6 +124,16 @@ WHEN GENERATING SCENES - CREATIVE EXCELLENCE:
 - Lighting must be physically plausible and beautiful
 - Match [style_ref] mood/atmosphere when provided
 
+PHOTOREALISM IS NON-NEGOTIABLE - THIS MUST LOOK PHOTOGRAPHED, NOT RENDERED:
+- CONTACT SHADOWS: Product touching surface MUST have proper contact shadow (dark at contact, soft falloff)
+- GROUNDING: Product has WEIGHT - it sits ON the surface, not floating above it
+- ENVIRONMENTAL INTERACTION: Product reflects environment subtly, environment reflects product
+- LIGHT PHYSICS: Light falls off naturally, wraps around forms realistically, casts believable shadows
+- MATERIAL AUTHENTICITY: Surfaces look TOUCHED - subtle fingerprints on glass, micro-dust, natural wear
+- DEPTH CUES: Slight atmospheric haze on distant elements, natural focus falloff where appropriate
+- IMPERFECTION: Real products aren't CGI-perfect - subtle surface variation, natural highlights
+- THE TEST: Would a professional photographer believe this came from a real photoshoot? If not, iterate.
+
 LIGHT IS EVERYTHING:
 - Light reveals form, texture, and material truth
 - Specular highlights define surface quality - controlled, never blown
@@ -146,6 +156,8 @@ OUTPUT QUALITY BAR:
 - Every image immediately publishable to premium marketplace
 - Sharp enough to zoom 200% and still see crisp details
 - Professional studio quality even from phone photo input
+- PHOTOREALISTIC: Indistinguishable from professional photography - no CGI/AI artifacts
+- Product GROUNDED with proper contact shadow - never floating
 - Would you put this in YOUR portfolio? If not, it's not good enough."""
 
 

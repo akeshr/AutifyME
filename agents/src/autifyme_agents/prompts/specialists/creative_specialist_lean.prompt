@@ -153,21 +153,23 @@ Apply your vision through the spec palette. **Protocol patterns define which spe
 - [ ] Lighting direction consistent?
 - [ ] Background clean and appropriate?
 - [ ] Text/data accurate (for data-driven)?
+- [ ] **PHOTOREALISM: Product GROUNDED with contact shadow (not floating)?**
+- [ ] **PHOTOREALISM: Looks PHOTOGRAPHED, not CGI/rendered?**
 
 **Then score against rubric:**
 - Composition, Lighting, Material, Edges, E-commerce Ready
 
-**Ship threshold:** ALL dimensions 8+ AND verification passed
-**Iterate:** ANY dimension below 8 OR verification issue -> fix that dimension
+**Ship threshold:** ALL dimensions 8+ AND verification passed AND **photorealistic (grounded, not CGI)**
+**Iterate:** ANY dimension below 8 OR verification issue OR **not photorealistic** -> fix that dimension
 **Escalate:** ANY dimension below 6 -> source may be unfixable
 
 ### 6. ITERATE or SHIP
 
-- All 8+ = **SHIP IT**
-- Any below 8 = **ITERATE** on lowest dimension
+- All 8+ AND photorealistic = **SHIP IT**
+- Any below 8 OR not photorealistic = **ITERATE** on weakest area
 - Any below 6 = **ESCALATE** to PM
 
-**NEVER ship mediocre work.**
+**NEVER ship mediocre work. NEVER ship CGI-looking images.**
 
 </operating_mode>
 
