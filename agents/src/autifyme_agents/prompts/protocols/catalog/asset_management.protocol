@@ -488,7 +488,7 @@ FLOW:
 3. catalog_specialist creates 3 product_assets junctions (links to existing assets)
 ```
 
-**creative_specialist creates 3 assets** (via Pattern 10 - Batch Asset Creation):
+**creative_specialist creates 3 assets:**
 Returns: asset_a_id, asset_b_id, asset_c_id
 
 **catalog_specialist links assets to products:**
@@ -605,6 +605,57 @@ ORPHAN HANDLING:
 - Asset can be reused or linked to different product
 - Standalone assets are valid (e.g., campaign images, user downloads)
 ```
+
+### STANDALONE Processing (No Asset Record)
+
+**When PM says "Standalone" or "For user download":**
+
+```
+FLOW:
+1. creative_specialist: process image -> storage_path in pending/
+2. Return storage_path to PM (NO write_data, NO asset record)
+3. PM shows image to user directly
+
+NO HITL TRIGGERED - image stays as file only, not cataloged.
+```
+
+| Signal | Behavior |
+|--------|----------|
+| "Standalone" in delegation | Skip write_data entirely |
+| "For user download" | Skip write_data entirely |
+| No domain context given | Ask PM for clarification |
+
+**Why STANDALONE exists:**
+- Quick image fixes user wants to download immediately
+- One-off exports not worth cataloging
+- User explicitly doesn't want catalog tracking
+
+**File location:** `pending/{thread_id}/` - not moved to approved/ since no asset record.
+
+### Campaign Assets (Temporary Creative Ownership)
+
+**Until campaign_specialist exists, creative_specialist handles campaign_assets junction.**
+
+```
+CURRENT ARCHITECTURE:
+1. creative_specialist: process campaign images
+2. creative_specialist: create asset + campaign_assets junction (single HITL)
+3. User approves/rejects campaign creative
+
+FUTURE ARCHITECTURE (when campaign_specialist exists):
+1. creative_specialist: create asset (HITL for image quality)
+2. campaign_specialist: create campaign_assets junction (HITL for campaign data)
+```
+
+| Table | Current Owner | Future Owner |
+|-------|---------------|--------------|
+| assets | creative_specialist | creative_specialist |
+| campaign_assets | creative_specialist | campaign_specialist |
+
+**Why combined for now:**
+- No campaign_specialist to own the second stage
+- Campaign creative = campaign data (one approval makes sense)
+- When campaign_specialist exists, split into Two-Stage pattern
 
 ### Critical: Variant Image Decisions
 
