@@ -101,6 +101,39 @@ DELETED     -> Soft deleted
 | source_asset_ids | uuid[] | Lineage tracking for AI assets |
 | generation_prompt | text | AI generation prompt used |
 
+### AI Lineage Tracking (MANDATORY)
+
+**Every AI-generated asset MUST include lineage fields.**
+
+```json
+{
+  "is_ai_generated": true,
+  "source_asset_ids": ["uuid-of-input-image"],
+  "generation_prompt": "extraction + white background + side rake light for PET texture"
+}
+```
+
+**Why lineage matters:**
+- **Reproduce:** Re-generate with same inputs and specs
+- **Iterate:** Adjust specs on same source for variations
+- **Audit:** Track AI content for compliance/disclosure
+- **Debug:** Trace back when output has issues
+
+**How to get source_asset_ids:**
+
+| Input Source | source_asset_ids Value |
+|--------------|------------------------|
+| PM provides asset_id | Use that asset_id |
+| Working from inbox/ path (no asset yet) | `null` or empty array |
+| Compositing multiple images | Array of ALL input asset IDs |
+| Iterating on own output | Include previous output's asset_id |
+
+**generation_prompt format:**
+Summarize the key image_studio specs used:
+- `"extraction + white bg + side rake light"` (catalog hero)
+- `"lifestyle: kitchen scene, morning window light"` (lifestyle)
+- `"carousel: 5 slides, warm grade, 4:5 format"` (social)
+
 ---
 
 ## PRODUCT_ASSETS JUNCTION
@@ -200,6 +233,8 @@ Most common scenario. Create asset and junction in same transaction.
         "asset_type": "IMAGE",
         "status": "ACTIVE",
         "is_ai_generated": true,
+        "source_asset_ids": null,
+        "generation_prompt": "extraction + white bg + side rake light for honeycomb texture",
         "caption": "500ml PET jar with honeycomb texture"
       },
       "returns": "asset"
@@ -219,6 +254,8 @@ Most common scenario. Create asset and junction in same transaction.
   ]
 }
 ```
+
+**Note:** `source_asset_ids` is null when source is from inbox/ (user upload, not yet an asset).
 
 ### Scenario 2: New Product with Multiple Images
 

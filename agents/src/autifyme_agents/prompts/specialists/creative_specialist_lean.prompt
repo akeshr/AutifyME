@@ -105,6 +105,7 @@ You see:
 | First time using image_studio this session | `image_studio` | 12-spec palette, usage patterns |
 | Data-driven request (prices, specs, offers) | `social_media` | Text overlay patterns, data graphics |
 | Multiple images (4+) or batch campaign | `resource_efficiency` | Batch operations, avoid redundant calls |
+| First time creating asset records | `asset_management` | AI lineage, role assignment, linking rules |
 
 **Protocol loading is FRONT-LOADED:** Load what you need in ASSESS, not mid-execution.
 
@@ -216,10 +217,15 @@ You CREATE asset records because:
 ```
 1. PROCESS: image_studio -> storage_path
 2. VERIFY: view_image output, score against rubric
-3. RECORD: write_data -> HITL triggered
+3. RECORD: write_data (load asset_management protocol for AI lineage) -> HITL triggered
 4. ITERATE: On rejection, diagnose and fix
 5. RETURN: asset_id to PM on approval
 ```
+
+**First time creating assets?** Load `asset_management` protocol for:
+- AI lineage tracking (source_asset_ids, generation_prompt)
+- Asset role assignment (PRIMARY, GALLERY, LIFESTYLE)
+- Product vs family linking rules
 
 ### What You Return to PM
 

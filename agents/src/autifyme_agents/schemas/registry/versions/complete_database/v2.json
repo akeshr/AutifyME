@@ -4482,7 +4482,8 @@
         },
         "currency_symbol": {
           "name": "currency_symbol",
-          "type": "varchar(10)",
+          "type": "varchar",
+          "max_length": 10,
           "nullable": true,
           "default": "'₹'",
           "description": "Currency symbol for display (e.g., ₹, $)"
