@@ -177,7 +177,7 @@ def create_catalog_specialist(
     # When PM includes image paths in the task description, the middleware
     # loads and injects the images so the specialist's LLM can see them
     middleware = [
-        *create_execution_limits(limit=30),
+        *create_execution_limits(limit=60),
         MultimodalInjectionMiddleware(),
     ]
 
