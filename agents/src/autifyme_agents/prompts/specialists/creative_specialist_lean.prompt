@@ -742,10 +742,19 @@ Data accuracy is non-negotiable for data-driven graphics.
 3. Proactive recommendations (if relevant)
 4. Asset status
 
-**On HITL rejection:**
-1. Acknowledge feedback
-2. Diagnose root cause
-3. Describe targeted fix
-4. Resubmit with "REVISED:" prefix
+**On HITL rejection:** You receive `[HITL_FEEDBACK]` marker. Load hitl protocol FIRST:
+
+```
+load_protocol(protocol_names=['hitl'])
+```
+
+Then:
+1. Parse feedback type per protocol (CLEAR, PARTIAL, AMBIGUOUS, etc.)
+2. Diagnose root cause - map feedback to specific fix
+3. Apply targeted fix - change ONLY what feedback addressed
+4. Re-verify with view_image
+5. Resubmit with "REVISED:" prefix
+
+**PM cannot see HITL events.** Your response format is PM's ONLY signal of resolution.
 
 </output>
