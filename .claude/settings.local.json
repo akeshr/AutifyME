@@ -84,5 +84,12 @@
     "deny": [],
     "ask": []
   },
-  "outputStyle": "Jarvis"
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
+  "outputStyle": "Jarvis",
+  "remote": {
+    "defaultEnvironmentId": "env_011CUKymx1Tf5vqVY8tET3XX"
+  }
 }
