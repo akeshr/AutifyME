@@ -37,6 +37,7 @@ from autifyme_agents.tools.image_studio.schemas import (
     CustomSpec,
     EnhancementSpec,
     ExtractionSpec,
+    FidelitySpec,
     FocusSpec,
     ImageInput,
     ImageMetadata,
@@ -104,27 +105,77 @@ IMAGES ARE LABELED - Use the labels to understand each image's role:
 - [product_variant] = additional product for family shots
 - The specialist will explain how to use each label
 
-SHARPNESS IS PARAMOUNT - NON-NEGOTIABLE:
-- ALL outputs must be TACK SHARP with MAXIMUM detail clarity
-- No blur, no soft focus, no fuzzy edges anywhere
+=============================================================================
+HIERARCHY OF REQUIREMENTS (IN STRICT ORDER):
+=============================================================================
+
+1. PRODUCT IDENTITY (ABSOLUTE - NEVER COMPROMISE) - when working with [source]/[product]
+2. SHARPNESS & FOCUS (NON-NEGOTIABLE) - always
+3. PHOTOREALISM (REQUIRED) - always
+4. CREATIVE ENHANCEMENT (ONLY AFTER 1-3 ARE SATISFIED) - always
+
+Enhancement that compromises identity is NOT enhancement - it's damage.
+
+=============================================================================
+1. PRODUCT IDENTITY - WHEN WORKING WITH [source]/[product] IMAGES
+=============================================================================
+
+APPLIES TO: Tasks involving [source] or [product] labeled images (extraction, enhancement, compositing)
+DOES NOT APPLY TO: Pure scene generation, style references, background-only tasks
+
+CRITICAL DISTINCTION: Source images are often RAW with photography problems.
+Your job: FIX photography problems, PRESERVE product identity.
+
+PRESERVE (product identity):
+- Artwork/prints: Exact design (sharpen if blurry, same design)
+- Text/labels: Exact font, words, layout (sharpen if blurry)
+- Shape: Actual product shape (fix camera distortion)
+- Texture/finish: Same pattern, same finish type
+- Colors: Actual product colors (fix color cast)
+
+FIX (photography artifacts):
+- Color cast → Correct to true colors
+- Blur → Sharpen to reveal details
+- Underexposed → Properly light
+- Bad angle → Recompose
+- Cluttered background → Clean it
+
+THE TEST: Does output show the SAME product, just better photographed?
+
+DO NOT (identity violations):
+- Regenerate artwork/text (different pose, font, or pattern = FAILURE)
+- Invent colors (vibrant pink instead of actual dusty rose = FAILURE)
+
+DO (valid fixes):
+- Color cast correction (yellow tungsten → true product colors = OK)
+
+=============================================================================
+2. SHARPNESS & FOCUS - NON-NEGOTIABLE
+=============================================================================
+
+EVERY output must be TACK SHARP with MAXIMUM detail clarity:
+- No blur, no soft focus, no fuzzy edges ANYWHERE
 - Text, patterns, character prints, logos must be CRISP and LEGIBLE
-- High-frequency details preserved at full resolution
-- Product edges razor-sharp - this is a premium catalog, not a phone screenshot
+- High-frequency details from [source] preserved at full resolution
+- Product edges razor-sharp - surgical precision
+- If source shows texture, output shows that texture SHARPER, not smoothed
 
-WHEN EXTRACTING FROM [source] - PRODUCT IDENTITY IS SACRED:
-- EXACT colors - match [source] precisely, do not interpret or shift
-- Character artwork/prints/logos - reproduce exactly as shown in [source]
-- Product shape/proportions - no distortion, no creative reinterpretation
-- This is THEIR product - it must look like THEIR product, not your interpretation
-- You ENHANCE presentation (lighting, background, sharpness) but PRESERVE identity
+SHARPNESS HIERARCHY:
+1. Product features that identify the product (logos, artwork, text) - SHARPEST
+2. Product surface details (texture, finish) - VERY SHARP
+3. Product edges - SHARP
+4. Background - can have controlled falloff if depth effect desired
 
-WHEN GENERATING SCENES - CREATIVE EXCELLENCE:
-- Honor the scene/placement/lighting specs provided
-- Product must look natural in the environment
-- Lighting must be physically plausible and beautiful
-- Match [style_ref] mood/atmosphere when provided
+SHARPNESS VIOLATION (FAILURE):
+  Source: Label with crisp "Natural Honey" text
+  Bad output: Text readable but slightly soft, not tack-sharp
+  Why it fails: "Readable" is not the bar. TACK SHARP is the bar. If text could be sharper, it's wrong.
 
-PHOTOREALISM IS NON-NEGOTIABLE - THIS MUST LOOK PHOTOGRAPHED, NOT RENDERED:
+=============================================================================
+3. PHOTOREALISM - REQUIRED
+=============================================================================
+
+THIS MUST LOOK PHOTOGRAPHED, NOT RENDERED:
 - CONTACT SHADOWS: Product touching surface MUST have proper contact shadow (dark at contact, soft falloff)
 - GROUNDING: Product has WEIGHT - it sits ON the surface, not floating above it
 - ENVIRONMENTAL INTERACTION: Product reflects environment subtly, environment reflects product
@@ -132,13 +183,27 @@ PHOTOREALISM IS NON-NEGOTIABLE - THIS MUST LOOK PHOTOGRAPHED, NOT RENDERED:
 - MATERIAL AUTHENTICITY: Surfaces look TOUCHED - subtle fingerprints on glass, micro-dust, natural wear
 - DEPTH CUES: Slight atmospheric haze on distant elements, natural focus falloff where appropriate
 - IMPERFECTION: Real products aren't CGI-perfect - subtle surface variation, natural highlights
-- THE TEST: Would a professional photographer believe this came from a real photoshoot? If not, iterate.
+
+PHOTOREALISM TEST: Would a professional photographer believe this came from a real photoshoot?
+
+PHOTOREALISM VIOLATION (FAILURE):
+  Bad output: Product appears to float above surface, no contact shadow
+  Why it fails: Every real object has weight. Missing shadow = obviously fake.
+
+  Bad output: Product has CGI-perfect surfaces, no micro-imperfections
+  Why it fails: Real products have subtle fingerprints, micro-dust, natural variation. Too perfect = fake.
+
+=============================================================================
+4. CREATIVE ENHANCEMENT (ONLY AFTER 1-3 SATISFIED)
+=============================================================================
+
+ONLY after fidelity, sharpness, and photorealism are locked:
 
 LIGHT IS EVERYTHING:
 - Light reveals form, texture, and material truth
 - Specular highlights define surface quality - controlled, never blown
 - Shadows create dimension - density appropriate to mood
-- Color temperature serves the story
+- Color temperature serves the story (but NEVER shifts product colors)
 
 MATERIAL TRUTH - RENDER EACH CORRECTLY:
 - Glass: Internal caustics, edge refraction, transparency depth - never flat
@@ -146,19 +211,31 @@ MATERIAL TRUTH - RENDER EACH CORRECTLY:
 - Plastic: Surface sheen gradient, translucency where present, character prints SHARP
 - Fabric: Weave texture, drape shadows, fiber detail at edges
 
-TECHNICAL PRECISION:
+SCENE GENERATION:
+- Honor the scene/placement/lighting specs provided
+- Product must look natural in the environment
+- Lighting must be physically plausible and beautiful
+- Match [style_ref] mood/atmosphere when provided
+
+=============================================================================
+TECHNICAL PRECISION
+=============================================================================
+
 - Focus: Tack sharp on product - entire product in focus, no soft areas
-- Color: When extracting, EXACT match to source; when generating, as directed
+- Color: When extracting, EXACT match to source; when generating scenes, as directed but product colors unchanged
 - Edges: Surgical extraction - no halos, no remnants, no fringing, no artifacts
 - Scale: Product proportions sacred - no distortion ever
 
-OUTPUT QUALITY BAR:
-- Every image immediately publishable to premium marketplace
+=============================================================================
+OUTPUT QUALITY BAR
+=============================================================================
+
+- Product owner would recognize their EXACT product (not a similar one)
 - Sharp enough to zoom 200% and still see crisp details
 - Professional studio quality even from phone photo input
-- PHOTOREALISTIC: Indistinguishable from professional photography - no CGI/AI artifacts
+- PHOTOREALISTIC: Indistinguishable from professional photography
 - Product GROUNDED with proper contact shadow - never floating
-- Would you put this in YOUR portfolio? If not, it's not good enough."""
+- Would you stake your reputation on this image? If not, it's not good enough."""
 
 
 # =============================================================================
@@ -386,6 +463,8 @@ def _build_prompt(input_spec: ImageStudioInput) -> str:
         spec_dict["composition"] = input_spec.composition.model_dump(exclude_none=True)
     if input_spec.material_treatment:
         spec_dict["material_treatment"] = input_spec.material_treatment.model_dump(exclude_none=True)
+    if input_spec.fidelity:
+        spec_dict["fidelity"] = input_spec.fidelity.model_dump(exclude_none=True)
     if input_spec.focus:
         spec_dict["focus"] = input_spec.focus.model_dump(exclude_none=True)
     if input_spec.enhancement:
@@ -513,6 +592,7 @@ def _image_studio_impl(
     extraction: dict[str, Any] | ExtractionSpec | None = None,
     focus: dict[str, Any] | FocusSpec | None = None,
     material_treatment: dict[str, Any] | MaterialTreatmentSpec | None = None,
+    fidelity: dict[str, Any] | FidelitySpec | None = None,
     custom_spec: dict[str, Any] | CustomSpec | None = None,
     creative_direction: str | None = None,
     thread_id: str | None = None,
@@ -532,6 +612,7 @@ def _image_studio_impl(
         extraction: Product extraction settings
         focus: Focus and depth of field settings
         material_treatment: Material-specific rendering instructions
+        fidelity: CRITICAL - Product fidelity preservation requirements
         custom_spec: Fully open-ended creative spec for OOTB ideas
         creative_direction: Additional creative notes
         thread_id: Auto-injected from RunnableConfig
@@ -574,6 +655,7 @@ def _image_studio_impl(
             extraction=_to_spec(extraction, ExtractionSpec),
             focus=_to_spec(focus, FocusSpec),
             material_treatment=_to_spec(material_treatment, MaterialTreatmentSpec),
+            fidelity=_to_spec(fidelity, FidelitySpec),
             custom_spec=_to_spec(custom_spec, CustomSpec),
             creative_direction=creative_direction,
             thread_id=thread_id,
@@ -699,17 +781,24 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- When image already catalog-ready\n"
             "- Text extraction/analysis (use view_image)\n\n"
             "STRUCTURED SPECS (all optional - use what applies):\n"
+            "- fidelity: CRITICAL for source images - {preserve_colors: 'exact match', preserve_artwork: 'honeycomb pattern', hero_features: 'texture pattern'}\n"
             "- extraction: {target_description: 'glass jar on left in [source]', isolation: 'complete', edge_treatment: 'sharp'}\n"
             "- background: {treatment: 'transparent'/'solid_color'/'scene', color: 'white', scene_description: 'modern kitchen'}\n"
             "- lighting: {type: 'natural_window'/'studio_3point', direction: 'front'/'side', special_requirements: 'match [style_ref]'}\n"
             "- composition: {position: 'center'/'[main] center [variant] right', camera_angle: 'slight_top', negative_space: 'generous_top'}\n"
-            "- enhancement: {sharpness: 'tack_sharp', color_treatment: 'vibrant'}\n"
+            "- enhancement: {sharpness: 'tack_sharp', color_treatment: 'accurate to source'}\n"
             "- scene: {environment: 'modern_kitchen', style: 'match [style_ref]', mood: 'warm_inviting'}\n"
             "- placement: {position: 'place [product] on marble counter', scale: 'prominent'}\n"
             "- material_treatment: {primary_material: 'clear_glass', rendering_notes: 'preserve caustics'}\n"
             "- custom_spec: {instruction: 'dramatic shot with water droplets', style_reference: 'Apple product photography'}\n"
             "- creative_direction: Free-form notes ('Family shot - main hero, second supporting')\n"
             "- output: {format: 'png'/'jpeg', size: '1K'/'2K', aspect_ratio: '1:1'/'16:9'}\n\n"
+            "FIDELITY FIRST (when working with source product images):\n"
+            "- ALWAYS include fidelity spec when extracting/processing products\n"
+            "- Fidelity > Enhancement: Preserve product identity before beautifying\n"
+            "- Colors, artwork, text, textures, shape must match source exactly\n"
+            "- Enhancement zone: background, lighting quality, sharpness, composition\n"
+            "- Fidelity zone (no changes): product colors, artwork, text, shape, textures\n\n"
             "CRITICAL:\n"
             "- images parameter REQUIRED: Min 1 labeled image, max 15\n"
             "- LABEL SYNTAX: Reference labels using [label] in spec STRING values (e.g., 'jar in [source]', 'match [style_ref]')\n"

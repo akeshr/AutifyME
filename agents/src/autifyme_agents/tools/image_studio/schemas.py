@@ -252,10 +252,10 @@ class EnhancementSpec(BaseModel):
     color_treatment: str = Field(
         default="accurate to source",
         description=(
-            "Color handling. "
-            "Examples: 'accurate to source - no grading', 'slight saturation boost', "
-            "'desaturated editorial', 'warm color grade', 'cool tones', "
-            "'vibrant lifestyle colors', 'true-to-product color accuracy critical'"
+            "Color handling. FIDELITY WARNING: Product colors must match source. "
+            "Examples: 'accurate to source - no grading' (DEFAULT for products), "
+            "'true-to-product color accuracy critical', 'preserve exact source colors'. "
+            "Scene-only options (NOT for product colors): 'warm ambient', 'cool tones'"
         )
     )
     detail_enhancement: str | None = Field(
@@ -391,6 +391,87 @@ class ProductPlacementSpec(BaseModel):
         description=(
             "Any additional placement instructions not covered above. "
             "Use for creative OOTB ideas, unique positioning, artistic arrangements."
+        )
+    )
+
+
+class FidelitySpec(BaseModel):
+    """CRITICAL: Product IDENTITY preservation requirements.
+
+    Use this spec WHENEVER working with source product images. This ensures
+    the output preserves the product's IDENTITY while fixing photography problems.
+
+    Key distinction:
+    - Product Identity (preserve): What makes this THE product - design, colors, shape, features
+    - Photography Artifacts (fix): Bad lighting, blur, color cast, poor angles
+
+    Identity > Enhancement. Always.
+    """
+
+    preserve_colors: str = Field(
+        default="true product colors (fix any color cast from bad lighting)",
+        description=(
+            "Product color preservation. Fix photography artifacts, preserve actual colors. "
+            "Examples: 'true product colors - remove yellow cast from tungsten lighting', "
+            "'actual amber honey color - source may have color cast', "
+            "'real dusty rose - don't shift to vibrant pink', "
+            "'correct white balance to show true product colors'"
+        )
+    )
+    preserve_artwork: str | None = Field(
+        default=None,
+        description=(
+            "Artwork/graphics/prints design that MUST be reproduced exactly. "
+            "Sharpen if blurry, but preserve the actual design. "
+            "Examples: 'cartoon bee mascot - same pose, same expression, same details', "
+            "'honeycomb geometric pattern - exact design even if source is blurry', "
+            "'brand logo with text - sharpen but same design'"
+        )
+    )
+    preserve_text: str | None = Field(
+        default=None,
+        description=(
+            "Text/labels that MUST match actual product labeling. "
+            "Sharpen if blurry, but same font, same words, same layout. "
+            "Examples: 'Wildflower Honey 500ml - sharpen but exact wording and font', "
+            "'brand name typography - reveal clearly, same design', "
+            "'nutritional info - legible and accurate to actual label'"
+        )
+    )
+    preserve_texture: str | None = Field(
+        default=None,
+        description=(
+            "Surface textures that ARE the product identity. "
+            "Enhance visibility, but same texture/pattern. "
+            "Examples: 'honeycomb embossed pattern - sharpen, same design', "
+            "'matte frosted finish - don't add gloss', 'brushed metal - same grain direction'"
+        )
+    )
+    preserve_shape: str = Field(
+        default="actual product shape (fix any camera distortion)",
+        description=(
+            "Product shape/silhouette - the actual shape, not photo distortion. "
+            "Examples: 'true jar shape - fix wide-angle distortion', "
+            "'actual proportions - correct any lens barrel distortion', "
+            "'real bottle silhouette - this shape IS the brand'"
+        )
+    )
+    hero_features: str | None = Field(
+        default=None,
+        description=(
+            "The 1-3 features that DEFINE this product's identity. "
+            "These MUST be visible, sharp, and true to actual product. "
+            "Examples: 'honeycomb texture pattern - this IS the brand differentiator', "
+            "'wooden dipper and amber honey color - signature look', "
+            "'brushed steel finish and minimalist logo - premium identity'"
+        )
+    )
+    fidelity_notes: str | None = Field(
+        default=None,
+        description=(
+            "Additional fidelity requirements or concerns. "
+            "Examples: 'customer complained about color drift in past - be extra careful', "
+            "'label text is small - must remain legible', 'texture is subtle - preserve without enhancement'"
         )
     )
 
@@ -771,6 +852,16 @@ class ImageStudioInput(BaseModel):
     material_treatment: MaterialTreatmentSpec | None = Field(
         default=None,
         description="Material-specific rendering instructions"
+    )
+
+    fidelity: FidelitySpec | None = Field(
+        default=None,
+        description=(
+            "CRITICAL: Product fidelity preservation requirements. "
+            "Use when working with source product images to ensure output "
+            "preserves essential features (colors, artwork, text, texture, shape). "
+            "Fidelity > Enhancement. Always include when extracting or processing products."
+        )
     )
 
     custom_spec: CustomSpec | None = Field(
