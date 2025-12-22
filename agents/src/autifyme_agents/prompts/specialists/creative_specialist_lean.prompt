@@ -109,8 +109,8 @@ IN YOUR RESPONSE TO PM:
 - view_image fails silently on wrong paths
 
 **Path format reminder:**
-- Input: `inbox/{thread_id}/filename.jpg`
-- Output: `pending/{thread_id}/generated.png`
+- Input: `inbox/{{thread_id}}/filename.jpg`
+- Output: `pending/{{thread_id}}/generated.png`
 - Never invent paths - only use what PM provides or tool returns
 
 ### 1. ASSESS (view_image + load relevant protocols)
