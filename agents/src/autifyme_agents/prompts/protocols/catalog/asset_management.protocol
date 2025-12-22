@@ -78,6 +78,42 @@ DELETED     -> Soft deleted
 | file_name | varchar(255) | Original filename |
 | asset_type | varchar(30) | IMAGE, VIDEO, DOCUMENT, MODEL_3D, OTHER |
 | status | varchar(20) | UPLOADING, PROCESSING, ACTIVE, ARCHIVED, DELETED |
+| purpose | varchar(20) | PRODUCT, FAMILY, CAMPAIGN, BRAND, SOCIAL, STANDALONE |
+
+### Purpose Field (CRITICAL for Asset Management)
+
+**Purpose indicates intended use and linking expectations:**
+
+| Purpose | Description | Expected Linking |
+|---------|-------------|------------------|
+| `PRODUCT` | Product hero, gallery, zoom | Must link via product_assets to product_id |
+| `FAMILY` | Family-level lifestyle, shared images | Must link via product_assets to product_family_id |
+| `CAMPAIGN` | Marketing campaign images | Must link via campaign_assets to campaign_id |
+| `BRAND` | Logos, brand assets | Company-level, no product linking |
+| `SOCIAL` | Social media content | May link to campaign or standalone |
+| `STANDALONE` | User downloads, one-off exports | No linking expected |
+
+**Orphan Detection:**
+- Asset with `purpose=PRODUCT` but no product_assets junction = ORPHAN (needs linking)
+- Asset with `purpose=FAMILY` but no product_assets junction = ORPHAN (needs linking)
+- Asset with `purpose=BRAND` with no linking = VALID (brand assets are company-level)
+
+### Classification Taxonomy
+
+**Three classification fields with distinct purposes:**
+
+| Field | Type | Purpose | Example |
+|-------|------|---------|---------|
+| `asset_type` | enum | File FORMAT | IMAGE, VIDEO, DOCUMENT |
+| `purpose` | enum | INTENDED USE | PRODUCT, CAMPAIGN, BRAND |
+| `category` | varchar | Visual STYLE | HERO, LIFESTYLE, GALLERY |
+| `tags` | text[] | SEARCHABLE terms | ["white-background", "500ml", "PET"] |
+
+**When to use each:**
+- `asset_type`: Set automatically based on file type
+- `purpose`: Set based on workflow context (catalog = PRODUCT, campaign = CAMPAIGN)
+- `category`: Set based on visual treatment (hero shot = HERO, lifestyle = LIFESTYLE)
+- `tags`: Add freeform terms for search (material, size, color, style)
 
 ### Optional Fields
 
@@ -88,10 +124,10 @@ DELETED     -> Soft deleted
 | mime_type | varchar(100) | MIME type (image/jpeg, etc.) |
 | width | integer | Width in pixels (images/videos) |
 | height | integer | Height in pixels |
-| category | varchar(100) | Asset category |
+| category | varchar(100) | Visual style: HERO, LIFESTYLE, GALLERY, TECHNICAL |
 | caption | varchar(500) | Human-readable caption for HITL |
-| tags | text[] | Tags for search |
-| metadata | jsonb | Additional metadata |
+| tags | text[] | Freeform search terms |
+| metadata | jsonb | Additional metadata (EXIF, colors, quality scores) |
 
 ### AI Generation Fields
 
