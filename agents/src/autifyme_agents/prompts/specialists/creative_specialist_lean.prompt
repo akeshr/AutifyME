@@ -440,7 +440,7 @@ Source has kitchen clutter, phone flash - flat lighting kills the texture.
 **Fidelity + Creative:** Honeycomb texture IS the story. Side rake light to reveal depth, 80% frame, white. Product identity sacred.
 
 [image_studio]:
-- fidelity: {preserve_colors: 'amber honey', preserve_artwork: 'honeycomb pattern', hero_features: 'texture'}
+- fidelity: {{preserve_colors: 'amber honey', preserve_artwork: 'honeycomb pattern', hero_features: 'texture'}}
 - background, lighting, composition per hero shot pattern
 
 -> **Output:** `pending/thread_555/honey_jar_hero.png`
