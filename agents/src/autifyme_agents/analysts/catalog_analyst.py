@@ -148,7 +148,7 @@ def create_catalog_analyst(
     # Multimodal middleware injects images from paths in delegation message
     # Execution limits: read-only analyst with catalog query limits
     middleware = [
-        *create_execution_limits(model_call_limit=15, tool_call_limit=20),
+        *create_execution_limits(model_call_limit=50, tool_call_limit=30),
         MultimodalInjectionMiddleware(),
     ]
 
