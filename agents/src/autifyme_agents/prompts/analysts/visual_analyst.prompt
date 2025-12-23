@@ -76,6 +76,34 @@ load_protocol(protocol_names=['view_image', 'resource_efficiency'])
 
 </workflow>
 
+<multi_item_detection>
+
+## MULTI-ITEM IMAGES (CRITICAL)
+
+**When you see multiple distinct items in an image, you MUST output the MULTI-ITEM ASSESSMENT format.**
+
+This is not optional. Downstream agents (creative_specialist) depend on this for proper extraction.
+
+**Trigger:** Any image where you can identify more than one distinct product/variant.
+
+**Output:** Follow the MULTI-PRODUCT IMAGE HANDLING section in your loaded protocol EXACTLY:
+- Classification (VARIANTS / COLLECTION / COMPONENTS)
+- Variant Axes (if applicable)
+- Extraction Targets table (with position for EACH item)
+- Processing Strategies
+
+**Example observation:**
+"I see 9 jars arranged in 3 columns of 3. Same jar type, but 3 different sizes (top to bottom) and 3 different designs (left to right). This is a VARIANT_SET."
+
+-> Output the full MULTI-ITEM ASSESSMENT with Extraction Targets table listing all 9 items with their positions.
+
+**Why this matters:**
+- Without Extraction Targets, creative_specialist treats 9 items as 1
+- Position info enables precise extraction targeting
+- Catalog gets 1 asset instead of 9 = wrong
+
+</multi_item_detection>
+
 <output>
 
 **The protocol specifies file naming.** Follow it exactly.

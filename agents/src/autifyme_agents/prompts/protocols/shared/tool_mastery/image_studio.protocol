@@ -384,6 +384,108 @@ Use it when creating asset record:
 write_data(..., data={"storage_url": storage_path, ...})
 ```
 
+### Anti-Pattern 6: Single Extraction for Multi-Item Image
+
+```
+WRONG:
+Source has 9 products, but:
+image_studio(extraction={"target_description": "the jars"})
+# Result: 1 asset for 9 products
+
+CORRECT:
+For each item in Extraction Targets:
+image_studio(extraction={"target_description": "Large jar with blue lid at top-left"})
+# Result: 9 assets, one per product
+```
+
+When source contains multiple items, extract each separately (unless explicitly asked for family shot).
+
+---
+
+## MULTI-ITEM EXTRACTION (CRITICAL)
+
+When source image contains multiple distinct items (variants, collection, etc.):
+
+### Position-Based Targeting
+
+Use precise position descriptors in `target_description`:
+
+| Position | Description Example |
+|----------|---------------------|
+| top-left | "the large jar with blue lid at top-left" |
+| top-center | "the medium bottle in top-center position" |
+| middle-right | "the pink container at middle-right" |
+| bottom-left | "the small jar in bottom-left corner" |
+| foreground | "the product in the foreground" |
+| left-column | "the jar in the left column" |
+| row-1 | "all items in the first row" |
+
+### Targeting Syntax
+
+**For single item extraction:**
+```json
+{
+  "target_description": "{description} at {position}",
+  "isolation": "complete"
+}
+```
+
+Examples:
+- `"Large PET jar with blue lid and Blossoms print at top-left position"`
+- `"Medium honey jar with yellow cap in center column"`
+- `"The red 500ml variant on the left side"`
+
+**For group extraction:**
+```json
+{
+  "target_description": "all {description} items",
+  "isolation": "complete"
+}
+```
+
+Examples:
+- `"all Large jars (the top row)"`
+- `"all blue-lid variants (left column)"`
+- `"the complete 3x3 arrangement of jars"`
+
+### Multi-Item Workflow
+
+```
+1. Visual analysis provides Extraction Targets table:
+   | # | Description | Position | Size | Design |
+   |---|-------------|----------|------|--------|
+   | 1 | Large jar, blue lid | top-left | Large | Blossoms |
+   | 2 | Large jar, yellow lid | top-center | Large | Charming |
+   ...
+
+2. For INDIVIDUAL extraction (catalog):
+   Loop through each row, call image_studio with specific target
+
+3. For COMPOSITE (family shot):
+   Single call with "all items as arranged"
+
+4. For BY_AXIS (grouped):
+   Group rows by attribute, extract each group
+```
+
+### Pattern 6: Multi-Item Individual Extraction
+
+```python
+# From Extraction Targets table - extract each item
+for item in extraction_targets:
+    image_studio(
+        images=[{"path": "inbox/products.jpg", "label": "source"}],
+        extraction={
+            "target_description": f"{item.description} at {item.position}",
+            "isolation": "complete"
+        },
+        background={"treatment": "solid_color", "color": "white"},
+        fidelity={"preserve_colors": "true", "hero_features": "product identity"},
+        output={"filename": f"product_{item.id}"}
+    )
+```
+Result: One hero shot per item in the source image.
+
 ---
 
 ## BEFORE image_studio

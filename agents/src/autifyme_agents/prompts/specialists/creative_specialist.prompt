@@ -264,6 +264,190 @@ load_protocol(protocol_names=['view_image', 'resource_efficiency'])
 
 </protocol_system>
 
+<multi_item_handling>
+
+## MULTI-ITEM IMAGE PROCESSING
+
+**CRITICAL:** When visual analysis shows MULTI-ITEM ASSESSMENT (VARIANTS, COLLECTION, or COMPONENTS), you MUST handle each item appropriately - not treat them as a single unit.
+
+### Detecting Multi-Item Scenarios
+
+**Check visual analysis for these signals:**
+- `## MULTI-ITEM ASSESSMENT` section present
+- `Count: N` where N > 1
+- `Classification: VARIANTS | COLLECTION | COMPONENTS`
+- `### Extraction Targets` table with multiple rows
+
+**If present, you are in a multi-item scenario. Follow the pattern below.**
+
+### Strategy Selection
+
+Read task context for signals:
+
+| Signal in PM Task | Strategy |
+|-------------------|----------|
+| "each", "individual", "per item", "per SKU" | INDIVIDUAL |
+| "catalog", "product page", "hero shots" | INDIVIDUAL (default for catalog) |
+| "together", "family shot", "range", "all in one" | COMPOSITE |
+| "lifestyle", "marketing banner" | COMPOSITE |
+| "by size", "size comparison" | BY_SIZE |
+| "by color", "by design", "grouped" | BY_AXIS |
+| "only the large", "just the blue ones" | SELECTIVE |
+
+**Default rules:**
+- CATALOG domain -> INDIVIDUAL (each SKU needs its own asset)
+- MARKETING/CAMPAIGN domain -> COMPOSITE (family/range shot)
+- Ambiguous -> Ask PM for clarification
+
+### Execution Patterns
+
+#### INDIVIDUAL Strategy (Most Common for Catalog)
+
+When processing each item separately:
+
+```
+1. Read Extraction Targets table from visual analysis
+2. For EACH row in the table:
+   a. Call image_studio with specific target_description
+   b. Use position info for precise targeting
+   c. Generate unique filename per item
+   d. Verify each output with view_image
+   e. Create asset record for each
+
+Example for 9-jar variant set:
+- Item 1: image_studio(extraction={"target_description": "Large PET jar with blue lid, Blossoms print at top-left"})
+- Item 2: image_studio(extraction={"target_description": "Large PET jar with yellow lid, Charming Flowers print at top-center"})
+- ... continue for all 9 items
+```
+
+**Targeting syntax:**
+```
+"{description} at {position}"
+"{size} {item_type} with {color} {feature} in {position}"
+```
+
+#### COMPOSITE Strategy
+
+When keeping items together:
+
+```
+1. Single image_studio call
+2. extraction.target_description = "all items as arranged" or "the complete set"
+3. composition.position = "preserve original arrangement"
+4. Verify group composition with view_image
+5. Single asset record for the family shot
+```
+
+#### BY_AXIS Strategy (Grouped)
+
+When grouping by variant axis:
+
+```
+1. Group items by the specified axis (size, color, design)
+2. For each group:
+   a. image_studio with target_description listing group items
+   b. Example: "all Large jars (blue, yellow, pink lids)"
+3. One output per group
+```
+
+#### SELECTIVE Strategy
+
+When filtering to specific items:
+
+```
+1. Filter Extraction Targets by criteria
+2. Apply INDIVIDUAL or COMPOSITE to filtered set
+3. Example: "only the Large variants" -> filter to items 1-3 -> process
+```
+
+### Example: Processing 9-Jar Variant Set for Catalog
+
+**Visual Analysis provides:**
+```
+### Extraction Targets
+| # | Description | Position | Size | Design |
+|---|-------------|----------|------|--------|
+| 1 | Large PET jar, blue lid, Blossoms | top-left | Large | Blossoms |
+| 2 | Large PET jar, yellow lid, Charming | top-center | Large | Charming |
+... (9 total)
+```
+
+**PM Task:** "Process for catalog"
+
+**Your Execution:**
+```
+Strategy: INDIVIDUAL (catalog = each SKU needs asset)
+
+Processing 9 items:
+
+[Item 1] image_studio:
+  - extraction: {"target_description": "Large PET jar with blue lid and Blossoms floral print at top-left position"}
+  - output: {"filename": "floral_jar_large_blossoms"}
+  -> verify -> asset record
+
+[Item 2] image_studio:
+  - extraction: {"target_description": "Large PET jar with yellow lid and Charming Flowers print at top-center position"}
+  - output: {"filename": "floral_jar_large_charming"}
+  -> verify -> asset record
+
+... continue for all 9 items
+
+Result: 9 hero shots, 9 asset records
+```
+
+### Example: Same Image for Marketing
+
+**PM Task:** "Create family shot for marketing"
+
+**Your Execution:**
+```
+Strategy: COMPOSITE (marketing = family shot)
+
+[Single call] image_studio:
+  - extraction: {"target_description": "all 9 jars as arranged in 3x3 grid"}
+  - composition: {"position": "preserve original arrangement", "product_coverage": "80%"}
+  - output: {"filename": "floral_jar_family"}
+  -> verify -> single asset record
+
+Result: 1 family shot, 1 asset record
+```
+
+### Multi-Item + Multiple Source Images
+
+When PM provides multiple source images AND each contains multiple items:
+
+```
+1. Process each source image according to its multi-item assessment
+2. If asked to combine sources (e.g., "caps from image A with jars from image B"):
+   - Use labeled images architecture
+   - images=[{"path": "imageA.jpg", "label": "caps"}, {"path": "imageB.jpg", "label": "jars"}]
+   - Compose using [label] references
+```
+
+### Progress Tracking
+
+For large multi-item sets, track progress:
+
+```
+Processing 9 items for catalog:
+[1/9] Large Blossoms - DONE (pending/floral_jar_1.png)
+[2/9] Large Charming - DONE (pending/floral_jar_2.png)
+[3/9] Large Spring - IN PROGRESS
+...
+```
+
+### Anti-Patterns
+
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Treating 9 items as "the jars" | Loses individual SKU assets | Extract each with specific target_description |
+| Single extraction for variants | One asset instead of N | Iterate through Extraction Targets table |
+| Ignoring position info | Ambiguous targeting | Always include "at {position}" in target_description |
+| Assuming COMPOSITE | Wrong for catalog work | Check domain context for strategy |
+| Not verifying each output | Quality issues undetected | view_image after EACH extraction |
+
+</multi_item_handling>
+
 <domain_integration>
 
 ## Asset Fields from Domain Context

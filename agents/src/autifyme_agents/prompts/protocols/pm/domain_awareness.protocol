@@ -28,7 +28,7 @@ Defines which domains own which decisions, enabling correct specialist routing.
 - Image enhancement: color correction, sharpening, lighting adjustments
 - Hero shots: marketplace-ready product images (Amazon, Shopify quality)
 - Lifestyle/contextual: scene generation, product in context
-- Multi-product: extraction, isolation, composite shots
+- **Multi-item processing: when source has multiple items, creative extracts each or creates family shot based on context**
 - Style transfer: match reference images for lighting, color, mood
 - Batch processing: consistent treatment across variant families
 - **Data-driven graphics: price posts, offer graphics, variant comparisons (PM provides data)**
@@ -246,6 +246,68 @@ Source image at: inbox/photo.jpg
 For CREATIVE domain."
 -> creative_specialist knows to use PET-specific processing
 ```
+
+### Multi-Item Image Delegation (CRITICAL)
+
+When visual analysis shows MULTI-ITEM ASSESSMENT (multiple products/variants in one image):
+
+**Include strategy context in delegation:**
+
+| Task | Strategy Hint | Delegation Example |
+|------|---------------|-------------------|
+| Catalog work | INDIVIDUAL | "Process for catalog. Visual shows 9 variants - need individual hero per SKU." |
+| Marketing | COMPOSITE | "Create family shot for marketing. Keep all variants together." |
+| User request | As specified | "User wants just the large sizes - extract those 3 only." |
+
+**Delegation Template for Multi-Item:**
+```
+"Process image at: inbox/products.jpg
+Read visual analysis at: visual_analysis_products.md
+
+**MULTI-ITEM:** Visual shows [N] items (Classification: [VARIANTS/COLLECTION]).
+Strategy: [INDIVIDUAL/COMPOSITE/BY_SIZE/SELECTIVE] - [reason].
+
+For CATALOG domain."
+```
+
+**Examples:**
+
+```
+CATALOG (individual extraction):
+"Process image at: inbox/floral_jars.jpg
+Read visual analysis at: visual_analysis_floral_jars.md
+
+**MULTI-ITEM:** Visual shows 9 jars (Classification: VARIANTS - 3 sizes x 3 designs).
+Strategy: INDIVIDUAL - each SKU needs its own hero shot.
+
+For CATALOG domain."
+-> Creative extracts 9 individual hero shots, creates 9 assets
+
+MARKETING (family shot):
+"Process image at: inbox/floral_jars.jpg
+Read visual analysis at: visual_analysis_floral_jars.md
+
+**MULTI-ITEM:** Visual shows 9 jars (Classification: VARIANTS).
+Strategy: COMPOSITE - create family shot for marketing.
+
+For CAMPAIGN domain."
+-> Creative creates 1 family shot, creates 1 asset
+
+SELECTIVE:
+"Process image at: inbox/floral_jars.jpg
+Read visual analysis at: visual_analysis_floral_jars.md
+
+**MULTI-ITEM:** Visual shows 9 jars.
+Strategy: SELECTIVE - extract only Large variants (top row).
+
+For CATALOG domain."
+-> Creative extracts 3 large variant hero shots
+```
+
+**Why this matters:**
+- Without strategy hint, creative defaults based on domain context
+- Explicit strategy prevents wrong output (1 shot when 9 needed, or vice versa)
+- Visual analysis provides Extraction Targets table - creative uses it
 
 ---
 

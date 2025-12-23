@@ -169,49 +169,135 @@ Flag quality issues in analysis.
 
 ## MULTI-PRODUCT IMAGE HANDLING
 
-When an image contains multiple products, classify the situation:
+**CRITICAL:** This section applies the domain-agnostic `multi_item_image.protocol` to catalog products.
+
+When an image contains multiple products, you MUST output an actionable manifest that downstream agents can execute.
+
+### Domain Vocabulary Mapping
+
+| Generic Term | Catalog Meaning |
+|--------------|-----------------|
+| Item | Product |
+| VARIANTS | Same product type, different size/color/design |
+| COLLECTION | Different product types (e.g., jar + lid + label) |
+| COMPONENTS | Disassembled product parts |
+| Variant Axes | Size, Color, Design, Material |
 
 ### Classification Matrix
 
-| Observation | Classification | Output Structure |
-|-------------|----------------|------------------|
-| Same product, multiple angles | SINGLE_ITEM | One analysis, note "multiple angles" |
-| Same product type, different sizes | VARIANT_SET | One analysis with variant breakdown |
-| Different product types | MULTIPLE_ITEMS | Separate analysis per product |
-| Product with accessories | SINGLE_WITH_ACCESSORIES | One analysis, note accessories |
+| Observation | Classification | Catalog Implication |
+|-------------|----------------|---------------------|
+| Same product, multiple angles | SINGLE_ITEM | One SKU, multiple assets |
+| Same product type, different sizes | VARIANTS | Multiple SKUs, same family |
+| Same product type, different colors/designs | VARIANTS | Multiple SKUs, variant axis |
+| Different product types | COLLECTION | Multiple families or bundled set |
+| Product with accessories | COLLECTION | Main product + accessory SKUs |
 
-### Multi-Product Analysis Template
+### Multi-Product Output Template (MANDATORY FORMAT)
 
+When multi-product detected, output this EXACT structure:
+
+```markdown
+## MULTI-ITEM ASSESSMENT
+
+- **Count:** [N products]
+- **Classification:** [VARIANTS | COLLECTION | COMPONENTS]
+- **Rationale:** [Why this classification - what visual evidence]
+
+### Variant Axes (if VARIANTS)
+
+| Axis | Values Found |
+|------|--------------|
+| Size | [e.g., Large, Medium, Small] |
+| Color | [e.g., Blue, Yellow, Pink] |
+| Design | [e.g., Blossoms, Charming Flowers, Spring Flowers] |
+
+### Extraction Targets
+
+| # | Description | Position | Size | Color | Design | Other Attributes |
+|---|-------------|----------|------|-------|--------|------------------|
+| 1 | [Full description] | [top-left] | [Large] | [Blue] | [Blossoms] | [any other] |
+| 2 | [Full description] | [top-center] | [Large] | [Yellow] | [Charming Flowers] | |
+| ... | ... | ... | ... | ... | ... | |
+
+### Processing Strategies
+
+| Strategy | Result | Recommended When |
+|----------|--------|------------------|
+| INDIVIDUAL | [N] hero shots, one per SKU | Catalog work, product pages |
+| BY_SIZE | [M] shots grouped by size | Size comparison graphics |
+| BY_DESIGN | [M] shots grouped by design | Design showcase |
+| COMPOSITE | 1 family shot | Marketing, range display |
+
+**Default for catalog:** INDIVIDUAL (each product needs its own hero shot)
+**For marketing request:** COMPOSITE (family/range shot)
 ```
-MULTI-PRODUCT ASSESSMENT:
-- Product count: [N]
-- Classification: [SINGLE_ITEM | VARIANT_SET | MULTIPLE_ITEMS | SINGLE_WITH_ACCESSORIES]
-- Rationale: [Why this classification]
 
-[If VARIANT_SET or MULTIPLE_ITEMS:]
-PRODUCT 1:
-  [Full analysis template]
+### Position Vocabulary
 
-PRODUCT 2:
-  [Full analysis template]
+Use these consistent descriptors for targeting:
 
-[If SINGLE_WITH_ACCESSORIES:]
-MAIN PRODUCT:
-  [Full analysis template]
-ACCESSORIES:
-  - [Accessory 1]: [Brief description]
-  - [Accessory 2]: [Brief description]
+| Position | Use For |
+|----------|---------|
+| top-left, top-center, top-right | Grid arrangements |
+| middle-left, center, middle-right | Middle row |
+| bottom-left, bottom-center, bottom-right | Bottom row |
+| left-column, center-column, right-column | Columnar displays |
+| foreground, background | Depth arrangements |
+| row-1, row-2, row-3 | Stacked arrangements |
+
+### Example: 9-Jar Variant Set
+
+```markdown
+## MULTI-ITEM ASSESSMENT
+
+- **Count:** 9 products
+- **Classification:** VARIANTS
+- **Rationale:** Same jar type in 3 sizes x 3 designs, identical form factor
+
+### Variant Axes
+
+| Axis | Values Found |
+|------|--------------|
+| Size | Large (1L), Medium (500ml), Small (250ml) |
+| Design | Blossoms (blue lid), Charming Flowers (yellow lid), Spring Flowers (pink lid) |
+
+### Extraction Targets
+
+| # | Description | Position | Size | Design |
+|---|-------------|----------|------|--------|
+| 1 | Large PET jar with blue lid, Blossoms floral print | top-left | Large | Blossoms |
+| 2 | Large PET jar with yellow lid, Charming Flowers print | top-center | Large | Charming Flowers |
+| 3 | Large PET jar with pink lid, Spring Flowers print | top-right | Large | Spring Flowers |
+| 4 | Medium PET jar with blue lid, Blossoms floral print | middle-left | Medium | Blossoms |
+| 5 | Medium PET jar with yellow lid, Charming Flowers print | middle-center | Medium | Charming Flowers |
+| 6 | Medium PET jar with pink lid, Spring Flowers print | middle-right | Medium | Spring Flowers |
+| 7 | Small PET jar with blue lid, Blossoms floral print | bottom-left | Small | Blossoms |
+| 8 | Small PET jar with yellow lid, Charming Flowers print | bottom-center | Small | Charming Flowers |
+| 9 | Small PET jar with pink lid, Spring Flowers print | bottom-right | Small | Spring Flowers |
+
+### Processing Strategies
+
+| Strategy | Result | Recommended When |
+|----------|--------|------------------|
+| INDIVIDUAL | 9 hero shots | Catalog (each SKU needs asset) |
+| BY_SIZE | 3 shots (Large set, Medium set, Small set) | Size comparison |
+| BY_DESIGN | 3 shots (Blossoms range, Charming range, Spring range) | Design showcase |
+| COMPOSITE | 1 family shot | Marketing, range display |
+
+**Default for catalog:** INDIVIDUAL
 ```
 
 ### Key Signals
 
-| Signal | Indicates |
-|--------|-----------|
-| Identical shape, different scales | VARIANT_SET (size variants) |
-| Same shape, different colors | VARIANT_SET (color variants) |
-| Different shapes entirely | MULTIPLE_ITEMS |
-| Same product from front/back/side | SINGLE_ITEM (angles) |
-| Product + cap/lid separately shown | SINGLE_WITH_ACCESSORIES |
+| Signal | Classification | Variant Axes |
+|--------|----------------|--------------|
+| Identical shape, different scales | VARIANTS | Size |
+| Same shape, different colors | VARIANTS | Color |
+| Same shape, different patterns/prints | VARIANTS | Design |
+| Different shapes entirely | COLLECTION | N/A |
+| Product + cap/lid separately | COLLECTION | N/A |
+| Same product from multiple angles | SINGLE_ITEM | N/A |
 
 ---
 
