@@ -141,7 +141,7 @@ def create_platform_media_tools(
             )
             return result
 
-        except Exception as e:
+        except Exception:
             logger.exception(f"Failed to download media from {platform_name}")
             raise
 

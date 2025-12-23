@@ -19,6 +19,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 
@@ -57,11 +58,9 @@ def build_storage_url(path: str, bucket: str = "assets") -> str:
 
     # Expand user path to storage path if needed
     if is_user_path(path):
-        try:
-            path = to_storage_path(path)
-        except ValueError:
+        with contextlib.suppress(ValueError):
             # No thread_id in context - path might already be complete or non-threaded
-            pass
+            path = to_storage_path(path)
 
     # Strip bucket prefix if accidentally included
     if path.startswith(f"{bucket}/"):

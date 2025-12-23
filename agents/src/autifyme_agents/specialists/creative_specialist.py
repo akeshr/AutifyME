@@ -84,7 +84,7 @@ def create_creative_specialist(
         raise ValueError("company_profile is required for Creative Specialist (single-tenant)")
 
     # Load and format prompt with company context
-    prompt_template = load_prompt("specialists/creative_specialist_lean.prompt")
+    prompt_template = load_prompt("specialists/creative_specialist.prompt")
     vi = company_profile.visual_identity
 
     system_prompt = prompt_template.format(

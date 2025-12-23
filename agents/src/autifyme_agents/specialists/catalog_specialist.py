@@ -106,7 +106,7 @@ def create_catalog_specialist(
         raise ValueError("company_profile is required for Catalog Specialist (single-tenant)")
 
     # Load and format prompt with company context
-    prompt_template = load_prompt("specialists/catalog_specialist_v2.prompt")
+    prompt_template = load_prompt("specialists/catalog_specialist.prompt")
     sku_conv = company_profile.sku_naming_convention
 
     system_prompt = prompt_template.format(

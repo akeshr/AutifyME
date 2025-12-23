@@ -63,7 +63,7 @@ def create_visual_analyst(
     if company_profile is None:
         raise ValueError("company_profile is required for Visual Analyst (single-tenant)")
 
-    prompt_template = load_prompt("analysts/visual_analyst_v2.prompt")
+    prompt_template = load_prompt("analysts/visual_analyst.prompt")
 
     system_prompt = prompt_template.format(
         company_name=company_profile.name,

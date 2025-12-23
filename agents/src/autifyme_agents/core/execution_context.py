@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Generator
+from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
