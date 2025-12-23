@@ -431,13 +431,7 @@ When source image contains multiple items, use position-based targeting.
 
 ### Position Vocabulary
 
-| Position | Meaning |
-|----------|---------|
-| top-left, top-center, top-right | Upper third |
-| middle-left, center, middle-right | Middle third |
-| bottom-left, bottom-center, bottom-right | Lower third |
-| foreground, background | Depth |
-| row-1, row-2, left-column, right-column | Grid positions |
+See `multi_item_image.protocol` for complete position vocabulary.
 
 ---
 
