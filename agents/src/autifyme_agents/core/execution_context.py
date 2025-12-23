@@ -38,6 +38,20 @@ _current_company_id: ContextVar[str | None] = ContextVar("company_id", default=N
 # Storage zones that use thread_id subfolder
 THREADED_ZONES = ("inbox", "pending")
 
+# Characters invalid in Supabase storage paths
+_INVALID_PATH_CHARS = ":"
+
+
+def _sanitize_for_path(value: str) -> str:
+    """Sanitize value for use in storage paths.
+
+    Replaces characters invalid in Supabase storage (like colons) with underscores.
+    """
+    result = value
+    for char in _INVALID_PATH_CHARS:
+        result = result.replace(char, "_")
+    return result
+
 
 def get_thread_id() -> str | None:
     """Get current thread_id from execution context."""
@@ -138,17 +152,19 @@ def to_storage_path(user_path: str) -> str:
 
     # Check if thread_id already present (idempotent)
     thread_id = get_thread_id()
-    if len(parts) >= 3 and thread_id and parts[1] == thread_id:
-        return path  # Already has thread_id
-
-    # Inject thread_id
     if not thread_id:
         logger.warning(f"No thread_id in context for path: {user_path}")
         raise ValueError(f"thread_id required for {zone}/ paths but not in context")
 
+    # Sanitize for storage path (replace invalid chars like colons)
+    safe_thread_id = _sanitize_for_path(thread_id)
+
+    if len(parts) >= 3 and parts[1] == safe_thread_id:
+        return path  # Already has thread_id
+
     # Pattern: zone/filename... -> zone/thread_id/filename...
     filename_parts = parts[1:]  # Everything after zone
-    return f"{zone}/{thread_id}/{'/'.join(filename_parts)}"
+    return f"{zone}/{safe_thread_id}/{'/'.join(filename_parts)}"
 
 
 def is_user_path(path: str) -> bool:
