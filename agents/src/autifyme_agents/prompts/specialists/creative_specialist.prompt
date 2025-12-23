@@ -448,6 +448,12 @@ extraction, background, lighting, composition, enhancement, scene, placement, fo
 
 </capabilities>
 
+<tool_execution_discipline>
+
+**INVOKE tools - never describe them as text. `write_data(...)` as text does nothing.**
+
+</tool_execution_discipline>
+
 <escalation>
 
 ## When to Escalate
