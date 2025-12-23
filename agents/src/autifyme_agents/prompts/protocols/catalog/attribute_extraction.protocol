@@ -99,11 +99,13 @@ Map extracted attributes to catalog fields:
 |-----------|---------------|-------|
 | sku | sku | Generate or user-provided |
 | name | name | Material + Size + Type |
-| description | description | Features, use case |
+| description | description | **REQUIRED (NOT NULL)** - Features, use case |
 | product_type | product_type | FINISHED_GOOD default |
 | hsn_code | hsn_code | From research |
 | gst_rate | gst_rate | Based on HSN |
 | barcode | barcode | If provided |
+
+**NEVER create products without description.** Database will reject with NOT NULL constraint.
 
 ### custom_attributes JSONB
 
@@ -163,10 +165,18 @@ Map to variant_values when attribute varies within family:
 | Attribute | Required | Source |
 |-----------|----------|--------|
 | name | YES | Generate from attributes |
+| description | YES (DB NOT NULL) | Generate from material + features + use case |
 | product_type | YES | Default FINISHED_GOOD |
 | material | Recommended | Visual or user |
 | capacity | Recommended | Visual or user |
 | price | YES for pricing | User or research |
+
+**CRITICAL: `description` is a database NOT NULL constraint.** Always generate a description combining:
+- Material type (PET, Glass, HDPE, etc.)
+- Key features (honeycomb texture, screw cap, food-grade, etc.)
+- Typical use case (food storage, beverage packaging, industrial use, etc.)
+
+Example: "Food-grade PET jar with honeycomb texture pattern, screw cap closure. Ideal for honey, jam, and dry food storage."
 
 ### Validation Rules
 
