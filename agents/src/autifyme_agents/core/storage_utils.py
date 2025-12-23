@@ -29,6 +29,27 @@ logger = logging.getLogger(__name__)
 THREADED_ZONES = ("inbox", "pending")
 STORAGE_PREFIXES = ("inbox/", "pending/", "products/", "brands/", "assets/", "outputs/")
 
+# Characters invalid in Supabase storage paths
+_INVALID_PATH_CHARS = ":"
+
+
+def sanitize_for_path(value: str) -> str:
+    """Sanitize value for use in storage paths.
+
+    Replaces characters invalid in Supabase storage (like colons) with underscores.
+    Used for thread_id and other identifiers that become path segments.
+
+    Args:
+        value: Raw identifier (e.g., "whatsapp:123:919...")
+
+    Returns:
+        Storage-safe identifier (e.g., "whatsapp_123_919...")
+    """
+    result = value
+    for char in _INVALID_PATH_CHARS:
+        result = result.replace(char, "_")
+    return result
+
 
 def build_storage_url(path: str, bucket: str = "assets") -> str:
     """Build Supabase storage URL from path.

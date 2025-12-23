@@ -14,6 +14,7 @@ from supabase.lib.client_options import AsyncClientOptions, SyncClientOptions
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.exceptions import ConfigurationError, StorageError
 from autifyme_agents.core.ports import StorageInterface
+from autifyme_agents.core.storage_utils import sanitize_for_path
 from autifyme_agents.schemas.models import (
     CompanyProfile,
     Product,
@@ -2616,8 +2617,8 @@ class SupabaseStorageClient(StorageInterface):
             StorageError: On upload failure
         """
         try:
-            # Sanitize thread_id for use as folder name (replace colons with underscores)
-            sanitized_thread_id = thread_id.replace(":", "_")
+            # Sanitize thread_id for use as folder name
+            sanitized_thread_id = sanitize_for_path(thread_id)
             folder_path = f"{zone}/{sanitized_thread_id}"
             storage_path = f"{folder_path}/{filename}"
 

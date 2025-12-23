@@ -29,6 +29,8 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
+from autifyme_agents.core.storage_utils import sanitize_for_path
+
 logger = logging.getLogger(__name__)
 
 # Context variables - invisible to LLMs
@@ -37,20 +39,6 @@ _current_company_id: ContextVar[str | None] = ContextVar("company_id", default=N
 
 # Storage zones that use thread_id subfolder
 THREADED_ZONES = ("inbox", "pending")
-
-# Characters invalid in Supabase storage paths
-_INVALID_PATH_CHARS = ":"
-
-
-def _sanitize_for_path(value: str) -> str:
-    """Sanitize value for use in storage paths.
-
-    Replaces characters invalid in Supabase storage (like colons) with underscores.
-    """
-    result = value
-    for char in _INVALID_PATH_CHARS:
-        result = result.replace(char, "_")
-    return result
 
 
 def get_thread_id() -> str | None:
@@ -157,7 +145,7 @@ def to_storage_path(user_path: str) -> str:
         raise ValueError(f"thread_id required for {zone}/ paths but not in context")
 
     # Sanitize for storage path (replace invalid chars like colons)
-    safe_thread_id = _sanitize_for_path(thread_id)
+    safe_thread_id = sanitize_for_path(thread_id)
 
     if len(parts) >= 3 and parts[1] == safe_thread_id:
         return path  # Already has thread_id
