@@ -953,6 +953,87 @@ class FakeStorage(StorageInterface):
             "content_type": content_type,
         }
 
+    async def list_storage_files(
+        self,
+        folder: str,
+        thread_id: str | None = None,
+        bucket: str = "assets",
+        limit: int = 50,
+        offset: int = 0,
+        extension_filter: list[str] | None = None,
+        prefix_filter: str | None = None,
+    ) -> dict[str, Any]:
+        """List files in a storage folder.
+
+        Simulates Supabase Storage list() for testing.
+        """
+        if not hasattr(self, "_file_storage"):
+            self._file_storage = {}
+
+        # Build folder path - thread-scoped for inbox/pending
+        if folder in ("inbox", "pending"):
+            if not thread_id:
+                raise ValueError(f"thread_id required for {folder}/ folder")
+            sanitized_thread_id = thread_id.replace(":", "_")
+            folder_path = f"{folder}/{sanitized_thread_id}"
+        else:
+            folder_path = folder
+
+        # Find matching files
+        bucket_prefix = f"{bucket}/{folder_path}/"
+        all_files = []
+
+        for key, data in self._file_storage.items():
+            if key.startswith(bucket_prefix):
+                # Extract filename from full path
+                relative_path = key[len(f"{bucket}/"):]
+                filename = relative_path.split("/")[-1]
+
+                file_info = {
+                    "name": filename,
+                    "storage_path": relative_path,
+                    "public_url": f"https://fake-storage.test/{key}",
+                    "size_bytes": data.get("size_bytes", 0),
+                    "content_type": data.get("content_type", "application/octet-stream"),
+                }
+                all_files.append(file_info)
+
+        # Apply extension filter
+        if extension_filter:
+            normalized_exts = [ext.lower().lstrip(".") for ext in extension_filter]
+            all_files = [
+                f for f in all_files
+                if any(f["name"].lower().endswith(f".{ext}") for ext in normalized_exts)
+            ]
+
+        # Apply prefix filter
+        if prefix_filter:
+            all_files = [f for f in all_files if f["name"].startswith(prefix_filter)]
+
+        # Calculate total before pagination
+        total_count = len(all_files)
+
+        # Apply offset and limit
+        paginated_files = all_files[offset:offset + limit]
+
+        # Add user_path for convenience
+        for file_info in paginated_files:
+            storage_path = file_info["storage_path"]
+            parts = storage_path.split("/")
+            if len(parts) >= 3 and parts[0] in ("inbox", "pending"):
+                file_info["user_path"] = f"{parts[0]}/{parts[-1]}"
+            else:
+                file_info["user_path"] = storage_path
+
+        return {
+            "success": True,
+            "folder": folder_path,
+            "files": paginated_files,
+            "count": len(paginated_files),
+            "total": total_count,
+            "has_more": (offset + limit) < total_count,
+        }
+
     # ========================================================================
     # Lifecycle Management
     # ========================================================================
