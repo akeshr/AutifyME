@@ -19,13 +19,13 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Any, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import InjectedToolArg, StructuredTool
+from langchain_core.tools import StructuredTool
 from PIL import Image
 
+from autifyme_agents.core.execution_context import get_thread_id, to_user_path
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.tool_error_handler import (
     build_agent_error_response,
@@ -323,9 +323,14 @@ def _load_and_encode_image(image_path: str) -> tuple[str, str]:
 def _save_base64_image(
     base64_data: str,
     output_spec: OutputSpec,
-    thread_id: str | None = None,
 ) -> tuple[Path, ImageMetadata, str | None]:
-    """Save base64 image data to temp file and optionally upload to pending."""
+    """Save base64 image data to temp file and optionally upload to pending.
+
+    Gets thread_id from execution context (invisible to LLM).
+    """
+    # Get thread_id from execution context
+    thread_id = get_thread_id()
+
     if "," in base64_data:
         base64_data = base64_data.split(",", 1)[1]
 
@@ -362,6 +367,12 @@ def _save_base64_image(
     # Upload to Supabase pending if storage and thread_id available
     storage_path: str | None = None
 
+    # Log why upload might be skipped
+    if _storage_client is None:
+        logger.warning("Upload skipped: storage client not configured")
+    elif thread_id is None:
+        logger.warning("Upload skipped: thread_id not available in execution context")
+
     if _storage_client is not None and thread_id is not None:
         content_type_map = {"png": "image/png", "jpeg": "image/jpeg", "webp": "image/webp"}
         content_type = content_type_map.get(extension, "image/png")
@@ -391,8 +402,16 @@ def _save_base64_image(
                     )
                 )
 
-            storage_path = upload_result["storage_path"]
-            logger.info("Uploaded to pending", extra={"storage_path": storage_path})
+            internal_path = upload_result["storage_path"]
+            storage_path = to_user_path(internal_path)  # LLM sees clean path
+            logger.info("Uploaded to pending", extra={"user_path": storage_path, "internal_path": internal_path})
+
+            # Surface versioning info to agent if duplicate was detected
+            if upload_result.get("duplicate_detected"):
+                metadata["duplicate_detected"] = True
+                metadata["original_filename"] = upload_result.get("original_filename")
+                metadata["actual_filename"] = upload_result.get("filename")
+                metadata["storage_warning"] = upload_result.get("warning")
         except Exception as upload_error:
             logger.warning(f"Failed to upload: {upload_error}")
 
@@ -545,9 +564,9 @@ def _process_images(input_spec: ImageStudioInput) -> ImageStudioOutput:
                 error_code=ImageStudioErrorCode.API_ERROR,
             )
 
-        # Save result
+        # Save result (thread_id obtained from execution context inside _save_base64_image)
         file_path, metadata, storage_path = _save_base64_image(
-            image_data, input_spec.output, input_spec.thread_id
+            image_data, input_spec.output
         )
 
         output_variant = OutputVariant(
@@ -595,9 +614,7 @@ def _image_studio_impl(
     fidelity: dict[str, Any] | FidelitySpec | None = None,
     custom_spec: dict[str, Any] | CustomSpec | None = None,
     creative_direction: str | None = None,
-    thread_id: str | None = None,
     output: dict[str, Any] | OutputSpec | None = None,
-    config: Annotated[RunnableConfig, InjectedToolArg] = None,  # type: ignore[assignment]
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Image Studio tool implementation.
 
@@ -615,14 +632,18 @@ def _image_studio_impl(
         fidelity: CRITICAL - Product fidelity preservation requirements
         custom_spec: Fully open-ended creative spec for OOTB ideas
         creative_direction: Additional creative notes
-        thread_id: Auto-injected from RunnableConfig
         output: Output specs (format, size, aspect_ratio)
-        config: Injected config for thread_id extraction
     """
-    # Inject thread_id from config if not provided
-    if thread_id is None and config is not None:
-        configurable = config.get("configurable", {})
-        thread_id = configurable.get("thread_id")
+    # Get thread_id from execution context (invisible to LLM)
+    thread_id = get_thread_id()
+
+    logger.debug(
+        "Image studio invoked",
+        extra={
+            "thread_id": thread_id,
+            "storage_configured": _storage_client is not None,
+        }
+    )
 
     try:
         # Convert dicts to spec objects
@@ -658,7 +679,6 @@ def _image_studio_impl(
             fidelity=_to_spec(fidelity, FidelitySpec),
             custom_spec=_to_spec(custom_spec, CustomSpec),
             creative_direction=creative_direction,
-            thread_id=thread_id,
             output=_to_spec(output, OutputSpec) or OutputSpec(),
         )
 
@@ -753,7 +773,7 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
     - Model reasons about what to do from specs and labels
 
     STORAGE:
-    - Generated images uploaded to pending/{thread_id}/
+    - Generated images uploaded to pending/
     - storage_path included in output for write_data
     """
     _set_storage_client(storage)
@@ -764,7 +784,7 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
         description=(
             "PURPOSE: Professional image processing (Gemini 3 Pro Image) - transform user uploads into catalog-ready assets. Extract products, generate lifestyle scenes, create hero shots, compose families. Your creative studio.\n\n"
             "LABELED IMAGES ARCHITECTURE (key differentiator):\n"
-            "- Each image has label: [{path: 'inbox/thread/photo.jpg', label: 'product'}]\n"
+            "- Each image has label: [{path: 'inbox/photo.jpg', label: 'product'}]\n"
             "- Reference labels in spec VALUES using [label] syntax: 'extract [product] from [source]', 'match [style_ref] lighting'\n"
             "- Common labels: 'product'/'source' (main), 'style_ref' (mood/lighting), 'background' (scene), 'product_variant' (family)\n"
             "- Model reasons about specs + labeled images to decide what to do\n"

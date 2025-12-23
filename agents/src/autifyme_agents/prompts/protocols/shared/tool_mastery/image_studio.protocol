@@ -16,8 +16,8 @@ The key differentiator of this tool: **labeled images + structured specs = intel
 ```json
 {
   "images": [
-    {"path": "inbox/thread/photo.jpg", "label": "product"},
-    {"path": "inbox/thread/mood.jpg", "label": "style_ref"}
+    {"path": "inbox/photo.jpg", "label": "product"},
+    {"path": "inbox/mood.jpg", "label": "style_ref"}
   ]
 }
 ```
@@ -176,7 +176,7 @@ Purpose: Output specifications.
 
 ```python
 image_studio(
-    images=[{"path": "inbox/thread/photo.jpg", "label": "source"}],
+    images=[{"path": "inbox/photo.jpg", "label": "source"}],
     extraction={"target_description": "glass jar in [source]"},
     background={"treatment": "transparent"},
     material_treatment={"primary_material": "clear_glass"},
@@ -189,7 +189,7 @@ Result: Extracted jar, transparent PNG, identity preserved.
 
 ```python
 image_studio(
-    images=[{"path": "inbox/thread/photo.jpg", "label": "source"}],
+    images=[{"path": "inbox/photo.jpg", "label": "source"}],
     extraction={"target_description": "product in [source]"},
     background={"treatment": "solid_color", "color": "white"}
 )
@@ -229,7 +229,7 @@ Result: Family shot with main product prominent, variant supporting.
 
 ```python
 image_studio(
-    images=[{"path": "inbox/thread/photo.jpg", "label": "source"}],
+    images=[{"path": "inbox/photo.jpg", "label": "source"}],
     extraction={"target_description": "product in [source]"},
     background={"treatment": "solid_color", "color": "#f5f5f5"},
     lighting={"type": "studio_3point"},
@@ -266,13 +266,13 @@ Result: Catalog-ready hero shot, identity preserved.
 ### Storage Path Flow
 
 ```
-User upload -> inbox/{thread_id}/filename.jpg
+User upload -> inbox/filename.jpg
      |
      v
 image_studio processing
      |
      v
-Output -> pending/{thread_id}/generated.png
+Output -> pending/generated.png
      |
      v
 write_data creates asset with storage_url
@@ -290,7 +290,7 @@ Asset linked to product via product_assets junction
 ```json
 {
   "success": true,
-  "storage_path": "pending/thread-123/20241217_studio_abc12345.png",
+  "storage_path": "pending/20241217_studio_abc12345.png",
   "local_path": "/tmp/media_downloads/20241217_studio_abc12345.png",
   "metadata": {
     "width": 1024,

@@ -2534,6 +2534,54 @@ class SupabaseStorageClient(StorageInterface):
             bucket=bucket,
         )
 
+    def _get_versioned_filename(
+        self,
+        client: Any,
+        bucket: str,
+        folder_path: str,
+        filename: str,
+    ) -> str:
+        """Find next available versioned filename.
+
+        Given 'image.png', checks for existing files and returns next version
+        like 'image-v2.png', 'image-v3.png', etc.
+
+        Args:
+            client: Supabase client
+            bucket: Storage bucket name
+            folder_path: Folder path within bucket
+            filename: Original filename
+
+        Returns:
+            Next available versioned filename
+        """
+        # Split filename into base and extension
+        if "." in filename:
+            base, ext = filename.rsplit(".", 1)
+            ext = f".{ext}"
+        else:
+            base = filename
+            ext = ""
+
+        # List existing files in folder
+        try:
+            response = client.storage.from_(bucket).list(folder_path)
+            existing_files = {item["name"] for item in response} if response else set()
+        except Exception:
+            existing_files = set()
+
+        # Find next available version
+        version = 2
+        while version <= 100:  # Safety limit
+            versioned_name = f"{base}-v{version}{ext}"
+            if versioned_name not in existing_files:
+                return versioned_name
+            version += 1
+
+        # Fallback to timestamp if too many versions
+        import time
+        return f"{base}-{int(time.time())}{ext}"
+
     async def _upload_to_zone(
         self,
         zone: str,
@@ -2545,6 +2593,9 @@ class SupabaseStorageClient(StorageInterface):
     ) -> dict[str, Any]:
         """Internal helper to upload to a specific zone (inbox or pending).
 
+        Handles duplicates by appending version numbers (-v2, -v3, etc.) and
+        returns metadata to inform the agent of the versioning.
+
         Args:
             zone: Storage zone ("inbox" or "pending")
             file_bytes: Raw file content
@@ -2554,7 +2605,12 @@ class SupabaseStorageClient(StorageInterface):
             bucket: Storage bucket name
 
         Returns:
-            Dict with upload result
+            Dict with upload result including:
+            - success, storage_path, bucket, public_url, size_bytes, content_type
+            - filename: Actual filename used (may differ from input if versioned)
+            - duplicate_detected: True if original filename already existed
+            - original_filename: Original requested filename (if versioned)
+            - warning: Human-readable message about versioning (if versioned)
 
         Raises:
             StorageError: On upload failure
@@ -2562,15 +2618,52 @@ class SupabaseStorageClient(StorageInterface):
         try:
             # Sanitize thread_id for use as folder name (replace colons with underscores)
             sanitized_thread_id = thread_id.replace(":", "_")
-            storage_path = f"{zone}/{sanitized_thread_id}/{filename}"
+            folder_path = f"{zone}/{sanitized_thread_id}"
+            storage_path = f"{folder_path}/{filename}"
 
-            # Upload to Supabase Storage
             client = self._ensure_client()
-            client.storage.from_(bucket).upload(
-                path=storage_path,
-                file=file_bytes,
-                file_options={"content-type": content_type},
-            )
+
+            # Track if we need to version the filename
+            duplicate_detected = False
+            original_filename = filename
+            actual_filename = filename
+
+            # Try upload - if duplicate, version the filename
+            try:
+                client.storage.from_(bucket).upload(
+                    path=storage_path,
+                    file=file_bytes,
+                    file_options={"content-type": content_type},
+                )
+            except Exception as upload_error:
+                # Check if it's a duplicate error (409)
+                error_str = str(upload_error)
+                if "409" in error_str or "Duplicate" in error_str or "already exists" in error_str.lower():
+                    duplicate_detected = True
+
+                    # Find next available version
+                    actual_filename = self._get_versioned_filename(
+                        client, bucket, folder_path, filename
+                    )
+                    storage_path = f"{folder_path}/{actual_filename}"
+
+                    # Upload with versioned filename
+                    client.storage.from_(bucket).upload(
+                        path=storage_path,
+                        file=file_bytes,
+                        file_options={"content-type": content_type},
+                    )
+
+                    logger.warning(
+                        "Duplicate detected, using versioned filename",
+                        extra={
+                            "original_filename": original_filename,
+                            "versioned_filename": actual_filename,
+                            "folder_path": folder_path,
+                        }
+                    )
+                else:
+                    raise  # Re-raise if it's not a duplicate error
 
             # Get public URL
             public_url = client.storage.from_(bucket).get_public_url(storage_path)
@@ -2584,17 +2677,29 @@ class SupabaseStorageClient(StorageInterface):
                     "thread_id": thread_id,
                     "size_bytes": len(file_bytes),
                     "content_type": content_type,
+                    "duplicate_detected": duplicate_detected,
                 }
             )
 
-            return {
+            result: dict[str, Any] = {
                 "success": True,
                 "storage_path": storage_path,
                 "bucket": bucket,
                 "public_url": public_url,
                 "size_bytes": len(file_bytes),
                 "content_type": content_type,
+                "filename": actual_filename,
             }
+
+            if duplicate_detected:
+                result["duplicate_detected"] = True
+                result["original_filename"] = original_filename
+                result["warning"] = (
+                    f"File '{original_filename}' already existed. "
+                    f"Saved as '{actual_filename}' instead."
+                )
+
+            return result
 
         except Exception as e:
             logger.error(

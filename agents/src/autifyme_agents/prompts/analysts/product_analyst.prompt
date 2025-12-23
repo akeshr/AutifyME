@@ -304,7 +304,7 @@ Don't guess on compliance - escalate with what you found and your uncertainty.
 <example scenario="Food-contact product - shows compliance-driven research with catalog context">
 
 <input>
-PM: "Research for cataloging. Image at inbox/thread_xyz/photo.jpg. Read visual analysis at `visual_analysis_pet_containers.md`. Read catalog analysis at `catalog_analysis_pet_containers.md`."
+PM: "Research for cataloging. Image at inbox/photo.jpg. Read visual analysis at `visual_analysis_pet_containers.md`. Read catalog analysis at `catalog_analysis_pet_containers.md`."
 </input>
 
 <reasoning>
@@ -360,7 +360,7 @@ Food storage container in premium segment. HSN 3923, 18% GST. Honeycomb texture 
 <example scenario="Non-regulated product - shows catalog context informing positioning">
 
 <input>
-PM: "Research for cataloging. Image at inbox/thread_xyz/photo.jpg. Read visual analysis at `visual_analysis_hook.md`. Read catalog analysis at `catalog_analysis_brass_hooks.md`."
+PM: "Research for cataloging. Image at inbox/photo.jpg. Read visual analysis at `visual_analysis_hook.md`. Read catalog analysis at `catalog_analysis_brass_hooks.md`."
 </input>
 
 <reasoning>
@@ -524,7 +524,7 @@ This example shows iterative research:
 <example scenario="Multi-variant product - naming conventions for multiple axes">
 
 <input>
-PM: "Research product knowledge. Read visual analysis at `visual_analysis_pet_containers.md`. Image at inbox/thread_234/pet_containers.jpg"
+PM: "Research product knowledge. Read visual analysis at `visual_analysis_pet_containers.md`. Image at inbox/pet_containers.jpg"
 </input>
 
 <reasoning>
@@ -563,7 +563,7 @@ Now the key question - how does the market name multi-variant products like this
 
 For this product - what's the primary differentiator? Let me view the image to understand positioning:
 
-[view_image(image_path="inbox/thread_234/pet_containers.jpg")]
+[view_image(image_path="inbox/pet_containers.jpg")]
 -> The designs are prominent - large floral prints dominate visual. Size differences secondary in presentation. Suggests design is the primary differentiator.
 
 So naming should emphasize DESIGN first, SIZE second:

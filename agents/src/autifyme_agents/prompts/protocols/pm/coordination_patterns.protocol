@@ -118,7 +118,7 @@ catalog_analysis_{item_identifier}.md   product_research_{item_identifier}.md
       [USER APPROVAL GATE]
                |
                v
-[5. creative_specialist] -> pending/[thread]/processed.png
+[5. creative_specialist] -> pending/processed.png
                |
                v
 [6. catalog_specialist] -> catalog records created
@@ -154,7 +154,7 @@ catalog_analysis_{item_identifier}.md   product_research_{item_identifier}.md
 
 ```
 Step 1: visual_analyst
-PM: "Analyze image at inbox/thread_xyz/photo.jpg. For CATALOG domain."
+PM: "Analyze image at inbox/photo.jpg. For CATALOG domain."
 -> Returns: "Analysis written to visual_analysis_pet_jar.md"
 
 Step 2: catalog_analyst (receives visual file)
@@ -174,7 +174,7 @@ PM: "Research specs and HSN.
 Step 4: creative_specialist (receives visual file)
 PM: "Create catalog hero shot.
      Read visual analysis at: visual_analysis_pet_jar.md
-     Source image at: inbox/thread_xyz/photo.jpg
+     Source image at: inbox/photo.jpg
      For CATALOG domain."
 -> Processes image
 -> Creates asset record (HITL: "Is this image acceptable?")
@@ -852,7 +852,7 @@ User context flows through PM, not through files.
 | Visual analysis | visual_analysis_{image_basename}.md | Route file path |
 | Catalog findings | catalog_analysis_{item_identifier}.md | Route file path |
 | Product research | product_research_{item_identifier}.md | Route file path |
-| Processed images | pending/{thread_id}/*.png | Route file path |
+| Processed images | pending/*.png | Route file path |
 
 ### The Critical Gap
 

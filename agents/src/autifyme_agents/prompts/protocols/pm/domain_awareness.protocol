@@ -141,7 +141,7 @@ Every delegation MUST include:
 ```
 "Find catalog placement for this product.
 Read visual analysis at: visual_analysis_pet_jar.md
-Source image at: inbox/thread_xyz/photo.jpg
+Source image at: inbox/photo.jpg
 For CATALOG domain. This is {company_name}'s product."
 ```
 
@@ -156,7 +156,7 @@ For PRODUCT domain. This is {company_name}'s product."
 ```
 "Create catalog hero shot for this product.
 Read visual analysis at: visual_analysis_pet_jar.md (contains material: PET)
-Source image at: inbox/thread_xyz/photo.jpg
+Source image at: inbox/photo.jpg
 For CATALOG domain."
 ```
 -> Creative processes, creates asset record (HITL), returns asset_id
@@ -176,7 +176,7 @@ For CAMPAIGN domain."
 **To creative_specialist (Standalone):**
 ```
 "Process this image for user.
-Source: inbox/thread_xyz/photo.jpg
+Source: inbox/photo.jpg
 Remove background, white background.
 Standalone - no asset record needed."
 ```
@@ -235,14 +235,14 @@ WRONG:
 -> catalog_specialist has NO context - doesn't know family, pricing, HSN
 
 WRONG:
-"Create hero shot for this product at inbox/thread_xyz/photo.jpg"
+"Create hero shot for this product at inbox/photo.jpg"
 -> creative_specialist doesn't know material type (glass? PET? metal?)
 -> Can't apply correct material_treatment specs
 
 CORRECT:
 "Create hero shot for this product.
 Read visual analysis at: visual_analysis_pet_jar.md (material: PET plastic)
-Source image at: inbox/thread_xyz/photo.jpg
+Source image at: inbox/photo.jpg
 For CREATIVE domain."
 -> creative_specialist knows to use PET-specific processing
 ```
@@ -285,7 +285,7 @@ Before EVERY delegation, verify:
 
 CORRECT:
 ```
-"Analyze image at inbox/thread_xyz/photo.jpg for product details. For CATALOG domain. This is {company_name}'s product."
+"Analyze image at inbox/photo.jpg for product details. For CATALOG domain. This is {company_name}'s product."
 ```
 -> visual_analyst receives path AND knows to load catalog protocols
 
@@ -298,7 +298,7 @@ WRONG (missing path):
 
 WRONG (missing domain):
 ```
-"Analyze image at inbox/thread_xyz/photo.jpg"
+"Analyze image at inbox/photo.jpg"
 ```
 -> Analyst doesn't know which protocols to load
 -> Generic analysis instead of domain-grounded
@@ -354,7 +354,7 @@ When creative_specialist returns a processed image and user should see it:
 ### Storage Path Architecture
 
 ```
-creative_specialist returns: "pending/thread_xyz/processed_hero.png"
+creative_specialist returns: "pending/processed_hero.png"
                                     |
                                     v
                           This is a STORAGE PATH (relative)
@@ -412,7 +412,7 @@ View it: [product reference or link]"
 
 ```
 WRONG:
-"Here's your image: pending/thread_xyz/abc123.png"
+"Here's your image: pending/abc123.png"
 -> Raw storage path is not user-friendly
 -> User can't access pending/ directly
 

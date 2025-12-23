@@ -359,7 +359,7 @@ def create_write_data_tool(
             "- HITL required: User must approve via hitl_summary (plain language for business users)\n"
             "- Validation: Always inspect_schema + read_data before write_data to verify structure and check duplicates\n\n"
             "OPTIONAL:\n"
-            "- asset_uploads: [{storage_path: 'pending/thread_id/file.png', returns: 'asset'}] - reference '@asset.public_url' in operations\n"
+            "- asset_uploads: [{storage_path: 'pending/file.png', returns: 'asset'}] - reference '@asset.public_url' in operations\n"
             "- dry_run: Preview without executing (no HITL required)\n"
             "- validate_only: Check schemas without executing (no HITL required)\n\n"
             "EXAMPLES:\n"

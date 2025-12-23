@@ -28,16 +28,15 @@ class ImageInput(BaseModel):
     The model receives all images and uses the labels to understand their role.
 
     Examples:
-        ImageInput(path="inbox/thread/product.jpg", label="product")
-        ImageInput(path="inbox/thread/style_ref.jpg", label="lighting_reference")
-        ImageInput(path="inbox/thread/scene.jpg", label="background_style")
-        ImageInput(path="inbox/thread/jar2.jpg", label="product_variant_2")
+        ImageInput(path="inbox/product.jpg", label="product")
+        ImageInput(path="inbox/style_ref.jpg", label="lighting_reference")
+        ImageInput(path="pending/extracted.png", label="background_style")
     """
 
     path: str = Field(
         description=(
-            "Storage path to the image (e.g., 'inbox/thread_id/photo.jpg'). "
-            "Can be inbox/, pending/, or products/ paths."
+            "Storage path from download_media or image_studio output. "
+            "Example: 'inbox/photo.jpg' or 'pending/output.png'"
         )
     )
     label: str = Field(
@@ -720,7 +719,7 @@ class ImageStudioInput(BaseModel):
     ```python
     ImageStudioInput(
         images=[
-            ImageInput(path="inbox/thread/group.jpg", label="source")
+            ImageInput(path="inbox/group.jpg", label="source")
         ],
         extraction=ExtractionSpec(
             target_description="the 500ml glass jar on the left in [source]",
@@ -742,8 +741,8 @@ class ImageStudioInput(BaseModel):
     ```python
     ImageStudioInput(
         images=[
-            ImageInput(path="inbox/thread/product.jpg", label="product"),
-            ImageInput(path="inbox/thread/mood.jpg", label="lighting_ref")
+            ImageInput(path="inbox/product.jpg", label="product"),
+            ImageInput(path="inbox/mood.jpg", label="lighting_ref")
         ],
         scene=SceneSpec(
             environment="modern minimalist kitchen",
@@ -769,9 +768,9 @@ class ImageStudioInput(BaseModel):
     ```python
     ImageStudioInput(
         images=[
-            ImageInput(path="inbox/thread/jar1.jpg", label="product_main"),
-            ImageInput(path="inbox/thread/jar2.jpg", label="product_variant"),
-            ImageInput(path="inbox/thread/background.jpg", label="scene_ref")
+            ImageInput(path="inbox/jar1.jpg", label="product_main"),
+            ImageInput(path="inbox/jar2.jpg", label="product_variant"),
+            ImageInput(path="inbox/background.jpg", label="scene_ref")
         ],
         scene=SceneSpec(
             environment="use [scene_ref] as background style",
@@ -795,14 +794,8 @@ class ImageStudioInput(BaseModel):
         description=(
             "REQUIRED: At least 1 labeled image (max 15). Each image has a label "
             "you reference in your specs/instructions. "
-            "Example: [ImageInput(path='inbox/thread/photo.jpg', label='product')]"
+            "Example: [ImageInput(path='inbox/photo.jpg', label='product')]"
         )
-    )
-
-    # Thread ID for cloud storage persistence (auto-injected from RunnableConfig)
-    thread_id: str | None = Field(
-        default=None,
-        description="Auto-injected from session context - do not pass explicitly."
     )
 
     # ==========================================================================
@@ -917,7 +910,7 @@ class OutputVariant(BaseModel):
     description: str | None = Field(default=None)
     storage_path: str | None = Field(
         default=None,
-        description="Bucket path (e.g., 'pending/thread_id/file.png'). Use in view_image, write_data."
+        description="Storage path (e.g., 'pending/output.png'). Use in view_image, write_data."
     )
 
 

@@ -13,11 +13,11 @@ Covers storage conventions, asset lifecycle, and product linking.
 
 ```
 assets/
-+-- inbox/{thread_id}/           # Raw uploads from user
++-- inbox/                       # Raw uploads from user
 |   +-- photo.jpg
 |   +-- document.pdf
 |
-+-- pending/{thread_id}/         # Processed images awaiting approval
++-- pending/                     # Processed images awaiting approval
 |   +-- 20241217_studio_abc.png
 |   +-- hero_shot.png
 |
@@ -30,8 +30,8 @@ assets/
 
 | Stage | Path Pattern | Created By |
 |-------|--------------|------------|
-| User Upload | `inbox/{thread_id}/filename.ext` | download_media tool |
-| Processed | `pending/{thread_id}/filename.ext` | image_studio tool |
+| User Upload | `inbox/filename.ext` | download_media tool |
+| Processed | `pending/filename.ext` | image_studio tool |
 | Cataloged | Stored URL in assets table | write_data after HITL |
 
 ---
@@ -263,7 +263,7 @@ Most common scenario. Create asset and junction in same transaction.
       "table": "assets",
       "data": {
         "name": "PET Jar 500ml Hero",
-        "storage_url": "pending/thread_xyz/20241217_studio_abc.png",
+        "storage_url": "pending/20241217_studio_abc.png",
         "storage_provider": "SUPABASE",
         "file_name": "20241217_studio_abc.png",
         "asset_type": "IMAGE",
@@ -630,7 +630,7 @@ NO HITL TRIGGERED - image stays as file only, not cataloged.
 - One-off exports not worth cataloging
 - User explicitly doesn't want catalog tracking
 
-**File location:** `pending/{thread_id}/` - not moved to approved/ since no asset record.
+**File location:** `pending/` - not moved to approved/ since no asset record.
 
 ### Campaign Assets (Temporary Creative Ownership)
 
