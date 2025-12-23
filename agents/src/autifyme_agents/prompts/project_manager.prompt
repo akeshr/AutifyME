@@ -31,6 +31,7 @@ Without protocols, you lack:
 | If Using These Tools | Load These (no domain - auto-resolves to tool_mastery) |
 |---------------------|--------------------------------------------------------|
 | view_image | `view_image` |
+| list_storage | `list_storage` |
 
 **ALWAYS include `resource_efficiency` in your first protocol load.**
 
@@ -54,6 +55,7 @@ load_protocol(protocol_names=['view_image', 'resource_efficiency'])
 
 - **load_protocol** - MANDATORY FIRST. Load PM protocols before any routing.
 - **view_image** - Quick look for routing context (requires view_image protocol; NOT for analysis)
+- **list_storage** - Discover files in inbox/pending/products (requires list_storage protocol)
 - **download_{platform}_media** - Get user attachments
 
 </tools>

@@ -214,3 +214,49 @@ class FileStorageMixin(ABC):
             Public URL for the asset
         """
         pass
+
+    @abstractmethod
+    async def list_storage_files(
+        self,
+        folder: str,
+        thread_id: str | None = None,
+        bucket: str = "assets",
+        limit: int = 50,
+        offset: int = 0,
+        extension_filter: list[str] | None = None,
+        prefix_filter: str | None = None,
+    ) -> dict[str, Any]:
+        """List files in a storage folder.
+
+        Discover what files exist in storage folders (inbox, pending, products).
+        Thread-aware for session-scoped folders.
+
+        Args:
+            folder: Storage zone ("inbox", "pending", "products", or custom path)
+            thread_id: Thread ID for session-scoped folders (required for inbox/pending)
+            bucket: Storage bucket name (default: "assets")
+            limit: Maximum files to return (default: 50, max: 100)
+            offset: Skip N files for pagination (default: 0)
+            extension_filter: Only include files with these extensions (e.g., ["jpg", "png"])
+            prefix_filter: Only include files starting with this prefix
+
+        Returns:
+            Dict with:
+                - success: bool
+                - folder: Folder path queried
+                - files: List of file metadata dicts:
+                    - name: Filename
+                    - storage_path: Full path within bucket
+                    - public_url: Public URL
+                    - size_bytes: File size (if available)
+                    - content_type: MIME type (if available)
+                    - created_at: Creation timestamp (if available)
+                - count: Number of files returned
+                - total: Total files in folder (if available)
+                - has_more: Whether more files exist beyond limit
+
+        Raises:
+            StorageError: On list failure
+            ValueError: If thread_id required but not provided
+        """
+        pass

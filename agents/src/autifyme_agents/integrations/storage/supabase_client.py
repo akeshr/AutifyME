@@ -2823,6 +2823,186 @@ class SupabaseStorageClient(StorageInterface):
                 original_error=e,
             ) from e
 
+    async def list_storage_files(
+        self,
+        folder: str,
+        thread_id: str | None = None,
+        bucket: str = "assets",
+        limit: int = 50,
+        offset: int = 0,
+        extension_filter: list[str] | None = None,
+        prefix_filter: str | None = None,
+    ) -> dict[str, Any]:
+        """List files in a storage folder.
+
+        Discover what files exist in storage folders (inbox, pending, products).
+        Thread-aware for session-scoped folders.
+
+        Args:
+            folder: Storage zone ("inbox", "pending", "products", or custom path)
+            thread_id: Thread ID for session-scoped folders (required for inbox/pending)
+            bucket: Storage bucket name (default: "assets")
+            limit: Maximum files to return (default: 50, max: 100)
+            offset: Skip N files for pagination (default: 0)
+            extension_filter: Only include files with these extensions (e.g., ["jpg", "png"])
+            prefix_filter: Only include files starting with this prefix
+
+        Returns:
+            Dict with file listing and metadata
+
+        Raises:
+            StorageError: On list failure
+            ValueError: If thread_id required but not provided
+        """
+        try:
+            # Validate limit
+            if limit > 100:
+                limit = 100
+            if limit < 1:
+                limit = 1
+
+            # Build folder path - thread-scoped for inbox/pending
+            if folder in ("inbox", "pending"):
+                if not thread_id:
+                    raise ValueError(
+                        f"thread_id is required for {folder}/ folder (session-scoped)"
+                    )
+                sanitized_thread_id = sanitize_for_path(thread_id)
+                folder_path = f"{folder}/{sanitized_thread_id}"
+            else:
+                folder_path = folder
+
+            client = self._ensure_client()
+
+            # List files in folder
+            try:
+                response = client.storage.from_(bucket).list(
+                    folder_path,
+                    {"limit": limit + offset, "offset": 0}  # Fetch enough for offset
+                )
+            except Exception as list_error:
+                # Handle empty folder or non-existent path
+                error_str = str(list_error).lower()
+                if "not found" in error_str or "404" in error_str:
+                    return {
+                        "success": True,
+                        "folder": folder_path,
+                        "files": [],
+                        "count": 0,
+                        "total": 0,
+                        "has_more": False,
+                    }
+                raise
+
+            if not response:
+                return {
+                    "success": True,
+                    "folder": folder_path,
+                    "files": [],
+                    "count": 0,
+                    "total": 0,
+                    "has_more": False,
+                }
+
+            # Filter out folder entries (only files)
+            all_files = [
+                item for item in response
+                if item.get("id") is not None  # Files have IDs, folders don't
+            ]
+
+            # Apply extension filter
+            if extension_filter:
+                normalized_exts = [ext.lower().lstrip(".") for ext in extension_filter]
+                all_files = [
+                    f for f in all_files
+                    if any(
+                        f.get("name", "").lower().endswith(f".{ext}")
+                        for ext in normalized_exts
+                    )
+                ]
+
+            # Apply prefix filter
+            if prefix_filter:
+                all_files = [
+                    f for f in all_files
+                    if f.get("name", "").startswith(prefix_filter)
+                ]
+
+            # Calculate total before pagination
+            total_count = len(all_files)
+
+            # Apply offset and limit
+            paginated_files = all_files[offset:offset + limit]
+
+            # Build enriched file list with public URLs
+            files: list[dict[str, Any]] = []
+            for item in paginated_files:
+                filename = item.get("name", "")
+                storage_path = f"{folder_path}/{filename}"
+                public_url = client.storage.from_(bucket).get_public_url(storage_path)
+
+                file_info: dict[str, Any] = {
+                    "name": filename,
+                    "storage_path": storage_path,
+                    "public_url": public_url,
+                }
+
+                # Add optional metadata if available
+                if item.get("metadata"):
+                    metadata = item["metadata"]
+                    if metadata.get("size"):
+                        file_info["size_bytes"] = metadata["size"]
+                    if metadata.get("mimetype"):
+                        file_info["content_type"] = metadata["mimetype"]
+
+                if item.get("created_at"):
+                    file_info["created_at"] = item["created_at"]
+
+                if item.get("updated_at"):
+                    file_info["updated_at"] = item["updated_at"]
+
+                files.append(file_info)
+
+            has_more = (offset + limit) < total_count
+
+            logger.info(
+                f"Listed {len(files)} files in {bucket}/{folder_path}",
+                extra={
+                    "bucket": bucket,
+                    "folder": folder_path,
+                    "count": len(files),
+                    "total": total_count,
+                    "has_more": has_more,
+                }
+            )
+
+            return {
+                "success": True,
+                "folder": folder_path,
+                "files": files,
+                "count": len(files),
+                "total": total_count,
+                "has_more": has_more,
+            }
+
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to list storage files: {bucket}/{folder}",
+                exc_info=True,
+                extra={
+                    "bucket": bucket,
+                    "folder": folder,
+                    "thread_id": thread_id,
+                }
+            )
+            raise StorageError(
+                message=f"Storage listing failed: {str(e)}",
+                operation="list_storage_files",
+                original_error=e,
+            ) from e
+
     # ========================================================================
     # Lifecycle Management
     # ========================================================================

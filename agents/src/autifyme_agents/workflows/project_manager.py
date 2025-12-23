@@ -168,6 +168,12 @@ async def create_project_manager(
     from autifyme_agents.tools.view_image import create_view_image_tool
     pm_tools.append(create_view_image_tool())
 
+    # list_storage for PM to discover files in storage folders
+    # PM uses this for: session awareness (what's in inbox/pending), workflow planning
+    if storage is not None:
+        from autifyme_agents.tools.list_storage import create_list_storage_tool
+        pm_tools.append(create_list_storage_tool(storage))
+
     # Platform media download (with storage for inbox persistence)
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools

@@ -165,6 +165,33 @@ filtered = manifest.filter(criteria)
 then: INDIVIDUAL or COMPOSITE on filtered
 ```
 
+#### SELECTIVE Parsing
+
+When user requests a subset, parse filter criteria from their words:
+
+| User Says | Filter Attribute | Match Pattern |
+|-----------|------------------|---------------|
+| "only the large ones" | Size | Size = "Large" |
+| "just the blue ones" | Color/Design | Color = "Blue" OR Design contains "blue" |
+| "the ones in the top row" | Position | Position starts with "top-" |
+| "middle size only" | Size | Size = "Medium" |
+| "the pink design" | Design | Design contains "pink" |
+
+**Parsing template:**
+```
+User request: "only the large ones"
+
+1. IDENTIFY filter: Size = "Large"
+2. MATCH against Extraction Targets:
+   - Item 1: Size=Large -> MATCH
+   - Item 2: Size=Large -> MATCH
+   - Item 4: Size=Medium -> NO MATCH
+   ...
+3. FILTERED SET: Items 1, 2, 3
+4. APPLY strategy: INDIVIDUAL on filtered set
+5. RESULT: 3 outputs (not 9)
+```
+
 ---
 
 ## STRATEGY SELECTION SIGNALS
@@ -220,6 +247,57 @@ If signals are unclear:
    - Confirm all intended items processed
    - Quality check each output
 ```
+
+---
+
+## FAILURE HANDLING
+
+When extracting N items individually, some may fail. Handle gracefully.
+
+### Failure Strategies
+
+| Strategy | When | Behavior |
+|----------|------|----------|
+| **CONTINUE** (default) | Most cases | Complete remaining items, report failures at end |
+| **RETRY_ONCE** | Ambiguous targeting | Retry failed item with refined description |
+| **ABORT** | Critical dependency between items | Stop on first failure, return partial results |
+
+### Result Reporting Format
+
+When extraction completes (with or without failures), report structured results:
+
+```markdown
+## EXTRACTION RESULTS
+
+- **Completed:** [X] of [N]
+- **Failed:** [Y] (items: #5, #7)
+- **Strategy used:** [INDIVIDUAL/COMPOSITE/etc.]
+
+### Outputs
+
+| # | Description | Output ID | Status | Notes |
+|---|-------------|-----------|--------|-------|
+| 1 | Large jar blue lid | asset_abc123 | SUCCESS | |
+| 2 | Large jar yellow lid | asset_def456 | SUCCESS | |
+| 5 | Medium jar blue lid | - | FAILED | Items overlap in source |
+| 7 | Small jar blue lid | - | FAILED | Extraction ambiguous |
+
+### Failure Details (if any)
+
+| # | Reason | Recoverable |
+|---|--------|-------------|
+| 5 | Items overlap - can't isolate | Yes - retry with tighter targeting |
+| 7 | Position descriptor too vague | Yes - use "bottom-left corner" |
+```
+
+### Recovery Guidance
+
+| Failure Type | Recovery Action |
+|--------------|-----------------|
+| Overlap/ambiguous | Retry with more specific position: "the leftmost jar in bottom row" |
+| Not found at position | Verify Extraction Targets against actual image |
+| Quality issue | Retry with different extraction settings |
+| Persistent failure | Report to PM, continue with successful items |
 
 ---
 
