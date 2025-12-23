@@ -895,6 +895,11 @@ class ImageMetadata(BaseModel):
     format: str
     size_bytes: int
     aspect_ratio: str
+    # Upload versioning fields (set when duplicate filename detected)
+    duplicate_detected: bool | None = None
+    original_filename: str | None = None
+    actual_filename: str | None = None
+    storage_warning: str | None = None
 
 
 class OutputVariant(BaseModel):

@@ -408,10 +408,10 @@ def _save_base64_image(
 
             # Surface versioning info to agent if duplicate was detected
             if upload_result.get("duplicate_detected"):
-                metadata["duplicate_detected"] = True
-                metadata["original_filename"] = upload_result.get("original_filename")
-                metadata["actual_filename"] = upload_result.get("filename")
-                metadata["storage_warning"] = upload_result.get("warning")
+                metadata.duplicate_detected = True
+                metadata.original_filename = upload_result.get("original_filename")
+                metadata.actual_filename = upload_result.get("filename")
+                metadata.storage_warning = upload_result.get("warning")
         except Exception as upload_error:
             logger.warning(f"Failed to upload: {upload_error}")
 
