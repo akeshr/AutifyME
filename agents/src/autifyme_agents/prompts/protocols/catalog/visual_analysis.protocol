@@ -235,18 +235,9 @@ When multi-product detected, output this EXACT structure:
 
 ### Position Vocabulary
 
-Use these consistent descriptors for targeting:
+See `multi_item_image.protocol` for the full position vocabulary (top-left, center, foreground, row-1, etc.).
 
-| Position | Use For |
-|----------|---------|
-| top-left, top-center, top-right | Grid arrangements |
-| middle-left, center, middle-right | Middle row |
-| bottom-left, bottom-center, bottom-right | Bottom row |
-| left-column, center-column, right-column | Columnar displays |
-| foreground, background | Depth arrangements |
-| row-1, row-2, row-3 | Stacked arrangements |
-
-### Example: 9-Jar Variant Set
+### Canonical Example: 9-Jar Variant Set
 
 ```markdown
 ## MULTI-ITEM ASSESSMENT
