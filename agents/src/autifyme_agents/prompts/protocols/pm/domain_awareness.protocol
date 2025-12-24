@@ -135,8 +135,9 @@ Complex requests span multiple domains. Execute in order:
 Every delegation MUST include:
 1. **File paths** - Agents cannot see your conversation
 2. **Domain context** - "For CATALOG domain"
-3. **Company context** - "This is {company_name}'s product"
-4. **Upstream files** - All relevant analysis files
+3. **Upstream files** - All relevant analysis files
+
+**Note:** Company context is injected automatically by middleware - no need to include.
 
 **For delegation templates and patterns, load coordination_patterns.**
 

@@ -132,7 +132,7 @@ PREVIOUSLY RESOLVED (do not re-verify):
 - [Aspect]: [resolution from earlier round]
 - [Aspect]: [resolution from earlier round]
 
-For [DOMAIN] domain. This is {company_name}'s product."
+For [DOMAIN] domain."
 ```
 
 ---
@@ -354,7 +354,7 @@ PREVIOUSLY RESOLVED (do not re-verify):
 - [Aspect]: [resolution] (from round [N])
 - [Aspect]: [resolution] (from round [N])
 
-For [DOMAIN] domain. This is {company_name}'s product."
+For [DOMAIN] domain."
 ```
 
 ### Template: Circuit Breaker Response to User

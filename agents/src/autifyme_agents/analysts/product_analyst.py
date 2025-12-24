@@ -18,6 +18,7 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import MultimodalInjectionMiddleware, create_execution_limits
 from autifyme_agents.tools import create_view_image_tool
+from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
 from autifyme_agents.tools.research_tools import (
     extract_web_content_tool,
     research_product_tool,
@@ -89,6 +90,7 @@ def create_product_analyst(
         "- Clear unknowns/assumptions for user to confirm\n"
         "- If long: write product_research_[item].md to thread directory\n\n"
         "TOOLS I USE:\n"
+        "- load_protocol (loads research_orchestration, market_intelligence, compliance_research at start)\n"
         "- research_product_tool, extract_web_content_tool, view_image\n\n"
         "GUARDRAILS:\n"
         "- No internal DB reads/writes; no record creation; no image editing\n"
@@ -96,6 +98,7 @@ def create_product_analyst(
     )
 
     tools: list[Any] = [
+        create_load_protocol_tool(),
         research_product_tool,
         extract_web_content_tool,
         create_view_image_tool(),  # View images for product analysis

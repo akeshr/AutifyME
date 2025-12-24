@@ -313,7 +313,7 @@ PM: "Create catalog entry.
      Read catalog analysis at: catalog_analysis_pet_jar.md
      Read product research at: product_research_pet_jar.md
      Asset already created and approved: asset_abc123
-     For CATALOG domain. This is {company_name}'s product."
+     For CATALOG domain."
 -> Creates product + product_assets junction (HITL: "Is this product data correct?")
 -> [USER APPROVES CATALOG ENTRY]
 ```
@@ -508,8 +508,7 @@ Read product research at: [product_research_file]
 
 Asset already created and approved: [asset_id from creative_specialist]
 
-For CATALOG domain. Create product and link to asset.
-This is {company_name}'s product."
+For CATALOG domain. Create product and link to asset."
 ```
 
 ### Two-Stage HITL (Intentional)
