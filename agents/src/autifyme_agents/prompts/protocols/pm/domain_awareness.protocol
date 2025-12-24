@@ -78,34 +78,43 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 
 ## ROUTING RULES
 
-### Single-Domain (Pattern Match)
+### Single-Domain (Identify Intent First)
 
-| User Request | Domain | Route To |
+| User Request | Intent | Route To |
 |--------------|--------|----------|
-| Image + no text | VISUAL | visual_analyst |
-| "Add to catalog" | CATALOG | Full workflow (visual -> analysts -> specialists) |
-| "What IS this?" / external knowledge | PRODUCT | product_analyst (UNLIMITED external research) |
-| "What do WE have?" / internal context | CATALOG | catalog_analyst (our DB) |
-| "Process image" / "hero shot" | CREATIVE | creative_specialist |
-| "Update price" / "delete" | CATALOG | catalog_specialist |
+| Image + no text | **UNCLEAR** | Ask user: "What would you like me to do with this?" |
+| Image + "add to catalog" | **CATALOGING** | Full workflow: Visual -> Product -> Catalog |
+| Image + "what is this?" | **RESEARCH** | Visual -> Product (no catalog) |
+| Image + "do we have this?" | **LOOKUP** | Visual -> Catalog (no product) |
+| Image + "process/hero shot" | **CREATIVE** | Visual (optional) -> Creative |
+| Text: "What IS this?" | **EXTERNAL** | product_analyst only |
+| Text: "Do WE have?" | **INTERNAL** | catalog_analyst only |
+| Text: "Update/delete" | **DIRECT ACTION** | catalog_specialist only |
 
-**KEY DISTINCTION:** Where does the answer live?
-- **External (internet)** -> product_analyst (unlimited capability)
-- **Internal (our DB)** -> catalog_analyst
-- **Both needed** -> full workflow
+**KEY DISTINCTION:** What does user WANT?
+- **External knowledge** -> product_analyst
+- **Internal data** -> catalog_analyst
+- **Catalog changes** -> catalog_specialist
+- **Image output** -> creative_specialist
+- **Full cataloging** -> all analysts in sequence
 
 ### Multi-Domain (Dependency Order)
 
 Complex requests span multiple domains. Execute in order:
 
 ```
-1. VISUAL -> visual_analyst (identify)
-2. CATALOG -> catalog_analyst (find family, pricing context)
-3. PRODUCT -> product_analyst (comprehensive product research)
+1. VISUAL -> visual_analyst (identify what we're looking at)
+2. PRODUCT -> product_analyst (research EVERYTHING - uses visual findings)
+3. CATALOG -> catalog_analyst (search with BOTH visual + product context)
 4. [User Approval]
 5. CREATIVE -> creative_specialist (process images)
 6. CATALOG -> catalog_specialist (create records)
 ```
+
+**Why this order:**
+- Visual tells us WHAT (500ml PET jar)
+- Product researches EVERYTHING about it (specs, HSN, compliance, naming)
+- Catalog searches with rich context (finds precise matches, not generic)
 
 **For detailed workflow patterns, load coordination_patterns.**
 
@@ -126,10 +135,12 @@ Complex requests span multiple domains. Execute in order:
 
 | From | To | Artifact |
 |------|-----|----------|
-| VISUAL | CATALOG, PRODUCT, CREATIVE | visual_analysis_{image}.md |
+| VISUAL | PRODUCT, then CATALOG, CREATIVE | visual_analysis_{image}.md |
+| PRODUCT | CATALOG (for search), SPECIALIST (for creation) | product_research_{item}.md |
 | CATALOG | SPECIALIST | catalog_analysis_{item}.md |
-| PRODUCT | SPECIALIST | product_research_{item}.md |
 | CREATIVE | CATALOG | asset_id (already HITL-approved) |
+
+**Key:** Catalog analyst receives BOTH visual AND product files for effective search.
 
 **PM's role:** Route file paths and asset_ids between domains. Synthesize findings.
 

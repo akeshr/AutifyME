@@ -9,53 +9,47 @@ Defines how PM sequences domain work and handles dependencies.
 
 ## COORDINATION MODES
 
-### Mode 1: Sequential Chain
+### Mode 1: Sequential Chain (ANALYSIS PHASE)
 
-Domains execute in strict order, each depending on previous.
-
-```
-Domain A -> Domain B -> Domain C
-```
-
-**Use When:**
-- Each step depends on previous output
-- Data flows forward through chain
-- Example: Catalog addition (visual -> catalog -> product -> creative -> specialist)
-
-**Pattern:**
-```
-1. Delegate to Domain A
-2. Wait for A's result
-3. Include A's output file in Domain B delegation
-4. Wait for B's result
-5. Continue chain...
-```
-
-### Mode 2: Parallel Fan-Out
-
-Multiple domains execute simultaneously, then converge.
+Analysis phase follows strict sequence because each step enriches the next.
 
 ```
-         -> Domain A -+
-        /             |
-Start ---> Domain B --+--> Converge
-        \             |
-         -> Domain C -+
+Visual -> Product -> Catalog
 ```
 
-**Use When:**
-- Domains are independent
-- Results will be synthesized later
-- Example: After visual analysis, catalog and product can run parallel
+**Why This Order:**
+- Visual tells us WHAT we're looking at (500ml PET jar)
+- Product researches EVERYTHING about it (specs, HSN, compliance, naming, positioning)
+- Catalog uses BOTH to search effectively (find similar products with rich context)
 
-**Pattern:**
+**Anti-Pattern (Parallel Analysis):**
 ```
-1. visual_analyst (required first - identifies product)
-2. PARALLEL:
-   - catalog_analyst (uses visual findings)
-   - product_analyst (uses visual findings)
-3. CONVERGE: PM synthesizes both for user
+WRONG: Visual -> [Catalog || Product] parallel
+-> Catalog searches with only visual findings ("PET jar")
+-> Misses rich product context (HSN, specs, compliance, positioning)
+-> Less effective search, wrong family recommendations
 ```
+
+**Correct Pattern:**
+```
+1. visual_analyst (identifies product)
+2. product_analyst (researches EVERYTHING - uses visual findings)
+3. catalog_analyst (searches with BOTH visual AND product findings)
+4. PM synthesizes all three for user
+```
+
+### Mode 2: Intelligent Sequencing
+
+**DECIDE based on information needs, not fixed patterns.**
+
+| Scenario | Sequence | Reasoning |
+|----------|----------|-----------|
+| **Full cataloging** | Visual -> Product -> Catalog | Catalog needs rich context to search |
+| **Quick lookup ("do we have this?")** | Visual -> Catalog only | No external research needed |
+| **Research only ("what is this?")** | Visual -> Product only | No catalog search needed |
+| **Just process image** | Visual (optional) -> Creative | Skip analysts entirely |
+
+**Key Principle:** Ask yourself: "What information does the NEXT agent need to do its job well?"
 
 ### Mode 3: Approval Gate
 
@@ -72,17 +66,17 @@ Analysis -> [USER APPROVAL] -> Execution
 
 **Pattern:**
 ```
-PHASE 1 - ANALYSIS (raw image sufficient):
-1. visual_analyst -> visual_analysis.md
-2. catalog_analyst -> catalog_analysis.md (parallel with 3)
-3. product_analyst -> product_research.md (parallel with 2)
-4. PM presents to user
+PHASE 1 - ANALYSIS (sequential - each enriches next):
+1. visual_analyst -> visual_analysis.md (identify product)
+2. product_analyst -> product_research.md (research EVERYTHING, uses visual)
+3. catalog_analyst -> catalog_analysis.md (search with BOTH findings)
+4. PM synthesizes and presents to user
 
 [USER APPROVAL GATE]
 
 PHASE 2 - EXECUTION (only after approval):
-5. creative_specialist -> processed images
-6. catalog_specialist -> catalog records
+5. creative_specialist -> processed images + asset record
+6. catalog_specialist -> catalog records + asset linking
 ```
 
 ---
@@ -98,32 +92,28 @@ Most common multi-domain workflow. Memorize this.
       |
       v
 [1. visual_analyst] -----> visual_analysis_{image_basename}.md
-      |
-      v (visual findings available)
-      |
-      +--------+--------+
-      |                 |
-      v                 v
-[2. catalog_analyst]  [3. product_analyst]
-      |                 |
-      v                 v
-catalog_analysis_{item_identifier}.md   product_research_{item_identifier}.md
-      |                 |
-      +--------+--------+
-               |
-               v
+      |                    (identifies: 500ml PET jar, honeycomb texture)
+      v
+[2. product_analyst] -----> product_research_{item_identifier}.md
+      |                     (uses visual findings)
+      |                     (researches: specs, HSN, compliance, naming, positioning)
+      v
+[3. catalog_analyst] -----> catalog_analysis_{item_identifier}.md
+      |                     (uses BOTH visual AND product findings)
+      |                     (searches with rich context: "500ml food-grade PET, HSN 3923")
+      v
 [4. PM synthesizes, presents to user]
-               |
-               v
-      [USER APPROVAL GATE]
-               |
-               v
-[5. creative_specialist] -> pending/processed.png
-               |
-               v
-[6. catalog_specialist] -> catalog records created
-               |
-               v
+      |
+      v
+[USER APPROVAL GATE]
+      |
+      v
+[5. creative_specialist] -> asset record + HITL approval for image
+      |
+      v
+[6. catalog_specialist] -> catalog records + asset linking
+      |
+      v
 [HITL APPROVAL] -> published
 ```
 
@@ -131,11 +121,23 @@ catalog_analysis_{item_identifier}.md   product_research_{item_identifier}.md
 
 | Step | Depends On | Why |
 |------|------------|-----|
-| catalog_analyst | visual_analyst | Needs product identification to search catalog |
-| product_analyst | visual_analyst | Needs product identification for research |
+| product_analyst | visual_analyst | Needs product identification to research the right thing |
+| catalog_analyst | visual_analyst + product_analyst | Needs BOTH to search catalog effectively with rich context |
 | PM synthesis | All analysts | Needs all findings for complete recommendation |
 | creative_specialist | User approval | Don't process if user will reject |
-| catalog_specialist | creative_specialist | Needs processed image paths for asset linking |
+| catalog_specialist | creative_specialist | Needs asset_id for linking |
+
+### Why Sequential (Not Parallel) for Analysis
+
+```
+WRONG (parallel):
+- Catalog searches with just "PET jar"
+- Finds generic matches, wrong family recommendations
+
+CORRECT (sequential):
+- Catalog searches with "500ml food-grade PET jar, HSN 3923, airtight seal, premium positioning"
+- Finds precise matches, accurate family recommendations
+```
 
 ---
 
@@ -263,9 +265,9 @@ Which approach fits your catalog strategy?"
 
 ## CROSS-DOMAIN REFINEMENT
 
-**When synthesis reveals that one analyst's findings would have changed another's analysis.**
+**When synthesis reveals conflict or need for deeper analysis.**
 
-Analysts run in parallel after visual. Sometimes their outputs conflict or one would inform the other. PM detects this during synthesis and triggers targeted second pass.
+With sequential flow (Visual -> Product -> Catalog), most cross-domain information already flows forward. However, synthesis may still reveal conflicts that need resolution.
 
 ### When to Trigger Second Pass
 
@@ -355,10 +357,12 @@ First pass (parallel) -> Conflict detected -> Second pass (targeted)
 
 | From | Artifact | Routes To | PM Action |
 |------|----------|-----------|-----------|
-| visual_analyst | visual_analysis_{image_basename}.md | catalog_analyst, product_analyst, creative_specialist | Include path in ALL subsequent delegations |
-| catalog_analyst | catalog_analysis_{item_identifier}.md | catalog_specialist | Include path when delegating to catalog_specialist |
-| product_analyst | product_research_{item_identifier}.md | catalog_specialist | Include path when delegating to catalog_specialist |
+| visual_analyst | visual_analysis_{image_basename}.md | product_analyst, catalog_analyst, creative_specialist | Include in ALL subsequent delegations |
+| product_analyst | product_research_{item_identifier}.md | catalog_analyst, catalog_specialist | Include for catalog analyst AND specialist |
+| catalog_analyst | catalog_analysis_{item_identifier}.md | catalog_specialist | Include when delegating to catalog_specialist |
 | creative_specialist | asset_id (UUID) | catalog_specialist | Include asset_id when delegating catalog creation |
+
+**Note:** Catalog analyst receives BOTH visual AND product files (not just visual).
 
 **Note:** Creative specialist now returns asset_id (not storage_path). Asset is already created and HITL-approved for image quality.
 
@@ -368,20 +372,23 @@ First pass (parallel) -> Conflict detected -> Second pass (targeted)
 Step 1: visual_analyst
 PM: "Analyze image at inbox/photo.jpg. For CATALOG domain."
 -> Returns: "Analysis written to visual_analysis_pet_jar.md"
+   (Contains: 500ml PET jar, honeycomb texture, food container)
 
-Step 2: catalog_analyst (receives visual file)
-PM: "Find catalog placement.
-     Read visual analysis at: visual_analysis_pet_jar.md
-     For CATALOG domain."
--> Returns: "Analysis written to catalog_analysis_pet_jar.md"
-
-Step 3: product_analyst (receives visual file)
+Step 2: product_analyst (receives visual file)
 PM: "Research this product comprehensively.
      Image at: inbox/photo.jpg
      Read visual analysis at: visual_analysis_pet_jar.md
      For PRODUCT domain."
 -> Returns: "Research written to product_research_pet_jar.md"
-   (Contains: specs, components, materials, compliance, naming, positioning - everything discovered)
+   (Contains: specs, HSN 3923, food-grade compliance, naming conventions, market positioning)
+
+Step 3: catalog_analyst (receives BOTH visual AND product files)
+PM: "Find catalog placement.
+     Read visual analysis at: visual_analysis_pet_jar.md
+     Read product research at: product_research_pet_jar.md
+     For CATALOG domain."
+-> Returns: "Analysis written to catalog_analysis_pet_jar.md"
+   (Uses rich context: "500ml food-grade PET, HSN 3923" -> precise family match)
 
 [USER APPROVAL - Proceed with cataloging?]
 
@@ -1327,7 +1334,8 @@ When user returns after timeout:
 
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
-| Parallel when sequential needed | visual_analyst and catalog_analyst parallel | visual_analyst FIRST, catalog_analyst needs identification |
+| **Wrong analysis order** | Catalog before Product | Visual -> Product -> Catalog (catalog needs product context) |
+| **Catalog with only visual** | Catalog searches with just "PET jar" | Include product_research so catalog searches with rich context |
 | Execution before approval | creative_specialist immediately after analysis | User approval GATE before creative_specialist |
 | Missing file routes | catalog_specialist without product_research.md | Include ALL analyst files for complete records |
 | Context not propagated | "Read visual_analysis.md" without user clarifications | Include user context: "User clarified X. Read file and REVISE." |
