@@ -706,7 +706,6 @@ class WorkflowRunner:
             if media_ids:
                 # Batch scenario: multiple media attachments
                 media_refs = ", ".join(media_ids)
-                message_count = raw_payload.get("message_count", len(media_ids))
                 if user_text:
                     # Text + media batch: append all media_ids to user message
                     user_text = f"{user_text} [media attachments ({len(media_ids)}): {media_refs}]"

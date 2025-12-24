@@ -700,7 +700,7 @@ class SupabaseStorageClient(StorageInterface):
             )
             return has_activity
 
-        except Exception as exc:
+        except Exception:
             # Fail open: if we can't check, assume no recent activity
             # This means text message will process immediately (safe default)
             logger.warning(
@@ -736,7 +736,7 @@ class SupabaseStorageClient(StorageInterface):
             )
             return has_pending
 
-        except Exception as exc:
+        except Exception:
             # Fail open: if we can't check, assume no pending messages
             logger.warning(
                 "Failed to check pending messages, assuming none",
@@ -777,7 +777,7 @@ class SupabaseStorageClient(StorageInterface):
                 )
             return orphaned
 
-        except Exception as exc:
+        except Exception:
             logger.error(
                 "Failed to get orphaned batches",
                 exc_info=True,
