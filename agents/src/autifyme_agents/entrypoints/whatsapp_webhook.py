@@ -481,6 +481,15 @@ async def receive(
                         media_id = media_obj.get("id")
                         # Audio/voice don't have captions
 
+                    # Skip empty text messages (reactions, read receipts, etc.)
+                    # These have msg_type="text" but no actual body content
+                    if msg_type == "text" and not (text and text.strip()):
+                        logger.debug(
+                            "Skipping empty text message",
+                            extra={"message_id": message_id, "sender": sender},
+                        )
+                        continue
+
                     logger.info(
                         "Processing WhatsApp message",
                         extra={

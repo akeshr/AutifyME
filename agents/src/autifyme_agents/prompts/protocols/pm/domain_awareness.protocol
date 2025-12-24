@@ -133,25 +133,26 @@ Complex requests span multiple domains. Execute in order:
 
 ## DOMAIN HANDOFFS
 
-| From | To | Artifact |
-|------|-----|----------|
-| VISUAL | PRODUCT, then CATALOG, CREATIVE | visual_analysis_{image}.md |
-| PRODUCT | CATALOG (for search), SPECIALIST (for creation) | product_research_{item}.md |
+| From | To | Artifacts |
+|------|-----|-----------|
+| PM | ALL AGENTS | **Source image path** (when image-based workflow) |
+| VISUAL | PRODUCT, CATALOG, CREATIVE | visual_analysis_{image}.md |
+| PRODUCT | CATALOG, SPECIALIST | product_research_{item}.md |
 | CATALOG | SPECIALIST | catalog_analysis_{item}.md |
 | CREATIVE | CATALOG | asset_id (already HITL-approved) |
 
-**Key:** Catalog analyst receives BOTH visual AND product files for effective search.
+**Key:** Every agent that might need to see the product receives the source image path.
 
-**PM's role:** Route file paths and asset_ids between domains. Synthesize findings.
+**PM's role:** Route image paths, analysis files, and asset_ids between domains. Synthesize findings.
 
 ---
 
 ## DELEGATION PRINCIPLES
 
 Every delegation MUST include:
-1. **File paths** - Agents cannot see your conversation
+1. **Source image path** - When image-based workflow (agents have multimodal capability)
 2. **Domain context** - "For CATALOG domain"
-3. **Upstream files** - All relevant analysis files
+3. **Upstream analysis files** - All relevant files from prior agents
 
 **Note:** Company context is injected automatically by middleware - no need to include.
 

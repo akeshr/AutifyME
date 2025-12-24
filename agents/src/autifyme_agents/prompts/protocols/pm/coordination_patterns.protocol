@@ -353,18 +353,19 @@ First pass (parallel) -> Conflict detected -> Second pass (targeted)
 
 ### File Routing (CRITICAL)
 
-**PM MUST include these files in each delegation. Agents cannot see your conversation.**
+**PM MUST include these in each delegation. Agents cannot see your conversation.**
 
-| From | Artifact | Routes To | PM Action |
-|------|----------|-----------|-----------|
-| visual_analyst | visual_analysis_{image_basename}.md | product_analyst, catalog_analyst, creative_specialist | Include in ALL subsequent delegations |
-| product_analyst | product_research_{item_identifier}.md | catalog_analyst, catalog_specialist | Include for catalog analyst AND specialist |
-| catalog_analyst | catalog_analysis_{item_identifier}.md | catalog_specialist | Include when delegating to catalog_specialist |
-| creative_specialist | asset_id (UUID) | catalog_specialist | Include asset_id when delegating catalog creation |
+| Artifact | Source | Routes To | PM Action |
+|----------|--------|-----------|-----------|
+| **Source image path** | User upload | ALL agents in image workflow | Include in EVERY delegation when image-based |
+| visual_analysis_{image}.md | visual_analyst | product, catalog, creative | Include in all subsequent delegations |
+| product_research_{item}.md | product_analyst | catalog_analyst, catalog_specialist | Include for catalog search and creation |
+| catalog_analysis_{item}.md | catalog_analyst | catalog_specialist | Include when delegating catalog creation |
+| asset_id (UUID) | creative_specialist | catalog_specialist | Include when linking asset to product |
 
-**Note:** Catalog analyst receives BOTH visual AND product files (not just visual).
+**Key:** Source image path goes to ALL agents - they have multimodal capability and may need to see the product directly.
 
-**Note:** Creative specialist now returns asset_id (not storage_path). Asset is already created and HITL-approved for image quality.
+**Note:** Creative specialist returns asset_id (not storage_path). Asset is already HITL-approved for image quality.
 
 ### Example: Full Catalog Addition with File Routing
 
@@ -382,13 +383,14 @@ PM: "Research this product comprehensively.
 -> Returns: "Research written to product_research_pet_jar.md"
    (Contains: specs, HSN 3923, food-grade compliance, naming conventions, market positioning)
 
-Step 3: catalog_analyst (receives BOTH visual AND product files)
+Step 3: catalog_analyst (receives image + visual + product files)
 PM: "Find catalog placement.
+     Source image at: inbox/photo.jpg
      Read visual analysis at: visual_analysis_pet_jar.md
      Read product research at: product_research_pet_jar.md
      For CATALOG domain."
 -> Returns: "Analysis written to catalog_analysis_pet_jar.md"
-   (Uses rich context: "500ml food-grade PET, HSN 3923" -> precise family match)
+   (Can view image directly + uses rich context for precise family match)
 
 [USER APPROVAL - Proceed with cataloging?]
 
@@ -402,8 +404,9 @@ PM: "Create catalog hero shot.
 -> [USER APPROVES IMAGE]
 -> Returns: "Asset created: asset_abc123. Ready for catalog entry."
 
-Step 5: catalog_specialist (receives ALL files + asset_id)
+Step 5: catalog_specialist (receives image + ALL files + asset_id)
 PM: "Create catalog entry.
+     Source image at: inbox/photo.jpg
      Read visual analysis at: visual_analysis_pet_jar.md
      Read catalog analysis at: catalog_analysis_pet_jar.md
      Read product research at: product_research_pet_jar.md

@@ -109,10 +109,11 @@ Agent responses contain file paths. Extract and store them:
 
 ### PROPAGATE (when delegating)
 
-Include ALL relevant upstream files based on what the agent needs:
+Include source image AND all relevant upstream files:
 
 ```
 "Create catalog entry.
+Source image at: inbox/photo.jpg
 Read visual analysis at: visual_analysis_pet_jar.md
 Read catalog analysis at: catalog_analysis_pet_jar.md
 Read product research at: product_research_container.md
@@ -122,16 +123,19 @@ For CATALOG domain."
 
 ### PRINCIPLE: Context Flows Forward
 
-**Any agent may need any upstream file depending on the scenario.**
+**For image-based workflows, EVERY agent receives:**
+1. **Source image path** - Agents have multimodal capability, can view directly
+2. **Upstream analysis files** - Prior agents' findings
 
-- Visual analysis -> often needed by catalog, product, creative, specialist
-- Catalog analysis -> often needed by specialists
-- Product research -> often needed by specialists, sometimes creative
-- Asset IDs -> needed when linking assets
+- Source image -> ALL agents in image workflow (they can see it)
+- Visual analysis -> product, catalog, creative, specialist
+- Product research -> catalog analyst, catalog specialist
+- Catalog analysis -> catalog specialist
+- Asset IDs -> catalog specialist (for linking)
 
-**Think:** "What context does THIS agent need for THIS task?" Include all relevant files.
+**Think:** "What context does THIS agent need?" Include image path + all relevant files.
 
-**VIOLATION:** Delegating without relevant upstream files = incomplete context = failed or wrong output.
+**VIOLATION:** Delegating without source image = agent can't see the product directly.
 
 ## Synthesis (At Approval Gate)
 
