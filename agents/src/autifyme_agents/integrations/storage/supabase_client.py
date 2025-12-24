@@ -668,7 +668,7 @@ class SupabaseStorageClient(StorageInterface):
             ) from exc
 
     async def has_recent_activity(
-        self, sender_id: str, window_seconds: int = 5
+        self, sender_id: str, window_seconds: int | float = 5
     ) -> bool:
         """Check if sender has recent activity within time window.
 
@@ -686,7 +686,7 @@ class SupabaseStorageClient(StorageInterface):
             client = await self._ensure_async_client()
             result = await client.rpc(
                 "has_recent_sender_activity",
-                {"p_sender_id": sender_id, "p_window_seconds": window_seconds}
+                {"p_sender_id": sender_id, "p_window_seconds": int(window_seconds)}
             ).execute()
 
             has_activity = bool(result.data)

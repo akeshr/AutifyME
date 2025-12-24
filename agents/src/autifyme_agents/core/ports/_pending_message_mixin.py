@@ -62,7 +62,7 @@ class PendingMessageMixin(ABC):
 
     @abstractmethod
     async def has_recent_activity(
-        self, sender_id: str, window_seconds: int = 5
+        self, sender_id: str, window_seconds: int | float = 5
     ) -> bool:
         """Check if sender has recent activity within time window.
 
