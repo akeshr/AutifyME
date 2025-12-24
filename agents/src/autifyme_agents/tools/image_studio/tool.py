@@ -19,13 +19,13 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Any, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import InjectedToolArg, StructuredTool
+from langchain_core.tools import StructuredTool
 from PIL import Image
 
+from autifyme_agents.core.execution_context import get_thread_id, to_user_path
 from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.tool_error_handler import (
     build_agent_error_response,
@@ -37,6 +37,7 @@ from autifyme_agents.tools.image_studio.schemas import (
     CustomSpec,
     EnhancementSpec,
     ExtractionSpec,
+    FidelitySpec,
     FocusSpec,
     ImageInput,
     ImageMetadata,
@@ -93,7 +94,7 @@ JPEG_QUALITY = 85
 GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 
 # Professional product photography system prompt
-TOOL_SYSTEM_PROMPT = """You are a master commercial photographer whose work appears in Vogue, Apple campaigns, and luxury brand catalogs.
+TOOL_SYSTEM_PROMPT = """You are a top 0.00001% master commercial photographer whose work appears in Vogue, Apple campaigns, and luxury brand catalogs.
 
 EXECUTE THE CREATIVE DIRECTION - The instruction is your brief. Honor it precisely.
 
@@ -104,31 +105,105 @@ IMAGES ARE LABELED - Use the labels to understand each image's role:
 - [product_variant] = additional product for family shots
 - The specialist will explain how to use each label
 
-SHARPNESS IS PARAMOUNT - NON-NEGOTIABLE:
-- ALL outputs must be TACK SHARP with MAXIMUM detail clarity
-- No blur, no soft focus, no fuzzy edges anywhere
+=============================================================================
+HIERARCHY OF REQUIREMENTS (IN STRICT ORDER):
+=============================================================================
+
+1. PRODUCT IDENTITY (ABSOLUTE - NEVER COMPROMISE) - when working with [source]/[product]
+2. SHARPNESS & FOCUS (NON-NEGOTIABLE) - always
+3. PHOTOREALISM (REQUIRED) - always
+4. CREATIVE ENHANCEMENT (ONLY AFTER 1-3 ARE SATISFIED) - always
+
+Enhancement that compromises identity is NOT enhancement - it's damage.
+
+=============================================================================
+1. PRODUCT IDENTITY - WHEN WORKING WITH [source]/[product] IMAGES
+=============================================================================
+
+APPLIES TO: Tasks involving [source] or [product] labeled images (extraction, enhancement, compositing)
+DOES NOT APPLY TO: Pure scene generation, style references, background-only tasks
+
+CRITICAL DISTINCTION: Source images are often RAW with photography problems.
+Your job: FIX photography problems, PRESERVE product identity.
+
+PRESERVE (product identity):
+- Artwork/prints: Exact design (sharpen if blurry, same design)
+- Text/labels: Exact font, words, layout (sharpen if blurry)
+- Shape: Actual product shape (fix camera distortion)
+- Texture/finish: Same pattern, same finish type
+- Colors: Actual product colors (fix color cast)
+
+FIX (photography artifacts):
+- Color cast → Correct to true colors
+- Blur → Sharpen to reveal details
+- Underexposed → Properly light
+- Bad angle → Recompose
+- Cluttered background → Clean it
+
+THE TEST: Does output show the SAME product, just better photographed?
+
+DO NOT (identity violations):
+- Regenerate artwork/text (different pose, font, or pattern = FAILURE)
+- Invent colors (vibrant pink instead of actual dusty rose = FAILURE)
+
+DO (valid fixes):
+- Color cast correction (yellow tungsten → true product colors = OK)
+
+=============================================================================
+2. SHARPNESS & FOCUS - NON-NEGOTIABLE
+=============================================================================
+
+EVERY output must be TACK SHARP with MAXIMUM detail clarity:
+- No blur, no soft focus, no fuzzy edges ANYWHERE
 - Text, patterns, character prints, logos must be CRISP and LEGIBLE
-- High-frequency details preserved at full resolution
-- Product edges razor-sharp - this is a premium catalog, not a phone screenshot
+- High-frequency details from [source] preserved at full resolution
+- Product edges razor-sharp - surgical precision
+- If source shows texture, output shows that texture SHARPER, not smoothed
 
-WHEN EXTRACTING FROM [source] - PRODUCT IDENTITY IS SACRED:
-- EXACT colors - match [source] precisely, do not interpret or shift
-- Character artwork/prints/logos - reproduce exactly as shown in [source]
-- Product shape/proportions - no distortion, no creative reinterpretation
-- This is THEIR product - it must look like THEIR product, not your interpretation
-- You ENHANCE presentation (lighting, background, sharpness) but PRESERVE identity
+SHARPNESS HIERARCHY:
+1. Product features that identify the product (logos, artwork, text) - SHARPEST
+2. Product surface details (texture, finish) - VERY SHARP
+3. Product edges - SHARP
+4. Background - can have controlled falloff if depth effect desired
 
-WHEN GENERATING SCENES - CREATIVE EXCELLENCE:
-- Honor the scene/placement/lighting specs provided
-- Product must look natural in the environment
-- Lighting must be physically plausible and beautiful
-- Match [style_ref] mood/atmosphere when provided
+SHARPNESS VIOLATION (FAILURE):
+  Source: Label with crisp "Natural Honey" text
+  Bad output: Text readable but slightly soft, not tack-sharp
+  Why it fails: "Readable" is not the bar. TACK SHARP is the bar. If text could be sharper, it's wrong.
+
+=============================================================================
+3. PHOTOREALISM - REQUIRED
+=============================================================================
+
+THIS MUST LOOK PHOTOGRAPHED, NOT RENDERED:
+- CONTACT SHADOWS: Product touching surface MUST have proper contact shadow (dark at contact, soft falloff)
+- GROUNDING: Product has WEIGHT - it sits ON the surface, not floating above it
+- ENVIRONMENTAL INTERACTION: Product reflects environment subtly, environment reflects product
+- LIGHT PHYSICS: Light falls off naturally, wraps around forms realistically, casts believable shadows
+- MATERIAL AUTHENTICITY: Surfaces look TOUCHED - subtle fingerprints on glass, micro-dust, natural wear
+- DEPTH CUES: Slight atmospheric haze on distant elements, natural focus falloff where appropriate
+- IMPERFECTION: Real products aren't CGI-perfect - subtle surface variation, natural highlights
+
+PHOTOREALISM TEST: Would a professional photographer believe this came from a real photoshoot?
+
+PHOTOREALISM VIOLATION (FAILURE):
+  Bad output: Product appears to float above surface, no contact shadow
+  Why it fails: Every real object has weight. Missing shadow = obviously fake.
+
+  Bad output: Product has CGI-perfect surfaces, no micro-imperfections
+  Why it fails: Real products have subtle fingerprints, micro-dust, natural variation. Too perfect = fake.
+
+=============================================================================
+4. CREATIVE ENHANCEMENT (ONLY AFTER 1-3 SATISFIED)
+=============================================================================
+
+ONLY after fidelity, sharpness, and photorealism are locked:
 
 LIGHT IS EVERYTHING:
 - Light reveals form, texture, and material truth
 - Specular highlights define surface quality - controlled, never blown
 - Shadows create dimension - density appropriate to mood
-- Color temperature serves the story
+- Color temperature serves the story (but NEVER shifts product colors)
 
 MATERIAL TRUTH - RENDER EACH CORRECTLY:
 - Glass: Internal caustics, edge refraction, transparency depth - never flat
@@ -136,17 +211,31 @@ MATERIAL TRUTH - RENDER EACH CORRECTLY:
 - Plastic: Surface sheen gradient, translucency where present, character prints SHARP
 - Fabric: Weave texture, drape shadows, fiber detail at edges
 
-TECHNICAL PRECISION:
+SCENE GENERATION:
+- Honor the scene/placement/lighting specs provided
+- Product must look natural in the environment
+- Lighting must be physically plausible and beautiful
+- Match [style_ref] mood/atmosphere when provided
+
+=============================================================================
+TECHNICAL PRECISION
+=============================================================================
+
 - Focus: Tack sharp on product - entire product in focus, no soft areas
-- Color: When extracting, EXACT match to source; when generating, as directed
+- Color: When extracting, EXACT match to source; when generating scenes, as directed but product colors unchanged
 - Edges: Surgical extraction - no halos, no remnants, no fringing, no artifacts
 - Scale: Product proportions sacred - no distortion ever
 
-OUTPUT QUALITY BAR:
-- Every image immediately publishable to premium marketplace
+=============================================================================
+OUTPUT QUALITY BAR
+=============================================================================
+
+- Product owner would recognize their EXACT product (not a similar one)
 - Sharp enough to zoom 200% and still see crisp details
 - Professional studio quality even from phone photo input
-- Would you put this in YOUR portfolio? If not, it's not good enough."""
+- PHOTOREALISTIC: Indistinguishable from professional photography
+- Product GROUNDED with proper contact shadow - never floating
+- Would you stake your reputation on this image? If not, it's not good enough."""
 
 
 # =============================================================================
@@ -234,9 +323,14 @@ def _load_and_encode_image(image_path: str) -> tuple[str, str]:
 def _save_base64_image(
     base64_data: str,
     output_spec: OutputSpec,
-    thread_id: str | None = None,
 ) -> tuple[Path, ImageMetadata, str | None]:
-    """Save base64 image data to temp file and optionally upload to pending."""
+    """Save base64 image data to temp file and optionally upload to pending.
+
+    Gets thread_id from execution context (invisible to LLM).
+    """
+    # Get thread_id from execution context
+    thread_id = get_thread_id()
+
     if "," in base64_data:
         base64_data = base64_data.split(",", 1)[1]
 
@@ -273,6 +367,12 @@ def _save_base64_image(
     # Upload to Supabase pending if storage and thread_id available
     storage_path: str | None = None
 
+    # Log why upload might be skipped
+    if _storage_client is None:
+        logger.warning("Upload skipped: storage client not configured")
+    elif thread_id is None:
+        logger.warning("Upload skipped: thread_id not available in execution context")
+
     if _storage_client is not None and thread_id is not None:
         content_type_map = {"png": "image/png", "jpeg": "image/jpeg", "webp": "image/webp"}
         content_type = content_type_map.get(extension, "image/png")
@@ -302,8 +402,16 @@ def _save_base64_image(
                     )
                 )
 
-            storage_path = upload_result["storage_path"]
-            logger.info("Uploaded to pending", extra={"storage_path": storage_path})
+            internal_path = upload_result["storage_path"]
+            storage_path = to_user_path(internal_path)  # LLM sees clean path
+            logger.info("Uploaded to pending", extra={"user_path": storage_path, "internal_path": internal_path})
+
+            # Surface versioning info to agent if duplicate was detected
+            if upload_result.get("duplicate_detected"):
+                metadata.duplicate_detected = True
+                metadata.original_filename = upload_result.get("original_filename")
+                metadata.actual_filename = upload_result.get("filename")
+                metadata.storage_warning = upload_result.get("warning")
         except Exception as upload_error:
             logger.warning(f"Failed to upload: {upload_error}")
 
@@ -374,6 +482,8 @@ def _build_prompt(input_spec: ImageStudioInput) -> str:
         spec_dict["composition"] = input_spec.composition.model_dump(exclude_none=True)
     if input_spec.material_treatment:
         spec_dict["material_treatment"] = input_spec.material_treatment.model_dump(exclude_none=True)
+    if input_spec.fidelity:
+        spec_dict["fidelity"] = input_spec.fidelity.model_dump(exclude_none=True)
     if input_spec.focus:
         spec_dict["focus"] = input_spec.focus.model_dump(exclude_none=True)
     if input_spec.enhancement:
@@ -454,9 +564,9 @@ def _process_images(input_spec: ImageStudioInput) -> ImageStudioOutput:
                 error_code=ImageStudioErrorCode.API_ERROR,
             )
 
-        # Save result
+        # Save result (thread_id obtained from execution context inside _save_base64_image)
         file_path, metadata, storage_path = _save_base64_image(
-            image_data, input_spec.output, input_spec.thread_id
+            image_data, input_spec.output
         )
 
         output_variant = OutputVariant(
@@ -501,11 +611,10 @@ def _image_studio_impl(
     extraction: dict[str, Any] | ExtractionSpec | None = None,
     focus: dict[str, Any] | FocusSpec | None = None,
     material_treatment: dict[str, Any] | MaterialTreatmentSpec | None = None,
+    fidelity: dict[str, Any] | FidelitySpec | None = None,
     custom_spec: dict[str, Any] | CustomSpec | None = None,
     creative_direction: str | None = None,
-    thread_id: str | None = None,
     output: dict[str, Any] | OutputSpec | None = None,
-    config: Annotated[RunnableConfig, InjectedToolArg] = None,  # type: ignore[assignment]
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Image Studio tool implementation.
 
@@ -520,16 +629,21 @@ def _image_studio_impl(
         extraction: Product extraction settings
         focus: Focus and depth of field settings
         material_treatment: Material-specific rendering instructions
+        fidelity: CRITICAL - Product fidelity preservation requirements
         custom_spec: Fully open-ended creative spec for OOTB ideas
         creative_direction: Additional creative notes
-        thread_id: Auto-injected from RunnableConfig
         output: Output specs (format, size, aspect_ratio)
-        config: Injected config for thread_id extraction
     """
-    # Inject thread_id from config if not provided
-    if thread_id is None and config is not None:
-        configurable = config.get("configurable", {})
-        thread_id = configurable.get("thread_id")
+    # Get thread_id from execution context (invisible to LLM)
+    thread_id = get_thread_id()
+
+    logger.debug(
+        "Image studio invoked",
+        extra={
+            "thread_id": thread_id,
+            "storage_configured": _storage_client is not None,
+        }
+    )
 
     try:
         # Convert dicts to spec objects
@@ -562,9 +676,9 @@ def _image_studio_impl(
             extraction=_to_spec(extraction, ExtractionSpec),
             focus=_to_spec(focus, FocusSpec),
             material_treatment=_to_spec(material_treatment, MaterialTreatmentSpec),
+            fidelity=_to_spec(fidelity, FidelitySpec),
             custom_spec=_to_spec(custom_spec, CustomSpec),
             creative_direction=creative_direction,
-            thread_id=thread_id,
             output=_to_spec(output, OutputSpec) or OutputSpec(),
         )
 
@@ -659,7 +773,7 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
     - Model reasons about what to do from specs and labels
 
     STORAGE:
-    - Generated images uploaded to pending/{thread_id}/
+    - Generated images uploaded to pending/
     - storage_path included in output for write_data
     """
     _set_storage_client(storage)
@@ -670,11 +784,10 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
         description=(
             "PURPOSE: Professional image processing (Gemini 3 Pro Image) - transform user uploads into catalog-ready assets. Extract products, generate lifestyle scenes, create hero shots, compose families. Your creative studio.\n\n"
             "LABELED IMAGES ARCHITECTURE (key differentiator):\n"
-            "- Each image has label: [{path: 'inbox/thread/photo.jpg', label: 'product'}]\n"
-            "- Reference labels in specs: 'extract [product]', 'match [style_ref] lighting', 'place [product] on [background]'\n"
-            "- Model reasons: Gemini understands specs + labeled images, decides what to do\n"
-            "- Single powerful operation: prompt + labeled images -> new image\n"
-            "- Common labels: 'product'/'source' (main), 'style_ref' (mood/lighting), 'background' (scene), 'product_variant' (family shots)\n"
+            "- Each image has label: [{path: 'inbox/photo.jpg', label: 'product'}]\n"
+            "- Reference labels in spec VALUES using [label] syntax: 'extract [product] from [source]', 'match [style_ref] lighting'\n"
+            "- Common labels: 'product'/'source' (main), 'style_ref' (mood/lighting), 'background' (scene), 'product_variant' (family)\n"
+            "- Model reasons about specs + labeled images to decide what to do\n"
             "- Max 15 images (Gemini constraint)\n\n"
             "USE WHEN:\n"
             "- Messy product photo: Extract clean product for catalog\n"
@@ -688,33 +801,32 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- When image already catalog-ready\n"
             "- Text extraction/analysis (use view_image)\n\n"
             "STRUCTURED SPECS (all optional - use what applies):\n"
+            "- fidelity: CRITICAL for source images - {preserve_colors: 'exact match', preserve_artwork: 'honeycomb pattern', hero_features: 'texture pattern'}\n"
             "- extraction: {target_description: 'glass jar on left in [source]', isolation: 'complete', edge_treatment: 'sharp'}\n"
             "- background: {treatment: 'transparent'/'solid_color'/'scene', color: 'white', scene_description: 'modern kitchen'}\n"
             "- lighting: {type: 'natural_window'/'studio_3point', direction: 'front'/'side', special_requirements: 'match [style_ref]'}\n"
             "- composition: {position: 'center'/'[main] center [variant] right', camera_angle: 'slight_top', negative_space: 'generous_top'}\n"
-            "- enhancement: {sharpness: 'tack_sharp', color_treatment: 'vibrant'}\n"
+            "- enhancement: {sharpness: 'tack_sharp', color_treatment: 'accurate to source'}\n"
             "- scene: {environment: 'modern_kitchen', style: 'match [style_ref]', mood: 'warm_inviting'}\n"
             "- placement: {position: 'place [product] on marble counter', scale: 'prominent'}\n"
             "- material_treatment: {primary_material: 'clear_glass', rendering_notes: 'preserve caustics'}\n"
             "- custom_spec: {instruction: 'dramatic shot with water droplets', style_reference: 'Apple product photography'}\n"
             "- creative_direction: Free-form notes ('Family shot - main hero, second supporting')\n"
             "- output: {format: 'png'/'jpeg', size: '1K'/'2K', aspect_ratio: '1:1'/'16:9'}\n\n"
+            "FIDELITY FIRST (when working with source product images):\n"
+            "- ALWAYS include fidelity spec when extracting/processing products\n"
+            "- Fidelity > Enhancement: Preserve product identity before beautifying\n"
+            "- Colors, artwork, text, textures, shape must match source exactly\n"
+            "- Enhancement zone: background, lighting quality, sharpness, composition\n"
+            "- Fidelity zone (no changes): product colors, artwork, text, shape, textures\n\n"
             "CRITICAL:\n"
             "- images parameter REQUIRED: Min 1 labeled image, max 15\n"
-            "- Labels enable composition: Model knows which image is which via labels\n"
-            "- Reference labels in specs: Use [label] syntax\n"
-            "- storage_path output: Use this for write_data product_images (pending/ path)\n"
-            "- View before and after: view_image to see input/output before cataloging\n"
+            "- LABEL SYNTAX: Reference labels using [label] in spec STRING values (e.g., 'jar in [source]', 'match [style_ref]')\n"
+            "- storage_path output: Use this for write_data assets (pending/ path)\n"
             "- Material matters: Glass, metal, plastic need different rendering (specify material_treatment)\n"
             "- One output per call: Not batch processing\n\n"
-            "EXAMPLES:\n"
-            "# Extract with transparent background\n"
-            "image_studio(images=[{path: 'inbox/thread/photo.jpg', label: 'source'}], extraction={target_description: 'glass jar in [source]', isolation: 'complete'}, background={treatment: 'transparent'}, material_treatment={primary_material: 'clear_glass'})\n"
-            "Returns: Clean extracted jar, transparent PNG, caustics preserved\n\n"
-            "# Lifestyle with style reference\n"
-            "image_studio(images=[{path: 'inbox/t/product.jpg', label: 'product'}, {path: 'inbox/t/mood.jpg', label: 'style_ref'}], scene={environment: 'modern kitchen', style: 'match [style_ref]'}, placement={position: 'place [product] on counter'}, lighting={type: 'natural_window', special_requirements: 'match [style_ref]'})\n"
-            "Returns: Product in kitchen matching reference mood/lighting\n\n"
-            "ALSO CONSIDER:\n"
+            "PATTERNS: See image_studio.protocol for detailed use patterns (extract, lifestyle, family, hero shot).\n\n"
+            "WORKFLOW:\n"
             "- view_image: BEFORE image_studio - see what you're working with\n"
             "- view_image: AFTER image_studio - verify output quality before cataloging\n"
             "- write_data: Image ready? Create asset record with storage_path from output\n"

@@ -118,7 +118,7 @@ catalog_analysis_{item_identifier}.md   product_research_{item_identifier}.md
       [USER APPROVAL GATE]
                |
                v
-[5. creative_specialist] -> pending/[thread]/processed.png
+[5. creative_specialist] -> pending/processed.png
                |
                v
 [6. catalog_specialist] -> catalog records created
@@ -154,7 +154,7 @@ catalog_analysis_{item_identifier}.md   product_research_{item_identifier}.md
 
 ```
 Step 1: visual_analyst
-PM: "Analyze image at inbox/thread_xyz/photo.jpg. For CATALOG domain."
+PM: "Analyze image at inbox/photo.jpg. For CATALOG domain."
 -> Returns: "Analysis written to visual_analysis_pet_jar.md"
 
 Step 2: catalog_analyst (receives visual file)
@@ -174,7 +174,7 @@ PM: "Research specs and HSN.
 Step 4: creative_specialist (receives visual file)
 PM: "Create catalog hero shot.
      Read visual analysis at: visual_analysis_pet_jar.md
-     Source image at: inbox/thread_xyz/photo.jpg
+     Source image at: inbox/photo.jpg
      For CATALOG domain."
 -> Processes image
 -> Creates asset record (HITL: "Is this image acceptable?")
@@ -478,6 +478,177 @@ When processing multiple images for same campaign:
 
 ---
 
+## DATA-DRIVEN CREATIVE PATTERN
+
+When user wants graphics with product data (prices, sizes, variants, offers).
+
+**Key Insight:** PM delegates to catalog_analyst for data, then passes data to creative. Creative stays pure creative.
+
+### Triggers
+
+- "Create price post" / "Make price graphic"
+- "Show all sizes with prices"
+- "Create offer graphic" / "Sale post"
+- "Instagram post with price" / "WhatsApp status with details"
+- "Compare variants" / "Show size comparison"
+- Any request combining VISUAL OUTPUT + PRODUCT DATA
+
+### Flow
+
+```
+[User: "Create Instagram post with prices for honey jar family"]
+      |
+      v
+[1. PM delegates to catalog_analyst for data]
+   "Fetch product data for honey jar family.
+    Need: all variants with prices, sizes, and asset paths.
+    For DATA-DRIVEN graphics."
+      |
+      v
+[2. catalog_analyst returns structured data]
+   "Product family: Honey Jars
+    Variants:
+    - 250ml: Rs 299, asset: products/honey_250ml.png
+    - 500ml: Rs 549, asset: products/honey_500ml.png
+    - 1L: Rs 999, asset: products/honey_1L.png"
+      |
+      v
+[3. PM delegates to creative_specialist WITH DATA]
+   "Create Instagram price post.
+    Platform: Instagram Feed (1:1).
+    Product data:
+    - 250ml jar: Rs 299
+    - 500ml jar: Rs 549
+    - 1L jar: Rs 999
+    Source images at: [asset paths from catalog_analyst]
+    For DATA-DRIVEN domain."
+      |
+      v
+[4. creative_specialist]
+   - Designs visual layout
+   - Integrates data with brand styling
+   - Verifies data accuracy
+   - Creates asset (HITL)
+      |
+      v
+[5. PM returns to user]
+```
+
+### Data Source Decision
+
+| Data Needed | Delegate To | Why |
+|-------------|-------------|-----|
+| Prices, sizes, variants, assets (in DB) | catalog_analyst | Has read_data for products/families |
+| Market prices, competitor pricing | product_analyst | Has web research tools |
+| Comparison with market | catalog_analyst THEN product_analyst | DB data + market context |
+
+### Data to Fetch by Request Type
+
+| Request Type | Data Needed | Source |
+|--------------|-------------|--------|
+| **Price post** | product.name, product.price, product.size, asset path | catalog_analyst |
+| **Family comparison** | All variants with prices, sizes, assets | catalog_analyst |
+| **Offer graphic** | Original price, offer price, discount % | catalog_analyst |
+| **Size comparison** | All sizes in family, ordered, with assets | catalog_analyst |
+| **Market comparison** | Our price + competitor prices | catalog_analyst + product_analyst |
+| **New launch** | Product details, launch date, hero asset | catalog_analyst |
+
+### Delegation Template (To catalog_analyst - DB Data)
+
+```
+"Fetch product data for [product/family].
+Need: [prices, sizes, variants, asset paths]
+For DATA-DRIVEN graphics."
+```
+
+### Delegation Template (To product_analyst - Market Data)
+
+```
+"Research market pricing for [product type].
+Need: [competitor prices, market range, positioning context]
+For DATA-DRIVEN graphics."
+```
+
+### Delegation Template (To creative_specialist - After Data)
+
+```
+"Create [graphic type] for [product/family].
+Platform: [Instagram Feed/Story/WhatsApp Status] ([aspect ratio]).
+
+Product data (from catalog_analyst):
+- [Variant 1]: Rs [Price], [Size]
+- [Variant 2]: Rs [Price], [Size]
+- [Variant 3]: Rs [Price], [Size]
+
+[Offer details if applicable]:
+- Original: Rs X
+- Offer: Rs Y
+- Discount: Z%
+
+Source images at: [asset paths from catalog_analyst]
+[Badge/Label if needed]: "NEW LAUNCH" / "LIMITED OFFER"
+
+For DATA-DRIVEN domain."
+```
+
+### Critical Requirements
+
+1. **catalog_analyst fetches data** - PM doesn't have read_data
+2. **PM passes data to creative** - Include EXACT numbers from catalog_analyst
+3. **Include asset paths** - catalog_analyst provides paths from product_assets
+4. **Specify platform + format** - Creative needs aspect ratio
+5. **Mention badges/labels** - "NEW", "SALE", "LIMITED", etc.
+
+### Anti-Pattern
+
+```
+WRONG:
+"Create price post for honey jars"
+-> Directly to creative without data
+-> Creative can't query database
+-> Will fail or waste turns
+
+WRONG:
+"Creative, get prices from database and create post"
+-> Creative doesn't have read_data for products
+-> Violates separation of concerns
+
+CORRECT:
+1. To catalog_analyst: "Fetch honey jar family data: variants, prices, asset paths."
+2. To creative (with data): "Create price post. Product data: [from analyst]"
+```
+
+### Variant Family Graphics - Full Example
+
+```
+[1. To catalog_analyst]
+   "Fetch product data for honey jar family.
+    Need: all variants with prices, sizes, asset paths."
+
+[2. catalog_analyst returns]
+   "Honey Jars (Glass):
+    - 250ml: Rs 299, asset: products/honey_250ml.png
+    - 500ml: Rs 549, asset: products/honey_500ml.png
+    - 1L: Rs 999, asset: products/honey_1L.png"
+
+[3. To creative_specialist (with data from step 2)]
+   "Create size comparison graphic.
+
+   Product family: Honey Jars (Glass)
+   Variants:
+   - 250ml: Rs 299 (image: products/honey_250ml.png)
+   - 500ml: Rs 549 (image: products/honey_500ml.png)
+   - 1L: Rs 999 (image: products/honey_1L.png)
+
+   Layout: Size progression (left to right, scale accurate)
+   Platform: Instagram Feed (1:1)
+   For DATA-DRIVEN domain."
+
+[4. Creative designs with accurate scale + pricing]
+```
+
+---
+
 ## UPDATE PATTERN
 
 Modify existing catalog data. May skip analysis.
@@ -681,7 +852,7 @@ User context flows through PM, not through files.
 | Visual analysis | visual_analysis_{image_basename}.md | Route file path |
 | Catalog findings | catalog_analysis_{item_identifier}.md | Route file path |
 | Product research | product_research_{item_identifier}.md | Route file path |
-| Processed images | pending/{thread_id}/*.png | Route file path |
+| Processed images | pending/*.png | Route file path |
 
 ### The Critical Gap
 

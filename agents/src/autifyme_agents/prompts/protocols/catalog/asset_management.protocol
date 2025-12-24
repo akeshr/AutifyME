@@ -13,11 +13,11 @@ Covers storage conventions, asset lifecycle, and product linking.
 
 ```
 assets/
-+-- inbox/{thread_id}/           # Raw uploads from user
++-- inbox/                       # Raw uploads from user
 |   +-- photo.jpg
 |   +-- document.pdf
 |
-+-- pending/{thread_id}/         # Processed images awaiting approval
++-- pending/                     # Processed images awaiting approval
 |   +-- 20241217_studio_abc.png
 |   +-- hero_shot.png
 |
@@ -30,8 +30,8 @@ assets/
 
 | Stage | Path Pattern | Created By |
 |-------|--------------|------------|
-| User Upload | `inbox/{thread_id}/filename.ext` | download_media tool |
-| Processed | `pending/{thread_id}/filename.ext` | image_studio tool |
+| User Upload | `inbox/filename.ext` | download_media tool |
+| Processed | `pending/filename.ext` | image_studio tool |
 | Cataloged | Stored URL in assets table | write_data after HITL |
 
 ---
@@ -78,6 +78,42 @@ DELETED     -> Soft deleted
 | file_name | varchar(255) | Original filename |
 | asset_type | varchar(30) | IMAGE, VIDEO, DOCUMENT, MODEL_3D, OTHER |
 | status | varchar(20) | UPLOADING, PROCESSING, ACTIVE, ARCHIVED, DELETED |
+| purpose | varchar(20) | PRODUCT, FAMILY, CAMPAIGN, BRAND, SOCIAL, STANDALONE |
+
+### Purpose Field (CRITICAL for Asset Management)
+
+**Purpose indicates intended use and linking expectations:**
+
+| Purpose | Description | Expected Linking |
+|---------|-------------|------------------|
+| `PRODUCT` | Product hero, gallery, zoom | Must link via product_assets to product_id |
+| `FAMILY` | Family-level lifestyle, shared images | Must link via product_assets to product_family_id |
+| `CAMPAIGN` | Marketing campaign images | Must link via campaign_assets to campaign_id |
+| `BRAND` | Logos, brand assets | Company-level, no product linking |
+| `SOCIAL` | Social media content | May link to campaign or standalone |
+| `STANDALONE` | User downloads, one-off exports | No linking expected |
+
+**Orphan Detection:**
+- Asset with `purpose=PRODUCT` but no product_assets junction = ORPHAN (needs linking)
+- Asset with `purpose=FAMILY` but no product_assets junction = ORPHAN (needs linking)
+- Asset with `purpose=BRAND` with no linking = VALID (brand assets are company-level)
+
+### Classification Taxonomy
+
+**Three classification fields with distinct purposes:**
+
+| Field | Type | Purpose | Example |
+|-------|------|---------|---------|
+| `asset_type` | enum | File FORMAT | IMAGE, VIDEO, DOCUMENT |
+| `purpose` | enum | INTENDED USE | PRODUCT, CAMPAIGN, BRAND |
+| `category` | varchar | Visual STYLE | HERO, LIFESTYLE, GALLERY |
+| `tags` | text[] | SEARCHABLE terms | ["white-background", "500ml", "PET"] |
+
+**When to use each:**
+- `asset_type`: Set automatically based on file type
+- `purpose`: Set based on workflow context (catalog = PRODUCT, campaign = CAMPAIGN)
+- `category`: Set based on visual treatment (hero shot = HERO, lifestyle = LIFESTYLE)
+- `tags`: Add freeform terms for search (material, size, color, style)
 
 ### Optional Fields
 
@@ -88,10 +124,10 @@ DELETED     -> Soft deleted
 | mime_type | varchar(100) | MIME type (image/jpeg, etc.) |
 | width | integer | Width in pixels (images/videos) |
 | height | integer | Height in pixels |
-| category | varchar(100) | Asset category |
+| category | varchar(100) | Visual style: HERO, LIFESTYLE, GALLERY, TECHNICAL |
 | caption | varchar(500) | Human-readable caption for HITL |
-| tags | text[] | Tags for search |
-| metadata | jsonb | Additional metadata |
+| tags | text[] | Freeform search terms |
+| metadata | jsonb | Additional metadata (EXIF, colors, quality scores) |
 
 ### AI Generation Fields
 
@@ -100,6 +136,39 @@ DELETED     -> Soft deleted
 | is_ai_generated | boolean | Whether AI-generated |
 | source_asset_ids | uuid[] | Lineage tracking for AI assets |
 | generation_prompt | text | AI generation prompt used |
+
+### AI Lineage Tracking (MANDATORY)
+
+**Every AI-generated asset MUST include lineage fields.**
+
+```json
+{
+  "is_ai_generated": true,
+  "source_asset_ids": ["uuid-of-input-image"],
+  "generation_prompt": "extraction + white background + side rake light for PET texture"
+}
+```
+
+**Why lineage matters:**
+- **Reproduce:** Re-generate with same inputs and specs
+- **Iterate:** Adjust specs on same source for variations
+- **Audit:** Track AI content for compliance/disclosure
+- **Debug:** Trace back when output has issues
+
+**How to get source_asset_ids:**
+
+| Input Source | source_asset_ids Value |
+|--------------|------------------------|
+| PM provides asset_id | Use that asset_id |
+| Working from inbox/ path (no asset yet) | `null` or empty array |
+| Compositing multiple images | Array of ALL input asset IDs |
+| Iterating on own output | Include previous output's asset_id |
+
+**generation_prompt format:**
+Summarize the key image_studio specs used:
+- `"extraction + white bg + side rake light"` (catalog hero)
+- `"lifestyle: kitchen scene, morning window light"` (lifestyle)
+- `"carousel: 5 slides, warm grade, 4:5 format"` (social)
 
 ---
 
@@ -194,12 +263,14 @@ Most common scenario. Create asset and junction in same transaction.
       "table": "assets",
       "data": {
         "name": "PET Jar 500ml Hero",
-        "storage_url": "pending/thread_xyz/20241217_studio_abc.png",
+        "storage_url": "pending/20241217_studio_abc.png",
         "storage_provider": "SUPABASE",
         "file_name": "20241217_studio_abc.png",
         "asset_type": "IMAGE",
         "status": "ACTIVE",
         "is_ai_generated": true,
+        "source_asset_ids": null,
+        "generation_prompt": "extraction + white bg + side rake light for honeycomb texture",
         "caption": "500ml PET jar with honeycomb texture"
       },
       "returns": "asset"
@@ -219,6 +290,8 @@ Most common scenario. Create asset and junction in same transaction.
   ]
 }
 ```
+
+**Note:** `source_asset_ids` is null when source is from inbox/ (user upload, not yet an asset).
 
 ### Scenario 2: New Product with Multiple Images
 
@@ -415,7 +488,7 @@ FLOW:
 3. catalog_specialist creates 3 product_assets junctions (links to existing assets)
 ```
 
-**creative_specialist creates 3 assets** (via Pattern 10 - Batch Asset Creation):
+**creative_specialist creates 3 assets:**
 Returns: asset_a_id, asset_b_id, asset_c_id
 
 **catalog_specialist links assets to products:**
@@ -532,6 +605,57 @@ ORPHAN HANDLING:
 - Asset can be reused or linked to different product
 - Standalone assets are valid (e.g., campaign images, user downloads)
 ```
+
+### STANDALONE Processing (No Asset Record)
+
+**When PM says "Standalone" or "For user download":**
+
+```
+FLOW:
+1. creative_specialist: process image -> storage_path in pending/
+2. Return storage_path to PM (NO write_data, NO asset record)
+3. PM shows image to user directly
+
+NO HITL TRIGGERED - image stays as file only, not cataloged.
+```
+
+| Signal | Behavior |
+|--------|----------|
+| "Standalone" in delegation | Skip write_data entirely |
+| "For user download" | Skip write_data entirely |
+| No domain context given | Ask PM for clarification |
+
+**Why STANDALONE exists:**
+- Quick image fixes user wants to download immediately
+- One-off exports not worth cataloging
+- User explicitly doesn't want catalog tracking
+
+**File location:** `pending/` - not moved to approved/ since no asset record.
+
+### Campaign Assets (Temporary Creative Ownership)
+
+**Until campaign_specialist exists, creative_specialist handles campaign_assets junction.**
+
+```
+CURRENT ARCHITECTURE:
+1. creative_specialist: process campaign images
+2. creative_specialist: create asset + campaign_assets junction (single HITL)
+3. User approves/rejects campaign creative
+
+FUTURE ARCHITECTURE (when campaign_specialist exists):
+1. creative_specialist: create asset (HITL for image quality)
+2. campaign_specialist: create campaign_assets junction (HITL for campaign data)
+```
+
+| Table | Current Owner | Future Owner |
+|-------|---------------|--------------|
+| assets | creative_specialist | creative_specialist |
+| campaign_assets | creative_specialist | campaign_specialist |
+
+**Why combined for now:**
+- No campaign_specialist to own the second stage
+- Campaign creative = campaign data (one approval makes sense)
+- When campaign_specialist exists, split into Two-Stage pattern
 
 ### Critical: Variant Image Decisions
 

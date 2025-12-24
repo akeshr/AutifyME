@@ -12,7 +12,7 @@ Defines which domains own which decisions, enabling correct specialist routing.
 | Domain | Owns | Specialists/Analysts | Routing Trigger |
 |--------|------|---------------------|-----------------|
 | **CATALOG** | Product data, families, variants, pricing, assets, inventory context | catalog_analyst, catalog_specialist | "add product", "update", "delete", "remove", "find similar", "catalog", "list products", "show", "inventory", "variant", "family", "price", "pricing" |
-| **CREATIVE** | Image processing, asset creation, visual output, product photography | creative_specialist | "process image", "create shot", "lifestyle", "campaign", "edit image", "enhance", "fix background", "white background", "hero shot", "product photo", "remove background", "clean up image" |
+| **CREATIVE** | Image processing, asset creation, visual output, product photography, data-driven graphics | creative_specialist | "process image", "create shot", "lifestyle", "campaign", "edit image", "enhance", "fix background", "white background", "hero shot", "product photo", "remove background", "clean up image", "price post", "price graphic", "show prices", "offer graphic", "sale post", "size comparison", "variant comparison" |
 | **VISUAL** | Image analysis, visual identification, quality assessment | visual_analyst | "what is this", "identify", "analyze image", "describe", "inspect", "check quality", "compare", image without text |
 | **PRODUCT** | External product research: specs, materials, dimensions, certifications, HSN, standards, market context | product_analyst | "research", "find out", "look up", "HSN", "compliance", "specs", "capacity", "certifications", "what is", "materials", "dimensions" |
 
@@ -28,9 +28,10 @@ Defines which domains own which decisions, enabling correct specialist routing.
 - Image enhancement: color correction, sharpening, lighting adjustments
 - Hero shots: marketplace-ready product images (Amazon, Shopify quality)
 - Lifestyle/contextual: scene generation, product in context
-- Multi-product: extraction, isolation, composite shots
+- **Multi-item processing: when source has multiple items, creative extracts each or creates family shot based on context**
 - Style transfer: match reference images for lighting, color, mood
 - Batch processing: consistent treatment across variant families
+- **Data-driven graphics: price posts, offer graphics, variant comparisons (PM provides data)**
 - **Asset Records: create asset record (HITL for image quality)**
 - **Campaign Asset Records: create asset + campaign_assets junction (until campaign_specialist exists)**
 
@@ -140,7 +141,7 @@ Every delegation MUST include:
 ```
 "Find catalog placement for this product.
 Read visual analysis at: visual_analysis_pet_jar.md
-Source image at: inbox/thread_xyz/photo.jpg
+Source image at: inbox/photo.jpg
 For CATALOG domain. This is {company_name}'s product."
 ```
 
@@ -155,10 +156,11 @@ For PRODUCT domain. This is {company_name}'s product."
 ```
 "Create catalog hero shot for this product.
 Read visual analysis at: visual_analysis_pet_jar.md (contains material: PET)
-Source image at: inbox/thread_xyz/photo.jpg
+Source image at: inbox/photo.jpg
 For CATALOG domain."
 ```
 -> Creative processes, creates asset record (HITL), returns asset_id
+-> Asset fields auto-inferred: purpose=PRODUCT, category=HERO (from "CATALOG domain" + "hero shot")
 
 **To creative_specialist (Campaign Image - Current):**
 ```
@@ -169,15 +171,50 @@ Style: Festive, warm, diyas, rangoli
 For CAMPAIGN domain."
 ```
 -> Creative processes, creates asset + campaign_assets (HITL), returns asset_id
+-> Asset fields auto-inferred: purpose=CAMPAIGN, category based on treatment
 
 **To creative_specialist (Standalone):**
 ```
 "Process this image for user.
-Source: inbox/thread_xyz/photo.jpg
+Source: inbox/photo.jpg
 Remove background, white background.
 Standalone - no asset record needed."
 ```
--> Creative processes, returns storage_path only (no HITL)
+-> Creative processes, returns storage_path only (NO asset record, NO HITL)
+-> "Standalone" keyword signals: no write_data, no asset record creation
+
+**To creative_specialist (Data-Driven Graphics):**
+```
+"Create [graphic type] for [product/family].
+Platform: [Instagram Feed/Story/WhatsApp Status] ([aspect ratio]).
+
+Product data:
+- [Variant 1]: Rs [Price], [Size]
+- [Variant 2]: Rs [Price], [Size]
+- [Variant 3]: Rs [Price], [Size]
+
+[If offer]:
+- Original price: Rs X
+- Offer price: Rs Y
+- Discount: Z%
+
+Source images at: [asset paths]
+[Badge if needed]: "NEW LAUNCH" / "LIMITED OFFER" / "BEST SELLER"
+
+For DATA-DRIVEN domain."
+```
+-> First delegate to analyst for data (see below), then pass to creative
+-> Creative receives data, designs visually, verifies accuracy
+-> Creative creates asset (HITL)
+-> Asset fields auto-inferred: purpose=SOCIAL, category=MARKETING (data-driven graphics are typically promotional)
+
+**Data Source Decision:**
+
+| Data Needed | Delegate To | Why |
+|-------------|-------------|-----|
+| Prices, sizes, variants (in DB) | catalog_analyst | Has read_data for products/families |
+| Market prices, competitor info | product_analyst | Has web research tools |
+| Both internal + external | catalog_analyst THEN product_analyst | Chain: DB data + market context |
 
 **To catalog_specialist (After Creative):**
 ```
@@ -198,17 +235,96 @@ WRONG:
 -> catalog_specialist has NO context - doesn't know family, pricing, HSN
 
 WRONG:
-"Create hero shot for this product at inbox/thread_xyz/photo.jpg"
+"Create hero shot for this product at inbox/photo.jpg"
 -> creative_specialist doesn't know material type (glass? PET? metal?)
 -> Can't apply correct material_treatment specs
 
 CORRECT:
 "Create hero shot for this product.
 Read visual analysis at: visual_analysis_pet_jar.md (material: PET plastic)
-Source image at: inbox/thread_xyz/photo.jpg
+Source image at: inbox/photo.jpg
 For CREATIVE domain."
 -> creative_specialist knows to use PET-specific processing
 ```
+
+### Multi-Item Image Delegation (CRITICAL)
+
+When visual analysis shows MULTI-ITEM ASSESSMENT, include strategy in delegation:
+
+**Template:**
+```
+"Process image at: [path]
+Read visual analysis at: [analysis_path]
+
+**MULTI-ITEM:** [N] items ([VARIANTS/COLLECTION]).
+Strategy: [INDIVIDUAL/COMPOSITE/SELECTIVE] - [reason].
+
+For [DOMAIN] domain."
+```
+
+**Strategy by domain:**
+
+| Domain | Default Strategy | Rationale |
+|--------|------------------|-----------|
+| CATALOG | INDIVIDUAL | Each SKU needs its own asset |
+| CAMPAIGN | COMPOSITE | Family/range shot for marketing |
+| User-specified | As requested | "only the large ones" = SELECTIVE |
+
+**Example:**
+```
+"Process image at: inbox/jars.jpg
+Read visual analysis at: visual_analysis_jars.md
+
+**MULTI-ITEM:** 9 items (VARIANTS).
+Strategy: INDIVIDUAL - catalog needs per-SKU assets.
+
+For CATALOG domain."
+```
+
+Creative loads `multi_item_image.protocol` for strategy execution patterns.
+
+### Compound Multi-Item Intent
+
+When user requests BOTH catalog AND marketing output from same multi-item image:
+
+**Detection signals:**
+- "add to catalog" + "comparison shot" / "family shot" / "range image"
+- "create products" + "marketing image"
+- "catalog these" + "also make a nice group shot"
+
+**Handling:** Two delegations with different strategies.
+
+**Template:**
+```
+"Process image at: [path]
+Read visual analysis at: [analysis_path]
+
+**MULTI-ITEM:** [N] items (VARIANTS).
+
+**Compound request:**
+1. INDIVIDUAL - [N] hero shots for catalog (per-SKU assets)
+2. COMPOSITE - 1 family shot for marketing
+
+For CATALOG + CREATIVE domains."
+```
+
+**Example:**
+```
+"Process image at: inbox/jars.jpg
+Read visual analysis at: visual_analysis_jars.md
+
+**MULTI-ITEM:** 9 items (VARIANTS).
+
+**Compound request:**
+1. INDIVIDUAL - 9 hero shots for catalog SKUs
+2. COMPOSITE - 1 family shot for marketing range display
+
+For CATALOG + CREATIVE domains."
+```
+
+Creative executes both strategies, returns:
+- 9 individual asset_ids (for catalog linking)
+- 1 composite asset_id (for marketing/campaign use)
 
 ---
 
@@ -248,7 +364,7 @@ Before EVERY delegation, verify:
 
 CORRECT:
 ```
-"Analyze image at inbox/thread_xyz/photo.jpg for product details. For CATALOG domain. This is {company_name}'s product."
+"Analyze image at inbox/photo.jpg for product details. For CATALOG domain. This is {company_name}'s product."
 ```
 -> visual_analyst receives path AND knows to load catalog protocols
 
@@ -261,7 +377,7 @@ WRONG (missing path):
 
 WRONG (missing domain):
 ```
-"Analyze image at inbox/thread_xyz/photo.jpg"
+"Analyze image at inbox/photo.jpg"
 ```
 -> Analyst doesn't know which protocols to load
 -> Generic analysis instead of domain-grounded
@@ -317,7 +433,7 @@ When creative_specialist returns a processed image and user should see it:
 ### Storage Path Architecture
 
 ```
-creative_specialist returns: "pending/thread_xyz/processed_hero.png"
+creative_specialist returns: "pending/processed_hero.png"
                                     |
                                     v
                           This is a STORAGE PATH (relative)
@@ -375,7 +491,7 @@ View it: [product reference or link]"
 
 ```
 WRONG:
-"Here's your image: pending/thread_xyz/abc123.png"
+"Here's your image: pending/abc123.png"
 -> Raw storage path is not user-friendly
 -> User can't access pending/ directly
 

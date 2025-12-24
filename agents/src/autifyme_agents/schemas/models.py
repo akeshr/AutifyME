@@ -60,27 +60,29 @@ class SKUNamingConvention(BaseModel):
     """
     Company-specific SKU naming rules for autonomous pattern generation.
 
-    Used by Product Architecture Specialist to generate consistent SKUs
+    Used by Catalog Specialist to generate consistent SKUs
     that match company branding and naming patterns.
+
+    Maps to: companies.brand_attributes.sku_naming in database.
     """
-    prefix_format: str = Field(
+    prefix: str = Field(
         ...,
-        description="Format for SKU prefix (e.g., 'BRAND-CATEGORY', 'CATEGORY-PRODUCT')"
+        description="SKU prefix (e.g., 'PAV' for Pavisha)"
+    )
+    pattern: str = Field(
+        ...,
+        description="SKU pattern template (e.g., 'PREFIX-CATEGORY-SIZE-VARIANT')"
     )
     separator: str = Field(
         default="-",
         description="Character used to separate SKU components"
-    )
-    variant_code_length: str = Field(
-        ...,
-        description="Length range for variant codes (e.g., '3-5', '4', '2-6')"
     )
     uppercase: bool = Field(
         default=True,
         description="Whether SKUs should be uppercase"
     )
     examples: list[str] = Field(
-        ...,
+        default_factory=list,
         description="Example SKUs following this convention (e.g., ['PAV-BTL-500ML-CLR', 'PAV-JAR-1L-AMB'])"
     )
 
@@ -138,13 +140,44 @@ class WorkflowOutcome(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class VisualIdentity(BaseModel):
+    """Brand visual identity for consistent creative output."""
+
+    primary_color: str = Field(
+        default="#d32f2f",
+        description="Primary brand color in hex (e.g., '#d32f2f')"
+    )
+    secondary_color: str = Field(
+        default="#000000",
+        description="Secondary brand color in hex"
+    )
+    accent_color: str | None = Field(
+        default=None,
+        description="Accent color for highlights"
+    )
+    font_family: str = Field(
+        default="sans-serif",
+        description="Primary font family (e.g., 'Inter', 'sans-serif')"
+    )
+    logo_asset_path: str | None = Field(
+        default=None,
+        description="Storage path to company logo (e.g., 'brands/logo.png')"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CompanyProfile(BaseModel):
     """
     Represents a company's profile and brand guidelines.
 
     Used to provide context for product descriptions, image analysis,
     and content generation across all departments.
+
+    Loaded from: companies + company_intelligence tables
+    Injected into: PM (full), Specialists (formatted prompts), Analysts (minimal)
     """
+    # Core identification
     id: str = Field(..., description="Unique identifier for the company.")
     name: str = Field(..., description="The company's business name.")
     brand_voice: str = Field(..., description="Brand voice description.")
@@ -152,10 +185,44 @@ class CompanyProfile(BaseModel):
     style_preferences: list[str] | None = Field(default_factory=list, description="Style keywords.")
     industry: str | None = Field(None, description="Company's industry vertical.")
 
-    # SKU Naming Conventions (for Product Architecture Specialist)
+    # Business context (from company_intelligence)
+    business_models: list[str] = Field(
+        default_factory=list,
+        description="Business models: B2B, B2C, D2C"
+    )
+    target_markets: list[str] = Field(
+        default_factory=list,
+        description="Target markets: India, South Asia, etc."
+    )
+    price_positioning: str = Field(
+        default="mid-range",
+        description="Price positioning: budget, mid-range, premium"
+    )
+
+    # SKU Naming Conventions (for Catalog Specialist)
     sku_naming_convention: SKUNamingConvention | None = Field(
         None,
         description="Company-specific SKU naming rules for autonomous pattern generation"
+    )
+
+    # Visual Identity (for Creative Specialist)
+    visual_identity: VisualIdentity = Field(
+        default_factory=VisualIdentity,
+        description="Brand visual identity for creative output"
+    )
+
+    # Pricing defaults (for Catalog Specialist)
+    default_currency: str = Field(
+        default="INR",
+        description="Default currency (ISO 4217)"
+    )
+    currency_symbol: str = Field(
+        default="₹",
+        description="Currency symbol for display (e.g., ₹, $)"
+    )
+    default_price_list_id: str | None = Field(
+        None,
+        description="Default retail price list UUID"
     )
 
     model_config = ConfigDict(from_attributes=True)

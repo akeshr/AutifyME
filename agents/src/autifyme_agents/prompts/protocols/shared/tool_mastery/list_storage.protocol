@@ -1,0 +1,392 @@
+<protocol name="list_storage" type="tool_mastery" domain="shared">
+
+## PURPOSE
+
+Master the list_storage tool - discover files in storage folders before viewing or using them.
+This tool gives you AWARENESS of what files exist. Complements view_image (see content) and
+read_data (query database metadata).
+
+## CRITICAL CONCEPT
+
+list_storage browses the file system (Supabase Storage), NOT the database.
+- read_data on `assets` table = database records with metadata
+- list_storage = actual files in storage folders
+
+Files may exist in storage without database records (user uploads before cataloging).
+Database records may reference files that no longer exist (deleted but not cleaned up).
+
+---
+
+## STORAGE ARCHITECTURE
+
+### Folder Structure
+
+```
+assets/
++-- inbox/                  # User uploads (this conversation)
+|   +-- photo.jpg
+|   +-- document.pdf
+|
++-- pending/                # AI-generated awaiting approval
+|   +-- hero_shot.png
+|   +-- edited_v2.png
+|
++-- products/               # Approved permanent assets
+    +-- 20241217_abc123.png
+    +-- hero_family_xyz.jpg
+```
+
+### Folder Types
+
+| Folder | Scope | What You See |
+|--------|-------|--------------|
+| inbox | Session | Files uploaded in THIS conversation |
+| pending | Session | AI-generated images in THIS conversation |
+| products | Global | All approved assets |
+| approved | Global | All approved assets |
+
+Session folders only show files from the current conversation. Global folders show everything.
+
+---
+
+## WHEN TO USE
+
+| Situation | Action |
+|-----------|--------|
+| User says "I uploaded images" | list_storage(folder="inbox") |
+| Check what images awaiting approval | list_storage(folder="pending") |
+| Find files by type | list_storage(folder="...", extension_filter=["jpg", "png"]) |
+| Browse approved assets | list_storage(folder="products") |
+| Before view_image when path unknown | list_storage first, then view_image |
+| Session context gathering | list_storage to see available inputs |
+
+---
+
+## PARAMETERS
+
+### folder (required)
+
+Storage folder to browse:
+
+| Value | Description |
+|-------|-------------|
+| inbox | User uploads (this conversation) |
+| pending | AI-generated awaiting approval (this conversation) |
+| products | Approved permanent assets |
+| approved | Alternative approved folder |
+| approved/families | Nested paths supported |
+
+### limit (optional, default: 20)
+
+Maximum files to return. Range: 1-100.
+
+Use smaller limits for quick checks, larger for comprehensive listing.
+
+### offset (optional, default: 0)
+
+Skip N files for pagination. Combine with limit for paging:
+- Page 1: offset=0, limit=20
+- Page 2: offset=20, limit=20
+- Page 3: offset=40, limit=20
+
+### extension_filter (optional)
+
+Only include files with specific extensions:
+
+```python
+extension_filter=["jpg", "png"]  # Images only
+extension_filter=["pdf"]         # Documents only
+extension_filter=[".jpeg", "webp"]  # Dots optional
+```
+
+### prefix_filter (optional)
+
+Only include files starting with prefix:
+
+```python
+prefix_filter="hero_"     # hero_shot.png, hero_v2.png
+prefix_filter="product_"  # product_123.jpg
+```
+
+---
+
+## RETURN STRUCTURE
+
+### Success
+
+```json
+{
+  "success": true,
+  "data": {
+    "folder": "inbox/whatsapp_123_919xxx",
+    "files": [
+      {
+        "name": "photo.jpg",
+        "storage_path": "inbox/whatsapp_123_919xxx/photo.jpg",
+        "user_path": "inbox/photo.jpg",
+        "public_url": "https://storage.supabase.co/.../photo.jpg",
+        "size_bytes": 245678,
+        "content_type": "image/jpeg",
+        "created_at": "2024-12-17T10:30:00Z"
+      }
+    ],
+    "count": 1,
+    "total": 5,
+    "has_more": true,
+    "pagination": {
+      "limit": 20,
+      "offset": 0,
+      "next_offset": 20
+    }
+  }
+}
+```
+
+### File Object Fields
+
+| Field | Always Present | Description |
+|-------|----------------|-------------|
+| name | Yes | Filename |
+| storage_path | Yes | Full path in bucket |
+| user_path | Yes | Simplified path for view_image |
+| public_url | Yes | Direct URL to file |
+| size_bytes | If available | File size |
+| content_type | If available | MIME type |
+| created_at | If available | Upload timestamp |
+
+### Error
+
+```json
+{
+  "success": false,
+  "error": "Session context required for inbox/",
+  "error_type": "CONTEXT_ERROR",
+  "Agent Action": "Cannot list inbox/ without session context..."
+}
+```
+
+---
+
+## COMMON PATTERNS
+
+### Pattern 1: Session Context Gathering
+
+Start of workflow - see what user provided.
+
+```python
+# Step 1: Check what's in inbox
+list_storage(folder="inbox")
+# Returns: 3 files [photo1.jpg, photo2.jpg, document.pdf]
+
+# Step 2: View images for analysis
+view_image(image_path="inbox/photo1.jpg")
+view_image(image_path="inbox/photo2.jpg")
+
+# Step 3: Proceed with workflow based on what you saw
+```
+
+### Pattern 2: Check Pending Before Approval
+
+Verify AI-generated outputs before HITL.
+
+```python
+# After image_studio processing
+list_storage(folder="pending")
+# Returns: [hero_shot.png, edited_v2.png]
+
+# Verify quality
+view_image(image_path="pending/hero_shot.png")
+
+# If good, proceed to write_data for cataloging
+```
+
+### Pattern 3: Find Specific Files
+
+Use filters to narrow results.
+
+```python
+# Find only PNG files
+list_storage(folder="pending", extension_filter=["png"])
+
+# Find hero shots by prefix
+list_storage(folder="pending", prefix_filter="hero_")
+
+# Find images only
+list_storage(folder="inbox", extension_filter=["jpg", "jpeg", "png", "webp"])
+```
+
+### Pattern 4: Paginate Large Folders
+
+Browse approved assets systematically.
+
+```python
+# Page 1
+list_storage(folder="products", limit=50, offset=0)
+# has_more: true, next_offset: 50
+
+# Page 2
+list_storage(folder="products", limit=50, offset=50)
+# has_more: true, next_offset: 100
+
+# Continue until has_more: false
+```
+
+### Pattern 5: Combine with Database Query
+
+Correlate files with database records.
+
+```python
+# Step 1: List files in storage
+list_storage(folder="pending")
+# Returns: [hero_shot.png] with storage_path
+
+# Step 2: Check if asset record exists
+read_data(
+    table="assets",
+    search_patterns={"storage_url": "%hero_shot.png%"}
+)
+# Returns: matching asset records (if cataloged)
+
+# If no record exists, file is uncataloged
+```
+
+---
+
+## TOOL COORDINATION
+
+### list_storage vs read_data
+
+| Need | Use |
+|------|-----|
+| What files exist in folder | list_storage |
+| Asset metadata from database | read_data on assets table |
+| Find file by name/extension | list_storage with filters |
+| Find asset by status/purpose | read_data with filters |
+| Correlate files with records | list_storage + read_data |
+
+### list_storage vs view_image
+
+| Need | Use |
+|------|-----|
+| What files are available | list_storage |
+| See specific file content | view_image |
+| Unknown file paths | list_storage first, then view_image |
+| Known file path | view_image directly |
+
+### Workflow Integration
+
+```
+USER UPLOAD WORKFLOW:
+1. User sends image
+2. download_media saves to inbox/
+3. list_storage(folder="inbox") -> discover what arrived
+4. view_image(image_path="inbox/file.jpg") -> see content
+5. Process as needed
+
+AI GENERATION WORKFLOW:
+1. image_studio generates output
+2. Saved to pending/
+3. list_storage(folder="pending") -> verify output exists
+4. view_image(image_path="pending/output.png") -> quality check
+5. write_data to catalog (triggers HITL)
+```
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Assuming Files Exist
+
+```
+WRONG:
+User: "I sent some photos"
+Agent: view_image(image_path="inbox/photo.jpg")  # Guessing filename!
+
+CORRECT:
+User: "I sent some photos"
+Agent: list_storage(folder="inbox")
+# Discover actual filenames: photo1.jpg, image_001.jpg
+Agent: view_image(image_path="inbox/photo1.jpg")
+```
+
+### Wrong: Using read_data for File Discovery
+
+```
+WRONG:
+# Trying to find what files exist
+read_data(table="assets", filters={"storage_url": "%inbox%"})
+# Only finds cataloged files!
+
+CORRECT:
+# Find all files in storage (including uncataloged)
+list_storage(folder="inbox")
+```
+
+### Wrong: Adding Path Segments
+
+```
+WRONG:
+list_storage(folder="inbox/subfolder/")  # Don't add path segments
+# inbox and pending don't have subfolders
+
+CORRECT:
+list_storage(folder="inbox")  # Just the folder name
+```
+
+### Wrong: Fetching All at Once
+
+```
+WRONG:
+list_storage(folder="products", limit=1000)  # Too many!
+# Slow, token-heavy, may timeout
+
+CORRECT:
+list_storage(folder="products", limit=50)  # Paginate
+# Check has_more, use offset for next page
+```
+
+---
+
+## EDGE CASES
+
+### Empty Folder
+
+Returns success with empty files array:
+
+```json
+{
+  "success": true,
+  "data": {
+    "folder": "inbox",
+    "files": [],
+    "count": 0,
+    "total": 0,
+    "has_more": false
+  }
+}
+```
+
+### Non-Existent Folder
+
+Same as empty - returns empty files array (not an error).
+
+---
+
+## PROACTIVE USAGE
+
+When user mentions uploads or images, LIST FIRST:
+
+```
+User: "I uploaded some product photos"
+Agent: [IMMEDIATELY calls list_storage(folder="inbox")]
+Agent: "I can see 3 files in your inbox: photo1.jpg, photo2.jpg, photo3.jpg.
+        Let me view them..."
+Agent: [Proceeds to view_image for each]
+```
+
+DO NOT:
+- Assume filenames
+- Skip discovery when paths unknown
+- Use read_data for file discovery
+
+</protocol>

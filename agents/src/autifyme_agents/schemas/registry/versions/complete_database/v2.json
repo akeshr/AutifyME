@@ -2214,10 +2214,17 @@
         },
         "category": {
           "name": "category",
-          "type": "varchar",
-          "max_length": 100,
+          "type": "enum",
+          "enum_values": ["HERO", "LIFESTYLE", "GALLERY", "TECHNICAL", "MARKETING"],
           "nullable": true,
-          "description": "Asset category"
+          "description": "Visual style: HERO (main product shots), LIFESTYLE (in-context), GALLERY (additional angles), TECHNICAL (specs/diagrams), MARKETING (promotional)"
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "varchar",
+          "max_length": 20,
+          "nullable": true,
+          "description": "Intended use determining linking expectations: PRODUCT (must link to product), FAMILY (must link to product_family), CAMPAIGN (links via campaign_assets), BRAND (company-level), SOCIAL (campaign or standalone), STANDALONE (no linking expected)"
         },
         "is_ai_generated": {
           "name": "is_ai_generated",
@@ -2236,7 +2243,7 @@
           "name": "generation_prompt",
           "type": "text",
           "nullable": true,
-          "description": "AI generation prompt"
+          "description": "AI generation prompt. REQUIRED when is_ai_generated=true (enforced by CHECK constraint). Format: 'extraction + white bg + side rake light' or 'lifestyle: kitchen scene, morning light'"
         },
         "caption": {
           "name": "caption",
@@ -2291,7 +2298,7 @@
       "primary_key": "id",
       "relationships": [],
       "business_rules": [],
-      "indexes": ["status", "asset_type", "category"]
+      "indexes": ["status", "asset_type", "category", "purpose"]
     },
     "product_assets": {
       "name": "product_assets",
@@ -3965,7 +3972,14 @@
           "name": "url",
           "type": "text",
           "nullable": false,
-          "description": "Asset URL"
+          "description": "Asset URL (DEPRECATED: use asset_id FK instead)"
+        },
+        "asset_id": {
+          "name": "asset_id",
+          "type": "uuid",
+          "nullable": true,
+          "references": "assets.id",
+          "description": "FK to assets table (preferred over url). Will become NOT NULL after migration."
         },
         "alt_text": {
           "name": "alt_text",
@@ -4392,11 +4406,17 @@
           "nullable": true,
           "description": "Target audience description"
         },
+        "industry": {
+          "name": "industry",
+          "type": "text",
+          "nullable": true,
+          "description": "Company industry vertical (e.g., Industrial B2B PET packaging)"
+        },
         "brand_attributes": {
           "name": "brand_attributes",
           "type": "jsonb",
           "nullable": true,
-          "description": "Brand attributes JSONB"
+          "description": "Brand attributes JSONB including: certifications[], quality_standards{}, market_positioning{}, competitive_advantages[], sku_naming{prefix, separator, uppercase, pattern, examples[]}"
         },
         "target_markets": {
           "name": "target_markets",
@@ -4474,6 +4494,20 @@
           "default": "'Asia/Kolkata'",
           "description": "Default timezone"
         },
+        "currency_symbol": {
+          "name": "currency_symbol",
+          "type": "varchar",
+          "max_length": 10,
+          "nullable": true,
+          "default": "'₹'",
+          "description": "Currency symbol for display (e.g., ₹, $)"
+        },
+        "default_retail_price_list_id": {
+          "name": "default_retail_price_list_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Default retail price list FK"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamptz",
@@ -4483,7 +4517,17 @@
         }
       },
       "primary_key": "id",
-      "relationships": [],
+      "relationships": [
+        {
+          "type": "parent",
+          "target_table": "price_lists",
+          "foreign_key": "default_retail_price_list_id",
+          "target_column": "id",
+          "cascade_delete": false,
+          "cascade_update": false,
+          "description": "Default retail price list"
+        }
+      ],
       "business_rules": [],
       "indexes": []
     },

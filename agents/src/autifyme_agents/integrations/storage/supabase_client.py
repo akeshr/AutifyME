@@ -14,7 +14,14 @@ from supabase.lib.client_options import AsyncClientOptions, SyncClientOptions
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.exceptions import ConfigurationError, StorageError
 from autifyme_agents.core.ports import StorageInterface
-from autifyme_agents.schemas.models import CompanyProfile, Product, WorkflowOutcome
+from autifyme_agents.core.storage_utils import sanitize_for_path
+from autifyme_agents.schemas.models import (
+    CompanyProfile,
+    Product,
+    SKUNamingConvention,
+    VisualIdentity,
+    WorkflowOutcome,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -320,17 +327,102 @@ class SupabaseStorageClient(StorageInterface):
         return self._async_client
 
     def get_company_profile(self) -> CompanyProfile:
-        """Return the single-tenant company profile from storage."""
+        """Return the single-tenant company profile from storage.
 
+        Loads data from:
+        - companies: Core company info, brand voice, currency
+        - company_intelligence: Visual identity, competitive intel
+        - assets: Logo storage path (if logo_asset_id in visual_identity)
+
+        Returns:
+            Enriched CompanyProfile with visual identity and all context
+        """
         client = self._ensure_client()
-        response = client.table("companies").select("*").limit(1).single().execute()
 
-        if not response.data:
+        # Load core company data
+        company_response = client.table("companies").select("*").limit(1).single().execute()
+        if not company_response.data:
             raise ValueError(
                 "No company profile found in storage. Populate the `companies` table before running workflows."
             )
+        company_data = company_response.data
 
-        return CompanyProfile.model_validate(response.data)
+        # Load company intelligence (visual identity, brand values, etc.)
+        intel_response = client.table("company_intelligence").select("*").limit(1).execute()
+        intel_data = intel_response.data[0] if intel_response.data else {}
+
+        # Build VisualIdentity from company_intelligence.visual_identity JSONB
+        visual_identity = VisualIdentity()
+        if intel_data.get("visual_identity"):
+            vi = intel_data["visual_identity"]
+            logo_asset_path: str | None = None
+
+            # Resolve logo_asset_id to storage path
+            if vi.get("logo_asset_id"):
+                try:
+                    asset_response = client.table("assets").select("storage_url").eq(
+                        "id", vi["logo_asset_id"]
+                    ).limit(1).single().execute()
+                    if asset_response.data and asset_response.data.get("storage_url"):
+                        # Extract relative path from full URL
+                        # URL: https://...supabase.co/storage/v1/object/public/assets/brands/file.jpg
+                        # Path: brands/file.jpg
+                        storage_url = asset_response.data["storage_url"]
+                        if "/assets/" in storage_url:
+                            logo_asset_path = storage_url.split("/assets/", 1)[1]
+                except Exception as e:
+                    logger.warning(f"Failed to resolve logo asset: {e}")
+
+            visual_identity = VisualIdentity(
+                primary_color=vi.get("primary_color", "#d32f2f"),
+                secondary_color=vi.get("secondary_color", "#000000"),
+                accent_color=vi.get("accent_color"),
+                font_family=vi.get("font_family", "sans-serif"),
+                logo_asset_path=logo_asset_path,
+            )
+
+        # Build SKUNamingConvention from brand_attributes.sku_naming
+        sku_naming: SKUNamingConvention | None = None
+        brand_attrs = company_data.get("brand_attributes") or {}
+        if brand_attrs.get("sku_naming"):
+            sku_data = brand_attrs["sku_naming"]
+            sku_naming = SKUNamingConvention(
+                prefix=sku_data.get("prefix", "SKU"),
+                pattern=sku_data.get("pattern", "PREFIX-CATEGORY-SIZE-VARIANT"),
+                separator=sku_data.get("separator", "-"),
+                uppercase=sku_data.get("uppercase", True),
+                examples=sku_data.get("examples", []),
+            )
+
+        # Extract style_preferences from brand_attributes or brand_values
+        style_preferences: list[str] = []
+        if brand_attrs.get("competitive_advantages"):
+            style_preferences = brand_attrs["competitive_advantages"][:5]
+        elif intel_data.get("brand_values"):
+            style_preferences = intel_data["brand_values"][:5]
+
+        # Extract business context from company_intelligence
+        business_models: list[str] = intel_data.get("business_models", [])
+        target_markets: list[str] = company_data.get("target_markets") or []
+        price_positioning: str = intel_data.get("price_positioning", "mid-range")
+
+        # Build enriched CompanyProfile
+        return CompanyProfile(
+            id=company_data["id"],
+            name=company_data["name"],
+            brand_voice=company_data.get("brand_voice", ""),
+            target_audience=company_data.get("target_audience", ""),
+            style_preferences=style_preferences,
+            industry=company_data.get("industry") or brand_attrs.get("industry_focus"),
+            business_models=business_models,
+            target_markets=target_markets,
+            price_positioning=price_positioning,
+            sku_naming_convention=sku_naming,
+            visual_identity=visual_identity,
+            default_currency=company_data.get("default_currency", "INR"),
+            currency_symbol=company_data.get("currency_symbol", "₹"),
+            default_price_list_id=company_data.get("default_retail_price_list_id"),
+        )
 
     def save_product(self, product: Product) -> Product:
         """Persist a product record using insert for new products or update for existing."""
@@ -2443,6 +2535,54 @@ class SupabaseStorageClient(StorageInterface):
             bucket=bucket,
         )
 
+    def _get_versioned_filename(
+        self,
+        client: Any,
+        bucket: str,
+        folder_path: str,
+        filename: str,
+    ) -> str:
+        """Find next available versioned filename.
+
+        Given 'image.png', checks for existing files and returns next version
+        like 'image-v2.png', 'image-v3.png', etc.
+
+        Args:
+            client: Supabase client
+            bucket: Storage bucket name
+            folder_path: Folder path within bucket
+            filename: Original filename
+
+        Returns:
+            Next available versioned filename
+        """
+        # Split filename into base and extension
+        if "." in filename:
+            base, ext = filename.rsplit(".", 1)
+            ext = f".{ext}"
+        else:
+            base = filename
+            ext = ""
+
+        # List existing files in folder
+        try:
+            response = client.storage.from_(bucket).list(folder_path)
+            existing_files = {item["name"] for item in response} if response else set()
+        except Exception:
+            existing_files = set()
+
+        # Find next available version
+        version = 2
+        while version <= 100:  # Safety limit
+            versioned_name = f"{base}-v{version}{ext}"
+            if versioned_name not in existing_files:
+                return versioned_name
+            version += 1
+
+        # Fallback to timestamp if too many versions
+        import time
+        return f"{base}-{int(time.time())}{ext}"
+
     async def _upload_to_zone(
         self,
         zone: str,
@@ -2454,6 +2594,9 @@ class SupabaseStorageClient(StorageInterface):
     ) -> dict[str, Any]:
         """Internal helper to upload to a specific zone (inbox or pending).
 
+        Handles duplicates by appending version numbers (-v2, -v3, etc.) and
+        returns metadata to inform the agent of the versioning.
+
         Args:
             zone: Storage zone ("inbox" or "pending")
             file_bytes: Raw file content
@@ -2463,23 +2606,65 @@ class SupabaseStorageClient(StorageInterface):
             bucket: Storage bucket name
 
         Returns:
-            Dict with upload result
+            Dict with upload result including:
+            - success, storage_path, bucket, public_url, size_bytes, content_type
+            - filename: Actual filename used (may differ from input if versioned)
+            - duplicate_detected: True if original filename already existed
+            - original_filename: Original requested filename (if versioned)
+            - warning: Human-readable message about versioning (if versioned)
 
         Raises:
             StorageError: On upload failure
         """
         try:
-            # Sanitize thread_id for use as folder name (replace colons with underscores)
-            sanitized_thread_id = thread_id.replace(":", "_")
-            storage_path = f"{zone}/{sanitized_thread_id}/{filename}"
+            # Sanitize thread_id for use as folder name
+            sanitized_thread_id = sanitize_for_path(thread_id)
+            folder_path = f"{zone}/{sanitized_thread_id}"
+            storage_path = f"{folder_path}/{filename}"
 
-            # Upload to Supabase Storage
             client = self._ensure_client()
-            client.storage.from_(bucket).upload(
-                path=storage_path,
-                file=file_bytes,
-                file_options={"content-type": content_type},
-            )
+
+            # Track if we need to version the filename
+            duplicate_detected = False
+            original_filename = filename
+            actual_filename = filename
+
+            # Try upload - if duplicate, version the filename
+            try:
+                client.storage.from_(bucket).upload(
+                    path=storage_path,
+                    file=file_bytes,
+                    file_options={"content-type": content_type},
+                )
+            except Exception as upload_error:
+                # Check if it's a duplicate error (409)
+                error_str = str(upload_error)
+                if "409" in error_str or "Duplicate" in error_str or "already exists" in error_str.lower():
+                    duplicate_detected = True
+
+                    # Find next available version
+                    actual_filename = self._get_versioned_filename(
+                        client, bucket, folder_path, filename
+                    )
+                    storage_path = f"{folder_path}/{actual_filename}"
+
+                    # Upload with versioned filename
+                    client.storage.from_(bucket).upload(
+                        path=storage_path,
+                        file=file_bytes,
+                        file_options={"content-type": content_type},
+                    )
+
+                    logger.warning(
+                        "Duplicate detected, using versioned filename",
+                        extra={
+                            "original_filename": original_filename,
+                            "versioned_filename": actual_filename,
+                            "folder_path": folder_path,
+                        }
+                    )
+                else:
+                    raise  # Re-raise if it's not a duplicate error
 
             # Get public URL
             public_url = client.storage.from_(bucket).get_public_url(storage_path)
@@ -2493,17 +2678,29 @@ class SupabaseStorageClient(StorageInterface):
                     "thread_id": thread_id,
                     "size_bytes": len(file_bytes),
                     "content_type": content_type,
+                    "duplicate_detected": duplicate_detected,
                 }
             )
 
-            return {
+            result: dict[str, Any] = {
                 "success": True,
                 "storage_path": storage_path,
                 "bucket": bucket,
                 "public_url": public_url,
                 "size_bytes": len(file_bytes),
                 "content_type": content_type,
+                "filename": actual_filename,
             }
+
+            if duplicate_detected:
+                result["duplicate_detected"] = True
+                result["original_filename"] = original_filename
+                result["warning"] = (
+                    f"File '{original_filename}' already existed. "
+                    f"Saved as '{actual_filename}' instead."
+                )
+
+            return result
 
         except Exception as e:
             logger.error(
@@ -2623,6 +2820,186 @@ class SupabaseStorageClient(StorageInterface):
             raise StorageError(
                 message=f"Asset move failed: {str(e)}",
                 operation="move_asset",
+                original_error=e,
+            ) from e
+
+    async def list_storage_files(
+        self,
+        folder: str,
+        thread_id: str | None = None,
+        bucket: str = "assets",
+        limit: int = 50,
+        offset: int = 0,
+        extension_filter: list[str] | None = None,
+        prefix_filter: str | None = None,
+    ) -> dict[str, Any]:
+        """List files in a storage folder.
+
+        Discover what files exist in storage folders (inbox, pending, products).
+        Thread-aware for session-scoped folders.
+
+        Args:
+            folder: Storage zone ("inbox", "pending", "products", or custom path)
+            thread_id: Thread ID for session-scoped folders (required for inbox/pending)
+            bucket: Storage bucket name (default: "assets")
+            limit: Maximum files to return (default: 50, max: 100)
+            offset: Skip N files for pagination (default: 0)
+            extension_filter: Only include files with these extensions (e.g., ["jpg", "png"])
+            prefix_filter: Only include files starting with this prefix
+
+        Returns:
+            Dict with file listing and metadata
+
+        Raises:
+            StorageError: On list failure
+            ValueError: If thread_id required but not provided
+        """
+        try:
+            # Validate limit
+            if limit > 100:
+                limit = 100
+            if limit < 1:
+                limit = 1
+
+            # Build folder path - thread-scoped for inbox/pending
+            if folder in ("inbox", "pending"):
+                if not thread_id:
+                    raise ValueError(
+                        f"thread_id is required for {folder}/ folder (session-scoped)"
+                    )
+                sanitized_thread_id = sanitize_for_path(thread_id)
+                folder_path = f"{folder}/{sanitized_thread_id}"
+            else:
+                folder_path = folder
+
+            client = self._ensure_client()
+
+            # List files in folder
+            try:
+                response = client.storage.from_(bucket).list(
+                    folder_path,
+                    {"limit": limit + offset, "offset": 0}  # Fetch enough for offset
+                )
+            except Exception as list_error:
+                # Handle empty folder or non-existent path
+                error_str = str(list_error).lower()
+                if "not found" in error_str or "404" in error_str:
+                    return {
+                        "success": True,
+                        "folder": folder_path,
+                        "files": [],
+                        "count": 0,
+                        "total": 0,
+                        "has_more": False,
+                    }
+                raise
+
+            if not response:
+                return {
+                    "success": True,
+                    "folder": folder_path,
+                    "files": [],
+                    "count": 0,
+                    "total": 0,
+                    "has_more": False,
+                }
+
+            # Filter out folder entries (only files)
+            all_files = [
+                item for item in response
+                if item.get("id") is not None  # Files have IDs, folders don't
+            ]
+
+            # Apply extension filter
+            if extension_filter:
+                normalized_exts = [ext.lower().lstrip(".") for ext in extension_filter]
+                all_files = [
+                    f for f in all_files
+                    if any(
+                        f.get("name", "").lower().endswith(f".{ext}")
+                        for ext in normalized_exts
+                    )
+                ]
+
+            # Apply prefix filter
+            if prefix_filter:
+                all_files = [
+                    f for f in all_files
+                    if f.get("name", "").startswith(prefix_filter)
+                ]
+
+            # Calculate total before pagination
+            total_count = len(all_files)
+
+            # Apply offset and limit
+            paginated_files = all_files[offset:offset + limit]
+
+            # Build enriched file list with public URLs
+            files: list[dict[str, Any]] = []
+            for item in paginated_files:
+                filename = item.get("name", "")
+                storage_path = f"{folder_path}/{filename}"
+                public_url = client.storage.from_(bucket).get_public_url(storage_path)
+
+                file_info: dict[str, Any] = {
+                    "name": filename,
+                    "storage_path": storage_path,
+                    "public_url": public_url,
+                }
+
+                # Add optional metadata if available
+                if item.get("metadata"):
+                    metadata = item["metadata"]
+                    if metadata.get("size"):
+                        file_info["size_bytes"] = metadata["size"]
+                    if metadata.get("mimetype"):
+                        file_info["content_type"] = metadata["mimetype"]
+
+                if item.get("created_at"):
+                    file_info["created_at"] = item["created_at"]
+
+                if item.get("updated_at"):
+                    file_info["updated_at"] = item["updated_at"]
+
+                files.append(file_info)
+
+            has_more = (offset + limit) < total_count
+
+            logger.info(
+                f"Listed {len(files)} files in {bucket}/{folder_path}",
+                extra={
+                    "bucket": bucket,
+                    "folder": folder_path,
+                    "count": len(files),
+                    "total": total_count,
+                    "has_more": has_more,
+                }
+            )
+
+            return {
+                "success": True,
+                "folder": folder_path,
+                "files": files,
+                "count": len(files),
+                "total": total_count,
+                "has_more": has_more,
+            }
+
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to list storage files: {bucket}/{folder}",
+                exc_info=True,
+                extra={
+                    "bucket": bucket,
+                    "folder": folder,
+                    "thread_id": thread_id,
+                }
+            )
+            raise StorageError(
+                message=f"Storage listing failed: {str(e)}",
+                operation="list_storage_files",
                 original_error=e,
             ) from e
 

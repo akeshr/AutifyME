@@ -10,7 +10,7 @@ Cross-domain reuse:
 - Procurement: Industry classifications, sourcing context
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain.chat_models import BaseChatModel
 
@@ -22,6 +22,9 @@ from autifyme_agents.tools.research_tools import (
     extract_web_content_tool,
     research_product_tool,
 )
+
+if TYPE_CHECKING:
+    from autifyme_agents.schemas.models import CompanyProfile
 
 
 def _get_analyst_llm() -> BaseChatModel:
@@ -39,22 +42,33 @@ def _get_analyst_llm() -> BaseChatModel:
 
 
 def create_product_analyst(
+    company_profile: "CompanyProfile",
     model: BaseChatModel | None = None,
 ) -> dict[str, Any]:
     """Create Product Analyst SubAgent spec.
 
     Args:
+        company_profile: Company context for prompt formatting.
         model: Optional LLM override. Defaults to Gemini 3 Flash.
 
     Returns:
         SubAgent spec dict for PM's subagents list.
 
     Example:
-        >>> analyst = create_product_analyst()
+        >>> analyst = create_product_analyst(company_profile)
         >>> # Add to PM subagents
         >>> subagents = [visual_analyst, analyst, ...]
     """
-    system_prompt = load_prompt("analysts/product_analyst.prompt")
+    if company_profile is None:
+        raise ValueError("company_profile is required for Product Analyst (single-tenant)")
+
+    prompt_template = load_prompt("analysts/product_analyst.prompt")
+
+    system_prompt = prompt_template.format(
+        company_name=company_profile.name,
+        industry=company_profile.industry or "Product Manufacturing",
+        target_markets=", ".join(company_profile.target_markets) if company_profile.target_markets else "India",
+    )
 
     description = (
         "ROLE: Analyst (read-only, external research)\n"
@@ -90,7 +104,7 @@ def create_product_analyst(
     # Multimodal middleware injects images from paths in delegation message
     # Execution limits: read-only analyst with web research limits
     middleware = [
-        *create_execution_limits(model_call_limit=15, tool_call_limit=20),
+        *create_execution_limits(limit=60),
         MultimodalInjectionMiddleware(),
     ]
 

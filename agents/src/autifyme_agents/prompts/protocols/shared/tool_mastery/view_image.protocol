@@ -38,8 +38,8 @@ Image source - accepts multiple formats:
 
 | Format | Example | Source |
 |--------|---------|--------|
-| Storage path | `inbox/thread_id/photo.jpg` | download_media output |
-| Storage path | `pending/thread_id/edit.png` | image processing output |
+| Storage path | `inbox/photo.jpg` | download_media output |
+| Storage path | `pending/edit.png` | image processing output |
 | Local path | `/path/to/image.jpg` | Local files |
 | URL | `https://example.com/image.jpg` | Direct URLs |
 
@@ -74,7 +74,7 @@ User sends image for data entry. View first, then enrich.
 
 ```python
 # Step 1: SEE the item
-view_image(image_path="inbox/thread_123/item.jpg")
+view_image(image_path="inbox/item.jpg")
 # You see: [visual details - type, material, features]
 
 # Step 2: Research enrichment (based on what you saw)
@@ -93,11 +93,11 @@ After processing, verify output quality.
 
 ```python
 # Step 1: Process image
-image_tool(operation="process", source="inbox/thread_123/raw.jpg")
-# Output: pending/thread_123/processed.png
+image_tool(operation="process", source="inbox/raw.jpg")
+# Output: pending/processed.png
 
 # Step 2: Verify quality
-view_image(image_path="pending/thread_123/processed.png")
+view_image(image_path="pending/processed.png")
 # You see: [processing result - verify quality acceptable]
 
 # Step 3: Use in data entry (if quality good)
@@ -114,7 +114,7 @@ read_data(table="items", search_patterns={"name": "%keyword%"})
 # Found: "Similar Item" - is this the same?
 
 # Visual comparison
-view_image(image_path="inbox/thread_123/new_item.jpg")
+view_image(image_path="inbox/new_item.jpg")
 # You see: [visual details of new item]
 
 # Existing item image (from asset_url)
@@ -127,7 +127,7 @@ view_image(image_path="https://storage.example.com/items/existing.jpg")
 Need to identify material from visual appearance.
 
 ```python
-view_image(image_path="inbox/thread_123/unknown.jpg")
+view_image(image_path="inbox/unknown.jpg")
 # You see: [visual characteristics]
 # Analysis: Based on transparency, texture, finish - likely [material type]
 ```
@@ -169,13 +169,13 @@ When viewing images, focus on:
 
 ```
 WRONG:
-User: "Here's my item image" [inbox/thread_123/item.jpg]
+User: "Here's my item image" [inbox/item.jpg]
 Agent: "I'll process this as a [assumed type]..."
 # Never viewed the image - assumption may be wrong!
 
 CORRECT:
-User: "Here's my item image" [inbox/thread_123/item.jpg]
-Agent: view_image(image_path="inbox/thread_123/item.jpg")
+User: "Here's my item image" [inbox/item.jpg]
+Agent: view_image(image_path="inbox/item.jpg")
 # Now I SEE: [actual visual details]
 Agent: "I can see this is a [actual type] with..."
 ```
@@ -189,7 +189,7 @@ WRONG:
 # Filename could be wrong!
 
 CORRECT:
-view_image(image_path="inbox/thread_123/item_type_500.jpg")
+view_image(image_path="inbox/item_type_500.jpg")
 # You SEE: [actual content - verify filename accuracy]
 ```
 
@@ -202,9 +202,9 @@ view_image(image_path=["img1.jpg", "img2.jpg", "img3.jpg"])
 
 CORRECT:
 # View one at a time
-view_image(image_path="inbox/thread_123/img1.jpg")
+view_image(image_path="inbox/img1.jpg")
 # Analyze first image...
-view_image(image_path="inbox/thread_123/img2.jpg")
+view_image(image_path="inbox/img2.jpg")
 # Analyze second image...
 ```
 
@@ -212,12 +212,12 @@ view_image(image_path="inbox/thread_123/img2.jpg")
 
 ```
 WRONG:
-view_image(image_path="inbox/thread_123/item.jpg")
+view_image(image_path="inbox/item.jpg")
 # ... later in same conversation ...
-view_image(image_path="inbox/thread_123/item.jpg")  # Same image again!
+view_image(image_path="inbox/item.jpg")  # Same image again!
 
 CORRECT:
-view_image(image_path="inbox/thread_123/item.jpg")
+view_image(image_path="inbox/item.jpg")
 # Remember what you saw, don't re-view unless image changed
 ```
 
@@ -264,7 +264,7 @@ You SEE the image in your context after the text metadata.
 [
   {
     "type": "text",
-    "text": "Error: Image not found at inbox/thread_123/missing.jpg"
+    "text": "Error: Image not found at inbox/missing.jpg"
   }
 ]
 ```
@@ -276,7 +276,7 @@ You SEE the image in your context after the text metadata.
 When user mentions an image, VIEW IT IMMEDIATELY:
 
 ```
-User: "I uploaded a photo to inbox/thread_789/new.jpg"
+User: "I uploaded a photo to inbox/new.jpg"
 Agent: [IMMEDIATELY calls view_image before any other action]
 Agent: "I can see your item - it's a [description]..."
 ```

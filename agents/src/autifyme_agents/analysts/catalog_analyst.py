@@ -13,7 +13,7 @@ Protocol Integration (v2):
 - Protocol grounds analysis in domain expertise and tool patterns
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain.chat_models import BaseChatModel
 
@@ -23,6 +23,9 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import MultimodalInjectionMiddleware, create_execution_limits
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
+
+if TYPE_CHECKING:
+    from autifyme_agents.schemas.models import CompanyProfile
 
 # Tables catalog_analyst can read (no write access)
 CATALOG_ANALYST_TABLES = [
@@ -71,26 +74,39 @@ def _get_analyst_llm() -> BaseChatModel:
 
 def create_catalog_analyst(
     storage: StorageInterface,
+    company_profile: "CompanyProfile",
     model: BaseChatModel | None = None,
 ) -> dict[str, Any]:
     """Create Catalog Analyst SubAgent spec.
 
     Args:
         storage: Storage interface for catalog queries (read-only)
+        company_profile: Company context for prompt formatting.
         model: Optional LLM override. Defaults to Gemini 3 Flash.
 
     Returns:
         SubAgent spec dict for PM's subagents list.
 
     Example:
-        >>> analyst = create_catalog_analyst(storage)
+        >>> analyst = create_catalog_analyst(storage, company_profile)
         >>> # Add to PM subagents
         >>> subagents = [visual_analyst, product_analyst, analyst, ...]
     """
     if storage is None:
         raise ValueError("storage is required for Catalog Analyst")
+    if company_profile is None:
+        raise ValueError("company_profile is required for Catalog Analyst (single-tenant)")
 
-    system_prompt = load_prompt("analysts/catalog_analyst_v2.prompt")
+    prompt_template = load_prompt("analysts/catalog_analyst.prompt")
+
+    system_prompt = prompt_template.format(
+        company_name=company_profile.name,
+        currency_symbol=company_profile.currency_symbol,
+        default_currency=company_profile.default_currency,
+        price_positioning=company_profile.price_positioning,
+        business_models=", ".join(company_profile.business_models) if company_profile.business_models else "B2B",
+        target_markets=", ".join(company_profile.target_markets) if company_profile.target_markets else "India",
+    )
 
     description = (
         "ROLE: Analyst (read-only, protocol-integrated)\n"
@@ -132,7 +148,7 @@ def create_catalog_analyst(
     # Multimodal middleware injects images from paths in delegation message
     # Execution limits: read-only analyst with catalog query limits
     middleware = [
-        *create_execution_limits(model_call_limit=15, tool_call_limit=20),
+        *create_execution_limits(limit=60),
         MultimodalInjectionMiddleware(),
     ]
 

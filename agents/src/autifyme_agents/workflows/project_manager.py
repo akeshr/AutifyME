@@ -71,7 +71,7 @@ def _load_prompt(
     channel: MessagingChannel | None = None,
 ) -> str:
     """Load and format PM prompt with company context."""
-    prompt_template = load_prompt("project_manager_v2.prompt")
+    prompt_template = load_prompt("project_manager.prompt")
 
     platform_name = "unknown"
     if channel is not None:
@@ -168,6 +168,12 @@ async def create_project_manager(
     from autifyme_agents.tools.view_image import create_view_image_tool
     pm_tools.append(create_view_image_tool())
 
+    # list_storage for PM to discover files in storage folders
+    # PM uses this for: session awareness (what's in inbox/pending), workflow planning
+    if storage is not None:
+        from autifyme_agents.tools.list_storage import create_list_storage_tool
+        pm_tools.append(create_list_storage_tool(storage))
+
     # Platform media download (with storage for inbox persistence)
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
@@ -182,18 +188,20 @@ async def create_project_manager(
     )
 
     # Analysts (Research Layer) - Fast, read-only, cross-domain reusable
-    visual_analyst = create_visual_analyst()
-    product_analyst = create_product_analyst()
-    catalog_analyst = create_catalog_analyst(storage=storage)
+    # All agents receive company_profile for prompt formatting
+    visual_analyst = create_visual_analyst(company_profile=company_profile)
+    product_analyst = create_product_analyst(company_profile=company_profile)
+    catalog_analyst = create_catalog_analyst(storage=storage, company_profile=company_profile)
 
     # Specialists (Execution Layer) - HITL-enabled, domain-specific
     creative_specialist = create_creative_specialist(
-        model=None,
+        company_profile=company_profile,
         storage=storage,
     )
     catalog_specialist = create_catalog_specialist(
-        model=specialist_llm,
         storage=storage,
+        company_profile=company_profile,
+        model=specialist_llm,
     )
 
     subagents: list[Any] = [
@@ -216,7 +224,7 @@ async def create_project_manager(
     # Task tool (subagent calls) preserved - contains specialist decisions
     # Other tools (schema, read_data, etc.) truncated - raw data can be re-fetched
     pm_middleware = [
-        *create_execution_limits(model_call_limit=15, tool_call_limit=20),
+        *create_execution_limits(limit=60),
         ContextEditingMiddleware(
             edits=[
                 HybridTruncateThenClearEdit(

@@ -16,9 +16,12 @@ class CompanyContext(TypedDict, total=False):
 
     Benefits:
     - Reduces token usage (context not in message history)
-    - Type-safe access in tools via Runtime.get().context
+    - Type-safe access in nodes/tools via get_runtime().context
     - Cleaner tool signatures (no company_profile parameter needed)
     - Consistent across entire agent hierarchy
+
+    Note: For specialists (SubAgents), context is injected via prompt
+    formatting at creation time, not via runtime context.
 
     Usage:
         # In agent creation:
@@ -28,10 +31,17 @@ class CompanyContext(TypedDict, total=False):
             context_schema=CompanyContext
         )
 
-        # In tool implementation:
-        from langgraph.runtime import Runtime
-        runtime = Runtime.get()
+        # In node/tool implementation:
+        from langgraph.runtime import get_runtime
+        runtime = get_runtime()
         company = runtime.context  # Type: CompanyContext
+
+        # For specialists (prompt-based injection):
+        system_prompt = prompt_template.format(
+            company_name=company_profile.name,
+            currency_symbol=company_profile.currency_symbol,
+            ...
+        )
     """
 
     # Core identification
@@ -43,3 +53,20 @@ class CompanyContext(TypedDict, total=False):
     target_audience: str
     style_preferences: list[str]
     industry: str | None
+
+    # Visual identity (for creative specialist)
+    primary_color: str  # e.g., "#d32f2f"
+    secondary_color: str  # e.g., "#000000"
+    accent_color: str | None
+    font_family: str  # e.g., "sans-serif"
+    logo_asset_path: str | None  # Storage path to company logo
+
+    # Catalog defaults (for catalog specialist)
+    default_currency: str  # e.g., "INR", "USD"
+    currency_symbol: str  # e.g., "₹", "$"
+    default_price_list_id: str | None  # UUID of default price list
+
+    # SKU naming (for catalog specialist)
+    sku_prefix: str | None  # e.g., "PAV" for Pavisha
+    sku_separator: str  # e.g., "-"
+    sku_uppercase: bool  # Whether SKUs should be uppercase

@@ -43,6 +43,7 @@ class ColumnType(str, Enum):
     JSON = "json"
     JSONB = "jsonb"
     ARRAY = "array"
+    ENUM = "enum"  # PostgreSQL custom enum types
 
 
 class ColumnSchema(BaseModel):

@@ -16,8 +16,8 @@ The key differentiator of this tool: **labeled images + structured specs = intel
 ```json
 {
   "images": [
-    {"path": "inbox/thread/photo.jpg", "label": "product"},
-    {"path": "inbox/thread/mood.jpg", "label": "style_ref"}
+    {"path": "inbox/photo.jpg", "label": "product"},
+    {"path": "inbox/mood.jpg", "label": "style_ref"}
   ]
 }
 ```
@@ -125,6 +125,17 @@ Purpose: Position product in scene.
 ```
 Purpose: Material-specific rendering instructions.
 
+### fidelity (CRITICAL for source images)
+
+```json
+{
+  "preserve_colors": "true product colors (fix color cast)",
+  "preserve_artwork": "bee mascot - same design",
+  "hero_features": "texture pattern is key differentiator"
+}
+```
+Purpose: FIX photography problems, PRESERVE product identity. Always include when processing [source]/[product].
+
 ### enhancement
 
 ```json
@@ -165,19 +176,20 @@ Purpose: Output specifications.
 
 ```python
 image_studio(
-    images=[{"path": "inbox/thread/photo.jpg", "label": "source"}],
-    extraction={"target_description": "glass jar in [source]", "isolation": "complete"},
+    images=[{"path": "inbox/photo.jpg", "label": "source"}],
+    extraction={"target_description": "glass jar in [source]"},
     background={"treatment": "transparent"},
-    material_treatment={"primary_material": "clear_glass"}
+    material_treatment={"primary_material": "clear_glass"},
+    fidelity={"preserve_colors": "true colors", "hero_features": "glass clarity"}
 )
 ```
-Result: Clean extracted jar, transparent PNG, caustics preserved.
+Result: Extracted jar, transparent PNG, identity preserved.
 
 ### Pattern 2: Extract with White Background
 
 ```python
 image_studio(
-    images=[{"path": "inbox/thread/photo.jpg", "label": "source"}],
+    images=[{"path": "inbox/photo.jpg", "label": "source"}],
     extraction={"target_description": "product in [source]"},
     background={"treatment": "solid_color", "color": "white"}
 )
@@ -217,15 +229,15 @@ Result: Family shot with main product prominent, variant supporting.
 
 ```python
 image_studio(
-    images=[{"path": "inbox/thread/photo.jpg", "label": "source"}],
+    images=[{"path": "inbox/photo.jpg", "label": "source"}],
     extraction={"target_description": "product in [source]"},
     background={"treatment": "solid_color", "color": "#f5f5f5"},
-    lighting={"type": "studio_3point", "direction": "front"},
-    enhancement={"sharpness": "tack_sharp"},
-    material_treatment={"primary_material": "clear_glass", "rendering_notes": "edge definition"}
+    lighting={"type": "studio_3point"},
+    material_treatment={"primary_material": "clear_glass"},
+    fidelity={"preserve_colors": "true colors", "hero_features": "key differentiator"}
 )
 ```
-Result: Professional catalog-ready hero shot.
+Result: Catalog-ready hero shot, identity preserved.
 
 ---
 
@@ -254,13 +266,13 @@ Result: Professional catalog-ready hero shot.
 ### Storage Path Flow
 
 ```
-User upload -> inbox/{thread_id}/filename.jpg
+User upload -> inbox/filename.jpg
      |
      v
 image_studio processing
      |
      v
-Output -> pending/{thread_id}/generated.png
+Output -> pending/generated.png
      |
      v
 write_data creates asset with storage_url
@@ -278,7 +290,7 @@ Asset linked to product via product_assets junction
 ```json
 {
   "success": true,
-  "storage_path": "pending/thread-123/20241217_studio_abc12345.png",
+  "storage_path": "pending/20241217_studio_abc12345.png",
   "local_path": "/tmp/media_downloads/20241217_studio_abc12345.png",
   "metadata": {
     "width": 1024,
@@ -325,7 +337,16 @@ CORRECT:
 3. view_image to verify output
 ```
 
-### Anti-Pattern 2: Missing Material Treatment for Glass/Metal
+### Anti-Pattern 2: Missing Fidelity Spec
+
+```
+WRONG: image_studio(images=[...], extraction={...})  # No fidelity
+
+CORRECT: image_studio(..., fidelity={"preserve_colors": "true", "hero_features": "key"})
+```
+Always include fidelity when processing [source]/[product].
+
+### Anti-Pattern 3: Missing Material Treatment for Glass/Metal
 
 ```
 WRONG:
@@ -340,7 +361,7 @@ image_studio(
 )
 ```
 
-### Anti-Pattern 3: Simple View When Processing Needed
+### Anti-Pattern 4: Simple View When Processing Needed
 
 ```
 WRONG:
@@ -351,7 +372,7 @@ Use view_image for viewing
 Use image_studio only when transformation needed
 ```
 
-### Anti-Pattern 4: Ignoring storage_path
+### Anti-Pattern 5: Ignoring storage_path
 
 ```
 WRONG:
@@ -362,6 +383,55 @@ Capture storage_path from output
 Use it when creating asset record:
 write_data(..., data={"storage_url": storage_path, ...})
 ```
+
+### Anti-Pattern 6: Single Extraction for Multi-Item Image
+
+```
+WRONG:
+Source has 9 products, but:
+image_studio(extraction={"target_description": "the jars"})
+# Result: 1 asset for 9 products
+
+CORRECT:
+For each item in Extraction Targets:
+image_studio(extraction={"target_description": "Large jar with blue lid at top-left"})
+# Result: 9 assets, one per product
+```
+
+When source contains multiple items, extract each separately (unless explicitly asked for family shot).
+
+---
+
+## MULTI-ITEM EXTRACTION
+
+When source image contains multiple items, use position-based targeting.
+
+**See `multi_item_image.protocol` for:**
+- Classification types (VARIANTS, COLLECTION, COMPONENTS)
+- Processing strategies (INDIVIDUAL, COMPOSITE, GROUPED)
+- Strategy selection signals
+- Full position vocabulary
+
+### Targeting Syntax
+
+**Single item:** `"{description} at {position}"`
+```json
+{"target_description": "Large jar with blue lid at top-left", "isolation": "complete"}
+```
+
+**Group:** `"all {description} items"`
+```json
+{"target_description": "all items in the top row", "isolation": "complete"}
+```
+
+**All together:** `"all items as arranged"`
+```json
+{"target_description": "all items as arranged", "isolation": "complete"}
+```
+
+### Position Vocabulary
+
+See `multi_item_image.protocol` for complete position vocabulary.
 
 ---
 

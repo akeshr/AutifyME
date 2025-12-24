@@ -91,7 +91,7 @@ async def _upload_rich_output(
         file=file_bytes,
         file_options={
             "content-type": "text/html; charset=utf-8",
-            "x-upsert": "true",  # Overwrite if exists
+            "upsert": "true",  # Overwrite if exists
         },
     )
 

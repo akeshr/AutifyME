@@ -27,7 +27,7 @@ Use `asset_uploads` when you need the user to SEE an image during HITL approval.
 ```json
 "asset_uploads": [
   {
-    "storage_path": "pending/thread_xyz/image.png",
+    "storage_path": "pending/image.png",
     "returns": "product_image",
     "caption": "PET Jar 500ml - catalog hero",
     "target_folder": "products"
@@ -411,7 +411,7 @@ Create asset record with image preview for HITL. Junction created later by domai
   "hitl_summary": "Processed image ready for your catalog.\n\n[What was done]: Background removed, lighting enhanced, hero shot created.\n\nApprove this image?",
   "asset_uploads": [
     {
-      "storage_path": "pending/thread_xyz/20251217_studio_abc.png",
+      "storage_path": "pending/20251217_studio_abc.png",
       "returns": "product_image",
       "caption": "PET Jar 500ml - catalog hero shot",
       "target_folder": "products"
@@ -454,7 +454,7 @@ When campaign domain has no specialist, creative creates both asset and campaign
   "hitl_summary": "Campaign image ready.\n\n[Campaign]: [name]\n[Style]: [treatment applied]\n\nApprove for campaign?",
   "asset_uploads": [
     {
-      "storage_path": "pending/thread_xyz/diwali_promo.png",
+      "storage_path": "pending/diwali_promo.png",
       "returns": "campaign_image",
       "caption": "Diwali promotional - festive product shot",
       "target_folder": "campaigns"

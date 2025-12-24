@@ -1,0 +1,503 @@
+<protocol name="product_photography" type="domain" domain="visual">
+
+## PURPOSE
+
+Expert knowledge for commercial product photography.
+This protocol contains what a $50K/shoot photographer KNOWS - composition, lighting, materials, quality standards.
+
+Load this when you need visual expertise for product imagery.
+
+---
+
+## THE $50K DIFFERENCE
+
+| Element | Amateur ($500) | Master ($50K) |
+|---------|----------------|---------------|
+| **Lighting** | Even, flat, "well-lit" | Reveals form, creates depth, tells story |
+| **Composition** | Product centered | Product dominates with intentional negative space |
+| **Material** | Shows the product | Glass sparkles, metal gleams, texture becomes tactile |
+| **Background** | Clean white | Supports product without competing |
+| **Edges** | Clean enough | Surgically perfect, ready for any composite |
+| **Emotion** | "Here's the product" | "You need this in your life" |
+
+**The Core Insight:** Amateurs light products so you can SEE them. Masters light products so you can FEEL them.
+
+---
+
+## COMPOSITION
+
+### Product Dominance
+
+| Task Type | Frame Coverage | Why |
+|-----------|---------------|-----|
+| Catalog hero | 70-85% | Product commands attention |
+| Lifestyle | 40-60% | Context matters, product anchors |
+| Detail/macro | 90%+ | Showcasing specific feature |
+| Family shot | 60-80% total | Main hero + supporting variants |
+
+### Negative Space Strategy
+
+Negative space is intentional, not empty.
+
+| Position | Purpose |
+|----------|---------|
+| **Top** | Marketplace text overlay, title space |
+| **Right** | Copy placement, social media captions |
+| **Left** | Editorial layout flexibility |
+| **Bottom** | Product anchoring, ground plane |
+
+**Hero shot default:** Generous top (30-40% of frame), balanced sides.
+
+### Camera Angle Psychology
+
+| Angle | Effect | Use For |
+|-------|--------|---------|
+| **Eye level** | Equality, relatability | Lifestyle, approachable products |
+| **Slight top (15-20 deg)** | Authority, overview | Catalog hero, product mastery |
+| **Dramatic top (45 deg)** | Graphic, pattern-focused | Flat-lay, texture showcase |
+| **Low angle** | Power, premium | Luxury, aspirational products |
+
+**Catalog default:** Slight top (15-20 degrees) - shows product with authority.
+
+### Rule of Thirds
+
+- **Use it:** Lifestyle shots, editorial, multi-product compositions
+- **Break it (center):** Single hero shots where symmetry creates impact
+- **Power points:** Place key features at intersection points
+
+---
+
+## LIGHTING
+
+### The Language of Light
+
+Light reveals form. Shadow creates dimension. Together they tell the story.
+
+| Light Quality | Effect | Use For |
+|---------------|--------|---------|
+| **Hard light** | Sharp shadows, texture emphasis | Texture showcase, dramatic mood |
+| **Soft light** | Gradual transitions, flattering | Beauty, approachable products |
+| **Diffused** | Even, no harsh shadows | Catalog standard, clean aesthetic |
+
+### Three-Point Lighting (Studio Standard)
+
+```
+        [BACK/RIM]
+            |
+            |
+         [PRODUCT]
+        /         \
+   [KEY]           [FILL]
+   45deg           opposite
+   main light      shadow fill
+```
+
+| Light | Purpose | Typical Ratio |
+|-------|---------|---------------|
+| **Key** | Main illumination, creates form | 100% (reference) |
+| **Fill** | Opens shadows, reduces contrast | 30-50% of key |
+| **Rim/Back** | Separation from background, edge definition | 50-100% of key |
+
+### Lighting Ratios
+
+| Ratio | Look | Use For |
+|-------|------|---------|
+| **1:1** | Flat, even | Documentation, not creative |
+| **2:1** | Soft, commercial | E-commerce standard |
+| **3:1** | Dramatic, editorial | Premium products, impact |
+| **4:1+** | High contrast, moody | Luxury, artistic |
+
+**Catalog default:** 2:1 to 3:1 - professional without being dramatic.
+
+### Direction Psychology
+
+| Direction | Effect | Use For |
+|-----------|--------|---------|
+| **Front** | Flat, informational | Technical documentation |
+| **45 deg side** | Form-revealing, dimensional | Standard product photography |
+| **90 deg side** | Dramatic texture | Texture showcase |
+| **Back/rim** | Glow, separation | Glass, translucent materials |
+| **Top** | Graphic, flat-lay | Pattern products, food |
+
+---
+
+## MATERIALS
+
+### Glass (Clear, Colored, Frosted)
+
+**Challenge:** Glass is invisible without light. Must reveal depth and edge.
+
+| Technique | Purpose |
+|-----------|---------|
+| **Backlight** | Creates glow, reveals transparency depth |
+| **Dark field** | Defines edges against light background |
+| **Bright field** | Shows internal details, caustics |
+| **Gradient reflections** | Shows form on curved surfaces |
+
+**Excellence markers:**
+- Internal caustics visible (light bending through)
+- Edge refraction sharp and clean
+- You can "see into" the glass, not just through it
+- Speculars controlled but present (life, not flat)
+
+### Metal (Polished, Brushed, Matte)
+
+**Challenge:** Metal reflects everything. Must control reflections to show form.
+
+| Surface | Technique |
+|---------|-----------|
+| **Polished** | Large soft source for smooth gradients, tight specular control |
+| **Brushed** | Directional light perpendicular to brush direction |
+| **Matte** | Soft even light, avoid harsh speculars |
+
+**Excellence markers:**
+- Gradient reflections that follow form (not random hotspots)
+- Controlled speculars that define edges
+- Micro-texture visible (especially brushed)
+- No burned highlights (detail preserved)
+
+### PET / Plastic (Clear, Colored, Textured)
+
+**Challenge:** Plastic looks cheap without care. Must show premium quality.
+
+| Aspect | Technique |
+|--------|-----------|
+| **Surface sheen** | Side light reveals surface quality |
+| **Labels/prints** | TACK SHARP - often the hero feature |
+| **Translucency** | Backlight where appropriate |
+| **Texture (honeycomb, etc.)** | Rake light at angle to reveal depth |
+
+**Excellence markers:**
+- Surface reads as quality, not cheap
+- Any text/graphics are razor sharp
+- Texture has dimensional feel (not flat)
+- Colors accurate, vibrant but not oversaturated
+
+### Fabric / Textile
+
+**Challenge:** Fabric has micro-texture that defines quality. Must reveal weave.
+
+| Technique | Purpose |
+|-----------|---------|
+| **Rake light** | Reveals weave texture |
+| **Soft key** | Flattering drape shadows |
+| **Low angle fill** | Opens fold shadows |
+
+**Excellence markers:**
+- Weave texture visible
+- Drape shadows show dimensionality
+- Fiber detail at edges
+- Color accurate across folds (no crushed shadows)
+
+### Ceramic / Porcelain
+
+**Challenge:** Matte vs gloss surfaces need different treatment.
+
+| Surface | Technique |
+|---------|-----------|
+| **Matte** | Even soft lighting, avoid speculars |
+| **Gloss** | Controlled speculars that define form |
+| **Textured** | Rake light for texture, soft overall |
+
+**Excellence markers:**
+- Surface finish reads correctly (matte vs gloss)
+- Even lighting without hotspots
+- Texture preserved (not smoothed out)
+- Clean edges, no color fringing
+
+### Food & Beverage
+
+**Challenge:** Food must look fresh, appetizing, ready to eat. The "freshness window" is critical.
+
+| Element | Technique |
+|---------|-----------|
+| **Texture** | Enhance crunch, moisture, steam where appropriate |
+| **Color** | Vibrant but natural - never oversaturated |
+| **Context** | Ingredients, preparation, serving suggestion |
+| **Props** | Complementary items (utensils, napkins, ingredients) |
+
+**Category-specific treatments:**
+
+| Category | Key Techniques |
+|----------|----------------|
+| **Beverages** | Condensation droplets, pour shots, ice clarity, liquid color depth |
+| **Baked goods** | Warm lighting, crumb detail, steam suggestion, golden tones |
+| **Fresh produce** | Water droplets, natural imperfections OK, vibrant greens |
+| **Packaged food** | Show contents AND packaging, serving suggestion |
+| **Honey/syrups** | Drip shots, backlight for glow, viscosity visible |
+
+**Excellence markers:**
+- Would you want to eat/drink this RIGHT NOW?
+- Freshness reads immediately
+- Texture is tactile (you can almost taste it)
+- Color is appetizing, not artificial
+- Context feels natural, not staged
+
+**The Appetite Test:** Does this image make you hungry/thirsty?
+
+### Electronics / Tech Products
+
+**Challenge:** Screens, LEDs, and reflective surfaces require special handling.
+
+| Element | Technique |
+|---------|-----------|
+| **Screens** | Show content or clean black, avoid reflections |
+| **LEDs/lights** | Subtle glow, not overblown |
+| **Buttons/ports** | Detail visible, not lost in shadow |
+| **Cables** | Neat, intentional arrangement |
+
+**Excellence markers:**
+- Screen content readable or intentionally off
+- No distracting reflections on glass/plastic
+- Product feels premium and functional
+- Technical details visible but not overwhelming
+
+### Jewelry / Small Items
+
+**Challenge:** Macro photography requirements, extreme detail visibility.
+
+| Element | Technique |
+|---------|-----------|
+| **Scale** | Include scale reference OR extreme close-up |
+| **Detail** | Tack sharp on key features (stones, engravings) |
+| **Sparkle** | Controlled highlights that show brilliance |
+| **Background** | Usually dark or neutral to emphasize item |
+
+**Excellence markers:**
+- Intricate details crystal clear
+- Metal finish reads true (gold vs silver vs rose gold)
+- Gems/stones show depth and brilliance
+- Clasp/closure details visible if relevant
+
+---
+
+## QUALITY SCORING RUBRIC
+
+### The Five Dimensions
+
+| Dimension | Weight | What to Evaluate |
+|-----------|--------|------------------|
+| **Composition** | 20% | Product dominance, negative space, framing intent |
+| **Lighting** | 25% | Form revelation, shadow quality, specular control |
+| **Material** | 25% | Material truth, texture rendering, reflections |
+| **Edge Quality** | 15% | Extraction cleanliness, artifact-free |
+| **E-commerce Ready** | 15% | Marketplace compatibility, background, format |
+
+### Scoring Guidelines
+
+| Score | Level | Description |
+|-------|-------|-------------|
+| **9-10** | Exceptional | Portfolio-worthy, premium catalog quality |
+| **8-8.9** | Professional | Meets commercial standards, minor refinements possible |
+| **7-7.9** | Acceptable | Passes requirements, room for improvement |
+| **6-6.9** | Below Standard | Technical issues, requires rework |
+| **<6** | Unacceptable | Fundamental problems, major rework |
+
+### Thresholds by Task Type
+
+| Task Type | Minimum | Target |
+|-----------|---------|--------|
+| Catalog hero | 8.5 | 9.0+ |
+| Lifestyle | 8.5 | 9.0+ |
+| Premium/luxury | 9.0 | 9.5+ |
+| Campaign | 8.5 | 9.0+ |
+| Quick fix | 7.5 | 8.0+ |
+
+---
+
+## MOOD & STYLE VOCABULARY
+
+### Mood Keywords -> Lighting + Color
+
+| Mood | Lighting | Color Temp | Scene Elements |
+|------|----------|------------|----------------|
+| **Warm cozy** | Soft, golden | 2700-3000K | Textiles, wood, warm materials |
+| **Clean minimal** | Even, cool | 5500-6500K | White, concrete, negative space |
+| **Dramatic** | High contrast | Variable | Dark backgrounds, rim lighting |
+| **Fresh natural** | Window light | 5500K | Plants, daylight, organic |
+| **Premium luxury** | Soft directional | Neutral | Dark surfaces, selective highlights |
+| **Playful vibrant** | Even, bright | Neutral | Color accents, dynamic composition |
+
+### Style References
+
+| Style | Characteristics | Good For |
+|-------|----------------|----------|
+| **Apple** | Clean, minimal, gradient backgrounds | Tech, premium products |
+| **Anthropologie** | Lifestyle, texture-rich, warm | Home goods, lifestyle |
+| **Aesop** | Moody, sophisticated, dark surfaces | Premium beauty, luxury |
+| **IKEA** | Bright, contextual, room settings | Furniture, home products |
+| **Food52** | Warm, rustic, natural light | Food-adjacent, kitchen |
+
+---
+
+## PRODUCT INFO GRAPHICS
+
+When PM provides product data in delegation, integrate it visually.
+
+### Data Elements & Treatments
+
+| Data Element | Visual Treatment | Placement |
+|--------------|------------------|-----------|
+| **Price** | Bold, accent color, prominent | Upper corner or banner |
+| **Size/Volume** | Clean typography, unit visible | Near product or info bar |
+| **Weight** | Secondary to size, same style | Grouped with size |
+| **Variants** | Color swatches, size chips | Bottom or side panel |
+| **SKU/Code** | Small, subtle, professional | Lower corner |
+| **Offer/Discount** | Strike-through original, highlight new | Banner or starburst |
+| **Features** | Icon + short text callouts | Pointing to product |
+
+### Price Tag Patterns
+
+| Style | Use Case | Visual Treatment |
+|-------|----------|------------------|
+| **Clean Modern** | Premium products | Minimal, brand font, subtle background |
+| **Bold Sale** | Promotions | High contrast, accent color, strike-through |
+| **Elegant** | Luxury items | Thin serif, gold/silver accents |
+| **Friendly** | Everyday items | Rounded, warm colors, approachable |
+
+**Realism for overlays:**
+- Text should feel DESIGNED, not pasted
+- Respect brand typography ({font_family})
+- Use brand colors ({primary_color}, {accent_color})
+- Shadow/glow only if natural in context
+- Never obscure key product features
+
+### Variant Comparison Layouts
+
+| Layout | Products | Structure |
+|--------|----------|-----------|
+| **Size Progression** | 3-5 sizes | Left-to-right smallest to largest |
+| **Color Array** | 3-6 colors | Grid or arc arrangement |
+| **Family Hero** | Full range | Central hero + variants around |
+| **A/B Split** | 2 variants | Side-by-side, equal weight |
+
+**Comparison excellence:**
+- Scale MUST be accurate (ml, grams reflect in size)
+- Lighting identical across all variants
+- Labels/callouts distinguish each variant
+- Clear visual hierarchy (hero vs supporting)
+
+### Specification Callouts
+
+For technical products or detailed features:
+
+```
+[PRODUCT IMAGE]
+     |
+     +-- Arrow pointing to feature
+         |
+         +-- "Feature Name"
+             "Spec: 500ml capacity"
+```
+
+| Callout Type | Treatment |
+|--------------|-----------|
+| **Arrow/Line** | Clean, thin, brand color |
+| **Label** | Boxed or floating, high contrast |
+| **Icon** | Simple, recognizable, consistent style |
+
+**Integration principle:** Data enhances understanding, never competes with product beauty.
+
+---
+
+## COMMON FAILURES
+
+### "Technically Correct, Emotionally Dead"
+
+**Symptom:** Image is clean, well-lit, properly framed - but boring.
+**Cause:** No creative vision, just following rules.
+**Fix:** Ask "What makes this product SPECIAL?" and emphasize that.
+
+### "Over-Processed Uncanny Valley"
+
+**Symptom:** Image looks fake, plasticky, or too perfect.
+**Cause:** Enhancement too aggressive.
+**Fix:** Reduce enhancement, let natural imperfections remain.
+
+### "Generic Studio Shot"
+
+**Symptom:** Could be any product, nothing distinctive.
+**Cause:** Same treatment regardless of product character.
+**Fix:** Let product's nature guide approach (modern = cool, traditional = warm).
+
+### "Feature Buried"
+
+**Symptom:** Product's best feature doesn't stand out.
+**Cause:** Lighting/composition doesn't emphasize differentiator.
+**Fix:** Identify hero feature, light and frame to showcase it.
+
+---
+
+## THE REALISM IMPERATIVE
+
+**Every image must be indistinguishable from professional photography.**
+
+| Authentic | Fake (NEVER) |
+|-----------|--------------|
+| Natural lighting with proper falloff | Flat, even lighting everywhere |
+| Real shadows that ground the product | Floating products, missing shadows |
+| Material-accurate reflections | Plastic-looking surfaces |
+| Believable context in lifestyle shots | Product awkwardly placed in scene |
+| Natural color grading | Over-saturated, HDR look |
+| Subtle imperfections | Uncanny perfection |
+| Proper scale and proportion | Products wrong size for context |
+| Authentic textures | Smoothed, AI-generated textures |
+
+### Realism Checklist
+
+**MUST PASS before shipping:**
+
+```
+[ ] Shadows present and properly grounded?
+[ ] Lighting direction consistent across elements?
+[ ] Materials render true to their nature?
+[ ] Product scale matches environment?
+[ ] Colors natural, not over-processed?
+[ ] No AI artifacts (weird edges, texture repetition)?
+[ ] Would fool a professional photographer?
+```
+
+**The Test:** Show this to a professional photographer. Would they believe it came from a real photoshoot?
+
+---
+
+## SELF-CRITIQUE CHECKLIST
+
+After generating any image, evaluate:
+
+```
+1. COMPOSITION
+   - Product dominates appropriately?
+   - Negative space intentional and useful?
+   - Camera angle serves the product?
+
+2. LIGHTING
+   - Reveals form and dimension?
+   - Shadows add depth without losing detail?
+   - Speculars controlled but present?
+
+3. MATERIAL
+   - Material reads TRUE to its nature?
+   - Texture visible and dimensional?
+   - Material-specific properties honored?
+
+4. EDGES
+   - Extraction surgical (no halos, fringing)?
+   - Could composite onto any background?
+
+5. E-COMMERCE
+   - Background marketplace-ready?
+   - Format/size appropriate?
+
+6. EMOTIONAL IMPACT
+   - Does it create DESIRE for the product?
+   - Would you stop scrolling?
+   - Does it tell a story or evoke a feeling?
+   - Is there aspiration or connection?
+```
+
+**The Desire Test:** If you weren't selling this product, would this image make you want to buy it?
+
+**Decision:** All dimensions 8+ AND realism checklist passed AND emotional impact present = ship. Any below 8 = iterate on weakest dimension.
+
+</protocol>

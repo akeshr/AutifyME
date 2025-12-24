@@ -1,0 +1,329 @@
+<protocol name="multi_item_image" type="exploration" domain="shared">
+
+## PURPOSE
+
+Domain-agnostic pattern for handling images containing multiple distinct items.
+Applies universally: products, properties, dishes, garments, components, or any future domain.
+
+This protocol defines the PATTERN. Domain-specific protocols apply the VOCABULARY.
+
+---
+
+## CORE CONCEPTS
+
+### Item
+A distinct, identifiable entity within an image that could be processed independently.
+
+| Domain | "Item" Means |
+|--------|--------------|
+| Catalog | Product, variant |
+| Real Estate | Room, property feature |
+| Food | Dish, ingredient |
+| Fashion | Garment, accessory |
+| Manufacturing | Component, part |
+| Events | Person, object |
+| **Any Future** | Whatever discrete entities exist |
+
+### Classification Types
+
+| Type | Definition | Examples |
+|------|------------|----------|
+| **VARIANTS** | Same item type, different attributes | 3 jar sizes, 4 shirt colors, 3 room angles |
+| **COLLECTION** | Different item types, related context | Product + accessories, dish + sides, outfit + accessories |
+| **COMPONENTS** | Parts of a single whole | Disassembled product, floor plan sections |
+| **UNRELATED** | Coincidental presence | Background clutter, bystanders |
+
+### Variant Axes
+
+When items are VARIANTS, identify the axes of variation:
+
+| Axis Type | Examples |
+|-----------|----------|
+| Size | Small/Medium/Large, 250ml/500ml/1L |
+| Color | Red/Blue/Green, Oak/Walnut/White |
+| Design | Pattern A/B/C, Style 1/2/3 |
+| Material | Glass/Plastic/Metal |
+| Configuration | 2-door/4-door, 1BR/2BR |
+
+---
+
+## ITEM MANIFEST FORMAT (CRITICAL OUTPUT)
+
+When multi-item detected, output a structured manifest that downstream agents can act on:
+
+```markdown
+## MULTI-ITEM ASSESSMENT
+
+- **Count:** [N]
+- **Classification:** [VARIANTS | COLLECTION | COMPONENTS | UNRELATED]
+- **Rationale:** [Why this classification]
+
+### Variant Axes (if VARIANTS)
+
+| Axis | Values |
+|------|--------|
+| [axis1] | [value1, value2, value3] |
+| [axis2] | [valueA, valueB] |
+
+### Extraction Targets
+
+| # | Description | Position | Key Attributes |
+|---|-------------|----------|----------------|
+| 1 | [what it is] | [where in frame] | [domain-specific attributes] |
+| 2 | [what it is] | [where in frame] | [domain-specific attributes] |
+| ... | ... | ... | ... |
+
+**Note:** Domain protocols extend "Key Attributes" with domain-specific columns (e.g., Size, Color for catalog).
+
+### Processing Strategies
+
+| Strategy | Result | Recommended When |
+|----------|--------|------------------|
+| INDIVIDUAL | [N] separate outputs | [context] |
+| BY_[AXIS] | [M] grouped outputs | [context] |
+| COMPOSITE | 1 combined output | [context] |
+
+**Default recommendation:** [STRATEGY] because [reasoning]
+```
+
+### Position Vocabulary (Universal)
+
+Use consistent position descriptors across all domains:
+
+| Position | Meaning |
+|----------|---------|
+| top-left, top-center, top-right | Upper third of frame |
+| middle-left, center, middle-right | Middle third of frame |
+| bottom-left, bottom-center, bottom-right | Lower third of frame |
+| foreground, midground, background | Depth positioning |
+| left-column, center-column, right-column | Columnar arrangement |
+| row-1, row-2, row-3 | Row arrangement |
+
+---
+
+## PROCESSING STRATEGIES
+
+### INDIVIDUAL
+
+Extract each item separately, producing N outputs.
+
+**When to use:**
+- Catalog/inventory work (each SKU needs its own asset)
+- Portfolio items (each piece showcased independently)
+- Detailed documentation (each component documented)
+
+**Execution pattern:**
+```
+for each item in manifest:
+    process(target="{item.description} at {item.position}")
+    output: one asset per item
+```
+
+### GROUPED (BY_AXIS)
+
+Group items by a variant axis, producing M outputs (M < N).
+
+**When to use:**
+- Size comparison graphics (group by size)
+- Color swatches (group by color)
+- Category showcases (group by type)
+
+**Execution pattern:**
+```
+for each group in manifest.group_by(axis):
+    process(targets=group.items)
+    output: one asset per group
+```
+
+### COMPOSITE
+
+Keep all items together in arrangement, producing 1 output.
+
+**When to use:**
+- Family/range shots (show the full collection)
+- Lifestyle scenes (items in context together)
+- Marketing banners (complete offering)
+
+**Execution pattern:**
+```
+process(all_items, preserve_arrangement=True)
+output: one combined asset
+```
+
+### SELECTIVE
+
+Filter to specific items, then apply INDIVIDUAL or COMPOSITE.
+
+**When to use:**
+- User requests specific items ("just the large ones")
+- Quality filtering ("only the sharp ones")
+- Relevance filtering ("only the food items, not the props")
+
+**Execution pattern:**
+```
+filtered = manifest.filter(criteria)
+then: INDIVIDUAL or COMPOSITE on filtered
+```
+
+#### SELECTIVE Parsing
+
+When user requests a subset, parse filter criteria from their words:
+
+| User Says | Filter Attribute | Match Pattern |
+|-----------|------------------|---------------|
+| "only the large ones" | Size | Size = "Large" |
+| "just the blue ones" | Color/Design | Color = "Blue" OR Design contains "blue" |
+| "the ones in the top row" | Position | Position starts with "top-" |
+| "middle size only" | Size | Size = "Medium" |
+| "the pink design" | Design | Design contains "pink" |
+
+**Parsing template:**
+```
+User request: "only the large ones"
+
+1. IDENTIFY filter: Size = "Large"
+2. MATCH against Extraction Targets:
+   - Item 1: Size=Large -> MATCH
+   - Item 2: Size=Large -> MATCH
+   - Item 4: Size=Medium -> NO MATCH
+   ...
+3. FILTERED SET: Items 1, 2, 3
+4. APPLY strategy: INDIVIDUAL on filtered set
+5. RESULT: 3 outputs (not 9)
+```
+
+---
+
+## STRATEGY SELECTION SIGNALS
+
+### From Task Description
+
+| Signal in Task | Implies Strategy |
+|----------------|------------------|
+| "each", "individual", "per item", "separately" | INDIVIDUAL |
+| "together", "family", "group", "all in one", "range" | COMPOSITE |
+| "by size", "by color", "grouped by" | GROUPED |
+| "only the X", "just the Y", "specific" | SELECTIVE |
+
+### From Domain Context
+
+| Domain Context | Default Strategy |
+|----------------|------------------|
+| Catalog, inventory, SKU creation | INDIVIDUAL |
+| Marketing, lifestyle, campaigns | COMPOSITE |
+| Comparison, sizing guide | GROUPED |
+| Quality issue, specific request | SELECTIVE |
+
+### Ambiguity Resolution
+
+If signals are unclear:
+1. Check if task explicitly mentions desired output count
+2. Infer from domain context (catalog = individual, marketing = composite)
+3. Ask for clarification with options
+
+---
+
+## WORKFLOW PATTERN
+
+```
+1. DETECT
+   - View image, identify item count and relationships
+   - Classify: VARIANTS / COLLECTION / COMPONENTS / UNRELATED
+
+2. MANIFEST
+   - Output structured item list with positions and attributes
+   - Identify variant axes if applicable
+
+3. STRATEGIZE
+   - Read task signals for strategy preference
+   - Apply domain defaults if no explicit signal
+   - Document chosen strategy with rationale
+
+4. EXECUTE
+   - Apply strategy pattern (INDIVIDUAL / GROUPED / COMPOSITE / SELECTIVE)
+   - Track progress through manifest
+
+5. VERIFY
+   - Confirm all intended items processed
+   - Quality check each output
+```
+
+---
+
+## FAILURE HANDLING
+
+When extracting N items individually, some may fail. Handle gracefully.
+
+### Failure Strategies
+
+| Strategy | When | Behavior |
+|----------|------|----------|
+| **CONTINUE** (default) | Most cases | Complete remaining items, report failures at end |
+| **RETRY_ONCE** | Ambiguous targeting | Retry failed item with refined description |
+| **ABORT** | Critical dependency between items | Stop on first failure, return partial results |
+
+### Result Reporting Format
+
+When extraction completes (with or without failures), report structured results:
+
+```markdown
+## EXTRACTION RESULTS
+
+- **Completed:** [X] of [N]
+- **Failed:** [Y] (items: #5, #7)
+- **Strategy used:** [INDIVIDUAL/COMPOSITE/etc.]
+
+### Outputs
+
+| # | Description | Output ID | Status | Notes |
+|---|-------------|-----------|--------|-------|
+| 1 | Large jar blue lid | asset_abc123 | SUCCESS | |
+| 2 | Large jar yellow lid | asset_def456 | SUCCESS | |
+| 5 | Medium jar blue lid | - | FAILED | Items overlap in source |
+| 7 | Small jar blue lid | - | FAILED | Extraction ambiguous |
+
+### Failure Details (if any)
+
+| # | Reason | Recoverable |
+|---|--------|-------------|
+| 5 | Items overlap - can't isolate | Yes - retry with tighter targeting |
+| 7 | Position descriptor too vague | Yes - use "bottom-left corner" |
+```
+
+### Recovery Guidance
+
+| Failure Type | Recovery Action |
+|--------------|-----------------|
+| Overlap/ambiguous | Retry with more specific position: "the leftmost jar in bottom row" |
+| Not found at position | Verify Extraction Targets against actual image |
+| Quality issue | Retry with different extraction settings |
+| Persistent failure | Report to PM, continue with successful items |
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Correct Approach |
+|--------------|---------|------------------|
+| Treating multi-item as single unit | "the jars" instead of "9 jars" | Enumerate each item explicitly |
+| No position info | Can't target specific items | Always include position descriptors |
+| Ignoring variant structure | Miss size/color relationships | Identify variant axes |
+| Hardcoded strategy | Always INDIVIDUAL or always COMPOSITE | Select strategy from signals |
+| No manifest output | Downstream agents can't act | Always produce structured manifest |
+
+---
+
+## DOMAIN APPLICATION
+
+This protocol provides the PATTERN. Domain-specific protocols provide the VOCABULARY:
+
+```
+Domain Protocol includes multi_item_image.protocol:
+- Maps "item" to domain entity (product, room, dish)
+- Maps attributes to domain fields (size, sqft, portion)
+- Applies domain-specific defaults
+```
+
+The pattern (classification, manifest, strategies) remains identical across domains.
+
+</protocol>

@@ -6,19 +6,20 @@ Gemini has known issues:
 
 This module provides a wrapper that:
 - Detects blank responses and retries with exponential backoff + jitter
-- Enforces request timeout using concurrent.futures (sync) / asyncio.timeout (async)
+- Enforces request timeout using ContextThreadPoolExecutor (sync) / asyncio.timeout (async)
+- Preserves LangSmith tracing context across thread boundaries
 """
 
 import asyncio
 import logging
 import random
-from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any
 
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langsmith.utils import ContextThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +174,7 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
         Raises:
             GeminiTimeoutError: If request exceeds timeout
         """
-        with ThreadPoolExecutor(max_workers=1) as executor:
+        with ContextThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(super().invoke, input, config, **kwargs)
             try:
                 return future.result(timeout=self.request_timeout)
