@@ -11,10 +11,23 @@ Defines how PM sequences domain work and handles dependencies.
 
 ### Mode 1: Sequential Chain (ANALYSIS PHASE)
 
+**CRITICAL: ONE AT A TIME. NEVER PARALLEL.**
+
 Analysis phase follows strict sequence because each step enriches the next.
 
 ```
-Visual -> Product -> Catalog
+Visual -> [WAIT] -> Product -> [WAIT] -> Catalog
+```
+
+**Execution Pattern:**
+```
+1. Delegate to visual_analyst
+2. WAIT for visual_analyst response (get visual_analysis.md)
+3. THEN delegate to product_analyst (include visual_analysis.md)
+4. WAIT for product_analyst response (get product_research.md)
+5. THEN delegate to catalog_analyst (include BOTH files)
+6. WAIT for catalog_analyst response
+7. Synthesize all three for user
 ```
 
 **Why This Order:**
@@ -22,21 +35,18 @@ Visual -> Product -> Catalog
 - Product researches EVERYTHING about it (specs, HSN, compliance, naming, positioning)
 - Catalog uses BOTH to search effectively (find similar products with rich context)
 
-**Anti-Pattern (Parallel Analysis):**
+**VIOLATION - Parallel Analysis:**
 ```
-WRONG: Visual -> [Catalog || Product] parallel
--> Catalog searches with only visual findings ("PET jar")
--> Misses rich product context (HSN, specs, compliance, positioning)
--> Less effective search, wrong family recommendations
+WRONG: Call Visual, Product, Catalog at the same time
+-> Product has NO visual findings to use
+-> Catalog has NO product research to search with
+-> Each agent works BLIND = garbage output
 ```
 
-**Correct Pattern:**
-```
-1. visual_analyst (identifies product)
-2. product_analyst (researches EVERYTHING - uses visual findings)
-3. catalog_analyst (searches with BOTH visual AND product findings)
-4. PM synthesizes all three for user
-```
+**Why parallel fails:**
+- Product analyst receives delegation but visual_analysis.md doesn't exist yet
+- Catalog analyst receives delegation but neither file exists yet
+- You just wasted 3 agent calls and got useless results
 
 ### Mode 2: Intelligent Sequencing
 
@@ -355,6 +365,17 @@ First pass (parallel) -> Conflict detected -> Second pass (targeted)
 
 **PM MUST include these in each delegation. Agents cannot see your conversation.**
 
+**CRITICAL: IMAGE PATH TO EVERY AGENT**
+
+Every agent in an image workflow receives `Source image at: inbox/photo.jpg`. Not just visual_analyst - ALL of them:
+- product_analyst: Can verify visual findings, see details for research
+- catalog_analyst: Can compare with existing products visually
+- creative_specialist: Needs source for processing
+- catalog_specialist: Reference during record creation
+
+**WRONG:** Only passing image to visual_analyst
+**CORRECT:** Every delegation includes the source image path
+
 | Artifact | Source | Routes To | PM Action |
 |----------|--------|-----------|-----------|
 | **Source image path** | User upload | ALL agents in image workflow | Include in EVERY delegation when image-based |
@@ -362,8 +383,6 @@ First pass (parallel) -> Conflict detected -> Second pass (targeted)
 | product_research_{item}.md | product_analyst | catalog_analyst, catalog_specialist | Include for catalog search and creation |
 | catalog_analysis_{item}.md | catalog_analyst | catalog_specialist | Include when delegating catalog creation |
 | asset_id (UUID) | creative_specialist | catalog_specialist | Include when linking asset to product |
-
-**Key:** Source image path goes to ALL agents - they have multimodal capability and may need to see the product directly.
 
 **Note:** Creative specialist returns asset_id (not storage_path). Asset is already HITL-approved for image quality.
 
