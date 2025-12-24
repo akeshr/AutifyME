@@ -742,7 +742,8 @@ class WorkflowRunner:
             from langchain.messages import HumanMessage
 
             # Extract user text - this is what PM should see directly
-            user_text = raw_payload.get("text", "")
+            # Use `or ""` to handle explicit None values (not just missing keys)
+            user_text = raw_payload.get("text") or ""
 
             # Handle batch scenario (media_ids array) or single message (media_id)
             media_ids = raw_payload.get("media_ids", [])
