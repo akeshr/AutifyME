@@ -116,24 +116,25 @@ Agent summaries are quick but may miss details. At the approval gate:
 1. **Read** all analysis files (visual, catalog, product)
 2. **Synthesize** into unified understanding (not concatenation)
 3. **Detect conflicts** between domains
-4. **Present** coherent recommendation to user
+4. **If conflict found:** Trigger second pass with cross-domain context (see coordination_patterns)
+5. **Present** coherent recommendation to user
 
 ```
 [Analysts complete]
        |
        v
-[read_file: visual_analysis_*.md]
-[read_file: catalog_analysis_*.md]
-[read_file: product_research_*.md]
+[read_file: all analysis files]
        |
        v
-[Synthesize: Identity + Placement + Compliance + Positioning]
+[Synthesize + Detect conflicts]
        |
-       v
-[Present unified recommendation to user]
+       +---> [Conflict?] --YES--> [Second pass with cross-domain context]
+       |                                    |
+       v                                    v
+[Present unified recommendation to user] <--+
 ```
 
-**The coordination_patterns protocol has detailed synthesis guidance.**
+**The coordination_patterns protocol has CROSS-DOMAIN REFINEMENT guidance.**
 
 </core_rules>
 

@@ -26,18 +26,31 @@ You cannot see PM's conversation. You only see what PM tells you. If something's
 
 When PM says "Read file at [path]":
 
-| Check | Action if Missing |
-|-------|-------------------|
-| Does file exist? | Return error: "File not found: [path]" |
-| Is content readable? | Return error: "Cannot read file: [path]" |
-| Does content match expected? | Flag if content seems wrong for task |
+| Step | Action |
+|------|--------|
+| 1. READ the file | `read_file(path)` - actually read it |
+| 2. VERIFY content | Does it contain expected analysis? |
+| 3. USE the content | Integrate findings into your work |
+
+**CRITICAL:** "Read X at path" is an INSTRUCTION, not just a reference. You MUST:
+1. Actually call read_file on that path
+2. Use the contents to inform your analysis/execution
+3. Build on upstream work, don't duplicate it
 
 **Pattern:**
 ```
-PM: "Read visual analysis at visual_analysis_product.md"
-You: [read_file] -> Verify file exists and contains visual analysis
-     If missing: "Required file visual_analysis_product.md not found.
-                  PM should ensure visual_analyst completed first."
+PM: "Find family fit. Read visual analysis at visual_analysis_product.md"
+
+You: [read_file("visual_analysis_product.md")]
+     -> Contains: "500ml PET jar, honeycomb texture, food-grade material"
+     -> USE this: Search for PET families with 500ml variants, food-safe
+     -> DON'T: Ignore and start fresh analysis
+```
+
+**If file missing:**
+```
+"Required file visual_analysis_product.md not found.
+PM should ensure visual_analyst completed first."
 ```
 
 ### 2. Required Context

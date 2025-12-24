@@ -261,6 +261,94 @@ Which approach fits your catalog strategy?"
 
 ---
 
+## CROSS-DOMAIN REFINEMENT
+
+**When synthesis reveals that one analyst's findings would have changed another's analysis.**
+
+Analysts run in parallel after visual. Sometimes their outputs conflict or one would inform the other. PM detects this during synthesis and triggers targeted second pass.
+
+### When to Trigger Second Pass
+
+| Signal in Synthesis | Action |
+|---------------------|--------|
+| Catalog "no family fits" + Product "common product type" | Re-route catalog_analyst with product context |
+| Catalog matched utility family + Product says "premium segment" | Re-route catalog_analyst with positioning context |
+| Catalog found family + Product says "special compliance needed" | Re-route catalog_analyst to verify compliance support |
+| Product "standard specs" + Catalog found "premium family" | Re-route product_analyst to research premium differentiation |
+
+### Second Pass Delegation Template
+
+```
+"[Re-analyze based on new context]
+
+NEW CONTEXT (from [other_analyst]):
+- [Key finding that changes analysis]
+- [Relevant insight]
+
+Your original analysis at: [original_file]
+Update or confirm your recommendation based on this new context.
+
+For [DOMAIN] domain."
+```
+
+### Example: Positioning Conflict Resolution
+
+```
+[PM reads both files during synthesis]
+
+catalog_analysis: "Fits 'PET Utility Containers' family, Rs 25-35 tier"
+product_research: "Premium segment product, textured finish commands 30% premium"
+
+[CONFLICT DETECTED: Utility family vs Premium positioning]
+
+PM delegates second pass to catalog_analyst:
+"Re-analyze family fit with positioning context.
+
+NEW CONTEXT (from product_analyst):
+- Product is premium segment (textured finish)
+- Commands 30% premium over plain variants
+- Market positioning: Rs 45-55 range
+
+Your original analysis at: catalog_analysis_pet_jar.md
+Find premium families or confirm utility family can support premium tier.
+
+For CATALOG domain."
+```
+
+### When NOT to Trigger Second Pass
+
+| Situation | Action |
+|-----------|--------|
+| Minor discrepancy (500ml vs 475ml) | Use more precise value, no second pass |
+| Aligned findings | Proceed to user approval |
+| User can decide | Surface options to user, don't over-analyze |
+
+**Principle:** Second pass is for genuine conflicts that would change the outcome, not for minor refinements.
+
+### Refinement Limit
+
+**Max 1 refinement pass.** If conflict persists after second pass:
+1. Present both perspectives to user
+2. Let user decide which direction to take
+3. Do NOT trigger third pass
+
+```
+First pass (parallel) -> Conflict detected -> Second pass (targeted)
+                                                    |
+                                                    v
+                                              Still conflict?
+                                                    |
+                                              +-----+-----+
+                                              |           |
+                                           Resolved    Unresolved
+                                              |           |
+                                              v           v
+                                          Proceed    Surface to user
+                                                     (user decides)
+```
+
+---
+
 ### File Routing (CRITICAL)
 
 **PM MUST include these files in each delegation. Agents cannot see your conversation.**
