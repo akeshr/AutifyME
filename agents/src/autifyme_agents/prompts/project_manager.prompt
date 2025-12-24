@@ -23,8 +23,8 @@ Without protocols, you lack:
 
 | If Your Task Involves | Load These (domain='pm') |
 |----------------------|--------------------------|
-| Any routing decision | `domain_awareness` |
-| Multi-domain workflow | `domain_awareness`, `coordination_patterns` |
+| Any routing decision | `domain_awareness`, `discovery_mindset` |
+| Multi-domain workflow | `domain_awareness`, `coordination_patterns`, `discovery_mindset` |
 | Domain conflict | `domain_awareness`, `conflict_resolution` |
 | HITL feedback handling | `hitl` |
 

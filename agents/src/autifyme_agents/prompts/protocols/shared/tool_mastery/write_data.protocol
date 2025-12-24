@@ -5,6 +5,37 @@
 Master the write_data tool - atomic multi-table database transactions with HITL approval.
 This is the ONLY way to create, update, or delete data.
 
+---
+
+## [CRITICAL] PREREQUISITE: Schema Discovery
+
+**You MUST call inspect_schema BEFORE write_data. No exceptions.**
+
+```
+MANDATORY SEQUENCE:
+1. inspect_schema(tables=[...], details=["structure", "relationships", "constraints"])
+2. Document discovered columns, types, constraints
+3. Map your data to actual schema columns
+4. Build write_data operations with verified columns
+5. Execute write_data
+```
+
+**Why?** Schema is truth. Protocols describe business intent. Only inspect_schema reveals:
+- Actual column names (not what you remember or assume)
+- Required columns (NOT NULL without defaults)
+- Valid enum values (exact case-sensitive values)
+- FK relationships (dependency order for operations)
+
+**VIOLATION:** Calling write_data without inspect_schema will cause:
+- Missing column errors (required fields you didn't know about)
+- Wrong column names (schema changed, memory hallucinated)
+- Invalid enum values (case mismatch, outdated values)
+- FK constraint violations (wrong dependency order)
+
+**Load `schema_discovery` protocol for the complete workflow.**
+
+---
+
 ## WRITEINTENT PATTERN (5 Required Fields + Optional asset_uploads)
 
 Every write_data call requires this structure:
@@ -536,20 +567,24 @@ Multiple assets with image previews for variant families.
 
 ---
 
-## BEFORE write_data
-
-**ALWAYS do these first:**
-
-1. **inspect_schema**: Know the table structure
-2. **read_data (duplicate check)**: Verify no duplicates
-3. **read_data (foreign keys)**: Get IDs for relationships
-4. **view_image (if applicable)**: Verify visual attributes
-
-Never write_data without validation.
-
----
-
 ## ANTI-PATTERNS
+
+### Anti-Pattern 0: Skipping Schema Discovery [CRITICAL - MOST COMMON ERROR]
+
+```
+WRONG:
+# Assume column names from memory or protocol
+write_data(operations=[{table: 'products', data: {'name': '...', 'sku_code': '...'}}])
+# FAILS: Column is 'sku', not 'sku_code'. Missing required 'description'.
+
+CORRECT:
+1. inspect_schema(tables=['products'], details=['structure', 'constraints'])
+2. See: sku (not sku_code), description NOT NULL, product_type enum
+3. Map data to actual columns
+4. write_data with verified column names
+```
+
+**This is the #1 cause of write_data failures.** Always verify schema before writing.
 
 ### Anti-Pattern 1: No duplicate check
 

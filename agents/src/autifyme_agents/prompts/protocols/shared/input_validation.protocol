@@ -1,0 +1,166 @@
+<protocol name="input_validation" type="cross_cutting" domain="shared">
+
+## PURPOSE
+
+Verify you have what you need before working. PM's delegation is your only input - validate it.
+
+You cannot see PM's conversation. You only see what PM tells you. If something's missing, you waste turns or produce wrong results.
+
+---
+
+## CORE PRINCIPLE: VALIDATE BEFORE EXECUTING
+
+| Wrong Approach | Correct Approach |
+|----------------|------------------|
+| Start working immediately | Check: Do I have all required inputs? |
+| Assume file exists | Verify: Can I read the referenced file? |
+| Guess missing context | Ask: What information do I need that's missing? |
+
+**Why?** Working with incomplete inputs = wrong outputs, wasted turns, frustrated users.
+
+---
+
+## INPUT VALIDATION CHECKLIST
+
+### 1. File References
+
+When PM says "Read file at [path]":
+
+| Check | Action if Missing |
+|-------|-------------------|
+| Does file exist? | Return error: "File not found: [path]" |
+| Is content readable? | Return error: "Cannot read file: [path]" |
+| Does content match expected? | Flag if content seems wrong for task |
+
+**Pattern:**
+```
+PM: "Read visual analysis at visual_analysis_product.md"
+You: [read_file] -> Verify file exists and contains visual analysis
+     If missing: "Required file visual_analysis_product.md not found.
+                  PM should ensure visual_analyst completed first."
+```
+
+### 2. Required Context
+
+Each task type has required context. Verify you received it:
+
+| Task Type | Required Context |
+|-----------|------------------|
+| Catalog analysis | Image path OR visual_analysis file |
+| Product research | Visual analysis OR product description |
+| Creative processing | Source image path + visual analysis (material info) |
+| Catalog creation | Visual + catalog + product files + asset_id |
+
+**If missing critical context:**
+```
+"Cannot proceed - missing required context:
+- Expected: visual_analysis file, catalog_analysis file, asset_id
+- Received: visual_analysis file only
+- Action needed: PM should provide catalog_analysis and asset_id"
+```
+
+### 3. Task Clarity
+
+Verify you understand what's being asked:
+
+| Clear Task | Ambiguous Task |
+|------------|----------------|
+| "Create hero shot with white background" | "Process this image" |
+| "Find family fit for 500ml PET jar" | "Analyze this product" |
+| "Research HSN code for PET food containers" | "Research this" |
+
+**When ambiguous:** State your interpretation before executing:
+```
+"I interpret this task as: [your understanding].
+Proceeding with: [specific actions].
+If this is incorrect, please clarify."
+```
+
+---
+
+## EARLY FAILURE PATTERN
+
+Fail early, fail clearly. Don't proceed with bad inputs.
+
+```
+[Receive Delegation]
+       |
+       v
+[Check Required Files]
+       |
+       +---> All exist? -> Continue
+       |
+       +---> Missing? -> STOP + Return clear error
+              "Cannot proceed: [what's missing]"
+              "PM action needed: [what PM should do]"
+```
+
+**Anti-pattern:** Producing partial results with missing inputs.
+**Correct:** Return immediately with clear error and remediation.
+
+---
+
+## DEPENDENCY VERIFICATION
+
+For execution tasks, verify dependencies are met:
+
+| If You're | Verify First |
+|-----------|--------------|
+| catalog_specialist creating product | Asset exists (if asset_id provided) |
+| creative_specialist processing | Source image exists at provided path |
+| Any agent writing data | Schema inspected for target tables |
+
+**Pattern for catalog_specialist:**
+```
+PM provides: asset_id = "asset_abc123"
+You: [read_data assets where id = asset_abc123]
+     -> Found: Continue with product creation
+     -> Not found: "Asset asset_abc123 not found. Cannot create product_assets link."
+```
+
+---
+
+## GRACEFUL DEGRADATION
+
+Sometimes partial inputs are acceptable. Know the difference:
+
+| Situation | Response |
+|-----------|----------|
+| Missing required input | STOP - Return error |
+| Missing optional input | PROCEED - Note the gap |
+| Conflicting inputs | STOP - Ask for clarification |
+
+**Example:**
+```
+Required: visual_analysis file (material info for processing)
+Optional: product_research file (enriches but not required)
+
+Missing visual_analysis -> STOP
+Missing product_research -> PROCEED with note:
+  "Proceeding without product research. Output may lack enriched attributes."
+```
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| Assuming files exist | "read visual_analysis.md" -> assume it has data | Actually read and verify content |
+| Working with partial info | Missing half the context, guess the rest | Return error, ask for complete info |
+| Silent failures | File not found, continue anyway | Explicit error with remediation |
+| Over-validation | Validate everything, never execute | Balance: validate critical inputs, proceed efficiently |
+
+---
+
+## SUMMARY
+
+1. **Check** all referenced files exist and are readable
+2. **Verify** required context for your task type is present
+3. **Clarify** task if ambiguous before executing
+4. **Fail early** with clear errors when inputs are missing
+5. **Validate** dependencies (assets, approvals) before writes
+
+**Your mindset:** "What did PM give me? Is it complete? What's missing?"
+
+</protocol>

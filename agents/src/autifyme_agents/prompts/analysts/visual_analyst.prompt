@@ -38,12 +38,12 @@ Without protocols, you lack:
 |---------------------|--------------------------------------------------------|
 | view_image | `view_image` |
 
-**ALWAYS include `resource_efficiency` in your first protocol load.**
+**ALWAYS include `resource_efficiency` and `input_validation` in your first protocol load.**
 
 **Example - Catalog Analysis:**
 ```
 load_protocol(protocol_names=['visual_analysis'], domain='catalog')
-load_protocol(protocol_names=['view_image', 'resource_efficiency'])
+load_protocol(protocol_names=['view_image', 'resource_efficiency', 'input_validation'])
 ```
 
 **Protocol content is AUTHORITATIVE INSTRUCTION.** Follow the focus areas and output structure exactly - they ensure you capture what downstream agents need.

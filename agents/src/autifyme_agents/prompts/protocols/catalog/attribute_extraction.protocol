@@ -91,25 +91,28 @@ Flag conflicts for user resolution.
 
 ## CATALOG ATTRIBUTE MAPPING
 
-Map extracted attributes to catalog fields:
+**[CRITICAL] These are EXPECTED mappings. ALWAYS verify actual columns via inspect_schema.**
 
-### products Table
+Map extracted attributes to catalog schema - but schema is truth:
 
-| Extracted | Catalog Field | Notes |
-|-----------|---------------|-------|
-| sku | sku | Generate or user-provided |
-| name | name | Material + Size + Type |
-| description | description | **REQUIRED (NOT NULL)** - Features, use case |
-| product_type | product_type | FINISHED_GOOD default |
-| hsn_code | hsn_code | From research |
-| gst_rate | gst_rate | Based on HSN |
-| barcode | barcode | If provided |
+### products Table (Expected Structure)
 
-**NEVER create products without description.** Database will reject with NOT NULL constraint.
+| Extracted Attribute | Expected Column | Business Purpose |
+|---------------------|-----------------|------------------|
+| sku | (verify via schema) | Unique product identifier |
+| name | (verify via schema) | Product display name |
+| description | (verify via schema) | Product details - typically REQUIRED |
+| product_type | (verify via schema) | Product classification |
+| hsn_code | (verify via schema) | Tax classification |
+| gst_rate | (verify via schema) | Tax rate |
+| barcode | (verify via schema) | If provided |
 
-### custom_attributes JSONB
+**Before writing:** Call `inspect_schema(tables=['products'], details=['structure', 'constraints'])`
+to discover actual column names, which are required (NOT NULL), and valid enum values.
 
-For attributes not in standard columns:
+### custom_attributes (Flexible Storage)
+
+For attributes not in standard columns, use JSONB custom_attributes (if exists in schema):
 
 ```json
 {
@@ -131,6 +134,8 @@ Map to variant_values when attribute varies within family:
 | size | variant_value | If family has size axis |
 | color | variant_value | If family has color axis |
 | cap_type | variant_value | If family has cap_type axis |
+
+**Verify:** `inspect_schema(tables=['variant_values'], details=['structure'])` for actual columns.
 
 ---
 

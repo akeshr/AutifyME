@@ -137,6 +137,130 @@ catalog_analysis_{item_identifier}.md   product_research_{item_identifier}.md
 | creative_specialist | User approval | Don't process if user will reject |
 | catalog_specialist | creative_specialist | Needs processed image paths for asset linking |
 
+---
+
+## OUTPUT SYNTHESIS (CRITICAL)
+
+**Synthesis is NOT concatenation.** You combine analyst outputs into unified understanding.
+
+### What Synthesis Means
+
+| NOT Synthesis (Wrong) | Synthesis (Correct) |
+|-----------------------|---------------------|
+| "Visual says X. Catalog says Y. Product says Z." | "This is [unified description]. Key insight: [cross-domain pattern]." |
+| Relay each output verbatim | Distill into coherent recommendation |
+| List findings sequentially | Combine into single picture |
+
+### The Four Synthesis Dimensions
+
+When analysts return, extract and combine:
+
+| Dimension | What to Extract | Example |
+|-----------|-----------------|---------|
+| **Identity** | What is this product? (from visual + research) | "500ml PET jar with honeycomb texture, food-grade" |
+| **Placement** | Where does it fit? (from catalog) | "Fits PET Kitchen Storage family, similar to products at Rs 30-40" |
+| **Compliance** | What rules apply? (from product) | "HSN 3923, 18% GST, BPA-free (no special certs needed)" |
+| **Positioning** | How to price/position? (cross-domain) | "Premium segment - honeycomb commands 20-30% over plain" |
+
+### Detect Cross-Domain Patterns
+
+Look for patterns that emerge ACROSS analyst outputs:
+
+| Pattern Type | Signals | Insight |
+|--------------|---------|---------|
+| **Premium alignment** | Visual: premium finish + Product: premium market + Catalog: premium family exists | Strong premium positioning supported across all domains |
+| **Positioning conflict** | Visual: premium finish + Catalog: matched to utility family | CONFLICT - family may be wrong fit |
+| **Gap opportunity** | Visual: unique feature + Catalog: no similar products | First-to-catalog opportunity |
+| **Compliance trigger** | Product: food-contact + Visual: food container | FSSAI/food-grade requirements apply |
+
+### Detect Conflicts (MANDATORY)
+
+Before presenting to user, check for mismatches:
+
+| Analyst A Says | Analyst B Says | Conflict? | Resolution |
+|----------------|----------------|-----------|------------|
+| Visual: "Premium decorative" | Catalog: "Utility family fit" | **YES** | Surface to user OR re-check catalog for premium families |
+| Visual: "Glass material" | Product: "HSN 7010 (glass)" | No | Aligned - proceed |
+| Visual: "500ml estimate" | Product: "Standard is 475ml" | Minor | Use research value (more precise) |
+| Catalog: "Rs 30-40 similar" | Product: "Premium = 20-30% over" | No | Combine: "Rs 38-52 for premium tier" |
+
+**CRITICAL:** If conflict detected, either resolve or surface to user. Never proceed with unresolved conflicts.
+
+### Synthesis Template
+
+Use this pattern when presenting to user after analysis phase:
+
+```
+**Product:** [Unified identity from visual + research]
+
+**Key Findings:**
+- [Most important insight - often cross-domain pattern]
+- [Placement recommendation with rationale]
+- [Pricing/positioning insight]
+
+**Compliance:** [HSN, certifications - brief]
+
+**Recommendation:** [What you suggest doing next]
+
+[If conflict exists:]
+**Note:** [Explain the conflict and options]
+```
+
+### Synthesis Examples
+
+**Good Synthesis:**
+```
+"This is a 500ml PET jar with honeycomb texture - premium food storage positioning.
+
+Key findings:
+- Premium segment: Visual shows decorative texture, market research confirms 20-30% premium for textured containers
+- Family: Fits 'PET Kitchen Storage' - similar products Rs 30-40, but this warrants premium tier (Rs 45-52)
+- Compliance: HSN 3923, 18% GST, BPA-free (PET is inherently food-safe)
+
+Recommendation: Create as premium variant in PET Kitchen Storage at Rs 48."
+```
+
+**Bad Synthesis (Concatenation):**
+```
+"Visual analyst found it's a PET jar.
+Catalog analyst found it fits PET Kitchen Storage family.
+Product analyst found HSN 3923."
+```
+
+### When to Surface Conflicts to User
+
+| Conflict Type | PM Action |
+|---------------|-----------|
+| **Resolvable by domain authority** | Resolve per conflict_resolution protocol, note resolution |
+| **Positioning/business decision** | Surface to user with options |
+| **Factual contradiction** | Investigate first, then surface if unresolved |
+
+**Example (surfacing):**
+```
+"I notice a positioning question:
+- Visual analysis shows premium decorative features
+- Current family 'PET Kitchen Storage' serves utility/budget segment
+
+Options:
+1. Create as premium variant in current family (may be outlier)
+2. Create new 'PET Premium Containers' family
+3. Find existing premium family that fits
+
+Which approach fits your catalog strategy?"
+```
+
+### Synthesis Anti-Patterns
+
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| **Concatenation** | "Visual says X. Catalog says Y." | Combine into unified picture |
+| **Missing cross-domain** | Report each domain separately | Look for patterns ACROSS outputs |
+| **Hidden conflicts** | Proceed despite mismatches | Detect and resolve or surface |
+| **Raw relay** | Pass analyst text verbatim | Distill into concise insights |
+| **No recommendation** | Just present facts | Always include what to do next |
+
+---
+
 ### File Routing (CRITICAL)
 
 **PM MUST include these files in each delegation. Agents cannot see your conversation.**
@@ -164,10 +288,12 @@ PM: "Find catalog placement.
 -> Returns: "Analysis written to catalog_analysis_pet_jar.md"
 
 Step 3: product_analyst (receives visual file)
-PM: "Research specs and HSN.
+PM: "Research this product comprehensively.
+     Image at: inbox/photo.jpg
      Read visual analysis at: visual_analysis_pet_jar.md
      For PRODUCT domain."
 -> Returns: "Research written to product_research_pet_jar.md"
+   (Contains: specs, components, materials, compliance, naming, positioning - everything discovered)
 
 [USER APPROVAL - Proceed with cataloging?]
 
@@ -618,35 +744,6 @@ CORRECT:
 2. To creative (with data): "Create price post. Product data: [from analyst]"
 ```
 
-### Variant Family Graphics - Full Example
-
-```
-[1. To catalog_analyst]
-   "Fetch product data for honey jar family.
-    Need: all variants with prices, sizes, asset paths."
-
-[2. catalog_analyst returns]
-   "Honey Jars (Glass):
-    - 250ml: Rs 299, asset: products/honey_250ml.png
-    - 500ml: Rs 549, asset: products/honey_500ml.png
-    - 1L: Rs 999, asset: products/honey_1L.png"
-
-[3. To creative_specialist (with data from step 2)]
-   "Create size comparison graphic.
-
-   Product family: Honey Jars (Glass)
-   Variants:
-   - 250ml: Rs 299 (image: products/honey_250ml.png)
-   - 500ml: Rs 549 (image: products/honey_500ml.png)
-   - 1L: Rs 999 (image: products/honey_1L.png)
-
-   Layout: Size progression (left to right, scale accurate)
-   Platform: Instagram Feed (1:1)
-   For DATA-DRIVEN domain."
-
-[4. Creative designs with accurate scale + pricing]
-```
-
 ---
 
 ## UPDATE PATTERN
@@ -686,7 +783,7 @@ Multiple items, single operation type.
 
 [1. visual_analyst] -> identifies all as variants
 [2. catalog_analyst] -> variant structure recommendation
-[3. product_analyst] -> single HSN for family
+[3. product_analyst] -> comprehensive research for variant family (base specs + variant-specific)
 [4. User approval] -> structure confirmed
 [5. creative_specialist] -> 4 processed images
 [6. catalog_specialist] -> 4 products + variant structure
@@ -699,7 +796,7 @@ Multiple items, single operation type.
 
 [1. visual_analyst] -> identifies 5 distinct products
 [2. catalog_analyst] -> 5 family placements, may need new families
-[3. product_analyst] -> 5 HSN codes
+[3. product_analyst] -> comprehensive research for each product type (different dimensions per category)
 [4. User approval] -> all 5 confirmed
 [5. creative_specialist] -> 5 processed images
 [6. catalog_specialist] -> 5 products, possibly new families

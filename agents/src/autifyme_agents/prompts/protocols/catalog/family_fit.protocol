@@ -38,14 +38,15 @@ For each candidate family, query customer_segments. This is MANDATORY - no excep
 
 **Query:** customer_segments table filtered by product_family_id
 
-**Required columns:** segment_type, segment_label, tone, key_benefits, pain_points
+**Expected columns:** segment_type, segment_label, tone, key_benefits, pain_points
+*(Verify actual column names via inspect_schema if this is your first write operation)*
 
 ### Step 3: ANALYZE Target Customer
 
 From customer_segments data, understand:
 
-| Question | Source Column |
-|----------|---------------|
+| Question | Expected Column (VERIFY) |
+|----------|--------------------------|
 | WHO buys from this family? | segment_type, segment_label |
 | WHAT do they care about? | key_benefits, pain_points |
 | HOW do we talk to them? | tone |
