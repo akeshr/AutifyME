@@ -309,6 +309,37 @@ async def _process_message_async(
         # Don't raise - background task failures are logged but don't affect webhook response
 
 
+async def _process_batch_after_delay(
+    batcher: MessageBatcher,
+    sender: str,
+    runner: WorkflowRunner,
+) -> None:
+    """Wait for debounce window, then process batch.
+
+    Each queued message starts this as a background task. The task:
+    1. Waits the debounce window (3 seconds)
+    2. Checks if messages are still pending for this sender
+    3. If yes, atomically fetches and processes them
+
+    Multiple concurrent tasks are safe - atomic fetch_and_clear ensures
+    only one task actually processes the batch.
+    """
+    try:
+        processed = await batcher.process_after_delay(sender, runner)
+        if processed:
+            logger.info(
+                "Background batch processing completed",
+                extra={"sender": sender},
+            )
+    except Exception as batch_exc:
+        logger.error(
+            "Background batch processing failed",
+            exc_info=batch_exc,
+            extra={"sender": sender, "error_type": type(batch_exc).__name__},
+        )
+        # Don't raise - background task failures are logged but don't affect webhook response
+
+
 # REMOVED: _is_approval_message() helper
 # Runner uses native LangGraph patterns - ALL messages go through handle_message()
 # Runner automatically detects pending interrupts via pm.get_state() and invokes approval_analyzer
@@ -514,6 +545,16 @@ async def receive(
                                 "message_type": msg_type,
                                 "debounce_reason": "media" if msg_type in ("image", "video", "document", "audio", "voice") else "recent_activity",
                             }
+                        )
+
+                        # Each message starts a delayed processing task
+                        # Task waits debounce window (3s), then processes if messages still pending
+                        # Multiple concurrent tasks are safe - atomic fetch_and_clear ensures only one processes
+                        background_tasks.add_task(
+                            _process_batch_after_delay,
+                            batcher=batcher,
+                            sender=sender,
+                            runner=runner,
                         )
                     else:
                         # Process immediately (text-only, no recent activity)

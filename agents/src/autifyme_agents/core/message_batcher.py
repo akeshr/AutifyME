@@ -164,7 +164,10 @@ class MessageBatcher:
         received_at: datetime,
         runner: WorkflowRunner,
     ) -> bool:
-        """Queue message for batch processing and start timer if needed.
+        """Queue message for batch processing.
+
+        Serverless-compatible: Instead of in-memory timers, we queue to DB
+        and check for ready batches on each webhook.
 
         Args:
             message_id: WhatsApp message ID
@@ -179,7 +182,7 @@ class MessageBatcher:
             runner: WorkflowRunner for batch processing
 
         Returns:
-            True if new timer was started, False if timer already running
+            True if batch was processed, False if still collecting
         """
         # Store message in DB buffer
         await self._storage.queue_pending_message(
@@ -194,30 +197,129 @@ class MessageBatcher:
             received_at=received_at,
         )
 
-        # Check if timer already running for this sender
-        async with self._lock:
-            if sender_id in self._active_timers:
-                logger.debug(
-                    "Timer already running, message added to batch",
-                    extra={"sender_id": sender_id, "message_id": message_id},
-                )
-                return False
+        logger.debug(
+            "Message queued to DB buffer",
+            extra={"sender_id": sender_id, "message_id": message_id},
+        )
 
-            # Start new debounce timer
-            timer_task = asyncio.create_task(
-                self._debounce_and_process(sender_id, runner),
-                name=f"debounce_{sender_id}",
+        # Return True to indicate caller should start delayed processing
+        # Each message starts its own delayed task - the last one will process the batch
+        return True
+
+    async def process_after_delay(self, sender_id: str, runner: WorkflowRunner) -> bool:
+        """Wait for debounce window, then process batch if still pending.
+
+        Serverless-compatible: Each queued message starts this as a background task.
+        The task waits the debounce window, then checks if messages are still pending.
+        If yes, it processes them. Multiple concurrent tasks are safe because
+        fetch_and_clear_batch is atomic.
+
+        Args:
+            sender_id: Phone number
+            runner: WorkflowRunner for batch processing
+
+        Returns:
+            True if batch was processed, False if nothing to process
+        """
+        # Wait for debounce window
+        await asyncio.sleep(self._debounce_seconds)
+
+        # Check if there are still pending messages for this sender
+        has_pending = await self._storage.has_pending_messages(sender_id)
+        if not has_pending:
+            logger.debug(
+                "No pending messages after debounce (already processed)",
+                extra={"sender_id": sender_id},
             )
-            self._active_timers[sender_id] = (timer_task, runner)
+            return False
 
-            logger.info(
-                "Started debounce timer for sender",
+        # Atomic fetch-and-delete, then process
+        batch = await self._storage.fetch_and_clear_batch(sender_id)
+        if not batch:
+            logger.debug(
+                "Batch was processed by another task",
+                extra={"sender_id": sender_id},
+            )
+            return False
+
+        # Safety limit
+        if len(batch) > self._max_batch_size:
+            logger.warning(
+                "Batch exceeds max size, truncating",
                 extra={
                     "sender_id": sender_id,
-                    "debounce_seconds": self._debounce_seconds,
+                    "batch_size": len(batch),
+                    "max_size": self._max_batch_size,
                 },
             )
-            return True
+            batch = batch[: self._max_batch_size]
+
+        logger.info(
+            "Processing message batch after debounce",
+            extra={
+                "sender_id": sender_id,
+                "batch_size": len(batch),
+                "message_types": [m.get("message_type") for m in batch],
+            },
+        )
+
+        await runner.handle_message_batch(sender_id, batch)
+        return True
+
+    async def check_and_process_ready_batches(self, runner: WorkflowRunner) -> int:
+        """Check for and process any batches that are ready (serverless-compatible).
+
+        Called on each webhook to check if any sender has messages older
+        than the debounce window. This replaces in-memory timers which
+        don't survive serverless function termination.
+
+        Args:
+            runner: WorkflowRunner for batch processing
+
+        Returns:
+            Number of batches processed
+        """
+        # Get messages older than debounce window (they've "waited long enough")
+        ready_batches = await self._storage.get_orphaned_batches(
+            age_seconds=int(self._debounce_seconds)
+        )
+
+        if not ready_batches:
+            return 0
+
+        # Group by sender
+        batches_by_sender: dict[str, list[dict[str, Any]]] = {}
+        for msg in ready_batches:
+            sender_id = msg.get("sender_id", msg.get("batch_key"))
+            if sender_id:
+                batches_by_sender.setdefault(sender_id, []).append(msg)
+
+        processed_count = 0
+        for sender_id, batch in batches_by_sender.items():
+            try:
+                logger.info(
+                    "Processing ready batch",
+                    extra={"sender_id": sender_id, "message_count": len(batch)},
+                )
+                # Atomic fetch-and-delete, then process
+                full_batch = await self._storage.fetch_and_clear_batch(sender_id)
+                if full_batch:
+                    await runner.handle_message_batch(sender_id, full_batch)
+                    processed_count += 1
+            except Exception:
+                logger.error(
+                    "Failed to process ready batch",
+                    exc_info=True,
+                    extra={"sender_id": sender_id},
+                )
+
+        if processed_count > 0:
+            logger.info(
+                "Ready batches processed",
+                extra={"batch_count": processed_count},
+            )
+
+        return processed_count
 
     async def _debounce_and_process(
         self, sender_id: str, runner: WorkflowRunner
