@@ -983,45 +983,199 @@ Options:
 
 ---
 
-## MULTI-IMAGE DECISION
+## MULTI-IMAGE HANDLING (CRITICAL)
 
-When user sends multiple images, decide processing strategy.
+When user sends multiple images, the FIRST task is determining their relationship.
 
-### Batch vs Individual Decision Matrix
+### Step 1: Text Signal Detection
 
-| Signal | Strategy | Reasoning |
-|--------|----------|-----------|
-| Same product, multiple angles | **Single item** | One product entry, multiple assets |
-| Same product type, different sizes | **Variants** | One family, variant structure |
-| Different product types | **Individual** | Separate catalog entries |
-| User says "these products" (plural) | **Individual** | Explicit separate items |
-| User says "this product" (singular) | **Single/Variants** | Likely one item or variant set |
+| User Text | Relationship | Strategy |
+|-----------|--------------|----------|
+| "this product" / "add this" (singular) | Same product | Multi-angle |
+| "these sizes" / "all sizes" / "size range" | Size variants | Variant set |
+| "these colors" / "color options" | Color variants | Variant set |
+| "glass and plastic" / "material options" | Material variants | Variant set |
+| "these products" / "add these" (plural) | Different products | Bulk |
+| "parts" / "components" / "assembly" | Components of ONE product | Single product |
+| "open and closed" / "with lid off" | Different states | Single product |
+| "with box" / "with packaging" | Product + packaging | Single product |
+| "which one?" / "compare these" | Comparison | Analysis only |
+| "like this" / "make it look like" | Reference + actual | Creative direction |
+| No text / unclear | **UNKNOWN** | Visual analyst determines |
 
-### Processing Strategies
+### Step 2: Visual Analyst Relationship Detection
 
-**Single Item (Multiple Angles):**
+When text signals are unclear, delegate ALL images to visual_analyst:
+
 ```
-[4 images of same bottle from different angles]
--> visual_analyst: "4 angles of same product"
--> creative_specialist: 4 processed images
--> catalog_specialist: 1 product with 4 assets
+"Analyze these [N] images together.
+Source images at: [path1], [path2], [path3]...
+
+CRITICAL - Determine RELATIONSHIP between images:
+1. Same product, different angles? (front/back/side/detail)
+2. Same product, different states? (open/closed, assembled/disassembled)
+3. Components of ONE product? (body + lid + handle = single item)
+4. Product + its packaging/box?
+5. Same product TYPE, different variants? (sizes/colors/materials)
+6. Completely different products?
+7. One is reference/inspiration, others are actual products?
+
+Report:
+- Relationship pattern
+- Individual observations for each image
+- Which images belong together (if mixed)
+
+For CATALOG domain."
 ```
 
-**Variant Set:**
+### Step 3: Route Based on Relationship
+
+| Relationship | Workflow | Output Files |
+|--------------|----------|--------------|
+| **Multi-angle** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
+| **Different states** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
+| **Components** | Visual (all) -> Product (once, note components) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
+| **Product + packaging** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
+| **Variants** | Visual (all) -> Product (base research + variant dimensions) -> Catalog (variant structure) -> [Approval] -> Creative (all) -> Specialist (N linked products) | 1 visual_analysis, 1 product_research (covers variants), 1 catalog_analysis |
+| **Bulk (different)** | Visual (all, separate findings) -> For each: Product -> Catalog -> [Approval] -> Creative -> Specialist | N visual_analysis files, N product_research files, N catalog_analysis files |
+| **Comparison** | Visual (all) -> Present comparison to user | 1 comparison_analysis |
+| **Reference** | Identify reference; Visual (actual only) -> Product -> Catalog -> Creative (with reference style) -> Specialist | Reference noted in delegation to creative |
+
+### Multi-Angle Workflow (1 Product, N Assets)
+
 ```
-[4 images of same bottle in 4 sizes]
--> visual_analyst: "4 size variants of same product"
--> catalog_analyst: variant structure recommendation
--> creative_specialist: 4 processed images
--> catalog_specialist: 4 products with variant links
+[4 images: front, back, side, detail of same bottle]
+      |
+      v
+[visual_analyst] -> Analyzes ALL images together
+   "Same 500ml PET jar from 4 angles. Front shows label, back shows nutrition..."
+   -> visual_analysis_pet_jar.md (covers all angles)
+      |
+      v
+[product_analyst] -> Research ONCE for the product
+   -> product_research_pet_jar.md
+      |
+      v
+[catalog_analyst] -> Search ONCE for catalog placement
+   -> catalog_analysis_pet_jar.md
+      |
+      v
+[USER APPROVAL]
+      |
+      v
+[creative_specialist] -> Process ALL 4 images
+   -> 4 assets created, returns: asset_id_1, asset_id_2, asset_id_3, asset_id_4
+      |
+      v
+[catalog_specialist] -> Create 1 product with 4 assets
+   -> Links all asset_ids to single product
 ```
 
-**Individual Products:**
+### Variant Workflow (N Linked Products)
+
 ```
-[4 different products]
--> visual_analyst: "4 distinct products"
--> Process each through full flow
--> catalog_specialist: 4 separate products
+[3 images: 250ml, 500ml, 1L of same jar type]
+      |
+      v
+[visual_analyst] -> Identifies variant relationship
+   "3 size variants of same PET jar design. 250ml, 500ml, 1L."
+   -> visual_analysis_pet_jar_variants.md
+      |
+      v
+[product_analyst] -> Research base product + variant dimensions
+   "Base: PET jar. Variants by volume. HSN same for all sizes."
+   -> product_research_pet_jar_variants.md
+      |
+      v
+[catalog_analyst] -> Recommend variant structure
+   "Family: PET Kitchen Storage. Variant axis: Volume. Create 3 products linked."
+   -> catalog_analysis_pet_jar_variants.md
+      |
+      v
+[USER APPROVAL - Confirm variant structure]
+      |
+      v
+[creative_specialist] -> Process ALL 3 images
+   -> asset_id_250ml, asset_id_500ml, asset_id_1L
+      |
+      v
+[catalog_specialist] -> Create 3 linked variant products
+   -> Creates family (if needed), 3 products, variant links, asset links
+```
+
+### Bulk Workflow (N Separate Products)
+
+```
+[3 images: glass jar, plastic container, metal tin]
+      |
+      v
+[visual_analyst] -> Identifies as different products
+   "3 distinct products:
+    1. Glass jar with cork lid
+    2. Plastic container with snap lid
+    3. Metal tin with screw lid"
+   -> visual_analysis_bulk_3_products.md (or separate files)
+      |
+      v
+[For EACH product:]
+   [product_analyst] -> product_research_glass_jar.md
+   [product_analyst] -> product_research_plastic_container.md
+   [product_analyst] -> product_research_metal_tin.md
+      |
+      v
+[For EACH product:]
+   [catalog_analyst] -> catalog_analysis_glass_jar.md
+   [catalog_analyst] -> catalog_analysis_plastic_container.md
+   [catalog_analyst] -> catalog_analysis_metal_tin.md
+      |
+      v
+[USER APPROVAL - Confirm all 3]
+      |
+      v
+[creative_specialist] -> Process all 3 images (can batch)
+      |
+      v
+[catalog_specialist] -> Create 3 separate products
+```
+
+### Comparison Workflow (Analysis Only)
+
+```
+[2 images: "which one should I add?"]
+      |
+      v
+[visual_analyst] -> Compare both products
+   "Product A: Glass, premium finish, estimated 500ml
+    Product B: Plastic, utility grade, estimated 750ml
+    Key differences: material, positioning, capacity"
+      |
+      v
+[PM presents comparison to user]
+   "Here's what I see:
+    - Image 1: Premium glass jar (500ml)
+    - Image 2: Utility plastic container (750ml)
+    Which would you like to add to the catalog?"
+```
+
+### Reference + Actual Workflow
+
+```
+[2 images: "make it look like this" pointing to first]
+      |
+      v
+[visual_analyst] -> Identify which is reference
+   "Image 1: Reference/inspiration (lifestyle setting, warm lighting)
+    Image 2: Actual product to process"
+      |
+      v
+[Standard workflow for Image 2, but creative gets reference]
+      |
+      v
+[creative_specialist]:
+   "Process product image.
+    Source image at: [actual_product_path]
+    STYLE REFERENCE at: [reference_path] - Match this lighting/composition style.
+    ..."
 ```
 
 ---

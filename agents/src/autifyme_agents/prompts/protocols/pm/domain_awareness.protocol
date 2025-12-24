@@ -35,7 +35,8 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 ### Visual Analyst
 - **Role:** PM's EYES. Reports EVERYTHING visible.
 - **Handles:** Comprehensive visual observation. Adapts focus by domain context.
-- **Output:** visual_analysis_{image}.md - complete visual inventory
+- **Multi-image:** Determines relationship (same product/variants/different) when given multiple images.
+- **Output:** visual_analysis_{image}.md - complete visual inventory + relationship pattern
 - **Key:** Observations feed all downstream agents (creative, catalog, product).
 
 ### Catalog Analyst
@@ -78,7 +79,7 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 
 ## ROUTING RULES
 
-### Single-Domain (Identify Intent First)
+### Single Image Requests
 
 | User Request | Intent | Route To |
 |--------------|--------|----------|
@@ -87,9 +88,27 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 | Image + "what is this?" | **RESEARCH** | Visual -> Product (no catalog) |
 | Image + "do we have this?" | **LOOKUP** | Visual -> Catalog (no product) |
 | Image + "process/hero shot" | **CREATIVE** | Visual (optional) -> Creative |
-| Text: "What IS this?" | **EXTERNAL** | product_analyst only |
-| Text: "Do WE have?" | **INTERNAL** | catalog_analyst only |
-| Text: "Update/delete" | **DIRECT ACTION** | catalog_specialist only |
+
+### Multiple Images - Determine Relationship FIRST
+
+| User Signal | Relationship | Route To |
+|-------------|--------------|----------|
+| "this product" (singular) | Same product, angles | Visual (all) -> Product (once) -> Catalog (once) |
+| "parts" / "components" | Components of ONE product | Visual (all) -> Product (once) -> Catalog (once) |
+| "open/closed" / "states" | Different states of ONE | Visual (all) -> Product (once) -> Catalog (once) |
+| "with packaging" / "box" | Product + packaging | Visual (all) -> Product (once) -> Catalog (once) |
+| "these sizes/colors" | Variants | Visual (all) -> Product (variants) -> Catalog (structure) |
+| "these products" (plural) | Different products | Visual (all) -> For each: Product -> Catalog |
+| "compare" / "which one" | Comparison | Visual (all) -> Present to user |
+| No text / unclear | **UNKNOWN** | Visual analyst determines relationship |
+
+### Text-Only Requests
+
+| User Request | Intent | Route To |
+|--------------|--------|----------|
+| "What IS this?" | **EXTERNAL** | product_analyst only |
+| "Do WE have?" | **INTERNAL** | catalog_analyst only |
+| "Update/delete" | **DIRECT ACTION** | catalog_specialist only |
 
 **KEY DISTINCTION:** What does user WANT?
 - **External knowledge** -> product_analyst
@@ -97,6 +116,7 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 - **Catalog changes** -> catalog_specialist
 - **Image output** -> creative_specialist
 - **Full cataloging** -> all analysts in sequence
+- **Multiple images** -> First determine relationship, then appropriate workflow
 
 ### Multi-Domain (Dependency Order)
 
