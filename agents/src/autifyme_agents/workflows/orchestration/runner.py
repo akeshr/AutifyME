@@ -154,6 +154,173 @@ class WorkflowRunner:
         thread_id = self.channel.format_thread_id(sender)
         await self._execute_workflow(thread_id, sender, text, media_id, sender_name)
 
+    async def handle_message_batch(
+        self,
+        sender: str,
+        messages: list[dict[str, Any]],
+    ) -> None:
+        """Process a batch of messages as unified context.
+
+        Used by MessageBatcher for multi-image scenarios where user sends
+        multiple images in quick succession. All messages are combined into
+        a single PM invocation with full context.
+
+        Args:
+            sender: Channel-specific sender ID (phone number)
+            messages: List of pending message records from batch buffer
+        """
+        if not messages:
+            logger.warning("handle_message_batch called with empty batch")
+            return
+
+        logger.info(
+            "Handling message batch",
+            extra={
+                "sender": sender,
+                "batch_size": len(messages),
+                "message_types": [m.get("message_type") for m in messages],
+            },
+        )
+
+        # Build unified payload from batch
+        texts = []
+        media_ids = []
+        sender_name = None
+
+        for msg in messages:
+            # Collect text content (message text + captions)
+            if msg.get("text_content"):
+                texts.append(msg["text_content"])
+            if msg.get("caption"):
+                texts.append(msg["caption"])
+
+            # Collect media IDs
+            if msg.get("media_id"):
+                media_ids.append(msg["media_id"])
+
+            # Use first available sender_name
+            if sender_name is None and msg.get("sender_name"):
+                sender_name = msg["sender_name"]
+
+        # Construct combined text with media reference
+        combined_text = " ".join(texts) if texts else ""
+        if media_ids:
+            media_summary = f"[{len(media_ids)} media attachment(s): {', '.join(media_ids)}]"
+            combined_text = f"{combined_text} {media_summary}".strip() if combined_text else media_summary
+
+        # Get thread_id and execute workflow
+        thread_id = self.channel.format_thread_id(sender)
+
+        # Use batch-aware execution with media_ids array
+        await self._execute_workflow_batch(
+            thread_id=thread_id,
+            sender=sender,
+            combined_text=combined_text,
+            media_ids=media_ids,
+            sender_name=sender_name,
+            message_count=len(messages),
+            first_received_at=messages[0].get("received_at"),
+        )
+
+    async def _execute_workflow_batch(
+        self,
+        thread_id: str,
+        sender: str,
+        combined_text: str,
+        media_ids: list[str],
+        sender_name: str | None,
+        message_count: int,
+        first_received_at: str | None,
+    ) -> None:
+        """Execute workflow for a batched message.
+
+        Similar to _execute_workflow but handles multiple media_ids.
+
+        Args:
+            thread_id: Conversation thread ID
+            sender: Channel-specific sender ID
+            combined_text: Unified text from all messages
+            media_ids: List of media attachment IDs
+            sender_name: User's display name
+            message_count: Number of messages in batch
+            first_received_at: Timestamp of first message
+        """
+        logger.debug(
+            "Executing batch workflow",
+            extra={
+                "thread_id": thread_id,
+                "media_count": len(media_ids),
+                "message_count": message_count,
+            },
+        )
+
+        # Prepare structured incoming message (use first media_id for compatibility)
+        incoming_message = IncomingMessage(
+            sender_id=sender,
+            sender_name=sender_name,
+            text=combined_text,
+            media_id=media_ids[0] if media_ids else None,
+            platform=self.channel.__class__.__name__.replace("Channel", "").lower(),
+        )
+
+        # Build batch-aware raw payload for PM
+        raw_payload = {
+            "platform": incoming_message.platform,
+            "sender": sender,
+            "sender_name": sender_name,
+            "text": combined_text,
+            "media_id": media_ids[0] if media_ids else None,  # Backward compat
+            "media_ids": media_ids,  # NEW: Full array for batch handling
+            "message_count": message_count,
+            "timestamp": first_received_at or incoming_message.received_at.isoformat(),
+        }
+
+        # Set execution context for all tools - thread_id invisible to LLMs
+        with execution_context(thread_id=thread_id, company_id="default"):
+            try:
+                # Execute with automatic outcome tracking via middleware
+                result, interrupt_value, tracking_id = await self.tracking_middleware.execute_with_tracking(
+                    thread_id=thread_id,
+                    incoming_message=incoming_message,
+                    pm_invoker=lambda tid: self._invoke_pm(thread_id, raw_payload, run_id=tid),
+                )
+
+                # Handle user-facing logic (same as single message flow)
+                if interrupt_value:
+                    error_response = self.workflow_handler.handle_interrupt(sender, thread_id, interrupt_value)
+
+                    if error_response:
+                        error_msg = error_response.get("error", str(error_response))
+                        logger.warning(
+                            "WriteIntent validation failed in batch - auto-rejecting",
+                            extra={"thread_id": thread_id, "error": error_msg},
+                        )
+                        await self._auto_reject_write_intent(thread_id, error_msg)
+                        return
+
+                    # HITL pending - nothing more to do
+                    return
+
+                if result:
+                    await self.workflow_handler.send_response(result, sender)
+                else:
+                    logger.warning(
+                        "Batch workflow completed without result",
+                        extra={"thread_id": thread_id},
+                    )
+
+            except Exception as e:
+                logger.error(
+                    "Batch workflow execution failed",
+                    exc_info=True,
+                    extra={"thread_id": thread_id, "error": str(e)},
+                )
+                # Send error response to user
+                await self.channel.send_text(
+                    sender,
+                    "I encountered an error processing your messages. Please try again.",
+                )
+
     async def _execute_workflow(
         self,
         thread_id: str,
@@ -529,11 +696,25 @@ class WorkflowRunner:
 
             # Extract user text - this is what PM should see directly
             user_text = raw_payload.get("text", "")
+
+            # Handle batch scenario (media_ids array) or single message (media_id)
+            media_ids = raw_payload.get("media_ids", [])
             media_id = raw_payload.get("media_id")
 
-            # Build natural language message that includes media_id when present
-            # PM needs media_id explicitly to call download_media tool
-            if media_id:
+            # Build natural language message that includes media reference(s) when present
+            # PM needs media_id(s) explicitly to call download_media tool
+            if media_ids:
+                # Batch scenario: multiple media attachments
+                media_refs = ", ".join(media_ids)
+                message_count = raw_payload.get("message_count", len(media_ids))
+                if user_text:
+                    # Text + media batch: append all media_ids to user message
+                    user_text = f"{user_text} [media attachments ({len(media_ids)}): {media_refs}]"
+                else:
+                    # Media batch only: create descriptive message with all media_ids
+                    user_text = f"[{len(media_ids)} media attachment(s): {media_refs}]"
+            elif media_id:
+                # Single media scenario (backward compat)
                 if user_text:
                     # Text + media: append media_id to user message
                     user_text = f"{user_text} [media_id: {media_id}]"
@@ -542,7 +723,7 @@ class WorkflowRunner:
                     user_text = f"[Media attachment: {media_id}]"
 
             # Put platform metadata in additional_kwargs (standard LangChain pattern)
-            # PM receives clean user text with embedded media_id, metadata available if needed
+            # PM receives clean user text with embedded media_id(s), metadata available if needed
             payload = {
                 "messages": [HumanMessage(
                     content=user_text,
@@ -550,7 +731,9 @@ class WorkflowRunner:
                         "platform": raw_payload.get("platform"),
                         "sender": raw_payload.get("sender"),
                         "sender_name": raw_payload.get("sender_name"),
-                        "media_id": media_id,
+                        "media_id": media_id,  # Backward compat
+                        "media_ids": media_ids,  # Batch support
+                        "message_count": raw_payload.get("message_count"),
                         "timestamp": raw_payload.get("timestamp"),
                     }
                 )]

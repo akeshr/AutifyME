@@ -13,6 +13,7 @@ from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from autifyme_agents.core.config import settings
 from autifyme_agents.core.logging_config import get_logger, setup_logging
+from autifyme_agents.core.message_batcher import MessageBatcher
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.integrations.storage.storage_factory import get_storage
 from autifyme_agents.workflows.channels.whatsapp.adapter import WhatsAppChannel
@@ -33,6 +34,72 @@ app = FastAPI()
 
 # Webhook will be initialized lazily on first request
 logger.info("AutifyME WhatsApp webhook serverless function loaded")
+
+
+# ============================================================================
+# Startup & Shutdown Events
+# ============================================================================
+
+
+@app.on_event("startup")
+async def startup_event() -> None:
+    """Initialize services and recover orphaned batches on startup.
+
+    Handles messages that were queued but never processed due to
+    server crash or restart before debounce timer fired.
+    """
+    global _message_batcher
+
+    logger.info("WhatsApp webhook starting up")
+
+    try:
+        # Initialize dependencies (forward references resolved at runtime)
+        storage = get_storage_dependency()
+        channel = get_channel_dependency()
+        workflow_handler = WriteIntentHandler(channel=channel)
+
+        # Initialize batcher singleton
+        if _message_batcher is None:
+            logger.info("Initializing MessageBatcher singleton on startup")
+            _message_batcher = MessageBatcher(storage=storage)
+
+        # Create runner for recovery
+        runner = WorkflowRunner(
+            channel=channel,
+            storage=storage,
+            workflow_handler=workflow_handler,
+        )
+
+        # Recover any orphaned batches from previous server instance
+        recovered = await _message_batcher.recover_orphaned_batches(runner)
+        if recovered > 0:
+            logger.info(
+                "Recovered orphaned messages on startup",
+                extra={"recovered_count": recovered},
+            )
+    except Exception:
+        # Non-fatal: recovery failure shouldn't prevent startup
+        logger.exception("Orphaned batch recovery failed on startup")
+
+    logger.info("WhatsApp webhook startup complete")
+
+
+@app.on_event("shutdown")
+async def shutdown_event() -> None:
+    """Gracefully shutdown services.
+
+    Cancels active debounce timers. Messages remain in DB for
+    recovery on next startup.
+    """
+    logger.info("WhatsApp webhook shutting down")
+
+    try:
+        if _message_batcher is not None:
+            await _message_batcher.shutdown()
+    except Exception:
+        logger.exception("MessageBatcher shutdown error")
+
+    logger.info("WhatsApp webhook shutdown complete")
 
 
 # ============================================================================
@@ -103,6 +170,31 @@ def get_runner(
         storage=storage,
         workflow_handler=workflow_handler,
     )
+
+
+# Global batcher instance (singleton for timer management)
+_message_batcher: MessageBatcher | None = None
+
+
+def get_batcher_dependency(
+    storage: StorageInterface = Depends(get_storage_dependency),  # noqa: B008
+) -> MessageBatcher:
+    """Get singleton MessageBatcher for Smart Skip debouncing.
+
+    Uses module-level singleton to preserve in-memory timer state
+    across requests (essential for debounce functionality).
+
+    Args:
+        storage: Storage adapter (injected by FastAPI)
+
+    Returns:
+        MessageBatcher singleton instance
+    """
+    global _message_batcher
+    if _message_batcher is None:
+        logger.info("Initializing MessageBatcher singleton")
+        _message_batcher = MessageBatcher(storage=storage)
+    return _message_batcher
 
 
 @app.get("/")
@@ -247,6 +339,7 @@ async def receive(
     background_tasks: BackgroundTasks,
     runner: WorkflowRunner = Depends(get_runner),  # noqa: B008
     storage: StorageInterface = Depends(get_storage_dependency),  # noqa: B008
+    batcher: MessageBatcher = Depends(get_batcher_dependency),  # noqa: B008
 ) -> Any:
     body = await request.json()
     event_path = _persist_event(body)
@@ -380,36 +473,68 @@ async def receive(
                         },
                     )
 
-                    # ✅ BACKGROUND PROCESSING: Schedule workflow asynchronously
-                    # FastAPI background tasks decouple webhook acknowledgment from workflow processing
-                    # This ensures WhatsApp receives 200 OK within timeout (~5 seconds) even when
-                    # workflows take longer (e.g., image analysis, 8+ products cataloging)
+                    # ✅ SMART SKIP BATCHING: Debounce media or burst messages
+                    # For multi-image scenarios, users send multiple images in quick succession.
+                    # Smart Skip logic:
+                    # - Media messages always debounce (common multi-image scenario)
+                    # - Text messages debounce only if recent activity or pending messages
+                    # - Single text with no activity processes immediately (zero latency)
                     #
                     # Flow:
                     # 1. Duplicate check (above) prevents multiple tasks for same message
-                    # 2. Add task to background queue
-                    # 3. Return 200 OK immediately (within milliseconds)
-                    # 4. Background task runs workflow (may take 10+ seconds)
-                    # 5. If WhatsApp retries, duplicate check blocks it (safety net)
-                    background_tasks.add_task(
-                        _process_message_async,
-                        runner=runner,
-                        sender=sender,
-                        text=text,
-                        media_id=media_id,
-                        sender_name=sender_name,
-                        message_id=message_id,
-                        event_path=event_path,
-                    )
+                    # 2. Smart Skip decides: debounce or immediate processing
+                    # 3. If debounce: queue to DB, start timer (3s), batch process
+                    # 4. If immediate: add to background tasks (existing behavior)
+                    # 5. Return 200 OK immediately (within milliseconds)
 
-                    logger.info(
-                        "Message scheduled for background processing",
-                        extra={
-                            "message_id": message_id,
-                            "sender": sender,
-                            "message_type": msg_type,
-                        }
-                    )
+                    received_at = datetime.fromtimestamp(int(timestamp))
+
+                    # Check if message should be debounced
+                    should_batch = await batcher.should_debounce(sender, msg_type or "text")
+
+                    if should_batch:
+                        # Queue for batch processing
+                        await batcher.queue_message(
+                            message_id=message_id,
+                            sender_id=sender,
+                            thread_id=thread_id,
+                            message_type=msg_type or "text",
+                            text_content=text,
+                            media_id=media_id,
+                            caption=text if media_id else None,  # Caption is text when media present
+                            sender_name=sender_name,
+                            received_at=received_at,
+                            runner=runner,
+                        )
+                        logger.info(
+                            "Message queued for batch processing",
+                            extra={
+                                "message_id": message_id,
+                                "sender": sender,
+                                "message_type": msg_type,
+                                "debounce_reason": "media" if msg_type in ("image", "video", "document", "audio", "voice") else "recent_activity",
+                            }
+                        )
+                    else:
+                        # Process immediately (text-only, no recent activity)
+                        background_tasks.add_task(
+                            _process_message_async,
+                            runner=runner,
+                            sender=sender,
+                            text=text,
+                            media_id=media_id,
+                            sender_name=sender_name,
+                            message_id=message_id,
+                            event_path=event_path,
+                        )
+                        logger.info(
+                            "Message scheduled for immediate processing",
+                            extra={
+                                "message_id": message_id,
+                                "sender": sender,
+                                "message_type": msg_type,
+                            }
+                        )
 
         return {"status": "processed"}
     except Exception as exc:  # noqa: BLE001
