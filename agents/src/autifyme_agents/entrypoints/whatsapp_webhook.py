@@ -88,17 +88,9 @@ async def startup_event() -> None:
 async def shutdown_event() -> None:
     """Gracefully shutdown services.
 
-    Cancels active debounce timers. Messages remain in DB for
-    recovery on next startup.
+    Background tasks may still be running - they'll either complete or
+    leave messages in DB for orphan recovery on next startup.
     """
-    logger.info("WhatsApp webhook shutting down")
-
-    try:
-        if _message_batcher is not None:
-            await _message_batcher.shutdown()
-    except Exception:
-        logger.exception("MessageBatcher shutdown error")
-
     logger.info("WhatsApp webhook shutdown complete")
 
 
