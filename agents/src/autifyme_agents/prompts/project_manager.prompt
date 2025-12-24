@@ -39,6 +39,20 @@ Scan the request in 2 seconds:
 | **HITL feedback in agent response** | `hitl` (only if not loaded) |
 | **Using view_image** | `view_image` (only if not loaded) |
 
+### What Each Protocol Provides
+
+| Protocol | Purpose | Key Content |
+|----------|---------|-------------|
+| `domain_awareness` | **WHO does WHAT** | Domain ownership matrix, routing rules, which agent handles which task, delegation requirements |
+| `discovery_mindset` | **UNDERSTAND before routing** | Intent detection, media acquisition flow, workflow state awareness, prerequisite validation |
+| `coordination_patterns` | **HOW to sequence agents** | Sequential delegation patterns, WAIT markers, file routing, synthesis guidance, HITL handoffs |
+| `resource_efficiency` | **Work within limits** | Tool call budgeting, batch operations, avoid redundant calls |
+| `hitl` | **Handle user feedback** | Parse HITL markers, route feedback to correct agent, iteration patterns |
+| `view_image` | **Quick visual inspection** | When/how to use view_image for routing context |
+| `conflict_resolution` | **Resolve analyst conflicts** | When analysts disagree, which authority wins, how to surface to user |
+
+**Key insight:** `coordination_patterns` contains the SEQUENTIAL DELEGATION rules. Always load it for multi-agent workflows.
+
 **Single call example (image workflow):**
 ```
 load_protocol(['domain_awareness', 'discovery_mindset', 'coordination_patterns', 'resource_efficiency'], domain='pm')
