@@ -289,34 +289,81 @@ class WorkflowRunner:
                 if interrupt_value:
                     error_response = self.workflow_handler.handle_interrupt(sender, thread_id, interrupt_value)
 
+                    # If validation failed, auto-reject with error so agent can retry
                     if error_response:
                         error_msg = error_response.get("error", str(error_response))
                         logger.warning(
                             "WriteIntent validation failed in batch - auto-rejecting",
-                            extra={"thread_id": thread_id, "error": error_msg},
+                            extra={"thread_id": thread_id, "error_type": error_response.get("error_type")},
                         )
-                        await self._auto_reject_write_intent(thread_id, error_msg)
+                        auto_reject: Command[Any] = Command(
+                            resume={"decisions": [{"type": "reject", "message": error_msg}]}
+                        )
+                        await self._resume_with_command(thread_id, auto_reject, sender)
                         return
 
                     # HITL pending - nothing more to do
                     return
 
-                if result:
-                    await self.workflow_handler.send_response(result, sender)
-                else:
+                if not result:
                     logger.warning(
                         "Batch workflow completed without result",
                         extra={"thread_id": thread_id},
                     )
+                    return
 
-            except Exception as e:
+                # Extract messages from result
+                messages = result.get("messages", [])
+                logger.debug(
+                    "Batch PM result received",
+                    extra={"thread_id": thread_id, "message_count": len(messages)},
+                )
+
+                # Check for structured response (PMOutput schema)
+                structured_response = result.get("structured_response")
+                if structured_response and isinstance(structured_response, PMOutput):
+                    # Send images first (if any)
+                    if structured_response.images:
+                        for img in structured_response.images:
+                            try:
+                                self.channel.send_image(sender, img.path, img.caption)
+                            except Exception as img_err:
+                                logger.warning(
+                                    "Failed to send image in batch",
+                                    extra={"path": img.path, "error": str(img_err)}
+                                )
+
+                    # Send text message
+                    if structured_response.message:
+                        self.channel.send_text(sender, structured_response.message)
+                        logger.info(
+                            "Batch PM structured response sent",
+                            extra={
+                                "thread_id": thread_id,
+                                "tracking_id": tracking_id,
+                                "image_count": len(structured_response.images) if structured_response.images else 0,
+                            }
+                        )
+                else:
+                    # Fallback to legacy extract_summary for non-structured responses
+                    summary = self.workflow_handler.extract_summary(messages)
+                    if summary:
+                        self.channel.send_text(sender, summary)
+                        logger.info("Batch PM response sent (legacy)", extra={"thread_id": thread_id})
+                    else:
+                        logger.warning(
+                            "No response extracted from batch PM messages",
+                            extra={"thread_id": thread_id, "message_count": len(messages)}
+                        )
+
+            except Exception:
                 logger.error(
                     "Batch workflow execution failed",
                     exc_info=True,
-                    extra={"thread_id": thread_id, "error": str(e)},
+                    extra={"thread_id": thread_id},
                 )
                 # Send error response to user
-                await self.channel.send_text(
+                self.channel.send_text(
                     sender,
                     "I encountered an error processing your messages. Please try again.",
                 )
