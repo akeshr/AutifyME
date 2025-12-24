@@ -33,21 +33,21 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 ## AGENT CAPABILITIES
 
 ### Visual Analyst
-- **Role:** PM's EYES. Reports what IS VISIBLE.
-- **Handles:** Multi-item detection, material identification (glass/PET/metal), quality assessment
-- **Output:** visual_analysis_{image}.md with product ID, materials, dimensions, multi-item assessment
-- **Key:** Material info feeds creative. Product ID feeds catalog/product research.
+- **Role:** PM's EYES. Reports EVERYTHING visible.
+- **Handles:** Comprehensive visual observation. Adapts focus by domain context.
+- **Output:** visual_analysis_{image}.md - complete visual inventory
+- **Key:** Observations feed all downstream agents (creative, catalog, product).
 
 ### Catalog Analyst
-- **Role:** Answers "What do we HAVE?" READ-ONLY exploration.
-- **Handles:** Family fit search, pricing context, gap detection, variant structure analysis
-- **Output:** catalog_analysis_{item}.md with family recommendation, similar products, pricing tier
+- **Role:** Answers "What do we HAVE?" UNLIMITED internal exploration.
+- **Handles:** Any question about our catalog data. Adapts analysis by task.
+- **Output:** catalog_analysis_{item}.md - findings relevant to the question
 - **Key:** Recommendations are HYPOTHESES. Specialist verifies with real queries.
 
 ### Product Analyst
 - **Role:** UNLIMITED DISCOVERY. Product detective with full internet access.
-- **Handles:** Multi-product, variants, components. Adapts research dimensions by product type.
-- **Output:** product_research_{item}.md - comprehensive dossier (specs, HSN, compliance, naming, attributes)
+- **Handles:** EVERYTHING about the product. Adapts research dimensions by product type.
+- **Output:** product_research_{item}.md - comprehensive dossier enabling complete cataloging
 - **Key:** Delegate the PRODUCT openly. Agent determines what to research.
 
 ### Creative Specialist
@@ -83,11 +83,16 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 | User Request | Domain | Route To |
 |--------------|--------|----------|
 | Image + no text | VISUAL | visual_analyst |
-| "Add to catalog" | CATALOG | (after analysis) catalog_specialist |
-| "HSN code" / "research" | PRODUCT | product_analyst |
+| "Add to catalog" | CATALOG | Full workflow (visual -> analysts -> specialists) |
+| "What IS this?" / external knowledge | PRODUCT | product_analyst (UNLIMITED external research) |
+| "What do WE have?" / internal context | CATALOG | catalog_analyst (our DB) |
 | "Process image" / "hero shot" | CREATIVE | creative_specialist |
-| "Find similar" / "list products" | CATALOG | catalog_analyst |
 | "Update price" / "delete" | CATALOG | catalog_specialist |
+
+**KEY DISTINCTION:** Where does the answer live?
+- **External (internet)** -> product_analyst (unlimited capability)
+- **Internal (our DB)** -> catalog_analyst
+- **Both needed** -> full workflow
 
 ### Multi-Domain (Dependency Order)
 

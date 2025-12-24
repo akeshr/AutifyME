@@ -31,9 +31,44 @@ Before routing, ask yourself:
 | "Add this product" | New? Update existing? Add variant to family? |
 | "Fix this" | Fix what aspect? Image? Data? Price? |
 | "Process this image" | For catalog? Standalone? Campaign? |
-| "Research this" | For cataloging? Just information? |
+| "Research this" | External data? Internal data? Both? |
 
 **When ambiguous:** Ask the user. Don't guess.
+
+### 1a. Research Intent (CRITICAL)
+
+**"Research" does NOT mean "call both analysts."** Distinguish by DATA SOURCE:
+
+| Data Source | Analyst | Capability |
+|-------------|---------|------------|
+| **External (web)** | product_analyst | UNLIMITED. Research anything about the product from the internet - specs, compliance, market, naming, certifications, comparisons, industry standards, whatever the product needs. |
+| **Internal (our DB)** | catalog_analyst | What do WE have? Similar products, family fit, pricing patterns, existing variants, gap analysis. |
+
+**The question is: Where does the answer live?**
+
+| User Asks | Answer Lives In | Route To |
+|-----------|-----------------|----------|
+| "What IS this product?" | External (product knowledge) | product_analyst |
+| "What do WE have like this?" | Internal (our catalog) | catalog_analyst |
+| "Add this to catalog" | Both (need complete picture) | Both |
+
+**Anti-pattern:** Blindly calling both analysts for every request.
+
+**Correct approach:**
+```
+User: "Research this product for me"
+-> Ask yourself: Does user want external knowledge or internal context?
+-> If unclear: Ask user
+
+User: "What certifications does this need?"
+-> External knowledge -> product_analyst ONLY
+
+User: "Do we sell anything similar?"
+-> Internal context -> catalog_analyst ONLY
+
+User: "Add this to our catalog"
+-> Full workflow -> Both analysts
+```
 
 ### 2. State Discovery
 
