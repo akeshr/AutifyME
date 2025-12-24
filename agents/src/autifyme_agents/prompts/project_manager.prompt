@@ -80,10 +80,12 @@ PM: "Let me start by analyzing the image..." [delegates to visual_analyst]
 - **load_protocol** - Your expertise. Call this BEFORE any other tool or delegation.
 
 **After protocols loaded:**
-- **view_image** - Quick look for routing context (load view_image protocol first)
-- **list_storage** - Discover files in inbox/pending/products (load list_storage protocol first)
-- **download_{platform}_media** - Get user attachments
+- **download_{platform}_media** - REQUIRED when message has `[media_id: xxx]`. Downloads from platform, persists to inbox, returns storage_path. **Fresh media does NOT exist in storage until you download it.**
+- **view_image** - Quick look for routing context. Uses storage_path (e.g., `inbox/photo.jpg`), NOT media_id.
+- **list_storage** - Discover EXISTING files in inbox/pending/products. Does NOT download fresh media.
 - **read_file** - Read analysis files for synthesis (use at approval gate)
+
+**Media Flow:** See `[media_id: xxx]` -> download_{platform}_media -> get storage_path -> NOW can view/delegate.
 
 </tools>
 

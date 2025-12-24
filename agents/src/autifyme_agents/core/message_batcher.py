@@ -206,6 +206,10 @@ class MessageBatcher:
         If yes, it processes them. Multiple concurrent tasks are safe because
         fetch_and_clear_batch is atomic.
 
+        Handles forwarded messages: WhatsApp sends each forwarded image as separate
+        webhook events with 1-2 second gaps. We re-check for recent activity after
+        sleeping - if new messages arrived during sleep, we extend the debounce window.
+
         Args:
             sender_id: Phone number
             runner: WorkflowRunner for batch processing
@@ -213,8 +217,26 @@ class MessageBatcher:
         Returns:
             True if batch was processed, False if nothing to process
         """
-        # Wait for debounce window
-        await asyncio.sleep(self._debounce_seconds)
+        # Re-check loop: extend debounce if new messages arrive during sleep
+        # Max iterations prevents infinite loop if messages keep arriving
+        max_extensions = 5
+        for iteration in range(max_extensions + 1):
+            await asyncio.sleep(self._debounce_seconds)
+
+            # Check if new messages arrived during our sleep
+            has_recent = await self._storage.has_recent_activity(
+                sender_id, self._debounce_seconds
+            )
+
+            if has_recent and iteration < max_extensions:
+                logger.debug(
+                    "New activity during debounce, extending wait",
+                    extra={"sender_id": sender_id, "iteration": iteration + 1},
+                )
+                continue
+
+            # No new activity or max extensions reached
+            break
 
         # Check if there are still pending messages for this sender
         has_pending = await self._storage.has_pending_messages(sender_id)
