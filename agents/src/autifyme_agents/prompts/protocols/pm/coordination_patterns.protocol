@@ -345,18 +345,18 @@ For CATALOG domain."
 3. Do NOT trigger third pass
 
 ```
-First pass (parallel) -> Conflict detected -> Second pass (targeted)
-                                                    |
-                                                    v
-                                              Still conflict?
-                                                    |
-                                              +-----+-----+
-                                              |           |
-                                           Resolved    Unresolved
-                                              |           |
-                                              v           v
-                                          Proceed    Surface to user
-                                                     (user decides)
+First pass (SEQUENTIAL: Visual -> Product -> Catalog) -> Conflict detected in synthesis -> Second pass (targeted re-analysis)
+                                                                                                    |
+                                                                                                    v
+                                                                                              Still conflict?
+                                                                                                    |
+                                                                                              +-----+-----+
+                                                                                              |           |
+                                                                                           Resolved    Unresolved
+                                                                                              |           |
+                                                                                              v           v
+                                                                                          Proceed    Surface to user
+                                                                                                     (user decides)
 ```
 
 ---
