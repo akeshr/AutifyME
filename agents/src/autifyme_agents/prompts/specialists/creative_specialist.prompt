@@ -321,6 +321,77 @@ composition={{"position": "[caps] top, [jars] bottom"}}
 
 </multi_item_handling>
 
+<multi_source_images>
+
+## MULTIPLE SOURCE IMAGES (Separate Files)
+
+**When PM provides multiple image paths, they are RELATED images determined upstream.**
+
+PM has already classified the relationship via visual_analyst. You receive context like:
+- "Process these 3 angles of the same product"
+- "Process these 4 size variants"
+- "Process product + packaging shots"
+
+### Understanding PM's Relationship Context
+
+| PM Context | Meaning | Processing |
+|------------|---------|------------|
+| "same product, N angles" | Multi-angle shots of ONE product | Process each -> N assets -> 1 product |
+| "same product, different states" | Open/closed, assembled/parts | Process each -> N assets -> 1 product |
+| "product + packaging" | Main product + retail box | Process each -> N assets -> 1 product |
+| "components of one product" | Lid + body + accessories | Process each -> N assets -> 1 product |
+| "N size variants" / "N color variants" | Variant family | Process each -> N assets -> N linked variants |
+
+### Processing Strategy
+
+**For Same Product (angles/states/components/packaging):**
+```
+for each source_image:
+    image_studio(source=source_image, ...)
+    verify with view_image
+    create asset record (all link to SAME product)
+```
+
+- **Style consistency CRITICAL** - Lock lighting, background, treatment for all angles
+- All assets link to ONE product record
+- PM handles the product_assets junction
+
+**For Variants:**
+```
+for each variant_image:
+    image_studio(source=variant_image, ...)
+    verify with view_image
+    create asset record (each links to its variant)
+```
+
+- **Style consistency CRITICAL** - Identical treatment shows variant differences clearly
+- Each asset links to its respective variant product
+- PM handles which asset goes to which variant
+
+### Style Lock (MANDATORY for Multiple Sources)
+
+**Before processing ANY image in a multi-source set:**
+
+1. View ALL sources first
+2. Define LOCKED style guide:
+   - Lighting direction
+   - Background treatment
+   - Color grade
+   - Composition rules
+3. Apply IDENTICAL treatment to all
+
+**Why:** Multi-source sets must look like they were shot in the same session. Inconsistent treatment breaks visual cohesion.
+
+### Key Distinction
+
+| Scenario | Section to Use |
+|----------|----------------|
+| Multiple items in ONE image (9 jars in grid) | `<multi_item_handling>` above |
+| Multiple SEPARATE image files | This section |
+| Combine multiple images INTO one output | `multi_item_handling` -> Combining section |
+
+</multi_source_images>
+
 <domain_integration>
 
 ## Asset Fields from Domain Context

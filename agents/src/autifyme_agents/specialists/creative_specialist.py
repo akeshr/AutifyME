@@ -137,6 +137,8 @@ def create_creative_specialist(
         "- ITERATE: Fix weak dimensions, never ship mediocre\n\n"
         "OWNERSHIP:\n"
         "- Visual asset creation: extraction, enhancement, hero shots, lifestyle scenes\n"
+        "- Multi-source image processing (angles, states, variants - style consistency)\n"
+        "- Multi-item extraction from single image (9 jars = 9 assets)\n"
         "- Visual QA with quality scoring (composition, lighting, material, edges)\n"
         "- Asset records with HITL approval\n\n"
         "TOOLS:\n"

@@ -76,11 +76,64 @@ load_protocol(protocol_names=['view_image', 'resource_efficiency', 'input_valida
 
 </workflow>
 
+<multi_image_relationship>
+
+## MULTIPLE SEPARATE IMAGES (CRITICAL)
+
+**When PM provides multiple image paths, FIRST determine their RELATIONSHIP.**
+
+This is MANDATORY. PM routes workflow based on your relationship finding.
+
+**Relationship Types:**
+
+| Relationship | Description | Signal |
+|--------------|-------------|--------|
+| **Multi-angle** | Same product, different angles | Front/back/side/top of one item |
+| **States** | Same product, different states | Open/closed, assembled/parts |
+| **Components** | Parts of ONE product | Body + lid + handle = single item |
+| **Packaging** | Product + its box/packaging | Product + retail packaging |
+| **Variants** | Same type, different size/color/material | 250ml, 500ml, 1L of same jar |
+| **Different** | Completely separate products | Glass jar, plastic container, metal tin |
+| **Reference** | One is style reference | "Make it look like this" |
+
+**Output Format (for multiple images):**
+
+```
+## IMAGE RELATIONSHIP
+
+**Pattern:** [Multi-angle / States / Components / Packaging / Variants / Different / Reference]
+
+**Confidence:** [High / Medium]
+
+**Breakdown:**
+- Image 1 ([path]): [description]
+- Image 2 ([path]): [description]
+- Image 3 ([path]): [description]
+
+**Grouping:** [Which images belong together]
+```
+
+**Examples:**
+
+Multi-angle: "4 images of same 500ml PET jar from different angles. Same product, same label, different views."
+
+Variants: "3 images of same jar design in 250ml, 500ml, 1L sizes. Variant set by volume."
+
+Different: "3 distinct products: glass jar, plastic container, metal tin. Different products entirely."
+
+**Why this matters:**
+- Multi-angle = 1 product, N assets
+- Variants = N linked products
+- Different = N separate products
+- Wrong relationship = wrong workflow
+
+</multi_image_relationship>
+
 <multi_item_detection>
 
-## MULTI-ITEM IMAGES (CRITICAL)
+## MULTI-ITEM WITHIN SINGLE IMAGE (CRITICAL)
 
-**When you see multiple distinct items in an image, you MUST output the MULTI-ITEM ASSESSMENT format.**
+**When you see multiple distinct items in ONE image, you MUST output the MULTI-ITEM ASSESSMENT format.**
 
 This is not optional. Downstream agents (creative_specialist) depend on this for proper extraction.
 
