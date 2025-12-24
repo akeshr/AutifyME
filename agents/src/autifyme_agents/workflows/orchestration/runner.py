@@ -769,6 +769,15 @@ class WorkflowRunner:
                     # Media only: create descriptive message with media_id
                     user_text = f"[Media attachment: {media_id}]"
 
+            # Guard: ensure we have actual content to send to PM
+            # Empty content causes Gemini to fail with "contents are required"
+            if not user_text.strip():
+                logger.warning(
+                    "Skipping message with no content (empty text, no media)",
+                    extra={"thread_id": thread_id},
+                )
+                return (None, None)
+
             # Put platform metadata in additional_kwargs (standard LangChain pattern)
             # PM receives clean user text with embedded media_id(s), metadata available if needed
             payload = {
