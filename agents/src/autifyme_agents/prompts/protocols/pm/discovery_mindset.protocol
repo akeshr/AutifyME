@@ -179,6 +179,7 @@ CORRECT:
 | "these colors" / "color options" | Variants (color) | Variant workflow |
 | "these products" / "add these" (plural) | Different products | Bulk workflow |
 | "parts" / "components" / "assembly" | Components of ONE product | Component workflow |
+| "jars and lids" / "bodies and caps" / "product and accessories" | **COMPONENTS (cross-image)** | **Compose workflow** |
 | "open and closed" / "with lid" | Different states of ONE product | Multi-angle workflow |
 | "with packaging" / "box and product" | Product + packaging | Multi-angle (packaging shots) |
 | "which one?" / "compare" | Comparison | Analysis only |
@@ -197,10 +198,14 @@ CRITICAL: Determine the RELATIONSHIP between images:
 - Same product, different angles? (front/back/side/top)
 - Same product, different states? (open/closed, assembled/parts)
 - Components of ONE product? (body + lid + handle = single item)
+- **CROSS-IMAGE COMPONENTS?** (Image A has bodies, Image B has lids, Image C has accessories -> COMPOSE)
 - Product + its packaging?
 - Same product TYPE, different variants? (sizes/colors/materials)
 - Different products entirely?
 - One is reference, others are actual?
+
+**COMPONENTS CHECK:** Do different images show different PARTS that need to be COMPOSED together?
+If yes, classify as COMPONENTS and provide composition matrix.
 
 Report:
 - Relationship pattern
@@ -219,6 +224,7 @@ For CATALOG domain."
 | "Components of single product" | 1 product, N assets (component shots) |
 | "Product + packaging" | 1 product, N assets (include packaging) |
 | "Variants: same type, different [size/color/material]" | Variant family workflow |
+| **"COMPONENTS (cross-image): bodies in A, lids in B"** | **Compose workflow - use image_studio with multiple labeled images** |
 | "N distinct products" | Bulk workflow (each gets full flow) |
 | "Mixed: X angles of product A, Y is different product B" | Split and process accordingly |
 
@@ -228,6 +234,7 @@ For CATALOG domain."
 
 Quick reference:
 - **Multi-angle/States/Components/Packaging** -> 1 product, N assets
+- **COMPONENTS (cross-image)** -> COMPOSE parts from multiple images into complete products
 - **Variants** -> N linked products
 - **Bulk (different products)** -> N separate products
 - **Comparison** -> Analysis only, no cataloging
