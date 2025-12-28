@@ -1090,6 +1090,91 @@ For CATALOG domain."
    -> Links all asset_ids to single product
 ```
 
+### Components Workflow (CRITICAL - COMPOSE, Don't Just Extract)
+
+**When visual_analyst identifies COMPONENTS pattern (e.g., jar body + lids + accessories):**
+
+The key insight: Components are PARTS of complete products. Hero shots must COMPOSE all parts together, not show each part separately.
+
+**WRONG approach:**
+- Image 1 (jars) -> Extract each jar separately
+- Image 2 (lids) -> Create "lid detail" image
+- Image 3 (spoons) -> Create "spoon detail" image
+- Result: Separate images of parts, no complete product shots
+
+**CORRECT approach:**
+- COMPOSE each variant by combining jar + matching lid + spoon
+- Result: Complete hero shots showing assembled products
+
+```
+[3 images: jar bodies, colored lids, measuring spoons]
+      |
+      v
+[visual_analyst] -> Identifies COMPONENTS relationship
+   "Image 1: 9 jar bodies (3 sizes x 3 colors)
+    Image 2: Lid and spoon close-up
+    Image 3: 4 colored lids
+    RELATIONSHIP: COMPONENTS - parts of complete products"
+   -> visual_analysis_jars_components.md
+      |
+      v
+[product_analyst] -> Research as COMPLETE product with components
+   -> product_research_storage_jars.md
+      |
+      v
+[catalog_analyst] -> Recommend variant structure
+   -> catalog_analysis_storage_jars.md
+      |
+      v
+[USER APPROVAL]
+      |
+      v
+[creative_specialist] -> COMPOSE complete products (NOT separate extractions)
+   -> See delegation template below
+      |
+      v
+[catalog_specialist] -> Create N variant products with assets
+```
+
+**PM Delegation Template for Creative (COMPONENTS):**
+
+```
+"Create COMPOSED hero shots for [product] variants.
+
+COMPONENT IMAGES (use ALL together):
+- Image 1: [path] (label: body) - Contains jar bodies
+- Image 2: [path] (label: accessory) - Contains spoons/accessories
+- Image 3: [path] (label: lid) - Contains colored lids
+
+COMPOSITION REQUIREMENT:
+For EACH variant, create a COMPLETE product hero shot by COMPOSING:
+- The matching jar body from [body] image
+- Its matching colored lid from [lid] image
+- The accessory from [accessory] image
+
+Use image_studio with multiple labeled images:
+images=[
+  {path: 'image1.jpg', label: 'body'},
+  {path: 'image2.jpg', label: 'lid'},
+  {path: 'image3.jpg', label: 'accessory'}
+]
+composition={position: '[body] center, [lid] fitted on top, [accessory] beside'}
+
+Create N complete product shots (one per variant), NOT N component shots.
+
+Read visual analysis at: [visual_analysis_file]
+For CATALOG domain."
+```
+
+**Key Differences from Multi-Angle:**
+
+| Multi-Angle | Components |
+|-------------|------------|
+| Same product, different views | Different PARTS of products |
+| Process each image independently | COMPOSE images together |
+| Each image = 1 asset | Multiple images = 1 composed asset |
+| Simple extraction | Multi-image composition |
+
 ### Variant Workflow (N Linked Products)
 
 ```
@@ -1325,6 +1410,98 @@ When research returns low confidence or incomplete data:
 - Flag gaps to user: "Research couldn't confirm [X]. Please provide or proceed without."
 - Don't guess on compliance/regulatory matters
 - User can proceed with incomplete data at their discretion
+
+---
+
+## OUTPUT COMPARISON PATTERN (CRITICAL)
+
+When user provides feedback comparing multiple generated outputs.
+
+### Triggers
+
+- "This one is good, others are bad"
+- "Only the blue one looks right"
+- "X is junk" / "X worked but Y didn't"
+- Any feedback that compares generated outputs
+
+### The Critical Rule
+
+**NEVER delegate with just filenames. ALWAYS include full storage paths.**
+
+```
+WRONG:
+"Compare blossom_small_blue_final_hero.png with blossom_small_pink_final_hero.png"
+-> Agent has no idea WHERE these files are
+-> Agent loops through ls, glob, grep trying to FIND them
+-> 5M+ tokens wasted, agent stuck
+
+CORRECT:
+"Compare these generated images:
+SUCCESS: pending/blossom_small_blue_final_hero.png
+FAILURES:
+- pending/blossom_small_pink_final_hero.png
+- pending/blossom_medium_blue_final_hero.png
+- pending/blossom_large_yellow_final_hero.png"
+-> Agent can view_image directly
+-> No file search needed
+```
+
+### Finding the Paths
+
+Before delegating, PM MUST retrieve actual paths from:
+1. **Previous creative_specialist output** - Check what paths were returned
+2. **Thread files** - Read the relevant analysis/output files
+3. **Pending folder listing** - If needed, `ls pending/` first
+
+### Delegation Template (Output Comparison)
+
+```
+"Compare the quality of these generated images.
+
+USER FEEDBACK: '[exact user feedback]'
+
+IMAGES TO COMPARE:
+SUCCESS (user approved):
+- [full_storage_path_1]
+
+FAILURES (user rejected):
+- [full_storage_path_2]
+- [full_storage_path_3]
+- [full_storage_path_4]
+
+MISSION:
+1. View ALL images using view_image
+2. Identify specific differences between SUCCESS and FAILURES:
+   - Lighting quality
+   - Edge/cutout quality
+   - Color accuracy
+   - Background consistency
+   - Overall photorealism
+3. Report findings to: /thread/quality_comparison.md
+
+For VISUAL domain."
+```
+
+### Anti-Pattern: File Search Loop
+
+If you delegate without paths:
+```
+Agent behavior:
+1. ls /thread/          -> no images
+2. glob /pending/*.png  -> no matches (wrong thread context)
+3. grep 'filename'      -> searching file contents
+4. ls /inbox/           -> source images, not outputs
+5. Repeat 40+ times...
+```
+
+**This wastes millions of tokens and never completes.**
+
+### Recovery If Already Stuck
+
+If agent is looping on file searches:
+1. Stop the current delegation
+2. Use `ls` or `glob` yourself to find the actual paths
+3. Re-delegate with complete paths
 
 ---
 

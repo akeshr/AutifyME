@@ -20,6 +20,7 @@ from typing import Any
 
 from langchain_core.tools import ToolException
 
+from autifyme_agents.core.execution_context import to_storage_path
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.write_intent import Operation, WriteIntent
 
@@ -332,10 +333,20 @@ class MultiOperationExecutor:
                     # Two modes: storage_path (move) vs temp_path (upload)
                     if asset_upload.storage_path is not None:
                         # Mode 1: Move from pending/ to target folder (preferred)
+                        # Convert user path to storage path (adds thread_id for pending/)
+                        # User path: "pending/hero.png" -> Storage: "pending/{thread_id}/hero.png"
+                        try:
+                            internal_path = to_storage_path(asset_upload.storage_path)
+                        except ValueError as e:
+                            # If thread_id not available, try using path as-is (may already be internal)
+                            logger.warning(f"Path conversion failed, using as-is: {e}")
+                            internal_path = asset_upload.storage_path
+
                         logger.info(
                             f"Moving asset: {asset_upload.storage_path} -> {asset_upload.bucket}/{asset_upload.target_folder}",
                             extra={
-                                "storage_path": asset_upload.storage_path,
+                                "user_path": asset_upload.storage_path,
+                                "internal_path": internal_path,
                                 "bucket": asset_upload.bucket,
                                 "target_folder": asset_upload.target_folder,
                                 "returns": asset_upload.returns,
@@ -343,7 +354,7 @@ class MultiOperationExecutor:
                         )
 
                         move_result = await self.storage.move_asset(
-                            source_path=asset_upload.storage_path,
+                            source_path=internal_path,
                             target_folder=asset_upload.target_folder,
                             bucket=asset_upload.bucket,
                         )
