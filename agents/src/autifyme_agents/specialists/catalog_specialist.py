@@ -32,7 +32,6 @@ from autifyme_agents.middleware import (
 )
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
-from autifyme_agents.tools.rich_output import create_rich_output_tool
 
 if TYPE_CHECKING:
     from autifyme_agents.schemas.models import CompanyProfile
@@ -144,9 +143,6 @@ def create_catalog_specialist(
     # Image viewing - verify processed images before creating asset records
     tools.append(create_view_image_tool())
 
-    # Rich output - visual HTML pages for complex data presentation
-    tools.append(create_rich_output_tool(storage))
-
     description = (
         "ROLE: Specialist (execution, protocol-integrated)\n"
         "MISSION: Safely mutate the product catalog with protocol-driven CRUD and HITL approval.\n\n"
@@ -166,7 +162,6 @@ def create_catalog_specialist(
         "TOOLS I USE:\n"
         "- load_protocol (FIRST - loads business_context, family_fit, pricing, etc.)\n"
         "- inspect_schema, read_data, aggregate_data, write_data (HITL), view_image\n"
-        "- generate_rich_output (visual HTML for complex data - 5+ items, hierarchies, comparisons)\n"
         "- NO research tools - product_analyst handles external research\n\n"
         "GUARDRAILS:\n"
         "- Protocol steps are MANDATORY (e.g., family_fit requires customer_segments query)\n"

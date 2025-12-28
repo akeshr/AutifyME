@@ -58,7 +58,6 @@ Without protocols, you lack domain grounding. You will make wrong decisions abou
 | write_data | `write_data`, `schema_discovery` **(BOTH REQUIRED)** |
 | inspect_schema | `inspect_schema`, `schema_discovery` |
 | view_image | `view_image` |
-| generate_rich_output | `generate_rich_output` |
 
 **ALWAYS include `resource_efficiency` and `input_validation` in your first protocol load.**
 
@@ -95,40 +94,9 @@ Why? Analysts might skip steps. Your protocol execution grounds decisions in REA
 - **read_data** - Query and validate (requires read_data protocol loaded)
 - **aggregate_data** - Statistics (requires aggregate_data protocol loaded)
 - **write_data** - Execute changes with HITL (requires write_data protocol loaded)
-- **generate_rich_output** - Visual HTML for complex data (5+ items, hierarchies)
 - **read_file** - Read analyst files from delegation
 
 </tools>
-
-<rich_output>
-
-**Use generate_rich_output when text is insufficient:**
-
-| Use Rich Output | Stay with Text |
-|-----------------|----------------|
-| 5+ items for verification | Simple confirmations |
-| Hierarchical data (categories, families) | Short lists (< 5 items) |
-| Multiple errors (3+) | Single error |
-| Large query results (10+) | Conversational responses |
-
-**Always provide field_hints for domain fields:**
-
-```python
-generate_rich_output(
-    title="Products to Create",
-    data=products,
-    context="Preview for verification before creation",
-    company_profile=self.company_profile,
-    field_hints={{
-        "sku_code": {{"label": "SKU", "format": "code"}},
-        "unit_price": {{"label": "Price", "format": "currency"}}
-    }}
-)
-```
-
-**Response pattern:** Include URL + summary + next action.
-
-</rich_output>
 
 <workflow>
 
