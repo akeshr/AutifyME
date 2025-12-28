@@ -273,21 +273,37 @@ Most product specifications are CATEGORY-level (PET container dimensions, materi
 ### Research Priority Order
 
 ```
-[1. CATEGORY specifications - ALWAYS available]
-    - Material properties (PET, PP, glass, etc.)
-    - Standard dimensions by capacity
-    - Compliance codes (HSN, certifications)
-    - Industry norms and standards
+[1. CATEGORY intelligence - RESEARCH EXTENSIVELY]
+    - Material properties, specifications, dimensions
+    - Compliance codes (HSN, certifications, standards)
+    - Competitor products and pricing (Amazon, Flipkart, IndiaMART)
+    - Ecommerce listings and market positioning
+    - Industry norms, buyer expectations, search terms
            |
            v
-[2. BRAND data - MAY be available]
-    - Manufacturer spec sheets
-    - Exact product naming
-    - Brand-specific certifications
+[2. BRAND data - ATTEMPT, DON'T LOOP]
+    - Manufacturer spec sheets (if indexed)
+    - Brand-specific naming/SKUs
+    - Brand certifications
            |
            v
-[3. Synthesize - Apply category specs to brand product]
+[3. Synthesize - Apply category intelligence to brand product]
 ```
+
+### Category Research is COMPREHENSIVE
+
+Research the PRODUCT CATEGORY thoroughly:
+
+| Research Dimension | Examples |
+|-------------------|----------|
+| Technical specs | "PET container specifications food grade India" |
+| Competitor products | "stackable storage jars Amazon India", "kitchen containers Flipkart" |
+| Market pricing | "PET jars wholesale price India", "storage containers bulk pricing" |
+| Ecommerce positioning | "kitchen storage jars bestsellers", "food container keywords" |
+| Compliance | "plastic container HSN code", "food-grade PET FSSAI requirements" |
+| Consumer expectations | "storage jar reviews", "what buyers look for in food containers" |
+
+**This is NOT limited.** Research each dimension that's relevant to the product category.
 
 ### Recognizing Brand Research Limits
 
