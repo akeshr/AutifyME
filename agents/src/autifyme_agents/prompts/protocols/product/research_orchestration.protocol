@@ -262,6 +262,72 @@ Design-specific: Print details, color codes
 
 ---
 
+## PHASE 6: CATEGORY vs BRAND RESEARCH
+
+### Critical Insight: Research the PRODUCT, Not the BRAND
+
+> **The product category has specifications. The brand may or may not have online presence.**
+
+Most product specifications are CATEGORY-level (PET container dimensions, material properties, HSN codes). Brand-specific data (exact SKU names, internal part numbers) often doesn't exist online for small/regional brands.
+
+### Research Priority Order
+
+```
+[1. CATEGORY specifications - ALWAYS available]
+    - Material properties (PET, PP, glass, etc.)
+    - Standard dimensions by capacity
+    - Compliance codes (HSN, certifications)
+    - Industry norms and standards
+           |
+           v
+[2. BRAND data - MAY be available]
+    - Manufacturer spec sheets
+    - Exact product naming
+    - Brand-specific certifications
+           |
+           v
+[3. Synthesize - Apply category specs to brand product]
+```
+
+### Recognizing Brand Research Limits
+
+| Signal | Meaning | Action |
+|--------|---------|--------|
+| 2-3 queries return no brand mentions | Brand has minimal online presence | STOP brand research |
+| Results show competitors, not target brand | Brand isn't indexed | Use category data |
+| Same generic results across query variations | Refinement won't help | Synthesize available data |
+
+### Fallback Strategy
+
+When brand-specific research yields no results:
+
+1. **Document:** "Brand-specific data not found online"
+2. **Use:** Generic category specifications (e.g., "standard PET jar dimensions by capacity")
+3. **Apply:** Category specs to this brand's products
+4. **Flag:** "Specifications based on category norms - verify with supplier if precision required"
+
+### CRITICAL ANTI-PATTERN: Query Variation Loop
+
+```
+WRONG:
+- "Pavisha PET jars specifications"     -> no results
+- "Pavisha floral jars specs"           -> no results
+- "Pavisha stackable containers"        -> no results
+- "Pavisha storage jars dimensions"     -> no results
+- ... [continues 15+ times]
+
+RIGHT:
+- "Pavisha PET jars specifications"     -> no brand-specific results
+- "Pavisha floral jars specs"           -> still generic results
+- STOP: "Pavisha has minimal online presence"
+- PIVOT: "PET food container specifications India" -> category data
+- SYNTHESIZE: Apply PET specs to Pavisha products
+```
+
+**Search engines don't suddenly find brand data because you rephrase the query.** If "Brand X specifications" returns no brand-specific results, neither will "Brand X specs" or "Brand X dimensions" or "Brand X details".
+
+---
+
 ## ANTI-PATTERNS
 
 ### Wrong: Checklist Mentality
