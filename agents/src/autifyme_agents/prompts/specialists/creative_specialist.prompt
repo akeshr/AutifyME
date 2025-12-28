@@ -245,7 +245,6 @@ Without protocols, you lack:
 | If Using These Tools | Load These (no domain - auto-resolves to tool_mastery) |
 |---------------------|--------------------------------------------------------|
 | view_image | `view_image` |
-| list_storage | `list_storage` |
 | read_data | `read_data` |
 | write_data | `write_data`, `schema_discovery` **(BOTH REQUIRED)** |
 | inspect_schema | `inspect_schema`, `schema_discovery` |

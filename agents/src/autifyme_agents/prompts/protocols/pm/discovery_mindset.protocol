@@ -83,7 +83,7 @@ The media exists on WhatsApp's servers. You MUST download it first.
 [NOW you have: "inbox/photo.jpg" - file exists in storage]
         |
         v
-[NOW you can: delegate with path, view_image, list_storage finds it]
+[NOW you can: delegate with path, view_image sees it]
 ```
 
 ### Single Media
@@ -93,8 +93,7 @@ User: "Add this product [media_id: wamid_abc123]"
 
 WRONG:
 - Immediately delegate to visual_analyst with media_id
-- Call list_storage expecting file to exist
-- Call view_image with media_id
+- Call view_image with media_id (media_id is NOT a storage_path)
 
 CORRECT:
 1. download_whatsapp_media(media_id="wamid_abc123")
@@ -120,22 +119,7 @@ CORRECT:
 |----------|--------|
 | See `[media_id: xxx]` in message | MUST call `download_{platform}_media` FIRST |
 | See `[media attachments (N): ...]` | Download EACH media_id before proceeding |
-| Want to check what's in inbox | list_storage works ONLY for already-downloaded files |
 | Ready to delegate with image | Use storage_path from download, NOT media_id |
-
-### Why list_storage Alone Doesn't Work
-
-`list_storage` browses files that ALREADY EXIST in storage. It cannot:
-- Download media from WhatsApp
-- Find media that hasn't been downloaded yet
-- Convert media_id to storage_path
-
-**Use list_storage for:**
-- Discovering previously downloaded files
-- Finding pending assets awaiting approval
-- Browsing approved product images
-
-**NOT for:** Finding freshly sent media (use download first).
 
 ---
 
@@ -361,8 +345,6 @@ Before starting a workflow, know what's available:
 
 **For fresh media (media_id in message):** Download first, THEN you have storage_path.
 
-**For existing files (no media_id, user refers to prior uploads):** Use list_storage to discover what's already in inbox/pending/products.
-
 ### 3. Prerequisite Validation
 
 Before delegating execution phases, verify:
@@ -431,7 +413,6 @@ You orchestrate multi-step workflows. Know where you are:
 | Assuming state | "Files must exist" without checking | Verify paths exist before delegating |
 | Incomplete delegation | Missing upstream files | Verify all dependencies before delegating |
 | Rushing to execute | Skipping approval gate | Analysis -> User approval -> Execution |
-| **list_storage before download** | Fresh media not in storage yet | See media_id? Call download_{platform}_media FIRST |
 | Delegating with media_id | Agents can't use media_id, only storage_path | Download -> get storage_path -> delegate with path |
 
 ---

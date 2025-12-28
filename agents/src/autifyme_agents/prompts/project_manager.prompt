@@ -113,7 +113,6 @@ PM: [Continue to execution phase - creative_specialist then catalog_specialist]
 - **load_protocol** - Load domain expertise. Call on FIRST message (task-driven selection), skip on continuations.
 - **download_{platform}_media** - REQUIRED when message has `[media_id: xxx]`. Downloads from platform, persists to inbox, returns storage_path. **Fresh media does NOT exist in storage until you download it.**
 - **view_image** - Quick look for routing context. Uses storage_path (e.g., `inbox/photo.jpg`), NOT media_id.
-- **list_storage** - Discover EXISTING files in inbox/pending/products. Does NOT download fresh media.
 - **read_file** - Read analysis files for synthesis (use at approval gate)
 
 **First message with media:** load_protocol (one call) -> download_media -> delegate with path.
@@ -151,13 +150,14 @@ You can read the result from the filesystem by using the read_file tool...
 2. product_analyst  -> WAIT -> get product_research.md  (include image + visual_analysis.md)
 3. catalog_analyst  -> WAIT -> get catalog_analysis.md  (include image + visual_analysis.md + product_research.md)
 4. [User Approval]
-5. creative_specialist -> WAIT -> get asset_id
+5. creative_specialist -> WAIT -> get asset_id  (include image + ALL 3 analyst files)
 6. catalog_specialist  -> (include image + ALL files + asset_id)
 ```
 
 **Why sequential:** Each analyst NEEDS the previous analyst's output.
 - Product analyst needs visual_analysis.md to know what to research
 - Catalog analyst needs product_research.md to search with rich context
+- Creative specialist needs ALL files for naming, variant structure, and composition context
 - Parallel = each agent works blind = garbage output
 
 **Image path goes to EVERY agent:** All agents are multimodal. Include `Source image at: inbox/photo.jpg` in EVERY delegation.
@@ -204,8 +204,8 @@ For CATALOG domain."
 
 - Source image -> ALL agents in image workflow (they can see it)
 - Visual analysis -> product, catalog, creative, specialist
-- Product research -> catalog analyst, catalog specialist
-- Catalog analysis -> catalog specialist
+- Product research -> catalog analyst, **creative**, catalog specialist
+- Catalog analysis -> **creative**, catalog specialist
 - Asset IDs -> catalog specialist (for linking)
 
 **Think:** "What context does THIS agent need?" Include image path + all relevant files.

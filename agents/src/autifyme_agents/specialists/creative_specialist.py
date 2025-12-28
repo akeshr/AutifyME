@@ -37,7 +37,6 @@ from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import create_execution_limits
 from autifyme_agents.tools import create_view_image_tool
 from autifyme_agents.tools.image_studio import create_image_studio_tool
-from autifyme_agents.tools.list_storage import create_list_storage_tool
 from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
 
 if TYPE_CHECKING:
@@ -105,11 +104,6 @@ def create_creative_specialist(
         create_image_studio_tool(storage=storage),  # Professional image processing with persistence
     ]
 
-    # Add storage-dependent tools
-    if storage is not None:
-        # List storage for discovering files in inbox/pending/products
-        tools.append(create_list_storage_tool(storage))
-
     # Add scoped data tools if storage is provided
     if storage is not None:
         from autifyme_agents.tools.data_engine import (
@@ -145,7 +139,6 @@ def create_creative_specialist(
         "- load_protocol (domain expertise when needed)\n"
         "- view_image (ALWAYS before and after processing)\n"
         "- image_studio (12-spec creative palette)\n"
-        "- list_storage (discover files in inbox/pending/products)\n"
         "- If storage: inspect_schema, read_data, write_data (HITL for writes)\n\n"
         "GUARDRAILS:\n"
         "- No catalog CRUD; delegate to catalog_specialist for product records"

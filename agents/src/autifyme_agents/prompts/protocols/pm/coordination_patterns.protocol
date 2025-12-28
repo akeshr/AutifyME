@@ -379,9 +379,9 @@ Every agent in an image workflow receives `Source image at: inbox/photo.jpg`. No
 | Artifact | Source | Routes To | PM Action |
 |----------|--------|-----------|-----------|
 | **Source image path** | User upload | ALL agents in image workflow | Include in EVERY delegation when image-based |
-| visual_analysis_{image}.md | visual_analyst | product, catalog, creative | Include in all subsequent delegations |
-| product_research_{item}.md | product_analyst | catalog_analyst, catalog_specialist | Include for catalog search and creation |
-| catalog_analysis_{item}.md | catalog_analyst | catalog_specialist | Include when delegating catalog creation |
+| visual_analysis_{image}.md | visual_analyst | product, catalog, creative, specialist | Include in all subsequent delegations |
+| product_research_{item}.md | product_analyst | catalog_analyst, creative, catalog_specialist | Include for naming, specs, and catalog |
+| catalog_analysis_{item}.md | catalog_analyst | creative, catalog_specialist | Include for family context and catalog creation |
 | asset_id (UUID) | creative_specialist | catalog_specialist | Include when linking asset to product |
 
 **Note:** Creative specialist returns asset_id (not storage_path). Asset is already HITL-approved for image quality.
@@ -413,12 +413,14 @@ PM: "Find catalog placement.
 
 [USER APPROVAL - Proceed with cataloging?]
 
-Step 4: creative_specialist (receives visual file)
+Step 4: creative_specialist (receives ALL analyst files)
 PM: "Create catalog hero shot.
-     Read visual analysis at: visual_analysis_pet_jar.md
      Source image at: inbox/photo.jpg
+     Read visual analysis at: visual_analysis_pet_jar.md
+     Read product research at: product_research_pet_jar.md
+     Read catalog analysis at: catalog_analysis_pet_jar.md
      For CATALOG domain."
--> Processes image
+-> Processes image (uses product naming, family context for proper hero shot)
 -> Creates asset record (HITL: "Is this image acceptable?")
 -> [USER APPROVES IMAGE]
 -> Returns: "Asset created: asset_abc123. Ready for catalog entry."
