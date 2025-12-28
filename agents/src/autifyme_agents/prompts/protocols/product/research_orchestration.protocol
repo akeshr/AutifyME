@@ -388,6 +388,25 @@ Image shows 5 items. "I see 5 distinct storage containers of different sizes. Le
 These appear to be a graduated set. Researching as variant group..."
 ```
 
+### Wrong: Dimension Loops
+
+```
+WRONG:
+"PET container pricing India"         -> market data
+"PET jars wholesale price"            -> similar data
+"plastic container bulk pricing"      -> similar data
+"storage jar market price India"      -> similar data
+"PET container cost wholesale"        -> similar data
+... [5+ queries on same dimension]
+
+RIGHT:
+"PET container pricing India"         -> market data
+"stackable jars Amazon Flipkart"      -> competitor context
+MOVE ON: "I have pricing context. Next dimension: compliance."
+```
+
+**2-3 queries per dimension is ENOUGH.** If you're rephrasing the same question, you're looping.
+
 ### Wrong: Ignoring Components
 
 ```
@@ -405,6 +424,94 @@ RIGHT:
 - Power cord: 1.2m length
 
 Each component researched for material, specifications, care instructions..."
+```
+
+---
+
+## PHASE 7: RESEARCH COMPLETION AND SYNTHESIS
+
+### Research Budget
+
+Research is NOT unlimited. Work within these constraints:
+
+| Budget Type | Limit | Rationale |
+|-------------|-------|-----------|
+| **Total queries** | 15-20 max | Comprehensive coverage without waste |
+| **Per dimension** | 2-3 queries | Sufficient for substantive data |
+| **Brand-specific** | 2-3 max | Stop if brand not indexed |
+| **Refinement queries** | 1-2 per dimension | One follow-up if initial query weak |
+
+**Budget allocation example (PET storage container):**
+```
+Technical specs:     3 queries (materials, dimensions, capacity)
+Compliance:          2 queries (HSN, certifications)
+Competitor/Market:   4 queries (Amazon, Flipkart, pricing, positioning)
+Ecommerce intel:     2 queries (keywords, buyer expectations)
+Brand-specific:      2 queries (then stop if no results)
+Follow-ups:          2 queries (for high-value sources)
+-------------------------------------------------
+Total:              15 queries
+```
+
+### Prior Research Utilization
+
+**ALWAYS check for existing research before starting fresh:**
+
+1. If PM mentions prior research files - READ THEM FIRST
+2. If researching a category you've seen before - check for related files
+3. Build on existing research, don't duplicate work
+
+```
+WRONG:
+PM: "Research Pavisha PET jars. Prior research at product_research_stackable_jars.md"
+Agent: [Ignores prior file, starts 18 brand queries from scratch]
+
+RIGHT:
+PM: "Research Pavisha PET jars. Prior research at product_research_stackable_jars.md"
+Agent: [Reads prior file first]
+       -> "I have category specs for PET jars already"
+       -> [Only researches gaps: brand-specific data, this variant's specifics]
+       -> [2-3 queries to fill gaps, then synthesize]
+```
+
+### Research Completion Checklist
+
+Research is COMPLETE when you can answer YES to these:
+
+| Dimension | Completion Question |
+|-----------|-------------------|
+| **Technical specs** | Can I specify materials, dimensions, capacity, weight? |
+| **Compliance** | Do I have HSN code and relevant certifications? |
+| **Market context** | Do I know competitor pricing and positioning? |
+| **Ecommerce intel** | Do I know what keywords/features buyers search for? |
+| **Variant handling** | Have I covered all variants identified in visual analysis? |
+
+**If any dimension is incomplete after 2-3 queries, document the gap and move on.**
+
+### Synthesis Trigger
+
+**STOP researching and START synthesizing when:**
+
+1. All completion checklist items are addressed (or documented as gaps)
+2. Research budget is 80% consumed
+3. Last 2-3 queries returned redundant/duplicate information
+4. You have enough to populate a catalog entry
+
+**The goal is ACTIONABLE OUTPUT, not exhaustive searching.**
+
+```
+WRONG:
+[Query 15] "PET container specs" -> useful data
+[Query 16] "PET container specifications" -> same data
+[Query 17] "PET jar specs India" -> same data
+[Query 18] "plastic container specifications" -> same data
+... [continues]
+
+RIGHT:
+[Query 15] "PET container specs" -> useful data
+[Query 16] "PET container specifications" -> same data as Q15
+STOP: "I'm getting redundant results. Time to synthesize."
+[write_file with comprehensive findings]
 ```
 
 ---
