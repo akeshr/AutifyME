@@ -265,6 +265,56 @@ research_product -> identify 0.8+ relevance sources -> extract 1-2 best
 
 ---
 
+## CATEGORY vs BRAND QUERIES
+
+### Category Queries (Always Productive)
+
+These queries return useful data because category information is well-indexed:
+
+```
+"PET container specifications food grade"     -> material specs
+"stackable jars Amazon India"                 -> competitor context
+"plastic container HSN code"                  -> compliance data
+"kitchen storage jars wholesale price"        -> market pricing
+```
+
+### Brand Queries (May Return Nothing)
+
+Small/regional brands often have no online presence:
+
+```
+"[SmallBrand] PET jars specifications"        -> likely no results
+"[SmallBrand] product catalog"                -> likely no results
+```
+
+**Rule:** After 2-3 brand-specific queries with no brand mentions in results, STOP. Pivot to category queries.
+
+---
+
+## QUERY VARIATION ANTI-PATTERN
+
+**Rephrasing the same query is NOT research progress.**
+
+```
+WRONG:
+"Pavisha PET jars specifications"             -> no brand results
+"Pavisha floral jars specs"                   -> no brand results
+"Pavisha stackable containers dimensions"     -> no brand results
+"Pavisha storage jars India"                  -> no brand results
+... [continues 15+ times]
+
+RIGHT:
+"Pavisha PET jars specifications"             -> no brand results
+"Pavisha product catalog"                     -> no brand results
+STOP brand queries. PIVOT:
+"PET food container specifications India"     -> category specs
+"stackable jars market pricing wholesale"     -> market data
+```
+
+**Search engines return the same results for synonymous queries.** If "Brand X specifications" finds nothing, "Brand X specs" won't either.
+
+---
+
 ## GRACEFUL DEGRADATION
 
 Research is OPTIONAL enrichment. On failure:
