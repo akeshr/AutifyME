@@ -671,7 +671,7 @@ PM: "Process inbox/[product_image].jpg for catalog. Read visual analysis at visu
 
 ## 3. LOAD PROTOCOLS
 
--> [load_protocol: product_photography, image_studio (visual) + view_image + shared]
+-> [load_protocol: product_photography (visual) + image_studio + view_image + shared]
 
 ## 4. APPLY MATERIAL KNOWLEDGE FROM ANALYST
 
