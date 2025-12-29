@@ -163,20 +163,22 @@ The product type determines what to research. Here are EXAMPLES, not limits:
 
 ### Query Evolution
 
-Don't stop at generic queries. Evolve based on findings:
+Evolve queries based on what you learn:
 
 ```
-Generic: "PET container specifications"
+Generic:  "[product type] specifications"
     |
     v
-Specific: "500ml PET jar food grade specifications"
+Specific: "[size] [product type] [grade] specifications"
     |
     v
-Deep: "PET jar honeycomb texture manufacturing specifications India"
+Deep:     "[product type] [specific feature] [manufacturing/technical] specifications [market]"
     |
     v
-Expert: "BPA-free PET container FSSAI compliance requirements 2024"
+Expert:   "[certification] [product type] [regulatory] requirements [year]"
 ```
+
+Each level adds specificity based on what the previous query revealed.
 
 ### When to Use extract_web_content
 
@@ -247,17 +249,17 @@ Signals in image/description:
 2. **Axis-specific research** - What changes per variant
 3. **Variant matrix** - All combinations and their implications
 
-**Example Output:**
+**Output Structure:**
 ```
-Base Product: PET Storage Jar with Lid
+Base Product: [Product Type with Key Feature]
 Variant Axes:
-  - Size: 500ml, 1L, 1.5L, 2L
-  - Design: Blossoms (blue), Spring (pink), Garden (green)
+  - [Axis 1]: [values]
+  - [Axis 2]: [values]
 
-Matrix: 4 sizes x 3 designs = 12 SKUs
+Matrix: [count] x [count] = [total SKUs]
 
-Size-specific: Dimensions, capacity, recommended use
-Design-specific: Print details, color codes
+[Axis 1]-specific: [what changes]
+[Axis 2]-specific: [what changes]
 ```
 
 ---
@@ -292,16 +294,15 @@ Most product specifications are CATEGORY-level (PET container dimensions, materi
 
 ### Category Research is COMPREHENSIVE
 
-Research the PRODUCT CATEGORY thoroughly:
+Research the PRODUCT CATEGORY thoroughly across these dimensions:
 
-| Research Dimension | Examples |
-|-------------------|----------|
-| Technical specs | "PET container specifications food grade India" |
-| Competitor products | "stackable storage jars Amazon India", "kitchen containers Flipkart" |
-| Market pricing | "PET jars wholesale price India", "storage containers bulk pricing" |
-| Ecommerce positioning | "kitchen storage jars bestsellers", "food container keywords" |
-| Compliance | "plastic container HSN code", "food-grade PET FSSAI requirements" |
-| Consumer expectations | "storage jar reviews", "what buyers look for in food containers" |
+| Dimension | What to Find |
+|-----------|--------------|
+| Technical specs | Materials, dimensions, capacity, weight, properties |
+| Competitor products | What competitors offer, their features, pricing |
+| Market pricing | Wholesale rates, retail prices, bulk discounts |
+| Ecommerce positioning | Keywords buyers use, bestseller features, reviews |
+| Compliance | Classification codes, certifications, regulatory requirements |
 
 **This is NOT limited.** Research each dimension that's relevant to the product category.
 
@@ -322,29 +323,17 @@ Research the PRODUCT CATEGORY thoroughly:
 When brand-specific research yields no results:
 
 1. **Document:** "Brand-specific data not found online"
-2. **Use:** Generic category specifications (e.g., "standard PET jar dimensions by capacity")
+2. **Use:** Generic category specifications
 3. **Apply:** Category specs to this brand's products
 4. **Flag:** "Specifications based on category norms - verify with supplier if precision required"
 
-### CRITICAL ANTI-PATTERN: Query Variation Loop
+### Query Variation Loop (CRITICAL ANTI-PATTERN)
 
-```
-WRONG:
-- "Pavisha PET jars specifications"     -> no results
-- "Pavisha floral jars specs"           -> no results
-- "Pavisha stackable containers"        -> no results
-- "Pavisha storage jars dimensions"     -> no results
-- ... [continues 15+ times]
+**The principle:** Search engines return the same results for synonymous queries. Rephrasing a failed query won't suddenly find new data.
 
-RIGHT:
-- "Pavisha PET jars specifications"     -> no brand-specific results
-- "Pavisha floral jars specs"           -> still generic results
-- STOP: "Pavisha has minimal online presence"
-- PIVOT: "PET food container specifications India" -> category data
-- SYNTHESIZE: Apply PET specs to Pavisha products
-```
+**The signal:** Results don't contain the brand/term you're searching for (only your query does).
 
-**Search engines don't suddenly find brand data because you rephrase the query.** If "Brand X specifications" returns no brand-specific results, neither will "Brand X specs" or "Brand X dimensions" or "Brand X details".
+**The action:** Recognize the signal after 1-2 attempts, then pivot to category research or move on.
 
 ---
 
@@ -352,85 +341,33 @@ RIGHT:
 
 ### Wrong: Checklist Mentality
 
-```
-WRONG:
-"Let me research HSN, compliance, naming, positioning."
-(Fixed list regardless of product)
+**Signal:** Using a fixed research list regardless of product type.
 
-RIGHT:
-"This is an electronic kitchen appliance. I need to research:
-power specs, performance metrics, safety certifications,
-components included, warranty terms, dimensions, weight,
-energy rating, controls, noise level, and competitive positioning."
-```
+**The principle:** Different products need different research dimensions. Identify what's relevant to THIS product, don't apply a generic checklist.
 
 ### Wrong: Stopping Too Early
 
-```
-WRONG:
-Found HSN code. Done.
+**Signal:** Stopping after finding one piece of data without covering other applicable dimensions.
 
-RIGHT:
-Found HSN code. Now: What certifications apply? What specs does this category typically have? What are competitors listing? What do buyers search for? What technical details exist? Is there a manufacturer datasheet?
-```
+**The principle:** Check the completion checklist. Can you answer all the key questions for applicable dimensions? If not, continue researching.
 
 ### Wrong: Missing Multi-Product
 
-```
-WRONG:
-Image shows 5 items. "This is a storage container..."
-(Treated as single product)
+**Signal:** Image shows multiple items but you're describing it as one product.
 
-RIGHT:
-Image shows 5 items. "I see 5 distinct storage containers of different sizes. Let me enumerate each:
-1. 500ml jar with blue lid
-2. 1L jar with blue lid
-3. 1.5L jar with blue lid
-4. 2L jar with blue lid
-5. 3L jar with blue lid
-
-These appear to be a graduated set. Researching as variant group..."
-```
+**The principle:** Count distinct items. Identify if they're variants, a set, or unrelated products. Research accordingly.
 
 ### Wrong: Dimension Loops
 
-**Signal: You're querying the same dimension and getting similar results.**
+**Signal:** You're querying the same dimension and getting similar results.
 
-```
-WRONG (ignoring the signal):
-"PET container pricing India"         -> market data
-"PET jars wholesale price"            -> similar data (SIGNAL!)
-"plastic container bulk pricing"      -> similar data (SIGNAL!)
-"storage jar market price India"      -> similar data (SIGNAL!)
-... [keeps going despite signals]
-
-RIGHT (responding to the signal):
-"PET container pricing India"         -> market data
-"PET jars wholesale price"            -> similar data
-RECOGNIZE: "I already have pricing data. This query didn't add new info."
-MOVE ON: "Next dimension: compliance."
-```
-
-**The test:** Did this query teach me something I didn't know? If no, move on.
+**The test:** Did this query teach me something I didn't know? If no, move on to the next dimension.
 
 ### Wrong: Ignoring Components
 
-```
-WRONG:
-"Kitchen mixer. HSN 8509, 28% GST."
+**Signal:** Product has multiple components but you only researched the main unit.
 
-RIGHT:
-"Kitchen mixer with:
-- Main unit: 750W motor, 5 speeds + pulse
-- Stainless steel bowl: 4.5L capacity
-- Dough hook: Heavy-duty, stainless steel
-- Whisk attachment: Wire balloon whisk
-- Flat beater: For batters and mixing
-- Splash guard: Transparent, with pour spout
-- Power cord: 1.2m length
-
-Each component researched for material, specifications, care instructions..."
-```
+**The principle:** Identify all components (main unit, accessories, attachments, packaging). Research each for materials, specifications, and care requirements.
 
 ---
 
@@ -458,49 +395,13 @@ Each component researched for material, specifications, care instructions..."
 - Each query is returning genuinely new information
 - You found a high-value source worth extracting
 
-### Research Flow Example (PET storage container)
-
-```
-[Technical specs]
-  Query: "PET food container specifications" -> materials, dimensions, capacity
-  Query: "food grade PET properties"         -> NEW: BPA-free, temperature limits
-  MOVE ON: I can specify materials and dimensions now
-
-[Compliance]
-  Query: "plastic container HSN code India"  -> HSN 3923, 18% GST
-  Query: "PET food container FSSAI"          -> NEW: food-grade requirements
-  MOVE ON: I have HSN and certification requirements
-
-[Market/Competitor]
-  Query: "storage jars Amazon India"         -> competitor pricing, features
-  Query: "kitchen containers Flipkart"       -> SIMILAR to Amazon results
-  MOVE ON: I have market context, more queries won't add much
-
-[Brand-specific]
-  Query: "Pavisha PET jars"                  -> no brand mentions in results
-  STOP: Brand not indexed online, use category data
-```
-
 ### Prior Research Utilization
 
 **ALWAYS check for existing research before starting fresh:**
 
 1. If PM mentions prior research files - READ THEM FIRST
 2. If researching a category you've seen before - check for related files
-3. Build on existing research, don't duplicate work
-
-```
-WRONG:
-PM: "Research Pavisha PET jars. Prior research at product_research_stackable_jars.md"
-Agent: [Ignores prior file, starts 18 brand queries from scratch]
-
-RIGHT:
-PM: "Research Pavisha PET jars. Prior research at product_research_stackable_jars.md"
-Agent: [Reads prior file first]
-       -> "I have category specs for PET jars already"
-       -> [Only researches gaps: brand-specific data, this variant's specifics]
-       -> [Only researches gaps until information gain stops, then synthesize]
-```
+3. Build on existing research - only query for gaps, not from scratch
 
 ### Research Completion Checklist
 
@@ -533,21 +434,6 @@ Research is COMPLETE when you've covered all APPLICABLE dimensions:
 | You have enough to write a comprehensive product dossier | Task completable |
 
 **The test:** Can a specialist populate every database field from your research? If yes, synthesize.
-
-```
-WRONG (ignoring signals):
-"PET container specs"           -> useful data
-"PET container specifications"  -> same data (SIGNAL: diminishing returns)
-"PET jar specs India"           -> same data (SIGNAL: looping)
-"plastic container specs"       -> same data (SIGNAL: still looping)
-... [ignores signals, continues anyway]
-
-RIGHT (responding to signals):
-"PET container specs"           -> useful data
-"PET container specifications"  -> same data
-RECOGNIZE: "I'm getting redundant results - this dimension is complete"
-MOVE ON or SYNTHESIZE
-```
 
 ---
 
