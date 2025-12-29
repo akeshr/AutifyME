@@ -61,10 +61,10 @@ Load this protocol when agent response contains:
 ```
 [HITL RESOLVED]
 
-User Feedback: "Price should be Rs 45"
+User Feedback: "Price should be [new price]"
 
 Resolutions:
-- Price: Rs 38 -> Rs 45 (per user feedback)
+- Price: [old price] -> [new price] (per user feedback)
 
 Proceeding with revised proposal.
 ```
@@ -234,14 +234,14 @@ When agent responds WITHOUT explicit markers but asks clarifying questions:
 ```
 WRONG:
 Agent: "Which family name would you prefer?"
-PM: "Use 'Floral PET Jars'" <- Re-instructs without checking
+PM: "Use '[Family Name A]'" <- Re-instructs without checking
 -> If user rejected this name, loop continues
 
 CORRECT:
 Agent: "Which family name would you prefer?"
 PM: "Did user reject your proposal? What feedback did they give?"
 Agent: "[HITL_FEEDBACK] was: 'I don't like that name'"
-PM to User: "You mentioned you don't like 'Floral PET Jars'. What name would you prefer?"
+PM to User: "You mentioned you don't like '[Family Name A]'. What name would you prefer?"
 -> Breaks the loop by going to user
 ```
 
@@ -256,7 +256,7 @@ WRONG:
 Agent: "## HITL FEEDBACK REQUIRES PM DIRECTION
 User said: 'I don't like the family name'"
 
-PM: "Use family name 'Floral PET Jar Series'"
+PM: "Use family name '[Family Name B]'"
 -> User ALREADY REJECTED something related to family name!
 -> PM is guessing/re-instructing without asking user
 -> Loop continues
@@ -264,8 +264,8 @@ PM: "Use family name 'Floral PET Jar Series'"
 CORRECT:
 PM to User: "You mentioned you don't like the family name.
 Would you prefer:
-1) Pavisha Floral Containers
-2) Decorative PET Jars
+1) [Brand] [Category] Containers
+2) [Description] [Type]
 3) Something else?"
 -> PM asks USER, doesn't guess
 ```
@@ -298,7 +298,7 @@ CORRECT:
 PM: "Create the product.
 
 USER CLARIFICATION (from HITL feedback):
-- Family name: 'Pavisha Storage Collection' (user's choice)
+- Family name: '[User's Chosen Name]' (user's choice)
 
 PREVIOUSLY RESOLVED:
 - Colors: 3 variants per visual analysis

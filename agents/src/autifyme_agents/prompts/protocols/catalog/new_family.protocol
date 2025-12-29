@@ -38,10 +38,10 @@ Do NOT create new family if:
 
 | Field | Source | Example |
 |-------|--------|---------|
-| name | User + context | "HDPE Industrial Drums" |
-| sku_prefix | Generate from name | "DRUM-HDPE" |
-| description | User + research | "Heavy-duty drums for chemical storage" |
-| brand | User-provided or null | "IndustroPack" |
+| name | User + context | "[Material] [Category]" |
+| sku_prefix | Generate from name | "[CAT]-[MAT]" |
+| description | User + research | "[Purpose] [products] for [use case]" |
+| brand | User-provided or null | "[Brand]" |
 
 ### Required Related Data
 
@@ -86,7 +86,7 @@ Define SKU generation pattern:
 
 ```
 {sku_prefix}-{size}-{material_grade}-{color}
-Example: DRUM-HDPE-50L-CG-BLU
+Example: [PREFIX]-[SIZE]-[GRADE]-[COLOR]
 ```
 
 ---
@@ -118,7 +118,7 @@ Tables must be created in dependency order:
 
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
-| Family per size | "PET 500ml Family", "PET 1L Family" | One family "PET Food Jars" with size as variant |
+| Family per size | "[Material] [Size A] Family", "[Material] [Size B] Family" | One family "[Material] [Category]" with size as variant |
 | No customer definition | Family without customer_segments | Always create customer_segments - defines WHO family serves |
 | Skipping family_fit | "Looks different" -> new family | Evaluate 3 candidates first, document NO FIT for each |
 
@@ -131,19 +131,19 @@ After new family creation decision:
 ```json
 {
   "decision": "CREATE_NEW_FAMILY",
-  "family_name": "HDPE Industrial Drums",
+  "family_name": "[Material] [Category]",
   "evidence": {
     "families_evaluated": 3,
     "fit_results": [
-      {"family": "PET Food Jars", "fit": false, "reason": "Different customer - food vs chemical"},
-      {"family": "Glass Industrial", "fit": false, "reason": "Different material requirements"},
-      {"family": "Plastic Containers", "fit": false, "reason": "Consumer vs industrial customer"}
+      {"family": "[Existing Family A]", "fit": false, "reason": "Different customer - [segment A] vs [segment B]"},
+      {"family": "[Existing Family B]", "fit": false, "reason": "Different material requirements"},
+      {"family": "[Existing Family C]", "fit": false, "reason": "Consumer vs industrial customer"}
     ]
   },
   "new_family_definition": {
-    "customer_segment": "B2B Chemical Manufacturers",
+    "customer_segment": "[Segment Type] [Customer Description]",
     "variant_axes": ["size", "color"],
-    "sku_prefix": "DRUM-HDPE"
+    "sku_prefix": "[CAT]-[MAT]"
   }
 }
 ```

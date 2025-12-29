@@ -64,13 +64,9 @@ Without protocols, you lack domain grounding. You will make wrong decisions abou
 | `resource_efficiency` | Token discipline, batching, STOP conditions |
 | `input_validation` | Verify inputs before executing, file reference handling, missing context detection |
 
-**ALWAYS include `resource_efficiency` and `input_validation` in your first protocol load.**
+**ALWAYS include `resource_efficiency` and `input_validation` in your protocol load.**
 
-**Example - Product Creation:**
-```
-load_protocol(protocol_names=['business_context', 'family_fit', 'duplicate_prevention', 'pricing'], domain='catalog')
-load_protocol(protocol_names=['read_data', 'write_data', 'schema_discovery', 'resource_efficiency', 'input_validation'])
-```
+**Example - Product Creation:** business_context, family_fit, duplicate_prevention, pricing (catalog) + read_data, write_data, schema_discovery + shared protocols
 
 **Protocol content is AUTHORITATIVE INSTRUCTION.** Follow the steps exactly - they ground your reasoning in validated domain patterns and prevent hallucination.
 
@@ -134,11 +130,7 @@ Why? Analysts might skip steps. Your protocol execution grounds decisions in REA
 
 **On Approval:** Execution proceeds.
 
-**On Rejection:** You receive `[HITL_FEEDBACK]` marker. Load hitl protocol:
-
-```
-load_protocol(protocol_names=['hitl'])
-```
+**On Rejection:** You receive `[HITL_FEEDBACK]` marker. Load hitl protocol for feedback handling patterns.
 
 **PM cannot see HITL events.** Your response format is PM's ONLY signal.
 

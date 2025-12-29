@@ -15,7 +15,7 @@ Two analysts provide contradictory recommendations.
 
 **Example:**
 - visual_analyst: "Premium decorative product, gift-market positioning"
-- catalog_analyst: "Fits in utility PET Kitchen Storage family"
+- catalog_analyst: "Fits in utility [Material] [Category] family"
 
 **Resolution:**
 1. Identify the root cause of disagreement
@@ -43,11 +43,11 @@ Analyst findings contradict each other factually.
 3. Synthesize: "New 4th size needs to be added to family"
 
 **Actual Conflict Example:**
-- visual_analyst: "PET material, transparent"
-- product_analyst: "HSN 7010 (glass containers)"
+- visual_analyst: "[Material A], transparent"
+- product_analyst: "[HSN-B] ([Material B] [products])"
 
 **Resolution:**
-1. HSN 7010 is for GLASS, not PET
+1. [HSN-B] is for [Material B], not [Material A]
 2. product_analyst made an error
 3. Action: Re-delegate to product_analyst with correction
 
@@ -56,7 +56,7 @@ Analyst findings contradict each other factually.
 Same domain, different recommendations based on interpretation.
 
 **Example:**
-- catalog_analyst recommends: "Add to existing PET Kitchen family"
+- catalog_analyst recommends: "Add to existing [Material] [Category] family"
 - BUT visual shows decorative prints, gift-market positioning
 
 **Resolution:**
@@ -120,10 +120,10 @@ When domains have overlapping concerns, authority determines resolution.
 
 **Example Application:**
 
-Conflict: "Should this decorative jar go in 'PET Kitchen Storage' or new family?"
+Conflict: "Should this decorative [product] go in '[Material] [Category]' or new family?"
 
 - VISUAL says: "Decorative, gift-market signals"
-- CATALOG says: "Material matches PET Kitchen Storage"
+- CATALOG says: "Material matches [Material] [Category]"
 
 Authority: CATALOG owns family placement
 But: CATALOG must consider customer segment, not just material
@@ -140,9 +140,9 @@ If customer_segments don't match, CATALOG should recommend new family.
 When analyst made an error:
 
 ```
-"CORRECTION: Your previous analysis suggested HSN 7010, but that's for glass.
-This is PET material (confirmed by visual analysis).
-Research correct HSN for PET food containers."
+"CORRECTION: Your previous analysis suggested [HSN-B], but that's for [Material B].
+This is [Material A] (confirmed by visual analysis).
+Research correct HSN for [Material A] [product type]."
 ```
 
 ### Pattern 2: Protocol Enforcement
@@ -163,9 +163,9 @@ When PM needs analyst to arbitrate:
 ```
 "CONFLICT to resolve:
 - Visual analysis indicates decorative, gift-market positioning
-- Your previous recommendation: PET Kitchen Storage (utility)
+- Your previous recommendation: [Material] [Category] (utility)
 
-Question: Do the customer_segments for PET Kitchen Storage match
+Question: Do the customer_segments for [Material] [Category] match
 a gift-buyer persona? If not, recommend appropriate family."
 ```
 
@@ -275,10 +275,10 @@ When analysts provide conflicting information about the same product.
 
 | Visual Says | Research Says | Resolution |
 |-------------|---------------|------------|
-| "PET plastic" | "HDPE based on product type" | Research wins - material analysis is more reliable |
-| "500ml capacity" | "Standard is 475ml" | Research wins - exact specs from standards |
+| "[Material A]" | "[Material B] based on product type" | Research wins - material analysis is more reliable |
+| "[size] capacity" | "Standard is [actual size]" | Research wins - exact specs from standards |
 | "Premium positioning" | "Budget segment" | Neither wins - present both views to user |
-| "Blue color" | N/A | Visual wins - color is observation, not research topic |
+| "[color]" | N/A | Visual wins - color is observation, not research topic |
 
 ### Resolution Framework
 

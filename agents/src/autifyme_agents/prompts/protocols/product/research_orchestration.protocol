@@ -98,7 +98,7 @@ The product type determines what to research. Here are EXAMPLES, not limits:
 | Shelf life | Expiry, PAO (period after opening) |
 | Certifications | Dermatologically tested, cruelty-free, vegan |
 | Fragrance | Notes, allergens, fragrance-free |
-| Packaging | Size, type (jar/tube/pump), recyclable |
+| Packaging | Size, type ([form A]/[form B]/[form C]), recyclable |
 
 ### Furniture/Home Decor
 | Dimension | What to Find |
@@ -236,7 +236,7 @@ Signals in image/description:
 
 | Axis Type | Examples |
 |-----------|----------|
-| Size | 250ml, 500ml, 1L, 2L |
+| Size | [size A], [size B], [size C], [size D] |
 | Color | Blue, Red, Green, Pink |
 | Design/Pattern | Floral, Geometric, Plain |
 | Material grade | Standard, Premium, Professional |

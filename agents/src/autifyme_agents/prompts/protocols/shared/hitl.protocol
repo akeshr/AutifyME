@@ -43,7 +43,7 @@ HITL feedback arrives as a message containing `[HITL_FEEDBACK]` marker:
 ```
 
 ```
-[HITL_FEEDBACK] Price should be Rs 45, not Rs 38
+[HITL_FEEDBACK] Price should be [new price], not [old price]
 ```
 
 ```
@@ -240,11 +240,11 @@ User specified exact change.
 **Action:** Apply directly, resubmit with REVISED marker.
 
 ```
-ORIGINAL: price = Rs 38
-FEEDBACK: "Make it Rs 45"
-REVISED: price = Rs 45
+ORIGINAL: price = [old price]
+FEEDBACK: "Make it [new price]"
+REVISED: price = [new price]
 
-hitl_summary: "REVISED: Price changed from Rs 38 to Rs 45 per your feedback. Approve?"
+hitl_summary: "REVISED: Price changed from [old price] to [new price] per your feedback. Approve?"
 ```
 
 ### PARTIAL
@@ -573,7 +573,7 @@ Round 3: "Unable to resolve after 2 rounds. Options: 1) exact value, 2) cancel, 
 ### Example 1: Clear Correction (Simple)
 
 ```
-[HITL_FEEDBACK] Price should be Rs 45, not Rs 38
+[HITL_FEEDBACK] Price should be [new price], not [old price]
 
 Type: CLEAR
 Action: Apply directly
@@ -581,10 +581,10 @@ Action: Apply directly
 Response:
 [HITL RESOLVED]
 
-**User Feedback:** "Price should be Rs 45, not Rs 38"
+**User Feedback:** "Price should be [new price], not [old price]"
 
 **Resolutions:**
-- Price: Rs 38 -> Rs 45 (per user feedback)
+- Price: [old price] -> [new price] (per user feedback)
 
 Proceeding with revised proposal.
 
@@ -600,7 +600,7 @@ Proceeding with revised proposal.
 Type: FACT
 Action: Check workspace
 
-[Check visual_analysis_storage_jars.md]
+[Check visual_analysis_[product].md]
 -> Found: "Colors: Blossoms (Blue), Charming Flowers (Yellow), Spring Flowers (Pink)"
 
 Response:
@@ -643,17 +643,17 @@ Response:
 
 **What I've Resolved:**
 - Sets/Combos: Will NOT create (source: user feedback - "don't create")
-- Color Variants: Will include Blossoms, Charming Flowers, Spring Flowers (source: visual_analysis_storage_jars.md)
+- Color Variants: Will include [Design A], [Design B], [Design C] (source: visual_analysis_[product].md)
 
 **What Needs Clarification:**
 | Aspect | User Said | Options | Recommendation |
 |--------|-----------|---------|----------------|
-| Family Name | "don't like the family name" | 1) "Pavisha Floral Collection", 2) "Decorative PET Storage", 3) Ask user | Option 1 - matches brand |
-| SKU Pattern | "don't like...sku" | 1) "PFC-" prefix, 2) "DPS-" prefix, 3) Ask user | Option 1 - aligns with family |
+| Family Name | "don't like the family name" | 1) "[Brand] [Category] Collection", 2) "[Description] [Type]", 3) Ask user | Option 1 - matches brand |
+| SKU Pattern | "don't like...sku" | 1) "[PREFIX-A]-" prefix, 2) "[PREFIX-B]-" prefix, 3) Ask user | Option 1 - aligns with family |
 
 **Workspace Files Checked:**
-- visual_analysis_storage_jars.md: Found 3 color variants
-- catalog_analysis_pet_containers.md: Found existing SKU patterns (PAV-*)
+- visual_analysis_[product].md: Found N color variants
+- catalog_analysis_[product].md: Found existing SKU patterns ([PREFIX]-*)
 
 **Request for PM:**
 Please ask user to choose family name and SKU pattern, or confirm my recommendations.
@@ -680,10 +680,10 @@ Response:
 - User did NOT specify what was wrong
 
 **What Was Proposed:**
-- Family: Floral PET Jar Series
-- SKU: FPJ-500ML-BLOSSOMS (and 11 variants)
-- Price Range: Rs 40-95
-- Products: 12 variants (4 sizes x 3 designs)
+- Family: [Family Name]
+- SKU: [PREFIX]-[SIZE]-[DESIGN] (and N variants)
+- Price Range: [Currency] [low]-[high]
+- Products: N variants (M sizes x K designs)
 
 **Request for PM:**
 Please ask user what specifically needs to change.
@@ -702,12 +702,12 @@ Response:
 **Escalation:** 3 of 3 (FINAL)
 
 **Unresolved after 2 rounds:**
-- Family Name: User rejected "Floral PET Series" and "Pavisha Floral Collection" without specifying preferred name
+- Family Name: User rejected "[Option A]" and "[Option B]" without specifying preferred name
 
 **Options for PM:**
 1. Ask user to provide exact family name they want
 2. Cancel this cataloging task
-3. Proceed with "Decorative Storage Jars" (generic, may need revision)
+3. Proceed with "[Descriptive] [Category]" (generic, may need revision)
 
 I cannot continue escalating the same issue. Please choose an option.
 ```
@@ -715,7 +715,7 @@ I cannot continue escalating the same issue. Please choose an option.
 ### Example 6: Redirect
 
 ```
-[HITL_FEEDBACK] Actually, don't create new - just update the existing 500ml jar
+[HITL_FEEDBACK] Actually, don't create new - just update the existing [size] [product]
 
 Type: REDIRECT
 Action: Escalate for task change
@@ -723,13 +723,13 @@ Action: Escalate for task change
 Response:
 [HITL REDIRECT]
 
-**User Feedback:** "Actually, don't create new - just update the existing 500ml jar"
+**User Feedback:** "Actually, don't create new - just update the existing [size] [product]"
 
 **Original Task:** Create new product family with 12 variants
 **User Wants:** Update existing product
 
 This requires task change, not revision.
-Please confirm: Should I update the existing 500ml jar instead?
+Please confirm: Should I update the existing [size] [product] instead?
 If yes, which attributes should I update?
 ```
 

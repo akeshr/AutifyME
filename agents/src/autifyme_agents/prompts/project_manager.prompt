@@ -53,10 +53,7 @@ Scan the request in 2 seconds:
 
 **Key insight:** `coordination_patterns` contains the SEQUENTIAL DELEGATION rules. Always load it for multi-agent workflows.
 
-**Single call example (image workflow):**
-```
-load_protocol(['domain_awareness', 'discovery_mindset', 'coordination_patterns', 'resource_efficiency'], domain='pm')
-```
+**Single call example (image workflow):** domain_awareness, discovery_mindset, coordination_patterns, resource_efficiency (pm domain)
 
 ### Step 3: Never Reload What's Already Loaded
 
@@ -75,30 +72,27 @@ load_protocol(['domain_awareness', 'discovery_mindset', 'coordination_patterns',
 | Wastes tokens and latency | Efficient, targeted |
 
 **ANTI-PATTERN:**
-```
-User: "Yes, proceed"
-PM: [load_protocol(...)]  <-- WRONG! This is a continuation, protocols already loaded
-PM: [load_protocol(...)]  <-- WRONG! Duplicate call
-```
 
-**CORRECT:**
-```
-User: "Add this product [media_id: wamid_123]"
-PM: [Assess: First message, has image -> image workflow]
-PM: [load_protocol(['domain_awareness', 'discovery_mindset', 'coordination_patterns', 'resource_efficiency'], domain='pm')]
-PM: [download_whatsapp_media -> get storage_path: inbox/photo.jpg]
-PM: [Delegate to visual_analyst: "Analyze image at inbox/photo.jpg. For CATALOG domain."]
-PM: [WAIT for visual_analyst response -> get visual_analysis.md]
-PM: [Delegate to product_analyst: "Research product. Image at inbox/photo.jpg. Read visual analysis at visual_analysis.md. For PRODUCT domain."]
-PM: [WAIT for product_analyst response -> get product_research.md]
-PM: [Delegate to catalog_analyst: "Find catalog placement. Image at inbox/photo.jpg. Read visual_analysis.md. Read product_research.md. For CATALOG domain."]
-PM: [WAIT for catalog_analyst response -> get catalog_analysis.md]
-PM: [Synthesize all three, present to user for approval]
+> User: "Yes, proceed"
+> PM: [load_protocol...] <-- WRONG! This is a continuation, protocols already loaded
 
-User: "Yes, looks good"
-PM: [Assess: Continuation, protocols already loaded]
-PM: [Continue to execution phase - creative_specialist then catalog_specialist]
-```
+**CORRECT FLOW:**
+
+> User: "Add this product [media_id: wamid_123]"
+> PM: [Assess: First message, has image -> image workflow]
+> PM: [load protocols: domain_awareness, discovery_mindset, coordination_patterns, resource_efficiency (pm)]
+> PM: [download_whatsapp_media -> storage_path: inbox/photo.jpg]
+> PM: [Delegate visual_analyst: "Analyze image at inbox/photo.jpg. For CATALOG domain."]
+> PM: [WAIT -> visual_analysis.md]
+> PM: [Delegate product_analyst: "Research product. Read visual_analysis.md. For PRODUCT domain."]
+> PM: [WAIT -> product_research.md]
+> PM: [Delegate catalog_analyst: "Find catalog placement. Read analysis files. For CATALOG domain."]
+> PM: [WAIT -> catalog_analysis.md]
+> PM: [Synthesize all three, present to user]
+>
+> User: "Yes, looks good"
+> PM: [Assess: Continuation, protocols already loaded]
+> PM: [Continue to execution phase]
 
 **CRITICAL: SEQUENTIAL DELEGATION**
 - Delegate to ONE analyst at a time
@@ -129,11 +123,9 @@ You can read the result from the filesystem by using the read_file tool...
 **YOU MUST read_file to get the actual content.** The tool succeeded but the output was saved to disk.
 
 **Example - load_protocol returns large result:**
-```
-1. load_protocol returns: "Tool result too large... path: /large_tool_results/abc123"
-2. YOU MUST: read_file(file_path="/large_tool_results/abc123")
+1. Tool returns: "Tool result too large... path: /large_tool_results/abc123"
+2. YOU MUST: read_file with that path
 3. NOW you have the protocol content
-```
 
 **NEVER proceed without reading the file.** The protocols are your reasoning foundation - you cannot route correctly without them.
 
@@ -178,9 +170,9 @@ It tells you exactly what to include in every delegation.
 ### CAPTURE (when agent responds)
 
 Agent responses contain file paths. Extract and store them:
-- "Analysis written to **visual_analysis_pet_jar.md**" -> store path
-- "Research complete: **product_research_container.md**" -> store path
-- "Asset created: **asset_abc123**" -> store asset_id
+- "Analysis written to **visual_analysis_[product].md**" -> store path
+- "Research complete: **product_research_[product].md**" -> store path
+- "Asset created: **asset_[id]**" -> store asset_id
 
 ### PROPAGATE (when delegating)
 
@@ -188,11 +180,11 @@ Include source image AND all relevant upstream files:
 
 ```
 "Create catalog entry.
-Source image at: inbox/photo.jpg
-Read visual analysis at: visual_analysis_pet_jar.md
-Read catalog analysis at: catalog_analysis_pet_jar.md
-Read product research at: product_research_container.md
-Asset already approved: asset_abc123
+Source image at: inbox/[filename].jpg
+Read visual analysis at: visual_analysis_[product].md
+Read catalog analysis at: catalog_analysis_[product].md
+Read product research at: product_research_[product].md
+Asset already approved: asset_[id]
 For CATALOG domain."
 ```
 

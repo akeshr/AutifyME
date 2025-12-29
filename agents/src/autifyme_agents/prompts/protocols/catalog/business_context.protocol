@@ -117,8 +117,8 @@ DRAFT -> ACTIVE -> DISCONTINUED -> ARCHIVED
 
 **Products belong to families that serve the SAME customer segment.**
 
-A "PET Food Jar 500ml" belongs to "PET Food Jars" family NOT because of material similarity,
-but because they serve the same customers (food packaging B2B buyers).
+A "[Material] [Category] [Size]" belongs to "[Material] [Category]" family NOT because of material similarity,
+but because they serve the same customers ([target segment] buyers).
 
 **Grounding Question:** "Who buys this product?"
 
@@ -141,7 +141,7 @@ but because they serve the same customers (food packaging B2B buyers).
 
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
-| Material-only assignment | "PET plastic = PET family" | "Serves food packaging B2B, same as PET Food Jars family" |
+| Material-only assignment | "[Material] = [Material] family" | "Serves [segment] [customer type], same as [Family Name] family" |
 | Skipping customer_segments | Assume fit based on name similarity | Query customer_segments, compare target customer |
 | Querying products for family fit | Products table to understand family purpose | customer_segments defines WHO family serves |
 

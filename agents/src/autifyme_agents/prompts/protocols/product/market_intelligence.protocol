@@ -20,7 +20,7 @@ Your research must answer: "What words do buyers use to find this?"
 
 | Level | Purpose | Pattern |
 |-------|---------|---------|
-| Family | Groups related products | Material + Category ("PET Storage Jars") |
+| Family | Groups related products | Material + Category ("[Material] [Category]") |
 | Product | Individual item identity | [DIFFERENTIATOR] + Type + [SIZE] |
 | SKU | Unique variant | Family-Attribute-Attribute-Sequence |
 
@@ -96,8 +96,8 @@ Research what makes products stand out:
 **What to extract:**
 - Common search phrases
 - Long-tail keywords
-- Problem-based searches ("airtight container for rice")
-- Use-case searches ("meal prep containers")
+- Problem-based searches ("[feature] [product] for [use case]")
+- Use-case searches ("[activity] [products]")
 
 ---
 
@@ -131,7 +131,7 @@ Research what makes products stand out:
 ```
 
 **Example:**
-"Premium PET storage jar with decorative floral print and honeycomb texture. Food-safe, BPA-free container perfect for kitchen organization. Airtight screw-lid keeps contents fresh. Ideal for gifting or pantry storage."
+"Premium [material] [product] with [decorative feature] and [texture]. [Grade] [product] perfect for [primary use]. [Closure type] keeps contents fresh. Ideal for [secondary uses]."
 
 ### Description Checklist
 
@@ -197,32 +197,29 @@ Research what makes products stand out:
 ### Wrong: Generic Names
 
 ```
-WRONG: "Plastic Container"
-RIGHT: "Floral Print PET Storage Jar 500ml"
-
-WRONG: "Brass Hook"
-RIGHT: "Brass Art Deco Wall Hook"
+WRONG: "[Generic Category]"
+RIGHT: "[Design] [Material] [Category] [Size]"
 ```
 
 ### Wrong: Assumed Positioning
 
 ```
 WRONG: "This is a premium product" (no evidence)
-RIGHT: "Premium positioning supported by: textured finish (20-30% premium in market),
-       decorative design, quality materials. Similar textured items at Rs 40-50 vs
-       plain at Rs 30-35."
+RIGHT: "Premium positioning supported by: [feature] ([X%] premium in market),
+       [design element], [quality indicator]. Similar [feature] items at [price range A] vs
+       plain at [price range B]."
 ```
 
 ### Wrong: Missing Context
 
 ```
 WRONG:
-Tags: ["container", "storage", "plastic"]
+Tags: ["[category]", "storage", "[material]"]
 
 RIGHT:
-Tags: ["pet-storage-jar", "kitchen-organization", "food-container",
-       "bpa-free", "airtight", "pantry-storage", "meal-prep",
-       "floral-print", "premium-container", "gift-set"]
+Tags: ["[material]-storage-[product]", "kitchen-organization", "[category]-[product]",
+       "[certification]", "airtight", "pantry-storage", "[use-case]",
+       "[design]-print", "premium-[product]", "gift-set"]
 ```
 
 </protocol>

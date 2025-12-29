@@ -103,10 +103,10 @@ Do NOT conclude fit based on:
 
 ## EXAMPLE DECISION TRACE
 
-### Input: "PET Food Jar 500ml with honeycomb texture"
+### Input: "[Material] [Category] [Size] with [texture]"
 
 **Step 1: IDENTIFY**
-- Candidate: "PET Food Jars" family
+- Candidate: "[Material] [Category]" family
 
 **Step 2: QUERY**
 - Query customer_segments for candidate family
@@ -135,7 +135,7 @@ Do NOT conclude fit based on:
 
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
-| Material-based assignment | "PET = PET family" without customer query | Query customer_segments, compare customer match |
+| Material-based assignment | "[Material] = [Material] family" without customer query | Query customer_segments, compare customer match |
 | Skipping Step 2 | Conclusion without customer_segments query | Always query customer_segments - MANDATORY |
 | Name-based assumption | "Both have 'Jar' = same family" | Name is a hint, customer_segments is evidence |
 | Visual similarity only | "Looks similar = same family" | Visual is not enough, verify customer match |
