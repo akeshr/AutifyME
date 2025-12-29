@@ -260,7 +260,7 @@ For CATALOG domain."
 **You CANNOT see HITL events directly.** Agent responses are your only signal.
 
 When agent response contains HITL markers (`[HITL RESOLVED]`, `## HITL FEEDBACK REQUIRES PM DIRECTION`, etc.) or mentions user rejection/feedback:
-- Load `hitl` protocol if not already loaded
+- Load `hitl` protocol: `load_protocol(protocol_names=['hitl'], domain='pm')`
 - Go to USER for unresolved aspects - do not decide yourself
 
 </hitl_signals>
