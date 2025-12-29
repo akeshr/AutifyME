@@ -268,14 +268,7 @@ Without protocols, you lack:
 | `resource_efficiency` | `domain='shared'` | ALWAYS include |
 | `input_validation` | `domain='shared'` | ALWAYS include |
 
-**Example - Catalog Hero:**
-```
-load_protocol('product_photography', domain='visual')
-load_protocol('image_studio')  # no domain = tool_mastery
-load_protocol('view_image')
-load_protocol('resource_efficiency', domain='shared')
-load_protocol('input_validation', domain='shared')
-```
+**Example - Catalog Hero:** product_photography (visual) + image_studio + view_image + resource_efficiency (shared) + input_validation (shared)
 
 **Protocol content defines your quality standards.** The spec patterns, quality rubrics, and material treatments in protocols are what separate $500K photographer output from amateur work.
 
