@@ -245,40 +245,37 @@ Without protocols, you lack:
 
 **ASSESS your task, then load the protocols YOU need:**
 
-| If Your Task Involves | Load These (domain='visual') |
-|----------------------|------------------------------|
-| Product hero/catalog shot | `product_photography` |
-| Lifestyle/scene generation | `product_photography` |
-| Social media content | `social_media` |
-| Data-driven graphics | `social_media` |
-| Campaign batch work | `product_photography` |
-| Multi-item processing | `multi_item_image` (shared) |
+| Task Type | Protocol | Domain Parameter |
+|-----------|----------|------------------|
+| Product hero/catalog shot | `product_photography` | `domain='visual'` |
+| Lifestyle/scene generation | `product_photography` | `domain='visual'` |
+| Social media content | `social_media` | `domain='visual'` |
+| Data-driven graphics | `social_media` | `domain='visual'` |
+| Multi-item processing | `multi_item_image` | `domain='shared'` |
+| Asset record creation | `asset_management` | `domain='catalog'` |
 
-| If Your Task Involves | Load These (domain='catalog') |
-|----------------------|-------------------------------|
-| Asset record creation | `asset_management` |
-| Asset + product linking (product_id provided) | `asset_management` - handles both assets and product_assets |
+| Tool Protocol | Domain Parameter |
+|---------------|------------------|
+| `image_studio` | *(omit - defaults to tool_mastery)* |
+| `view_image` | *(omit - defaults to tool_mastery)* |
+| `read_data` | *(omit - defaults to tool_mastery)* |
+| `write_data` + `schema_discovery` | *(omit - defaults to tool_mastery)* |
+| `inspect_schema` + `schema_discovery` | *(omit - defaults to tool_mastery)* |
 
-| If Using These Tools | Load These (no domain - auto-resolves to tool_mastery) |
-|---------------------|--------------------------------------------------------|
-| image_studio | `image_studio` |
-| view_image | `view_image` |
-| read_data | `read_data` |
-| write_data | `write_data`, `schema_discovery` **(BOTH REQUIRED)** |
-| inspect_schema | `inspect_schema`, `schema_discovery` |
+| Shared Protocol | Domain Parameter | When |
+|-----------------|------------------|------|
+| `hitl` | `domain='shared'` | On `[HITL_FEEDBACK]` - load FIRST |
+| `resource_efficiency` | `domain='shared'` | ALWAYS include |
+| `input_validation` | `domain='shared'` | ALWAYS include |
 
-| When This Happens | Load These FIRST |
-|-------------------|------------------|
-| `[HITL_FEEDBACK]` marker in input | `hitl` (shared) - BEFORE any other action |
-
-| Shared Protocol | Contains |
-|-----------------|----------|
-| `resource_efficiency` | Token discipline, batching, STOP conditions |
-| `input_validation` | Verify inputs before executing, file reference handling, missing context detection |
-
-**ALWAYS include `resource_efficiency` and `input_validation` in your protocol load.**
-
-**Example - Catalog Hero:** product_photography (visual) + image_studio, view_image (tool_mastery) + shared protocols
+**Example - Catalog Hero:**
+```
+load_protocol('product_photography', domain='visual')
+load_protocol('image_studio')  # no domain = tool_mastery
+load_protocol('view_image')
+load_protocol('resource_efficiency', domain='shared')
+load_protocol('input_validation', domain='shared')
+```
 
 **Protocol content defines your quality standards.** The spec patterns, quality rubrics, and material treatments in protocols are what separate $500K photographer output from amateur work.
 
