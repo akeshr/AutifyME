@@ -20,7 +20,7 @@ Your research must answer: "What words do buyers use to find this?"
 
 | Level | Purpose | Pattern |
 |-------|---------|---------|
-| Family | Groups related products | Material + Category ("PET Storage Jars") |
+| Family | Groups related products | Material + Category ("[Material] [Category]") |
 | Product | Individual item identity | [DIFFERENTIATOR] + Type + [SIZE] |
 | SKU | Unique variant | Family-Attribute-Attribute-Sequence |
 
@@ -131,7 +131,7 @@ Research what makes products stand out:
 ```
 
 **Example:**
-"Premium PET storage jar with decorative floral print and honeycomb texture. Food-safe, BPA-free container perfect for kitchen organization. Airtight screw-lid keeps contents fresh. Ideal for gifting or pantry storage."
+"Premium [material] [product] with [decorative feature] and [texture]. [Grade] container perfect for [primary use]. [Closure type] keeps contents fresh. Ideal for [secondary uses]."
 
 ### Description Checklist
 
@@ -197,20 +197,17 @@ Research what makes products stand out:
 ### Wrong: Generic Names
 
 ```
-WRONG: "Plastic Container"
-RIGHT: "Floral Print PET Storage Jar 500ml"
-
-WRONG: "Brass Hook"
-RIGHT: "Brass Art Deco Wall Hook"
+WRONG: "[Generic Category]"
+RIGHT: "[Design] [Material] [Category] [Size]"
 ```
 
 ### Wrong: Assumed Positioning
 
 ```
 WRONG: "This is a premium product" (no evidence)
-RIGHT: "Premium positioning supported by: textured finish (20-30% premium in market),
-       decorative design, quality materials. Similar textured items at Rs 40-50 vs
-       plain at Rs 30-35."
+RIGHT: "Premium positioning supported by: [feature] ([X%] premium in market),
+       [design element], [quality indicator]. Similar [feature] items at [price range A] vs
+       plain at [price range B]."
 ```
 
 ### Wrong: Missing Context

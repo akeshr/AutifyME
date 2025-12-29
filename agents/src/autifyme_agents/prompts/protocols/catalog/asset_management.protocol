@@ -107,7 +107,7 @@ DELETED     -> Soft deleted
 | `asset_type` | enum | File FORMAT | IMAGE, VIDEO, DOCUMENT |
 | `purpose` | enum | INTENDED USE | PRODUCT, CAMPAIGN, BRAND |
 | `category` | varchar | Visual STYLE | HERO, LIFESTYLE, GALLERY |
-| `tags` | text[] | SEARCHABLE terms | ["white-background", "500ml", "PET"] |
+| `tags` | text[] | SEARCHABLE terms | ["[background-type]", "[size]", "[material]"] |
 
 **When to use each:**
 - `asset_type`: Set automatically based on file type
@@ -145,7 +145,7 @@ DELETED     -> Soft deleted
 {
   "is_ai_generated": true,
   "source_asset_ids": ["uuid-of-input-image"],
-  "generation_prompt": "extraction + white background + side rake light for PET texture"
+  "generation_prompt": "extraction + [background] + [lighting] for [material] texture"
 }
 ```
 
@@ -262,16 +262,16 @@ Most common scenario. Create asset and junction in same transaction.
       "action": "create",
       "table": "assets",
       "data": {
-        "name": "PET Jar 500ml Hero",
-        "storage_url": "pending/20241217_studio_abc.png",
+        "name": "[Product] [Size] Hero",
+        "storage_url": "pending/[timestamp]_studio_[id].png",
         "storage_provider": "SUPABASE",
-        "file_name": "20241217_studio_abc.png",
+        "file_name": "[timestamp]_studio_[id].png",
         "asset_type": "IMAGE",
         "status": "ACTIVE",
         "is_ai_generated": true,
         "source_asset_ids": null,
-        "generation_prompt": "extraction + white bg + side rake light for honeycomb texture",
-        "caption": "500ml PET jar with honeycomb texture"
+        "generation_prompt": "extraction + [background] + [lighting] for [texture]",
+        "caption": "[size] [material] [product] with [texture]"
       },
       "returns": "asset"
     },
@@ -374,7 +374,7 @@ One lifestyle image shared by all products in family. Link to family, not produc
       "action": "create",
       "table": "assets",
       "data": {
-        "name": "PET Storage Family Lifestyle",
+        "name": "[Material] [Category] Family Lifestyle",
         "storage_url": "pending/t/family_lifestyle.png",
         "asset_type": "IMAGE",
         "status": "ACTIVE"

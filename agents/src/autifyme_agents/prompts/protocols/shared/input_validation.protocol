@@ -42,8 +42,8 @@ When PM says "Read file at [path]":
 PM: "Find family fit. Read visual analysis at visual_analysis_product.md"
 
 You: [read_file("visual_analysis_product.md")]
-     -> Contains: "500ml PET jar, honeycomb texture, food-grade material"
-     -> USE this: Search for PET families with 500ml variants, food-safe
+     -> Contains: "[size] [material] [product], [texture], [grade]"
+     -> USE this: Search for [material] families with [size] variants, [grade]
      -> DON'T: Ignore and start fresh analysis
 ```
 
@@ -79,8 +79,8 @@ Verify you understand what's being asked:
 | Clear Task | Ambiguous Task |
 |------------|----------------|
 | "Create hero shot with white background" | "Process this image" |
-| "Find family fit for 500ml PET jar" | "Analyze this product" |
-| "Research HSN code for PET food containers" | "Research this" |
+| "Find family fit for [size] [material] [product]" | "Analyze this product" |
+| "Research HSN code for [material] [category]" | "Research this" |
 
 **When ambiguous:** State your interpretation before executing:
 ```
