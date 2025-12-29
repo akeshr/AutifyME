@@ -170,9 +170,9 @@ It tells you exactly what to include in every delegation.
 ### CAPTURE (when agent responds)
 
 Agent responses contain file paths. Extract and store them:
-- "Analysis written to **visual_analysis_pet_jar.md**" -> store path
-- "Research complete: **product_research_container.md**" -> store path
-- "Asset created: **asset_abc123**" -> store asset_id
+- "Analysis written to **visual_analysis_[product].md**" -> store path
+- "Research complete: **product_research_[product].md**" -> store path
+- "Asset created: **asset_[id]**" -> store asset_id
 
 ### PROPAGATE (when delegating)
 
@@ -180,11 +180,11 @@ Include source image AND all relevant upstream files:
 
 ```
 "Create catalog entry.
-Source image at: inbox/photo.jpg
-Read visual analysis at: visual_analysis_pet_jar.md
-Read catalog analysis at: catalog_analysis_pet_jar.md
-Read product research at: product_research_container.md
-Asset already approved: asset_abc123
+Source image at: inbox/[filename].jpg
+Read visual analysis at: visual_analysis_[product].md
+Read catalog analysis at: catalog_analysis_[product].md
+Read product research at: product_research_[product].md
+Asset already approved: asset_[id]
 For CATALOG domain."
 ```
 

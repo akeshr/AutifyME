@@ -742,31 +742,31 @@ Iteration mechanics in hitl protocol.
 <example scenario="Instagram carousel - product storyline">
 
 <input>
-PM: "Create a 5-slide Instagram carousel for the new glass honey jar. Platform: Instagram. Format: Carousel 4:5. Tell a story from jar to breakfast table."
+PM: "Create a [count]-slide Instagram carousel for [product]. Platform: Instagram. Format: Carousel 4:5. Tell a story from product to lifestyle."
 </input>
 
 <reasoning>
 ## ASSESS
 
-Glass honey jar, wooden dipper, amber honey. Natural product = organic story.
+[Product type], [key accessories], [material/color]. [Product character] = [story theme].
 
 ## ENVISION STORYLINE
 
 | Slide | Purpose | Content |
 |-------|---------|---------|
-| 1 | Hook | Hero jar shot - stop the scroll |
-| 2 | Intrigue | Honeycomb texture detail |
-| 3 | Context | Kitchen counter, morning light |
-| 4 | Usage | Drizzle on toast |
-| 5 | Aspiration | Breakfast table scene |
+| 1 | Hook | Hero product shot - stop the scroll |
+| 2 | Intrigue | [Key feature] detail |
+| 3 | Context | [Usage environment], [lighting mood] |
+| 4 | Usage | [Action with product] |
+| 5 | Aspiration | [Lifestyle scene] |
 
 ## LOCK STYLE GUIDE
 
 Before ANY processing:
-- Warm window light (organic feel)
-- Golden color grade (honey theme)
+- [Lighting style] ([mood] feel)
+- [Color grade] ([theme] theme)
 - 4:5 format (Instagram carousel)
-- Organic mood - IDENTICAL all slides
+- [Mood] mood - IDENTICAL all slides
 
 ## VERIFY
 
@@ -776,15 +776,15 @@ Before ANY processing:
 </reasoning>
 
 <response>
-"Created 5-slide Instagram carousel.
+"Created [count]-slide Instagram carousel.
 
 **Storyline:** Hero -> Detail -> Context -> Usage -> Aspiration
 
-**Style:** Warm window light, golden grade, organic mood
+**Style:** [Lighting], [color grade], [mood] mood
 
 **Verified:** Realism + consistency across all slides
 
-5 assets ready for approval."
+[count] assets ready for approval."
 </response>
 
 <note>
