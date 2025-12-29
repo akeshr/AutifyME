@@ -173,12 +173,10 @@ Apply your vision through the spec palette. **Protocol patterns define which spe
 
 **MANDATORY: view_image on EVERY output before scoring.**
 
-```
-1. VERIFY: view_image(output_path) - SEE what was generated
-2. FIDELITY CHECK: Compare output against source features
-3. SCORE: Against quality dimensions
-4. DECIDE: Ship, iterate, or escalate
-```
+1. **VERIFY:** view_image on output path - SEE what was generated
+2. **FIDELITY CHECK:** Compare output against source features
+3. **SCORE:** Against quality dimensions
+4. **DECIDE:** Ship, iterate, or escalate
 
 **IDENTITY VERIFICATION (when processing [source]/[product]):**
 
@@ -293,25 +291,19 @@ The `multi_item_image` protocol defines:
 ### Execution
 
 **For INDIVIDUAL (most common):**
-```
-for each row in Extraction Targets:
-    image_studio(extraction={{"target_description": "{{description}} at {{position}}"}})
-    verify with view_image
-    create asset record
-```
+For each row in Extraction Targets:
+-> image_studio with extraction targeting "[description] at [position]"
+-> verify with view_image
+-> create asset record
 
 **For COMPOSITE:**
-```
-image_studio(extraction={{"target_description": "all items as arranged"}})
-```
+-> image_studio with extraction targeting "all items as arranged"
 
 ### Combining Multiple Source Images
 
 When PM provides multiple source images to combine:
-```
-images=[{{"path": "imageA.jpg", "label": "caps"}}, {{"path": "imageB.jpg", "label": "jars"}}]
-composition={{"position": "[caps] top, [jars] bottom"}}
-```
+-> image_studio with multiple images, each labeled
+-> composition specifying relative positions (e.g., "[label A] top, [label B] bottom")
 
 ### Key Rule
 
@@ -343,24 +335,20 @@ PM has already classified the relationship via visual_analyst. You receive conte
 ### Processing Strategy
 
 **For Same Product (angles/states/components/packaging):**
-```
-for each source_image:
-    image_studio(source=source_image, ...)
-    verify with view_image
-    create asset record (all link to SAME product)
-```
+For each source_image:
+-> image_studio with consistent treatment
+-> verify with view_image
+-> create asset record (all link to SAME product)
 
 - **Style consistency CRITICAL** - Lock lighting, background, treatment for all angles
 - All assets link to ONE product record
 - PM handles the product_assets junction
 
 **For Variants:**
-```
-for each variant_image:
-    image_studio(source=variant_image, ...)
-    verify with view_image
-    create asset record (each links to its variant)
-```
+For each variant_image:
+-> image_studio with consistent treatment
+-> verify with view_image
+-> create asset record (each links to its variant)
 
 - **Style consistency CRITICAL** - Identical treatment shows variant differences clearly
 - Each asset links to its respective variant product

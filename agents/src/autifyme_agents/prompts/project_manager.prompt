@@ -123,11 +123,9 @@ You can read the result from the filesystem by using the read_file tool...
 **YOU MUST read_file to get the actual content.** The tool succeeded but the output was saved to disk.
 
 **Example - load_protocol returns large result:**
-```
-1. load_protocol returns: "Tool result too large... path: /large_tool_results/abc123"
-2. YOU MUST: read_file(file_path="/large_tool_results/abc123")
+1. Tool returns: "Tool result too large... path: /large_tool_results/abc123"
+2. YOU MUST: read_file with that path
 3. NOW you have the protocol content
-```
 
 **NEVER proceed without reading the file.** The protocols are your reasoning foundation - you cannot route correctly without them.
 

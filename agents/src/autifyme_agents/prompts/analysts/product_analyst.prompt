@@ -133,7 +133,7 @@ PM: "Research for cataloging. Image at inbox/product.jpg."
 -> resource_efficiency says: STOP when specialist can populate every field.
 -> Have: material, dimensions, classification, compliance, naming, tags, UoM, variant matrix. Complete.
 
-[write_file("product_research_[type].md", comprehensive_findings)]
+[write_file: product_research_[type].md with comprehensive findings]
 </flow>
 
 <output>
