@@ -432,11 +432,12 @@ Each component researched for material, specifications, care instructions..."
 
 ### Research Budget
 
-Research is NOT unlimited. Work within these constraints:
+Research is disciplined, not unlimited. Work within these guidelines:
 
-| Budget Type | Limit | Rationale |
-|-------------|-------|-----------|
-| **Total queries** | 15-20 max | Comprehensive coverage without waste |
+| Budget Type | Guideline | Rationale |
+|-------------|-----------|-----------|
+| **Typical total** | 15-20 queries | Comprehensive coverage for most products |
+| **Complex products** | Up to 25-30 | Electronics, multi-component, regulated items |
 | **Per dimension** | 2-3 queries | Sufficient for substantive data |
 | **Brand-specific** | 2-3 max | Stop if brand not indexed |
 | **Refinement queries** | 1-2 per dimension | One follow-up if initial query weak |
@@ -476,26 +477,32 @@ Agent: [Reads prior file first]
 
 ### Research Completion Checklist
 
-Research is COMPLETE when you can answer YES to these:
+Research is COMPLETE when you've covered all APPLICABLE dimensions:
 
-| Dimension | Completion Question |
-|-----------|-------------------|
-| **Technical specs** | Can I specify materials, dimensions, capacity, weight? |
-| **Compliance** | Do I have HSN code and relevant certifications? |
-| **Market context** | Do I know competitor pricing and positioning? |
-| **Ecommerce intel** | Do I know what keywords/features buyers search for? |
-| **Variant handling** | Have I covered all variants identified in visual analysis? |
+| Dimension | Applies To | Completion Question |
+|-----------|------------|-------------------|
+| **Technical specs** | ALL products | Can I specify materials, dimensions, capacity, weight? |
+| **Compliance** | Regulated products | Do I have HSN code and relevant certifications? |
+| **Market context** | Consumer products | Do I know competitor pricing and positioning? |
+| **Ecommerce intel** | Online-sold products | Do I know what keywords/features buyers search for? |
+| **Variant handling** | Multi-variant products | Have I covered all variants identified in visual analysis? |
 
-**If any dimension is incomplete after 2-3 queries, document the gap and move on.**
+**Not all dimensions apply to all products:**
+- Industrial components: Technical specs + Compliance (skip ecommerce)
+- Custom products: Technical specs only (no market comparables)
+- Single SKUs: Skip variant handling
+
+**If an applicable dimension is incomplete after 2-3 queries, document the gap and move on.**
 
 ### Synthesis Trigger
 
-**STOP researching and START synthesizing when:**
+**STOP researching and START synthesizing when ANY of these are true:**
 
-1. All completion checklist items are addressed (or documented as gaps)
-2. Research budget is 80% consumed
-3. Last 2-3 queries returned redundant/duplicate information
-4. You have enough to populate a catalog entry
+1. All applicable checklist dimensions are addressed (or documented as gaps)
+2. You've covered the main dimensions and are now finding redundant information
+3. Last 2-3 queries returned data you already have
+4. You have enough information to populate a catalog entry
+5. You've made 15+ queries for a simple product or 25+ for complex products
 
 **The goal is ACTIONABLE OUTPUT, not exhaustive searching.**
 
