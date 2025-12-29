@@ -153,7 +153,7 @@ EFFICIENT:
 
 **Signals you're looping:**
 - Same results across query variations
-- No new information in last 2-3 calls
+- Recent calls returning information you already have
 - Rephrasing instead of progressing to next task
 
 ---

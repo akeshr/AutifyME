@@ -307,11 +307,15 @@ Research the PRODUCT CATEGORY thoroughly:
 
 ### Recognizing Brand Research Limits
 
-| Signal | Meaning | Action |
-|--------|---------|--------|
-| 2-3 queries return no brand mentions | Brand has minimal online presence | STOP brand research |
-| Results show competitors, not target brand | Brand isn't indexed | Use category data |
-| Same generic results across query variations | Refinement won't help | Synthesize available data |
+**Brand data either exists online or it doesn't. You'll know within 2 queries.**
+
+| Signal | What It Means | Action |
+|--------|---------------|--------|
+| Results mention the brand directly | Brand has online presence | Continue brand research |
+| Results show only competitors/category | Brand isn't indexed | STOP brand queries, pivot to category |
+| Same generic results across variations | Rephrasing won't help | Synthesize with category data |
+
+**The test:** Does the search result contain the brand name in the content (not just your query)? If no, the brand has no online presence.
 
 ### Fallback Strategy
 
@@ -390,22 +394,24 @@ These appear to be a graduated set. Researching as variant group..."
 
 ### Wrong: Dimension Loops
 
+**Signal: You're querying the same dimension and getting similar results.**
+
 ```
-WRONG:
+WRONG (ignoring the signal):
+"PET container pricing India"         -> market data
+"PET jars wholesale price"            -> similar data (SIGNAL!)
+"plastic container bulk pricing"      -> similar data (SIGNAL!)
+"storage jar market price India"      -> similar data (SIGNAL!)
+... [keeps going despite signals]
+
+RIGHT (responding to the signal):
 "PET container pricing India"         -> market data
 "PET jars wholesale price"            -> similar data
-"plastic container bulk pricing"      -> similar data
-"storage jar market price India"      -> similar data
-"PET container cost wholesale"        -> similar data
-... [5+ queries on same dimension]
-
-RIGHT:
-"PET container pricing India"         -> market data
-"stackable jars Amazon Flipkart"      -> competitor context
-MOVE ON: "I have pricing context. Next dimension: compliance."
+RECOGNIZE: "I already have pricing data. This query didn't add new info."
+MOVE ON: "Next dimension: compliance."
 ```
 
-**2-3 queries per dimension is ENOUGH.** If you're rephrasing the same question, you're looping.
+**The test:** Did this query teach me something I didn't know? If no, move on.
 
 ### Wrong: Ignoring Components
 
@@ -430,28 +436,49 @@ Each component researched for material, specifications, care instructions..."
 
 ## PHASE 7: RESEARCH COMPLETION AND SYNTHESIS
 
-### Research Budget
+### Research Discipline: Information Gain, Not Query Count
 
-Research is disciplined, not unlimited. Work within these guidelines:
+**Don't count queries. Evaluate information gain.**
 
-| Budget Type | Guideline | Rationale |
-|-------------|-----------|-----------|
-| **Typical total** | 15-20 queries | Comprehensive coverage for most products |
-| **Complex products** | Up to 25-30 | Electronics, multi-component, regulated items |
-| **Per dimension** | 2-3 queries | Sufficient for substantive data |
-| **Brand-specific** | 2-3 max | Stop if brand not indexed |
-| **Refinement queries** | 1-2 per dimension | One follow-up if initial query weak |
+| Before Each Query, Ask | If NO | If YES |
+|------------------------|-------|--------|
+| Will this query likely return NEW information? | Skip it | Make the query |
+| Is this a different dimension than my last query? | You might be looping | Good, continue |
+| Do I already have enough on this dimension? | Move to next dimension | Continue if gaps remain |
 
-**Budget allocation example (PET storage container):**
+### Dimension Completion Signals
+
+**Move to the next dimension when:**
+- You can answer the key questions for that dimension
+- Your last query on this dimension returned information you already had
+- You've covered the main sources (e.g., for pricing: checked Amazon, wholesale, market rates)
+
+**Stay on a dimension when:**
+- Key questions remain unanswered
+- Each query is returning genuinely new information
+- You found a high-value source worth extracting
+
+### Research Flow Example (PET storage container)
+
 ```
-Technical specs:     3 queries (materials, dimensions, capacity)
-Compliance:          2 queries (HSN, certifications)
-Competitor/Market:   4 queries (Amazon, Flipkart, pricing, positioning)
-Ecommerce intel:     2 queries (keywords, buyer expectations)
-Brand-specific:      2 queries (then stop if no results)
-Follow-ups:          2 queries (for high-value sources)
--------------------------------------------------
-Total:              15 queries
+[Technical specs]
+  Query: "PET food container specifications" -> materials, dimensions, capacity
+  Query: "food grade PET properties"         -> NEW: BPA-free, temperature limits
+  MOVE ON: I can specify materials and dimensions now
+
+[Compliance]
+  Query: "plastic container HSN code India"  -> HSN 3923, 18% GST
+  Query: "PET food container FSSAI"          -> NEW: food-grade requirements
+  MOVE ON: I have HSN and certification requirements
+
+[Market/Competitor]
+  Query: "storage jars Amazon India"         -> competitor pricing, features
+  Query: "kitchen containers Flipkart"       -> SIMILAR to Amazon results
+  MOVE ON: I have market context, more queries won't add much
+
+[Brand-specific]
+  Query: "Pavisha PET jars"                  -> no brand mentions in results
+  STOP: Brand not indexed online, use category data
 ```
 
 ### Prior Research Utilization
@@ -472,7 +499,7 @@ PM: "Research Pavisha PET jars. Prior research at product_research_stackable_jar
 Agent: [Reads prior file first]
        -> "I have category specs for PET jars already"
        -> [Only researches gaps: brand-specific data, this variant's specifics]
-       -> [2-3 queries to fill gaps, then synthesize]
+       -> [Only researches gaps until information gain stops, then synthesize]
 ```
 
 ### Research Completion Checklist
@@ -492,33 +519,34 @@ Research is COMPLETE when you've covered all APPLICABLE dimensions:
 - Custom products: Technical specs only (no market comparables)
 - Single SKUs: Skip variant handling
 
-**If an applicable dimension is incomplete after 2-3 queries, document the gap and move on.**
+**If an applicable dimension yields no useful results despite varied queries, document the gap and move on.**
 
 ### Synthesis Trigger
 
-**STOP researching and START synthesizing when ANY of these are true:**
+**STOP researching and START synthesizing when you recognize these signals:**
 
-1. All applicable checklist dimensions are addressed (or documented as gaps)
-2. You've covered the main dimensions and are now finding redundant information
-3. Last 2-3 queries returned data you already have
-4. You have enough information to populate a catalog entry
-5. You've made 15+ queries for a simple product or 25+ for complex products
+| Signal | What It Means |
+|--------|---------------|
+| You can answer the completion checklist questions | Research goal achieved |
+| Recent queries return information you already have | Diminishing returns |
+| You're rephrasing queries hoping for different results | You're looping |
+| You have enough to write a comprehensive product dossier | Task completable |
 
-**The goal is ACTIONABLE OUTPUT, not exhaustive searching.**
+**The test:** Can a specialist populate every database field from your research? If yes, synthesize.
 
 ```
-WRONG:
-[Query 15] "PET container specs" -> useful data
-[Query 16] "PET container specifications" -> same data
-[Query 17] "PET jar specs India" -> same data
-[Query 18] "plastic container specifications" -> same data
-... [continues]
+WRONG (ignoring signals):
+"PET container specs"           -> useful data
+"PET container specifications"  -> same data (SIGNAL: diminishing returns)
+"PET jar specs India"           -> same data (SIGNAL: looping)
+"plastic container specs"       -> same data (SIGNAL: still looping)
+... [ignores signals, continues anyway]
 
-RIGHT:
-[Query 15] "PET container specs" -> useful data
-[Query 16] "PET container specifications" -> same data as Q15
-STOP: "I'm getting redundant results. Time to synthesize."
-[write_file with comprehensive findings]
+RIGHT (responding to signals):
+"PET container specs"           -> useful data
+"PET container specifications"  -> same data
+RECOGNIZE: "I'm getting redundant results - this dimension is complete"
+MOVE ON or SYNTHESIZE
 ```
 
 ---
