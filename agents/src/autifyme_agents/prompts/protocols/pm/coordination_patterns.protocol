@@ -63,16 +63,16 @@ WRONG: Call Visual, Product, Catalog at the same time
 
 ### Mode 3: Approval Gate
 
-Sequential chain with user checkpoint before expensive operations.
+Sequential chain with user checkpoint before execution.
 
 ```
-Analysis -> [USER APPROVAL] -> Execution
+Analysis -> [PRESENT FINDINGS] -> [USER DECIDES] -> Execution (per user request)
 ```
 
 **Use When:**
-- Expensive operations follow analysis
-- User might reject or modify
-- Example: Image processing only after user approves catalog addition
+- User should choose what to do next
+- Multiple execution options exist
+- User controls order and scope of execution
 
 **Pattern:**
 ```
@@ -80,13 +80,18 @@ PHASE 1 - ANALYSIS (sequential - each enriches next):
 1. visual_analyst -> visual_analysis.md (identify product)
 2. product_analyst -> product_research.md (research EVERYTHING, uses visual)
 3. catalog_analyst -> catalog_analysis.md (search with BOTH findings)
-4. PM synthesizes and presents to user
+4. PM synthesizes and presents findings
+5. PM asks open-ended: "What would you like to do next?"
 
-[USER APPROVAL GATE]
+[USER DECIDES - no numbered options]
 
-PHASE 2 - EXECUTION (only after approval):
-5. creative_specialist -> processed images + asset record
-6. catalog_specialist -> catalog records + asset linking
+PHASE 2 - EXECUTION (per user's request):
+User can request ANY combination in ANY order:
+- "Create catalog entry" -> catalog_specialist
+- "Process the image" -> creative_specialist
+- "Both, catalog first" -> catalog_specialist -> creative_specialist
+- "Both, images first" -> creative_specialist -> catalog_specialist
+- "Full flow" -> creative_specialist -> catalog_specialist (standard)
 ```
 
 ---
@@ -112,19 +117,23 @@ Most common multi-domain workflow. Memorize this.
       |                     (uses BOTH visual AND product findings)
       |                     (searches with rich context: "[product specs], [HSN code]")
       v
-[4. PM synthesizes, presents to user]
+[4. PM synthesizes, presents findings]
       |
       v
-[USER APPROVAL GATE]
+[5. PM asks: "What would you like to do next?"]
       |
       v
-[5. creative_specialist] -> asset record + HITL approval for image
+[USER DECIDES - FULL FLEXIBILITY]
       |
-      v
-[6. catalog_specialist] -> catalog records + asset linking
+      +---> "Add to catalog" -> catalog_specialist first
       |
-      v
-[HITL APPROVAL] -> published
+      +---> "Process image" -> creative_specialist first
+      |
+      +---> "Both, catalog first" -> catalog_specialist -> creative_specialist
+      |
+      +---> "Both, images first" -> creative_specialist -> catalog_specialist
+      |
+      +---> "Full flow" / "yes" -> creative_specialist -> catalog_specialist (standard)
 ```
 
 ### Key Dependencies
@@ -134,8 +143,11 @@ Most common multi-domain workflow. Memorize this.
 | product_analyst | visual_analyst | Needs product identification to research the right thing |
 | catalog_analyst | visual_analyst + product_analyst | Needs BOTH to search catalog effectively with rich context |
 | PM synthesis | All analysts | Needs all findings for complete recommendation |
-| creative_specialist | User approval | Don't process if user will reject |
-| catalog_specialist | creative_specialist | Needs asset_id for linking |
+| creative_specialist | User request | Only process when user asks for image processing |
+| catalog_specialist | User request | Only create catalog entry when user asks |
+| asset linking | Both specialists complete | Link asset to product after both exist |
+
+**Flexible Order:** User chooses which comes first. If catalog first, product is created without asset link. When creative completes later, asset is linked to existing product.
 
 ### Why Sequential (Not Parallel) for Analysis
 
@@ -216,18 +228,22 @@ Use this pattern when presenting to user after analysis phase:
 **Note:** [Explain the conflict and options]
 
 ---
-**What would you like to do?**
-
-1. **Add to catalog** - Process image and create catalog entry in [Family] at [price tier]
-2. **Just process image** - Get the processed image only (no catalog entry)
-3. **Adjust something** - Change family, pricing, or other details first
+**What would you like to do next?**
 ```
 
-**CRITICAL:** Present options. User decides the path. Do NOT assume catalog creation.
+**CRITICAL:** Open-ended question. User decides WHAT and in WHAT ORDER. Do NOT present numbered options - they constrain the user.
+
+User can request any combination:
+- Catalog entry first, then images
+- Images first, then catalog
+- Just catalog, no images
+- Just images, no catalog
+- Both together (standard flow)
+- Adjust something first
 
 ### Synthesis Examples
 
-**Good Synthesis (with options):**
+**Good Synthesis (open-ended):**
 ```
 "This is a [size] [material] [product] with [feature] - [segment] positioning.
 
@@ -236,10 +252,7 @@ Key findings:
 - Family: Fits '[Family]' at [price tier]
 - Compliance: [HSN], [GST%]
 
-What would you like to do?
-1. Add to catalog in [Family] at [price]
-2. Just get the processed image
-3. Adjust something first"
+What would you like to do next?"
 ```
 
 **Bad Synthesis (Concatenation):**

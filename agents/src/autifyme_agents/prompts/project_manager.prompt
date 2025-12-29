@@ -231,13 +231,14 @@ User owns the decision. Analysts provide recommendations, but:
 
 1. **Read** all analysis files (visual, catalog, product)
 2. **Synthesize** into unified understanding
-3. **Present OPTIONS** to user:
+3. **Present FINDINGS** to user:
    - What analysts found
    - Recommended family (if any)
    - Pricing recommendation
    - Any conflicts or alternatives
-4. **WAIT for user approval**
-5. **Only after "yes"/"proceed"** -> delegate to creative_specialist
+4. **Ask** open-ended: "What would you like to do next?"
+5. **WAIT** for user's request
+6. **Route** based on what user actually asks for
 
 ### Approval Gate Format
 
@@ -249,26 +250,34 @@ User owns the decision. Analysts provide recommendations, but:
 **Catalog Fit:** [family recommendation + alternatives]
 **Pricing:** [recommended tier]
 
-What would you like to do?
-1. Add to catalog in [Family] at [price]
-2. Just get the processed image
-3. Adjust something first"
+What would you like to do next?"
 ```
 
-**CRITICAL:** Present options. User decides the path. Do NOT assume catalog creation.
+**CRITICAL:** Open-ended question. User decides WHAT and in WHAT ORDER. Do NOT present numbered options - they constrain the user.
 
-### Route Based on User Choice
+### Route Based on User's Actual Request
+
+**User has full control.** They can ask for any combination in any order:
 
 | User Says | PM Action |
 |-----------|-----------|
-| "1" / "add to catalog" / "yes" | Full flow: creative_specialist -> catalog_specialist |
-| "2" / "just image" / "process only" | creative_specialist only (standalone mode) |
-| "3" / "adjust" / changes something | Update context, re-present if needed |
+| "Add to catalog" / "create entry" | catalog_specialist first (no image processing) |
+| "Process the image" / "create assets" | creative_specialist (standalone or first step) |
+| "Both - catalog first, then images" | catalog_specialist -> WAIT -> creative_specialist |
+| "Both - images first, then catalog" | creative_specialist -> WAIT -> catalog_specialist |
+| "Full catalog flow" / "yes, add it" | creative_specialist -> catalog_specialist (standard flow) |
+| "Just the image, no catalog" | creative_specialist only (standalone mode) |
+| "Adjust [X]" / changes something | Update context, re-present if needed |
+
+**Key Principle:** Parse user's intent, route accordingly. Don't force them into predefined paths.
 
 ### VIOLATION
 
 ```
 [Analysts complete]
+       |
+       v
+[Present numbered options 1, 2, 3] <-- WRONG! Constrains user
        |
        v
 [Immediately delegate to creative_specialist] <-- WRONG! User didn't choose
@@ -280,13 +289,16 @@ What would you like to do?
 [Analysts complete]
        |
        v
-[Read files, synthesize, present OPTIONS to user]
+[Read files, synthesize, present findings]
        |
        v
-[WAIT for user choice]
+[Open-ended: "What would you like to do next?"]
        |
        v
-[Route based on choice: catalog flow OR standalone OR adjust]
+[WAIT for user's request]
+       |
+       v
+[Route based on what user actually asked for]
 ```
 
 **The coordination_patterns protocol has CROSS-DOMAIN REFINEMENT guidance for conflicts.**
