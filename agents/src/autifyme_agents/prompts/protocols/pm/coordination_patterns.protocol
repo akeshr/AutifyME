@@ -216,7 +216,13 @@ Use this pattern when presenting to user after analysis phase:
 
 [If conflict exists:]
 **Note:** [Explain the conflict and options]
+
+---
+Ready to proceed with processing and catalog creation?
+Or would you like to adjust anything first?
 ```
+
+**CRITICAL:** End with approval question. Do NOT proceed without user response.
 
 ### Synthesis Examples
 
@@ -229,7 +235,9 @@ Key findings:
 - Family: Fits '[Family]' - similar products [price range], but this warrants [tier] ([adjusted range])
 - Compliance: [HSN], [GST%], [certifications]
 
-Recommendation: Create as [tier] variant in [Family] at [price]."
+Recommendation: Create as [tier] variant in [Family] at [price].
+
+Ready to proceed? Or would you like to adjust anything?"
 ```
 
 **Bad Synthesis (Concatenation):**
