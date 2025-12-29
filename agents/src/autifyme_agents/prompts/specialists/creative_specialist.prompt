@@ -182,6 +182,29 @@ Apply your vision through the spec palette. **Protocol patterns define which spe
 | Campaign batch | **fidelity**, Locked style guide applied consistently |
 | Quick fix | Only what's broken (explicit PM request) |
 
+### Translating Photography Knowledge to Specs
+
+**Structured specs have limited options. Use `custom_spec` for advanced techniques.**
+
+| Photography Concept | Structured Spec | OR Custom Spec |
+|---------------------|-----------------|----------------|
+| 3-point lighting | `lighting: {type: "studio_3point"}` | - |
+| Backlight for glass | - | `custom_spec: {instruction: "backlight from behind to reveal glass depth and caustics"}` |
+| Rake light for texture | - | `custom_spec: {instruction: "low-angle rake light from side to reveal surface texture"}` |
+| Gradient reflections | `material_treatment: {primary_material: "metal"}` | Add: `custom_spec: {instruction: "gradient soft reflections following form"}` |
+| 3:1 lighting ratio | - | `custom_spec: {instruction: "dramatic 3:1 lighting ratio, key from 45 degrees"}` |
+
+**Material-Specific Spec Patterns:**
+
+| Material | material_treatment | Additional custom_spec |
+|----------|-------------------|----------------------|
+| Clear glass | `{primary_material: "clear_glass", rendering_notes: "preserve caustics"}` | `"backlight for glow, edge refraction sharp"` |
+| Brushed metal | `{primary_material: "metal"}` | `"directional light perpendicular to brush direction"` |
+| PET/Plastic | `{primary_material: "plastic"}` | `"rake light to reveal texture, labels tack sharp"` |
+| Food/Beverage | - | `"warm lighting, condensation droplets, fresh and appetizing"` |
+
+**Rule:** When product_photography protocol specifies a technique not in structured specs, use `custom_spec.instruction` to describe it naturally. The AI model understands photography language.
+
 ### 5. VERIFY + CRITIQUE
 
 **MANDATORY: view_image on EVERY output before scoring.**
