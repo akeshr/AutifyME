@@ -60,7 +60,7 @@ Use `asset_uploads` when you need the user to SEE an image during HITL approval.
   {
     "storage_path": "pending/image.png",
     "returns": "product_image",
-    "caption": "PET Jar 500ml - catalog hero",
+    "caption": "[Product] - catalog hero",
     "target_folder": "products"
   }
 ]
@@ -444,7 +444,7 @@ Create asset record with image preview for HITL. Junction created later by domai
     {
       "storage_path": "pending/20251217_studio_abc.png",
       "returns": "product_image",
-      "caption": "PET Jar 500ml - catalog hero shot",
+      "caption": "[Product Name] - catalog hero shot",
       "target_folder": "products"
     }
   ],
@@ -533,16 +533,16 @@ Multiple assets with image previews for variant families.
   "reasoning": "Processed [N] variants with consistent treatment. All verified.",
   "hitl_summary": "Created [N] product images:\n- [variant 1]\n- [variant 2]\n...\n\nApprove batch?",
   "asset_uploads": [
-    {"storage_path": "pending/t/variant_500ml.png", "returns": "img_500ml", "caption": "500ml variant"},
-    {"storage_path": "pending/t/variant_1L.png", "returns": "img_1L", "caption": "1L variant"}
+    {"storage_path": "pending/t/variant_[size_a].png", "returns": "img_size_a", "caption": "[Size A] variant"},
+    {"storage_path": "pending/t/variant_[size_b].png", "returns": "img_size_b", "caption": "[Size B] variant"}
   ],
   "operations": [
     {
       "action": "create",
       "table": "assets",
       "data": [
-        {"name": "Variant 500ml Hero", "storage_url": "@img_500ml.public_url", "asset_type": "IMAGE", "status": "ACTIVE", "caption": "@img_500ml.caption"},
-        {"name": "Variant 1L Hero", "storage_url": "@img_1L.public_url", "asset_type": "IMAGE", "status": "ACTIVE", "caption": "@img_1L.caption"}
+        {"name": "Variant [Size A] Hero", "storage_url": "@img_size_a.public_url", "asset_type": "IMAGE", "status": "ACTIVE", "caption": "@img_size_a.caption"},
+        {"name": "Variant [Size B] Hero", "storage_url": "@img_size_b.public_url", "asset_type": "IMAGE", "status": "ACTIVE", "caption": "@img_size_b.caption"}
       ],
       "returns": "assets_batch"
     }

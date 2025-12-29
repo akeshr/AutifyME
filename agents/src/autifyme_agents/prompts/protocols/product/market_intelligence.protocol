@@ -96,8 +96,8 @@ Research what makes products stand out:
 **What to extract:**
 - Common search phrases
 - Long-tail keywords
-- Problem-based searches ("airtight container for rice")
-- Use-case searches ("meal prep containers")
+- Problem-based searches ("[feature] [product] for [use case]")
+- Use-case searches ("[activity] [products]")
 
 ---
 
@@ -131,7 +131,7 @@ Research what makes products stand out:
 ```
 
 **Example:**
-"Premium [material] [product] with [decorative feature] and [texture]. [Grade] container perfect for [primary use]. [Closure type] keeps contents fresh. Ideal for [secondary uses]."
+"Premium [material] [product] with [decorative feature] and [texture]. [Grade] [product] perfect for [primary use]. [Closure type] keeps contents fresh. Ideal for [secondary uses]."
 
 ### Description Checklist
 
@@ -214,12 +214,12 @@ RIGHT: "Premium positioning supported by: [feature] ([X%] premium in market),
 
 ```
 WRONG:
-Tags: ["container", "storage", "plastic"]
+Tags: ["[category]", "storage", "[material]"]
 
 RIGHT:
-Tags: ["pet-storage-jar", "kitchen-organization", "food-container",
-       "bpa-free", "airtight", "pantry-storage", "meal-prep",
-       "floral-print", "premium-container", "gift-set"]
+Tags: ["[material]-storage-[product]", "kitchen-organization", "[category]-[product]",
+       "[certification]", "airtight", "pantry-storage", "[use-case]",
+       "[design]-print", "premium-[product]", "gift-set"]
 ```
 
 </protocol>

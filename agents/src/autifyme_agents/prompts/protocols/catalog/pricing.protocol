@@ -136,13 +136,13 @@ User Price Provided?
 ```json
 {
   "recommended_price": 100.00,
-  "currency": "INR",
+  "currency": "[CURRENCY]",
   "price_source": "family_inference | user_provided | market_research | cost_plus",
   "confidence": "high | medium | low",
   "breakdown": {
     "base_price": 95.00,
     "variant_adjustments": [
-      {"axis": "size", "value": "500ml", "adjustment": 0},
+      {"axis": "size", "value": "[size]", "adjustment": 0},
       {"axis": "color", "value": "blue", "adjustment": 5}
     ],
     "total_adjustments": 5.00

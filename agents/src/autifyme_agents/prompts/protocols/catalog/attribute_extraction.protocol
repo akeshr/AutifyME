@@ -250,7 +250,7 @@ Never create catalog entry with missing required attributes.
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
 | Guessing without source | "probably [material]", "looks like [size]" | Visual analysis -> infer, then research to confirm |
-| Ignoring conflicts | User says 500ml, image suggests 750ml -> use 500ml | Flag conflict, ask user to confirm |
-| Variant data in custom_attributes | {size: 500ml, color: blue} when family has axes | Link to variant_values; custom_attributes for non-variant only |
+| Ignoring conflicts | User says [size A], image suggests [size B] -> use [size A] | Flag conflict, ask user to confirm |
+| Variant data in custom_attributes | {size: [size], color: [color]} when family has axes | Link to variant_values; custom_attributes for non-variant only |
 
 </protocol>

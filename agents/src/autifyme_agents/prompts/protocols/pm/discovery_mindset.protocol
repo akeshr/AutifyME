@@ -163,7 +163,7 @@ CORRECT:
 | "these colors" / "color options" | Variants (color) | Variant workflow |
 | "these products" / "add these" (plural) | Different products | Bulk workflow |
 | "parts" / "components" / "assembly" | Components of ONE product | Component workflow |
-| "jars and lids" / "bodies and caps" / "product and accessories" | **COMPONENTS (cross-image)** | **Compose workflow** |
+| "[bodies] and [closures]" / "[products] and [accessories]" | **COMPONENTS (cross-image)** | **Compose workflow** |
 | "open and closed" / "with lid" | Different states of ONE product | Multi-angle workflow |
 | "with packaging" / "box and product" | Product + packaging | Multi-angle (packaging shots) |
 | "which one?" / "compare" | Comparison | Analysis only |

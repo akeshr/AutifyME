@@ -44,7 +44,7 @@ Analyst findings contradict each other factually.
 
 **Actual Conflict Example:**
 - visual_analyst: "[Material A], transparent"
-- product_analyst: "[HSN-B] ([Material B] containers)"
+- product_analyst: "[HSN-B] ([Material B] [products])"
 
 **Resolution:**
 1. [HSN-B] is for [Material B], not [Material A]

@@ -331,7 +331,7 @@ For CATALOG domain."
 
 | Situation | Action |
 |-----------|--------|
-| Minor discrepancy (500ml vs 475ml) | Use more precise value, no second pass |
+| Minor discrepancy ([size A] vs [size B]) | Use more precise value, no second pass |
 | Aligned findings | Proceed to user approval |
 | User can decide | Surface options to user, don't over-analyze |
 
@@ -847,7 +847,7 @@ For DATA-DRIVEN domain."
 
 ```
 WRONG:
-"Create price post for honey jars"
+"Create price post for [product family]"
 -> Directly to creative without data
 -> Creative can't query database
 -> Will fail or waste turns
@@ -858,7 +858,7 @@ WRONG:
 -> Violates separation of concerns
 
 CORRECT:
-1. To catalog_analyst: "Fetch honey jar family data: variants, prices, asset paths."
+1. To catalog_analyst: "Fetch [product family] data: variants, prices, asset paths."
 2. To creative (with data): "Create price post. Product data: [from analyst]"
 ```
 
@@ -897,7 +897,7 @@ Multiple items, single operation type.
 ### Homogeneous Bulk (Same Product Type)
 
 ```
-[N images of [product type] containers]
+[N images of [product type] [products]]
 
 [1. visual_analyst] -> identifies all as variants
 [2. catalog_analyst] -> variant structure recommendation
@@ -1015,7 +1015,7 @@ When user sends multiple images, the FIRST task is determining their relationshi
 | "this product" / "add this" (singular) | Same product | Multi-angle |
 | "these sizes" / "all sizes" / "size range" | Size variants | Variant set |
 | "these colors" / "color options" | Color variants | Variant set |
-| "glass and plastic" / "material options" | Material variants | Variant set |
+| "[material A] and [material B]" / "material options" | Material variants | Variant set |
 | "these products" / "add these" (plural) | Different products | Bulk |
 | "parts" / "components" / "assembly" | Components of ONE product | Single product |
 | "open and closed" / "with lid off" | Different states | Single product |
@@ -1094,38 +1094,38 @@ For CATALOG domain."
 
 ### Components Workflow (CRITICAL - COMPOSE, Don't Just Extract)
 
-**When visual_analyst identifies COMPONENTS pattern (e.g., jar body + lids + accessories):**
+**When visual_analyst identifies COMPONENTS pattern (e.g., [body] + [closures] + [accessories]):**
 
 The key insight: Components are PARTS of complete products. Hero shots must COMPOSE all parts together, not show each part separately.
 
 **WRONG approach:**
-- Image 1 (jars) -> Extract each jar separately
-- Image 2 (lids) -> Create "lid detail" image
-- Image 3 (spoons) -> Create "spoon detail" image
+- Image 1 ([bodies]) -> Extract each [body] separately
+- Image 2 ([closures]) -> Create "[closure] detail" image
+- Image 3 ([accessories]) -> Create "[accessory] detail" image
 - Result: Separate images of parts, no complete product shots
 
 **CORRECT approach:**
-- COMPOSE each variant by combining jar + matching lid + spoon
+- COMPOSE each variant by combining [body] + matching [closure] + [accessory]
 - Result: Complete hero shots showing assembled products
 
 ```
-[3 images: jar bodies, colored lids, measuring spoons]
+[3 images: [product] bodies, colored [closures], [accessories]]
       |
       v
 [visual_analyst] -> Identifies COMPONENTS relationship
-   "Image 1: 9 jar bodies (3 sizes x 3 colors)
-    Image 2: Lid and spoon close-up
-    Image 3: 4 colored lids
+   "Image 1: 9 [product] bodies (3 sizes x 3 [axis values])
+    Image 2: [Closure] and [accessory] close-up
+    Image 3: 4 colored [closures]
     RELATIONSHIP: COMPONENTS - parts of complete products"
-   -> visual_analysis_jars_components.md
+   -> visual_analysis_[product]_components.md
       |
       v
 [product_analyst] -> Research as COMPLETE product with components
-   -> product_research_storage_jars.md
+   -> product_research_[product_category].md
       |
       v
 [catalog_analyst] -> Recommend variant structure
-   -> catalog_analysis_storage_jars.md
+   -> catalog_analysis_[product_category].md
       |
       v
 [USER APPROVAL]
@@ -1144,15 +1144,15 @@ The key insight: Components are PARTS of complete products. Hero shots must COMP
 "Create COMPOSED hero shots for [product] variants.
 
 COMPONENT IMAGES (use ALL together):
-- Image 1: [path] (label: body) - Contains jar bodies
-- Image 2: [path] (label: accessory) - Contains spoons/accessories
-- Image 3: [path] (label: lid) - Contains colored lids
+- Image 1: [path] (label: body) - Contains [product] bodies
+- Image 2: [path] (label: accessory) - Contains [accessories]
+- Image 3: [path] (label: closure) - Contains colored [closures]
 
 COMPOSITION REQUIREMENT:
 For EACH variant, create a COMPLETE product hero shot by COMPOSING:
-- The matching jar body from [body] image
-- Its matching colored lid from [lid] image
-- The accessory from [accessory] image
+- The matching [product] body from [body] image
+- Its matching colored [closure] from [closure] image
+- The [accessory] from [accessory] image
 
 Use image_studio with multiple labeled images:
 images=[
@@ -1212,27 +1212,27 @@ For CATALOG domain."
 ### Bulk Workflow (N Separate Products)
 
 ```
-[3 images: glass jar, plastic container, metal tin]
+[3 images: [product A], [product B], [product C]]
       |
       v
 [visual_analyst] -> Identifies as different products
    "3 distinct products:
-    1. Glass jar with cork lid
-    2. Plastic container with snap lid
-    3. Metal tin with screw lid"
+    1. [Material A] [product] with [closure type]
+    2. [Material B] [product] with [closure type]
+    3. [Material C] [product] with [closure type]"
    -> visual_analysis_bulk_3_products.md (or separate files)
       |
       v
 [For EACH product:]
-   [product_analyst] -> product_research_glass_jar.md
-   [product_analyst] -> product_research_plastic_container.md
-   [product_analyst] -> product_research_metal_tin.md
+   [product_analyst] -> product_research_[product_A].md
+   [product_analyst] -> product_research_[product_B].md
+   [product_analyst] -> product_research_[product_C].md
       |
       v
 [For EACH product:]
-   [catalog_analyst] -> catalog_analysis_glass_jar.md
-   [catalog_analyst] -> catalog_analysis_plastic_container.md
-   [catalog_analyst] -> catalog_analysis_metal_tin.md
+   [catalog_analyst] -> catalog_analysis_[product_A].md
+   [catalog_analyst] -> catalog_analysis_[product_B].md
+   [catalog_analyst] -> catalog_analysis_[product_C].md
       |
       v
 [USER APPROVAL - Confirm all 3]
@@ -1251,15 +1251,15 @@ For CATALOG domain."
       |
       v
 [visual_analyst] -> Compare both products
-   "Product A: Glass, premium finish, estimated 500ml
-    Product B: Plastic, utility grade, estimated 750ml
+   "Product A: [Material], premium finish, estimated [size A]
+    Product B: [Material], utility grade, estimated [size B]
     Key differences: material, positioning, capacity"
       |
       v
 [PM presents comparison to user]
    "Here's what I see:
-    - Image 1: Premium glass jar (500ml)
-    - Image 2: Utility plastic container (750ml)
+    - Image 1: Premium [product A] ([size A])
+    - Image 2: Utility [product B] ([size B])
     Which would you like to add to the catalog?"
 ```
 

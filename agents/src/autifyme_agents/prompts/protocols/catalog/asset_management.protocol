@@ -340,10 +340,10 @@ Each variant gets its own image. Create N assets + N junctions.
       "action": "create",
       "table": "assets",
       "data": [
-        {"name": "500ml variant", "storage_url": "pending/t/500ml.png", ...},
-        {"name": "1L variant", "storage_url": "pending/t/1L.png", ...},
-        {"name": "1.5L variant", "storage_url": "pending/t/1_5L.png", ...},
-        {"name": "2L variant", "storage_url": "pending/t/2L.png", ...}
+        {"name": "[Size A] variant", "storage_url": "pending/t/[size_a].png", ...},
+        {"name": "[Size B] variant", "storage_url": "pending/t/[size_b].png", ...},
+        {"name": "[Size C] variant", "storage_url": "pending/t/[size_c].png", ...},
+        {"name": "[Size D] variant", "storage_url": "pending/t/[size_d].png", ...}
       ],
       "returns": "assets_batch"
     },
@@ -522,7 +522,7 @@ Same asset used for multiple products (e.g., generic accessory image).
 
 ```json
 {
-  "goal": "Link existing cap image to new bottle product",
+  "goal": "Link existing [component] image to new [product]",
   "reasoning": "Same cap type used across product line. Reusing existing asset.",
   "operations": [
     {

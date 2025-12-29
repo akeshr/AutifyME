@@ -14,7 +14,7 @@ product_families
     |
     +-- variant_axes (size, color, cap_type)
     |       |
-    |       +-- variant_values (500ml, Blue, Diamond)
+    |       +-- variant_values ([size], [color], [design])
     |
     +-- products (individual SKUs)
             |
@@ -66,7 +66,7 @@ product_families
 
 | Field | Convention | Example |
 |-------|------------|---------|
-| value | lowercase, identifier | 500ml, blue, diamond |
+| value | lowercase, identifier | [size], [color], [design] |
 | display_label | Human-readable | 500 ML, Blue, Diamond Cap |
 | sku_code | UPPERCASE, short | 500ML, BLU, DIA |
 
@@ -74,8 +74,8 @@ product_families
 
 | Axis | Value | SKU Code |
 |------|-------|----------|
-| size | 500ml | 500ML |
-| size | 1L | 1L |
+| size | [size-a] | [SIZE-A] |
+| size | [size-b] | [SIZE-B] |
 | color | clear | CLR |
 | color | blue | BLU |
 | cap_type | diamond | DIA |
@@ -86,7 +86,7 @@ product_families
 | Field | Required | Purpose |
 |-------|----------|---------|
 | variant_axis_id | Yes | FK to owning axis |
-| value | Yes | lowercase identifier (500ml, blue) |
+| value | Yes | lowercase identifier ([size], [color]) |
 | display_label | Yes | Human-readable (500 ML, Blue) |
 | sku_code | Yes | UPPERCASE, short for SKU generation |
 | price_adjustment | No | Price delta from base (default 0) |
@@ -187,7 +187,7 @@ Each variant value can have a price adjustment:
 
 **Final Price = Base Price + Sum(Adjustments)**
 
-Example: 1L Blue = Base + 15 + 5 = Base + 20
+Example: [Size B] [Color] = Base + [adj-1] + [adj-2] = Base + [total]
 
 ---
 
@@ -196,7 +196,7 @@ Example: 1L Blue = Base + 15 + 5 = Base + 20
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
 | Flat product list | "[Product] [size] [color]" as separate unlinked items | Family with axes [size, color], products linked via variant values |
-| Inconsistent SKU codes | "500", "500ml", "500ML", "HALF-LITER" mixed | Consistent pattern: "[SIZE-CODE]" (UPPERCASE) |
+| Inconsistent SKU codes | "[size]", "[size]ml", "[SIZE]ML", "[ALIAS]" mixed | Consistent pattern: "[SIZE-CODE]" (UPPERCASE) |
 | Missing variant links | Product without product_variant_values | Always create junction records for family with axes |
 
 </protocol>
