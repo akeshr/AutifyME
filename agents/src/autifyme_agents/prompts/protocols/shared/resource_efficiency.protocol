@@ -134,6 +134,28 @@ EFFICIENT (bounded):
 - [Stop when sufficient for task]
 ```
 
+### Pattern 6: Recognize Loops
+
+**If you're rephrasing the same question, you're looping - not progressing.**
+
+```
+LOOPING (waste):
+- query("X specs")           -> result A
+- query("X specifications")  -> result A (same)
+- query("X details")         -> result A (same)
+[3 queries, same intent, same results]
+
+EFFICIENT:
+- query("X specs")           -> result A
+- RECOGNIZE: "I have this information already"
+- MOVE ON to different dimension or task
+```
+
+**Signals you're looping:**
+- Same results across query variations
+- Recent calls returning information you already have
+- Rephrasing instead of progressing to next task
+
 ---
 
 ## AVOIDING RESOURCE WASTE

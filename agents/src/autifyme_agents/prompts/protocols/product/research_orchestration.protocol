@@ -163,20 +163,22 @@ The product type determines what to research. Here are EXAMPLES, not limits:
 
 ### Query Evolution
 
-Don't stop at generic queries. Evolve based on findings:
+Evolve queries based on what you learn:
 
 ```
-Generic: "PET container specifications"
+Generic:  "[product type] specifications"
     |
     v
-Specific: "500ml PET jar food grade specifications"
+Specific: "[size] [product type] [grade] specifications"
     |
     v
-Deep: "PET jar honeycomb texture manufacturing specifications India"
+Deep:     "[product type] [specific feature] [manufacturing/technical] specifications [market]"
     |
     v
-Expert: "BPA-free PET container FSSAI compliance requirements 2024"
+Expert:   "[certification] [product type] [regulatory] requirements [year]"
 ```
+
+Each level adds specificity based on what the previous query revealed.
 
 ### When to Use extract_web_content
 
@@ -247,18 +249,91 @@ Signals in image/description:
 2. **Axis-specific research** - What changes per variant
 3. **Variant matrix** - All combinations and their implications
 
-**Example Output:**
+**Output Structure:**
 ```
-Base Product: PET Storage Jar with Lid
+Base Product: [Product Type with Key Feature]
 Variant Axes:
-  - Size: 500ml, 1L, 1.5L, 2L
-  - Design: Blossoms (blue), Spring (pink), Garden (green)
+  - [Axis 1]: [values]
+  - [Axis 2]: [values]
 
-Matrix: 4 sizes x 3 designs = 12 SKUs
+Matrix: [count] x [count] = [total SKUs]
 
-Size-specific: Dimensions, capacity, recommended use
-Design-specific: Print details, color codes
+[Axis 1]-specific: [what changes]
+[Axis 2]-specific: [what changes]
 ```
+
+---
+
+## PHASE 6: CATEGORY vs BRAND RESEARCH
+
+### Critical Insight: Research the PRODUCT, Not the BRAND
+
+> **The product category has specifications. The brand may or may not have online presence.**
+
+Most product specifications are CATEGORY-level (dimensions, material properties, classification codes). Brand-specific data (exact SKU names, internal part numbers) often doesn't exist online for small/regional brands.
+
+### Research Priority Order
+
+```
+[1. CATEGORY intelligence - RESEARCH EXTENSIVELY]
+    - Material properties, specifications, dimensions
+    - Compliance codes (HSN, certifications, standards)
+    - Competitor products and pricing (major marketplaces, wholesale platforms)
+    - Ecommerce listings and market positioning
+    - Industry norms, buyer expectations, search terms
+           |
+           v
+[2. BRAND data - ATTEMPT, DON'T LOOP]
+    - Manufacturer spec sheets (if indexed)
+    - Brand-specific naming/SKUs
+    - Brand certifications
+           |
+           v
+[3. Synthesize - Apply category intelligence to brand product]
+```
+
+### Category Research is COMPREHENSIVE
+
+Research the PRODUCT CATEGORY thoroughly across these dimensions:
+
+| Dimension | What to Find |
+|-----------|--------------|
+| Technical specs | Materials, dimensions, capacity, weight, properties |
+| Competitor products | What competitors offer, their features, pricing |
+| Market pricing | Wholesale rates, retail prices, bulk discounts |
+| Ecommerce positioning | Keywords buyers use, bestseller features, reviews |
+| Compliance | Classification codes, certifications, regulatory requirements |
+
+**This is NOT limited.** Research each dimension that's relevant to the product category.
+
+### Recognizing Brand Research Limits
+
+**Brand data either exists online or it doesn't. The first query reveals the answer.**
+
+| Signal | What It Means | Action |
+|--------|---------------|--------|
+| Results mention the brand directly | Brand has online presence | Continue brand research |
+| Results show only competitors/category | Brand isn't indexed | STOP brand queries, pivot to category |
+| Same generic results across variations | Rephrasing won't help | Synthesize with category data |
+
+**The test:** Does the search result contain the brand name in the content (not just your query)? If no, the brand has no online presence.
+
+### Fallback Strategy
+
+When brand-specific research yields no results:
+
+1. **Document:** "Brand-specific data not found online"
+2. **Use:** Generic category specifications
+3. **Apply:** Category specs to this brand's products
+4. **Flag:** "Specifications based on category norms - verify with supplier if precision required"
+
+### Query Variation Loop (CRITICAL ANTI-PATTERN)
+
+**The principle:** Search engines return the same results for synonymous queries. Rephrasing a failed query won't suddenly find new data.
+
+**The signal:** Results don't contain the brand/term you're searching for (only your query does).
+
+**The action:** Recognize the signal immediately - if results don't mention your search term, pivot to category research or move on.
 
 ---
 
@@ -266,64 +341,99 @@ Design-specific: Print details, color codes
 
 ### Wrong: Checklist Mentality
 
-```
-WRONG:
-"Let me research HSN, compliance, naming, positioning."
-(Fixed list regardless of product)
+**Signal:** Using a fixed research list regardless of product type.
 
-RIGHT:
-"This is an electronic kitchen appliance. I need to research:
-power specs, performance metrics, safety certifications,
-components included, warranty terms, dimensions, weight,
-energy rating, controls, noise level, and competitive positioning."
-```
+**The principle:** Different products need different research dimensions. Identify what's relevant to THIS product, don't apply a generic checklist.
 
 ### Wrong: Stopping Too Early
 
-```
-WRONG:
-Found HSN code. Done.
+**Signal:** Stopping after finding one piece of data without covering other applicable dimensions.
 
-RIGHT:
-Found HSN code. Now: What certifications apply? What specs does this category typically have? What are competitors listing? What do buyers search for? What technical details exist? Is there a manufacturer datasheet?
-```
+**The principle:** Check the completion checklist. Can you answer all the key questions for applicable dimensions? If not, continue researching.
 
 ### Wrong: Missing Multi-Product
 
-```
-WRONG:
-Image shows 5 items. "This is a storage container..."
-(Treated as single product)
+**Signal:** Image shows multiple items but you're describing it as one product.
 
-RIGHT:
-Image shows 5 items. "I see 5 distinct storage containers of different sizes. Let me enumerate each:
-1. 500ml jar with blue lid
-2. 1L jar with blue lid
-3. 1.5L jar with blue lid
-4. 2L jar with blue lid
-5. 3L jar with blue lid
+**The principle:** Count distinct items. Identify if they're variants, a set, or unrelated products. Research accordingly.
 
-These appear to be a graduated set. Researching as variant group..."
-```
+### Wrong: Dimension Loops
+
+**Signal:** You're querying the same dimension and getting similar results.
+
+**The test:** Did this query teach me something I didn't know? If no, move on to the next dimension.
 
 ### Wrong: Ignoring Components
 
-```
-WRONG:
-"Kitchen mixer. HSN 8509, 28% GST."
+**Signal:** Product has multiple components but you only researched the main unit.
 
-RIGHT:
-"Kitchen mixer with:
-- Main unit: 750W motor, 5 speeds + pulse
-- Stainless steel bowl: 4.5L capacity
-- Dough hook: Heavy-duty, stainless steel
-- Whisk attachment: Wire balloon whisk
-- Flat beater: For batters and mixing
-- Splash guard: Transparent, with pour spout
-- Power cord: 1.2m length
+**The principle:** Identify all components (main unit, accessories, attachments, packaging). Research each for materials, specifications, and care requirements.
 
-Each component researched for material, specifications, care instructions..."
-```
+---
+
+## PHASE 7: RESEARCH COMPLETION AND SYNTHESIS
+
+### Research Discipline: Information Gain, Not Query Count
+
+**Don't count queries. Evaluate information gain.**
+
+| Before Each Query, Ask | If NO | If YES |
+|------------------------|-------|--------|
+| Will this query likely return NEW information? | Skip it | Make the query |
+| Is this a different dimension than my last query? | You might be looping | Good, continue |
+| Do I already have enough on this dimension? | Move to next dimension | Continue if gaps remain |
+
+### Dimension Completion Signals
+
+**Move to the next dimension when:**
+- You can answer the key questions for that dimension
+- Your last query on this dimension returned information you already had
+- You've covered the main source types for that dimension (marketplaces, wholesale, official sources)
+
+**Stay on a dimension when:**
+- Key questions remain unanswered
+- Each query is returning genuinely new information
+- You found a high-value source worth extracting
+
+### Prior Research Utilization
+
+**ALWAYS check for existing research before starting fresh:**
+
+1. If PM mentions prior research files - READ THEM FIRST
+2. If researching a category you've seen before - check for related files
+3. Build on existing research - only query for gaps, not from scratch
+
+### Research Completion Checklist
+
+Research is COMPLETE when you've covered all APPLICABLE dimensions:
+
+| Dimension | Applies To | Completion Question |
+|-----------|------------|-------------------|
+| **Technical specs** | ALL products | Can I specify materials, dimensions, capacity, weight? |
+| **Compliance** | Regulated products | Do I have HSN code and relevant certifications? |
+| **Market context** | Consumer products | Do I know competitor pricing and positioning? |
+| **Ecommerce intel** | Online-sold products | Do I know what keywords/features buyers search for? |
+| **Variant handling** | Multi-variant products | Have I covered all variants identified in visual analysis? |
+
+**Not all dimensions apply to all products:**
+- Industrial components: Technical specs + Compliance (skip ecommerce)
+- Custom products: Technical specs only (no market comparables)
+- Single SKUs: Skip variant handling
+
+**If an applicable dimension yields no useful results despite varied queries, document the gap and move on.**
+
+### Synthesis Trigger
+
+**STOP researching and START synthesizing when you recognize these signals:**
+
+| Signal | What It Means |
+|--------|---------------|
+| You can answer the completion checklist questions | Research goal achieved |
+| Recent queries return information you already have | Diminishing returns |
+| You're rephrasing queries hoping for different results | You're looping |
+| You have enough to write a comprehensive product dossier | Task completable |
+
+**The test:** Can a specialist populate every database field from your research? If yes, synthesize.
 
 ---
 

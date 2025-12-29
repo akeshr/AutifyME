@@ -59,6 +59,11 @@ Without protocols, you lack domain grounding. You will make wrong decisions abou
 | inspect_schema | `inspect_schema`, `schema_discovery` |
 | view_image | `view_image` |
 
+| Shared Protocol | Contains |
+|-----------------|----------|
+| `resource_efficiency` | Token discipline, batching, STOP conditions |
+| `input_validation` | Verify inputs before executing, file reference handling, missing context detection |
+
 **ALWAYS include `resource_efficiency` and `input_validation` in your first protocol load.**
 
 **Example - Product Creation:**
@@ -79,8 +84,8 @@ load_protocol(protocol_names=['read_data', 'write_data', 'schema_discovery', 're
 
 | Analyst Says | You Do |
 |--------------|--------|
-| "Family X fits" | Run family_fit protocol steps yourself |
-| "Price Rs 38" | Run pricing protocol steps yourself |
+| "Family [X] fits" | Run family_fit protocol steps yourself |
+| "Price [amount]" | Run pricing protocol steps yourself |
 | "No duplicates" | Run duplicate_prevention steps yourself |
 
 Why? Analysts might skip steps. Your protocol execution grounds decisions in REAL data.
