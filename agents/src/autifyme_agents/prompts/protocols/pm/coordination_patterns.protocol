@@ -31,7 +31,7 @@ Visual -> [WAIT] -> Product -> [WAIT] -> Catalog
 ```
 
 **Why This Order:**
-- Visual tells us WHAT we're looking at (500ml PET jar)
+- Visual tells us WHAT we're looking at ([product description])
 - Product researches EVERYTHING about it (specs, HSN, compliance, naming, positioning)
 - Catalog uses BOTH to search effectively (find similar products with rich context)
 
@@ -102,7 +102,7 @@ Most common multi-domain workflow. Memorize this.
       |
       v
 [1. visual_analyst] -----> visual_analysis_{image_basename}.md
-      |                    (identifies: 500ml PET jar, honeycomb texture)
+      |                    (identifies: [product type], [key features])
       v
 [2. product_analyst] -----> product_research_{item_identifier}.md
       |                     (uses visual findings)
@@ -110,7 +110,7 @@ Most common multi-domain workflow. Memorize this.
       v
 [3. catalog_analyst] -----> catalog_analysis_{item_identifier}.md
       |                     (uses BOTH visual AND product findings)
-      |                     (searches with rich context: "500ml food-grade PET, HSN 3923")
+      |                     (searches with rich context: "[product specs], [HSN code]")
       v
 [4. PM synthesizes, presents to user]
       |
@@ -141,11 +141,11 @@ Most common multi-domain workflow. Memorize this.
 
 ```
 WRONG (parallel):
-- Catalog searches with just "PET jar"
+- Catalog searches with just "[product type]"
 - Finds generic matches, wrong family recommendations
 
 CORRECT (sequential):
-- Catalog searches with "500ml food-grade PET jar, HSN 3923, airtight seal, premium positioning"
+- Catalog searches with "[size] [material] [product], [HSN], [features], [positioning]"
 - Finds precise matches, accurate family recommendations
 ```
 
@@ -169,10 +169,10 @@ When analysts return, extract and combine:
 
 | Dimension | What to Extract | Example |
 |-----------|-----------------|---------|
-| **Identity** | What is this product? (from visual + research) | "500ml PET jar with honeycomb texture, food-grade" |
-| **Placement** | Where does it fit? (from catalog) | "Fits PET Kitchen Storage family, similar to products at Rs 30-40" |
-| **Compliance** | What rules apply? (from product) | "HSN 3923, 18% GST, BPA-free (no special certs needed)" |
-| **Positioning** | How to price/position? (cross-domain) | "Premium segment - honeycomb commands 20-30% over plain" |
+| **Identity** | What is this product? (from visual + research) | "[size] [material] [product] with [feature], [grade]" |
+| **Placement** | Where does it fit? (from catalog) | "Fits [Family] family, similar to products at [price range]" |
+| **Compliance** | What rules apply? (from product) | "[HSN], [GST%], [certifications]" |
+| **Positioning** | How to price/position? (cross-domain) | "[segment] - [feature] commands [X%] over [baseline]" |
 
 ### Detect Cross-Domain Patterns
 
@@ -192,9 +192,9 @@ Before presenting to user, check for mismatches:
 | Analyst A Says | Analyst B Says | Conflict? | Resolution |
 |----------------|----------------|-----------|------------|
 | Visual: "Premium decorative" | Catalog: "Utility family fit" | **YES** | Surface to user OR re-check catalog for premium families |
-| Visual: "Glass material" | Product: "HSN 7010 (glass)" | No | Aligned - proceed |
-| Visual: "500ml estimate" | Product: "Standard is 475ml" | Minor | Use research value (more precise) |
-| Catalog: "Rs 30-40 similar" | Product: "Premium = 20-30% over" | No | Combine: "Rs 38-52 for premium tier" |
+| Visual: "[material]" | Product: "[HSN] ([material])" | No | Aligned - proceed |
+| Visual: "[size] estimate" | Product: "Standard is [actual size]" | Minor | Use research value (more precise) |
+| Catalog: "[price range] similar" | Product: "Premium = [X%] over" | No | Combine: "[calculated range] for premium tier" |
 
 **CRITICAL:** If conflict detected, either resolve or surface to user. Never proceed with unresolved conflicts.
 
@@ -222,21 +222,21 @@ Use this pattern when presenting to user after analysis phase:
 
 **Good Synthesis:**
 ```
-"This is a 500ml PET jar with honeycomb texture - premium food storage positioning.
+"This is a [size] [material] [product] with [feature] - [segment] positioning.
 
 Key findings:
-- Premium segment: Visual shows decorative texture, market research confirms 20-30% premium for textured containers
-- Family: Fits 'PET Kitchen Storage' - similar products Rs 30-40, but this warrants premium tier (Rs 45-52)
-- Compliance: HSN 3923, 18% GST, BPA-free (PET is inherently food-safe)
+- [Segment]: Visual shows [feature], market research confirms [X%] premium for [feature type]
+- Family: Fits '[Family]' - similar products [price range], but this warrants [tier] ([adjusted range])
+- Compliance: [HSN], [GST%], [certifications]
 
-Recommendation: Create as premium variant in PET Kitchen Storage at Rs 48."
+Recommendation: Create as [tier] variant in [Family] at [price]."
 ```
 
 **Bad Synthesis (Concatenation):**
 ```
-"Visual analyst found it's a PET jar.
-Catalog analyst found it fits PET Kitchen Storage family.
-Product analyst found HSN 3923."
+"Visual analyst found it's a [product].
+Catalog analyst found it fits [Family] family.
+Product analyst found [HSN]."
 ```
 
 ### When to Surface Conflicts to User
@@ -251,11 +251,11 @@ Product analyst found HSN 3923."
 ```
 "I notice a positioning question:
 - Visual analysis shows premium decorative features
-- Current family 'PET Kitchen Storage' serves utility/budget segment
+- Current family '[Family]' serves utility/budget segment
 
 Options:
 1. Create as premium variant in current family (may be outlier)
-2. Create new 'PET Premium Containers' family
+2. Create new '[Material] Premium [Category]' family
 3. Find existing premium family that fits
 
 Which approach fits your catalog strategy?"
@@ -308,8 +308,8 @@ For [DOMAIN] domain."
 ```
 [PM reads both files during synthesis]
 
-catalog_analysis: "Fits 'PET Utility Containers' family, Rs 25-35 tier"
-product_research: "Premium segment product, textured finish commands 30% premium"
+catalog_analysis: "Fits '[Utility Family]' family, [low price] tier"
+product_research: "Premium segment product, [feature] commands [X%] premium"
 
 [CONFLICT DETECTED: Utility family vs Premium positioning]
 
@@ -317,11 +317,11 @@ PM delegates second pass to catalog_analyst:
 "Re-analyze family fit with positioning context.
 
 NEW CONTEXT (from product_analyst):
-- Product is premium segment (textured finish)
-- Commands 30% premium over plain variants
-- Market positioning: Rs 45-55 range
+- Product is premium segment ([feature])
+- Commands [X%] premium over plain variants
+- Market positioning: [premium price range]
 
-Your original analysis at: catalog_analysis_pet_jar.md
+Your original analysis at: catalog_analysis_[product].md
 Find premium families or confirm utility family can support premium tier.
 
 For CATALOG domain."
@@ -390,48 +390,48 @@ Every agent in an image workflow receives `Source image at: inbox/photo.jpg`. No
 
 ```
 Step 1: visual_analyst
-PM: "Analyze image at inbox/photo.jpg. For CATALOG domain."
--> Returns: "Analysis written to visual_analysis_pet_jar.md"
-   (Contains: 500ml PET jar, honeycomb texture, food container)
+PM: "Analyze image at inbox/[filename].jpg. For CATALOG domain."
+-> Returns: "Analysis written to visual_analysis_[product].md"
+   (Contains: [product description], [key features])
 
 Step 2: product_analyst (receives visual file)
 PM: "Research this product comprehensively.
-     Image at: inbox/photo.jpg
-     Read visual analysis at: visual_analysis_pet_jar.md
+     Image at: inbox/[filename].jpg
+     Read visual analysis at: visual_analysis_[product].md
      For PRODUCT domain."
--> Returns: "Research written to product_research_pet_jar.md"
-   (Contains: specs, HSN 3923, food-grade compliance, naming conventions, market positioning)
+-> Returns: "Research written to product_research_[product].md"
+   (Contains: specs, [HSN], compliance, naming conventions, market positioning)
 
 Step 3: catalog_analyst (receives image + visual + product files)
 PM: "Find catalog placement.
-     Source image at: inbox/photo.jpg
-     Read visual analysis at: visual_analysis_pet_jar.md
-     Read product research at: product_research_pet_jar.md
+     Source image at: inbox/[filename].jpg
+     Read visual analysis at: visual_analysis_[product].md
+     Read product research at: product_research_[product].md
      For CATALOG domain."
--> Returns: "Analysis written to catalog_analysis_pet_jar.md"
+-> Returns: "Analysis written to catalog_analysis_[product].md"
    (Can view image directly + uses rich context for precise family match)
 
 [USER APPROVAL - Proceed with cataloging?]
 
 Step 4: creative_specialist (receives ALL analyst files)
 PM: "Create catalog hero shot.
-     Source image at: inbox/photo.jpg
-     Read visual analysis at: visual_analysis_pet_jar.md
-     Read product research at: product_research_pet_jar.md
-     Read catalog analysis at: catalog_analysis_pet_jar.md
+     Source image at: inbox/[filename].jpg
+     Read visual analysis at: visual_analysis_[product].md
+     Read product research at: product_research_[product].md
+     Read catalog analysis at: catalog_analysis_[product].md
      For CATALOG domain."
 -> Processes image (uses product naming, family context for proper hero shot)
 -> Creates asset record (HITL: "Is this image acceptable?")
 -> [USER APPROVES IMAGE]
--> Returns: "Asset created: asset_abc123. Ready for catalog entry."
+-> Returns: "Asset created: asset_[id]. Ready for catalog entry."
 
 Step 5: catalog_specialist (receives image + ALL files + asset_id)
 PM: "Create catalog entry.
-     Source image at: inbox/photo.jpg
-     Read visual analysis at: visual_analysis_pet_jar.md
-     Read catalog analysis at: catalog_analysis_pet_jar.md
-     Read product research at: product_research_pet_jar.md
-     Asset already created and approved: asset_abc123
+     Source image at: inbox/[filename].jpg
+     Read visual analysis at: visual_analysis_[product].md
+     Read catalog analysis at: catalog_analysis_[product].md
+     Read product research at: product_research_[product].md
+     Asset already created and approved: asset_[id]
      For CATALOG domain."
 -> Creates product + product_assets junction (HITL: "Is this product data correct?")
 -> [USER APPROVES CATALOG ENTRY]
@@ -443,7 +443,7 @@ PM: "Create catalog entry.
 
 **Anti-Pattern:**
 ```
-WRONG: "Create catalog entry for the PET jar"
+WRONG: "Create catalog entry for the [product]"
 -> catalog_specialist has no files, no context, will fail or produce incomplete record
 
 WRONG: Route storage_path to catalog_specialist for asset creation
@@ -740,30 +740,30 @@ When user wants graphics with product data (prices, sizes, variants, offers).
 ### Flow
 
 ```
-[User: "Create Instagram post with prices for honey jar family"]
+[User: "Create Instagram post with prices for [product] family"]
       |
       v
 [1. PM delegates to catalog_analyst for data]
-   "Fetch product data for honey jar family.
+   "Fetch product data for [product] family.
     Need: all variants with prices, sizes, and asset paths.
     For DATA-DRIVEN graphics."
       |
       v
 [2. catalog_analyst returns structured data]
-   "Product family: Honey Jars
+   "Product family: [Family Name]
     Variants:
-    - 250ml: Rs 299, asset: products/honey_250ml.png
-    - 500ml: Rs 549, asset: products/honey_500ml.png
-    - 1L: Rs 999, asset: products/honey_1L.png"
+    - [Size A]: [Currency] [Price A], asset: products/[product]_[size_a].png
+    - [Size B]: [Currency] [Price B], asset: products/[product]_[size_b].png
+    - [Size C]: [Currency] [Price C], asset: products/[product]_[size_c].png"
       |
       v
 [3. PM delegates to creative_specialist WITH DATA]
    "Create Instagram price post.
     Platform: Instagram Feed (1:1).
     Product data:
-    - 250ml jar: Rs 299
-    - 500ml jar: Rs 549
-    - 1L jar: Rs 999
+    - [Size A]: [Currency] [Price A]
+    - [Size B]: [Currency] [Price B]
+    - [Size C]: [Currency] [Price C]
     Source images at: [asset paths from catalog_analyst]
     For DATA-DRIVEN domain."
       |
@@ -871,7 +871,7 @@ Modify existing catalog data. May skip analysis.
 ### Simple Update (Clear Instruction)
 
 ```
-"Update SKU-001 price to Rs 45"
+"Update [SKU] price to [price]"
 
 [catalog_specialist directly] -> updated
 ```
@@ -881,10 +881,10 @@ No analysis needed - user provided complete instruction.
 ### Ambiguous Update (Needs Context)
 
 ```
-"Update the blue bottle price"
+"Update the [color] [product] price"
 
 [1. catalog_analyst] -> find product, current price
-[2. PM confirms with user] -> "You mean BOTTLE-GLASS-250ML-BLUE at Rs 95?"
+[2. PM confirms with user] -> "You mean [SKU] at [current price]?"
 [3. catalog_specialist] -> update after confirmation
 ```
 
@@ -897,27 +897,27 @@ Multiple items, single operation type.
 ### Homogeneous Bulk (Same Product Type)
 
 ```
-[4 images of PET containers]
+[N images of [product type] containers]
 
 [1. visual_analyst] -> identifies all as variants
 [2. catalog_analyst] -> variant structure recommendation
 [3. product_analyst] -> comprehensive research for variant family (base specs + variant-specific)
 [4. User approval] -> structure confirmed
-[5. creative_specialist] -> 4 processed images
-[6. catalog_specialist] -> 4 products + variant structure
+[5. creative_specialist] -> N processed images
+[6. catalog_specialist] -> N products + variant structure
 ```
 
 ### Heterogeneous Bulk (Different Products)
 
 ```
-[5 images: glass, PET, metal, wood, ceramic]
+[N images: [material A], [material B], [material C]...]
 
-[1. visual_analyst] -> identifies 5 distinct products
-[2. catalog_analyst] -> 5 family placements, may need new families
+[1. visual_analyst] -> identifies N distinct products
+[2. catalog_analyst] -> N family placements, may need new families
 [3. product_analyst] -> comprehensive research for each product type (different dimensions per category)
-[4. User approval] -> all 5 confirmed
-[5. creative_specialist] -> 5 processed images
-[6. catalog_specialist] -> 5 products, possibly new families
+[4. User approval] -> all N confirmed
+[5. creative_specialist] -> N processed images
+[6. catalog_specialist] -> N products, possibly new families
 ```
 
 ---
@@ -1065,30 +1065,30 @@ For CATALOG domain."
 ### Multi-Angle Workflow (1 Product, N Assets)
 
 ```
-[4 images: front, back, side, detail of same bottle]
+[N images: front, back, side, detail of same product]
       |
       v
 [visual_analyst] -> Analyzes ALL images together
-   "Same 500ml PET jar from 4 angles. Front shows label, back shows nutrition..."
-   -> visual_analysis_pet_jar.md (covers all angles)
+   "Same [product] from N angles. Front shows [feature A], back shows [feature B]..."
+   -> visual_analysis_[product].md (covers all angles)
       |
       v
 [product_analyst] -> Research ONCE for the product
-   -> product_research_pet_jar.md
+   -> product_research_[product].md
       |
       v
 [catalog_analyst] -> Search ONCE for catalog placement
-   -> catalog_analysis_pet_jar.md
+   -> catalog_analysis_[product].md
       |
       v
 [USER APPROVAL]
       |
       v
-[creative_specialist] -> Process ALL 4 images
-   -> 4 assets created, returns: asset_id_1, asset_id_2, asset_id_3, asset_id_4
+[creative_specialist] -> Process ALL N images
+   -> N assets created, returns: asset_id_1, asset_id_2, ..., asset_id_N
       |
       v
-[catalog_specialist] -> Create 1 product with 4 assets
+[catalog_specialist] -> Create 1 product with N assets
    -> Links all asset_ids to single product
 ```
 
@@ -1180,33 +1180,33 @@ For CATALOG domain."
 ### Variant Workflow (N Linked Products)
 
 ```
-[3 images: 250ml, 500ml, 1L of same jar type]
+[N images: [Size A], [Size B], [Size C] of same product type]
       |
       v
 [visual_analyst] -> Identifies variant relationship
-   "3 size variants of same PET jar design. 250ml, 500ml, 1L."
-   -> visual_analysis_pet_jar_variants.md
+   "N size variants of same [product] design. [Size A], [Size B], [Size C]."
+   -> visual_analysis_[product]_variants.md
       |
       v
 [product_analyst] -> Research base product + variant dimensions
-   "Base: PET jar. Variants by volume. HSN same for all sizes."
-   -> product_research_pet_jar_variants.md
+   "Base: [product]. Variants by [axis]. HSN same for all sizes."
+   -> product_research_[product]_variants.md
       |
       v
 [catalog_analyst] -> Recommend variant structure
-   "Family: PET Kitchen Storage. Variant axis: Volume. Create 3 products linked."
-   -> catalog_analysis_pet_jar_variants.md
+   "Family: [Family]. Variant axis: [axis]. Create N products linked."
+   -> catalog_analysis_[product]_variants.md
       |
       v
 [USER APPROVAL - Confirm variant structure]
       |
       v
-[creative_specialist] -> Process ALL 3 images
-   -> asset_id_250ml, asset_id_500ml, asset_id_1L
+[creative_specialist] -> Process ALL N images
+   -> asset_id_[size_a], asset_id_[size_b], asset_id_[size_c]
       |
       v
-[catalog_specialist] -> Create 3 linked variant products
-   -> Creates family (if needed), 3 products, variant links, asset links
+[catalog_specialist] -> Create N linked variant products
+   -> Creates family (if needed), N products, variant links, asset links
 ```
 
 ### Bulk Workflow (N Separate Products)
@@ -1573,8 +1573,8 @@ Consistent file naming enables reliable file routing between agents.
 ### Item Identifier Rules
 
 - Use image basename when available: `20251217_152547_photo`
-- Use descriptive slug when no image: `pet_container_500ml`
-- For variants: `pet_containers_variant_set`
+- Use descriptive slug when no image: `[product]_[size]`
+- For variants: `[product]_variant_set`
 - Never use generic names: `analysis.md`, `research.md` (will overwrite)
 
 ### PM File Routing
@@ -1582,9 +1582,9 @@ Consistent file naming enables reliable file routing between agents.
 When delegating, PM includes file paths and asset IDs explicitly:
 ```
 "Create catalog entry.
-Read visual analysis at: visual_analysis_20251217_photo.md
-Read product research at: product_research_pet_container.md
-Asset already created and approved: asset_abc123"
+Read visual analysis at: visual_analysis_[identifier].md
+Read product research at: product_research_[identifier].md
+Asset already created and approved: asset_[id]"
 ```
 
 ---
@@ -1636,7 +1636,7 @@ When user returns after timeout:
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
 | **Wrong analysis order** | Catalog before Product | Visual -> Product -> Catalog (catalog needs product context) |
-| **Catalog with only visual** | Catalog searches with just "PET jar" | Include product_research so catalog searches with rich context |
+| **Catalog with only visual** | Catalog searches with just "[product type]" | Include product_research so catalog searches with rich context |
 | Execution before approval | creative_specialist immediately after analysis | User approval GATE before creative_specialist |
 | Missing file routes | catalog_specialist without product_research.md | Include ALL analyst files for complete records |
 | Context not propagated | "Read visual_analysis.md" without user clarifications | Include user context: "User clarified X. Read file and REVISE." |
