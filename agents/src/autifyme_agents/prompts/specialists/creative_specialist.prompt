@@ -247,7 +247,7 @@ Without protocols, you lack:
 | Lifestyle/scene generation | `product_photography`, `image_studio` |
 | Social media content | `social_media`, `image_studio` |
 | Data-driven graphics | `social_media`, `image_studio` |
-| Campaign batch work | `product_photography`, `resource_efficiency` |
+| Campaign batch work | `product_photography`, `image_studio`, `resource_efficiency` |
 
 | If Your Task Involves | Load These (domain='catalog') |
 |----------------------|-------------------------------|
@@ -416,7 +416,8 @@ For each source_image:
 
 - **Style consistency CRITICAL** - Lock lighting, background, treatment for all angles
 - All assets link to ONE product record
-- PM handles the product_assets junction
+- If PM provides product_id: YOU create product_assets junction for each asset (per Product Linking section)
+- If no product_id: catalog_specialist links later
 
 **For Variants:**
 For each variant_image:
@@ -426,7 +427,8 @@ For each variant_image:
 
 - **Style consistency CRITICAL** - Identical treatment shows variant differences clearly
 - Each asset links to its respective variant product
-- PM handles which asset goes to which variant
+- If PM provides variant product_ids: YOU create product_assets junction for each (per Product Linking section)
+- If no product_ids: catalog_specialist links later
 
 ### Style Lock (MANDATORY for Multiple Sources)
 
