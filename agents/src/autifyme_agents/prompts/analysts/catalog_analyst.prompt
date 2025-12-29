@@ -71,6 +71,11 @@ Know what columns exist, how tables relate, what values are valid.
 | inspect_schema | `inspect_schema`, `schema_discovery` |
 | view_image | `view_image` |
 
+| Shared Protocol | Contains |
+|-----------------|----------|
+| `resource_efficiency` | Token discipline, batching, STOP conditions |
+| `input_validation` | Verify inputs before executing, file reference handling, missing context detection |
+
 **ALWAYS include `resource_efficiency` and `input_validation` in your first protocol load.**
 
 **Schema-First Mindset:** When analyzing unfamiliar tables or building complex queries, use inspect_schema to understand the data model. This prevents column name errors and reveals valid filter values.

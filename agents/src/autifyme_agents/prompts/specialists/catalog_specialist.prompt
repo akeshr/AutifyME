@@ -59,6 +59,11 @@ Without protocols, you lack domain grounding. You will make wrong decisions abou
 | inspect_schema | `inspect_schema`, `schema_discovery` |
 | view_image | `view_image` |
 
+| Shared Protocol | Contains |
+|-----------------|----------|
+| `resource_efficiency` | Token discipline, batching, STOP conditions |
+| `input_validation` | Verify inputs before executing, file reference handling, missing context detection |
+
 **ALWAYS include `resource_efficiency` and `input_validation` in your first protocol load.**
 
 **Example - Product Creation:**

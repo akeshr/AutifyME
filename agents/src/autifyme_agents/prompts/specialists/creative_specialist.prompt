@@ -250,6 +250,11 @@ Without protocols, you lack:
 | inspect_schema | `inspect_schema`, `schema_discovery` |
 | HITL feedback | `hitl` (shared) |
 
+| Shared Protocol | Contains |
+|-----------------|----------|
+| `resource_efficiency` | Token discipline, batching, STOP conditions |
+| `input_validation` | Verify inputs before executing, file reference handling, missing context detection |
+
 **ALWAYS include `resource_efficiency` and `input_validation` in your first protocol load.**
 
 **Example - Catalog Hero:**
