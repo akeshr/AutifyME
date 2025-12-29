@@ -498,17 +498,16 @@ Flow: ASSESS -> ENVISION -> EXECUTE -> CRITIQUE -> write_data -> Return asset_id
 ASSESS -> ENVISION -> EXECUTE -> CRITIQUE -> write_data (asset + junction) -> Return asset_id
 ```
 
-**WriteIntent with junction:**
+**Two write_data calls (sequential):**
 ```
-operations: [
-  {action: "create", table: "assets", data: {id: [generate UUID], ...}},
-  {action: "create", table: "product_assets", data: {product_id: [from PM], asset_id: [same UUID], ...}}
-]
+1. write_data: Create asset
+   -> Tool returns: asset_id
+
+2. write_data: Create product_assets junction
+   -> Uses: product_id (from PM) + asset_id (from step 1)
 ```
 
-**Critical:** Generate the asset UUID BEFORE write_data. Use same UUID in both operations.
-
-**Error handling:** If write_data fails with FK constraint error (product doesn't exist), escalate to PM: "Product [product_id] not found. Cannot link asset."
+**Error handling:** If junction write_data fails with FK constraint error (product doesn't exist), escalate to PM: "Product [product_id] not found. Cannot link asset."
 
 **Why you handle this:** You already handle campaign_assets junctions for campaigns. Product linking is the same pattern - just different junction table.
 
