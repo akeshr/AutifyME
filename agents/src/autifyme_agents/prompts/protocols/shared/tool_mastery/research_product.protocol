@@ -268,7 +268,7 @@ research_product -> identify 0.8+ relevance sources -> extract 1-2 best
 ## RESEARCH TERMINATION
 
 > **Detailed termination criteria are in `research_orchestration` protocol (Phase 6 & 7).**
-> Load it via: `load_protocol(['research_orchestration'], domain='product')`
+> Load it via: `load_protocol(protocol_names=['research_orchestration'], domain='product')`
 
 ### Quick Reference
 

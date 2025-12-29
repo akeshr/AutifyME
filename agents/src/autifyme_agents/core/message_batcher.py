@@ -104,8 +104,8 @@ class MessageBatcher:
         """
         # Media messages always debounce (common multi-image scenario)
         if message_type in MEDIA_TYPES:
-            logger.debug(
-                "Debouncing media message",
+            logger.info(
+                "BATCHER: Debounce=TRUE (media type always batches)",
                 extra={"sender_id": sender_id, "message_type": message_type},
             )
             return True
@@ -116,17 +116,25 @@ class MessageBatcher:
             has_recent = await self._storage.has_recent_activity(
                 sender_id, self._recent_window_seconds
             )
+            logger.info(
+                "BATCHER: Checked recent activity",
+                extra={"sender_id": sender_id, "has_recent": has_recent, "window_seconds": self._recent_window_seconds},
+            )
             if has_recent:
-                logger.debug(
-                    "Debouncing text message (recent activity detected)",
-                    extra={"sender_id": sender_id},
+                logger.info(
+                    "BATCHER: Debounce=TRUE (recent activity within window)",
+                    extra={"sender_id": sender_id, "window_seconds": self._recent_window_seconds},
                 )
                 return True
 
             has_pending = await self._storage.has_pending_messages(sender_id)
+            logger.info(
+                "BATCHER: Checked pending messages",
+                extra={"sender_id": sender_id, "has_pending": has_pending},
+            )
             if has_pending:
-                logger.debug(
-                    "Debouncing text message (pending messages exist)",
+                logger.info(
+                    "BATCHER: Debounce=TRUE (pending messages exist in DB)",
                     extra={"sender_id": sender_id},
                 )
                 return True
@@ -134,15 +142,15 @@ class MessageBatcher:
         except Exception:
             # Fail open: process immediately if DB check fails
             logger.warning(
-                "Smart Skip check failed, processing immediately",
+                "BATCHER: Smart Skip check FAILED, processing immediately (fail-open)",
                 exc_info=True,
                 extra={"sender_id": sender_id},
             )
             return False
 
         # Text message with no recent activity: process immediately
-        logger.debug(
-            "No debounce needed (text with no recent activity)",
+        logger.info(
+            "BATCHER: Debounce=FALSE (text with no recent activity, no pending)",
             extra={"sender_id": sender_id},
         )
         return False
@@ -220,6 +228,10 @@ class MessageBatcher:
         # Re-check loop: extend debounce if new messages arrive during sleep
         # Max iterations prevents infinite loop if messages keep arriving
         max_extensions = 5
+        logger.info(
+            "BATCHER: Starting debounce wait",
+            extra={"sender_id": sender_id, "debounce_seconds": self._debounce_seconds},
+        )
         for iteration in range(max_extensions + 1):
             await asyncio.sleep(self._debounce_seconds)
 
@@ -229,29 +241,37 @@ class MessageBatcher:
             )
 
             if has_recent and iteration < max_extensions:
-                logger.debug(
-                    "New activity during debounce, extending wait",
-                    extra={"sender_id": sender_id, "iteration": iteration + 1},
+                logger.info(
+                    "BATCHER: New activity during debounce, extending wait",
+                    extra={"sender_id": sender_id, "iteration": iteration + 1, "max_extensions": max_extensions},
                 )
                 continue
 
             # No new activity or max extensions reached
+            logger.info(
+                "BATCHER: Debounce wait complete",
+                extra={"sender_id": sender_id, "iterations": iteration + 1, "has_recent": has_recent},
+            )
             break
 
         # Check if there are still pending messages for this sender
         has_pending = await self._storage.has_pending_messages(sender_id)
         if not has_pending:
-            logger.debug(
-                "No pending messages after debounce (already processed)",
+            logger.info(
+                "BATCHER: No pending messages after debounce (already processed by another task)",
                 extra={"sender_id": sender_id},
             )
             return False
 
         # Atomic fetch-and-delete, then process
+        logger.info(
+            "BATCHER: Fetching batch atomically",
+            extra={"sender_id": sender_id},
+        )
         batch = await self._storage.fetch_and_clear_batch(sender_id)
         if not batch:
-            logger.debug(
-                "Batch was processed by another task",
+            logger.info(
+                "BATCHER: Batch was empty (race condition - another task processed)",
                 extra={"sender_id": sender_id},
             )
             return False
@@ -259,7 +279,7 @@ class MessageBatcher:
         # Safety limit
         if len(batch) > self._max_batch_size:
             logger.warning(
-                "Batch exceeds max size, truncating",
+                "BATCHER: Batch exceeds max size, truncating",
                 extra={
                     "sender_id": sender_id,
                     "batch_size": len(batch),
@@ -268,16 +288,24 @@ class MessageBatcher:
             )
             batch = batch[: self._max_batch_size]
 
+        # Log each message in the batch for traceability
+        message_ids = [m.get("message_id", "unknown") for m in batch]
         logger.info(
-            "Processing message batch after debounce",
+            "BATCHER: BATCH_PROCESSING_START - Triggering single workflow for batch",
             extra={
                 "sender_id": sender_id,
                 "batch_size": len(batch),
+                "message_ids": message_ids,
                 "message_types": [m.get("message_type") for m in batch],
             },
         )
 
         await runner.handle_message_batch(sender_id, batch)
+
+        logger.info(
+            "BATCHER: BATCH_PROCESSING_COMPLETE",
+            extra={"sender_id": sender_id, "batch_size": len(batch), "message_ids": message_ids},
+        )
         return True
 
     async def recover_orphaned_batches(self, runner: WorkflowRunner) -> int:

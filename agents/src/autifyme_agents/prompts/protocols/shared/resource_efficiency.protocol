@@ -207,12 +207,12 @@ RIGHT:
 
 ```
 WRONG:
-- load_protocol(names=["X"])
+- load_protocol(protocol_names=["X"])
 - [Work]
-- load_protocol(names=["X"])  # Already loaded!
+- load_protocol(protocol_names=["X"])  # Already loaded!
 
 RIGHT:
-- load_protocol(names=["X", "Y", "Z"])  # All needed upfront
+- load_protocol(protocol_names=["X", "Y", "Z"])  # All needed upfront
 - [Reference throughout, no re-load]
 ```
 

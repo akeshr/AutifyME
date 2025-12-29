@@ -38,14 +38,29 @@ Without protocols, you lack:
 |---------------------|--------------------------------------------------------|
 | view_image | `view_image` |
 
-| Shared Protocol | Contains |
-|-----------------|----------|
+| Shared Protocols (omit domain - auto-resolves to shared/) | Contains |
+|----------------------------------------------------------|----------|
 | `resource_efficiency` | Token discipline, batching, STOP conditions |
 | `input_validation` | Verify inputs before executing, file reference handling, missing context detection |
 
 **ALWAYS include `resource_efficiency` and `input_validation` in your protocol load.**
 
-**Example - Catalog Analysis:** visual_analysis (catalog) + view_image + shared protocols
+### Loading Example - Catalog Domain Analysis
+
+**Step 1: Domain protocol (MUST use domain='catalog')**
+```
+load_protocol(protocol_names=['visual_analysis'], domain='catalog')
+```
+
+**Step 2: Tool + Shared protocols (omit domain - auto-resolves)**
+```
+load_protocol(protocol_names=['view_image', 'resource_efficiency', 'input_validation'])
+```
+
+**Resolution Rules:**
+- **Catalog protocols** (visual_analysis): MUST use `domain='catalog'`
+- **Tool protocols** (view_image): Omit domain - auto-resolves to `shared/tool_mastery/`
+- **Shared protocols** (resource_efficiency, input_validation): Omit domain - auto-resolves to `shared/`
 
 **Protocol content is AUTHORITATIVE INSTRUCTION.** Follow the focus areas and output structure exactly - they ensure you capture what downstream agents need.
 

@@ -71,14 +71,30 @@ Without protocols, you lack domain grounding. You will make wrong decisions abou
 | inspect_schema | `inspect_schema`, `schema_discovery` |
 | view_image | `view_image` |
 
-| Shared Protocol | Contains |
-|-----------------|----------|
+| Shared Protocols (omit domain - auto-resolves to shared/) | Contains |
+|----------------------------------------------------------|----------|
 | `resource_efficiency` | Token discipline, batching, STOP conditions |
 | `input_validation` | Verify inputs before executing, file reference handling, missing context detection |
+| `hitl` | HITL feedback handling (load on `[HITL_FEEDBACK]` marker) |
 
 **ALWAYS include `resource_efficiency` and `input_validation` in your protocol load.**
 
-**Example - Product Creation:** business_context, family_fit, duplicate_prevention, pricing (catalog) + read_data, write_data, schema_discovery + shared protocols
+### Loading Example - Product Creation
+
+**Step 1: Domain protocols (MUST use domain='catalog')**
+```
+load_protocol(protocol_names=['business_context', 'family_fit', 'duplicate_prevention', 'pricing', 'attribute_extraction'], domain='catalog')
+```
+
+**Step 2: Tool + Shared protocols (omit domain - auto-resolves)**
+```
+load_protocol(protocol_names=['read_data', 'write_data', 'schema_discovery', 'resource_efficiency', 'input_validation'])
+```
+
+**Resolution Rules:**
+- **Catalog protocols** (business_context, family_fit, pricing, etc.): MUST use `domain='catalog'`
+- **Tool protocols** (read_data, write_data, etc.): Omit domain - auto-resolves to `shared/tool_mastery/`
+- **Shared protocols** (resource_efficiency, input_validation, hitl): Omit domain - auto-resolves to `shared/`
 
 **Protocol content is AUTHORITATIVE INSTRUCTION.** Follow the steps exactly - they ground your reasoning in validated domain patterns and prevent hallucination.
 

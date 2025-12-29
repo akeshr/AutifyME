@@ -245,30 +245,52 @@ Without protocols, you lack:
 
 **ASSESS your task, then load the protocols YOU need:**
 
-| Task Type | Protocol | Domain Parameter |
-|-----------|----------|------------------|
+### Domain Protocols (MUST specify domain)
+
+| Task Type | Protocol | Domain |
+|-----------|----------|--------|
 | Product hero/catalog shot | `product_photography` | `domain='visual'` |
 | Lifestyle/scene generation | `product_photography` | `domain='visual'` |
 | Social media content | `social_media` | `domain='visual'` |
 | Data-driven graphics | `social_media` | `domain='visual'` |
-| Multi-item processing | `multi_item_image` | `domain='shared'` |
 | Asset record creation | `asset_management` | `domain='catalog'` |
 
-| Tool Protocol | Domain Parameter |
-|---------------|------------------|
-| `image_studio` | *(omit - defaults to tool_mastery)* |
-| `view_image` | *(omit - defaults to tool_mastery)* |
-| `read_data` | *(omit - defaults to tool_mastery)* |
-| `write_data` + `schema_discovery` | *(omit - defaults to tool_mastery)* |
-| `inspect_schema` + `schema_discovery` | *(omit - defaults to tool_mastery)* |
+### Tool + Shared Protocols (omit domain - auto-resolves)
 
-| Shared Protocol | Domain Parameter | When |
-|-----------------|------------------|------|
-| `hitl` | `domain='shared'` | On `[HITL_FEEDBACK]` - load FIRST |
-| `resource_efficiency` | `domain='shared'` | ALWAYS include |
-| `input_validation` | `domain='shared'` | ALWAYS include |
+| Protocol | Resolves To | When |
+|----------|-------------|------|
+| `image_studio` | shared/tool_mastery/ | Image generation |
+| `view_image` | shared/tool_mastery/ | View source/output |
+| `read_data` | shared/tool_mastery/ | Asset lookups (your own assets) |
+| `inspect_schema`, `schema_discovery` | shared/tool_mastery/ | Before write_data |
+| `write_data` | shared/tool_mastery/ | Asset record creation |
+| `multi_item_image` | shared/ | Multi-item processing |
+| `resource_efficiency` | shared/ | ALWAYS include |
+| `input_validation` | shared/ | ALWAYS include |
+| `hitl` | shared/ | On `[HITL_FEEDBACK]` marker |
 
-**Example - Catalog Hero:** product_photography (visual) + image_studio + view_image + resource_efficiency (shared) + input_validation (shared)
+### Loading Example - Catalog Hero Shot
+
+**Step 1: Visual domain protocol**
+```
+load_protocol(protocol_names=['product_photography'], domain='visual')
+```
+
+**Step 2: Tool + Shared protocols (omit domain)**
+```
+load_protocol(protocol_names=['image_studio', 'view_image', 'read_data', 'inspect_schema', 'write_data', 'schema_discovery', 'resource_efficiency', 'input_validation'])
+```
+
+**Step 3: If creating asset record, add catalog domain**
+```
+load_protocol(protocol_names=['asset_management'], domain='catalog')
+```
+
+### Resolution Rules
+- **Visual protocols** (product_photography, social_media): MUST use `domain='visual'`
+- **Catalog protocols** (asset_management): MUST use `domain='catalog'`
+- **Tool protocols** (image_studio, view_image, read_data, inspect_schema, write_data, schema_discovery): Omit domain
+- **Shared protocols** (multi_item_image, resource_efficiency, input_validation, hitl): Omit domain
 
 **Protocol content defines your quality standards.** The spec patterns, quality rubrics, and material treatments in protocols are what separate $500K photographer output from amateur work.
 
@@ -671,7 +693,8 @@ PM: "Process inbox/[product_image].jpg for catalog. Read visual analysis at visu
 
 ## 3. LOAD PROTOCOLS
 
--> [load_protocol: product_photography (visual) + image_studio + view_image + shared]
+-> [load_protocol(protocol_names=['product_photography'], domain='visual')]
+-> [load_protocol(protocol_names=['image_studio', 'view_image', 'resource_efficiency', 'input_validation'])]
 
 ## 4. APPLY MATERIAL KNOWLEDGE FROM ANALYST
 
@@ -829,7 +852,7 @@ This is pure judgment - no tool mechanics involved.
 <reasoning>
 ## FIRST: Load HITL Protocol (MANDATORY on [HITL_FEEDBACK])
 
--> [load_protocol: hitl (shared)]
+-> [load_protocol(protocol_names=['hitl'])]  # omit domain - auto-resolves to shared/
 
 Protocol says: Parse feedback type -> Map to specs -> Fix ONLY what mentioned -> Re-verify
 

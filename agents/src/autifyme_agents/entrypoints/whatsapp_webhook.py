@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -427,11 +428,48 @@ async def receive(
                     msg_type = message.get("type")
                     timestamp = message.get("timestamp")
 
+                    # Generate trace ID for this message's journey through the system
+                    trace_id = f"trace_{uuid.uuid4().hex[:8]}"
+
+                    # Log raw message payload for debugging
+                    logger.info(
+                        f"TRACE[{trace_id}] RAW_PAYLOAD: WhatsApp message received",
+                        extra={
+                            "trace_id": trace_id,
+                            "raw_message": message,
+                            "message_id": message_id,
+                            "sender": sender,
+                            "msg_type": msg_type,
+                            "timestamp": timestamp,
+                            "message_keys": list(message.keys()),
+                            "event_path": str(event_path),
+                        },
+                    )
+
                     # Skip if essential fields are missing
                     if not message_id or not sender:
                         logger.warning(
-                            "Skipping message with missing id or sender",
-                            extra={"whatsapp_message": message, "event_path": str(event_path)},
+                            f"TRACE[{trace_id}] SKIP: Missing id or sender",
+                            extra={"trace_id": trace_id, "whatsapp_message": message, "event_path": str(event_path)},
+                        )
+                        continue
+
+                    # Validate message type is supported
+                    # WhatsApp sends "unsupported" for message types not enabled on the account
+                    # (stickers, locations, contacts, reactions, etc.)
+                    SUPPORTED_MESSAGE_TYPES = {"text", "image", "video", "document", "audio", "voice"}
+                    if msg_type not in SUPPORTED_MESSAGE_TYPES:
+                        logger.warning(
+                            f"TRACE[{trace_id}] SKIP: Unsupported message type '{msg_type}'",
+                            extra={
+                                "trace_id": trace_id,
+                                "msg_type": msg_type,
+                                "supported_types": list(SUPPORTED_MESSAGE_TYPES),
+                                "raw_message": message,
+                                "message_id": message_id,
+                                "sender": sender,
+                                "event_path": str(event_path),
+                            },
                         )
                         continue
 
@@ -440,6 +478,10 @@ async def receive(
                     # process the same message multiple times. Uses database to survive restarts.
                     # Storage adapter handles atomic check-and-mark via port (no concrete adapter leakage)
                     thread_id = runner.channel.format_thread_id(sender)
+                    logger.info(
+                        f"TRACE[{trace_id}] IDEMPOTENCY_CHECK: Checking duplicate for message_id",
+                        extra={"trace_id": trace_id, "message_id": message_id, "thread_id": thread_id, "sender": sender},
+                    )
                     if storage.check_and_mark_message_processed(
                         message_id=message_id,
                         sender_id=sender,
@@ -447,10 +489,14 @@ async def receive(
                         received_at=datetime.fromtimestamp(int(timestamp)),
                     ):
                         logger.info(
-                            "Skipping duplicate message (DB idempotency)",
-                            extra={"message_id": message_id, "sender": sender, "event_path": str(event_path)},
+                            f"TRACE[{trace_id}] SKIP: Duplicate message (already processed)",
+                            extra={"trace_id": trace_id, "message_id": message_id, "sender": sender, "event_path": str(event_path)},
                         )
                         continue
+                    logger.info(
+                        f"TRACE[{trace_id}] IDEMPOTENCY_CHECK: New message, marked as processing",
+                        extra={"trace_id": trace_id, "message_id": message_id},
+                    )
 
                     # Extract text and media based on message type
                     # WhatsApp API structure varies by type:
@@ -522,7 +568,24 @@ async def receive(
                     received_at = datetime.fromtimestamp(int(timestamp))
 
                     # Check if message should be debounced
+                    logger.info(
+                        f"TRACE[{trace_id}] DEBOUNCE_CHECK: Evaluating batch vs immediate",
+                        extra={"trace_id": trace_id, "message_id": message_id, "msg_type": msg_type, "sender": sender},
+                    )
                     should_batch = await batcher.should_debounce(sender, msg_type or "text")
+                    debounce_reason = "media" if msg_type in ("image", "video", "document", "audio", "voice") else "recent_activity_or_pending"
+
+                    logger.info(
+                        f"TRACE[{trace_id}] DEBOUNCE_DECISION: {'BATCH' if should_batch else 'IMMEDIATE'}",
+                        extra={
+                            "trace_id": trace_id,
+                            "message_id": message_id,
+                            "should_batch": should_batch,
+                            "debounce_reason": debounce_reason if should_batch else "no_recent_activity",
+                            "msg_type": msg_type,
+                            "sender": sender,
+                        },
+                    )
 
                     if should_batch:
                         # Queue for batch processing
@@ -539,18 +602,23 @@ async def receive(
                             runner=runner,
                         )
                         logger.info(
-                            "Message queued for batch processing",
+                            f"TRACE[{trace_id}] QUEUED: Message added to pending_messages DB",
                             extra={
+                                "trace_id": trace_id,
                                 "message_id": message_id,
                                 "sender": sender,
                                 "message_type": msg_type,
-                                "debounce_reason": "media" if msg_type in ("image", "video", "document", "audio", "voice") else "recent_activity",
+                                "thread_id": thread_id,
                             }
                         )
 
                         # Each message starts a delayed processing task
                         # Task waits debounce window (3s), then processes if messages still pending
                         # Multiple concurrent tasks are safe - atomic fetch_and_clear ensures only one processes
+                        logger.info(
+                            f"TRACE[{trace_id}] BATCH_TASK_STARTED: Background task for delayed processing",
+                            extra={"trace_id": trace_id, "message_id": message_id, "sender": sender},
+                        )
                         background_tasks.add_task(
                             _process_batch_after_delay,
                             batcher=batcher,
@@ -559,6 +627,10 @@ async def receive(
                         )
                     else:
                         # Process immediately (text-only, no recent activity)
+                        logger.info(
+                            f"TRACE[{trace_id}] IMMEDIATE_TASK_STARTED: Background task for workflow",
+                            extra={"trace_id": trace_id, "message_id": message_id, "sender": sender},
+                        )
                         background_tasks.add_task(
                             _process_message_async,
                             runner=runner,
@@ -568,14 +640,6 @@ async def receive(
                             sender_name=sender_name,
                             message_id=message_id,
                             event_path=event_path,
-                        )
-                        logger.info(
-                            "Message scheduled for immediate processing",
-                            extra={
-                                "message_id": message_id,
-                                "sender": sender,
-                                "message_type": msg_type,
-                            }
                         )
 
         return {"status": "processed"}

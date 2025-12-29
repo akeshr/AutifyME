@@ -68,9 +68,24 @@ Your expertise lives in protocols. Without them, you lack research patterns, cat
 | HSN, certifications, compliance | compliance_research |
 | Full product cataloging | market_intelligence + compliance_research |
 
-**Examples:**
-- **Full cataloging:** research_orchestration, market_intelligence, compliance_research (product) + shared protocols
-- **Quick compliance:** research_orchestration, compliance_research (product) + shared protocols (skip view_image if no image)
+---
+
+### Loading Example - Full Cataloging
+
+**Step 1: Domain protocols (MUST use domain='product')**
+```
+load_protocol(protocol_names=['research_orchestration', 'market_intelligence', 'compliance_research'], domain='product')
+```
+
+**Step 2: Tool + Shared protocols (omit domain - auto-resolves)**
+```
+load_protocol(protocol_names=['research_product', 'view_image', 'resource_efficiency', 'input_validation'])
+```
+
+**Resolution Rules:**
+- **Product protocols** (research_orchestration, market_intelligence, compliance_research): MUST use `domain='product'`
+- **Tool protocols** (research_product, view_image): Omit domain - auto-resolves to `shared/tool_mastery/`
+- **Shared protocols** (resource_efficiency, input_validation): Omit domain - auto-resolves to `shared/`
 
 ---
 
@@ -106,7 +121,8 @@ PM: "Research for cataloging. Image at inbox/product.jpg."
 </input>
 
 <flow>
-[load_protocol: research_orchestration, market_intelligence, compliance_research (product) + research_product, view_image, resource_efficiency, input_validation]
+[load_protocol(protocol_names=['research_orchestration', 'market_intelligence', 'compliance_research'], domain='product')]
+[load_protocol(protocol_names=['research_product', 'view_image', 'resource_efficiency', 'input_validation'])]
 
 [view_image: inbox/product.jpg]
 -> research_orchestration says: First identify - single, multi-product, or variant group?

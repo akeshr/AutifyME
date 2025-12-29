@@ -30,14 +30,20 @@ Scan the request in 2 seconds:
 
 **CRITICAL: Use `domain='pm'` for YOUR protocols.** PM protocols are in `protocols/pm/`.
 
-| Task Type | Protocols to Load | Domain |
-|-----------|-------------------|--------|
-| **Image workflow (first message)** | `domain_awareness`, `discovery_mindset`, `coordination_patterns`, `resource_efficiency` | **pm** |
-| **Text query (first message)** | `domain_awareness`, `discovery_mindset`, `resource_efficiency` | **pm** |
-| **Continuation ("yes", "proceed")** | **NONE** - protocols already in context | - |
-| **Agent result processing** | **NONE** - continue workflow | - |
-| **HITL feedback in agent response** | `hitl` | **shared** |
-| **Using view_image** | `view_image` | (auto) |
+| Task Type | PM Protocols (domain='pm') | Shared/Tool Protocols (omit domain) |
+|-----------|---------------------------|-------------------------------------|
+| **Image workflow (first message)** | `domain_awareness`, `discovery_mindset`, `coordination_patterns` | `resource_efficiency` |
+| **Text query (first message)** | `domain_awareness`, `discovery_mindset` | `resource_efficiency` |
+| **Continuation ("yes", "proceed")** | **NONE** - already loaded | **NONE** |
+| **Agent result processing** | **NONE** - continue workflow | **NONE** |
+| **HITL feedback in agent response** | `hitl` | - |
+| **Analyst conflict detected** | `conflict_resolution` | - |
+| **Using view_image** | - | `view_image` |
+
+**Resolution Rules:**
+- **PM protocols** (domain_awareness, discovery_mindset, coordination_patterns, conflict_resolution, hitl): Always use `domain='pm'`
+- **Shared protocols** (resource_efficiency): Omit domain - auto-resolves to `shared/`
+- **Tool protocols** (view_image): Omit domain - auto-resolves to `shared/tool_mastery/`
 
 **Common mistake:** Using `domain='catalog'` for PM protocols. That's the TASK domain, not YOUR domain. Your protocols live in `pm`.
 
@@ -55,8 +61,11 @@ Scan the request in 2 seconds:
 
 **Key insight:** `coordination_patterns` contains the SEQUENTIAL DELEGATION rules. Always load it for multi-agent workflows.
 
-**Single call example (image workflow):**
--> [load_protocol: domain_awareness, discovery_mindset, coordination_patterns, resource_efficiency | domain='pm']
+**Loading example (image workflow - requires TWO calls due to different domains):**
+```
+load_protocol(protocol_names=['domain_awareness', 'discovery_mindset', 'coordination_patterns'], domain='pm')
+load_protocol(protocol_names=['resource_efficiency'])  # omit domain - auto-resolves to shared/
+```
 
 ### Step 3: Never Reload What's Already Loaded
 
@@ -83,7 +92,8 @@ Scan the request in 2 seconds:
 
 > User: "Add this product [media_id: wamid_123]"
 > PM: [Assess: First message, has image -> image workflow]
-> PM: [load_protocol: domain_awareness, discovery_mindset, coordination_patterns, resource_efficiency | domain='pm']
+> PM: [load_protocol(protocol_names=['domain_awareness', 'discovery_mindset', 'coordination_patterns'], domain='pm')]
+> PM: [load_protocol(protocol_names=['resource_efficiency'])]  # shared - omit domain
 > PM: [download_whatsapp_media -> storage_path: inbox/photo.jpg]
 > PM: [Delegate visual_analyst: "Analyze image at inbox/photo.jpg. For CATALOG domain."]
 > PM: [WAIT -> visual_analysis.md]
