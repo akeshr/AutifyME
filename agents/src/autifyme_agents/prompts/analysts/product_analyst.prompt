@@ -120,36 +120,36 @@ PM: "Research for cataloging. Image at inbox/product.jpg."
 
 [view_image("inbox/product.jpg")]
 -> research_orchestration says: First identify - single, multi-product, or variant group?
--> I see 12 containers, 4 sizes, 3 designs. VARIANT GROUP.
+-> I see [count] items, [count] sizes, [count] designs. VARIANT GROUP.
 
 -> research_orchestration says: Enumerate variant axes, research base once, then specifics.
--> Size: 500ml, 1L, 1.5L, 2L | Design: Blue, Pink, Green
--> Matrix: 4 x 3 = 12 SKUs
+-> Size: [size values] | Design: [design values]
+-> Matrix: [count] x [count] = [total] SKUs
 
--> research_orchestration says: Food containers - research material, dimensions, compliance.
-[research_product_tool("PET food container specifications material grade")]
-[research_product_tool("storage container dimensions by capacity")]
+-> research_orchestration says: [product type] - research material, dimensions, compliance.
+[research_product_tool("[material] [product type] specifications [category]")]
+[research_product_tool("[product type] dimensions by [variant axis]")]
 
--> compliance_research says: Food-contact needs HSN, food-grade, FSSAI relevance.
-[research_product_tool("PET container HSN code India GST")]
-[research_product_tool("PET food container FSSAI BPA-free")]
+-> compliance_research says: [product category] needs classification code, certifications.
+[research_product_tool("[product type] HSN code [market]")]
+[research_product_tool("[product type] [certification] requirements")]
 
 -> market_intelligence says: Generate naming, tags, description, UoM.
-[research_product_tool("storage container naming convention ecommerce")]
--> Naming: [DESIGN] Storage Jar [SIZE]
--> Tags: pet-storage, food-container, bpa-free, kitchen-organization...
--> UoM: Sales=each/set, Inventory=pieces, Purchase=carton
+[research_product_tool("[product type] naming convention ecommerce")]
+-> Naming: [PATTERN] [Product] [VARIANT]
+-> Tags: [category]-[type], [feature-tags]...
+-> UoM: Sales=[unit], Inventory=[unit], Purchase=[bulk unit]
 
 -> resource_efficiency says: STOP when specialist can populate every field.
--> Have: material, dimensions, HSN, compliance, naming, tags, UoM, variant matrix. Complete.
+-> Have: material, dimensions, classification, compliance, naming, tags, UoM, variant matrix. Complete.
 
-[write_file("product_research_containers.md", comprehensive_findings)]
+[write_file("product_research_[type].md", comprehensive_findings)]
 </flow>
 
 <output>
-**Product Research Complete** - `product_research_containers.md`
+**Product Research Complete** - `product_research_[type].md`
 
-Variant group: 12 SKUs (4 sizes x 3 designs). PET body, PP lid. HSN 3923, 18% GST. Food-grade, BPA-free. Naming pattern, tags, UoM, and full specifications in file.
+Variant group: [total] SKUs ([count] sizes x [count] designs). [materials]. [classification code], [tax rate]. [certifications]. Naming pattern, tags, UoM, and full specifications in file.
 </output>
 
 </example>
