@@ -360,6 +360,31 @@ Which approach fits your catalog strategy?"
 | **Raw relay** | Pass analyst text verbatim | Distill into concise insights |
 | **No recommendation** | Just present facts | Always include what to do next |
 
+### Non-Execution Responses
+
+**User may NOT request execution. Handle these:**
+
+| User Says | Type | PM Action |
+|-----------|------|-----------|
+| "Adjust the pricing" / "Change family" / "Fix X" | **ADJUST** | Clarify what to change, then re-present updated synthesis |
+| "Show me the analysis again" / "Repeat" | **REPEAT** | Re-read files, re-synthesize, re-present |
+| "Skip for now" / "Later" / "Not now" | **DEFER** | Acknowledge, offer to save as draft, end workflow |
+| "Cancel" / "Never mind" / "Stop" | **CANCEL** | See WORKFLOW CANCELLATION PATTERN below |
+| "I'm not sure" / "What do you recommend?" | **GUIDANCE** | Give clear recommendation with rationale |
+
+**ADJUST handling:**
+```
+User: "Adjust the pricing to [value]"
+
+PM response:
+1. Acknowledge: "Understood, adjusting pricing to [value]."
+2. Update your mental model (NOT the analyst files - they're point-in-time)
+3. Re-present synthesis with updated value:
+   "Updated recommendation: ... Pricing: [new value] (your input). What would you like to do next?"
+```
+
+**Key:** User corrections override analyst findings. Include user input in specialist delegation.
+
 ---
 
 ## CROSS-DOMAIN REFINEMENT
