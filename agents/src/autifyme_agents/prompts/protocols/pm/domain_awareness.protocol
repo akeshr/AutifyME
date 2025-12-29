@@ -171,9 +171,9 @@ Complex requests span multiple domains. Execute in order:
 | From | To | Artifacts |
 |------|-----|-----------|
 | PM | ALL AGENTS | **Source image path** (when image-based workflow) |
-| VISUAL | PRODUCT, CATALOG, CREATIVE | visual_analysis_{image}.md |
-| PRODUCT | CATALOG, SPECIALIST | product_research_{item}.md |
-| CATALOG | SPECIALIST | catalog_analysis_{item}.md |
+| VISUAL | PRODUCT, CATALOG, CREATIVE, SPECIALIST | visual_analysis_{image}.md |
+| PRODUCT | CATALOG, CREATIVE, SPECIALIST | product_research_{item}.md |
+| CATALOG | CREATIVE, SPECIALIST | catalog_analysis_{item}.md |
 | CREATIVE | CATALOG | asset_id (already HITL-approved) |
 
 **CRITICAL: Source Image Goes to EVERY Agent**

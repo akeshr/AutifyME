@@ -727,10 +727,14 @@ Standalone - no asset record needed."
 
 ```
 "Create catalog hero shot for [product].
-Read visual analysis at: [visual_analysis_file]
 Source image at: [source_image_path]
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
 For CATALOG domain."
 ```
+
+**Why all files?** Creative needs product research for accurate naming (HSN, brand, specs) and catalog analysis for variant structure and family context.
 
 ### PM Delegation Template (To Catalog - After Creative)
 
@@ -761,8 +765,10 @@ For CATALOG domain. Create product without asset link."
 
 ```
 "Create catalog hero shot for [product].
-Read visual analysis at: [visual_analysis_file]
 Source image at: [source_image_path]
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
 
 Link to existing product: [product_id]
 

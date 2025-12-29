@@ -61,6 +61,8 @@ Without protocols, you lack domain grounding. You will make wrong decisions abou
 | "Create product..." + "No asset yet" | Product Only | Create product, skip product_assets |
 | "Link asset to product" + both IDs | Link Only | Create product_assets junction only |
 
+**Error handling:** If junction write_data fails with FK constraint (asset doesn't exist), escalate to PM: "Asset [asset_id] not found. Cannot link to product."
+
 | If Using These Tools | Load These (no domain - auto-resolves to tool_mastery) |
 |---------------------|--------------------------------------------------------|
 | read_data | `read_data` |

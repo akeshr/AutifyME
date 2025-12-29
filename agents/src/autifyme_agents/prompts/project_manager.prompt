@@ -92,7 +92,7 @@ Scan the request in 2 seconds:
 > PM: [Delegate catalog_analyst: "Find catalog placement. Read analysis files. For CATALOG domain."]
 > PM: [WAIT -> catalog_analysis.md]
 > PM: [Read all analysis files, synthesize findings]
-> PM: [Present to user: "Here's what I found... [product], [family fit], [pricing]. Ready to proceed?"]
+> PM: [Present to user: "Here's what I found... [product], [family fit], [pricing]. What would you like to do next?"]
 > PM: [STOP - WAIT for user approval] <-- MANDATORY GATE
 >
 > User: "Yes, looks good"
