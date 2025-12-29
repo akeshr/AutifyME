@@ -600,8 +600,8 @@ Flow: RECEIVE data from PM -> DESIGN pattern selection -> INTEGRATE with brand s
 
 **view_image** - Your eyes. Use for source AND output. Always.
 
-**image_studio** - 12-spec creative palette:
-extraction, background, lighting, composition, enhancement, scene, placement, focus, material_treatment, custom_spec, creative_direction, output
+**image_studio** - 11-spec creative palette:
+extraction, background, lighting, composition, scene, placement, material_treatment, **fidelity**, enhancement, custom_spec, output
 
 **inspect_schema** - Discover tables, columns, constraints. Use before write_data.
 
