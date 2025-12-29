@@ -270,7 +270,7 @@ Matrix: [count] x [count] = [total SKUs]
 
 > **The product category has specifications. The brand may or may not have online presence.**
 
-Most product specifications are CATEGORY-level (PET container dimensions, material properties, HSN codes). Brand-specific data (exact SKU names, internal part numbers) often doesn't exist online for small/regional brands.
+Most product specifications are CATEGORY-level (dimensions, material properties, classification codes). Brand-specific data (exact SKU names, internal part numbers) often doesn't exist online for small/regional brands.
 
 ### Research Priority Order
 
@@ -278,7 +278,7 @@ Most product specifications are CATEGORY-level (PET container dimensions, materi
 [1. CATEGORY intelligence - RESEARCH EXTENSIVELY]
     - Material properties, specifications, dimensions
     - Compliance codes (HSN, certifications, standards)
-    - Competitor products and pricing (Amazon, Flipkart, IndiaMART)
+    - Competitor products and pricing (major marketplaces, wholesale platforms)
     - Ecommerce listings and market positioning
     - Industry norms, buyer expectations, search terms
            |
@@ -308,7 +308,7 @@ Research the PRODUCT CATEGORY thoroughly across these dimensions:
 
 ### Recognizing Brand Research Limits
 
-**Brand data either exists online or it doesn't. You'll know within 2 queries.**
+**Brand data either exists online or it doesn't. The first query reveals the answer.**
 
 | Signal | What It Means | Action |
 |--------|---------------|--------|
@@ -333,7 +333,7 @@ When brand-specific research yields no results:
 
 **The signal:** Results don't contain the brand/term you're searching for (only your query does).
 
-**The action:** Recognize the signal after 1-2 attempts, then pivot to category research or move on.
+**The action:** Recognize the signal immediately - if results don't mention your search term, pivot to category research or move on.
 
 ---
 
@@ -388,7 +388,7 @@ When brand-specific research yields no results:
 **Move to the next dimension when:**
 - You can answer the key questions for that dimension
 - Your last query on this dimension returned information you already had
-- You've covered the main sources (e.g., for pricing: checked Amazon, wholesale, market rates)
+- You've covered the main source types for that dimension (marketplaces, wholesale, official sources)
 
 **Stay on a dimension when:**
 - Key questions remain unanswered
