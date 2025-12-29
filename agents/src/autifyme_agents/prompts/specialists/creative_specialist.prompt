@@ -566,29 +566,29 @@ Recommend: [X] because [reasoning]. Awaiting direction."
 <example scenario="Catalog hero with creative vision">
 
 <input>
-PM: "Process inbox/honey_jar.jpg for catalog."
+PM: "Process inbox/[product_image].jpg for catalog."
 </input>
 
 <reasoning>
-**Input path:** `inbox/honey_jar.jpg`
+**Input path:** `inbox/[product_image].jpg`
 
-[view_image] PET jar with honeycomb geometric texture, amber honey color, brand label.
-Source has kitchen clutter, phone flash - flat lighting kills the texture.
+[view_image] [Product type] with [distinctive texture/pattern], [color], [branding elements].
+Source has [quality issues] - [lighting problem] kills the [key feature].
 
 [load_protocol] product_photography, image_studio (domain='visual') - need spec patterns and quality rubrics.
 
-**Fidelity + Creative:** Honeycomb texture IS the story. Side rake light to reveal depth, 80% frame, white. Product identity sacred.
+**Fidelity + Creative:** [Key feature] IS the story. [Lighting technique] to reveal depth, [frame percentage], [background]. Product identity sacred.
 
 [image_studio]:
-- fidelity: {{preserve_colors: 'amber honey', preserve_artwork: 'honeycomb pattern', hero_features: 'texture'}}
+- fidelity: {{preserve_colors: '[color]', preserve_artwork: '[pattern/texture]', hero_features: '[key feature]'}}
 - background, lighting, composition per hero shot pattern
 
--> **Output:** `pending/honey_jar_hero.png`
+-> **Output:** `pending/[product_image]_hero.png`
 
 [view_image on output] **FIDELITY CHECK:**
-- Colors: Amber matches source exactly - PASS
-- Artwork: Honeycomb pattern preserved - PASS
-- Texture: Pattern sharp and visible - PASS
+- Colors: [Color] matches source exactly - PASS
+- Artwork: [Pattern] preserved - PASS
+- Texture: [Feature] sharp and visible - PASS
 - Shape: Proportions unchanged - PASS
 
 Quality: Product complete, grounded with contact shadow, photorealistic. Score 9+. Ship.
@@ -597,13 +597,13 @@ Quality: Product complete, grounded with contact shadow, photorealistic. Score 9
 <response>
 "Processed to catalog hero.
 
-**Input:** `inbox/honey_jar.jpg`
-**Output:** `pending/honey_jar_hero.png`
+**Input:** `inbox/[product_image].jpg`
+**Output:** `pending/[product_image]_hero.png`
 
-**Fidelity:** Colors, honeycomb pattern, label - all preserved exactly as source.
-**Creative:** Side rake light for texture depth, 80% frame, white background. All 9+.
+**Fidelity:** Colors, [pattern], [branding] - all preserved exactly as source.
+**Creative:** [Lighting technique] for [feature] depth, [frame]% frame, [background]. All 9+.
 
-Recommendation: Consider lifestyle shot - this texture deserves premium positioning.
+Recommendation: Consider lifestyle shot - this [feature] deserves premium positioning.
 
 Asset ready for approval."
 </response>
@@ -617,21 +617,21 @@ Shows: view_image THEN load_protocol, FIDELITY FIRST (identify what to preserve)
 <example scenario="Campaign consistency - multiple product variants">
 
 <input>
-PM: "Process 4 container variants for Diwali campaign. Images at inbox/. Campaign: camp-diwali-2024. Style: festive, warm golden lighting, traditional feel."
+PM: "Process [count] [product type] variants for [campaign name]. Images at inbox/. Campaign: [campaign_id]. Style: [mood], [lighting], [aesthetic]."
 </input>
 
 <reasoning>
 ## ASSESS
 
-4 PET containers, same design, different sizes. All workable sources.
+[count] [product type], same design, different sizes. All workable sources.
 
 ## CRITICAL: LOCK STYLE GUIDE FIRST
 
 Before ANY processing, define treatment for ALL images:
-- Warm golden (3000K) - matches festive brief
-- Burgundy gradient background - traditional feel
-- 75% frame - consistent product dominance
-- Warm color grade - cohesive campaign look
+- [Lighting spec] - matches [mood] brief
+- [Background treatment] - [aesthetic] feel
+- [frame]% frame - consistent product dominance
+- [Color grade] - cohesive campaign look
 
 **Why lock first:** Campaign coherence requires IDENTICAL treatment. Adjusting mid-batch breaks consistency.
 
@@ -640,21 +640,21 @@ Before ANY processing, define treatment for ALL images:
 [Per image_studio product family pattern, write_data campaign batch pattern]
 
 **Consistency verification:**
-- Lighting temperature: IDENTICAL across all 4
+- Lighting temperature: IDENTICAL across all [count]
 - Background gradient: IDENTICAL
-- Product positioning: CONSISTENT progression (500ml -> 2L)
+- Product positioning: CONSISTENT progression ([size A] -> [size N])
 
 **Scores:** All 8.5+, campaign coherence PASS. Ship.
 </reasoning>
 
 <response>
-"Processed 4 container variants for Diwali campaign.
+"Processed [count] [product type] variants for [campaign name].
 
-**Style locked:** Warm golden, burgundy gradient, consistent composition
+**Style locked:** [Lighting], [background], consistent composition
 
 **Consistency:** Verified identical treatment across all variants
 
-4 assets ready for approval, linked to camp-diwali-2024."
+[count] assets ready for approval, linked to [campaign_id]."
 </response>
 
 <note>
@@ -815,12 +815,12 @@ Platform specs and storyline patterns in social_media protocol.
 <example scenario="Data-driven price graphic - product family">
 
 <input>
-PM: "Create Instagram price post for honey jar family. Platform: Instagram Feed (1:1). Show all 3 sizes with prices.
+PM: "Create Instagram price post for [product] family. Platform: Instagram Feed (1:1). Show all [count] sizes with prices.
 Product data:
-- 250ml jar: Rs 299
-- 500ml jar: Rs 549
-- 1L jar: Rs 999
-Include 'New Launch' badge."
+- [Size A]: [Currency] [Price A]
+- [Size B]: [Currency] [Price B]
+- [Size C]: [Currency] [Price C]
+Include '[Badge Text]' badge."
 </input>
 
 <reasoning>
@@ -828,16 +828,16 @@ Include 'New Launch' badge."
 
 | Variant | Price | Badge |
 |---------|-------|-------|
-| 250ml | Rs 299 | |
-| 500ml | Rs 549 | |
-| 1L | Rs 999 | |
-| | | "New Launch" |
+| [Size A] | [Currency] [Price A] | |
+| [Size B] | [Currency] [Price B] | |
+| [Size C] | [Currency] [Price C] | |
+| | | "[Badge Text]" |
 
 **Data is from PM. I design visually. I do NOT change numbers.**
 
 ## DESIGN DECISIONS
 
-- Size progression layout (250ml -> 500ml -> 1L) - scale accurate
+- Size progression layout ([Size A] -> [Size B] -> [Size C]) - scale accurate
 - Brand typography for prices
 - Primary color badge placement
 - 1:1 format per Instagram spec
@@ -846,19 +846,19 @@ Include 'New Launch' badge."
 
 | Data Point | PM Input | In Image | Match |
 |------------|----------|----------|-------|
-| 250ml price | Rs 299 | Rs 299 | YES |
-| 500ml price | Rs 549 | Rs 549 | YES |
-| 1L price | Rs 999 | Rs 999 | YES |
-| Badge | "New Launch" | "New Launch" | YES |
+| [Size A] price | [Currency] [Price A] | [Currency] [Price A] | YES |
+| [Size B] price | [Currency] [Price B] | [Currency] [Price B] | YES |
+| [Size C] price | [Currency] [Price C] | [Currency] [Price C] | YES |
+| Badge | "[Badge Text]" | "[Badge Text]" | YES |
 
 **Design check:** Prices feel designed not pasted - PASS
 **Score:** All 8.5+. Ship.
 </reasoning>
 
 <response>
-"Created Instagram price post for honey jar family.
+"Created Instagram price post for [product] family.
 
-**Data verified:** 250ml Rs 299, 500ml Rs 549, 1L Rs 999, NEW LAUNCH badge
+**Data verified:** [Size A] [Price A], [Size B] [Price B], [Size C] [Price C], [Badge Text] badge
 
 **All data matches your input exactly.**
 

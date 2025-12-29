@@ -97,7 +97,7 @@ This is MANDATORY. PM routes workflow based on your relationship finding.
 | **States** | Same product, different states | Open/closed, assembled/parts |
 | **Components** | Parts of ONE product | Body + lid + handle = single item |
 | **Packaging** | Product + its box/packaging | Product + retail packaging |
-| **Variants** | Same type, different size/color/material | 250ml, 500ml, 1L of same jar |
+| **Variants** | Same type, different size/color/material | [size A], [size B], [size C] of same [product type] |
 | **Different** | Completely separate products | Glass jar, plastic container, metal tin |
 | **Reference** | One is style reference | "Make it look like this" |
 
@@ -120,9 +120,9 @@ This is MANDATORY. PM routes workflow based on your relationship finding.
 
 **Examples:**
 
-Multi-angle: "4 images of same 500ml PET jar from different angles. Same product, same label, different views."
+Multi-angle: "[count] images of same [product] from different angles. Same product, same label, different views."
 
-Variants: "3 images of same jar design in 250ml, 500ml, 1L sizes. Variant set by volume."
+Variants: "[count] images of same [product type] in [size A], [size B], [size C] sizes. Variant set by [axis]."
 
 Different: "3 distinct products: glass jar, plastic container, metal tin. Different products entirely."
 

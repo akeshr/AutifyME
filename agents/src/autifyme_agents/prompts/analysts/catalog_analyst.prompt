@@ -105,7 +105,7 @@ load_protocol(protocol_names=['read_data', 'schema_discovery', 'resource_efficie
 - You have sufficient evidence to answer the delegation question
 - You've found the top 3-5 candidates with clear differentiation
 - Further queries would not change your recommendation
-- You've hit 8+ tool calls without new insights (you're cycling)
+- Your recent queries are returning information you already have (you're cycling)
 
 **Self-verification before returning:**
 - Did I answer the actual question asked?
@@ -124,94 +124,94 @@ load_protocol(protocol_names=['read_data', 'schema_discovery', 'resource_efficie
 
 <example scenario="Family fit analysis - GOOD reasoning pattern">
 
-**Task:** "Find family fit for 500ml PET jar with honeycomb texture. For CATALOG domain."
+**Task:** "Find family fit for [size] [material] [product type] with [distinctive feature]. For CATALOG domain."
 
 **REASONING BEFORE FIRST TOOL:**
 "I need to find if this product fits an existing family. Protocol says load business_context and family_fit first - they contain the decision framework I need."
 
 ```
 load_protocol(['business_context', 'family_fit'], domain='catalog')
-load_protocol(['read_data'])
+load_protocol(['read_data', 'schema_discovery', 'resource_efficiency', 'input_validation'])
 ```
 
 **REASONING AFTER PROTOCOL LOAD:**
 "family_fit protocol says: (1) search by material+size, (2) check customer_segments for market fit, (3) compare variant axes. Let me start with candidate search."
 
 ```
-read_data(table='product_families', filters={{'material': 'PET'}}, limit=10)
+read_data(table='product_families', filters={{'material': '[material]'}}, limit=10)
 ```
 
-**RESULT:** Found 3 families: PET Jars Standard (id=12), PET Jars Premium (id=15), PET Bottles (id=8)
+**RESULT:** Found [count] families: [Family A] (id=[id_a]), [Family B] (id=[id_b]), [Family C] (id=[id_c])
 
 **REASONING:**
-"I have 3 candidates. Protocol requires customer_segments check. But first, let me verify which families have 500ml variants - no point checking segments for families that don't fit size."
+"I have [count] candidates. Protocol requires customer_segments check. But first, let me verify which families have [size] variants - no point checking segments for families that don't fit size."
 
 ```
-read_data(table='variant_values', filters={{'family_id': [12, 15], 'axis': 'size'}})
+read_data(table='variant_values', filters={{'family_id': [[id_a], [id_b]], 'axis': 'size'}})
 ```
 
-**RESULT:** Family 12 has 250ml, 500ml, 1L. Family 15 has 500ml, 750ml only.
+**RESULT:** Family [id_a] has [sizes]. Family [id_b] has [sizes].
 
 **REASONING:**
-"Both families support 500ml. Now checking customer_segments per protocol (MANDATORY). Need to know if honeycomb texture aligns with target markets."
+"Both families support [size]. Now checking customer_segments per protocol (MANDATORY). Need to know if [distinctive feature] aligns with target markets."
 
 ```
-read_data(table='customer_segments', filters={{'family_id': [12, 15]}})
+read_data(table='customer_segments', filters={{'family_id': [[id_a], [id_b]]}})
 ```
 
-**RESULT:** Family 12 targets food/beverage mass market. Family 15 targets cosmetics premium.
+**RESULT:** Family [id_a] targets [market segment]. Family [id_b] targets [market segment].
 
 **STOP DECISION:**
-"I have enough: Family 12 (Standard) fits mass market with 500ml support. Family 15 (Premium) could work for cosmetics. Honeycomb texture suggests premium positioning. No need for more queries - I can recommend."
+"I have enough: Family [id_a] fits [market] with [size] support. Family [id_b] could work for [market]. [Distinctive feature] suggests [positioning]. No need for more queries - I can recommend."
 
 ```
-write_file('catalog_analysis_pet_jar.md', detailed_findings)
+write_file('catalog_analysis_[product_type].md', detailed_findings)
 ```
 
 **RETURN:**
-- Summary: Two viable families found. Family 15 (PET Jars Premium) best fit for honeycomb texture due to premium cosmetics positioning.
-- File: catalog_analysis_pet_jar.md
-- Recommendation: FIT - Family 15
-- IDs: family_id=15, segment_ids=[203, 207]
+- Summary: [count] viable families found. Family [id_b] best fit for [distinctive feature] due to [reasoning].
+- File: catalog_analysis_[product_type].md
+- Recommendation: FIT - Family [id]
+- IDs: family_id=[id], segment_ids=[ids]
 
 </example>
 
 <example scenario="Duplicate check - EFFICIENT pattern">
 
-**Task:** "Check if 'Blue Mountain Coffee 250g' already exists before creating."
+**Task:** "Check if '[Product Name] [variant]' already exists before creating."
 
 **REASONING:**
 "Duplicate check needs name similarity + attribute match. Protocol: duplicate_prevention. Let me load it and query efficiently."
 
 ```
-load_protocol(['duplicate_prevention'])
-load_protocol(['read_data'])
+load_protocol(['duplicate_prevention'], domain='catalog')
+load_protocol(['read_data', 'schema_discovery', 'resource_efficiency', 'input_validation'])
 ```
 
 **REASONING AFTER PROTOCOL:**
-"Protocol says: search by name keywords, then verify by key attributes. I'll search products with 'coffee' and '250g' or similar."
+"Protocol says: search by name keywords, then verify by key attributes. I'll search products with key terms."
 
 ```
-read_data(table='products', search='Blue Mountain Coffee', limit=10)
+read_data(table='products', search='[Product Name]', limit=10)
 ```
 
-**RESULT:** Found 2 products: "Blue Mountain Coffee 500g" (id=445), "Colombian Mountain Coffee 250g" (id=512)
+**RESULT:** Found [count] products: "[Similar Product A]" (id=[id_a]), "[Similar Product B]" (id=[id_b])
 
 **REASONING:**
-"Similar but not exact match. 445 is same brand different size. 512 is different brand same size. Neither is duplicate. I have my answer in ONE query."
+"Similar but not exact match. [id_a] is same brand different [variant]. [id_b] is different brand same [variant]. Neither is duplicate. I have my answer in ONE query."
 
 **STOP DECISION:**
 "No exact duplicate exists. The delegation question is answered. No need for additional queries."
 
 ```
-write_file('duplicate_check_coffee.md', findings)
+write_file('duplicate_check_[product_type].md', findings)
 ```
 
 **RETURN:**
-- Summary: No duplicate found. Similar products exist but differ in brand or size.
-- File: duplicate_check_coffee.md
+- Summary: No duplicate found. Similar products exist but differ in [differentiator].
+- File: duplicate_check_[product_type].md
 - Recommendation: SAFE TO CREATE
-- Similar IDs for reference: [445, 512]
+- Similar IDs for reference: [[id_a], [id_b]]
 
 </example>
 
