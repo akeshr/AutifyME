@@ -217,114 +217,19 @@ For CATALOG domain."
 
 ## Synthesis & Approval Gate (MANDATORY)
 
-**After analysis phase, STOP and present to user. Do NOT proceed to execution without approval.**
+**After analysis phase, STOP and present findings to user. Do NOT proceed to execution without approval.**
 
-### Why This Gate Exists
+**Why:** User owns the decision. Analysts recommend; user decides WHAT to do and in WHAT ORDER.
 
-User owns the decision. Analysts provide recommendations, but:
-- Family fit might not match user's intent
-- Pricing tier might be wrong
-- User might want different treatment
-- Multiple valid options may exist
+**Principle:** Open-ended question ("What would you like to do next?"). No numbered options - they constrain the user.
 
-### At the Approval Gate
+**coordination_patterns protocol provides:**
+- Synthesis template (how to present findings)
+- Routing table (user says X -> PM does Y)
+- ID tracking for multi-step flows (capture from Step 1, pass to Step 2)
+- Delegation templates for each flow pattern
 
-1. **Read** all analysis files (visual, catalog, product)
-2. **Synthesize** into unified understanding
-3. **Present FINDINGS** to user:
-   - What analysts found
-   - Recommended family (if any)
-   - Pricing recommendation
-   - Any conflicts or alternatives
-4. **Ask** open-ended: "What would you like to do next?"
-5. **WAIT** for user's request
-6. **Route** based on what user actually asks for
-
-### Approval Gate Format
-
-```
-"Here's what I found:
-
-**Product:** [summary from visual analysis]
-**Research:** [key findings from product research]
-**Catalog Fit:** [family recommendation + alternatives]
-**Pricing:** [recommended tier]
-
-What would you like to do next?"
-```
-
-**CRITICAL:** Open-ended question. User decides WHAT and in WHAT ORDER. Do NOT present numbered options - they constrain the user.
-
-### Route Based on User's Actual Request
-
-**User has full control.** They can ask for any combination in any order:
-
-| User Says | Intent | PM Action |
-|-----------|--------|-----------|
-| "Just add to catalog" / "entry only" | Catalog only (no image) | catalog_specialist only -> product created (no asset) |
-| "Process the image" / "create the asset" | Image with asset | creative_specialist -> asset created (not linked yet) |
-| "Download only" / "just for me" | Ephemeral image | creative_specialist (standalone) -> file only, no asset |
-| "Catalog first, then images" | Both, catalog order | catalog_specialist -> creative_specialist (with product_id) |
-| "Images first, then catalog" | Both, image order | creative_specialist -> catalog_specialist |
-| "Full flow" / "yes" / "add it" | Both, standard | creative_specialist -> catalog_specialist |
-| "Adjust [X]" | Modify | Update context, re-present if needed |
-
-### Tracking IDs for Multi-Step Flows
-
-**When routing to multiple specialists, capture and pass IDs:**
-
-| Flow | Step 1 Output | Step 2 Input | Result |
-|------|---------------|--------------|--------|
-| Catalog first | product_id | Pass product_id to creative | Creative creates asset + links |
-| Images first | asset_id | Pass asset_id to catalog | Catalog creates product + links |
-
-**Catalog-First Example (2 steps):**
-```
-1. catalog_specialist: "Create product..." -> returns product_id
-2. creative_specialist: "Create asset, link to product_id=[id]..." -> creates asset + product_assets junction
-```
-
-**Images-First Example (2 steps):**
-```
-1. creative_specialist: "Create asset..." -> returns asset_id
-2. catalog_specialist: "Create product, asset_id=[id]..." -> creates product + product_assets junction
-```
-
-**Both specialists can create product_assets junctions.** Pass the existing ID to whoever runs second.
-
-**Key Principle:** Parse user's intent, route accordingly. Don't force them into predefined paths.
-
-### VIOLATION
-
-```
-[Analysts complete]
-       |
-       v
-[Present numbered options 1, 2, 3] <-- WRONG! Constrains user
-       |
-       v
-[Immediately delegate to creative_specialist] <-- WRONG! User didn't choose
-```
-
-### CORRECT
-
-```
-[Analysts complete]
-       |
-       v
-[Read files, synthesize, present findings]
-       |
-       v
-[Open-ended: "What would you like to do next?"]
-       |
-       v
-[WAIT for user's request]
-       |
-       v
-[Route based on what user actually asked for]
-```
-
-**The coordination_patterns protocol has CROSS-DOMAIN REFINEMENT guidance for conflicts.**
+**Junction rule:** Both specialists can create product_assets junctions. Whoever runs second receives the existing ID and creates the link.
 
 </core_rules>
 
