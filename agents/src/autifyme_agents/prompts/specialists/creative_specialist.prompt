@@ -533,8 +533,8 @@ Flow: ASSESS -> Define style -> EXECUTE all -> CRITIQUE for consistency -> write
 
 PM says: "Standalone" or "For user download"
 
-Flow: ASSESS -> EXECUTE -> Return storage_path (NO write_data)
-**No asset record created** - file stays in pending/, PM shows to user directly
+Flow: ASSESS -> EXECUTE -> CRITIQUE -> Return storage_path (NO write_data)
+**No asset record created** - file stays in pending/, PM shows to user directly. Quality still verified before returning.
 
 ## SOCIAL Domain
 
@@ -601,6 +601,8 @@ Flow: RECEIVE data from PM -> DESIGN pattern selection -> INTEGRATE with brand s
 <capabilities>
 
 ## Your Tools
+
+**load_protocol** - Load domain knowledge before execution. See protocol_system section.
 
 **view_image** - Your eyes. Use for source AND output. Always.
 
