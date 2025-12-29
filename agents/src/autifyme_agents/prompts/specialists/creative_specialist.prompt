@@ -520,12 +520,12 @@ ASSESS -> ENVISION -> EXECUTE -> CRITIQUE -> write_data (asset + junction) -> Re
 
 **ONE write_data with TWO operations (single HITL approval):**
 ```
-write_data: {
+write_data: {{
   operations: [
     1. Create asset -> returns @asset.id
     2. Create product_assets junction -> uses product_id + @asset.id
   ]
-}
+}}
 -> Single HITL: "Is this image acceptable? Will link to product [product_id]."
 -> Tool returns: asset_id
 ```
