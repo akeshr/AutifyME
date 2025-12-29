@@ -175,21 +175,21 @@ PM -> creative_specialist: "Standalone - no asset record"
 [DONE] File in pending/. No asset record. Cannot link to catalog.
 ```
 
-#### Flow D: Catalog First (3 steps)
+#### Flow D: Catalog First (2 steps)
 ```
 User: "Catalog first, then images"
 
-Step 1: PM -> catalog_specialist: Create product
+Step 1: PM -> catalog_specialist: Create product (no asset_id)
         <- Returns: product_id (CAPTURE THIS)
 
-Step 2: PM -> creative_specialist: Create asset
-        <- Returns: asset_id (CAPTURE THIS)
-
-Step 3: PM -> catalog_specialist: "Link asset [asset_id] to product [product_id]"
-        <- Returns: junction created
+Step 2: PM -> creative_specialist: Create asset, product_id=[product_id]
+        <- Creative creates asset + product_assets junction
+        <- Returns: asset_id
 
 [DONE] Product + Asset + Junction all exist.
 ```
+
+**Key:** Creative handles junction when given product_id (same pattern as campaign_assets).
 
 #### Flow E: Images First (standard)
 ```
@@ -204,14 +204,16 @@ Step 2: PM -> catalog_specialist: Create product, asset_id=[asset_id]
 [DONE] Product + Asset + Junction all exist.
 ```
 
-### ID Tracking (CRITICAL for Catalog-First)
+### ID Tracking (Both Flows are 2 Steps)
 
-**PM must capture and propagate IDs:**
+**PM captures from Step 1, passes to Step 2:**
 
-| Flow | Capture from Step 1 | Capture from Step 2 | Use in Step 3 |
-|------|---------------------|---------------------|---------------|
-| Catalog first | product_id | asset_id | Both -> catalog_specialist for linking |
-| Images first | asset_id | - | Pass asset_id to catalog_specialist |
+| Flow | Step 1 Returns | Pass to Step 2 | Step 2 Creates |
+|------|----------------|----------------|----------------|
+| Catalog first | product_id | product_id -> creative | Asset + junction |
+| Images first | asset_id | asset_id -> catalog | Product + junction |
+
+**Both specialists can create product_assets junctions.** Whoever runs second receives the existing ID and creates the junction.
 
 ### Why Sequential (Not Parallel) for Analysis
 
@@ -730,16 +732,19 @@ No asset yet - product entry only.
 For CATALOG domain. Create product without asset link."
 ```
 
-### PM Delegation Template (Link Asset to Existing Product)
+### PM Delegation Template (Creative with Product Linking)
 
 ```
-"Link asset to existing product.
+"Create catalog hero shot for [product].
+Read visual analysis at: [visual_analysis_file]
+Source image at: [source_image_path]
 
-Product already created: [product_id]
-Asset already created: [asset_id]
+Link to existing product: [product_id]
 
-For CATALOG domain. Create product_assets junction only."
+For CATALOG domain. Create asset and link to product."
 ```
+
+**Creative creates both asset record AND product_assets junction when product_id provided.**
 
 ### Two-Stage HITL (Intentional)
 

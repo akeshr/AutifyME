@@ -67,11 +67,16 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 
 ## ASSET OWNERSHIP (CRITICAL)
 
-| Entity | Owner | HITL Concern |
-|--------|-------|--------------|
-| Asset record | creative_specialist | "Is this image acceptable?" |
-| Product record | catalog_specialist | "Is this product data correct?" |
-| product_assets junction | catalog_specialist | Links existing asset to product |
+| Entity | Primary Owner | Can Also Create | HITL Concern |
+|--------|---------------|-----------------|--------------|
+| Asset record | creative_specialist | - | "Is this image acceptable?" |
+| Product record | catalog_specialist | - | "Is this product data correct?" |
+| product_assets junction | **Both** | Whoever runs second | Links asset to product |
+| campaign_assets junction | creative_specialist | - | Links asset to campaign |
+
+**Junction Rule:** Whoever runs SECOND creates the junction (they have the ID from step 1).
+- Catalog first -> Creative creates product_assets (receives product_id)
+- Images first -> Catalog creates product_assets (receives asset_id)
 
 **Two-Stage HITL:** Creative handles image quality. Catalog handles product data. Separated concerns.
 

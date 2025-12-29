@@ -252,6 +252,7 @@ Without protocols, you lack:
 | If Your Task Involves | Load These (domain='catalog') |
 |----------------------|-------------------------------|
 | Asset record creation | `asset_management` |
+| Asset + product linking (product_id provided) | `asset_management` - handles both assets and product_assets |
 
 | If Using These Tools | Load These (no domain - auto-resolves to tool_mastery) |
 |---------------------|--------------------------------------------------------|
@@ -482,6 +483,30 @@ PM says: "Process for catalog" or "For CATALOG domain"
 
 Flow: ASSESS -> ENVISION -> EXECUTE -> CRITIQUE -> write_data -> Return asset_id
 **Asset fields:** purpose=PRODUCT, category=HERO (or LIFESTYLE if lifestyle shot)
+
+### Product Linking (When product_id provided)
+
+**If PM provides product_id, YOU create the product_assets junction:**
+
+| PM Provides | You Create | Rationale |
+|-------------|------------|-----------|
+| No product_id | Asset only | Product doesn't exist yet, catalog_specialist will link later |
+| product_id | Asset + product_assets junction | Product exists, link immediately |
+
+**Flow with product_id:**
+```
+ASSESS -> ENVISION -> EXECUTE -> CRITIQUE -> write_data (asset + junction) -> Return asset_id
+```
+
+**WriteIntent with junction:**
+```
+operations: [
+  {action: "create", table: "assets", data: {...}},
+  {action: "create", table: "product_assets", data: {product_id: [from PM], asset_id: [from asset creation], ...}}
+]
+```
+
+**Why you handle this:** You already handle campaign_assets junctions for campaigns. Product linking is the same pattern - just different junction table.
 
 ## CAMPAIGN Domain
 

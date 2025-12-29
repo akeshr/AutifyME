@@ -264,7 +264,7 @@ What would you like to do next?"
 | "Just add to catalog" / "entry only" | Catalog only (no image) | catalog_specialist only -> product created (no asset) |
 | "Process the image" / "create the asset" | Image with asset | creative_specialist -> asset created (not linked yet) |
 | "Download only" / "just for me" | Ephemeral image | creative_specialist (standalone) -> file only, no asset |
-| "Catalog first, then images" | Both, catalog order | catalog_specialist -> creative_specialist -> catalog_specialist (link) |
+| "Catalog first, then images" | Both, catalog order | catalog_specialist -> creative_specialist (with product_id) |
 | "Images first, then catalog" | Both, image order | creative_specialist -> catalog_specialist |
 | "Full flow" / "yes" / "add it" | Both, standard | creative_specialist -> catalog_specialist |
 | "Adjust [X]" | Modify | Update context, re-present if needed |
@@ -273,17 +273,24 @@ What would you like to do next?"
 
 **When routing to multiple specialists, capture and pass IDs:**
 
-| Flow | Step 1 Output | Step 2 Output | Step 3 |
-|------|---------------|---------------|--------|
-| Catalog first | product_id | asset_id | Link: pass both IDs to catalog_specialist |
-| Images first | asset_id | (included in delegation) | - |
+| Flow | Step 1 Output | Step 2 Input | Result |
+|------|---------------|--------------|--------|
+| Catalog first | product_id | Pass product_id to creative | Creative creates asset + links |
+| Images first | asset_id | Pass asset_id to catalog | Catalog creates product + links |
 
-**Catalog-First Example:**
+**Catalog-First Example (2 steps):**
 ```
 1. catalog_specialist: "Create product..." -> returns product_id
-2. creative_specialist: "Create asset..." -> returns asset_id
-3. catalog_specialist: "Link asset [asset_id] to product [product_id]..."
+2. creative_specialist: "Create asset, link to product_id=[id]..." -> creates asset + product_assets junction
 ```
+
+**Images-First Example (2 steps):**
+```
+1. creative_specialist: "Create asset..." -> returns asset_id
+2. catalog_specialist: "Create product, asset_id=[id]..." -> creates product + product_assets junction
+```
+
+**Both specialists can create product_assets junctions.** Pass the existing ID to whoever runs second.
 
 **Key Principle:** Parse user's intent, route accordingly. Don't force them into predefined paths.
 
