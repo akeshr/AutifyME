@@ -28,16 +28,18 @@ Scan the request in 2 seconds:
 
 ### Step 2: Load Based on Task Type (ONE Call)
 
-**The tool auto-resolves domains.** Use ONE call with all protocols you need:
+**CRITICAL: Use `domain='pm'` for YOUR protocols.** PM protocols are in `protocols/pm/`.
 
-| Task Type | Protocols to Load |
-|-----------|-------------------|
-| **Image workflow (first message)** | `domain_awareness`, `discovery_mindset`, `coordination_patterns`, `resource_efficiency` |
-| **Text query (first message)** | `domain_awareness`, `discovery_mindset`, `resource_efficiency` |
-| **Continuation ("yes", "proceed")** | **NONE** - protocols already in context |
-| **Agent result processing** | **NONE** - continue workflow |
-| **HITL feedback in agent response** | `hitl` (only if not loaded) |
-| **Using view_image** | `view_image` (only if not loaded) |
+| Task Type | Protocols to Load | Domain |
+|-----------|-------------------|--------|
+| **Image workflow (first message)** | `domain_awareness`, `discovery_mindset`, `coordination_patterns`, `resource_efficiency` | **pm** |
+| **Text query (first message)** | `domain_awareness`, `discovery_mindset`, `resource_efficiency` | **pm** |
+| **Continuation ("yes", "proceed")** | **NONE** - protocols already in context | - |
+| **Agent result processing** | **NONE** - continue workflow | - |
+| **HITL feedback in agent response** | `hitl` | **shared** |
+| **Using view_image** | `view_image` | (auto) |
+
+**Common mistake:** Using `domain='catalog'` for PM protocols. That's the TASK domain, not YOUR domain. Your protocols live in `pm`.
 
 ### What Each Protocol Provides
 
@@ -53,7 +55,8 @@ Scan the request in 2 seconds:
 
 **Key insight:** `coordination_patterns` contains the SEQUENTIAL DELEGATION rules. Always load it for multi-agent workflows.
 
-**Single call example (image workflow):** domain_awareness, discovery_mindset, coordination_patterns, resource_efficiency (pm domain)
+**Single call example (image workflow):**
+-> [load_protocol: domain_awareness, discovery_mindset, coordination_patterns, resource_efficiency | domain='pm']
 
 ### Step 3: Never Reload What's Already Loaded
 
@@ -80,7 +83,7 @@ Scan the request in 2 seconds:
 
 > User: "Add this product [media_id: wamid_123]"
 > PM: [Assess: First message, has image -> image workflow]
-> PM: [load protocols: domain_awareness, discovery_mindset, coordination_patterns, resource_efficiency (pm)]
+> PM: [load_protocol: domain_awareness, discovery_mindset, coordination_patterns, resource_efficiency | domain='pm']
 > PM: [download_whatsapp_media -> storage_path: inbox/photo.jpg]
 > PM: [Delegate visual_analyst: "Analyze image at inbox/photo.jpg. For CATALOG domain."]
 > PM: [WAIT -> visual_analysis.md]
