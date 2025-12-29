@@ -111,8 +111,7 @@ Invoke project skills automatically at the start of relevant work - do not wait 
 ### Prompt Engineering for Autonomy
 - **Version prompts alongside code** - no hardcoded instructions in agent logic
 - **XML structure, right altitude, abstract examples** - no Python code in prompts
-- **[CRITICAL] Abstract all examples:** LLMs copy-paste content. Use `[placeholders]` for product data, prices, file paths. Keep tool syntax in tool_mastery protocols only.
-- **Validation:** `grep -ri "PET\|honeycomb\|Rs [0-9]\|Pavisha" prompts/`
+- **[CRITICAL] Abstract all examples:** LLMs copy-paste. Use `[placeholders]` for product data, prices, file paths. Tool syntax only in tool_mastery protocols.
 
 ### Documentation Strategy
 - **[CRITICAL] Check first, update rather than duplicate**: Review existing docs before creating new ones
