@@ -247,11 +247,12 @@ Without protocols, you lack:
 
 | If Your Task Involves | Load These (domain='visual') |
 |----------------------|------------------------------|
-| Product hero/catalog shot | `product_photography`, `image_studio` |
-| Lifestyle/scene generation | `product_photography`, `image_studio` |
-| Social media content | `social_media`, `image_studio` |
-| Data-driven graphics | `social_media`, `image_studio` |
-| Campaign batch work | `product_photography`, `image_studio`, `resource_efficiency` |
+| Product hero/catalog shot | `product_photography` |
+| Lifestyle/scene generation | `product_photography` |
+| Social media content | `social_media` |
+| Data-driven graphics | `social_media` |
+| Campaign batch work | `product_photography` |
+| Multi-item processing | `multi_item_image` (shared) |
 
 | If Your Task Involves | Load These (domain='catalog') |
 |----------------------|-------------------------------|
@@ -260,6 +261,7 @@ Without protocols, you lack:
 
 | If Using These Tools | Load These (no domain - auto-resolves to tool_mastery) |
 |---------------------|--------------------------------------------------------|
+| image_studio | `image_studio` |
 | view_image | `view_image` |
 | read_data | `read_data` |
 | write_data | `write_data`, `schema_discovery` **(BOTH REQUIRED)** |
@@ -276,7 +278,7 @@ Without protocols, you lack:
 
 **ALWAYS include `resource_efficiency` and `input_validation` in your protocol load.**
 
-**Example - Catalog Hero:** product_photography, image_studio (visual) + view_image + shared protocols
+**Example - Catalog Hero:** product_photography (visual) + image_studio, view_image (tool_mastery) + shared protocols
 
 **Protocol content defines your quality standards.** The spec patterns, quality rubrics, and material treatments in protocols are what separate $500K photographer output from amateur work.
 
