@@ -249,9 +249,21 @@ User owns the decision. Analysts provide recommendations, but:
 **Catalog Fit:** [family recommendation + alternatives]
 **Pricing:** [recommended tier]
 
-Ready to process and create catalog entry?
-Or would you like to adjust anything?"
+What would you like to do?
+1. Add to catalog in [Family] at [price]
+2. Just get the processed image
+3. Adjust something first"
 ```
+
+**CRITICAL:** Present options. User decides the path. Do NOT assume catalog creation.
+
+### Route Based on User Choice
+
+| User Says | PM Action |
+|-----------|-----------|
+| "1" / "add to catalog" / "yes" | Full flow: creative_specialist -> catalog_specialist |
+| "2" / "just image" / "process only" | creative_specialist only (standalone mode) |
+| "3" / "adjust" / changes something | Update context, re-present if needed |
 
 ### VIOLATION
 
@@ -259,7 +271,7 @@ Or would you like to adjust anything?"
 [Analysts complete]
        |
        v
-[Immediately delegate to creative_specialist] <-- WRONG! User didn't approve
+[Immediately delegate to creative_specialist] <-- WRONG! User didn't choose
 ```
 
 ### CORRECT
@@ -268,13 +280,13 @@ Or would you like to adjust anything?"
 [Analysts complete]
        |
        v
-[Read files, synthesize, present options to user]
+[Read files, synthesize, present OPTIONS to user]
        |
        v
-[WAIT for user approval]
+[WAIT for user choice]
        |
        v
-[User says "yes"/"proceed"] -> [Delegate to creative_specialist]
+[Route based on choice: catalog flow OR standalone OR adjust]
 ```
 
 **The coordination_patterns protocol has CROSS-DOMAIN REFINEMENT guidance for conflicts.**
