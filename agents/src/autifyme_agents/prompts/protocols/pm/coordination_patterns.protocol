@@ -145,9 +145,73 @@ Most common multi-domain workflow. Memorize this.
 | PM synthesis | All analysts | Needs all findings for complete recommendation |
 | creative_specialist | User request | Only process when user asks for image processing |
 | catalog_specialist | User request | Only create catalog entry when user asks |
-| asset linking | Both specialists complete | Link asset to product after both exist |
+| asset linking | Both IDs available | Link asset to product requires both product_id and asset_id |
 
-**Flexible Order:** User chooses which comes first. If catalog first, product is created without asset link. When creative completes later, asset is linked to existing product.
+### Flexible Order: Detailed Flows
+
+**User chooses what and in what order. PM routes accordingly:**
+
+#### Flow A: Catalog Only (no image)
+```
+User: "Just add to catalog" / "entry only"
+PM -> catalog_specialist: Create product (no asset_id)
+     <- Returns: product_id
+[DONE] Product exists without image. User can add image later.
+```
+
+#### Flow B: Image Only (with asset)
+```
+User: "Process the image" / "create the asset"
+PM -> creative_specialist: Create asset
+     <- Returns: asset_id
+[DONE] Asset exists, not linked. User can create catalog entry later.
+```
+
+#### Flow C: Image Only (ephemeral)
+```
+User: "Download only" / "just for me"
+PM -> creative_specialist: "Standalone - no asset record"
+     <- Returns: storage_path (no asset_id)
+[DONE] File in pending/. No asset record. Cannot link to catalog.
+```
+
+#### Flow D: Catalog First (3 steps)
+```
+User: "Catalog first, then images"
+
+Step 1: PM -> catalog_specialist: Create product
+        <- Returns: product_id (CAPTURE THIS)
+
+Step 2: PM -> creative_specialist: Create asset
+        <- Returns: asset_id (CAPTURE THIS)
+
+Step 3: PM -> catalog_specialist: "Link asset [asset_id] to product [product_id]"
+        <- Returns: junction created
+
+[DONE] Product + Asset + Junction all exist.
+```
+
+#### Flow E: Images First (standard)
+```
+User: "Images first" / "yes" / "full flow"
+
+Step 1: PM -> creative_specialist: Create asset
+        <- Returns: asset_id
+
+Step 2: PM -> catalog_specialist: Create product, asset_id=[asset_id]
+        <- Returns: product_id + junction
+
+[DONE] Product + Asset + Junction all exist.
+```
+
+### ID Tracking (CRITICAL for Catalog-First)
+
+**PM must capture and propagate IDs:**
+
+| Flow | Capture from Step 1 | Capture from Step 2 | Use in Step 3 |
+|------|---------------------|---------------------|---------------|
+| Catalog first | product_id | asset_id | Both -> catalog_specialist for linking |
+| Images first | asset_id | - | Pass asset_id to catalog_specialist |
 
 ### Why Sequential (Not Parallel) for Analysis
 
@@ -651,6 +715,30 @@ Read product research at: [product_research_file]
 Asset already created and approved: [asset_id from creative_specialist]
 
 For CATALOG domain. Create product and link to asset."
+```
+
+### PM Delegation Template (Catalog Only - No Asset)
+
+```
+"Create catalog entry for [product].
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
+
+No asset yet - product entry only.
+
+For CATALOG domain. Create product without asset link."
+```
+
+### PM Delegation Template (Link Asset to Existing Product)
+
+```
+"Link asset to existing product.
+
+Product already created: [product_id]
+Asset already created: [asset_id]
+
+For CATALOG domain. Create product_assets junction only."
 ```
 
 ### Two-Stage HITL (Intentional)

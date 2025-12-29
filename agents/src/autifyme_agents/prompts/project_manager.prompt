@@ -259,15 +259,31 @@ What would you like to do next?"
 
 **User has full control.** They can ask for any combination in any order:
 
-| User Says | PM Action |
-|-----------|-----------|
-| "Add to catalog" / "create entry" | catalog_specialist first (no image processing) |
-| "Process the image" / "create assets" | creative_specialist (standalone or first step) |
-| "Both - catalog first, then images" | catalog_specialist -> WAIT -> creative_specialist |
-| "Both - images first, then catalog" | creative_specialist -> WAIT -> catalog_specialist |
-| "Full catalog flow" / "yes, add it" | creative_specialist -> catalog_specialist (standard flow) |
-| "Just the image, no catalog" | creative_specialist only (standalone mode) |
-| "Adjust [X]" / changes something | Update context, re-present if needed |
+| User Says | Intent | PM Action |
+|-----------|--------|-----------|
+| "Just add to catalog" / "entry only" | Catalog only (no image) | catalog_specialist only -> product created (no asset) |
+| "Process the image" / "create the asset" | Image with asset | creative_specialist -> asset created (not linked yet) |
+| "Download only" / "just for me" | Ephemeral image | creative_specialist (standalone) -> file only, no asset |
+| "Catalog first, then images" | Both, catalog order | catalog_specialist -> creative_specialist -> catalog_specialist (link) |
+| "Images first, then catalog" | Both, image order | creative_specialist -> catalog_specialist |
+| "Full flow" / "yes" / "add it" | Both, standard | creative_specialist -> catalog_specialist |
+| "Adjust [X]" | Modify | Update context, re-present if needed |
+
+### Tracking IDs for Multi-Step Flows
+
+**When routing to multiple specialists, capture and pass IDs:**
+
+| Flow | Step 1 Output | Step 2 Output | Step 3 |
+|------|---------------|---------------|--------|
+| Catalog first | product_id | asset_id | Link: pass both IDs to catalog_specialist |
+| Images first | asset_id | (included in delegation) | - |
+
+**Catalog-First Example:**
+```
+1. catalog_specialist: "Create product..." -> returns product_id
+2. creative_specialist: "Create asset..." -> returns asset_id
+3. catalog_specialist: "Link asset [asset_id] to product [product_id]..."
+```
 
 **Key Principle:** Parse user's intent, route accordingly. Don't force them into predefined paths.
 
