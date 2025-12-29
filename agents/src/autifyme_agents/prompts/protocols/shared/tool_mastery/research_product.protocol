@@ -265,53 +265,19 @@ research_product -> identify 0.8+ relevance sources -> extract 1-2 best
 
 ---
 
-## CATEGORY vs BRAND QUERIES
+## RESEARCH TERMINATION
 
-### Category Queries (Always Productive)
+> **Detailed termination criteria are in `research_orchestration` protocol (Phase 6 & 7).**
+> Load it via: `load_protocol(['research_orchestration'], domain='product')`
 
-These queries return useful data because category information is well-indexed:
+### Quick Reference
 
-```
-"PET container specifications food grade"     -> material specs
-"stackable jars Amazon India"                 -> competitor context
-"plastic container HSN code"                  -> compliance data
-"kitchen storage jars wholesale price"        -> market pricing
-```
+| Query Type | Behavior |
+|------------|----------|
+| **Category queries** | Always productive - research extensively |
+| **Brand queries** | 2-3 attempts max, then pivot to category |
 
-### Brand Queries (May Return Nothing)
-
-Small/regional brands often have no online presence:
-
-```
-"[SmallBrand] PET jars specifications"        -> likely no results
-"[SmallBrand] product catalog"                -> likely no results
-```
-
-**Rule:** After 2-3 brand-specific queries with no brand mentions in results, STOP. Pivot to category queries.
-
----
-
-## QUERY VARIATION ANTI-PATTERN
-
-**Rephrasing the same query is NOT research progress.**
-
-```
-WRONG:
-"Pavisha PET jars specifications"             -> no brand results
-"Pavisha floral jars specs"                   -> no brand results
-"Pavisha stackable containers dimensions"     -> no brand results
-"Pavisha storage jars India"                  -> no brand results
-... [continues 15+ times]
-
-RIGHT:
-"Pavisha PET jars specifications"             -> no brand results
-"Pavisha product catalog"                     -> no brand results
-STOP brand queries. PIVOT:
-"PET food container specifications India"     -> category specs
-"stackable jars market pricing wholesale"     -> market data
-```
-
-**Search engines return the same results for synonymous queries.** If "Brand X specifications" finds nothing, "Brand X specs" won't either.
+**Key insight:** Search engines return same results for synonymous queries. Rephrasing doesn't find new data.
 
 ---
 

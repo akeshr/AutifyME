@@ -134,31 +134,27 @@ EFFICIENT (bounded):
 - [Stop when sufficient for task]
 ```
 
-### Pattern 6: Recognize Query Loops
+### Pattern 6: Recognize Loops
 
-**If you're rephrasing the same question, you're looping - not researching.**
+**If you're rephrasing the same question, you're looping - not progressing.**
 
 ```
 LOOPING (waste):
-- "Brand X specs"           -> no brand results
-- "Brand X specifications"  -> no brand results
-- "Brand X details"         -> no brand results
-- "Brand X information"     -> no brand results
-[4 queries, same intent, same results]
+- query("X specs")           -> result A
+- query("X specifications")  -> result A (same)
+- query("X details")         -> result A (same)
+[3 queries, same intent, same results]
 
 EFFICIENT:
-- "Brand X specs"           -> no brand results
-- "Brand X catalog"         -> no brand results
-RECOGNIZE: Brand has no online presence
-PIVOT: Search category instead
-- "product-type specifications" -> useful category data
-[3 queries, recognized pattern, pivoted]
+- query("X specs")           -> result A
+- RECOGNIZE: "I have this information already"
+- MOVE ON to different dimension or task
 ```
 
 **Signals you're looping:**
 - Same results across query variations
-- No new information in last 2-3 queries
-- Rephrasing instead of researching different dimensions
+- No new information in last 2-3 calls
+- Rephrasing instead of progressing to next task
 
 ---
 
