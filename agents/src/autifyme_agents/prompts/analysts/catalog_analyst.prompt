@@ -165,7 +165,7 @@ Know what columns exist, how tables relate, what values are valid.
 **REASONING:**
 "Duplicate check needs name similarity + attribute match. Protocol: duplicate_prevention."
 
--> [load protocols: duplicate_prevention (catalog) + read_data, schema_discovery + shared]
+-> [load protocols: business_context, duplicate_prevention (catalog) + read_data, schema_discovery + shared]
 
 **REASONING AFTER PROTOCOL:**
 "Protocol says: search by name keywords, then verify by key attributes."

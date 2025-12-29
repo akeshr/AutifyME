@@ -63,16 +63,16 @@ WRONG: Call Visual, Product, Catalog at the same time
 
 ### Mode 3: Approval Gate
 
-Sequential chain with user checkpoint before expensive operations.
+Sequential chain with user checkpoint before execution.
 
 ```
-Analysis -> [USER APPROVAL] -> Execution
+Analysis -> [PRESENT FINDINGS] -> [USER DECIDES] -> Execution (per user request)
 ```
 
 **Use When:**
-- Expensive operations follow analysis
-- User might reject or modify
-- Example: Image processing only after user approves catalog addition
+- User should choose what to do next
+- Multiple execution options exist
+- User controls order and scope of execution
 
 **Pattern:**
 ```
@@ -80,13 +80,18 @@ PHASE 1 - ANALYSIS (sequential - each enriches next):
 1. visual_analyst -> visual_analysis.md (identify product)
 2. product_analyst -> product_research.md (research EVERYTHING, uses visual)
 3. catalog_analyst -> catalog_analysis.md (search with BOTH findings)
-4. PM synthesizes and presents to user
+4. PM synthesizes and presents findings
+5. PM asks open-ended: "What would you like to do next?"
 
-[USER APPROVAL GATE]
+[USER DECIDES - no numbered options]
 
-PHASE 2 - EXECUTION (only after approval):
-5. creative_specialist -> processed images + asset record
-6. catalog_specialist -> catalog records + asset linking
+PHASE 2 - EXECUTION (per user's request):
+User can request ANY combination in ANY order:
+- "Create catalog entry" -> catalog_specialist
+- "Process the image" -> creative_specialist
+- "Both, catalog first" -> catalog_specialist -> creative_specialist
+- "Both, images first" -> creative_specialist -> catalog_specialist
+- "Full flow" -> creative_specialist -> catalog_specialist (standard)
 ```
 
 ---
@@ -112,19 +117,23 @@ Most common multi-domain workflow. Memorize this.
       |                     (uses BOTH visual AND product findings)
       |                     (searches with rich context: "[product specs], [HSN code]")
       v
-[4. PM synthesizes, presents to user]
+[4. PM synthesizes, presents findings]
       |
       v
-[USER APPROVAL GATE]
+[5. PM asks: "What would you like to do next?"]
       |
       v
-[5. creative_specialist] -> asset record + HITL approval for image
+[USER DECIDES - FULL FLEXIBILITY]
       |
-      v
-[6. catalog_specialist] -> catalog records + asset linking
+      +---> "Add to catalog" -> catalog_specialist first
       |
-      v
-[HITL APPROVAL] -> published
+      +---> "Process image" -> creative_specialist first
+      |
+      +---> "Both, catalog first" -> catalog_specialist -> creative_specialist
+      |
+      +---> "Both, images first" -> creative_specialist -> catalog_specialist
+      |
+      +---> "Full flow" / "yes" -> creative_specialist -> catalog_specialist (standard)
 ```
 
 ### Key Dependencies
@@ -134,8 +143,77 @@ Most common multi-domain workflow. Memorize this.
 | product_analyst | visual_analyst | Needs product identification to research the right thing |
 | catalog_analyst | visual_analyst + product_analyst | Needs BOTH to search catalog effectively with rich context |
 | PM synthesis | All analysts | Needs all findings for complete recommendation |
-| creative_specialist | User approval | Don't process if user will reject |
-| catalog_specialist | creative_specialist | Needs asset_id for linking |
+| creative_specialist | User request | Only process when user asks for image processing |
+| catalog_specialist | User request | Only create catalog entry when user asks |
+| asset linking | Both IDs available | Link asset to product requires both product_id and asset_id |
+
+### Flexible Order: Detailed Flows
+
+**User chooses what and in what order. PM routes accordingly:**
+
+#### Flow A: Catalog Only (no image)
+```
+User: "Just add to catalog" / "entry only"
+PM -> catalog_specialist: Create product (no asset_id)
+     <- Returns: product_id
+[DONE] Product exists without image. User can add image later.
+```
+
+#### Flow B: Image Only (with asset)
+```
+User: "Process the image" / "create the asset"
+PM -> creative_specialist: Create asset
+     <- Returns: asset_id
+[DONE] Asset exists, not linked. User can create catalog entry later.
+```
+
+#### Flow C: Image Only (ephemeral)
+```
+User: "Download only" / "just for me"
+PM -> creative_specialist: "Standalone - no asset record"
+     <- Returns: storage_path (no asset_id)
+[DONE] File in pending/. No asset record. Cannot link to catalog.
+```
+
+#### Flow D: Catalog First (2 steps)
+```
+User: "Catalog first, then images"
+
+Step 1: PM -> catalog_specialist: Create product (no asset_id)
+        <- Returns: product_id (CAPTURE THIS)
+
+Step 2: PM -> creative_specialist: Create asset, product_id=[product_id]
+        <- Creative creates asset + product_assets junction
+        <- Returns: asset_id
+
+[DONE] Product + Asset + Junction all exist.
+```
+
+**Key:** Creative handles junction when given product_id (same pattern as campaign_assets).
+
+#### Flow E: Images First (standard)
+```
+User: "Images first" / "yes" / "full flow"
+
+Step 1: PM -> creative_specialist: Create asset
+        <- Returns: asset_id
+
+Step 2: PM -> catalog_specialist: Create product, asset_id=[asset_id]
+        <- Returns: product_id + junction
+
+[DONE] Product + Asset + Junction all exist.
+```
+
+### ID Tracking (Both Flows are 2 Steps)
+
+**PM captures from Step 1, passes to Step 2:**
+
+| Flow | Step 1 Returns | Pass to Step 2 | Step 2 Creates |
+|------|----------------|----------------|----------------|
+| Catalog first | product_id | product_id -> creative | Asset + junction |
+| Images first | asset_id | asset_id -> catalog | Product + junction |
+
+**Both specialists can create product_assets junctions.** Whoever runs second receives the existing ID and creates the junction.
 
 ### Why Sequential (Not Parallel) for Analysis
 
@@ -212,24 +290,35 @@ Use this pattern when presenting to user after analysis phase:
 
 **Compliance:** [HSN, certifications - brief]
 
-**Recommendation:** [What you suggest doing next]
-
 [If conflict exists:]
 **Note:** [Explain the conflict and options]
+
+---
+**What would you like to do next?**
 ```
+
+**CRITICAL:** Open-ended question. User decides WHAT and in WHAT ORDER. Do NOT present numbered options - they constrain the user.
+
+User can request any combination:
+- Catalog entry first, then images
+- Images first, then catalog
+- Just catalog, no images
+- Just images, no catalog
+- Both together (standard flow)
+- Adjust something first
 
 ### Synthesis Examples
 
-**Good Synthesis:**
+**Good Synthesis (open-ended):**
 ```
 "This is a [size] [material] [product] with [feature] - [segment] positioning.
 
 Key findings:
-- [Segment]: Visual shows [feature], market research confirms [X%] premium for [feature type]
-- Family: Fits '[Family]' - similar products [price range], but this warrants [tier] ([adjusted range])
-- Compliance: [HSN], [GST%], [certifications]
+- [Segment]: Visual shows [feature], research confirms [X%] premium
+- Family: Fits '[Family]' at [price tier]
+- Compliance: [HSN], [GST%]
 
-Recommendation: Create as [tier] variant in [Family] at [price]."
+What would you like to do next?"
 ```
 
 **Bad Synthesis (Concatenation):**
@@ -270,6 +359,31 @@ Which approach fits your catalog strategy?"
 | **Hidden conflicts** | Proceed despite mismatches | Detect and resolve or surface |
 | **Raw relay** | Pass analyst text verbatim | Distill into concise insights |
 | **No recommendation** | Just present facts | Always include what to do next |
+
+### Non-Execution Responses
+
+**User may NOT request execution. Handle these:**
+
+| User Says | Type | PM Action |
+|-----------|------|-----------|
+| "Adjust the pricing" / "Change family" / "Fix X" | **ADJUST** | Clarify what to change, then re-present updated synthesis |
+| "Show me the analysis again" / "Repeat" | **REPEAT** | Re-read files, re-synthesize, re-present |
+| "Skip for now" / "Later" / "Not now" | **DEFER** | Acknowledge, offer to save as draft, end workflow |
+| "Cancel" / "Never mind" / "Stop" | **CANCEL** | See WORKFLOW CANCELLATION PATTERN below |
+| "I'm not sure" / "What do you recommend?" | **GUIDANCE** | Give clear recommendation with rationale |
+
+**ADJUST handling:**
+```
+User: "Adjust the pricing to [value]"
+
+PM response:
+1. Acknowledge: "Understood, adjusting pricing to [value]."
+2. Update your mental model (NOT the analyst files - they're point-in-time)
+3. Re-present synthesis with updated value:
+   "Updated recommendation: ... Pricing: [new value] (your input). What would you like to do next?"
+```
+
+**Key:** User corrections override analyst findings. Include user input in specialist delegation.
 
 ---
 
@@ -613,10 +727,14 @@ Standalone - no asset record needed."
 
 ```
 "Create catalog hero shot for [product].
-Read visual analysis at: [visual_analysis_file]
 Source image at: [source_image_path]
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
 For CATALOG domain."
 ```
+
+**Why all files?** Creative needs product research for accurate naming (HSN, brand, specs) and catalog analysis for variant structure and family context.
 
 ### PM Delegation Template (To Catalog - After Creative)
 
@@ -629,6 +747,35 @@ Asset already created and approved: [asset_id from creative_specialist]
 
 For CATALOG domain. Create product and link to asset."
 ```
+
+### PM Delegation Template (Catalog Only - No Asset)
+
+```
+"Create catalog entry for [product].
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
+
+No asset yet - product entry only.
+
+For CATALOG domain. Create product without asset link."
+```
+
+### PM Delegation Template (Creative with Product Linking)
+
+```
+"Create catalog hero shot for [product].
+Source image at: [source_image_path]
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
+
+Link to existing product: [product_id]
+
+For CATALOG domain. Create asset and link to product."
+```
+
+**Creative creates both asset record AND product_assets junction when product_id provided.**
 
 ### Two-Stage HITL (Intentional)
 

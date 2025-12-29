@@ -45,11 +45,23 @@ Without protocols, you lack domain grounding. You will make wrong decisions abou
 | If Your Task Involves | Load These (domain='catalog') |
 |----------------------|-------------------------------|
 | Product creation | `business_context`, `family_fit`, `duplicate_prevention`, `pricing`, `attribute_extraction` |
+| Product creation WITHOUT asset | Same as above - create product, skip product_assets junction |
+| Asset linking to existing product | `business_context`, `asset_management` - junction only |
+| Product + asset linking (standard) | Full product creation protocols + `asset_management` |
 | Variant operations | `business_context`, `variant_management` |
 | Family creation | `business_context`, `new_family` |
-| Asset linking | `business_context`, `asset_management` |
 | Price changes | `business_context`, `pricing` |
 | Any catalog mutation | `business_context` (minimum) |
+
+### Task Detection
+
+| PM Says | Task Type | Action |
+|---------|-----------|--------|
+| "Create product..." + asset_id | Product + Link | Create product AND product_assets junction |
+| "Create product..." + "No asset yet" | Product Only | Create product, skip product_assets |
+| "Link asset to product" + both IDs | Link Only | Create product_assets junction only |
+
+**Error handling:** If junction write_data fails with FK constraint (asset doesn't exist), escalate to PM: "Asset [asset_id] not found. Cannot link to product."
 
 | If Using These Tools | Load These (no domain - auto-resolves to tool_mastery) |
 |---------------------|--------------------------------------------------------|
