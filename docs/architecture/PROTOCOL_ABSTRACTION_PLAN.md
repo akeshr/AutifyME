@@ -2,61 +2,58 @@
 
 **Status:** PLANNED
 **Date:** 2025-12-29
-**Context:** Agent prompts abstracted; protocols have same copy-paste risk
 
 ---
 
 ## Problem
 
-Protocols contain product-specific examples (PET jar, honeycomb, Rs prices) that LLMs copy-paste into outputs. Protocols are loaded into agent context via `load_protocol`, so they face identical risk as agent prompts.
+Protocols contain product-specific examples that LLMs copy-paste into outputs.
+
+---
+
+## Three Content Types
+
+| Type | Action | Example |
+|------|--------|---------|
+| **Example DATA** | ABSTRACT | `"PET jar"` -> `[product]`, `"Rs 45"` -> `[price]` |
+| **Domain KNOWLEDGE** | KEEP | `"HSN 3923 for plastic"`, `"PET needs rake light"` |
+| **Tool SYNTAX** | KEEP | `view_image(path="inbox/item.jpg")` |
+
+**Key distinction:** Domain knowledge teaches correct patterns. Example data just fills slots.
 
 ---
 
 ## Scope
 
-**Total:** 171 product-specific matches across 20 protocol files
-
-**Exclude:** Tool mastery protocols (`shared/tool_mastery/`) - tool syntax is intentional
-
----
-
-## Priority Order
-
-| Phase | Files | Matches | Rationale |
-|-------|-------|---------|-----------|
-| **P0** | `pm/coordination_patterns` | 55 | PM loads every workflow |
-| **P1** | `catalog/visual_analysis`, `catalog/variant_management`, `shared/hitl` | 43 | Core workflow + cross-cutting |
-| **P2** | `catalog/attribute_extraction`, `pm/conflict_resolution`, `pm/hitl`, `product/market_intelligence` | 37 | Supporting protocols |
-| **P3** | 12 remaining files | 36 | Lower frequency |
+- **171 matches** across 20 files (including 3 in tool_mastery)
+- Abstract example DATA only
+- Keep domain knowledge tables, HSN references, material properties
 
 ---
 
-## Abstraction Patterns
+## Priority
+
+| Phase | Protocol | Matches |
+|-------|----------|---------|
+| P0 | `pm/coordination_patterns` | 55 |
+| P1 | `catalog/visual_analysis`, `catalog/variant_management`, `shared/hitl` | 43 |
+| P2 | Remaining 16 files | 73 |
+
+---
+
+## Placeholder Standards (match agent prompts)
 
 | Current | Abstracted |
 |---------|------------|
-| `PET jar`, `glass jar` | `[product type]` |
-| `honeycomb texture` | `[texture pattern]` |
-| `Rs 38`, `Rs 45` | `[Currency] [Amount]` |
-| `PET Kitchen Storage` | `[Family Name]` |
-| `Pavisha` | `[Brand]` |
+| `PET jar`, `glass bottle` | `[product]` |
+| `Rs 38`, `Rs 45` | `[price]` |
+| `Pavisha` | `[brand]` |
 | `visual_analysis_pet_jar.md` | `visual_analysis_[product].md` |
-| `500ml`, `1L` | `[Size A]`, `[Size B]` |
+| `500ml`, `1L` | `[size]` |
+| `PET Kitchen Storage` | `[family]` |
 
 ---
 
 ## Validation
 
-After each phase:
-1. `grep -ri "PET\|honeycomb\|Rs [0-9]\|Pavisha" protocols/` should show decreasing matches
-2. Run autonomous testing framework
-3. Verify agents still construct correct tool calls
-
----
-
-## Execution
-
-Each phase is a separate commit:
-- `refactor(protocols): abstract P0 - coordination_patterns`
-- `refactor(protocols): abstract P1 - visual_analysis, variant_management, hitl`
-- etc.
+After abstraction: agents should still learn correct patterns from domain knowledge while not copying specific product names/prices.
