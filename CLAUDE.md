@@ -112,6 +112,36 @@ Invoke project skills automatically at the start of relevant work - do not wait 
 - **Version prompts alongside code** - no hardcoded instructions in agent logic
 - **XML structure, right altitude, canonical examples** - no Python code in prompts
 
+### **[CRITICAL] Prompt & Protocol Abstraction Standards**
+
+**The Problem:** LLMs copy-paste content from examples. Product-specific data in examples bleeds into outputs.
+
+**Two Content Types - Different Treatment:**
+
+| Content Type | Location | Abstraction Rule |
+|--------------|----------|------------------|
+| **Product data** | Agent prompts, protocol examples | ALWAYS abstract: `[product]`, `[price]`, `[material]` |
+| **Tool syntax** | Tool mastery protocols | KEEP exact syntax - agents need to learn correct calls |
+
+**Agent Prompts (`.prompt` files):**
+- Examples use `[placeholders]` for all product-specific content
+- File paths: `visual_analysis_[product].md` not `visual_analysis_pet_jar.md`
+- Prices: `[Currency] [Amount]` not `Rs 45`
+- Products: `[product type]`, `[material]`, `[feature]`
+- NO code blocks with tool call syntax - use descriptive notation
+
+**Protocols (`.protocol` files):**
+- **Tool mastery protocols** (`shared/tool_mastery/`): Keep exact tool syntax - teaching correct usage
+- **Domain protocols** (catalog/, product/, pm/): Abstract product-specific examples
+- **Shared protocols**: Abstract product data, keep structural patterns
+
+**Why This Matters:**
+- Protocols are loaded into agent context via `load_protocol`
+- Product data in protocols has SAME copy-paste risk as agent prompts
+- Tool syntax in tool_mastery is INTENTIONAL - agents should copy correct patterns
+
+**Test:** Before committing prompt/protocol changes, grep for: `PET|honeycomb|Rs \d+|Family \d+|Pavisha`
+
 ### Documentation Strategy
 - **[CRITICAL] Check first, update rather than duplicate**: Review existing docs before creating new ones
 - **Create only when necessary**: Novel topics, complex specifications, long-term architectural impact
