@@ -41,10 +41,10 @@ Extract from user messages:
 | Attribute | Input Pattern |
 |-----------|---------------|
 | brand | "from [Brand]", "[Brand] product" |
-| capacity | "500ml", "1 liter", "half kg" |
-| material | "PET", "glass", "plastic" |
-| use_case | "for food", "for cosmetics" |
-| price | "Rs 30", "around 50 rupees" |
+| capacity | "[size]", "[volume]", "[weight]" |
+| material | "[material type]" |
+| use_case | "for [category]" |
+| price | "[Currency] [amount]", "around [amount]" |
 
 ### 4. Product Research Files (From product_analyst)
 
@@ -116,12 +116,12 @@ For attributes not in standard columns, use JSONB custom_attributes (if exists i
 
 ```json
 {
-  "material": "PET",
-  "material_grade": "food_grade",
-  "capacity_ml": 500,
-  "texture": "honeycomb",
-  "closure_type": "screw_cap",
-  "certifications": ["BPA-free", "FDA approved"]
+  "material": "[material]",
+  "material_grade": "[grade]",
+  "capacity_ml": [size],
+  "texture": "[texture]",
+  "closure_type": "[closure]",
+  "certifications": ["[cert-1]", "[cert-2]"]
 }
 ```
 
@@ -177,11 +177,11 @@ Map to variant_values when attribute varies within family:
 | price | YES for pricing | User or research |
 
 **CRITICAL: `description` is a database NOT NULL constraint.** Always generate a description combining:
-- Material type (PET, Glass, HDPE, etc.)
-- Key features (honeycomb texture, screw cap, food-grade, etc.)
-- Typical use case (food storage, beverage packaging, industrial use, etc.)
+- Material type
+- Key features (texture, closure, grade, etc.)
+- Typical use case (storage, packaging, industrial use, etc.)
 
-Example: "Food-grade PET jar with honeycomb texture pattern, screw cap closure. Ideal for honey, jam, and dry food storage."
+Example: "[Grade] [material] [product] with [texture] pattern, [closure] closure. Ideal for [use cases]."
 
 ### Validation Rules
 
@@ -199,9 +199,9 @@ Example: "Food-grade PET jar with honeycomb texture pattern, screw cap closure. 
 
 | Scenario | Primary Source | Secondary Source | Example Output |
 |----------|---------------|------------------|----------------|
-| Image-first | Visual analysis | Research verification | Material: PET (visual) -> Confirm 500ml (research) |
-| User-input | User message parsing | Visual/research for gaps | "500ml PET jar Rs 30" -> Need color, texture from image |
-| Research-heavy | Web research | Visual identification | HSN lookup -> 3923 (plastic containers), GST 18% |
+| Image-first | Visual analysis | Research verification | Material: [material] (visual) -> Confirm [size] (research) |
+| User-input | User message parsing | Visual/research for gaps | "[size] [material] [product] [price]" -> Need color, texture from image |
+| Research-heavy | Web research | Visual identification | HSN lookup -> [HSN] ([category]), GST [rate]% |
 
 ---
 
@@ -219,9 +219,7 @@ Generate product names from attributes:
 
 | Attributes | Generated Name |
 |------------|----------------|
-| PET, Jar, 500ml, Clear, Honeycomb | PET Food Jar 500ml Clear Honeycomb |
-| Glass, Bottle, 750ml, Green | Glass Bottle 750ml Green |
-| HDPE, Container, 20L, Blue | HDPE Container 20L Blue |
+| [Material], [Type], [Size], [Color], [Feature] | [Material] [Category] [Type] [Size] [Color] [Feature] |
 
 ### Rules
 
@@ -251,7 +249,7 @@ Never create catalog entry with missing required attributes.
 
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
-| Guessing without source | "probably PET", "looks like 500ml" | Visual analysis -> infer, then research to confirm |
+| Guessing without source | "probably [material]", "looks like [size]" | Visual analysis -> infer, then research to confirm |
 | Ignoring conflicts | User says 500ml, image suggests 750ml -> use 500ml | Flag conflict, ask user to confirm |
 | Variant data in custom_attributes | {size: 500ml, color: blue} when family has axes | Link to variant_values; custom_attributes for non-variant only |
 
