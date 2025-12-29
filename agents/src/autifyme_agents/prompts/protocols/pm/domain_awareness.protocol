@@ -14,17 +14,17 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 | **CATALOG** | Product data, families, variants, pricing, assets linking | catalog_analyst, catalog_specialist |
 | **CREATIVE** | Image processing, asset creation, visual output, data-driven graphics | creative_specialist |
 | **VISUAL** | Image analysis, visual identification, quality assessment | visual_analyst |
-| **PRODUCT** | Product discovery: EVERYTHING about the product (unlimited research capability) | product_analyst |
+| **PRODUCT** | Product discovery, naming, positioning, market research | product_analyst |
 
 ---
 
 ## DOMAIN SCOPES
 
-**CATALOG:** Product CRUD, families, variants, pricing, product-asset linking (links to existing assets)
+**CATALOG:** Product CRUD, families, variants, pricing, product-asset linking. Queries OUR database.
 
 **CREATIVE:** Background processing, hero shots, lifestyle scenes, data-driven graphics, asset record creation (HITL for image quality)
 
-**PRODUCT:** UNLIMITED DISCOVERY. Product Analyst is a product detective with access to all information on the internet. Delegate the PRODUCT, not specific research questions. Product Analyst determines what to research based on product type. Returns comprehensive dossier enabling complete database population.
+**PRODUCT:** Product detective with access to all information on the internet. Naming, positioning, market keywords, how customers search. Returns comprehensive dossier.
 
 **VISUAL:** Image analysis, identification, comparison (observation only, no editing)
 
@@ -40,14 +40,14 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 - **Key:** Observations feed all downstream agents (creative, catalog, product).
 
 ### Catalog Analyst
-- **Role:** Answers "What do we HAVE?" UNLIMITED internal exploration.
-- **Handles:** Any question about our catalog data. Adapts analysis by task.
+- **Role:** Answers "What do WE have?" Database exploration.
+- **Handles:** Any question about OUR catalog data. Family fit, pricing, duplicates.
 - **Output:** catalog_analysis_{item}.md - findings relevant to the question
 - **Key:** Recommendations are HYPOTHESES. Specialist verifies with real queries.
 
 ### Product Analyst
-- **Role:** UNLIMITED DISCOVERY. Product detective with full internet access.
-- **Handles:** EVERYTHING about the product. Adapts research dimensions by product type.
+- **Role:** Answers "What IS this?" Outside world research.
+- **Handles:** Naming, positioning, keywords, market research, how customers search.
 - **Output:** product_research_{item}.md - comprehensive dossier enabling complete cataloging
 - **Key:** Delegate the PRODUCT openly. Agent determines what to research.
 
@@ -111,8 +111,8 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 
 | User Request | Intent | Route To |
 |--------------|--------|----------|
-| "What IS this?" | **EXTERNAL** | product_analyst only |
-| "Do WE have?" | **INTERNAL** | catalog_analyst only |
+| "What IS this?" | **RESEARCH** | product_analyst only |
+| "Do WE have?" | **LOOKUP** | catalog_analyst only |
 | "Update/delete" | **DIRECT ACTION** | catalog_specialist only |
 
 **KEY DISTINCTION:** What does user WANT?
@@ -159,10 +159,10 @@ Complex requests span multiple domains. Execute in order:
 
 | Domain | IN Scope | OUT of Scope |
 |--------|----------|--------------|
-| CATALOG | Product CRUD, pricing, families, asset linking | Image creation, external research |
+| CATALOG | Product CRUD, pricing, families, asset linking | External research, naming conventions |
 | CREATIVE | Image processing, scene generation | Catalog records, pricing decisions |
 | VISUAL | Image analysis, identification | Catalog queries, image editing |
-| PRODUCT | All external research | Catalog data, image work |
+| PRODUCT | Outside research, naming, positioning | Catalog data, image work |
 
 ---
 
