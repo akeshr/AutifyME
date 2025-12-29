@@ -155,6 +155,38 @@ Missing product_research -> PROCEED with note:
 
 ---
 
+## CONTEXT PRECEDENCE
+
+When PM's delegation message contains information that differs from file contents, **delegation takes precedence**.
+
+**Why?** User feedback flows through PM. Analyst files are point-in-time snapshots. PM's delegation reflects the current state after user amendments.
+
+| Source | Role | Precedence |
+|--------|------|------------|
+| PM's delegation message | Current truth (includes user feedback) | **HIGHEST** |
+| Analyst files | Baseline analysis | Lower - may be outdated |
+| Your own assumptions | Fallback | Lowest |
+
+**Pattern:**
+```
+File says: "[size] [material] [product]"
+PM says: "User clarified: [different size]. Override analyst finding."
+
+You use: [different size] (PM's delegation wins)
+```
+
+**Practical Application:**
+1. Read file for baseline context
+2. Check PM's delegation for amendments/overrides
+3. When conflict exists, state it and use PM's version:
+   ```
+   "File says [X], but PM clarifies [Y] per user feedback. Using [Y]."
+   ```
+
+**Anti-pattern:** Ignoring PM's delegation and using only file contents.
+
+---
+
 ## ANTI-PATTERNS
 
 | Anti-Pattern | Problem | Fix |
