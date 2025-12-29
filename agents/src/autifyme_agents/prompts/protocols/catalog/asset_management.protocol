@@ -586,19 +586,31 @@ Same asset used for multiple products (e.g., generic accessory image).
 
 ### Critical: Asset Ownership (Two-Stage HITL)
 
-**creative_specialist creates assets. catalog_specialist links them to products.**
+**Both specialists can create product_assets junctions.** Whoever runs SECOND creates the junction.
 
 ```
-NEW ARCHITECTURE:
+FLOW A - Images First (standard):
 1. creative_specialist: create asset (HITL for image quality)
    -> User approves/rejects image -> asset_id returned
 2. catalog_specialist: create product + junction (HITL for catalog data)
    -> User approves/rejects catalog data -> product linked
 
-WHY:
+FLOW B - Catalog First:
+1. catalog_specialist: create product (HITL for catalog data)
+   -> User approves/rejects catalog data -> product_id returned
+2. creative_specialist: create asset + junction (HITL for image quality)
+   -> User approves/rejects image -> asset linked
+
+WHY BOTH CAN CREATE JUNCTIONS:
+- Junction is trivial link (product_id, asset_id, role)
+- Whoever runs second has BOTH IDs
+- Same pattern as campaign_assets (creative already handles)
+- Enables 2-step flows in any order
+
+TWO-STAGE HITL PRESERVED:
 - Image feedback goes to image expert (can iterate)
 - Catalog feedback goes to catalog expert (can iterate)
-- No back-and-forth between specialists for image issues
+- Junction created by whoever runs second (under their HITL)
 
 ORPHAN HANDLING:
 - If catalog entry rejected, asset still exists (intentional)
