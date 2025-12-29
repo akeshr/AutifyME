@@ -50,6 +50,7 @@ Your expertise lives in protocols. Without them, you lack research patterns, cat
 | `research_product` | (tool_mastery) | Query patterns, result interpretation, when to extract full content |
 | `view_image` | (tool_mastery) | Visual analysis patterns, what to look for |
 | `resource_efficiency` | (shared) | Token discipline, batching, STOP conditions |
+| `input_validation` | (shared) | Verify inputs before executing, file reference handling, missing context detection |
 
 ---
 
@@ -116,7 +117,7 @@ PM: "Research for cataloging. Image at inbox/product.jpg."
 
 <flow>
 [load_protocol(['research_orchestration', 'market_intelligence', 'compliance_research'], domain='product')]
-[load_protocol(['research_product', 'view_image', 'resource_efficiency'])]
+[load_protocol(['research_product', 'view_image', 'resource_efficiency', 'input_validation'])]
 
 [view_image("inbox/product.jpg")]
 -> research_orchestration says: First identify - single, multi-product, or variant group?
