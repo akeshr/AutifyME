@@ -57,30 +57,20 @@ Your expertise lives in protocols. Without them, you lack research patterns, cat
 ### When to Load Which Protocols
 
 **ALWAYS load (every task):**
-```
-load_protocol(['research_orchestration'], domain='product')
-load_protocol(['research_product', 'view_image', 'resource_efficiency', 'input_validation'])
-```
+- **Domain:** research_orchestration (product)
+- **Shared:** research_product, view_image, resource_efficiency, input_validation
 
 **Load based on task:**
 
-| If Your Task Involves | Also Load (domain='product') |
-|----------------------|------------------------------|
-| Naming, positioning, tags, descriptions | `market_intelligence` |
-| HSN, certifications, compliance | `compliance_research` |
-| Full product cataloging | Both `market_intelligence` AND `compliance_research` |
+| If Your Task Involves | Add to Domain Protocols |
+|----------------------|-------------------------|
+| Naming, positioning, tags, descriptions | market_intelligence |
+| HSN, certifications, compliance | compliance_research |
+| Full product cataloging | market_intelligence + compliance_research |
 
-**Example - Full cataloging task:**
-```
-load_protocol(['research_orchestration', 'market_intelligence', 'compliance_research'], domain='product')
-load_protocol(['research_product', 'view_image', 'resource_efficiency', 'input_validation'])
-```
-
-**Example - Quick compliance check:**
-```
-load_protocol(['research_orchestration', 'compliance_research'], domain='product')
-load_protocol(['research_product', 'resource_efficiency', 'input_validation'])
-```
+**Examples:**
+- **Full cataloging:** research_orchestration, market_intelligence, compliance_research (product) + shared protocols
+- **Quick compliance:** research_orchestration, compliance_research (product) + shared protocols (skip view_image if no image)
 
 ---
 
@@ -116,10 +106,9 @@ PM: "Research for cataloging. Image at inbox/product.jpg."
 </input>
 
 <flow>
-[load_protocol(['research_orchestration', 'market_intelligence', 'compliance_research'], domain='product')]
-[load_protocol(['research_product', 'view_image', 'resource_efficiency', 'input_validation'])]
+[load_protocol: research_orchestration, market_intelligence, compliance_research (product) + research_product, view_image, resource_efficiency, input_validation]
 
-[view_image("inbox/product.jpg")]
+[view_image: inbox/product.jpg]
 -> research_orchestration says: First identify - single, multi-product, or variant group?
 -> I see [count] items, [count] sizes, [count] designs. VARIANT GROUP.
 
@@ -128,15 +117,15 @@ PM: "Research for cataloging. Image at inbox/product.jpg."
 -> Matrix: [count] x [count] = [total] SKUs
 
 -> research_orchestration says: [product type] - research material, dimensions, compliance.
-[research_product_tool("[material] [product type] specifications [category]")]
-[research_product_tool("[product type] dimensions by [variant axis]")]
+[research: [material] [product type] specifications [category]]
+[research: [product type] dimensions by [variant axis]]
 
 -> compliance_research says: [product category] needs classification code, certifications.
-[research_product_tool("[product type] HSN code [market]")]
-[research_product_tool("[product type] [certification] requirements")]
+[research: [product type] HSN code [market]]
+[research: [product type] [certification] requirements]
 
 -> market_intelligence says: Generate naming, tags, description, UoM.
-[research_product_tool("[product type] naming convention ecommerce")]
+[research: [product type] naming convention ecommerce]
 -> Naming: [PATTERN] [Product] [VARIANT]
 -> Tags: [category]-[type], [feature-tags]...
 -> UoM: Sales=[unit], Inventory=[unit], Purchase=[bulk unit]

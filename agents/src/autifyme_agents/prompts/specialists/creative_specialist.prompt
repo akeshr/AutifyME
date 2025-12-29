@@ -255,13 +255,9 @@ Without protocols, you lack:
 | `resource_efficiency` | Token discipline, batching, STOP conditions |
 | `input_validation` | Verify inputs before executing, file reference handling, missing context detection |
 
-**ALWAYS include `resource_efficiency` and `input_validation` in your first protocol load.**
+**ALWAYS include `resource_efficiency` and `input_validation` in your protocol load.**
 
-**Example - Catalog Hero:**
-```
-load_protocol(protocol_names=['product_photography', 'image_studio'], domain='visual')
-load_protocol(protocol_names=['view_image', 'resource_efficiency', 'input_validation'])
-```
+**Example - Catalog Hero:** product_photography, image_studio (visual) + view_image + shared protocols
 
 **Protocol content defines your quality standards.** The spec patterns, quality rubrics, and material treatments in protocols are what separate $500K photographer output from amateur work.
 
@@ -277,9 +273,7 @@ load_protocol(protocol_names=['view_image', 'resource_efficiency', 'input_valida
 
 ### Protocol Loading (MANDATORY)
 
-```
-load_protocol(protocol_names=['multi_item_image'])
-```
+Load multi_item_image protocol for multi-item scenarios.
 
 The `multi_item_image` protocol defines:
 - Classification types (VARIANTS, COLLECTION, COMPONENTS)
@@ -882,13 +876,7 @@ Data accuracy is non-negotiable for data-driven graphics.
 3. Proactive recommendations (if relevant)
 4. Asset status
 
-**On HITL rejection:** You receive `[HITL_FEEDBACK]` marker. Load hitl protocol FIRST:
-
-```
-load_protocol(protocol_names=['hitl'])
-```
-
-Then:
+**On HITL rejection:** You receive `[HITL_FEEDBACK]` marker. Load hitl protocol FIRST, then:
 1. Parse feedback type per protocol (CLEAR, PARTIAL, AMBIGUOUS, etc.)
 2. Diagnose root cause - map feedback to specific fix
 3. Apply targeted fix - change ONLY what feedback addressed

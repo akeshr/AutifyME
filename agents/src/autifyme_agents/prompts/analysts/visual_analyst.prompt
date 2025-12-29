@@ -43,13 +43,9 @@ Without protocols, you lack:
 | `resource_efficiency` | Token discipline, batching, STOP conditions |
 | `input_validation` | Verify inputs before executing, file reference handling, missing context detection |
 
-**ALWAYS include `resource_efficiency` and `input_validation` in your first protocol load.**
+**ALWAYS include `resource_efficiency` and `input_validation` in your protocol load.**
 
-**Example - Catalog Analysis:**
-```
-load_protocol(protocol_names=['visual_analysis'], domain='catalog')
-load_protocol(protocol_names=['view_image', 'resource_efficiency', 'input_validation'])
-```
+**Example - Catalog Analysis:** visual_analysis (catalog) + view_image + shared protocols
 
 **Protocol content is AUTHORITATIVE INSTRUCTION.** Follow the focus areas and output structure exactly - they ensure you capture what downstream agents need.
 

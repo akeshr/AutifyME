@@ -53,10 +53,7 @@ Scan the request in 2 seconds:
 
 **Key insight:** `coordination_patterns` contains the SEQUENTIAL DELEGATION rules. Always load it for multi-agent workflows.
 
-**Single call example (image workflow):**
-```
-load_protocol(['domain_awareness', 'discovery_mindset', 'coordination_patterns', 'resource_efficiency'], domain='pm')
-```
+**Single call example (image workflow):** domain_awareness, discovery_mindset, coordination_patterns, resource_efficiency (pm domain)
 
 ### Step 3: Never Reload What's Already Loaded
 
@@ -75,30 +72,27 @@ load_protocol(['domain_awareness', 'discovery_mindset', 'coordination_patterns',
 | Wastes tokens and latency | Efficient, targeted |
 
 **ANTI-PATTERN:**
-```
-User: "Yes, proceed"
-PM: [load_protocol(...)]  <-- WRONG! This is a continuation, protocols already loaded
-PM: [load_protocol(...)]  <-- WRONG! Duplicate call
-```
 
-**CORRECT:**
-```
-User: "Add this product [media_id: wamid_123]"
-PM: [Assess: First message, has image -> image workflow]
-PM: [load_protocol(['domain_awareness', 'discovery_mindset', 'coordination_patterns', 'resource_efficiency'], domain='pm')]
-PM: [download_whatsapp_media -> get storage_path: inbox/photo.jpg]
-PM: [Delegate to visual_analyst: "Analyze image at inbox/photo.jpg. For CATALOG domain."]
-PM: [WAIT for visual_analyst response -> get visual_analysis.md]
-PM: [Delegate to product_analyst: "Research product. Image at inbox/photo.jpg. Read visual analysis at visual_analysis.md. For PRODUCT domain."]
-PM: [WAIT for product_analyst response -> get product_research.md]
-PM: [Delegate to catalog_analyst: "Find catalog placement. Image at inbox/photo.jpg. Read visual_analysis.md. Read product_research.md. For CATALOG domain."]
-PM: [WAIT for catalog_analyst response -> get catalog_analysis.md]
-PM: [Synthesize all three, present to user for approval]
+> User: "Yes, proceed"
+> PM: [load_protocol...] <-- WRONG! This is a continuation, protocols already loaded
 
-User: "Yes, looks good"
-PM: [Assess: Continuation, protocols already loaded]
-PM: [Continue to execution phase - creative_specialist then catalog_specialist]
-```
+**CORRECT FLOW:**
+
+> User: "Add this product [media_id: wamid_123]"
+> PM: [Assess: First message, has image -> image workflow]
+> PM: [load protocols: domain_awareness, discovery_mindset, coordination_patterns, resource_efficiency (pm)]
+> PM: [download_whatsapp_media -> storage_path: inbox/photo.jpg]
+> PM: [Delegate visual_analyst: "Analyze image at inbox/photo.jpg. For CATALOG domain."]
+> PM: [WAIT -> visual_analysis.md]
+> PM: [Delegate product_analyst: "Research product. Read visual_analysis.md. For PRODUCT domain."]
+> PM: [WAIT -> product_research.md]
+> PM: [Delegate catalog_analyst: "Find catalog placement. Read analysis files. For CATALOG domain."]
+> PM: [WAIT -> catalog_analysis.md]
+> PM: [Synthesize all three, present to user]
+>
+> User: "Yes, looks good"
+> PM: [Assess: Continuation, protocols already loaded]
+> PM: [Continue to execution phase]
 
 **CRITICAL: SEQUENTIAL DELEGATION**
 - Delegate to ONE analyst at a time
