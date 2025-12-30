@@ -7,10 +7,19 @@ This protocol is domain-agnostic and tool-agnostic.
 
 **When to load:** ANY tool response contains `[HITL_FEEDBACK]` marker.
 
-**[CRITICAL] Mental Model:** `[HITL_FEEDBACK]` means USER REJECTED your proposed action.
-- They said NO to what you submitted
-- The text after the marker tells you WHY (or is empty if no reason given)
-- NEVER resubmit the same action unchanged - that's exactly what they rejected
+**[CRITICAL] Mental Model:** `[HITL_FEEDBACK]` means USER HAS FEEDBACK on your proposed action.
+
+**First instinct: Can I resolve this myself?**
+- Question ("What is X?") → Explain and retry with clarification
+- Confusion ("didn't get that") → Rephrase/simplify and retry
+- Clear correction ("use Y instead") → Apply change and retry
+- Choice question ("A or B?") → Make recommendation, explain rationale, retry
+
+**Only escalate when you genuinely cannot proceed:**
+- Bare rejection with no explanation
+- Subjective preference you can't guess
+- Business decision outside your domain
+- After 2 failed attempts at resolution
 
 ---
 
@@ -66,10 +75,12 @@ HITL feedback arrives as a message containing `[HITL_FEEDBACK]` marker:
 | Pattern | Type | Meaning | Action |
 |---------|------|---------|--------|
 | "Reject" / empty / no reason | **BARE_REJECT** | User rejected but didn't say why | Escalate asking WHAT was wrong |
+| "What is X?" / "Why Y?" / "didn't get that" | **QUESTION** | User needs explanation | **Explain and retry** |
+| "Should we X or Y?" / "A or B?" | **CHOICE** | User asking you to decide | **Recommend with rationale, retry** |
 | "There is X" / "X as well" / "X exists" | **FACT** | User is informing you of information | Check workspace, accept if not found |
 | "I don't like X" / "X is wrong" / "not X" | **REJECTION** | User wants different value | Propose alternatives OR escalate |
-| "Change X to Y" / "Use Y" / "Make it Y" | **CLEAR** | User specifies exact change | Apply directly |
-| "Seems off" / "Check X" / "doesn't look right" | **AMBIGUOUS** | User unsure what's wrong | Escalate with diagnostic options |
+| "Change X to Y" / "Use Y" / "Make it Y" | **CLEAR** | User specifies exact change | Apply directly, retry |
+| "Seems off" / "Check X" / "doesn't look right" | **AMBIGUOUS** | User unsure what's wrong | Investigate, propose fix, retry |
 | "I like X but not Y" / "X is fine, but Y" | **PARTIAL** | Some approved, some rejected | Apply approved, handle rejected |
 | "Approve if you X" / "OK but change X" | **CONDITIONAL** | Approval with required change | Apply condition, resubmit |
 | "Actually, do Z instead" / "No, I want Z" | **REDIRECT** | User wants different action | Escalate for task change |
@@ -83,45 +94,55 @@ HITL feedback arrives as a message containing `[HITL_FEEDBACK]` marker:
       v
 [1. Is feedback empty or just "Reject"?]
       |
-      +---> YES -> BARE_REJECT
+      +---> YES -> BARE_REJECT (escalate)
       |
       v
-[2. Does feedback specify exact values?]
+[2. Is feedback a QUESTION? ("what is", "why", "didn't get")]
       |
-      +---> YES ("use X", "change to Y") -> CLEAR
+      +---> YES -> QUESTION (explain and retry)
       |
       v
-[3. Does feedback approve some, reject others?]
+[3. Is feedback asking YOU to choose? ("should we", "A or B")]
+      |
+      +---> YES -> CHOICE (recommend and retry)
+      |
+      v
+[4. Does feedback specify exact values?]
+      |
+      +---> YES ("use X", "change to Y") -> CLEAR (apply and retry)
+      |
+      v
+[5. Does feedback approve some, reject others?]
       |
       +---> YES ("X is fine but Y") -> PARTIAL
       |
       v
-[4. Does feedback have a condition?]
+[6. Does feedback have a condition?]
       |
-      +---> YES ("approve if", "OK but") -> CONDITIONAL
-      |
-      v
-[5. Does feedback redirect to different task?]
-      |
-      +---> YES ("actually do Z", "no I want") -> REDIRECT
+      +---> YES ("approve if", "OK but") -> CONDITIONAL (apply and retry)
       |
       v
-[6. Does feedback cancel entirely?]
+[7. Does feedback redirect to different task?]
+      |
+      +---> YES ("actually do Z", "no I want") -> REDIRECT (escalate)
+      |
+      v
+[8. Does feedback cancel entirely?]
       |
       +---> YES ("never mind", "cancel") -> CANCEL
       |
       v
-[7. Does feedback state facts ("there is X")?]
+[9. Does feedback state facts ("there is X")?]
       |
-      +---> YES -> FACT
+      +---> YES -> FACT (incorporate and retry)
       |
       v
-[8. Does feedback express dislike without alternative?]
+[10. Does feedback express dislike without alternative?]
       |
       +---> YES ("don't like", "wrong") -> REJECTION
       |
       v
-[9. Default] -> AMBIGUOUS
+[11. Default] -> AMBIGUOUS (investigate, propose fix, retry)
 ```
 
 ---
@@ -183,6 +204,46 @@ User rejected without explanation. You have NO information about what's wrong.
 Please ask user what specifically needs to change.
 
 **I cannot guess.** Re-submitting without knowing the issue will likely be rejected again.
+```
+
+### QUESTION
+
+User is asking for explanation or clarification. They need to UNDERSTAND before approving.
+
+**Action:** Explain clearly in hitl_summary, then resubmit.
+
+**You CAN resolve this yourself. Do NOT escalate.**
+
+```
+[QUESTION detected: "What is B in SSB?"]
+
+Action:
+1. Identify what confused user (the "B" in SKU prefix)
+2. Explain in hitl_summary: "SSB stood for Stack-Spoon-Bloom. Changing to PAV-SS (SmartStack) for clarity."
+3. Apply improvement (simpler prefix)
+4. Resubmit with explanation
+
+hitl_summary: "CLARIFIED: Changed prefix from SSB to PAV-SS (SmartStack) - the B was confusing. Approve?"
+```
+
+### CHOICE
+
+User is asking YOU to make a decision between options.
+
+**Action:** Make a recommendation with clear rationale, then resubmit.
+
+**You CAN resolve this yourself. Do NOT escalate.**
+
+```
+[CHOICE detected: "Should we use category name or collection name as family?"]
+
+Action:
+1. Identify the options (category name vs collection name)
+2. Apply your domain knowledge to recommend
+3. Explain rationale in hitl_summary
+4. Resubmit with your choice
+
+hitl_summary: "RECOMMENDATION: Using 'Pavisha SmartStack Printed Kitchen Jars' as Family Name (specific to this product set). The broader 'SmartStack Storage Collection' can house future products. Approve?"
 ```
 
 ### FACT
