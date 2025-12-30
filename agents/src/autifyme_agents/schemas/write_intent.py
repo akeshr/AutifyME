@@ -112,10 +112,12 @@ class AssetUpload(BaseModel):
 
     @field_validator("storage_path", "temp_path", mode="after")
     @classmethod
-    def validate_path_provided(cls, v: str | None, info: Any) -> str | None:
-        """Validate that at least one path is provided."""
-        # This runs for each field, actual validation in model_validator
-        return v
+    def sanitize_path(cls, v: str | None, info: Any) -> str | None:
+        """Sanitize path by stripping LLM output artifacts (trailing commas, quotes)."""
+        if v is None:
+            return v
+        # Strip whitespace and common LLM output artifacts
+        return v.strip().rstrip(",;\"'")
 
     def model_post_init(self, __context: Any) -> None:
         """Validate that exactly one of temp_path or storage_path is provided."""

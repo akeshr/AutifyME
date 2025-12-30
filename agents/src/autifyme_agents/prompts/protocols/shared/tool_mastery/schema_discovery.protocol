@@ -1,0 +1,92 @@
+<protocol name="schema_discovery" type="tool_mastery" domain="shared">
+
+## PURPOSE
+
+Schema understanding is FOUNDATIONAL for ALL database operations - reads AND writes.
+The database schema is the ONLY source of truth for columns and constraints.
+
+---
+
+## WHEN TO USE
+
+| Operation | Schema Discovery |
+|-----------|------------------|
+| **write_data** | **MANDATORY** - Must know columns, constraints, FKs |
+| **read_data** | **RECOMMENDED** - Know what to query and filter by |
+| **New domain/task** | **START HERE** - Build mental model first |
+
+---
+
+## CORE PRINCIPLE: SCHEMA IS TRUTH
+
+| Wrong Approach | Correct Approach |
+|----------------|------------------|
+| "Protocol says column is `sku`" | inspect_schema -> verify column exists |
+| "I'll filter by `family_id`" | inspect_schema -> discover it's `product_family_id` |
+| "Status can be 'active'" | inspect_schema -> enum values are UPPERCASE |
+
+**Why?** Schema evolves. Protocols may be outdated. Memory hallucinates column names.
+
+---
+
+## WHAT INSPECT_SCHEMA PROVIDES
+
+```json
+inspect_schema(tables=["table_name"], details=["structure", "relationships", "constraints"])
+```
+
+| Detail | What You Learn |
+|--------|----------------|
+| `structure` | Column names, types, nullable, defaults |
+| `relationships` | Foreign keys, join paths |
+| `constraints` | Enum values, NOT NULL, unique |
+| `samples` | Real data examples (optional) |
+
+---
+
+## FOR WRITES (MANDATORY)
+
+Before write_data:
+1. **Inspect** all target tables
+2. **Note** required columns (NOT NULL without defaults)
+3. **Note** FK dependencies (what must exist first)
+4. **Note** enum values (exact case-sensitive)
+5. **Map** your data to actual columns
+6. **Execute** write_data
+
+**VIOLATION:** write_data without inspect_schema = column errors, constraint violations, FK failures.
+
+---
+
+## FOR READS (RECOMMENDED)
+
+Before querying unfamiliar tables:
+1. **Inspect** to see what columns exist
+2. **Note** column types (affects filter syntax)
+3. **Note** relationships (for joins)
+4. **Build** queries with correct column names
+
+**Benefit:** Queries succeed first time. No "column not found" errors.
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Result | Fix |
+|--------------|--------|-----|
+| Skip schema discovery | Missing columns, wrong names | Always inspect before write |
+| Guess column names | `family_id` vs `product_family_id` | Inspect to see actual names |
+| Assume enum values | `'active'` vs `'ACTIVE'` | Inspect constraints for exact values |
+| Ignore relationships | FK constraint violations | Inspect to see dependency order |
+
+---
+
+## INTEGRATION
+
+Schema Discovery + Domain Protocols work together:
+- **Protocols** = WHAT to achieve (business logic)
+- **Schema** = HOW to achieve it (actual columns)
+
+The agent reasons: "Protocol says create product. Schema shows products table needs sku, name, description (NOT NULL). I'll provide all three."
+
+</protocol>

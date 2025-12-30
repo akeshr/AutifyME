@@ -9,12 +9,14 @@ This domain owns: product master data, families, variants, pricing, images, and 
 
 ## PRIMARY TABLES (Priority Order)
 
-When exploring the catalog, query these tables in this priority order:
+When exploring the catalog, query these tables in this priority order.
+
+**[CRITICAL] Column names below are EXPECTED - always verify via inspect_schema before writing.**
 
 ### Tier 1: Core PIM (Always Query First)
 
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
+| Table | Purpose | Expected Columns (VERIFY) |
+|-------|---------|---------------------------|
 | `products` | Master product catalog | sku, name, product_type, status, product_family_id |
 | `product_families` | Product groupings | name, sku_prefix, brand, is_configurable |
 | `customer_segments` | WHO families serve | segment_type, tone, key_benefits, pain_points |
@@ -24,33 +26,35 @@ Always query customer_segments when evaluating which family a product belongs to
 
 ### Tier 2: Variant Structure
 
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
+| Table | Purpose | Expected Columns (VERIFY) |
+|-------|---------|---------------------------|
 | `variant_axes` | Variant dimensions | name (size, color, cap_type), product_family_id |
 | `variant_values` | Values per axis | value, display_label, sku_code, price_adjustment |
 | `product_variant_values` | Product-to-value junction | product_id, variant_value_id |
 
 ### Tier 3: Pricing
 
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
+| Table | Purpose | Expected Columns (VERIFY) |
+|-------|---------|---------------------------|
 | `price_lists` | Pricing contexts | code, currency, is_tax_inclusive, list_type |
 | `product_prices` | Product prices | price_list_id, product_id, unit_price |
 
 ### Tier 4: Master Data
 
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
+| Table | Purpose | Expected Columns (VERIFY) |
+|-------|---------|---------------------------|
 | `uom` | Units of measure | code (KG, PCS, L), uom_category |
 | `industries` | NAICS industry codes | naics_code, name |
 | `product_family_industries` | Family-industry targeting | industry_use_case, industry_benefits |
 
 ### Tier 5: Assets
 
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
+| Table | Purpose | Expected Columns (VERIFY) |
+|-------|---------|---------------------------|
 | `assets` | Digital assets | storage_path, asset_type, mime_type |
 | `product_assets` | Product-asset junction | product_id, asset_id, usage_context |
+
+**Before ANY write operation:** `inspect_schema(tables=[...], details=['structure', 'constraints'])`
 
 ---
 
@@ -113,8 +117,8 @@ DRAFT -> ACTIVE -> DISCONTINUED -> ARCHIVED
 
 **Products belong to families that serve the SAME customer segment.**
 
-A "PET Food Jar 500ml" belongs to "PET Food Jars" family NOT because of material similarity,
-but because they serve the same customers (food packaging B2B buyers).
+A "[Material] [Category] [Size]" belongs to "[Material] [Category]" family NOT because of material similarity,
+but because they serve the same customers ([target segment] buyers).
 
 **Grounding Question:** "Who buys this product?"
 
@@ -137,7 +141,7 @@ but because they serve the same customers (food packaging B2B buyers).
 
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
-| Material-only assignment | "PET plastic = PET family" | "Serves food packaging B2B, same as PET Food Jars family" |
+| Material-only assignment | "[Material] = [Material] family" | "Serves [segment] [customer type], same as [Family Name] family" |
 | Skipping customer_segments | Assume fit based on name similarity | Query customer_segments, compare target customer |
 | Querying products for family fit | Products table to understand family purpose | customer_segments defines WHO family serves |
 

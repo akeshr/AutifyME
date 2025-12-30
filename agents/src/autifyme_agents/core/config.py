@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: str | None = None
     AGENT_RECURSION_LIMIT: int = 50
 
+    # Message Batching (Smart Skip for Multi-Image Handling)
+    # Debounce: 5s catches WhatsApp forwards (3-4s gaps between forwarded items)
+    MESSAGE_BATCH_DEBOUNCE_SECONDS: float = 5.0  # Debounce window duration
+    MESSAGE_BATCH_RECENT_WINDOW_SECONDS: int = 7  # Recent activity detection window
+    MESSAGE_BATCH_MAX_SIZE: int = 10  # Max messages per batch (safety limit)
+
     # Research & Web Tools
     TAVILY_API_KEY: str | None = None  # Web search & content extraction (Phase 2G)
 

@@ -5,6 +5,37 @@
 Master the write_data tool - atomic multi-table database transactions with HITL approval.
 This is the ONLY way to create, update, or delete data.
 
+---
+
+## [CRITICAL] PREREQUISITE: Schema Discovery
+
+**You MUST call inspect_schema BEFORE write_data. No exceptions.**
+
+```
+MANDATORY SEQUENCE:
+1. inspect_schema(tables=[...], details=["structure", "relationships", "constraints"])
+2. Document discovered columns, types, constraints
+3. Map your data to actual schema columns
+4. Build write_data operations with verified columns
+5. Execute write_data
+```
+
+**Why?** Schema is truth. Protocols describe business intent. Only inspect_schema reveals:
+- Actual column names (not what you remember or assume)
+- Required columns (NOT NULL without defaults)
+- Valid enum values (exact case-sensitive values)
+- FK relationships (dependency order for operations)
+
+**VIOLATION:** Calling write_data without inspect_schema will cause:
+- Missing column errors (required fields you didn't know about)
+- Wrong column names (schema changed, memory hallucinated)
+- Invalid enum values (case mismatch, outdated values)
+- FK constraint violations (wrong dependency order)
+
+**Load `schema_discovery` protocol for the complete workflow.**
+
+---
+
 ## WRITEINTENT PATTERN (5 Required Fields + Optional asset_uploads)
 
 Every write_data call requires this structure:
@@ -29,7 +60,7 @@ Use `asset_uploads` when you need the user to SEE an image during HITL approval.
   {
     "storage_path": "pending/image.png",
     "returns": "product_image",
-    "caption": "PET Jar 500ml - catalog hero",
+    "caption": "[Product] - catalog hero",
     "target_folder": "products"
   }
 ]
@@ -413,7 +444,7 @@ Create asset record with image preview for HITL. Junction created later by domai
     {
       "storage_path": "pending/20251217_studio_abc.png",
       "returns": "product_image",
-      "caption": "PET Jar 500ml - catalog hero shot",
+      "caption": "[Product Name] - catalog hero shot",
       "target_folder": "products"
     }
   ],
@@ -502,16 +533,16 @@ Multiple assets with image previews for variant families.
   "reasoning": "Processed [N] variants with consistent treatment. All verified.",
   "hitl_summary": "Created [N] product images:\n- [variant 1]\n- [variant 2]\n...\n\nApprove batch?",
   "asset_uploads": [
-    {"storage_path": "pending/t/variant_500ml.png", "returns": "img_500ml", "caption": "500ml variant"},
-    {"storage_path": "pending/t/variant_1L.png", "returns": "img_1L", "caption": "1L variant"}
+    {"storage_path": "pending/t/variant_[size_a].png", "returns": "img_size_a", "caption": "[Size A] variant"},
+    {"storage_path": "pending/t/variant_[size_b].png", "returns": "img_size_b", "caption": "[Size B] variant"}
   ],
   "operations": [
     {
       "action": "create",
       "table": "assets",
       "data": [
-        {"name": "Variant 500ml Hero", "storage_url": "@img_500ml.public_url", "asset_type": "IMAGE", "status": "ACTIVE", "caption": "@img_500ml.caption"},
-        {"name": "Variant 1L Hero", "storage_url": "@img_1L.public_url", "asset_type": "IMAGE", "status": "ACTIVE", "caption": "@img_1L.caption"}
+        {"name": "Variant [Size A] Hero", "storage_url": "@img_size_a.public_url", "asset_type": "IMAGE", "status": "ACTIVE", "caption": "@img_size_a.caption"},
+        {"name": "Variant [Size B] Hero", "storage_url": "@img_size_b.public_url", "asset_type": "IMAGE", "status": "ACTIVE", "caption": "@img_size_b.caption"}
       ],
       "returns": "assets_batch"
     }
@@ -536,20 +567,24 @@ Multiple assets with image previews for variant families.
 
 ---
 
-## BEFORE write_data
-
-**ALWAYS do these first:**
-
-1. **inspect_schema**: Know the table structure
-2. **read_data (duplicate check)**: Verify no duplicates
-3. **read_data (foreign keys)**: Get IDs for relationships
-4. **view_image (if applicable)**: Verify visual attributes
-
-Never write_data without validation.
-
----
-
 ## ANTI-PATTERNS
+
+### Anti-Pattern 0: Skipping Schema Discovery [CRITICAL - MOST COMMON ERROR]
+
+```
+WRONG:
+# Assume column names from memory or protocol
+write_data(operations=[{table: 'products', data: {'name': '...', 'sku_code': '...'}}])
+# FAILS: Column is 'sku', not 'sku_code'. Missing required 'description'.
+
+CORRECT:
+1. inspect_schema(tables=['products'], details=['structure', 'constraints'])
+2. See: sku (not sku_code), description NOT NULL, product_type enum
+3. Map data to actual columns
+4. write_data with verified column names
+```
+
+**This is the #1 cause of write_data failures.** Always verify schema before writing.
 
 ### Anti-Pattern 1: No duplicate check
 

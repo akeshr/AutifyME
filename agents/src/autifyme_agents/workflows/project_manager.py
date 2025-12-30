@@ -168,12 +168,6 @@ async def create_project_manager(
     from autifyme_agents.tools.view_image import create_view_image_tool
     pm_tools.append(create_view_image_tool())
 
-    # list_storage for PM to discover files in storage folders
-    # PM uses this for: session awareness (what's in inbox/pending), workflow planning
-    if storage is not None:
-        from autifyme_agents.tools.list_storage import create_list_storage_tool
-        pm_tools.append(create_list_storage_tool(storage))
-
     # Platform media download (with storage for inbox persistence)
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
@@ -228,11 +222,11 @@ async def create_project_manager(
         ContextEditingMiddleware(
             edits=[
                 HybridTruncateThenClearEdit(
-                    trigger_truncate=50000,  # Start truncating at 30k tokens
-                    trigger_clear=80000,  # Clear if still over 80k
-                    max_truncate_length=1000,  # Keep first 500 chars of each result
-                    keep_recent_truncate=5,  # Don't truncate last 3 results
-                    keep_recent_clear=5,  # Don't clear last 5 results
+                    trigger_truncate=80000,  # Start truncating at 30k tokens
+                    trigger_clear=120000,  # Clear if still over 80k
+                    max_truncate_length=2000,  # Keep first 500 chars of each result
+                    keep_recent_truncate=10,  # Don't truncate last 3 results
+                    keep_recent_clear=10,  # Don't clear last 5 results
                     exclude_tools=("task",),  # Preserve subagent results
                 )
             ]

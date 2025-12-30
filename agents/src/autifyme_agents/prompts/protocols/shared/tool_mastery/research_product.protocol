@@ -165,7 +165,7 @@ Returns: Item type identification, common uses, specifications.
 |--------|-------|
 | Cost per search | ~$0.008 (paid tier) |
 | Free tier | 1000 searches/month |
-| Expected usage | 2-3 searches per item |
+| Expected usage | Few targeted searches per item (stop when information gain drops) |
 | Monthly estimate | ~150 searches (well within free tier) |
 
 **Efficiency Rules:**
@@ -262,6 +262,22 @@ research_product -> identify 0.8+ relevance sources -> extract 1-2 best
   "Agent Action": "Continue workflow without research, inform user."
 }
 ```
+
+---
+
+## RESEARCH TERMINATION
+
+> **Detailed termination criteria are in `research_orchestration` protocol (Phase 6 & 7).**
+> Load it via: `load_protocol(protocol_names=['research_orchestration'], domain='product')`
+
+### Quick Reference
+
+| Query Type | Behavior |
+|------------|----------|
+| **Category queries** | Always productive - research until information gain drops |
+| **Brand queries** | If results don't mention brand, it's not indexed - pivot to category |
+
+**Key insight:** Search engines return same results for synonymous queries. Rephrasing doesn't find new data.
 
 ---
 

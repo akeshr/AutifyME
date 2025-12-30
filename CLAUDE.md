@@ -38,7 +38,7 @@ Modern LLMs are highly capable: massive context windows (200K+ tokens), strong r
 - **Design for reasoning, not automation:** Agents should analyze situations and decide, not follow scripts
 
 **[CRITICAL] The Domain Grounding Reality:**
-LLMs are general-purpose - they DON'T know your tools, business rules, or domain expectations. Canonical examples (2-4 complex, pattern-illustrative) bridge this gap. Use `agent-improvement` skill to diagnose and fix underperforming agents.
+LLMs are general-purpose - they DON'T know your tools, business rules, or domain expectations. Canonical examples (2-4 complex, pattern-illustrative, ABSTRACT with `[placeholders]`) bridge this gap. Use `agent-improvement` skill to diagnose and fix underperforming agents.
 
 ### **[CRITICAL] ULTRATHINK: First-Principles Engineering - Clean Slate, Not Frankenstein**
 
@@ -110,7 +110,8 @@ Invoke project skills automatically at the start of relevant work - do not wait 
 
 ### Prompt Engineering for Autonomy
 - **Version prompts alongside code** - no hardcoded instructions in agent logic
-- **XML structure, right altitude, canonical examples** - no Python code in prompts
+- **XML structure, right altitude, abstract examples** - no Python code in prompts
+- **[CRITICAL] Abstract all examples:** LLMs copy-paste. Use `[placeholders]` for product data, prices, file paths. Tool syntax only in tool_mastery protocols.
 
 ### Documentation Strategy
 - **[CRITICAL] Check first, update rather than duplicate**: Review existing docs before creating new ones

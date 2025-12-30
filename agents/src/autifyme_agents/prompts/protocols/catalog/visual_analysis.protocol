@@ -178,10 +178,14 @@ When an image contains multiple products, you MUST output an actionable manifest
 | Generic Term | Catalog Meaning |
 |--------------|-----------------|
 | Item | Product |
-| VARIANTS | Same product type, different size/color/design |
-| COLLECTION | Different product types (e.g., jar + lid + label) |
-| COMPONENTS | Disassembled product parts |
+| VARIANTS | Same product type, different size/color/design (complete products in grid) |
+| COLLECTION | Different product types (e.g., jar + lid + label in same image) |
+| COMPONENTS | **Different PARTS across multiple images** (bodies in one, lids in another) -> COMPOSE together |
 | Variant Axes | Size, Color, Design, Material |
+
+**CRITICAL DISTINCTION:**
+- **VARIANTS** = Complete products in a grid -> EXTRACT each individually
+- **COMPONENTS** = Incomplete parts across images -> COMPOSE into complete products
 
 ### Classification Matrix
 
@@ -192,6 +196,7 @@ When an image contains multiple products, you MUST output an actionable manifest
 | Same product type, different colors/designs | VARIANTS | Multiple SKUs, variant axis |
 | Different product types | COLLECTION | Multiple families or bundled set |
 | Product with accessories | COLLECTION | Main product + accessory SKUs |
+| **Different images contain different PARTS** (bodies, lids, accessories) | **COMPONENTS** | **COMPOSE parts into complete product shots** |
 
 ### Multi-Product Output Template (MANDATORY FORMAT)
 
@@ -250,30 +255,30 @@ See `multi_item_image.protocol` for the full position vocabulary (top-left, cent
 
 | Axis | Values Found |
 |------|--------------|
-| Size | Large (1L), Medium (500ml), Small (250ml) |
-| Design | Blossoms (blue lid), Charming Flowers (yellow lid), Spring Flowers (pink lid) |
+| Size | [Size A] ([volume A]), [Size B] ([volume B]), [Size C] ([volume C]) |
+| Design | [Design A] ([color A] lid), [Design B] ([color B] lid), [Design C] ([color C] lid) |
 
 ### Extraction Targets
 
 | # | Description | Position | Size | Design |
 |---|-------------|----------|------|--------|
-| 1 | Large PET jar with blue lid, Blossoms floral print | top-left | Large | Blossoms |
-| 2 | Large PET jar with yellow lid, Charming Flowers print | top-center | Large | Charming Flowers |
-| 3 | Large PET jar with pink lid, Spring Flowers print | top-right | Large | Spring Flowers |
-| 4 | Medium PET jar with blue lid, Blossoms floral print | middle-left | Medium | Blossoms |
-| 5 | Medium PET jar with yellow lid, Charming Flowers print | middle-center | Medium | Charming Flowers |
-| 6 | Medium PET jar with pink lid, Spring Flowers print | middle-right | Medium | Spring Flowers |
-| 7 | Small PET jar with blue lid, Blossoms floral print | bottom-left | Small | Blossoms |
-| 8 | Small PET jar with yellow lid, Charming Flowers print | bottom-center | Small | Charming Flowers |
-| 9 | Small PET jar with pink lid, Spring Flowers print | bottom-right | Small | Spring Flowers |
+| 1 | [Size A] [product] with [color A] lid, [Design A] print | top-left | [Size A] | [Design A] |
+| 2 | [Size A] [product] with [color B] lid, [Design B] print | top-center | [Size A] | [Design B] |
+| 3 | [Size A] [product] with [color C] lid, [Design C] print | top-right | [Size A] | [Design C] |
+| 4 | [Size B] [product] with [color A] lid, [Design A] print | middle-left | [Size B] | [Design A] |
+| 5 | [Size B] [product] with [color B] lid, [Design B] print | middle-center | [Size B] | [Design B] |
+| 6 | [Size B] [product] with [color C] lid, [Design C] print | middle-right | [Size B] | [Design C] |
+| 7 | [Size C] [product] with [color A] lid, [Design A] print | bottom-left | [Size C] | [Design A] |
+| 8 | [Size C] [product] with [color B] lid, [Design B] print | bottom-center | [Size C] | [Design B] |
+| 9 | [Size C] [product] with [color C] lid, [Design C] print | bottom-right | [Size C] | [Design C] |
 
 ### Processing Strategies
 
 | Strategy | Result | Recommended When |
 |----------|--------|------------------|
-| INDIVIDUAL | 9 hero shots | Catalog (each SKU needs asset) |
-| BY_SIZE | 3 shots (Large set, Medium set, Small set) | Size comparison |
-| BY_DESIGN | 3 shots (Blossoms range, Charming range, Spring range) | Design showcase |
+| INDIVIDUAL | N hero shots | Catalog (each SKU needs asset) |
+| BY_SIZE | M shots (one per size) | Size comparison |
+| BY_DESIGN | K shots (one per design) | Design showcase |
 | COMPOSITE | 1 family shot | Marketing, range display |
 
 **Default for catalog:** INDIVIDUAL
@@ -289,6 +294,63 @@ See `multi_item_image.protocol` for the full position vocabulary (top-left, cent
 | Different shapes entirely | COLLECTION | N/A |
 | Product + cap/lid separately | COLLECTION | N/A |
 | Same product from multiple angles | SINGLE_ITEM | N/A |
+
+### COMPONENTS Detection (CRITICAL - Cross-Image Analysis)
+
+**When analyzing MULTIPLE images, check if they show different PARTS of products:**
+
+| Cross-Image Signal | Classification | Action |
+|--------------------|----------------|--------|
+| Image A has bodies, Image B has lids | **COMPONENTS** | Parts to COMPOSE into complete products |
+| Image A has products, Image B has accessories (spoons, handles) | **COMPONENTS** | Accessories to ADD to products |
+| Each image has same product type but dismantled | **COMPONENTS** | Reassemble for hero shots |
+| Grid of bodies + separate image with lids array | **COMPONENTS** | Match and compose |
+
+**COMPONENTS Output Template:**
+
+```markdown
+## MULTI-IMAGE ASSESSMENT
+
+- **Classification:** COMPONENTS
+- **Rationale:** Multiple images contain different PARTS of complete products
+
+### Component Images
+
+| Image | Contains | Count | Notes |
+|-------|----------|-------|-------|
+| [path1] | Jar bodies | 9 (3x3 grid) | Main product bodies |
+| [path2] | Colored lids | 4 colors | Lid accessories |
+| [path3] | Measuring spoons | 4 colors | Spoon accessories |
+
+### Composition Matrix
+
+| Variant | Body From | Lid From | Accessory From |
+|---------|-----------|----------|----------------|
+| Large Blue | [path1] top-left | [path2] blue lid | [path3] blue spoon |
+| Large Yellow | [path1] mid-left | [path2] yellow lid | [path3] yellow spoon |
+| ... | ... | ... | ... |
+
+### CRITICAL - Processing Strategy
+
+**COMPOSE, don't just EXTRACT.**
+
+Each hero shot should combine:
+1. Body from grid image (extraction)
+2. Matching lid from lid image (overlay/composite)
+3. Accessory from accessory image (positioned beside)
+
+Use image_studio with multiple labeled images:
+```
+images=[
+  {path: 'grid.jpg', label: 'body'},
+  {path: 'lids.jpg', label: 'lid'},
+  {path: 'spoons.jpg', label: 'accessory'}
+]
+composition={position: '[body] center, [lid] on top, [accessory] beside'}
+```
+```
+
+**Anti-Pattern:** Treating COMPONENTS as VARIANTS and just extracting from grid - results in incomplete products (bodies without lids).
 
 ---
 
@@ -327,8 +389,8 @@ After visual analysis, proceed to:
 
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
-| Surface-level analysis | "This is a plastic bottle" | Full detail: "500ml PET bottle, honeycomb texture, screw cap, clear, B2B food positioning" |
-| Material-only focus | Only identify PET vs Glass | Material + Form + Features + Target Customer - all four inform decisions |
-| Ignoring target customer | "PET jar = PET family" | Consider finish and positioning: "Premium finish suggests D2C cosmetic, check cosmetic families" |
+| Surface-level analysis | "This is a plastic bottle" | Full detail: "[size] [material] [product], [texture], [closure], [finish], [segment] positioning" |
+| Material-only focus | Only identify material | Material + Form + Features + Target Customer - all four inform decisions |
+| Ignoring target customer | "[material] [product] = [material] family" | Consider finish and positioning: "Premium finish suggests D2C cosmetic, check cosmetic families" |
 
 </protocol>

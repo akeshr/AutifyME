@@ -74,6 +74,9 @@ def build_storage_url(path: str, bucket: str = "assets") -> str:
     # Import here to avoid circular dependency
     from autifyme_agents.core.execution_context import is_user_path, to_storage_path
 
+    # Sanitize LLM output artifacts (trailing commas, quotes, whitespace)
+    path = path.strip().rstrip(",;\"'")
+
     # Normalize
     path = path.lstrip("/\\")
 
@@ -104,7 +107,8 @@ def is_storage_path(path: str) -> bool:
     if path.startswith(("http://", "https://")):
         return False
 
-    normalized = path.lstrip("/\\")
+    # Sanitize LLM output artifacts before checking
+    normalized = path.strip().rstrip(",;\"'").lstrip("/\\")
 
     # Windows absolute paths
     if len(normalized) > 1 and normalized[1] == ":":

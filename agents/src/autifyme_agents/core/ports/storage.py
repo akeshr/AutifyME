@@ -9,6 +9,7 @@ The interface is split into focused mixins for organization:
 - ValidationMixin: Dry-run and constraint checking
 - AnalyticsMixin: Workflow outcomes and schema intelligence
 - WebhookMixin: Idempotency for duplicate message detection
+- PendingMessageMixin: Batching for rapid-fire messages
 - LifecycleMixin: Transaction and cleanup operations
 - FileStorageMixin: Asset upload/download operations
 """
@@ -17,6 +18,7 @@ from ._analytics_mixin import AnalyticsMixin
 from ._crud_mixin import CRUDMixin
 from ._file_storage_mixin import FileStorageMixin
 from ._lifecycle_mixin import LifecycleMixin
+from ._pending_message_mixin import PendingMessageMixin
 from ._validation_mixin import ValidationMixin
 from ._webhook_mixin import WebhookMixin
 
@@ -26,6 +28,7 @@ class StorageInterface(
     ValidationMixin,
     AnalyticsMixin,
     WebhookMixin,
+    PendingMessageMixin,
     LifecycleMixin,
     FileStorageMixin,
 ):
@@ -37,6 +40,7 @@ class StorageInterface(
     - ValidationMixin: validate_entity_data, check_constraint_violations
     - AnalyticsMixin: get_company_profile, workflow_outcome tracking, schema stats
     - WebhookMixin: check_and_mark_message_processed
+    - PendingMessageMixin: queue_pending_message, fetch_and_clear_batch
     - LifecycleMixin: transaction, cleanup
     - FileStorageMixin: upload_asset, delete_asset, get_asset_public_url
 

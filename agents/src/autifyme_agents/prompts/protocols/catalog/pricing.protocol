@@ -72,14 +72,14 @@ Query variant_values table for price_adjustment by axis.
 
 | Variant | Adjustment |
 |---------|------------|
-| Family Base | Rs 100 |
-| Size 500ml | +Rs 0 (base) |
-| Size 1L | +Rs 20 |
-| Color Blue | +Rs 5 |
+| Family Base | [Currency] [Base] |
+| Size [A] | +[Currency] 0 (base) |
+| Size [B] | +[Currency] [adj-1] |
+| Color [X] | +[Currency] [adj-2] |
 
 **Results:**
-- 500ml Clear: Rs 100 + 0 + 0 = Rs 100
-- 1L Blue: Rs 100 + 20 + 5 = Rs 125
+- [Size A] [Color default]: [Base] + 0 + 0 = [Base]
+- [Size B] [Color X]: [Base] + [adj-1] + [adj-2] = [Total]
 
 ---
 
@@ -136,13 +136,13 @@ User Price Provided?
 ```json
 {
   "recommended_price": 100.00,
-  "currency": "INR",
+  "currency": "[CURRENCY]",
   "price_source": "family_inference | user_provided | market_research | cost_plus",
   "confidence": "high | medium | low",
   "breakdown": {
     "base_price": 95.00,
     "variant_adjustments": [
-      {"axis": "size", "value": "500ml", "adjustment": 0},
+      {"axis": "size", "value": "[size]", "adjustment": 0},
       {"axis": "color", "value": "blue", "adjustment": 5}
     ],
     "total_adjustments": 5.00

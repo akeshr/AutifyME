@@ -9,80 +9,89 @@ Defines how PM sequences domain work and handles dependencies.
 
 ## COORDINATION MODES
 
-### Mode 1: Sequential Chain
+### Mode 1: Sequential Chain (ANALYSIS PHASE)
 
-Domains execute in strict order, each depending on previous.
+**CRITICAL: ONE AT A TIME. NEVER PARALLEL.**
 
-```
-Domain A -> Domain B -> Domain C
-```
-
-**Use When:**
-- Each step depends on previous output
-- Data flows forward through chain
-- Example: Catalog addition (visual -> catalog -> product -> creative -> specialist)
-
-**Pattern:**
-```
-1. Delegate to Domain A
-2. Wait for A's result
-3. Include A's output file in Domain B delegation
-4. Wait for B's result
-5. Continue chain...
-```
-
-### Mode 2: Parallel Fan-Out
-
-Multiple domains execute simultaneously, then converge.
+Analysis phase follows strict sequence because each step enriches the next.
 
 ```
-         -> Domain A -+
-        /             |
-Start ---> Domain B --+--> Converge
-        \             |
-         -> Domain C -+
+Visual -> [WAIT] -> Product -> [WAIT] -> Catalog
 ```
 
-**Use When:**
-- Domains are independent
-- Results will be synthesized later
-- Example: After visual analysis, catalog and product can run parallel
+**Execution Pattern:**
+```
+1. Delegate to visual_analyst
+2. WAIT for visual_analyst response (get visual_analysis.md)
+3. THEN delegate to product_analyst (include visual_analysis.md)
+4. WAIT for product_analyst response (get product_research.md)
+5. THEN delegate to catalog_analyst (include BOTH files)
+6. WAIT for catalog_analyst response
+7. Synthesize all three for user
+```
 
-**Pattern:**
+**Why This Order:**
+- Visual tells us WHAT we're looking at ([product description])
+- Product researches EVERYTHING about it (specs, HSN, compliance, naming, positioning)
+- Catalog uses BOTH to search effectively (find similar products with rich context)
+
+**VIOLATION - Parallel Analysis:**
 ```
-1. visual_analyst (required first - identifies product)
-2. PARALLEL:
-   - catalog_analyst (uses visual findings)
-   - product_analyst (uses visual findings)
-3. CONVERGE: PM synthesizes both for user
+WRONG: Call Visual, Product, Catalog at the same time
+-> Product has NO visual findings to use
+-> Catalog has NO product research to search with
+-> Each agent works BLIND = garbage output
 ```
+
+**Why parallel fails:**
+- Product analyst receives delegation but visual_analysis.md doesn't exist yet
+- Catalog analyst receives delegation but neither file exists yet
+- You just wasted 3 agent calls and got useless results
+
+### Mode 2: Intelligent Sequencing
+
+**DECIDE based on information needs, not fixed patterns.**
+
+| Scenario | Sequence | Reasoning |
+|----------|----------|-----------|
+| **Full cataloging** | Visual -> Product -> Catalog | Catalog needs rich context to search |
+| **Quick lookup ("do we have this?")** | Visual -> Catalog only | No external research needed |
+| **Research only ("what is this?")** | Visual -> Product only | No catalog search needed |
+| **Just process image** | Visual (optional) -> Creative | Skip analysts entirely |
+
+**Key Principle:** Ask yourself: "What information does the NEXT agent need to do its job well?"
 
 ### Mode 3: Approval Gate
 
-Sequential chain with user checkpoint before expensive operations.
+Sequential chain with user checkpoint before execution.
 
 ```
-Analysis -> [USER APPROVAL] -> Execution
+Analysis -> [PRESENT FINDINGS] -> [USER DECIDES] -> Execution (per user request)
 ```
 
 **Use When:**
-- Expensive operations follow analysis
-- User might reject or modify
-- Example: Image processing only after user approves catalog addition
+- User should choose what to do next
+- Multiple execution options exist
+- User controls order and scope of execution
 
 **Pattern:**
 ```
-PHASE 1 - ANALYSIS (raw image sufficient):
-1. visual_analyst -> visual_analysis.md
-2. catalog_analyst -> catalog_analysis.md (parallel with 3)
-3. product_analyst -> product_research.md (parallel with 2)
-4. PM presents to user
+PHASE 1 - ANALYSIS (sequential - each enriches next):
+1. visual_analyst -> visual_analysis.md (identify product)
+2. product_analyst -> product_research.md (research EVERYTHING, uses visual)
+3. catalog_analyst -> catalog_analysis.md (search with BOTH findings)
+4. PM synthesizes and presents findings
+5. PM asks open-ended: "What would you like to do next?"
 
-[USER APPROVAL GATE]
+[USER DECIDES - no numbered options]
 
-PHASE 2 - EXECUTION (only after approval):
-5. creative_specialist -> processed images
-6. catalog_specialist -> catalog records
+PHASE 2 - EXECUTION (per user's request):
+User can request ANY combination in ANY order:
+- "Create catalog entry" -> catalog_specialist
+- "Process the image" -> creative_specialist
+- "Both, catalog first" -> catalog_specialist -> creative_specialist
+- "Both, images first" -> creative_specialist -> catalog_specialist
+- "Full flow" -> creative_specialist -> catalog_specialist (standard)
 ```
 
 ---
@@ -98,96 +107,446 @@ Most common multi-domain workflow. Memorize this.
       |
       v
 [1. visual_analyst] -----> visual_analysis_{image_basename}.md
+      |                    (identifies: [product type], [key features])
+      v
+[2. product_analyst] -----> product_research_{item_identifier}.md
+      |                     (uses visual findings)
+      |                     (researches: specs, HSN, compliance, naming, positioning)
+      v
+[3. catalog_analyst] -----> catalog_analysis_{item_identifier}.md
+      |                     (uses BOTH visual AND product findings)
+      |                     (searches with rich context: "[product specs], [HSN code]")
+      v
+[4. PM synthesizes, presents findings]
       |
-      v (visual findings available)
+      v
+[5. PM asks: "What would you like to do next?"]
       |
-      +--------+--------+
-      |                 |
-      v                 v
-[2. catalog_analyst]  [3. product_analyst]
-      |                 |
-      v                 v
-catalog_analysis_{item_identifier}.md   product_research_{item_identifier}.md
-      |                 |
-      +--------+--------+
-               |
-               v
-[4. PM synthesizes, presents to user]
-               |
-               v
-      [USER APPROVAL GATE]
-               |
-               v
-[5. creative_specialist] -> pending/processed.png
-               |
-               v
-[6. catalog_specialist] -> catalog records created
-               |
-               v
-[HITL APPROVAL] -> published
+      v
+[USER DECIDES - FULL FLEXIBILITY]
+      |
+      +---> "Add to catalog" -> catalog_specialist first
+      |
+      +---> "Process image" -> creative_specialist first
+      |
+      +---> "Both, catalog first" -> catalog_specialist -> creative_specialist
+      |
+      +---> "Both, images first" -> creative_specialist -> catalog_specialist
+      |
+      +---> "Full flow" / "yes" -> creative_specialist -> catalog_specialist (standard)
 ```
 
 ### Key Dependencies
 
 | Step | Depends On | Why |
 |------|------------|-----|
-| catalog_analyst | visual_analyst | Needs product identification to search catalog |
-| product_analyst | visual_analyst | Needs product identification for research |
+| product_analyst | visual_analyst | Needs product identification to research the right thing |
+| catalog_analyst | visual_analyst + product_analyst | Needs BOTH to search catalog effectively with rich context |
 | PM synthesis | All analysts | Needs all findings for complete recommendation |
-| creative_specialist | User approval | Don't process if user will reject |
-| catalog_specialist | creative_specialist | Needs processed image paths for asset linking |
+| creative_specialist | User request | Only process when user asks for image processing |
+| catalog_specialist | User request | Only create catalog entry when user asks |
+| asset linking | Both IDs available | Link asset to product requires both product_id and asset_id |
+
+### Flexible Order: Detailed Flows
+
+**User chooses what and in what order. PM routes accordingly:**
+
+#### Flow A: Catalog Only (no image)
+```
+User: "Just add to catalog" / "entry only"
+PM -> catalog_specialist: Create product (no asset_id)
+     <- Returns: product_id
+[DONE] Product exists without image. User can add image later.
+```
+
+#### Flow B: Image Only (with asset)
+```
+User: "Process the image" / "create the asset"
+PM -> creative_specialist: Create asset
+     <- Returns: asset_id
+[DONE] Asset exists, not linked. User can create catalog entry later.
+```
+
+#### Flow C: Image Only (ephemeral)
+```
+User: "Download only" / "just for me"
+PM -> creative_specialist: "Standalone - no asset record"
+     <- Returns: storage_path (no asset_id)
+[DONE] File in pending/. No asset record. Cannot link to catalog.
+```
+
+#### Flow D: Catalog First (2 steps)
+```
+User: "Catalog first, then images"
+
+Step 1: PM -> catalog_specialist: Create product (no asset_id)
+        <- Returns: product_id (CAPTURE THIS)
+
+Step 2: PM -> creative_specialist: Create asset, product_id=[product_id]
+        <- Creative creates asset + product_assets junction
+        <- Returns: asset_id
+
+[DONE] Product + Asset + Junction all exist.
+```
+
+**Key:** Creative handles junction when given product_id (same pattern as campaign_assets).
+
+#### Flow E: Images First (standard)
+```
+User: "Images first" / "yes" / "full flow"
+
+Step 1: PM -> creative_specialist: Create asset
+        <- Returns: asset_id
+
+Step 2: PM -> catalog_specialist: Create product, asset_id=[asset_id]
+        <- Returns: product_id + junction
+
+[DONE] Product + Asset + Junction all exist.
+```
+
+### ID Tracking (Both Flows are 2 Steps)
+
+**PM captures from Step 1, passes to Step 2:**
+
+| Flow | Step 1 Returns | Pass to Step 2 | Step 2 Creates |
+|------|----------------|----------------|----------------|
+| Catalog first | product_id | product_id -> creative | Asset + junction |
+| Images first | asset_id | asset_id -> catalog | Product + junction |
+
+**Both specialists can create product_assets junctions.** Whoever runs second receives the existing ID and creates the junction.
+
+### Why Sequential (Not Parallel) for Analysis
+
+```
+WRONG (parallel):
+- Catalog searches with just "[product type]"
+- Finds generic matches, wrong family recommendations
+
+CORRECT (sequential):
+- Catalog searches with "[size] [material] [product], [HSN], [features], [positioning]"
+- Finds precise matches, accurate family recommendations
+```
+
+---
+
+## OUTPUT SYNTHESIS (CRITICAL)
+
+**Synthesis is NOT concatenation.** You combine analyst outputs into unified understanding.
+
+### What Synthesis Means
+
+| NOT Synthesis (Wrong) | Synthesis (Correct) |
+|-----------------------|---------------------|
+| "Visual says X. Catalog says Y. Product says Z." | "This is [unified description]. Key insight: [cross-domain pattern]." |
+| Relay each output verbatim | Distill into coherent recommendation |
+| List findings sequentially | Combine into single picture |
+
+### The Four Synthesis Dimensions
+
+When analysts return, extract and combine:
+
+| Dimension | What to Extract | Example |
+|-----------|-----------------|---------|
+| **Identity** | What is this product? (from visual + research) | "[size] [material] [product] with [feature], [grade]" |
+| **Placement** | Where does it fit? (from catalog) | "Fits [Family] family, similar to products at [price range]" |
+| **Compliance** | What rules apply? (from product) | "[HSN], [GST%], [certifications]" |
+| **Positioning** | How to price/position? (cross-domain) | "[segment] - [feature] commands [X%] over [baseline]" |
+
+### Detect Cross-Domain Patterns
+
+Look for patterns that emerge ACROSS analyst outputs:
+
+| Pattern Type | Signals | Insight |
+|--------------|---------|---------|
+| **Premium alignment** | Visual: premium finish + Product: premium market + Catalog: premium family exists | Strong premium positioning supported across all domains |
+| **Positioning conflict** | Visual: premium finish + Catalog: matched to utility family | CONFLICT - family may be wrong fit |
+| **Gap opportunity** | Visual: unique feature + Catalog: no similar products | First-to-catalog opportunity |
+| **Compliance trigger** | Product: food-contact + Visual: food container | FSSAI/food-grade requirements apply |
+
+### Detect Conflicts (MANDATORY)
+
+Before presenting to user, check for mismatches:
+
+| Analyst A Says | Analyst B Says | Conflict? | Resolution |
+|----------------|----------------|-----------|------------|
+| Visual: "Premium decorative" | Catalog: "Utility family fit" | **YES** | Surface to user OR re-check catalog for premium families |
+| Visual: "[material]" | Product: "[HSN] ([material])" | No | Aligned - proceed |
+| Visual: "[size] estimate" | Product: "Standard is [actual size]" | Minor | Use research value (more precise) |
+| Catalog: "[price range] similar" | Product: "Premium = [X%] over" | No | Combine: "[calculated range] for premium tier" |
+
+**CRITICAL:** If conflict detected, either resolve or surface to user. Never proceed with unresolved conflicts.
+
+### Synthesis Template
+
+Use this pattern when presenting to user after analysis phase:
+
+```
+**Product:** [Unified identity from visual + research]
+
+**Key Findings:**
+- [Most important insight - often cross-domain pattern]
+- [Placement recommendation with rationale]
+- [Pricing/positioning insight]
+
+**Compliance:** [HSN, certifications - brief]
+
+[If conflict exists:]
+**Note:** [Explain the conflict and options]
+
+---
+**What would you like to do next?**
+```
+
+**CRITICAL:** Open-ended question. User decides WHAT and in WHAT ORDER. Do NOT present numbered options - they constrain the user.
+
+User can request any combination:
+- Catalog entry first, then images
+- Images first, then catalog
+- Just catalog, no images
+- Just images, no catalog
+- Both together (standard flow)
+- Adjust something first
+
+### Synthesis Examples
+
+**Good Synthesis (open-ended):**
+```
+"This is a [size] [material] [product] with [feature] - [segment] positioning.
+
+Key findings:
+- [Segment]: Visual shows [feature], research confirms [X%] premium
+- Family: Fits '[Family]' at [price tier]
+- Compliance: [HSN], [GST%]
+
+What would you like to do next?"
+```
+
+**Bad Synthesis (Concatenation):**
+```
+"Visual analyst found it's a [product].
+Catalog analyst found it fits [Family] family.
+Product analyst found [HSN]."
+```
+
+### When to Surface Conflicts to User
+
+| Conflict Type | PM Action |
+|---------------|-----------|
+| **Resolvable by domain authority** | Resolve per conflict_resolution protocol, note resolution |
+| **Positioning/business decision** | Surface to user with options |
+| **Factual contradiction** | Investigate first, then surface if unresolved |
+
+**Example (surfacing):**
+```
+"I notice a positioning question:
+- Visual analysis shows premium decorative features
+- Current family '[Family]' serves utility/budget segment
+
+Options:
+1. Create as premium variant in current family (may be outlier)
+2. Create new '[Material] Premium [Category]' family
+3. Find existing premium family that fits
+
+Which approach fits your catalog strategy?"
+```
+
+### Synthesis Anti-Patterns
+
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| **Concatenation** | "Visual says X. Catalog says Y." | Combine into unified picture |
+| **Missing cross-domain** | Report each domain separately | Look for patterns ACROSS outputs |
+| **Hidden conflicts** | Proceed despite mismatches | Detect and resolve or surface |
+| **Raw relay** | Pass analyst text verbatim | Distill into concise insights |
+| **No recommendation** | Just present facts | Always include what to do next |
+
+### Non-Execution Responses
+
+**User may NOT request execution. Handle these:**
+
+| User Says | Type | PM Action |
+|-----------|------|-----------|
+| "Adjust the pricing" / "Change family" / "Fix X" | **ADJUST** | Clarify what to change, then re-present updated synthesis |
+| "Show me the analysis again" / "Repeat" | **REPEAT** | Re-read files, re-synthesize, re-present |
+| "Skip for now" / "Later" / "Not now" | **DEFER** | Acknowledge, offer to save as draft, end workflow |
+| "Cancel" / "Never mind" / "Stop" | **CANCEL** | See WORKFLOW CANCELLATION PATTERN below |
+| "I'm not sure" / "What do you recommend?" | **GUIDANCE** | Give clear recommendation with rationale |
+
+**ADJUST handling:**
+```
+User: "Adjust the pricing to [value]"
+
+PM response:
+1. Acknowledge: "Understood, adjusting pricing to [value]."
+2. Update your mental model (NOT the analyst files - they're point-in-time)
+3. Re-present synthesis with updated value:
+   "Updated recommendation: ... Pricing: [new value] (your input). What would you like to do next?"
+```
+
+**Key:** User corrections override analyst findings. Include user input in specialist delegation.
+
+---
+
+## CROSS-DOMAIN REFINEMENT
+
+**When synthesis reveals conflict or need for deeper analysis.**
+
+With sequential flow (Visual -> Product -> Catalog), most cross-domain information already flows forward. However, synthesis may still reveal conflicts that need resolution.
+
+### When to Trigger Second Pass
+
+| Signal in Synthesis | Action |
+|---------------------|--------|
+| Catalog "no family fits" + Product "common product type" | Re-route catalog_analyst with product context |
+| Catalog matched utility family + Product says "premium segment" | Re-route catalog_analyst with positioning context |
+| Catalog found family + Product says "special compliance needed" | Re-route catalog_analyst to verify compliance support |
+| Product "standard specs" + Catalog found "premium family" | Re-route product_analyst to research premium differentiation |
+
+### Second Pass Delegation Template
+
+```
+"[Re-analyze based on new context]
+
+NEW CONTEXT (from [other_analyst]):
+- [Key finding that changes analysis]
+- [Relevant insight]
+
+Your original analysis at: [original_file]
+Update or confirm your recommendation based on this new context.
+
+For [DOMAIN] domain."
+```
+
+### Example: Positioning Conflict Resolution
+
+```
+[PM reads both files during synthesis]
+
+catalog_analysis: "Fits '[Utility Family]' family, [low price] tier"
+product_research: "Premium segment product, [feature] commands [X%] premium"
+
+[CONFLICT DETECTED: Utility family vs Premium positioning]
+
+PM delegates second pass to catalog_analyst:
+"Re-analyze family fit with positioning context.
+
+NEW CONTEXT (from product_analyst):
+- Product is premium segment ([feature])
+- Commands [X%] premium over plain variants
+- Market positioning: [premium price range]
+
+Your original analysis at: catalog_analysis_[product].md
+Find premium families or confirm utility family can support premium tier.
+
+For CATALOG domain."
+```
+
+### When NOT to Trigger Second Pass
+
+| Situation | Action |
+|-----------|--------|
+| Minor discrepancy ([size A] vs [size B]) | Use more precise value, no second pass |
+| Aligned findings | Proceed to user approval |
+| User can decide | Surface options to user, don't over-analyze |
+
+**Principle:** Second pass is for genuine conflicts that would change the outcome, not for minor refinements.
+
+### Refinement Limit
+
+**Max 1 refinement pass.** If conflict persists after second pass:
+1. Present both perspectives to user
+2. Let user decide which direction to take
+3. Do NOT trigger third pass
+
+```
+First pass (SEQUENTIAL: Visual -> Product -> Catalog) -> Conflict detected in synthesis -> Second pass (targeted re-analysis)
+                                                                                                    |
+                                                                                                    v
+                                                                                              Still conflict?
+                                                                                                    |
+                                                                                              +-----+-----+
+                                                                                              |           |
+                                                                                           Resolved    Unresolved
+                                                                                              |           |
+                                                                                              v           v
+                                                                                          Proceed    Surface to user
+                                                                                                     (user decides)
+```
+
+---
 
 ### File Routing (CRITICAL)
 
-**PM MUST include these files in each delegation. Agents cannot see your conversation.**
+**PM MUST include these in each delegation. Agents cannot see your conversation.**
 
-| From | Artifact | Routes To | PM Action |
-|------|----------|-----------|-----------|
-| visual_analyst | visual_analysis_{image_basename}.md | catalog_analyst, product_analyst, creative_specialist | Include path in ALL subsequent delegations |
-| catalog_analyst | catalog_analysis_{item_identifier}.md | catalog_specialist | Include path when delegating to catalog_specialist |
-| product_analyst | product_research_{item_identifier}.md | catalog_specialist | Include path when delegating to catalog_specialist |
-| creative_specialist | asset_id (UUID) | catalog_specialist | Include asset_id when delegating catalog creation |
+**CRITICAL: IMAGE PATH TO EVERY AGENT**
 
-**Note:** Creative specialist now returns asset_id (not storage_path). Asset is already created and HITL-approved for image quality.
+Every agent in an image workflow receives `Source image at: inbox/photo.jpg`. Not just visual_analyst - ALL of them:
+- product_analyst: Can verify visual findings, see details for research
+- catalog_analyst: Can compare with existing products visually
+- creative_specialist: Needs source for processing
+- catalog_specialist: Reference during record creation
+
+**WRONG:** Only passing image to visual_analyst
+**CORRECT:** Every delegation includes the source image path
+
+| Artifact | Source | Routes To | PM Action |
+|----------|--------|-----------|-----------|
+| **Source image path** | User upload | ALL agents in image workflow | Include in EVERY delegation when image-based |
+| visual_analysis_{image}.md | visual_analyst | product, catalog, creative, specialist | Include in all subsequent delegations |
+| product_research_{item}.md | product_analyst | catalog_analyst, creative, catalog_specialist | Include for naming, specs, and catalog |
+| catalog_analysis_{item}.md | catalog_analyst | creative, catalog_specialist | Include for family context and catalog creation |
+| asset_id (UUID) | creative_specialist | catalog_specialist | Include when linking asset to product |
+
+**Note:** Creative specialist returns asset_id (not storage_path). Asset is already HITL-approved for image quality.
 
 ### Example: Full Catalog Addition with File Routing
 
 ```
 Step 1: visual_analyst
-PM: "Analyze image at inbox/photo.jpg. For CATALOG domain."
--> Returns: "Analysis written to visual_analysis_pet_jar.md"
+PM: "Analyze image at inbox/[filename].jpg. For CATALOG domain."
+-> Returns: "Analysis written to visual_analysis_[product].md"
+   (Contains: [product description], [key features])
 
-Step 2: catalog_analyst (receives visual file)
-PM: "Find catalog placement.
-     Read visual analysis at: visual_analysis_pet_jar.md
-     For CATALOG domain."
--> Returns: "Analysis written to catalog_analysis_pet_jar.md"
-
-Step 3: product_analyst (receives visual file)
-PM: "Research specs and HSN.
-     Read visual analysis at: visual_analysis_pet_jar.md
+Step 2: product_analyst (receives visual file)
+PM: "Research this product comprehensively.
+     Image at: inbox/[filename].jpg
+     Read visual analysis at: visual_analysis_[product].md
      For PRODUCT domain."
--> Returns: "Research written to product_research_pet_jar.md"
+-> Returns: "Research written to product_research_[product].md"
+   (Contains: specs, [HSN], compliance, naming conventions, market positioning)
+
+Step 3: catalog_analyst (receives image + visual + product files)
+PM: "Find catalog placement.
+     Source image at: inbox/[filename].jpg
+     Read visual analysis at: visual_analysis_[product].md
+     Read product research at: product_research_[product].md
+     For CATALOG domain."
+-> Returns: "Analysis written to catalog_analysis_[product].md"
+   (Can view image directly + uses rich context for precise family match)
 
 [USER APPROVAL - Proceed with cataloging?]
 
-Step 4: creative_specialist (receives visual file)
+Step 4: creative_specialist (receives ALL analyst files)
 PM: "Create catalog hero shot.
-     Read visual analysis at: visual_analysis_pet_jar.md
-     Source image at: inbox/photo.jpg
+     Source image at: inbox/[filename].jpg
+     Read visual analysis at: visual_analysis_[product].md
+     Read product research at: product_research_[product].md
+     Read catalog analysis at: catalog_analysis_[product].md
      For CATALOG domain."
--> Processes image
+-> Processes image (uses product naming, family context for proper hero shot)
 -> Creates asset record (HITL: "Is this image acceptable?")
 -> [USER APPROVES IMAGE]
--> Returns: "Asset created: asset_abc123. Ready for catalog entry."
+-> Returns: "Asset created: asset_[id]. Ready for catalog entry."
 
-Step 5: catalog_specialist (receives ALL files + asset_id)
+Step 5: catalog_specialist (receives image + ALL files + asset_id)
 PM: "Create catalog entry.
-     Read visual analysis at: visual_analysis_pet_jar.md
-     Read catalog analysis at: catalog_analysis_pet_jar.md
-     Read product research at: product_research_pet_jar.md
-     Asset already created and approved: asset_abc123
-     For CATALOG domain. This is {company_name}'s product."
+     Source image at: inbox/[filename].jpg
+     Read visual analysis at: visual_analysis_[product].md
+     Read catalog analysis at: catalog_analysis_[product].md
+     Read product research at: product_research_[product].md
+     Asset already created and approved: asset_[id]
+     For CATALOG domain."
 -> Creates product + product_assets junction (HITL: "Is this product data correct?")
 -> [USER APPROVES CATALOG ENTRY]
 ```
@@ -198,7 +557,7 @@ PM: "Create catalog entry.
 
 **Anti-Pattern:**
 ```
-WRONG: "Create catalog entry for the PET jar"
+WRONG: "Create catalog entry for the [product]"
 -> catalog_specialist has no files, no context, will fail or produce incomplete record
 
 WRONG: Route storage_path to catalog_specialist for asset creation
@@ -368,10 +727,14 @@ Standalone - no asset record needed."
 
 ```
 "Create catalog hero shot for [product].
-Read visual analysis at: [visual_analysis_file]
 Source image at: [source_image_path]
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
 For CATALOG domain."
 ```
+
+**Why all files?** Creative needs product research for accurate naming (HSN, brand, specs) and catalog analysis for variant structure and family context.
 
 ### PM Delegation Template (To Catalog - After Creative)
 
@@ -382,9 +745,37 @@ Read product research at: [product_research_file]
 
 Asset already created and approved: [asset_id from creative_specialist]
 
-For CATALOG domain. Create product and link to asset.
-This is {company_name}'s product."
+For CATALOG domain. Create product and link to asset."
 ```
+
+### PM Delegation Template (Catalog Only - No Asset)
+
+```
+"Create catalog entry for [product].
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
+
+No asset yet - product entry only.
+
+For CATALOG domain. Create product without asset link."
+```
+
+### PM Delegation Template (Creative with Product Linking)
+
+```
+"Create catalog hero shot for [product].
+Source image at: [source_image_path]
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
+
+Link to existing product: [product_id]
+
+For CATALOG domain. Create asset and link to product."
+```
+
+**Creative creates both asset record AND product_assets junction when product_id provided.**
 
 ### Two-Stage HITL (Intentional)
 
@@ -496,30 +887,30 @@ When user wants graphics with product data (prices, sizes, variants, offers).
 ### Flow
 
 ```
-[User: "Create Instagram post with prices for honey jar family"]
+[User: "Create Instagram post with prices for [product] family"]
       |
       v
 [1. PM delegates to catalog_analyst for data]
-   "Fetch product data for honey jar family.
+   "Fetch product data for [product] family.
     Need: all variants with prices, sizes, and asset paths.
     For DATA-DRIVEN graphics."
       |
       v
 [2. catalog_analyst returns structured data]
-   "Product family: Honey Jars
+   "Product family: [Family Name]
     Variants:
-    - 250ml: Rs 299, asset: products/honey_250ml.png
-    - 500ml: Rs 549, asset: products/honey_500ml.png
-    - 1L: Rs 999, asset: products/honey_1L.png"
+    - [Size A]: [Currency] [Price A], asset: products/[product]_[size_a].png
+    - [Size B]: [Currency] [Price B], asset: products/[product]_[size_b].png
+    - [Size C]: [Currency] [Price C], asset: products/[product]_[size_c].png"
       |
       v
 [3. PM delegates to creative_specialist WITH DATA]
    "Create Instagram price post.
     Platform: Instagram Feed (1:1).
     Product data:
-    - 250ml jar: Rs 299
-    - 500ml jar: Rs 549
-    - 1L jar: Rs 999
+    - [Size A]: [Currency] [Price A]
+    - [Size B]: [Currency] [Price B]
+    - [Size C]: [Currency] [Price C]
     Source images at: [asset paths from catalog_analyst]
     For DATA-DRIVEN domain."
       |
@@ -603,7 +994,7 @@ For DATA-DRIVEN domain."
 
 ```
 WRONG:
-"Create price post for honey jars"
+"Create price post for [product family]"
 -> Directly to creative without data
 -> Creative can't query database
 -> Will fail or waste turns
@@ -614,37 +1005,8 @@ WRONG:
 -> Violates separation of concerns
 
 CORRECT:
-1. To catalog_analyst: "Fetch honey jar family data: variants, prices, asset paths."
+1. To catalog_analyst: "Fetch [product family] data: variants, prices, asset paths."
 2. To creative (with data): "Create price post. Product data: [from analyst]"
-```
-
-### Variant Family Graphics - Full Example
-
-```
-[1. To catalog_analyst]
-   "Fetch product data for honey jar family.
-    Need: all variants with prices, sizes, asset paths."
-
-[2. catalog_analyst returns]
-   "Honey Jars (Glass):
-    - 250ml: Rs 299, asset: products/honey_250ml.png
-    - 500ml: Rs 549, asset: products/honey_500ml.png
-    - 1L: Rs 999, asset: products/honey_1L.png"
-
-[3. To creative_specialist (with data from step 2)]
-   "Create size comparison graphic.
-
-   Product family: Honey Jars (Glass)
-   Variants:
-   - 250ml: Rs 299 (image: products/honey_250ml.png)
-   - 500ml: Rs 549 (image: products/honey_500ml.png)
-   - 1L: Rs 999 (image: products/honey_1L.png)
-
-   Layout: Size progression (left to right, scale accurate)
-   Platform: Instagram Feed (1:1)
-   For DATA-DRIVEN domain."
-
-[4. Creative designs with accurate scale + pricing]
 ```
 
 ---
@@ -656,7 +1018,7 @@ Modify existing catalog data. May skip analysis.
 ### Simple Update (Clear Instruction)
 
 ```
-"Update SKU-001 price to Rs 45"
+"Update [SKU] price to [price]"
 
 [catalog_specialist directly] -> updated
 ```
@@ -666,10 +1028,10 @@ No analysis needed - user provided complete instruction.
 ### Ambiguous Update (Needs Context)
 
 ```
-"Update the blue bottle price"
+"Update the [color] [product] price"
 
 [1. catalog_analyst] -> find product, current price
-[2. PM confirms with user] -> "You mean BOTTLE-GLASS-250ML-BLUE at Rs 95?"
+[2. PM confirms with user] -> "You mean [SKU] at [current price]?"
 [3. catalog_specialist] -> update after confirmation
 ```
 
@@ -682,27 +1044,27 @@ Multiple items, single operation type.
 ### Homogeneous Bulk (Same Product Type)
 
 ```
-[4 images of PET containers]
+[N images of [product type] [products]]
 
 [1. visual_analyst] -> identifies all as variants
 [2. catalog_analyst] -> variant structure recommendation
-[3. product_analyst] -> single HSN for family
+[3. product_analyst] -> comprehensive research for variant family (base specs + variant-specific)
 [4. User approval] -> structure confirmed
-[5. creative_specialist] -> 4 processed images
-[6. catalog_specialist] -> 4 products + variant structure
+[5. creative_specialist] -> N processed images
+[6. catalog_specialist] -> N products + variant structure
 ```
 
 ### Heterogeneous Bulk (Different Products)
 
 ```
-[5 images: glass, PET, metal, wood, ceramic]
+[N images: [material A], [material B], [material C]...]
 
-[1. visual_analyst] -> identifies 5 distinct products
-[2. catalog_analyst] -> 5 family placements, may need new families
-[3. product_analyst] -> 5 HSN codes
-[4. User approval] -> all 5 confirmed
-[5. creative_specialist] -> 5 processed images
-[6. catalog_specialist] -> 5 products, possibly new families
+[1. visual_analyst] -> identifies N distinct products
+[2. catalog_analyst] -> N family placements, may need new families
+[3. product_analyst] -> comprehensive research for each product type (different dimensions per category)
+[4. User approval] -> all N confirmed
+[5. creative_specialist] -> N processed images
+[6. catalog_specialist] -> N products, possibly new families
 ```
 
 ---
@@ -789,45 +1151,284 @@ Options:
 
 ---
 
-## MULTI-IMAGE DECISION
+## MULTI-IMAGE HANDLING (CRITICAL)
 
-When user sends multiple images, decide processing strategy.
+When user sends multiple images, the FIRST task is determining their relationship.
 
-### Batch vs Individual Decision Matrix
+### Step 1: Text Signal Detection
 
-| Signal | Strategy | Reasoning |
-|--------|----------|-----------|
-| Same product, multiple angles | **Single item** | One product entry, multiple assets |
-| Same product type, different sizes | **Variants** | One family, variant structure |
-| Different product types | **Individual** | Separate catalog entries |
-| User says "these products" (plural) | **Individual** | Explicit separate items |
-| User says "this product" (singular) | **Single/Variants** | Likely one item or variant set |
+| User Text | Relationship | Strategy |
+|-----------|--------------|----------|
+| "this product" / "add this" (singular) | Same product | Multi-angle |
+| "these sizes" / "all sizes" / "size range" | Size variants | Variant set |
+| "these colors" / "color options" | Color variants | Variant set |
+| "[material A] and [material B]" / "material options" | Material variants | Variant set |
+| "these products" / "add these" (plural) | Different products | Bulk |
+| "parts" / "components" / "assembly" | Components of ONE product | Single product |
+| "open and closed" / "with lid off" | Different states | Single product |
+| "with box" / "with packaging" | Product + packaging | Single product |
+| "which one?" / "compare these" | Comparison | Analysis only |
+| "like this" / "make it look like" | Reference + actual | Creative direction |
+| No text / unclear | **UNKNOWN** | Visual analyst determines |
 
-### Processing Strategies
+### Step 2: Visual Analyst Relationship Detection
 
-**Single Item (Multiple Angles):**
+When text signals are unclear, delegate ALL images to visual_analyst:
+
 ```
-[4 images of same bottle from different angles]
--> visual_analyst: "4 angles of same product"
--> creative_specialist: 4 processed images
--> catalog_specialist: 1 product with 4 assets
+"Analyze these [N] images together.
+Source images at: [path1], [path2], [path3]...
+
+CRITICAL - Determine RELATIONSHIP between images:
+1. Same product, different angles? (front/back/side/detail)
+2. Same product, different states? (open/closed, assembled/disassembled)
+3. Components of ONE product? (body + lid + handle = single item)
+4. Product + its packaging/box?
+5. Same product TYPE, different variants? (sizes/colors/materials)
+6. Completely different products?
+7. One is reference/inspiration, others are actual products?
+
+Report:
+- Relationship pattern
+- Individual observations for each image
+- Which images belong together (if mixed)
+
+For CATALOG domain."
 ```
 
-**Variant Set:**
+### Step 3: Route Based on Relationship
+
+| Relationship | Workflow | Output Files |
+|--------------|----------|--------------|
+| **Multi-angle** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
+| **Different states** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
+| **Components** | Visual (all) -> Product (once, note components) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
+| **Product + packaging** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
+| **Variants** | Visual (all) -> Product (base research + variant dimensions) -> Catalog (variant structure) -> [Approval] -> Creative (all) -> Specialist (N linked products) | 1 visual_analysis, 1 product_research (covers variants), 1 catalog_analysis |
+| **Bulk (different)** | Visual (all, separate findings) -> For each: Product -> Catalog -> [Approval] -> Creative -> Specialist | N visual_analysis files, N product_research files, N catalog_analysis files |
+| **Comparison** | Visual (all) -> Present comparison to user | 1 comparison_analysis |
+| **Reference** | Identify reference; Visual (actual only) -> Product -> Catalog -> Creative (with reference style) -> Specialist | Reference noted in delegation to creative |
+
+### Multi-Angle Workflow (1 Product, N Assets)
+
 ```
-[4 images of same bottle in 4 sizes]
--> visual_analyst: "4 size variants of same product"
--> catalog_analyst: variant structure recommendation
--> creative_specialist: 4 processed images
--> catalog_specialist: 4 products with variant links
+[N images: front, back, side, detail of same product]
+      |
+      v
+[visual_analyst] -> Analyzes ALL images together
+   "Same [product] from N angles. Front shows [feature A], back shows [feature B]..."
+   -> visual_analysis_[product].md (covers all angles)
+      |
+      v
+[product_analyst] -> Research ONCE for the product
+   -> product_research_[product].md
+      |
+      v
+[catalog_analyst] -> Search ONCE for catalog placement
+   -> catalog_analysis_[product].md
+      |
+      v
+[USER APPROVAL]
+      |
+      v
+[creative_specialist] -> Process ALL N images
+   -> N assets created, returns: asset_id_1, asset_id_2, ..., asset_id_N
+      |
+      v
+[catalog_specialist] -> Create 1 product with N assets
+   -> Links all asset_ids to single product
 ```
 
-**Individual Products:**
+### Components Workflow (CRITICAL - COMPOSE, Don't Just Extract)
+
+**When visual_analyst identifies COMPONENTS pattern (e.g., [body] + [closures] + [accessories]):**
+
+The key insight: Components are PARTS of complete products. Hero shots must COMPOSE all parts together, not show each part separately.
+
+**WRONG approach:**
+- Image 1 ([bodies]) -> Extract each [body] separately
+- Image 2 ([closures]) -> Create "[closure] detail" image
+- Image 3 ([accessories]) -> Create "[accessory] detail" image
+- Result: Separate images of parts, no complete product shots
+
+**CORRECT approach:**
+- COMPOSE each variant by combining [body] + matching [closure] + [accessory]
+- Result: Complete hero shots showing assembled products
+
 ```
-[4 different products]
--> visual_analyst: "4 distinct products"
--> Process each through full flow
--> catalog_specialist: 4 separate products
+[3 images: [product] bodies, colored [closures], [accessories]]
+      |
+      v
+[visual_analyst] -> Identifies COMPONENTS relationship
+   "Image 1: 9 [product] bodies (3 sizes x 3 [axis values])
+    Image 2: [Closure] and [accessory] close-up
+    Image 3: 4 colored [closures]
+    RELATIONSHIP: COMPONENTS - parts of complete products"
+   -> visual_analysis_[product]_components.md
+      |
+      v
+[product_analyst] -> Research as COMPLETE product with components
+   -> product_research_[product_category].md
+      |
+      v
+[catalog_analyst] -> Recommend variant structure
+   -> catalog_analysis_[product_category].md
+      |
+      v
+[USER APPROVAL]
+      |
+      v
+[creative_specialist] -> COMPOSE complete products (NOT separate extractions)
+   -> See delegation template below
+      |
+      v
+[catalog_specialist] -> Create N variant products with assets
+```
+
+**PM Delegation Template for Creative (COMPONENTS):**
+
+```
+"Create COMPOSED hero shots for [product] variants.
+
+COMPONENT IMAGES (use ALL together):
+- Image 1: [path] (label: body) - Contains [product] bodies
+- Image 2: [path] (label: accessory) - Contains [accessories]
+- Image 3: [path] (label: closure) - Contains colored [closures]
+
+COMPOSITION REQUIREMENT:
+For EACH variant, create a COMPLETE product hero shot by COMPOSING:
+- The matching [product] body from [body] image
+- Its matching colored [closure] from [closure] image
+- The [accessory] from [accessory] image
+
+Use image_studio with multiple labeled images:
+images=[
+  {path: 'image1.jpg', label: 'body'},
+  {path: 'image2.jpg', label: 'lid'},
+  {path: 'image3.jpg', label: 'accessory'}
+]
+composition={position: '[body] center, [lid] fitted on top, [accessory] beside'}
+
+Create N complete product shots (one per variant), NOT N component shots.
+
+Read visual analysis at: [visual_analysis_file]
+For CATALOG domain."
+```
+
+**Key Differences from Multi-Angle:**
+
+| Multi-Angle | Components |
+|-------------|------------|
+| Same product, different views | Different PARTS of products |
+| Process each image independently | COMPOSE images together |
+| Each image = 1 asset | Multiple images = 1 composed asset |
+| Simple extraction | Multi-image composition |
+
+### Variant Workflow (N Linked Products)
+
+```
+[N images: [Size A], [Size B], [Size C] of same product type]
+      |
+      v
+[visual_analyst] -> Identifies variant relationship
+   "N size variants of same [product] design. [Size A], [Size B], [Size C]."
+   -> visual_analysis_[product]_variants.md
+      |
+      v
+[product_analyst] -> Research base product + variant dimensions
+   "Base: [product]. Variants by [axis]. HSN same for all sizes."
+   -> product_research_[product]_variants.md
+      |
+      v
+[catalog_analyst] -> Recommend variant structure
+   "Family: [Family]. Variant axis: [axis]. Create N products linked."
+   -> catalog_analysis_[product]_variants.md
+      |
+      v
+[USER APPROVAL - Confirm variant structure]
+      |
+      v
+[creative_specialist] -> Process ALL N images
+   -> asset_id_[size_a], asset_id_[size_b], asset_id_[size_c]
+      |
+      v
+[catalog_specialist] -> Create N linked variant products
+   -> Creates family (if needed), N products, variant links, asset links
+```
+
+### Bulk Workflow (N Separate Products)
+
+```
+[3 images: [product A], [product B], [product C]]
+      |
+      v
+[visual_analyst] -> Identifies as different products
+   "3 distinct products:
+    1. [Material A] [product] with [closure type]
+    2. [Material B] [product] with [closure type]
+    3. [Material C] [product] with [closure type]"
+   -> visual_analysis_bulk_3_products.md (or separate files)
+      |
+      v
+[For EACH product:]
+   [product_analyst] -> product_research_[product_A].md
+   [product_analyst] -> product_research_[product_B].md
+   [product_analyst] -> product_research_[product_C].md
+      |
+      v
+[For EACH product:]
+   [catalog_analyst] -> catalog_analysis_[product_A].md
+   [catalog_analyst] -> catalog_analysis_[product_B].md
+   [catalog_analyst] -> catalog_analysis_[product_C].md
+      |
+      v
+[USER APPROVAL - Confirm all 3]
+      |
+      v
+[creative_specialist] -> Process all 3 images (can batch)
+      |
+      v
+[catalog_specialist] -> Create 3 separate products
+```
+
+### Comparison Workflow (Analysis Only)
+
+```
+[2 images: "which one should I add?"]
+      |
+      v
+[visual_analyst] -> Compare both products
+   "Product A: [Material], premium finish, estimated [size A]
+    Product B: [Material], utility grade, estimated [size B]
+    Key differences: material, positioning, capacity"
+      |
+      v
+[PM presents comparison to user]
+   "Here's what I see:
+    - Image 1: Premium [product A] ([size A])
+    - Image 2: Utility [product B] ([size B])
+    Which would you like to add to the catalog?"
+```
+
+### Reference + Actual Workflow
+
+```
+[2 images: "make it look like this" pointing to first]
+      |
+      v
+[visual_analyst] -> Identify which is reference
+   "Image 1: Reference/inspiration (lifestyle setting, warm lighting)
+    Image 2: Actual product to process"
+      |
+      v
+[Standard workflow for Image 2, but creative gets reference]
+      |
+      v
+[creative_specialist]:
+   "Process product image.
+    Source image at: [actual_product_path]
+    STYLE REFERENCE at: [reference_path] - Match this lighting/composition style.
+    ..."
 ```
 
 ---
@@ -961,57 +1562,95 @@ When research returns low confidence or incomplete data:
 
 ---
 
-## CROSS-ANALYST CONTRADICTION PATTERN
+## OUTPUT COMPARISON PATTERN (CRITICAL)
 
-When analysts provide conflicting information about the same product.
+When user provides feedback comparing multiple generated outputs.
 
-### Common Contradictions
+### Triggers
 
-| Visual Says | Research Says | Resolution |
-|-------------|---------------|------------|
-| "PET plastic" | "HDPE based on product type" | Research wins - material analysis is more reliable |
-| "500ml capacity" | "Standard is 475ml" | Research wins - exact specs from standards |
-| "Premium positioning" | "Budget segment" | Neither wins - present both views to user |
-| "Blue color" | N/A | Visual wins - color is observation, not research topic |
+- "This one is good, others are bad"
+- "Only the blue one looks right"
+- "X is junk" / "X worked but Y didn't"
+- Any feedback that compares generated outputs
 
-### Resolution Framework
+### The Critical Rule
+
+**NEVER delegate with just filenames. ALWAYS include full storage paths.**
 
 ```
-[visual_analyst: Finding A]
-[product_analyst: Finding B (contradicts A)]
-      |
-      v
-[PM identifies contradiction type]
-      |
-      +---> Fact vs Estimate (capacity, dimensions)
-      |         |
-      |         v
-      |    Trust research (has sources)
-      |    Note: "Visual estimated X, research confirms Y"
-      |
-      +---> Observation vs Research (material, features)
-      |         |
-      |         v
-      |    Trust visual for observable facts
-      |    Trust research for non-observable specs
-      |
-      +---> Opinion vs Opinion (positioning, style)
-              |
-              v
-         Present both to user:
-         "Visual suggests [X], research indicates [Y].
-         Which positioning aligns with your intent?"
+WRONG:
+"Compare blossom_small_blue_final_hero.png with blossom_small_pink_final_hero.png"
+-> Agent has no idea WHERE these files are
+-> Agent loops through ls, glob, grep trying to FIND them
+-> 5M+ tokens wasted, agent stuck
+
+CORRECT:
+"Compare these generated images:
+SUCCESS: pending/blossom_small_blue_final_hero.png
+FAILURES:
+- pending/blossom_small_pink_final_hero.png
+- pending/blossom_medium_blue_final_hero.png
+- pending/blossom_large_yellow_final_hero.png"
+-> Agent can view_image directly
+-> No file search needed
 ```
 
-### File Handling
+### Finding the Paths
 
-When contradiction detected, the LATER file should acknowledge:
+Before delegating, PM MUST retrieve actual paths from:
+1. **Previous creative_specialist output** - Check what paths were returned
+2. **Thread files** - Read the relevant analysis/output files
+3. **Pending folder listing** - If needed, `ls pending/` first
+
+### Delegation Template (Output Comparison)
+
 ```
-product_research_{item_identifier}.md:
-"Note: Visual analysis identified material as [X].
-Research indicates [Y] based on [source].
-Using research finding due to [reasoning]."
+"Compare the quality of these generated images.
+
+USER FEEDBACK: '[exact user feedback]'
+
+IMAGES TO COMPARE:
+SUCCESS (user approved):
+- [full_storage_path_1]
+
+FAILURES (user rejected):
+- [full_storage_path_2]
+- [full_storage_path_3]
+- [full_storage_path_4]
+
+MISSION:
+1. View ALL images using view_image
+2. Identify specific differences between SUCCESS and FAILURES:
+   - Lighting quality
+   - Edge/cutout quality
+   - Color accuracy
+   - Background consistency
+   - Overall photorealism
+3. Report findings to: /thread/quality_comparison.md
+
+For VISUAL domain."
 ```
+
+### Anti-Pattern: File Search Loop
+
+If you delegate without paths:
+```
+Agent behavior:
+1. ls /thread/          -> no images
+2. glob /pending/*.png  -> no matches (wrong thread context)
+3. grep 'filename'      -> searching file contents
+4. ls /inbox/           -> source images, not outputs
+5. Repeat 40+ times...
+```
+
+**This wastes millions of tokens and never completes.**
+
+### Recovery If Already Stuck
+
+If agent is looping on file searches:
+1. Stop the current delegation
+2. Use `ls` or `glob` yourself to find the actual paths
+3. Re-delegate with complete paths
 
 ---
 
@@ -1081,8 +1720,8 @@ Consistent file naming enables reliable file routing between agents.
 ### Item Identifier Rules
 
 - Use image basename when available: `20251217_152547_photo`
-- Use descriptive slug when no image: `pet_container_500ml`
-- For variants: `pet_containers_variant_set`
+- Use descriptive slug when no image: `[product]_[size]`
+- For variants: `[product]_variant_set`
 - Never use generic names: `analysis.md`, `research.md` (will overwrite)
 
 ### PM File Routing
@@ -1090,9 +1729,9 @@ Consistent file naming enables reliable file routing between agents.
 When delegating, PM includes file paths and asset IDs explicitly:
 ```
 "Create catalog entry.
-Read visual analysis at: visual_analysis_20251217_photo.md
-Read product research at: product_research_pet_container.md
-Asset already created and approved: asset_abc123"
+Read visual analysis at: visual_analysis_[identifier].md
+Read product research at: product_research_[identifier].md
+Asset already created and approved: asset_[id]"
 ```
 
 ---
@@ -1143,7 +1782,8 @@ When user returns after timeout:
 
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
-| Parallel when sequential needed | visual_analyst and catalog_analyst parallel | visual_analyst FIRST, catalog_analyst needs identification |
+| **Wrong analysis order** | Catalog before Product | Visual -> Product -> Catalog (catalog needs product context) |
+| **Catalog with only visual** | Catalog searches with just "[product type]" | Include product_research so catalog searches with rich context |
 | Execution before approval | creative_specialist immediately after analysis | User approval GATE before creative_specialist |
 | Missing file routes | catalog_specialist without product_research.md | Include ALL analyst files for complete records |
 | Context not propagated | "Read visual_analysis.md" without user clarifications | Include user context: "User clarified X. Read file and REVISE." |

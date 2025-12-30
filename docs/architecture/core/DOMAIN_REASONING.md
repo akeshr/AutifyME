@@ -415,14 +415,20 @@ protocols/
 ```
 1. Agent receives task from PM with domain context
 2. Agent assesses: "What protocols do I need?"
-3. Agent calls load_protocol(["family_fit", "tool_mastery"])
-4. Middleware loads: catalog/family_fit.protocol, catalog/tool_mastery.protocol
+3. Agent calls:
+   - load_protocol(protocol_names=['business_context', 'family_fit'], domain='catalog')
+   - load_protocol(protocol_names=['read_data', 'resource_efficiency', 'input_validation'])
+4. Loader resolves:
+   - catalog/business_context.protocol, catalog/family_fit.protocol
+   - shared/tool_mastery/read_data.protocol, shared/resource_efficiency.protocol, shared/input_validation.protocol
 5. Agent executes with domain-grounded reasoning
 ```
 
 **Resolution Order:**
-1. Domain-specific first: `catalog/family_fit.protocol`
-2. Shared fallback: `shared/patterns/fit_assessment.protocol`
+
+1. Domain-specific: `{domain}/{protocol}.protocol` when domain specified
+2. Shared fallback: `shared/{protocol}.protocol`
+3. Tool mastery fallback: `shared/tool_mastery/{protocol}.protocol`
 
 ---
 
