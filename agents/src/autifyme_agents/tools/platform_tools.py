@@ -67,7 +67,7 @@ def create_platform_media_tools(
     """
     platform_name = channel.__class__.__name__.replace("Channel", "").lower()
 
-    def _download_media_impl(media_id: str) -> dict[str, Any]:
+    def _download_media_impl(media_id: str) -> dict[str, Any] | list[dict[str, Any]]:
         """Download media and persist to Supabase inbox.
 
         Returns user-friendly path (no thread_id visible).
@@ -129,17 +129,42 @@ def create_platform_media_tools(
             storage_path = upload_result["storage_path"]
             user_path = to_user_path(storage_path)
 
-            result = {
-                "storage_path": user_path,  # LLM sees clean path
-                "mime_type": mime_type,
-                "size_bytes": len(media_bytes),
-            }
-
             logger.info(
                 "Media persisted to inbox",
                 extra={"user_path": user_path, "internal_path": storage_path}
             )
-            return result
+
+            # Return multimodal content if image, otherwise dict
+            if mime_type.startswith("image/"):
+                from autifyme_agents.tools.view_image import _load_image_as_data_uri
+
+                try:
+                    data_uri, img_metadata = _load_image_as_data_uri(storage_path)
+                    return [
+                        {
+                            "type": "text",
+                            "text": (
+                                f"Downloaded image to storage.\n"
+                                f"storage_path: {user_path}\n"
+                                f"mime_type: {mime_type}\n"
+                                f"size_bytes: {len(media_bytes)}\n"
+                                f"dimensions: {img_metadata['original_size']}"
+                            ),
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": data_uri},
+                        },
+                    ]
+                except Exception as e:
+                    logger.warning(f"Failed to load image for preview: {e}")
+                    # Fall through to dict return
+
+            return {
+                "storage_path": user_path,
+                "mime_type": mime_type,
+                "size_bytes": len(media_bytes),
+            }
 
         except Exception:
             logger.exception(f"Failed to download media from {platform_name}")
