@@ -25,6 +25,57 @@ class LifecycleMixin(ABC):
             - All operations within the context are atomic (all-or-nothing)
             - Exceptions trigger automatic rollback
             - Nested transactions may not be supported (adapter-specific)
+
+        DEPRECATED: For multi-operation writes, use execute_write_intent_rpc()
+        which provides true ACID guarantees via database RPC.
+        """
+        pass
+
+    @abstractmethod
+    async def execute_write_intent_rpc(
+        self,
+        operations: list[dict[str, Any]],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Execute multi-operation write intent atomically via database RPC.
+
+        Provides true ACID transaction guarantees - all operations succeed
+        together or fail together with automatic rollback.
+
+        Args:
+            operations: List of operations (pre-sorted by dependencies).
+                Each operation is a dict with:
+                - action: 'create', 'update', 'delete', or 'upsert'
+                - table: Target table name
+                - data: Record data (for create/upsert)
+                - filters: WHERE conditions (for update/delete)
+                - updates: SET values (for update)
+                - returns: Name to store result for @references
+                - on_conflict: 'error', 'skip', 'update' (for create/upsert)
+                - conflict_fields: Columns for ON CONFLICT (for upsert)
+                - soft_delete: true/false (for delete)
+
+            context: Pre-populated context (e.g., from asset uploads).
+                Keys can be referenced in operations using @name.field syntax.
+
+        Returns:
+            On success: {
+                'success': True,
+                'results': [...],
+                'context': {...},
+                'operations_executed': int
+            }
+            On failure: {
+                'success': False,
+                'error': str,
+                'error_code': str,
+                'failed_operation_index': int,
+                'failed_operation': {...}
+            }
+
+        Raises:
+            StorageError: On RPC call failure
         """
         pass
 

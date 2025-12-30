@@ -2557,8 +2557,137 @@ class SupabaseStorageClient(StorageInterface):
         so we implement best-effort rollback tracking. For true atomic
         transactions, consider using direct Postgres connection or
         implementing transaction-aware operations at application level.
+
+        DEPRECATED: For multi-operation writes, use execute_write_intent_rpc()
+        which provides true ACID guarantees via Postgres RPC.
         """
         return SupabaseTransaction(self)
+
+    async def execute_write_intent_rpc(
+        self,
+        operations: list[dict[str, Any]],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Execute multi-operation write intent atomically via Postgres RPC.
+
+        Provides true ACID transaction guarantees - all operations succeed
+        together or fail together with automatic rollback. Replaces the
+        best-effort rollback approach of the transaction() context manager.
+
+        Args:
+            operations: List of operations (pre-sorted by dependencies).
+                Each operation is a dict with:
+                - action: 'create', 'update', 'delete', or 'upsert'
+                - table: Target table name
+                - data: Record data (for create/upsert)
+                - filters: WHERE conditions (for update/delete)
+                - updates: SET values (for update)
+                - returns: Name to store result for @references
+                - on_conflict: 'error', 'skip', 'update' (for create/upsert)
+                - conflict_fields: Columns for ON CONFLICT (for upsert)
+                - soft_delete: true/false (for delete)
+
+            context: Pre-populated context (e.g., from asset uploads).
+                Keys can be referenced in operations using @name.field syntax.
+
+        Returns:
+            On success: {
+                'success': True,
+                'results': [...],  # Results per operation
+                'context': {...},  # Final context with all returns
+                'operations_executed': int
+            }
+            On failure: {
+                'success': False,
+                'error': str,
+                'error_code': str,
+                'failed_operation_index': int,
+                'failed_operation': {...}
+            }
+
+        Raises:
+            StorageError: On RPC call failure (network, auth, etc.)
+
+        Examples:
+            # Create parent with children using @references
+            result = await storage.execute_write_intent_rpc(
+                operations=[
+                    {
+                        'action': 'create',
+                        'table': 'product_families',
+                        'data': {'name': 'PET Bottles', 'code_prefix': 'PET'},
+                        'returns': 'family'
+                    },
+                    {
+                        'action': 'create',
+                        'table': 'products',
+                        'data': [
+                            {'family_id': '@family.id', 'name': 'PET 500ml'},
+                            {'family_id': '@family.id', 'name': 'PET 1L'}
+                        ]
+                    }
+                ]
+            )
+            if result['success']:
+                print(f"Created {result['operations_executed']} operations")
+            else:
+                print(f"Failed: {result['error']}")
+        """
+        try:
+            client = await self._ensure_async_client()
+
+            # Call the atomic RPC function
+            result = await client.rpc(
+                "execute_write_intent",
+                {
+                    "p_operations": operations,
+                    "p_context": context or {},
+                }
+            ).execute()
+
+            # RPC returns the result directly in data
+            rpc_result = result.data
+
+            if rpc_result is None:
+                return {
+                    "success": False,
+                    "error": "RPC returned null result",
+                    "error_code": "RPC_NULL_RESULT",
+                }
+
+            # Log result
+            if rpc_result.get("success"):
+                logger.info(
+                    "WriteIntent RPC executed successfully",
+                    extra={
+                        "operations_executed": rpc_result.get("operations_executed", 0),
+                        "results_count": len(rpc_result.get("results", [])),
+                    }
+                )
+            else:
+                logger.warning(
+                    "WriteIntent RPC failed - transaction rolled back",
+                    extra={
+                        "error": rpc_result.get("error"),
+                        "error_code": rpc_result.get("error_code"),
+                        "failed_operation_index": rpc_result.get("failed_operation_index"),
+                    }
+                )
+
+            return rpc_result
+
+        except Exception as e:
+            logger.error(
+                "WriteIntent RPC call failed",
+                exc_info=True,
+                extra={"operation_count": len(operations)}
+            )
+            raise StorageError(
+                message=f"WriteIntent RPC failed: {str(e)}",
+                operation="execute_write_intent_rpc",
+                original_error=e,
+            ) from e
 
     # ========================================================================
     # File Storage (Supabase Storage Buckets)
