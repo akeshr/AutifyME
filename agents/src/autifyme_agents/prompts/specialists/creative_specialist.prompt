@@ -636,11 +636,8 @@ Flow: RECEIVE data from PM -> DESIGN pattern selection -> INTEGRATE with brand s
 **image_studio** - 11-spec creative palette:
 extraction, background, lighting, composition, scene, placement, material_treatment, **fidelity**, enhancement, custom_spec, output
 
-**[CRITICAL] Color Handling in image_studio:**
-- NEVER use color names from PM's task description (e.g., "Royal Blue", "Sun Yellow")
-- Color words in prompts cause image_studio to GENERATE those colors instead of EXTRACTING from source
-- Always reference source image for colors: "matching the product's accent color" NOT "bright blue"
-- If PM describes colors, IGNORE the names - extract actual colors from source via view_image
+**[CRITICAL] Color Handling:** Extract from source, never use PM's color names.
+(See product_photography protocol COLOR HANDLING section for details)
 
 **inspect_schema** - Discover tables, columns, constraints. Use before write_data.
 

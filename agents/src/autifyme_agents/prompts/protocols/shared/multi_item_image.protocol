@@ -99,6 +99,25 @@ Use consistent position descriptors across all domains:
 | left-column, center-column, right-column | Columnar arrangement |
 | row-1, row-2, row-3 | Row arrangement |
 
+### **[CRITICAL] Position Descriptions Must Match Actual Layout**
+
+Grid positions ("top-left", "bottom-right") ONLY work for images with true grid layouts.
+
+**For STACKED/COLUMNAR layouts** (e.g., jars stacked in 3 columns of different heights):
+- Use: "left-column, 3rd from top" or "right-column, top item"
+- NOT: "middle-left" (ambiguous - which row in which column?)
+
+**Decision logic:**
+1. **True grid** (items form rectangular matrix): Use grid positions (top-left, middle-center, etc.)
+2. **Columns of stacks** (irregular heights): Use column + stack position (left-column, 2nd from top)
+3. **Single row/column**: Use ordinal (1st, 2nd, 3rd) or left/center/right
+
+**Best practice:** Combine spatial position WITH visual identifier:
+- "the jar with [Print Name] in left-column"
+- "the [color] lid variant, 3rd from top"
+
+Visual identifiers (print names, colors, sizes) are MORE RELIABLE than spatial positions alone.
+
 ---
 
 ## PROCESSING STRATEGIES

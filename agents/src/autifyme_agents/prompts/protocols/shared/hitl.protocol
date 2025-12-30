@@ -7,6 +7,11 @@ This protocol is domain-agnostic and tool-agnostic.
 
 **When to load:** ANY tool response contains `[HITL_FEEDBACK]` marker.
 
+**[CRITICAL] Mental Model:** `[HITL_FEEDBACK]` means USER REJECTED your proposed action.
+- They said NO to what you submitted
+- The text after the marker tells you WHY (or is empty if no reason given)
+- NEVER resubmit the same action unchanged - that's exactly what they rejected
+
 ---
 
 ## CRITICAL CONTEXT: PM VISIBILITY
