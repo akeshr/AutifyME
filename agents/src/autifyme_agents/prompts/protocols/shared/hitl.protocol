@@ -304,16 +304,24 @@ Please confirm new task direction.
 
 User wants to abandon the task.
 
-**Action:** Confirm and return to PM.
+**Action:** Confirm cancellation, report any partial work, return to PM.
+
+**[CRITICAL] Include partial results if ANY work was completed before cancel:**
+- Asset IDs already created
+- Files already written
+- Items already processed (e.g., "7/10 images")
+
+This enables PM to inform user of salvageable work.
 
 ```
 [HITL CANCELED]
 
-**User's HITL Feedback:**
-> "Never mind, cancel this"
+**User Feedback:** "[user's exact words, or 'Cancel' if bare]"
+
+**Partial Results (if any):**
+[Report what YOU actually completed - asset IDs, files, progress count]
 
 Task abandoned per user request.
-No action taken.
 ```
 
 ---
@@ -423,7 +431,11 @@ When user canceled the task:
 ```
 [HITL CANCELED]
 
-**User Feedback:** "[exact feedback]"
+**User Feedback:** "[exact feedback or 'Cancel' if bare cancel]"
+
+**Partial Results (if any):**
+- [What was completed before cancel, e.g., "7/10 images generated: asset_001, asset_002..."]
+- [Or "No partial results - canceled before any output"]
 
 Task abandoned per user request.
 Awaiting new instructions.
