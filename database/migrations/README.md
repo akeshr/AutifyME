@@ -111,27 +111,22 @@ Before applying to production:
 
 ---
 
-### 007_fix_write_intent_array_types.sql (Array Type Fix)
+### 007_fix_array_type_handling.sql (Array Type Helper)
 
-**Purpose**: Fixes `execute_write_intent` RPC to handle PostgreSQL array columns (text[], int[], etc.)
+**Purpose**: Adds helper function for text[] column updates via `execute_write_intent` RPC
 
-**Problem**: When updating array columns like `tags`, the RPC passed JSONB arrays directly, but PostgreSQL cannot implicitly cast `jsonb` to `text[]`.
+**Problem**: When updating array columns like `tags`, the RPC passes JSONB arrays directly, but PostgreSQL cannot implicitly cast `jsonb` to `text[]`.
 
 **Error Fixed**: `column 'tags' is of type text[] but expression is of type jsonb` (Error 42804)
 
-**Functions Added/Updated**:
+**Functions Added**:
 - `jsonb_to_text_array(jsonb)` - Converts JSONB array to PostgreSQL text[]
-- `is_array_column(text, text)` - Checks if a column is an array type
-- `execute_write_intent(jsonb, jsonb)` - Updated with array type detection and conversion
-- `format_jsonb_value(jsonb)` - Helper for SQL value formatting
-- `build_where_clause(jsonb)` - WHERE clause builder with operators
-- `resolve_references(jsonb, jsonb)` - @name.field reference resolution
+
+**Next Step**: Patch `execute_write_intent` function to use this helper for text[] columns. See migration file for instructions.
 
 **Rollback**:
 ```sql
 DROP FUNCTION IF EXISTS jsonb_to_text_array(jsonb);
-DROP FUNCTION IF EXISTS is_array_column(text, text);
--- Note: execute_write_intent will need to be restored from previous version
 ```
 
 ---
@@ -139,7 +134,7 @@ DROP FUNCTION IF EXISTS is_array_column(text, text);
 ## Phase Roadmap
 
 - [x] **Phase 1.2**: Outcome tracking tables and views
-- [x] **Phase 1.7**: WriteIntent RPC with array type support
+- [ ] **Phase 1.7**: WriteIntent RPC with array type support (helper added, patch pending)
 - [ ] **Phase 2.1**: pgvector extension + embedding columns
 - [ ] **Phase 2.2**: Routing optimization tables
 - [ ] **Phase 3**: Auto-healing workflow tables
