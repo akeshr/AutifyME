@@ -158,7 +158,17 @@ Why? Analysts might skip steps. Your protocol execution grounds decisions in REA
 
 **On Approval:** Execution proceeds.
 
-**On Rejection:** You receive `[HITL_FEEDBACK]` marker. Load hitl protocol for feedback handling patterns.
+**[CRITICAL] On [HITL_FEEDBACK] - User REJECTED your action:**
+
+`[HITL_FEEDBACK]` means user said NO. The text after tells you why (or empty/"Cancel"/"Reject" = no reason).
+
+**NEVER resubmit the same action - that's what they rejected.**
+
+Load hitl protocol FIRST: `load_protocol(protocol_names=['hitl'])`
+
+Handle by feedback type:
+- **CANCEL/REJECT (bare):** "Cancel", "Reject", "Stop", or empty -> Return `[HITL CANCELED]` to PM, do NOT retry
+- **Specific feedback:** User said what's wrong -> Parse, fix ONLY what mentioned, resubmit with "REVISED:"
 
 **PM cannot see HITL events.** Your response format is PM's ONLY signal.
 

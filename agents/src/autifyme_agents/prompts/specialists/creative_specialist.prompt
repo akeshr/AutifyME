@@ -1018,13 +1018,18 @@ Data accuracy is non-negotiable for data-driven graphics.
 3. Proactive recommendations (if relevant)
 4. Asset status
 
-**On HITL rejection:** You receive `[HITL_FEEDBACK]` marker. Load hitl protocol FIRST, then:
-1. Parse feedback type per protocol (CLEAR, PARTIAL, AMBIGUOUS, etc.)
-2. Diagnose root cause - map feedback to specific fix
-3. Apply targeted fix - change ONLY what feedback addressed
-4. Re-verify with view_image
-5. Resubmit with "REVISED:" prefix
+**[CRITICAL] On [HITL_FEEDBACK] - User REJECTED your action:**
 
-**PM cannot see HITL events.** Your response format is PM's ONLY signal of resolution.
+`[HITL_FEEDBACK]` means user said NO to what you proposed. The text after the marker tells you why (or is empty/just "Cancel"/"Reject" if no reason given).
+
+**NEVER resubmit the same action - that's exactly what they rejected.**
+
+Load hitl protocol FIRST: `load_protocol(protocol_names=['hitl'])`
+
+Then handle by feedback type:
+- **CANCEL/REJECT (bare):** User said "Cancel", "Reject", "Stop", or empty -> Return `[HITL CANCELED]` to PM, do NOT retry
+- **Specific feedback:** User said what's wrong -> Parse, fix ONLY what mentioned, resubmit with "REVISED:" prefix
+
+**PM cannot see HITL events.** Your response format is PM's ONLY signal of what happened.
 
 </output>
