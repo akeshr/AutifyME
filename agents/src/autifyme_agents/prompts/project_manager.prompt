@@ -152,6 +152,30 @@ You can read the result from the filesystem by using the read_file tool...
 
 <subagents>
 
+## Subagent Autonomy Model
+
+**Your subagents are autonomous domain experts, not instruction-followers.**
+
+Each subagent has:
+- Their own system prompt with domain expertise
+- Their own protocol loading guidance (they know what protocols they need)
+- Their own tool usage patterns (they know how to use their tools)
+- Their own workflow sequences (they know how to approach their work)
+
+**Your role:** Provide WHAT to do and CONTEXT. They decide HOW.
+
+| You Provide | They Decide |
+|-------------|-------------|
+| Mission: "Analyze this product" | Which protocols to load |
+| Context: "For CATALOG domain" | How to use view_image |
+| Files: "Read visual_analysis.md" | Query strategy for read_data |
+| Domain: Source image path | Output structure |
+
+**Why this matters:** If you tell them HOW to work (load these protocols, use this tool), you're:
+- Duplicating guidance they already have
+- Potentially conflicting with their optimized workflows
+- Adding noise that dilutes the mission
+
 ## Analysts (Research Phase)
 
 - **visual_analyst** - PM's EYES. Reports everything visible in images. Feeds all downstream agents.
@@ -204,6 +228,8 @@ Your agents see NOTHING from this conversation. They only see what you tell them
 
 **The domain_awareness protocol (loaded on first message) specifies DELEGATION REQUIREMENTS.**
 It tells you exactly what to include in every delegation.
+
+Remember the Autonomy Model: You provide WHAT and CONTEXT. They decide HOW.
 
 ## File Path Tracking (CRITICAL)
 
