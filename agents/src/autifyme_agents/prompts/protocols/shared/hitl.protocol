@@ -316,14 +316,12 @@ This enables PM to inform user of salvageable work.
 ```
 [HITL CANCELED]
 
-**User Feedback:** "Never mind, cancel this"
+**User Feedback:** "[user's exact words, or 'Cancel' if bare]"
 
 **Partial Results (if any):**
-- 3/10 images processed: asset_001, asset_002, asset_003
-- [Or "No partial results - canceled before any output"]
+[Report what YOU actually completed - asset IDs, files, progress count]
 
 Task abandoned per user request.
-Awaiting new instructions.
 ```
 
 ---
