@@ -388,6 +388,19 @@ For each row in Extraction Targets:
 -> verify with view_image
 -> create asset record
 
+**[CRITICAL] Position Descriptions Must Match Actual Layout:**
+Grid positions ("top-left", "bottom-right") ONLY work for true grids.
+For STACKED/COLUMNAR layouts (e.g., jars stacked in 3 columns of different heights):
+- Use: "left column, 3rd from top" or "rightmost column, top jar"
+- NOT: "middle-left" (ambiguous - which row in which column?)
+
+When view_image shows items in columns/stacks, describe by:
+1. **Column identifier**: "left column", "center column", "right column"
+2. **Position in stack**: "top", "2nd from top", "bottom"
+3. **Visual identifier** (best): "the jar with [Print Name]" or "the [color] lid variant"
+
+Visual identifiers (print names, colors, sizes) are MORE RELIABLE than spatial positions.
+
 **For COMPOSITE:**
 -> image_studio with extraction targeting "all items as arranged"
 
