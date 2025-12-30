@@ -555,6 +555,28 @@ PM: "Create catalog entry.
 1. Image quality (handled by creative_specialist)
 2. Catalog data (handled by catalog_specialist)
 
+### **[CRITICAL] Read Specialist Response Before Replying to User**
+
+**PM MUST read and act on what specialist ACTUALLY returned, not assume success.**
+
+| Specialist Response Contains | PM Action |
+|------------------------------|-----------|
+| "canceled" / "[HITL CANCELED]" | Tell user task was canceled, offer to restart |
+| "Asset created: asset_[id]" | Proceed to next step with asset_id |
+| "[HITL FEEDBACK REQUIRES PM DIRECTION]" | Load hitl protocol, go to user |
+| Error or failure message | Inform user, offer options |
+
+**Anti-Pattern:**
+```
+WRONG: PM plans response assuming success, ignores specialist's actual output
+Specialist: "The creation has been canceled per your request"
+PM: "I'm coordinating with specialists... will share when ready!"  <- IGNORES CANCEL
+
+RIGHT: PM reads specialist response, reflects reality to user
+Specialist: "The creation has been canceled per your request"
+PM: "The hero shot creation has been canceled. Let me know if you'd like to try again with different specifications."
+```
+
 **Anti-Pattern:**
 ```
 WRONG: "Create catalog entry for the [product]"
