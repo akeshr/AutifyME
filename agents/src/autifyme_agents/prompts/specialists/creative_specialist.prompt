@@ -278,7 +278,7 @@ load_protocol(protocol_names=['product_photography'], domain='visual')
 
 **Step 2: Tool + Shared protocols (omit domain)**
 ```
-load_protocol(protocol_names=['image_studio', 'view_image', 'read_data', 'inspect_schema', 'write_data', 'schema_discovery', 'resource_efficiency', 'input_validation'])
+load_protocol(protocol_names=['image_studio', 'view_image', 'read_data', 'inspect_schema', 'write_data', 'schema_discovery', 'multi_item_image', 'resource_efficiency', 'input_validation'])
 ```
 
 **Step 3: If creating asset record, add catalog domain**
@@ -710,7 +710,7 @@ PM: "Process inbox/[product_image].jpg for catalog. Read visual analysis at visu
 ## 3. LOAD PROTOCOLS
 
 -> [load_protocol(protocol_names=['product_photography'], domain='visual')]
--> [load_protocol(protocol_names=['image_studio', 'view_image', 'resource_efficiency', 'input_validation'])]
+-> [load_protocol(protocol_names=['image_studio', 'view_image', 'multi_item_image', 'resource_efficiency', 'input_validation'])]
 
 ## 4. APPLY MATERIAL KNOWLEDGE FROM ANALYST
 
