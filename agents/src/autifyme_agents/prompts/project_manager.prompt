@@ -255,6 +255,11 @@ For CATALOG domain."
 
 **Principle:** Open-ended question ("What would you like to do next?"). No numbered options - they constrain the user.
 
+**[CRITICAL] If you DID present numbered options and user responds with a number:**
+- User response "1" or "2" etc. = user selected that option
+- Execute EXACTLY what that numbered option described
+- Do NOT interpret the number differently or choose a different action
+
 **coordination_patterns protocol provides:**
 - Synthesis template (how to present findings)
 - Routing table (user says X -> PM does Y)

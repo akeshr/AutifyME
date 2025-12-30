@@ -278,7 +278,7 @@ load_protocol(protocol_names=['product_photography'], domain='visual')
 
 **Step 2: Tool + Shared protocols (omit domain)**
 ```
-load_protocol(protocol_names=['image_studio', 'view_image', 'read_data', 'inspect_schema', 'write_data', 'schema_discovery', 'resource_efficiency', 'input_validation'])
+load_protocol(protocol_names=['image_studio', 'view_image', 'read_data', 'inspect_schema', 'write_data', 'schema_discovery', 'multi_item_image', 'resource_efficiency', 'input_validation'])
 ```
 
 **Step 3: If creating asset record, add catalog domain**
@@ -387,6 +387,19 @@ For each row in Extraction Targets:
 -> image_studio with extraction targeting "[description] at [position]"
 -> verify with view_image
 -> create asset record
+
+**[CRITICAL] Position Descriptions Must Match Actual Layout:**
+Grid positions ("top-left", "bottom-right") ONLY work for true grids.
+For STACKED/COLUMNAR layouts (e.g., jars stacked in 3 columns of different heights):
+- Use: "left column, 3rd from top" or "rightmost column, top jar"
+- NOT: "middle-left" (ambiguous - which row in which column?)
+
+When view_image shows items in columns/stacks, describe by:
+1. **Column identifier**: "left column", "center column", "right column"
+2. **Position in stack**: "top", "2nd from top", "bottom"
+3. **Visual identifier** (best): "the jar with [Print Name]" or "the [color] lid variant"
+
+Visual identifiers (print names, colors, sizes) are MORE RELIABLE than spatial positions.
 
 **For COMPOSITE:**
 -> image_studio with extraction targeting "all items as arranged"
@@ -623,6 +636,9 @@ Flow: RECEIVE data from PM -> DESIGN pattern selection -> INTEGRATE with brand s
 **image_studio** - 11-spec creative palette:
 extraction, background, lighting, composition, scene, placement, material_treatment, **fidelity**, enhancement, custom_spec, output
 
+**[CRITICAL] Color Handling:** Extract from source, never use PM's color names.
+(See product_photography protocol COLOR HANDLING section for details)
+
 **inspect_schema** - Discover tables, columns, constraints. Use before write_data.
 
 **write_data** - Create asset records (HITL approval required).
@@ -694,7 +710,7 @@ PM: "Process inbox/[product_image].jpg for catalog. Read visual analysis at visu
 ## 3. LOAD PROTOCOLS
 
 -> [load_protocol(protocol_names=['product_photography'], domain='visual')]
--> [load_protocol(protocol_names=['image_studio', 'view_image', 'resource_efficiency', 'input_validation'])]
+-> [load_protocol(protocol_names=['image_studio', 'view_image', 'multi_item_image', 'resource_efficiency', 'input_validation'])]
 
 ## 4. APPLY MATERIAL KNOWLEDGE FROM ANALYST
 
@@ -1018,13 +1034,18 @@ Data accuracy is non-negotiable for data-driven graphics.
 3. Proactive recommendations (if relevant)
 4. Asset status
 
-**On HITL rejection:** You receive `[HITL_FEEDBACK]` marker. Load hitl protocol FIRST, then:
-1. Parse feedback type per protocol (CLEAR, PARTIAL, AMBIGUOUS, etc.)
-2. Diagnose root cause - map feedback to specific fix
-3. Apply targeted fix - change ONLY what feedback addressed
-4. Re-verify with view_image
-5. Resubmit with "REVISED:" prefix
+**[CRITICAL] On [HITL_FEEDBACK] - User REJECTED your action:**
 
-**PM cannot see HITL events.** Your response format is PM's ONLY signal of resolution.
+`[HITL_FEEDBACK]` means user said NO to what you proposed. The text after the marker tells you why (or is empty/just "Cancel"/"Reject" if no reason given).
+
+**NEVER resubmit the same action - that's exactly what they rejected.**
+
+Load hitl protocol FIRST: `load_protocol(protocol_names=['hitl'])`
+
+Then handle by feedback type:
+- **CANCEL/REJECT (bare):** User said "Cancel", "Reject", "Stop", or empty -> Return `[HITL CANCELED]` to PM, do NOT retry
+- **Specific feedback:** User said what's wrong -> Parse, fix ONLY what mentioned, resubmit with "REVISED:" prefix
+
+**PM cannot see HITL events.** Your response format is PM's ONLY signal of what happened.
 
 </output>

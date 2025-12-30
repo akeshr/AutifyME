@@ -1287,6 +1287,10 @@ The key insight: Components are PARTS of complete products. Hero shots must COMP
 
 **PM Delegation Template for Creative (COMPONENTS):**
 
+**[CRITICAL] Do NOT describe specific colors (e.g., "Royal Blue", "Sun Yellow").**
+Say "matching colored" and let specialist extract exact colors from source images.
+Color words in prompts cause image_studio to generate/shift colors instead of extracting accurately.
+
 ```
 "Create COMPOSED hero shots for [product] variants.
 
@@ -1298,7 +1302,7 @@ COMPONENT IMAGES (use ALL together):
 COMPOSITION REQUIREMENT:
 For EACH variant, create a COMPLETE product hero shot by COMPOSING:
 - The matching [product] body from [body] image
-- Its matching colored [closure] from [closure] image
+- Its matching colored [closure] from [closure] image (view source to identify)
 - The [accessory] from [accessory] image
 
 Use image_studio with multiple labeled images:
