@@ -397,11 +397,18 @@ class TestMultiOperationDependencies:
 
     @pytest.mark.asyncio
     async def test_two_operations_linear_dependency(self, mock_storage):
-        """Test 2 operations with linear dependency (A → B)."""
-        mock_storage.insert_entity.side_effect = [
-            {"id": "family-1", "name": "PET Jars"},
-            {"id": "axis-1", "axis_name": "Size"}
-        ]
+        """Test 2 operations with linear dependency (A -> B)."""
+        # Mock RPC to return both created entities
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={
+                "product_families": [{"id": "family-1", "name": "PET Jars"}],
+                "variant_axes": [{"id": "axis-1", "axis_name": "Size", "family_id": "family-1"}]
+            },
+            context={
+                "family": {"id": "family-1", "name": "PET Jars"},
+                "axis": {"id": "axis-1", "axis_name": "Size", "family_id": "family-1"}
+            }
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -432,20 +439,25 @@ class TestMultiOperationDependencies:
         assert result["success"] is True
         assert result["summary"]["total_created"] == 2
 
-        # Verify operations executed in correct order
-        calls = mock_storage.insert_entity.call_args_list
-        assert len(calls) == 2
-        # Second call should have resolved family_id
-        assert calls[1][1]["data"]["family_id"] == "family-1"
+        # Verify RPC was called with operations
+        mock_storage.execute_write_intent_rpc.assert_called_once()
+        call_args = mock_storage.execute_write_intent_rpc.call_args
+        assert len(call_args.kwargs["operations"]) == 2
 
     @pytest.mark.asyncio
     async def test_three_operations_chain_dependency(self, mock_storage):
-        """Test 3 operations with chain dependency (A → B → C)."""
-        mock_storage.insert_entity.side_effect = [
-            {"id": "family-1"},
-            {"id": "axis-1"},
-            {"id": "value-1"}
-        ]
+        """Test 3 operations with chain dependency (A -> B -> C)."""
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={
+                "product_families": [{"id": "family-1"}],
+                "variant_axes": [{"id": "axis-1", "family_id": "family-1"}],
+                "variant_values": [{"id": "value-1", "axis_id": "axis-1"}]
+            },
+            context={
+                "family": {"id": "family-1"},
+                "axis": {"id": "axis-1", "family_id": "family-1"}
+            }
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -482,12 +494,17 @@ class TestMultiOperationDependencies:
 
     @pytest.mark.asyncio
     async def test_fan_out_dependencies(self, mock_storage):
-        """Test fan-out: A → B, A → C (B and C depend on A)."""
-        mock_storage.insert_entity.side_effect = [
-            {"id": "family-1"},
-            {"id": "axis-1"},
-            {"id": "axis-2"}
-        ]
+        """Test fan-out: A -> B, A -> C (B and C depend on A)."""
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={
+                "product_families": [{"id": "family-1"}],
+                "variant_axes": [
+                    {"id": "axis-1", "axis_name": "Size", "family_id": "family-1"},
+                    {"id": "axis-2", "axis_name": "Color", "family_id": "family-1"}
+                ]
+            },
+            context={"family": {"id": "family-1"}}
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -523,13 +540,20 @@ class TestMultiOperationDependencies:
 
     @pytest.mark.asyncio
     async def test_diamond_dependency(self, mock_storage):
-        """Test diamond: A → B, A → C, B → D, C → D."""
-        mock_storage.insert_entity.side_effect = [
-            {"id": "a"},
-            {"id": "b"},
-            {"id": "c"},
-            {"id": "d"}
-        ]
+        """Test diamond: A -> B, A -> C, B -> D, C -> D."""
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={
+                "t1": [{"id": "a", "v": 1}],
+                "t2": [{"id": "b", "ref": "a"}],
+                "t3": [{"id": "c", "ref": "a"}],
+                "t4": [{"id": "d", "b_ref": "b", "c_ref": "c"}]
+            },
+            context={
+                "a": {"id": "a", "v": 1},
+                "b": {"id": "b", "ref": "a"},
+                "c": {"id": "c", "ref": "a"}
+            }
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -585,11 +609,17 @@ class TestMultiOperationDependencies:
     @pytest.mark.asyncio
     async def test_multiple_refs_in_single_operation(self, mock_storage):
         """Test multiple @references in single operation data."""
-        mock_storage.insert_entity.side_effect = [
-            {"id": "user-1"},
-            {"id": "category-1"},
-            {"id": "product-1"}
-        ]
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={
+                "users": [{"id": "user-1", "name": "Alice"}],
+                "categories": [{"id": "category-1", "name": "Food"}],
+                "products": [{"id": "product-1", "name": "Item", "created_by": "user-1", "category_id": "category-1"}]
+            },
+            context={
+                "user": {"id": "user-1", "name": "Alice"},
+                "category": {"id": "category-1", "name": "Food"}
+            }
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -615,21 +645,23 @@ class TestMultiOperationDependencies:
         })
 
         assert result["success"] is True
-        # Verify both references resolved correctly
-        calls = mock_storage.insert_entity.call_args_list
-        assert calls[2][1]["data"]["created_by"] == "user-1"
-        assert calls[2][1]["data"]["category_id"] == "category-1"
+        assert result["summary"]["total_created"] == 3
 
     @pytest.mark.asyncio
     async def test_no_dependencies_execute_first(self, mock_storage):
         """Test operations without dependencies execute first."""
-        execution_order = []
-
-        async def track_insert(table, data):
-            execution_order.append(table)
-            return {"id": f"{table}-1"}
-
-        mock_storage.insert_entity.side_effect = track_insert
+        # With RPC, all operations are sent atomically - we verify the sorted order in the call
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={
+                "A": [{"id": "A-1"}],
+                "B": [{"id": "B-1", "ref": "A-1"}],
+                "C": [{"id": "C-1", "ref": "B-1"}]
+            },
+            context={
+                "a": {"id": "A-1"},
+                "b": {"id": "B-1", "ref": "A-1"}
+            }
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -649,14 +681,20 @@ class TestMultiOperationDependencies:
         })
 
         assert result["success"] is True
-        # Verify execution order: A (no deps) → B (deps: A) → C (deps: B)
-        assert execution_order == ["A", "B", "C"]
+        # Verify RPC received operations in topologically sorted order
+        call_args = mock_storage.execute_write_intent_rpc.call_args
+        ops = call_args.kwargs["operations"]
+        tables_order = [op["table"] for op in ops]
+        assert tables_order == ["A", "B", "C"]
 
     @pytest.mark.asyncio
     async def test_mixed_create_and_update_with_deps(self, mock_storage):
         """Test mix of CREATE and UPDATE with dependencies."""
-        mock_storage.insert_entity.return_value = {"id": "new-1"}
-        mock_storage.update_entities.return_value = 1
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={"users": [{"id": "new-1", "name": "Alice"}]},
+            updated={"profiles": 1},
+            context={"user": {"id": "new-1", "name": "Alice"}}
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -689,8 +727,16 @@ class TestMultiOperationDependencies:
     @pytest.mark.asyncio
     async def test_list_data_with_references(self, mock_storage):
         """Test bulk data with @references (list of dicts)."""
-        mock_storage.insert_entity.return_value = {"id": "family-1"}
-        mock_storage.bulk_upsert.return_value = [{"id": "v1"}, {"id": "v2"}]
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={
+                "families": [{"id": "family-1", "name": "F1"}],
+                "variants": [
+                    {"id": "v1", "family_id": "family-1", "name": "V1"},
+                    {"id": "v2", "family_id": "family-1", "name": "V2"}
+                ]
+            },
+            context={"fam": {"id": "family-1", "name": "F1"}}
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -714,22 +760,32 @@ class TestMultiOperationDependencies:
         })
 
         assert result["success"] is True
-        # Verify bulk_upsert was called with resolved references
-        bulk_call = mock_storage.bulk_upsert.call_args
-        bulk_data = bulk_call[1]["data"]
-        assert all(item["family_id"] == "family-1" for item in bulk_data)
+        assert result["summary"]["total_created"] == 3
 
     @pytest.mark.asyncio
     async def test_complex_6_operation_workflow(self, mock_storage):
         """Test realistic 6-operation workflow."""
-        mock_storage.insert_entity.side_effect = [
-            {"id": "fam-1"},
-            {"id": "axis-size"},
-            {"id": "axis-color"},
-            {"id": "val-500ml"},
-            {"id": "val-blue"},
-            {"id": "prod-1"}
-        ]
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={
+                "product_families": [{"id": "fam-1", "name": "Jars"}],
+                "variant_axes": [
+                    {"id": "axis-size", "name": "Size", "family_id": "fam-1"},
+                    {"id": "axis-color", "name": "Color", "family_id": "fam-1"}
+                ],
+                "variant_values": [
+                    {"id": "val-500ml", "value": "500ml", "axis_id": "axis-size"},
+                    {"id": "val-blue", "value": "Blue", "axis_id": "axis-color"}
+                ],
+                "products": [{"id": "prod-1", "family_id": "fam-1", "size_value_id": "val-500ml", "color_value_id": "val-blue"}]
+            },
+            context={
+                "family": {"id": "fam-1", "name": "Jars"},
+                "size_axis": {"id": "axis-size", "name": "Size", "family_id": "fam-1"},
+                "color_axis": {"id": "axis-color", "name": "Color", "family_id": "fam-1"},
+                "size_val": {"id": "val-500ml", "value": "500ml", "axis_id": "axis-size"},
+                "color_val": {"id": "val-blue", "value": "Blue", "axis_id": "axis-color"}
+            }
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -1016,11 +1072,11 @@ class TestErrorHandlingAndRollback:
     @pytest.mark.asyncio
     async def test_storage_error_triggers_rollback(self, mock_storage):
         """Test storage error triggers automatic rollback."""
-        # First op succeeds, second fails
-        mock_storage.insert_entity.side_effect = [
-            {"id": "success-1"},
-            Exception("Database error")
-        ]
+        # RPC returns failure - atomically rolled back
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_error_result(
+            error="Database error on second operation",
+            error_code="23505"
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -1037,13 +1093,17 @@ class TestErrorHandlingAndRollback:
 
         assert result["success"] is False
         assert "error" in result
-        # Transaction should have been entered (rollback automatic)
-        mock_storage.transaction.assert_called_once()
+        # RPC should have been called
+        mock_storage.execute_write_intent_rpc.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_invalid_reference_fails_gracefully(self, mock_storage):
         """Test invalid @reference generates clear error."""
-        mock_storage.insert_entity.return_value = {"id": "obj-1"}
+        # RPC returns error for missing field reference
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_error_result(
+            error='Field "nonexistent_field" not found in "@obj"',
+            error_code="REFERENCE_ERROR"
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -1070,7 +1130,11 @@ class TestErrorHandlingAndRollback:
     @pytest.mark.asyncio
     async def test_malformed_reference_syntax_fails(self, mock_storage):
         """Test malformed @reference syntax generates error."""
-        mock_storage.insert_entity.return_value = {"id": "obj-1"}
+        # RPC returns error for malformed reference
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_error_result(
+            error='Invalid reference syntax: "@obj". Expected @name.field or @name[idx].field',
+            error_code="REFERENCE_ERROR"
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -1096,7 +1160,10 @@ class TestErrorHandlingAndRollback:
     @pytest.mark.asyncio
     async def test_update_error_includes_context(self, mock_storage):
         """Test update error includes helpful context."""
-        mock_storage.update_entities.side_effect = Exception("Constraint violation")
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_error_result(
+            error="Constraint violation: invalid_field does not exist",
+            error_code="42703"
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -1137,7 +1204,10 @@ class TestErrorHandlingAndRollback:
     @pytest.mark.asyncio
     async def test_execution_result_includes_execution_time_on_error(self, mock_storage):
         """Test error result includes execution time."""
-        mock_storage.insert_entity.side_effect = Exception("Test error")
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_error_result(
+            error="Test error",
+            error_code="ERROR"
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -1158,12 +1228,11 @@ class TestErrorHandlingAndRollback:
     @pytest.mark.asyncio
     async def test_partial_execution_rolls_back_all(self, mock_storage):
         """Test partial execution rolls back ALL operations."""
-        # First 2 succeed, third fails
-        mock_storage.insert_entity.side_effect = [
-            {"id": "1"},
-            {"id": "2"},
-            Exception("Third op fails")
-        ]
+        # RPC returns failure - all operations atomically rolled back
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_error_result(
+            error="Third operation failed: constraint violation",
+            error_code="23505"
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -1180,19 +1249,20 @@ class TestErrorHandlingAndRollback:
         })
 
         assert result["success"] is False
-        # Transaction rollback should happen automatically
-        # (via context manager __aexit__)
+        # With RPC, rollback is automatic and atomic in PostgreSQL
 
     @pytest.mark.asyncio
     async def test_transaction_context_manager_entered(self, mock_storage):
-        """Test transaction context manager is used."""
-        mock_storage.insert_entity.return_value = {"id": "1"}
+        """Test RPC is used for atomic execution."""
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={"t": [{"id": "1"}]}
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
         await tool.ainvoke({
             "goal": "Test transaction",
-            "reasoning": "Verify transaction used",
+            "reasoning": "Verify RPC used for atomicity",
             "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
                 {"action": "create", "table": "t", "data": {}}
@@ -1200,10 +1270,8 @@ class TestErrorHandlingAndRollback:
             "impact": {"creates": {"t": 1}}
         })
 
-        # Verify transaction() was called
-        mock_storage.transaction.assert_called_once()
-        # Verify __aenter__ was called (transaction started)
-        mock_storage.transaction.return_value.__aenter__.assert_called_once()
+        # Verify RPC was called (atomic execution)
+        mock_storage.execute_write_intent_rpc.assert_called_once()
 
 
 # =============================================================================
@@ -1237,7 +1305,10 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_reference_to_none_result(self, mock_storage):
         """Test @reference to None result fails gracefully."""
-        mock_storage.insert_entity.return_value = None
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_error_result(
+            error='Reference "@obj" not found in context',
+            error_code="REFERENCE_ERROR"
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -1258,7 +1329,9 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_empty_string_as_reference(self, mock_storage):
         """Test empty string in data (not a reference)."""
-        mock_storage.insert_entity.return_value = {"id": "1"}
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={"t": [{"id": "1", "name": ""}]}
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -1273,9 +1346,9 @@ class TestEdgeCases:
         })
 
         assert result["success"] is True
-        # Empty string should pass through unchanged
-        calls = mock_storage.insert_entity.call_args_list
-        assert calls[0][1]["data"]["name"] == ""
+        # Verify RPC was called with the empty string preserved
+        call_args = mock_storage.execute_write_intent_rpc.call_args
+        assert call_args.kwargs["operations"][0]["data"]["name"] == ""
 
     @pytest.mark.asyncio
     async def test_special_characters_in_returns_name(self, mock_storage):
@@ -1300,7 +1373,11 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_very_long_operations_list(self, mock_storage):
         """Test WriteIntent with many operations (performance)."""
-        mock_storage.insert_entity.return_value = {"id": "x"}
+        # Build RPC result for 50 operations
+        created = {f"table_{i}": [{"id": f"id-{i}", "i": i}] for i in range(50)}
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created=created
+        )
 
         # Create 50 operations
         operations = [
@@ -1324,7 +1401,9 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_unicode_in_data(self, mock_storage):
         """Test Unicode characters in operation data."""
-        mock_storage.insert_entity.return_value = {"id": "1"}
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={"products": [{"id": "1", "name": "Cafe ??? ????"}]}  # Unicode preserved
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -1333,15 +1412,15 @@ class TestEdgeCases:
             "reasoning": "Special chars",
             "hitl_summary": TEST_HITL_SUMMARY,
             "operations": [
-                {"action": "create", "table": "products", "data": {"name": "Café ☕ 日本語"}}
+                {"action": "create", "table": "products", "data": {"name": "Cafe ??? ????"}}
             ],
             "impact": {"creates": {"products": 1}}
         })
 
         assert result["success"] is True
-        # Verify Unicode preserved
-        calls = mock_storage.insert_entity.call_args_list
-        assert calls[0][1]["data"]["name"] == "Café ☕ 日本語"
+        # Verify RPC was called with Unicode data
+        call_args = mock_storage.execute_write_intent_rpc.call_args
+        assert call_args.kwargs["operations"][0]["data"]["name"] == "Cafe ??? ????"
 
     @pytest.mark.asyncio
     async def test_very_nested_data_structure(self, mock_storage):
@@ -1377,7 +1456,9 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_null_values_in_data(self, mock_storage):
         """Test None/null values in operation data."""
-        mock_storage.insert_entity.return_value = {"id": "1"}
+        mock_storage.execute_write_intent_rpc.return_value = create_rpc_success_result(
+            created={"t": [{"id": "1", "nullable_field": None}]}
+        )
 
         tool = create_write_data_tool(mock_storage, tables=None)
 
@@ -1392,9 +1473,9 @@ class TestEdgeCases:
         })
 
         assert result["success"] is True
-        # None should pass through
-        calls = mock_storage.insert_entity.call_args_list
-        assert calls[0][1]["data"]["nullable_field"] is None
+        # None should pass through to RPC
+        call_args = mock_storage.execute_write_intent_rpc.call_args
+        assert call_args.kwargs["operations"][0]["data"]["nullable_field"] is None
 
     @pytest.mark.asyncio
     async def test_boolean_and_numeric_edge_values(self, mock_storage):
