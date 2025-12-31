@@ -145,6 +145,107 @@ Empty space has purpose:
 
 ---
 
+## CATALOG CONSISTENCY DOCTRINE (Critical for Base Assets)
+
+Catalog shots are **foundation assets**. All future content (lifestyle, social, campaigns) builds on these. Inconsistent foundations create downstream chaos.
+
+### The Catalog Grid Test
+
+**Would these images look professional side-by-side in a product grid?**
+
+If variants have different angles, framing, or lighting direction, the grid looks amateur.
+
+### Variant/Family Consistency Requirements
+
+When processing multiple products in a family:
+
+| Element | Requirement | Why |
+|---------|-------------|-----|
+| **Camera Angle** | IDENTICAL across all variants | Grid alignment |
+| **Framing/Proportions** | Same product coverage (70-85%) | Visual harmony |
+| **Lighting Direction** | Same key light position | Consistent shadows |
+| **Output Dimensions** | Same aspect ratio and size | Grid compatibility |
+| **Background** | Identical treatment | Clean comparison |
+
+### Style Lock (MANDATORY for Multi-Variant)
+
+**Before processing ANY variant in a family:**
+
+1. **View ALL variants first** - Understand the full set
+2. **Define LOCKED style guide:**
+   - Camera angle: [specific angle]
+   - Framing: product fills [X]% of frame
+   - Lighting: key light from [direction]
+   - Output: [dimensions], [aspect ratio]
+3. **Apply IDENTICALLY to each variant**
+4. **Verify consistency after batch completion**
+
+```
+WRONG: Process each variant independently
+       -> Different angles, different framing, grid looks chaotic
+
+RIGHT: Define style ONCE, apply to ALL variants
+       -> Consistent angle, framing, lighting across family
+```
+
+### Feature Visibility Doctrine
+
+**All critical features must be visible in catalog shots.**
+
+| Feature Type | Must Show | Common Failure |
+|--------------|-----------|----------------|
+| **Label/Brand** | Full label readable, not angled away | Label partially hidden |
+| **Size Indicator** | Size text/marking visible | Size info cropped or obscured |
+| **Key Differentiator** | What makes variants different (lid color, size) | Differentiator not prominent |
+| **Texture/Pattern** | Hero texture fully visible | Texture compressed or hidden |
+| **Product Shape** | True proportions, no distortion | Lens distortion, odd angle |
+
+**Reasoning:** If customer can't see what makes this variant unique, the catalog fails its purpose.
+
+### Dimension Standards
+
+| Use Case | Aspect Ratio | Minimum Size | Notes |
+|----------|--------------|--------------|-------|
+| E-commerce grid | 1:1 (square) | 1000x1000px | Most common, universal |
+| Product detail | 1:1 or 4:5 | 1500x1500px | Higher res for zoom |
+| Marketplace | Per platform | Per platform | Check requirements |
+
+**Default:** 1:1 at 1024x1024 unless PM specifies otherwise.
+
+### Batch Processing Pattern
+
+For a family with N variants:
+
+```
+1. view_image ALL variants (understand the set)
+2. DEFINE style lock:
+   - angle: slight_top (15-20 deg)
+   - framing: product 75% of frame
+   - lighting: studio_3point, key from left
+   - output: 1:1, 1024x1024
+3. FOR EACH variant:
+   - image_studio with LOCKED style
+   - view_image to verify consistency
+4. AFTER ALL:
+   - Compare outputs mentally (same angle? same framing?)
+   - If inconsistent -> REDO the outliers
+```
+
+### Consistency Self-Check
+
+After processing a batch, ask:
+
+1. **ANGLE:** All variants shot from same angle?
+2. **FRAMING:** Products fill same percentage of frame?
+3. **LIGHTING:** Shadows fall same direction?
+4. **FEATURES:** All key features visible on each?
+5. **DIMENSIONS:** All same size and aspect ratio?
+6. **GRID TEST:** Would these look pro side-by-side?
+
+If ANY fails -> Fix before shipping.
+
+---
+
 ## PHOTOREALISM DOCTRINE
 
 Every image must be indistinguishable from professional photography.
@@ -277,20 +378,41 @@ Any dimension below 6 -> Source may be unfixable, ESCALATE
 | Single extraction for multi-item | 1 asset for 9 products | Multi-item: N items = N assets |
 | Over-enhancement until CGI-looking | Breaks photorealism | Photorealism: real, not rendered |
 | Missing material_treatment for glass | Flat, dead glass | Material: honor physics |
+| **Processing variants independently** | **Inconsistent angles/framing** | **Consistency: style lock first** |
+| **Different dimensions per variant** | **Grid looks broken** | **Consistency: same output specs** |
+| **Cropping critical features** | **Customer can't compare** | **Feature visibility: all features shown** |
+| **Skipping batch consistency check** | **Ship inconsistent set** | **Consistency: grid test before ship** |
 
 ---
 
 ## SELF-CRITIQUE
 
-After generating, ask:
+### Single Image Check
+
+After generating each image, ask:
 
 1. **FIDELITY:** Colors, artwork, text, texture match source?
 2. **SHARPNESS:** Tack sharp on all features?
 3. **PHOTOREALISM:** Grounded, shadowed, real?
 4. **MATERIAL:** Rendered true to nature?
 5. **COMPOSITION:** Product dominates appropriately?
+6. **FEATURES:** All critical features visible (label, size, differentiator)?
 
-All pass -> SHIP
+### Batch/Family Check (After ALL variants processed)
+
+7. **ANGLE:** All variants shot from same angle?
+8. **FRAMING:** Products fill same percentage of frame?
+9. **LIGHTING:** Shadows fall same direction?
+10. **DIMENSIONS:** All same size and aspect ratio?
+11. **GRID TEST:** Would these look pro side-by-side?
+
+### Decision
+
+```
+Single image: All 1-6 pass -> SHIP
+Batch: All 1-11 pass -> SHIP
 Any fail -> ITERATE on the failure
+Consistency fail -> REDO outliers with locked style
+```
 
 </protocol>
