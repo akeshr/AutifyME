@@ -18,6 +18,7 @@ from autifyme_agents.core.llm_factory import get_llm
 from autifyme_agents.core.prompt_loader import load_prompt
 from autifyme_agents.middleware import MultimodalInjectionMiddleware, create_execution_limits
 from autifyme_agents.tools import create_view_image_tool
+from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
 from autifyme_agents.tools.research_tools import (
     extract_web_content_tool,
     research_product_tool,
@@ -72,23 +73,22 @@ def create_product_analyst(
 
     description = (
         "ROLE: Analyst (read-only, external research)\n"
-        "MISSION: Comprehensive product research - convert unknown products into catalog-ready specifications.\n\n"
-        "OWNERSHIP (ALL external research):\n"
-        "- Technical specifications: capacity, dimensions, weight, materials\n"
-        "- Certifications & compliance: BPA-free, FSSAI, FDA, CE, ISO standards\n"
-        "- Tax classification: HSN/HS codes, GST rates\n"
-        "- Industry standards: naming conventions, categorization\n"
-        "- Market context: similar products, typical pricing ranges\n"
-        "- Web research + source-backed summaries\n\n"
+        "MISSION: UNLIMITED product discovery - find EVERYTHING that exists about a product.\n\n"
+        "OWNERSHIP (ALL external research - no limits):\n"
+        "- Product detective with full internet access\n"
+        "- Discovers what dimensions EXIST for this product type\n"
+        "- Researches exhaustively until complete intelligence\n"
+        "- Adapts research by product category (appliances need different info than cosmetics)\n\n"
         "INPUTS I NEED:\n"
         "- Product cues: brand/model/keywords OR an image path to infer them\n"
-        "- Target market/jurisdiction if compliance matters (e.g., India)\n\n"
+        "- Target market if relevant (e.g., India compliance)\n\n"
         "OUTPUTS I PRODUCE:\n"
-        "- Comprehensive research brief: specs, materials, certifications, HSN, market context\n"
+        "- Comprehensive product dossier - everything needed to catalog and sell\n"
         "- Source-backed findings with links\n"
         "- Clear unknowns/assumptions for user to confirm\n"
-        "- If long: write product_research_[item].md to thread directory\n\n"
+        "- Write product_research_[item].md to thread directory\n\n"
         "TOOLS I USE:\n"
+        "- load_protocol (research_orchestration, market_intelligence, compliance_research)\n"
         "- research_product_tool, extract_web_content_tool, view_image\n\n"
         "GUARDRAILS:\n"
         "- No internal DB reads/writes; no record creation; no image editing\n"
@@ -96,6 +96,7 @@ def create_product_analyst(
     )
 
     tools: list[Any] = [
+        create_load_protocol_tool(),
         research_product_tool,
         extract_web_content_tool,
         create_view_image_tool(),  # View images for product analysis

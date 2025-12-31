@@ -531,6 +531,262 @@ class SupabaseStorageClient(StorageInterface):
             ) from exc
 
     # ========================================================================
+    # Pending Message Batching (Smart Skip for Multi-Image Handling)
+    # ========================================================================
+
+    async def queue_pending_message(
+        self,
+        message_id: str,
+        sender_id: str,
+        thread_id: str,
+        message_type: str,
+        text_content: str | None,
+        media_id: str | None,
+        caption: str | None,
+        sender_name: str | None,
+        received_at: datetime,
+    ) -> dict[str, Any]:
+        """Queue a message for batch processing.
+
+        Inserts into pending_messages table with sender_id as batch_key.
+        Uses async client for non-blocking webhook handling.
+
+        Args:
+            message_id: WhatsApp message ID (unique)
+            sender_id: Phone number
+            thread_id: LangGraph thread ID
+            message_type: text, image, video, document, audio, voice
+            text_content: Message text (if any)
+            media_id: WhatsApp media ID (if any)
+            caption: Media caption (if any)
+            sender_name: User display name (if available)
+            received_at: When webhook was received
+
+        Returns:
+            Inserted record with id and batch_key
+
+        Raises:
+            StorageError: If insert fails
+        """
+        try:
+            client = await self._ensure_async_client()
+            data = {
+                "message_id": message_id,
+                "sender_id": sender_id,
+                "thread_id": thread_id,
+                "batch_key": sender_id,  # Group by sender
+                "message_type": message_type,
+                "text_content": text_content,
+                "media_id": media_id,
+                "caption": caption,
+                "sender_name": sender_name,
+                "received_at": received_at.isoformat(),
+            }
+
+            result = await client.table("pending_messages").insert(data).execute()
+
+            if not result.data or len(result.data) == 0:
+                raise StorageError(
+                    message="Insert to pending_messages returned no data",
+                    operation="queue_pending_message",
+                )
+
+            inserted = result.data[0]
+            logger.debug(
+                "Queued pending message",
+                extra={
+                    "message_id": message_id,
+                    "sender_id": sender_id,
+                    "message_type": message_type,
+                },
+            )
+            return inserted
+
+        except Exception as exc:
+            if isinstance(exc, StorageError):
+                raise
+            logger.error(
+                "Failed to queue pending message",
+                exc_info=True,
+                extra={
+                    "message_id": message_id,
+                    "sender_id": sender_id,
+                    "error_type": type(exc).__name__,
+                },
+            )
+            raise StorageError(
+                message=f"Failed to queue pending message: {str(exc)}",
+                operation="queue_pending_message",
+                original_error=exc,
+            ) from exc
+
+    async def fetch_and_clear_batch(self, batch_key: str) -> list[dict[str, Any]]:
+        """Atomically fetch and delete all pending messages for a sender.
+
+        Uses PostgreSQL function for atomic operation - retrieves all queued
+        messages and removes them from the buffer in a single transaction.
+
+        Args:
+            batch_key: Sender ID (grouping key)
+
+        Returns:
+            List of pending message records, ordered by created_at ASC
+
+        Raises:
+            StorageError: If RPC call fails
+        """
+        try:
+            client = await self._ensure_async_client()
+            result = await client.rpc(
+                "fetch_and_clear_pending_batch",
+                {"p_batch_key": batch_key}
+            ).execute()
+
+            batch = result.data if result.data else []
+            logger.info(
+                "Fetched and cleared pending batch",
+                extra={
+                    "batch_key": batch_key,
+                    "message_count": len(batch),
+                },
+            )
+            return batch
+
+        except Exception as exc:
+            logger.error(
+                "Failed to fetch and clear pending batch",
+                exc_info=True,
+                extra={
+                    "batch_key": batch_key,
+                    "error_type": type(exc).__name__,
+                },
+            )
+            raise StorageError(
+                message=f"Failed to fetch pending batch: {str(exc)}",
+                operation="fetch_and_clear_batch",
+                original_error=exc,
+            ) from exc
+
+    async def has_recent_activity(
+        self, sender_id: str, window_seconds: int | float = 5
+    ) -> bool:
+        """Check if sender has recent activity within time window.
+
+        Used for Smart Skip logic: text messages only debounce if
+        there's recent activity (indicating a burst of messages).
+
+        Args:
+            sender_id: Phone number
+            window_seconds: Lookback window (default 5s)
+
+        Returns:
+            True if sender has pending messages created within window
+        """
+        try:
+            client = await self._ensure_async_client()
+            result = await client.rpc(
+                "has_recent_sender_activity",
+                {"p_sender_id": sender_id, "p_window_seconds": int(window_seconds)}
+            ).execute()
+
+            has_activity = bool(result.data)
+            logger.debug(
+                "Checked recent activity",
+                extra={
+                    "sender_id": sender_id,
+                    "window_seconds": window_seconds,
+                    "has_activity": has_activity,
+                },
+            )
+            return has_activity
+
+        except Exception:
+            # Fail open: if we can't check, assume no recent activity
+            # This means text message will process immediately (safe default)
+            logger.warning(
+                "Failed to check recent activity, assuming none",
+                exc_info=True,
+                extra={"sender_id": sender_id},
+            )
+            return False
+
+    async def has_pending_messages(self, sender_id: str) -> bool:
+        """Check if sender has any messages in the buffer.
+
+        Args:
+            sender_id: Phone number
+
+        Returns:
+            True if sender has at least one pending message
+        """
+        try:
+            client = await self._ensure_async_client()
+            result = await client.rpc(
+                "has_pending_messages",
+                {"p_sender_id": sender_id}
+            ).execute()
+
+            has_pending = bool(result.data)
+            logger.debug(
+                "Checked pending messages",
+                extra={
+                    "sender_id": sender_id,
+                    "has_pending": has_pending,
+                },
+            )
+            return has_pending
+
+        except Exception:
+            # Fail open: if we can't check, assume no pending messages
+            logger.warning(
+                "Failed to check pending messages, assuming none",
+                exc_info=True,
+                extra={"sender_id": sender_id},
+            )
+            return False
+
+    async def get_orphaned_batches(
+        self, age_seconds: int = 33
+    ) -> list[dict[str, Any]]:
+        """Get pending messages older than expected processing time.
+
+        Used for server restart recovery - these messages were queued
+        but never processed (server crashed before timer fired).
+
+        Args:
+            age_seconds: Age threshold (default 33s = 3s debounce + 30s buffer)
+
+        Returns:
+            List of orphaned message records grouped by batch_key
+        """
+        try:
+            client = await self._ensure_async_client()
+            result = await client.rpc(
+                "get_orphaned_pending_messages",
+                {"p_age_seconds": age_seconds}
+            ).execute()
+
+            orphaned = result.data if result.data else []
+            if orphaned:
+                logger.warning(
+                    "Found orphaned pending messages for recovery",
+                    extra={
+                        "orphan_count": len(orphaned),
+                        "age_threshold_seconds": age_seconds,
+                    },
+                )
+            return orphaned
+
+        except Exception:
+            logger.error(
+                "Failed to get orphaned batches",
+                exc_info=True,
+                extra={"age_seconds": age_seconds},
+            )
+            # Return empty list - recovery will be attempted next startup
+            return []
+
+    # ========================================================================
     # Phase 1.2: Workflow Outcome Tracking (Agentic Evolution)
     # ========================================================================
 
@@ -2301,8 +2557,137 @@ class SupabaseStorageClient(StorageInterface):
         so we implement best-effort rollback tracking. For true atomic
         transactions, consider using direct Postgres connection or
         implementing transaction-aware operations at application level.
+
+        DEPRECATED: For multi-operation writes, use execute_write_intent_rpc()
+        which provides true ACID guarantees via Postgres RPC.
         """
         return SupabaseTransaction(self)
+
+    async def execute_write_intent_rpc(
+        self,
+        operations: list[dict[str, Any]],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Execute multi-operation write intent atomically via Postgres RPC.
+
+        Provides true ACID transaction guarantees - all operations succeed
+        together or fail together with automatic rollback. Replaces the
+        best-effort rollback approach of the transaction() context manager.
+
+        Args:
+            operations: List of operations (pre-sorted by dependencies).
+                Each operation is a dict with:
+                - action: 'create', 'update', 'delete', or 'upsert'
+                - table: Target table name
+                - data: Record data (for create/upsert)
+                - filters: WHERE conditions (for update/delete)
+                - updates: SET values (for update)
+                - returns: Name to store result for @references
+                - on_conflict: 'error', 'skip', 'update' (for create/upsert)
+                - conflict_fields: Columns for ON CONFLICT (for upsert)
+                - soft_delete: true/false (for delete)
+
+            context: Pre-populated context (e.g., from asset uploads).
+                Keys can be referenced in operations using @name.field syntax.
+
+        Returns:
+            On success: {
+                'success': True,
+                'results': [...],  # Results per operation
+                'context': {...},  # Final context with all returns
+                'operations_executed': int
+            }
+            On failure: {
+                'success': False,
+                'error': str,
+                'error_code': str,
+                'failed_operation_index': int,
+                'failed_operation': {...}
+            }
+
+        Raises:
+            StorageError: On RPC call failure (network, auth, etc.)
+
+        Examples:
+            # Create parent with children using @references
+            result = await storage.execute_write_intent_rpc(
+                operations=[
+                    {
+                        'action': 'create',
+                        'table': 'product_families',
+                        'data': {'name': 'PET Bottles', 'code_prefix': 'PET'},
+                        'returns': 'family'
+                    },
+                    {
+                        'action': 'create',
+                        'table': 'products',
+                        'data': [
+                            {'family_id': '@family.id', 'name': 'PET 500ml'},
+                            {'family_id': '@family.id', 'name': 'PET 1L'}
+                        ]
+                    }
+                ]
+            )
+            if result['success']:
+                print(f"Created {result['operations_executed']} operations")
+            else:
+                print(f"Failed: {result['error']}")
+        """
+        try:
+            client = await self._ensure_async_client()
+
+            # Call the atomic RPC function
+            result = await client.rpc(
+                "execute_write_intent",
+                {
+                    "p_operations": operations,
+                    "p_context": context or {},
+                }
+            ).execute()
+
+            # RPC returns the result directly in data
+            rpc_result = result.data
+
+            if rpc_result is None:
+                return {
+                    "success": False,
+                    "error": "RPC returned null result",
+                    "error_code": "RPC_NULL_RESULT",
+                }
+
+            # Log result
+            if rpc_result.get("success"):
+                logger.info(
+                    "WriteIntent RPC executed successfully",
+                    extra={
+                        "operations_executed": rpc_result.get("operations_executed", 0),
+                        "results_count": len(rpc_result.get("results", [])),
+                    }
+                )
+            else:
+                logger.warning(
+                    "WriteIntent RPC failed - transaction rolled back",
+                    extra={
+                        "error": rpc_result.get("error"),
+                        "error_code": rpc_result.get("error_code"),
+                        "failed_operation_index": rpc_result.get("failed_operation_index"),
+                    }
+                )
+
+            return rpc_result
+
+        except Exception as e:
+            logger.error(
+                "WriteIntent RPC call failed",
+                exc_info=True,
+                extra={"operation_count": len(operations)}
+            )
+            raise StorageError(
+                message=f"WriteIntent RPC failed: {str(e)}",
+                operation="execute_write_intent_rpc",
+                original_error=e,
+            ) from e
 
     # ========================================================================
     # File Storage (Supabase Storage Buckets)

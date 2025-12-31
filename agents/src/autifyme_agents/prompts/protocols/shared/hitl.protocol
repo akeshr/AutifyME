@@ -7,6 +7,20 @@ This protocol is domain-agnostic and tool-agnostic.
 
 **When to load:** ANY tool response contains `[HITL_FEEDBACK]` marker.
 
+**[CRITICAL] Mental Model:** `[HITL_FEEDBACK]` means USER HAS FEEDBACK on your proposed action.
+
+**First instinct: Can I resolve this myself?**
+- Question ("What is X?") → Explain and retry with clarification
+- Confusion ("didn't get that") → Rephrase/simplify and retry
+- Clear correction ("use Y instead") → Apply change and retry
+- Choice question ("A or B?") → Make recommendation, explain rationale, retry
+
+**Only escalate when you genuinely cannot proceed:**
+- Bare rejection with no explanation
+- Subjective preference you can't guess
+- Business decision outside your domain
+- After 2 failed attempts at resolution
+
 ---
 
 ## CRITICAL CONTEXT: PM VISIBILITY
@@ -43,7 +57,7 @@ HITL feedback arrives as a message containing `[HITL_FEEDBACK]` marker:
 ```
 
 ```
-[HITL_FEEDBACK] Price should be Rs 45, not Rs 38
+[HITL_FEEDBACK] Price should be [new price], not [old price]
 ```
 
 ```
@@ -61,10 +75,12 @@ HITL feedback arrives as a message containing `[HITL_FEEDBACK]` marker:
 | Pattern | Type | Meaning | Action |
 |---------|------|---------|--------|
 | "Reject" / empty / no reason | **BARE_REJECT** | User rejected but didn't say why | Escalate asking WHAT was wrong |
+| "What is X?" / "Why Y?" / "didn't get that" | **QUESTION** | User needs explanation | **Explain and retry** |
+| "Should we X or Y?" / "A or B?" | **CHOICE** | User asking you to decide | **Recommend with rationale, retry** |
 | "There is X" / "X as well" / "X exists" | **FACT** | User is informing you of information | Check workspace, accept if not found |
 | "I don't like X" / "X is wrong" / "not X" | **REJECTION** | User wants different value | Propose alternatives OR escalate |
-| "Change X to Y" / "Use Y" / "Make it Y" | **CLEAR** | User specifies exact change | Apply directly |
-| "Seems off" / "Check X" / "doesn't look right" | **AMBIGUOUS** | User unsure what's wrong | Escalate with diagnostic options |
+| "Change X to Y" / "Use Y" / "Make it Y" | **CLEAR** | User specifies exact change | Apply directly, retry |
+| "Seems off" / "Check X" / "doesn't look right" | **AMBIGUOUS** | User unsure what's wrong | Investigate, propose fix, retry |
 | "I like X but not Y" / "X is fine, but Y" | **PARTIAL** | Some approved, some rejected | Apply approved, handle rejected |
 | "Approve if you X" / "OK but change X" | **CONDITIONAL** | Approval with required change | Apply condition, resubmit |
 | "Actually, do Z instead" / "No, I want Z" | **REDIRECT** | User wants different action | Escalate for task change |
@@ -78,45 +94,55 @@ HITL feedback arrives as a message containing `[HITL_FEEDBACK]` marker:
       v
 [1. Is feedback empty or just "Reject"?]
       |
-      +---> YES -> BARE_REJECT
+      +---> YES -> BARE_REJECT (escalate)
       |
       v
-[2. Does feedback specify exact values?]
+[2. Is feedback a QUESTION? ("what is", "why", "didn't get")]
       |
-      +---> YES ("use X", "change to Y") -> CLEAR
+      +---> YES -> QUESTION (explain and retry)
       |
       v
-[3. Does feedback approve some, reject others?]
+[3. Is feedback asking YOU to choose? ("should we", "A or B")]
+      |
+      +---> YES -> CHOICE (recommend and retry)
+      |
+      v
+[4. Does feedback specify exact values?]
+      |
+      +---> YES ("use X", "change to Y") -> CLEAR (apply and retry)
+      |
+      v
+[5. Does feedback approve some, reject others?]
       |
       +---> YES ("X is fine but Y") -> PARTIAL
       |
       v
-[4. Does feedback have a condition?]
+[6. Does feedback have a condition?]
       |
-      +---> YES ("approve if", "OK but") -> CONDITIONAL
-      |
-      v
-[5. Does feedback redirect to different task?]
-      |
-      +---> YES ("actually do Z", "no I want") -> REDIRECT
+      +---> YES ("approve if", "OK but") -> CONDITIONAL (apply and retry)
       |
       v
-[6. Does feedback cancel entirely?]
+[7. Does feedback redirect to different task?]
+      |
+      +---> YES ("actually do Z", "no I want") -> REDIRECT (escalate)
+      |
+      v
+[8. Does feedback cancel entirely?]
       |
       +---> YES ("never mind", "cancel") -> CANCEL
       |
       v
-[7. Does feedback state facts ("there is X")?]
+[9. Does feedback state facts ("there is X")?]
       |
-      +---> YES -> FACT
+      +---> YES -> FACT (incorporate and retry)
       |
       v
-[8. Does feedback express dislike without alternative?]
+[10. Does feedback express dislike without alternative?]
       |
       +---> YES ("don't like", "wrong") -> REJECTION
       |
       v
-[9. Default] -> AMBIGUOUS
+[11. Default] -> AMBIGUOUS (investigate, propose fix, retry)
 ```
 
 ---
@@ -180,6 +206,46 @@ Please ask user what specifically needs to change.
 **I cannot guess.** Re-submitting without knowing the issue will likely be rejected again.
 ```
 
+### QUESTION
+
+User is asking for explanation or clarification. They need to UNDERSTAND before approving.
+
+**Action:** Explain clearly in hitl_summary, then resubmit.
+
+**You CAN resolve this yourself. Do NOT escalate.**
+
+```
+[QUESTION detected: "What is B in SSB?"]
+
+Action:
+1. Identify what confused user (the "B" in SKU prefix)
+2. Explain in hitl_summary: "SSB stood for Stack-Spoon-Bloom. Changing to PAV-SS (SmartStack) for clarity."
+3. Apply improvement (simpler prefix)
+4. Resubmit with explanation
+
+hitl_summary: "CLARIFIED: Changed prefix from SSB to PAV-SS (SmartStack) - the B was confusing. Approve?"
+```
+
+### CHOICE
+
+User is asking YOU to make a decision between options.
+
+**Action:** Make a recommendation with clear rationale, then resubmit.
+
+**You CAN resolve this yourself. Do NOT escalate.**
+
+```
+[CHOICE detected: "Should we use category name or collection name as family?"]
+
+Action:
+1. Identify the options (category name vs collection name)
+2. Apply your domain knowledge to recommend
+3. Explain rationale in hitl_summary
+4. Resubmit with your choice
+
+hitl_summary: "RECOMMENDATION: Using 'Pavisha SmartStack Printed Kitchen Jars' as Family Name (specific to this product set). The broader 'SmartStack Storage Collection' can house future products. Approve?"
+```
+
 ### FACT
 
 User is stating information exists. They are INFORMING you, not ASKING.
@@ -240,11 +306,11 @@ User specified exact change.
 **Action:** Apply directly, resubmit with REVISED marker.
 
 ```
-ORIGINAL: price = Rs 38
-FEEDBACK: "Make it Rs 45"
-REVISED: price = Rs 45
+ORIGINAL: price = [old price]
+FEEDBACK: "Make it [new price]"
+REVISED: price = [new price]
 
-hitl_summary: "REVISED: Price changed from Rs 38 to Rs 45 per your feedback. Approve?"
+hitl_summary: "REVISED: Price changed from [old price] to [new price] per your feedback. Approve?"
 ```
 
 ### PARTIAL
@@ -299,16 +365,24 @@ Please confirm new task direction.
 
 User wants to abandon the task.
 
-**Action:** Confirm and return to PM.
+**Action:** Confirm cancellation, report any partial work, return to PM.
+
+**[CRITICAL] Include partial results if ANY work was completed before cancel:**
+- Asset IDs already created
+- Files already written
+- Items already processed (e.g., "7/10 images")
+
+This enables PM to inform user of salvageable work.
 
 ```
 [HITL CANCELED]
 
-**User's HITL Feedback:**
-> "Never mind, cancel this"
+**User Feedback:** "[user's exact words, or 'Cancel' if bare]"
+
+**Partial Results (if any):**
+[Report what YOU actually completed - asset IDs, files, progress count]
 
 Task abandoned per user request.
-No action taken.
 ```
 
 ---
@@ -418,7 +492,11 @@ When user canceled the task:
 ```
 [HITL CANCELED]
 
-**User Feedback:** "[exact feedback]"
+**User Feedback:** "[exact feedback or 'Cancel' if bare cancel]"
+
+**Partial Results (if any):**
+- [What was completed before cancel, e.g., "7/10 images generated: asset_001, asset_002..."]
+- [Or "No partial results - canceled before any output"]
 
 Task abandoned per user request.
 Awaiting new instructions.
@@ -573,7 +651,7 @@ Round 3: "Unable to resolve after 2 rounds. Options: 1) exact value, 2) cancel, 
 ### Example 1: Clear Correction (Simple)
 
 ```
-[HITL_FEEDBACK] Price should be Rs 45, not Rs 38
+[HITL_FEEDBACK] Price should be [new price], not [old price]
 
 Type: CLEAR
 Action: Apply directly
@@ -581,10 +659,10 @@ Action: Apply directly
 Response:
 [HITL RESOLVED]
 
-**User Feedback:** "Price should be Rs 45, not Rs 38"
+**User Feedback:** "Price should be [new price], not [old price]"
 
 **Resolutions:**
-- Price: Rs 38 -> Rs 45 (per user feedback)
+- Price: [old price] -> [new price] (per user feedback)
 
 Proceeding with revised proposal.
 
@@ -600,7 +678,7 @@ Proceeding with revised proposal.
 Type: FACT
 Action: Check workspace
 
-[Check visual_analysis_storage_jars.md]
+[Check visual_analysis_[product].md]
 -> Found: "Colors: Blossoms (Blue), Charming Flowers (Yellow), Spring Flowers (Pink)"
 
 Response:
@@ -643,17 +721,17 @@ Response:
 
 **What I've Resolved:**
 - Sets/Combos: Will NOT create (source: user feedback - "don't create")
-- Color Variants: Will include Blossoms, Charming Flowers, Spring Flowers (source: visual_analysis_storage_jars.md)
+- Color Variants: Will include [Design A], [Design B], [Design C] (source: visual_analysis_[product].md)
 
 **What Needs Clarification:**
 | Aspect | User Said | Options | Recommendation |
 |--------|-----------|---------|----------------|
-| Family Name | "don't like the family name" | 1) "Pavisha Floral Collection", 2) "Decorative PET Storage", 3) Ask user | Option 1 - matches brand |
-| SKU Pattern | "don't like...sku" | 1) "PFC-" prefix, 2) "DPS-" prefix, 3) Ask user | Option 1 - aligns with family |
+| Family Name | "don't like the family name" | 1) "[Brand] [Category] Collection", 2) "[Description] [Type]", 3) Ask user | Option 1 - matches brand |
+| SKU Pattern | "don't like...sku" | 1) "[PREFIX-A]-" prefix, 2) "[PREFIX-B]-" prefix, 3) Ask user | Option 1 - aligns with family |
 
 **Workspace Files Checked:**
-- visual_analysis_storage_jars.md: Found 3 color variants
-- catalog_analysis_pet_containers.md: Found existing SKU patterns (PAV-*)
+- visual_analysis_[product].md: Found N color variants
+- catalog_analysis_[product].md: Found existing SKU patterns ([PREFIX]-*)
 
 **Request for PM:**
 Please ask user to choose family name and SKU pattern, or confirm my recommendations.
@@ -680,10 +758,10 @@ Response:
 - User did NOT specify what was wrong
 
 **What Was Proposed:**
-- Family: Floral PET Jar Series
-- SKU: FPJ-500ML-BLOSSOMS (and 11 variants)
-- Price Range: Rs 40-95
-- Products: 12 variants (4 sizes x 3 designs)
+- Family: [Family Name]
+- SKU: [PREFIX]-[SIZE]-[DESIGN] (and N variants)
+- Price Range: [Currency] [low]-[high]
+- Products: N variants (M sizes x K designs)
 
 **Request for PM:**
 Please ask user what specifically needs to change.
@@ -702,12 +780,12 @@ Response:
 **Escalation:** 3 of 3 (FINAL)
 
 **Unresolved after 2 rounds:**
-- Family Name: User rejected "Floral PET Series" and "Pavisha Floral Collection" without specifying preferred name
+- Family Name: User rejected "[Option A]" and "[Option B]" without specifying preferred name
 
 **Options for PM:**
 1. Ask user to provide exact family name they want
 2. Cancel this cataloging task
-3. Proceed with "Decorative Storage Jars" (generic, may need revision)
+3. Proceed with "[Descriptive] [Category]" (generic, may need revision)
 
 I cannot continue escalating the same issue. Please choose an option.
 ```
@@ -715,7 +793,7 @@ I cannot continue escalating the same issue. Please choose an option.
 ### Example 6: Redirect
 
 ```
-[HITL_FEEDBACK] Actually, don't create new - just update the existing 500ml jar
+[HITL_FEEDBACK] Actually, don't create new - just update the existing [size] [product]
 
 Type: REDIRECT
 Action: Escalate for task change
@@ -723,13 +801,13 @@ Action: Escalate for task change
 Response:
 [HITL REDIRECT]
 
-**User Feedback:** "Actually, don't create new - just update the existing 500ml jar"
+**User Feedback:** "Actually, don't create new - just update the existing [size] [product]"
 
 **Original Task:** Create new product family with 12 variants
 **User Wants:** Update existing product
 
 This requires task change, not revision.
-Please confirm: Should I update the existing 500ml jar instead?
+Please confirm: Should I update the existing [size] [product] instead?
 If yes, which attributes should I update?
 ```
 

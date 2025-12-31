@@ -17,6 +17,22 @@ Database records may reference files that no longer exist (deleted but not clean
 
 ---
 
+## FRESH MEDIA WARNING (PM only)
+
+**list_storage CANNOT find media that hasn't been downloaded yet.**
+
+When user sends image via WhatsApp, PM receives `[media_id: wamid_xxx]`. The image is on WhatsApp's servers, NOT in our storage. PM must call `download_whatsapp_media(media_id)` FIRST to download and persist to inbox. Only THEN will list_storage find the file.
+
+| Scenario | What Works |
+|----------|------------|
+| Fresh message with `[media_id: xxx]` | download_{platform}_media FIRST, then list_storage |
+| User refers to "the images I sent earlier" | list_storage (already downloaded) |
+| Check what exists before delegating | list_storage |
+
+**Agents (not PM):** You receive storage_path in delegation. No need to download.
+
+---
+
 ## STORAGE ARCHITECTURE
 
 ### Folder Structure

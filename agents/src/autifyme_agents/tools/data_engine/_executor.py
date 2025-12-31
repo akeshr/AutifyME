@@ -20,6 +20,7 @@ from typing import Any
 
 from langchain_core.tools import ToolException
 
+from autifyme_agents.core.execution_context import to_storage_path
 from autifyme_agents.core.ports import StorageInterface
 from autifyme_agents.schemas.write_intent import Operation, WriteIntent
 
@@ -310,12 +311,15 @@ class MultiOperationExecutor:
         self, intent: WriteIntent, start_time: float
     ) -> ExecutionResult:
         """
-        Execute operations atomically with transaction.
+        Execute operations atomically via Postgres RPC.
+
+        Provides true ACID transaction guarantees - all operations succeed
+        together or fail together with automatic rollback.
 
         Execution order:
         1. Upload assets (if any) - store results in context
-        2. Execute database operations in dependency order
-        3. On any error, rollback transaction AND delete uploaded assets
+        2. Execute ALL database operations in single RPC call (atomic)
+        3. On any error, Postgres rolls back automatically AND we delete uploaded assets
         """
         uploaded_assets: list[dict[str, Any]] = []  # Track for rollback
 
@@ -332,10 +336,20 @@ class MultiOperationExecutor:
                     # Two modes: storage_path (move) vs temp_path (upload)
                     if asset_upload.storage_path is not None:
                         # Mode 1: Move from pending/ to target folder (preferred)
+                        # Convert user path to storage path (adds thread_id for pending/)
+                        # User path: "pending/hero.png" -> Storage: "pending/{thread_id}/hero.png"
+                        try:
+                            internal_path = to_storage_path(asset_upload.storage_path)
+                        except ValueError as e:
+                            # If thread_id not available, try using path as-is (may already be internal)
+                            logger.warning(f"Path conversion failed, using as-is: {e}")
+                            internal_path = asset_upload.storage_path
+
                         logger.info(
                             f"Moving asset: {asset_upload.storage_path} -> {asset_upload.bucket}/{asset_upload.target_folder}",
                             extra={
-                                "storage_path": asset_upload.storage_path,
+                                "user_path": asset_upload.storage_path,
+                                "internal_path": internal_path,
                                 "bucket": asset_upload.bucket,
                                 "target_folder": asset_upload.target_folder,
                                 "returns": asset_upload.returns,
@@ -343,7 +357,7 @@ class MultiOperationExecutor:
                         )
 
                         move_result = await self.storage.move_asset(
-                            source_path=asset_upload.storage_path,
+                            source_path=internal_path,
                             target_folder=asset_upload.target_folder,
                             bucket=asset_upload.bucket,
                         )
@@ -401,115 +415,56 @@ class MultiOperationExecutor:
                             f"AssetUpload '{asset_upload.returns}' has neither storage_path nor temp_path"
                         )
 
-            # Phase 2: Execute database operations in transaction
-            async with self.storage.transaction():
-                created_entities: dict[str, list[dict[str, Any]]] = {}
-                updated_entities: dict[str, int] = {}
-                deleted_entities: dict[str, int] = {}
-                warnings: list[str] = []
+            # Phase 2: Execute ALL database operations atomically via RPC
+            # Convert Operation objects to dicts for RPC
+            operations_for_rpc = [
+                {
+                    "action": op.action,
+                    "table": op.table,
+                    "data": op.data,
+                    "filters": op.filters,
+                    "updates": op.updates,
+                    "returns": op.returns,
+                    "on_conflict": op.on_conflict,
+                    "conflict_fields": op.conflict_fields,
+                    "soft_delete": op.soft_delete,
+                }
+                for op in sorted_operations
+            ]
 
-                for op in sorted_operations:
-                    logger.info(
-                        f"Executing operation: {op.action} on {op.table}",
-                        extra={"action": op.action, "table": op.table},
-                    )
+            logger.info(
+                f"Executing {len(operations_for_rpc)} operations via atomic RPC",
+                extra={
+                    "goal": intent.goal,
+                    "operation_count": len(operations_for_rpc),
+                    "context_keys": list(context.keys()),
+                },
+            )
 
-                    # Resolve references in data
-                    resolved_data = (
-                        self._resolve_references(op.data, context) if op.data is not None else None
-                    )
+            # Execute via RPC - true ACID transaction
+            rpc_result = await self.storage.execute_write_intent_rpc(
+                operations=operations_for_rpc,
+                context=context,
+            )
 
-                    # Execute operation
-                    if op.action == "create":
-                        # Validation ensures create has data (empty dict {} is valid)
-                        if resolved_data is None:
-                            raise ToolException("CREATE requires data")
-                        result = await self._execute_create(
-                            op.table, resolved_data, op.on_conflict, op.conflict_fields
-                        )
+            execution_time_ms = int((time.time() - start_time) * 1000)
 
-                        # Track created entities
-                        if op.table not in created_entities:
-                            created_entities[op.table] = []
-
-                        if isinstance(result, list):
-                            created_entities[op.table].extend(result)
-                        else:
-                            created_entities[op.table].append(result)
-
-                        # Store in context for reference resolution
-                        if op.returns:
-                            if isinstance(result, list):
-                                context[op.returns] = result[0]  # First result
-                            else:
-                                context[op.returns] = result
-
-                    elif op.action == "update":
-                        # Validation ensures update has filters and data/updates
-                        if op.filters is None:
-                            raise ToolException("UPDATE requires filters")
-                        updates_data = op.updates or resolved_data
-                        if updates_data is None:
-                            raise ToolException("UPDATE requires updates or data")
-                        if not isinstance(updates_data, dict):
-                            raise ToolException("UPDATE data must be dict, not list")
-                        count = await self._execute_update(
-                            op.table,
-                            op.filters,
-                            updates_data,
-                        )
-                        updated_entities[op.table] = updated_entities.get(op.table, 0) + count
-
-                        # Warn if update matched 0 rows
-                        if count == 0:
-                            warnings.append(
-                                f"UPDATE on {op.table} matched 0 rows (filters: {op.filters}). "
-                                f"Operation succeeded but no data was modified."
-                            )
-
-                    elif op.action == "delete":
-                        # Validation ensures delete has filters
-                        if op.filters is None:
-                            raise ToolException("DELETE requires filters")
-                        count = await self._execute_delete(
-                            op.table, op.filters, op.soft_delete, op.cascade
-                        )
-                        deleted_entities[op.table] = deleted_entities.get(op.table, 0) + count
-
-                        # Warn if delete matched 0 rows
-                        if count == 0:
-                            warnings.append(
-                                f"DELETE on {op.table} matched 0 rows (filters: {op.filters}). "
-                                f"Operation succeeded but no data was removed."
-                            )
-
-                    elif op.action == "upsert":
-                        # Validation ensures upsert has data (empty dict {} is valid)
-                        if resolved_data is None:
-                            raise ToolException("UPSERT requires data")
-                        result = await self._execute_upsert(
-                            op.table, resolved_data, op.conflict_fields
-                        )
-
-                        # Track created entities (upsert returns list)
-                        if op.table not in created_entities:
-                            created_entities[op.table] = []
-                        created_entities[op.table].extend(result)
-
-                        # Store in context
-                        if op.returns:
-                            context[op.returns] = result[0] if result else None
-
-                execution_time_ms = int((time.time() - start_time) * 1000)
+            if rpc_result.get("success"):
+                # Parse RPC results into our format
+                created_entities, updated_entities, deleted_entities, warnings = (
+                    self._parse_rpc_results(rpc_result.get("results", []))
+                )
 
                 logger.info(
-                    "WriteIntent execution successful",
+                    "WriteIntent execution successful (atomic RPC)",
                     extra={
                         "goal": intent.goal,
                         "execution_time_ms": execution_time_ms,
                         "assets_uploaded": len(uploaded_assets),
+                        "operations_executed": rpc_result.get("operations_executed", 0),
                         "created_count": sum(
-                            len(entities) for entities in created_entities.values()
+                            len(entities) if isinstance(entities, list) else entities
+                            for entities in created_entities.values()
                         ),
                         "updated_count": sum(updated_entities.values()),
                         "deleted_count": sum(deleted_entities.values()),
@@ -525,33 +480,45 @@ class MultiOperationExecutor:
                     execution_time_ms=execution_time_ms,
                     warnings=warnings,
                 )
+            else:
+                # RPC returned failure - Postgres has already rolled back
+                error_msg = self._build_error_message(
+                    Exception(rpc_result.get("error", "Unknown RPC error"))
+                )
+
+                # Rollback uploaded assets since DB operations failed
+                await self._rollback_assets(uploaded_assets)
+
+                logger.error(
+                    "WriteIntent RPC failed - Postgres rolled back automatically",
+                    extra={
+                        "goal": intent.goal,
+                        "error": rpc_result.get("error"),
+                        "error_code": rpc_result.get("error_code"),
+                        "failed_operation_index": rpc_result.get("failed_operation_index"),
+                        "execution_time_ms": execution_time_ms,
+                        "assets_rolled_back": len(uploaded_assets),
+                    },
+                )
+
+                return ExecutionResult(
+                    success=False,
+                    error_message=error_msg,
+                    error_operation=str(rpc_result.get("failed_operation", {})),
+                    execution_time_ms=execution_time_ms,
+                    rollback_performed=True,
+                )
 
         except Exception as e:
-            # Transaction automatically rolled back
+            # Network/auth error calling RPC
             execution_time_ms = int((time.time() - start_time) * 1000)
             error_msg = self._build_error_message(e)
 
-            # Rollback uploaded assets (delete from storage)
-            if uploaded_assets:
-                logger.warning(
-                    f"Rolling back {len(uploaded_assets)} uploaded assets due to error",
-                    extra={"asset_count": len(uploaded_assets)},
-                )
-                for asset in uploaded_assets:
-                    try:
-                        await self.storage.delete_asset(
-                            storage_path=asset["storage_path"],
-                            bucket=asset["bucket"],
-                        )
-                        logger.info(f"Rolled back asset: {asset['storage_path']}")
-                    except Exception as rollback_error:
-                        logger.error(
-                            f"Failed to rollback asset {asset['storage_path']}: {rollback_error}",
-                            exc_info=True,
-                        )
+            # Rollback uploaded assets
+            await self._rollback_assets(uploaded_assets)
 
             logger.error(
-                "WriteIntent execution failed - transaction rolled back",
+                "WriteIntent execution failed",
                 exc_info=True,
                 extra={
                     "goal": intent.goal,
@@ -567,6 +534,88 @@ class MultiOperationExecutor:
                 execution_time_ms=execution_time_ms,
                 rollback_performed=True,
             )
+
+    def _parse_rpc_results(
+        self, results: list[dict[str, Any]]
+    ) -> tuple[
+        dict[str, list[dict[str, Any]]],
+        dict[str, int],
+        dict[str, int],
+        list[str],
+    ]:
+        """
+        Parse RPC results array into executor result format.
+
+        Returns:
+            Tuple of (created_entities, updated_entities, deleted_entities, warnings)
+        """
+        created_entities: dict[str, list[dict[str, Any]]] = {}
+        updated_entities: dict[str, int] = {}
+        deleted_entities: dict[str, int] = {}
+        warnings: list[str] = []
+
+        for result in results:
+            action = result.get("action")
+            table = result.get("table")
+            count = result.get("count", 0)
+            data = result.get("data")
+
+            if action == "create":
+                if table not in created_entities:
+                    created_entities[table] = []
+                if isinstance(data, list):
+                    created_entities[table].extend(data)
+                elif data:
+                    created_entities[table].append(data)
+
+            elif action == "update":
+                updated_entities[table] = updated_entities.get(table, 0) + count
+                if count == 0:
+                    warnings.append(
+                        f"UPDATE on {table} matched 0 rows. "
+                        f"Operation succeeded but no data was modified."
+                    )
+
+            elif action == "delete":
+                deleted_entities[table] = deleted_entities.get(table, 0) + count
+                if count == 0:
+                    warnings.append(
+                        f"DELETE on {table} matched 0 rows. "
+                        f"Operation succeeded but no data was removed."
+                    )
+
+            elif action == "upsert":
+                if table not in created_entities:
+                    created_entities[table] = []
+                if isinstance(data, list):
+                    created_entities[table].extend(data)
+                elif data:
+                    created_entities[table].append(data)
+
+        return created_entities, updated_entities, deleted_entities, warnings
+
+    async def _rollback_assets(self, uploaded_assets: list[dict[str, Any]]) -> None:
+        """Rollback uploaded assets on failure."""
+        if not uploaded_assets:
+            return
+
+        logger.warning(
+            f"Rolling back {len(uploaded_assets)} uploaded assets due to error",
+            extra={"asset_count": len(uploaded_assets)},
+        )
+
+        for asset in uploaded_assets:
+            try:
+                await self.storage.delete_asset(
+                    storage_path=asset["storage_path"],
+                    bucket=asset["bucket"],
+                )
+                logger.info(f"Rolled back asset: {asset['storage_path']}")
+            except Exception as rollback_error:
+                logger.error(
+                    f"Failed to rollback asset {asset['storage_path']}: {rollback_error}",
+                    exc_info=True,
+                )
 
     def _resolve_dependencies(self, operations: list[Operation]) -> list[Operation]:
         """

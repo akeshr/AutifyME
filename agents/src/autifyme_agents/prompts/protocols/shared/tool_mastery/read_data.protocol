@@ -4,6 +4,31 @@
 
 Master the read_data tool - universal database read for queries, batch reads, pagination, and counts.
 
+---
+
+## SCHEMA-FIRST QUERYING (Recommended)
+
+**Know the schema before you query.** Use inspect_schema to understand:
+- What columns exist (avoid guessing `family_id` vs `product_family_id`)
+- Column types (text vs enum vs jsonb - affects filter syntax)
+- Valid enum values (e.g., status is 'ACTIVE' not 'active')
+- Relationships (how to join tables correctly)
+
+```
+Pattern:
+1. inspect_schema(tables=['target_table'], details=['structure', 'constraints'])
+2. Note column names, types, enum values
+3. Build query with correct column names and valid filter values
+4. read_data with schema-informed parameters
+```
+
+**When to inspect first:**
+- First time querying a table
+- Building complex filters with enum/FK columns
+- Query failures due to column/value errors
+
+---
+
 ## CRITICAL DISTINCTION: filters vs search_patterns
 
 This is the #1 source of errors. Understand deeply.

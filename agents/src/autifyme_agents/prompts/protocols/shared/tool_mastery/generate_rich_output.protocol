@@ -224,9 +224,9 @@ generate_rich_output(
 generate_rich_output(
     title="Product Comparison",
     data=[
-        {"name": "Standard", "price": 499, "capacity": "500ml", "material": "Glass"},
-        {"name": "Pro", "price": 799, "capacity": "1L", "material": "Glass"},
-        {"name": "Elite", "price": 1299, "capacity": "2L", "material": "Crystal"}
+        {"name": "Standard", "price": "[price A]", "capacity": "[size A]", "material": "[Material]"},
+        {"name": "Pro", "price": "[price B]", "capacity": "[size B]", "material": "[Material]"},
+        {"name": "Elite", "price": "[price C]", "capacity": "[size C]", "material": "[Material]"}
     ],
     context="Side-by-side comparison requested by user.",
     company_profile=self.company_profile,
@@ -330,7 +330,7 @@ Please review each issue and let me know how to proceed.
 
 **Query results:**
 ```
-Found 47 products matching "glass jar":
+Found 47 products matching "[search term]":
 
 https://supabase.../outputs/ghi789.html
 

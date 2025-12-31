@@ -111,9 +111,30 @@ Before applying to production:
 
 ---
 
+### 007_fix_array_type_handling.sql (Array Type Helper)
+
+**Purpose**: Adds helper function for text[] column updates via `execute_write_intent` RPC
+
+**Problem**: When updating array columns like `tags`, the RPC passes JSONB arrays directly, but PostgreSQL cannot implicitly cast `jsonb` to `text[]`.
+
+**Error Fixed**: `column 'tags' is of type text[] but expression is of type jsonb` (Error 42804)
+
+**Functions Added**:
+- `jsonb_to_text_array(jsonb)` - Converts JSONB array to PostgreSQL text[]
+
+**Next Step**: Patch `execute_write_intent` function to use this helper for text[] columns. See migration file for instructions.
+
+**Rollback**:
+```sql
+DROP FUNCTION IF EXISTS jsonb_to_text_array(jsonb);
+```
+
+---
+
 ## Phase Roadmap
 
 - [x] **Phase 1.2**: Outcome tracking tables and views
+- [ ] **Phase 1.7**: WriteIntent RPC with array type support (helper added, patch pending)
 - [ ] **Phase 2.1**: pgvector extension + embedding columns
 - [ ] **Phase 2.2**: Routing optimization tables
 - [ ] **Phase 3**: Auto-healing workflow tables

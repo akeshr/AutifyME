@@ -107,7 +107,7 @@ DELETED     -> Soft deleted
 | `asset_type` | enum | File FORMAT | IMAGE, VIDEO, DOCUMENT |
 | `purpose` | enum | INTENDED USE | PRODUCT, CAMPAIGN, BRAND |
 | `category` | varchar | Visual STYLE | HERO, LIFESTYLE, GALLERY |
-| `tags` | text[] | SEARCHABLE terms | ["white-background", "500ml", "PET"] |
+| `tags` | text[] | SEARCHABLE terms | ["[background-type]", "[size]", "[material]"] |
 
 **When to use each:**
 - `asset_type`: Set automatically based on file type
@@ -145,7 +145,7 @@ DELETED     -> Soft deleted
 {
   "is_ai_generated": true,
   "source_asset_ids": ["uuid-of-input-image"],
-  "generation_prompt": "extraction + white background + side rake light for PET texture"
+  "generation_prompt": "extraction + [background] + [lighting] for [material] texture"
 }
 ```
 
@@ -262,16 +262,16 @@ Most common scenario. Create asset and junction in same transaction.
       "action": "create",
       "table": "assets",
       "data": {
-        "name": "PET Jar 500ml Hero",
-        "storage_url": "pending/20241217_studio_abc.png",
+        "name": "[Product] [Size] Hero",
+        "storage_url": "pending/[timestamp]_studio_[id].png",
         "storage_provider": "SUPABASE",
-        "file_name": "20241217_studio_abc.png",
+        "file_name": "[timestamp]_studio_[id].png",
         "asset_type": "IMAGE",
         "status": "ACTIVE",
         "is_ai_generated": true,
         "source_asset_ids": null,
-        "generation_prompt": "extraction + white bg + side rake light for honeycomb texture",
-        "caption": "500ml PET jar with honeycomb texture"
+        "generation_prompt": "extraction + [background] + [lighting] for [texture]",
+        "caption": "[size] [material] [product] with [texture]"
       },
       "returns": "asset"
     },
@@ -340,10 +340,10 @@ Each variant gets its own image. Create N assets + N junctions.
       "action": "create",
       "table": "assets",
       "data": [
-        {"name": "500ml variant", "storage_url": "pending/t/500ml.png", ...},
-        {"name": "1L variant", "storage_url": "pending/t/1L.png", ...},
-        {"name": "1.5L variant", "storage_url": "pending/t/1_5L.png", ...},
-        {"name": "2L variant", "storage_url": "pending/t/2L.png", ...}
+        {"name": "[Size A] variant", "storage_url": "pending/t/[size_a].png", ...},
+        {"name": "[Size B] variant", "storage_url": "pending/t/[size_b].png", ...},
+        {"name": "[Size C] variant", "storage_url": "pending/t/[size_c].png", ...},
+        {"name": "[Size D] variant", "storage_url": "pending/t/[size_d].png", ...}
       ],
       "returns": "assets_batch"
     },
@@ -374,7 +374,7 @@ One lifestyle image shared by all products in family. Link to family, not produc
       "action": "create",
       "table": "assets",
       "data": {
-        "name": "PET Storage Family Lifestyle",
+        "name": "[Material] [Category] Family Lifestyle",
         "storage_url": "pending/t/family_lifestyle.png",
         "asset_type": "IMAGE",
         "status": "ACTIVE"
@@ -522,7 +522,7 @@ Same asset used for multiple products (e.g., generic accessory image).
 
 ```json
 {
-  "goal": "Link existing cap image to new bottle product",
+  "goal": "Link existing [component] image to new [product]",
   "reasoning": "Same cap type used across product line. Reusing existing asset.",
   "operations": [
     {
@@ -586,19 +586,31 @@ Same asset used for multiple products (e.g., generic accessory image).
 
 ### Critical: Asset Ownership (Two-Stage HITL)
 
-**creative_specialist creates assets. catalog_specialist links them to products.**
+**Both specialists can create product_assets junctions.** Whoever runs SECOND creates the junction.
 
 ```
-NEW ARCHITECTURE:
+FLOW A - Images First (standard):
 1. creative_specialist: create asset (HITL for image quality)
    -> User approves/rejects image -> asset_id returned
 2. catalog_specialist: create product + junction (HITL for catalog data)
    -> User approves/rejects catalog data -> product linked
 
-WHY:
+FLOW B - Catalog First:
+1. catalog_specialist: create product (HITL for catalog data)
+   -> User approves/rejects catalog data -> product_id returned
+2. creative_specialist: create asset + junction (HITL for image quality)
+   -> User approves/rejects image -> asset linked
+
+WHY BOTH CAN CREATE JUNCTIONS:
+- Junction is trivial link (product_id, asset_id, role)
+- Whoever runs second has BOTH IDs
+- Same pattern as campaign_assets (creative already handles)
+- Enables 2-step flows in any order
+
+TWO-STAGE HITL PRESERVED:
 - Image feedback goes to image expert (can iterate)
 - Catalog feedback goes to catalog expert (can iterate)
-- No back-and-forth between specialists for image issues
+- Junction created by whoever runs second (under their HITL)
 
 ORPHAN HANDLING:
 - If catalog entry rejected, asset still exists (intentional)

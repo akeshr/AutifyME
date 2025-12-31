@@ -1,0 +1,267 @@
+<protocol name="compliance_research" type="decision" domain="product">
+
+## PURPOSE
+
+Guide regulatory research for HSN classification, compliance requirements, and certification needs. Ensure products are catalog-ready with correct classifications and compliance awareness.
+
+---
+
+## CORE PRINCIPLE: COMPLIANCE IS CATEGORY-DEPENDENT
+
+> **Not all products need compliance research. The PRODUCT TYPE determines requirements.**
+
+| Category | Compliance Intensity | Focus |
+|----------|---------------------|-------|
+| Food-contact | HIGH | FSSAI, BIS, food-grade certs |
+| Cosmetics | HIGH | IS 15778, BIS, labeling |
+| Electronics | HIGH | BIS, EMC, safety marks |
+| Toys | HIGH | BIS, age-appropriate, safety |
+| Decorative | LOW | HSN only |
+| Hardware | LOW | HSN, maybe load ratings |
+| Apparel | MEDIUM | Fiber content, care labels |
+
+---
+
+## HSN CODE RESEARCH
+
+### What is HSN?
+
+Harmonized System of Nomenclature - standardized classification for GST and trade:
+- 4-digit: Chapter and heading
+- 6-digit: Subheading
+- 8-digit: Tariff item (India-specific)
+
+### HSN Research Strategy
+
+**Step 1: Category Search**
+```
+Query: "[product type] [material] HSN code India GST"
+```
+
+**Step 2: Verify and Narrow**
+```
+Query: "HSN [code found] meaning items covered"
+```
+
+**Step 3: Check Exceptions**
+```
+Query: "[product type] HSN classification exceptions [use case]"
+```
+
+### Common HSN Chapters
+
+| Chapter | Category | Examples |
+|---------|----------|----------|
+| 39 | Plastics | PET, PP, HDPE containers |
+| 70 | Glass | Bottles, jars, glassware |
+| 73 | Iron/Steel | Hardware, fixtures |
+| 74 | Copper | Brass items (copper alloy) |
+| 83 | Base metal miscellaneous | Mountings, fittings |
+| 69 | Ceramics | Pottery, tableware |
+| 94 | Furniture | Furniture, furnishings |
+
+### HSN Implications
+
+Every HSN code has implications beyond classification:
+- GST rate (5%, 12%, 18%, 28%)
+- Import duty (if applicable)
+- Export incentives (some HSN codes qualify)
+- Compliance triggers (food-contact HSN = FSSAI relevant)
+
+---
+
+## CERTIFICATION REQUIREMENTS
+
+### India-Specific Certifications
+
+| Certification | Full Name | Required For |
+|---------------|-----------|--------------|
+| BIS | Bureau of Indian Standards | Mandatory products list |
+| FSSAI | Food Safety and Standards Authority | Food and food-contact |
+| ISI | Indian Standards Institution | Quality mark (voluntary) |
+| BEE | Bureau of Energy Efficiency | Appliances |
+| WPC | Wireless Planning & Coordination | RF devices |
+| CDSCO | Central Drugs Standard Control | Medical devices |
+
+### Food-Contact Certification Matrix
+
+| Material | Use Case | Required Certs |
+|----------|----------|----------------|
+| PET | Food storage | Food-grade, BPA-free claim |
+| Glass | Food/beverage | Generally safe, check lead-free |
+| Stainless Steel | Cookware | Food-grade steel (304/316) |
+| Plastic lids | Food containers | Food-grade PP/HDPE |
+| Ceramics | Tableware | Lead/cadmium-free for food use |
+
+### Certification Research Queries
+
+**Query Pattern:** `[product type] [material] compliance India [regulation body]`
+**Query Pattern:** `[product type] BIS mandatory registration`
+**Query Pattern:** `[material] food-grade certification India`
+
+---
+
+## INDUSTRY STANDARDS
+
+### When Standards Matter
+
+| Situation | Standard Relevance |
+|-----------|-------------------|
+| B2B sales | Buyers expect standard compliance |
+| Export | International standards required |
+| Premium positioning | Standards validate quality claims |
+| Liability products | Safety standards non-negotiable |
+
+### Common Indian Standards
+
+| Standard | Covers |
+|----------|--------|
+| IS 10146 | Polyethylene containers |
+| IS 10909 | PET containers |
+| IS 15778 | Cosmetic containers |
+| IS 16739 | Packaged water bottles |
+| IS 4693 | Stainless steel cookware |
+
+### Standard Research Queries
+
+**Query Pattern:** `IS standard [product type] [material] India`
+**Query Pattern:** `[product type] quality standards India BIS`
+
+---
+
+## SPECIAL CATEGORIES
+
+### Handicraft Exemptions
+
+Some handmade items qualify for reduced GST:
+- Requires EPCH certification
+- Must be individually crafted
+- Machine-made disqualified even if artisanal-looking
+
+**Query Pattern:** `handicraft GST exemption India EPCH certification`
+
+### Import/Export Implications
+
+For products that may be imported or exported:
+- Duty drawback eligibility
+- Quality Control Order (QCO) requirements
+- Pre-shipment inspection requirements
+
+**Query Pattern:** `[product type] export compliance India`
+
+---
+
+## DECISION FLOW
+
+```
+[Product Category Identified]
+          |
+          v
+[1. Is compliance-intensive category?]
+          |
+     +----+----+
+     |         |
+    YES       NO
+     |         |
+     v         v
+[Research    [HSN only,
+certs/BIS]   skip certs]
+     |
+     v
+[2. Research HSN code]
+          |
+          v
+[3. Verify HSN implications]
+          |
+          v
+[4. Check category-specific requirements]
+          |
+          v
+[5. Note B2B expectations vs B2C]
+```
+
+---
+
+## OUTPUT STRUCTURE
+
+### Compliance Section Format
+
+```markdown
+## Classification & Compliance
+
+### HSN Classification
+- Code: [8-digit HSN]
+- Description: [What this code covers]
+- GST Rate: [X%]
+- Implications: [What this means for the product]
+
+### Certification Requirements
+| Certification | Required? | Why | How to Obtain |
+|---------------|-----------|-----|---------------|
+| [Cert name] | [Yes/No/Recommended] | [Reason] | [Brief process] |
+
+### Compliance Notes
+- [Any special considerations]
+- [B2B vs B2C differences]
+- [Warnings or conditions]
+```
+
+---
+
+## ANTI-PATTERNS
+
+### Wrong: Over-researching Non-compliance Products
+
+```
+WRONG:
+Product: Brass decorative hook
+Research: FSSAI, BIS, EMC, food-safety...
+(Decorative items have minimal compliance needs!)
+
+RIGHT:
+Product: Brass decorative hook
+Research: HSN code only (8302 - base metal mountings)
+Note: No compliance requirements for decorative hardware
+```
+
+### Wrong: Stopping at HSN
+
+```
+WRONG:
+"HSN 3923, 18% GST"
+(What does this MEAN?)
+
+RIGHT:
+"HSN 3923 (plastic articles for packing/conveyance), 18% GST.
+This classification indicates that for food-contact use,
+food-grade certification becomes relevant for B2B buyers.
+FSSAI registration required if marketed as food storage."
+```
+
+### Wrong: Assuming Compliance
+
+```
+WRONG:
+"No compliance needed" (without checking)
+
+RIGHT:
+"Checked BIS mandatory registration list - this category
+not currently mandated. However, food-contact use would
+trigger food-grade expectations from buyers."
+```
+
+### Wrong: Missing Use-Case Implications
+
+```
+WRONG:
+"Glass bottle HSN 7010"
+
+RIGHT:
+"HSN depends on use case:
+- Utility/storage: 7010 (glass containers)
+- Cosmetic/perfumery: 3303 (if marketed as such)
+- Food/beverage: 7010 but FSSAI relevant
+The cork stopper suggests cosmetic positioning - verify intended use."
+```
+
+</protocol>

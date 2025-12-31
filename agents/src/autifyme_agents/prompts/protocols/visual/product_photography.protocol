@@ -428,6 +428,32 @@ For technical products or detailed features:
 
 ---
 
+## COLOR HANDLING
+
+### **[CRITICAL] Extract Colors from Source - Never Use Described Names**
+
+When PM delegates with color descriptions ("Royal Blue lid", "Sun Yellow variant"):
+- **IGNORE** the color names in the delegation text
+- **EXTRACT** actual colors from source image via view_image
+- Color names in image_studio prompts cause the tool to GENERATE those colors instead of EXTRACTING from source
+
+| Wrong | Right |
+|-------|-------|
+| "with Royal Blue lid" | "with the blue lid matching source" |
+| "Sun Yellow measuring spoon" | "measuring spoon in the product's accent color" |
+| "Pink variant" | "the pink-lidded variant as shown in source" |
+
+**Why this matters:**
+- "Royal Blue" tells image_studio to CREATE royal blue (may not match product)
+- "matching the lid color from source" tells it to EXTRACT and preserve the actual color
+
+**Reference patterns:**
+- "...matching the [element]'s color from [source_label]"
+- "...in the product's [primary/accent] color"
+- "...preserving the exact [color element] from source image"
+
+---
+
 ## THE REALISM IMPERATIVE
 
 **Every image must be indistinguishable from professional photography.**

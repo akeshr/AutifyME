@@ -28,7 +28,7 @@ A distinct, identifiable entity within an image that could be processed independ
 
 | Type | Definition | Examples |
 |------|------------|----------|
-| **VARIANTS** | Same item type, different attributes | 3 jar sizes, 4 shirt colors, 3 room angles |
+| **VARIANTS** | Same item type, different attributes | 3 [product] sizes, 4 [product] colors, 3 [view] angles |
 | **COLLECTION** | Different item types, related context | Product + accessories, dish + sides, outfit + accessories |
 | **COMPONENTS** | Parts of a single whole | Disassembled product, floor plan sections |
 | **UNRELATED** | Coincidental presence | Background clutter, bystanders |
@@ -39,7 +39,7 @@ When items are VARIANTS, identify the axes of variation:
 
 | Axis Type | Examples |
 |-----------|----------|
-| Size | Small/Medium/Large, 250ml/500ml/1L |
+| Size | Small/Medium/Large, [size A]/[size B]/[size C] |
 | Color | Red/Blue/Green, Oak/Walnut/White |
 | Design | Pattern A/B/C, Style 1/2/3 |
 | Material | Glass/Plastic/Metal |
@@ -98,6 +98,25 @@ Use consistent position descriptors across all domains:
 | foreground, midground, background | Depth positioning |
 | left-column, center-column, right-column | Columnar arrangement |
 | row-1, row-2, row-3 | Row arrangement |
+
+### **[CRITICAL] Position Descriptions Must Match Actual Layout**
+
+Grid positions ("top-left", "bottom-right") ONLY work for images with true grid layouts.
+
+**For STACKED/COLUMNAR layouts** (e.g., jars stacked in 3 columns of different heights):
+- Use: "left-column, 3rd from top" or "right-column, top item"
+- NOT: "middle-left" (ambiguous - which row in which column?)
+
+**Decision logic:**
+1. **True grid** (items form rectangular matrix): Use grid positions (top-left, middle-center, etc.)
+2. **Columns of stacks** (irregular heights): Use column + stack position (left-column, 2nd from top)
+3. **Single row/column**: Use ordinal (1st, 2nd, 3rd) or left/center/right
+
+**Best practice:** Combine spatial position WITH visual identifier:
+- "the jar with [Print Name] in left-column"
+- "the [color] lid variant, 3rd from top"
+
+Visual identifiers (print names, colors, sizes) are MORE RELIABLE than spatial positions alone.
 
 ---
 
@@ -277,10 +296,10 @@ When extraction completes (with or without failures), report structured results:
 
 | # | Description | Output ID | Status | Notes |
 |---|-------------|-----------|--------|-------|
-| 1 | Large jar blue lid | asset_abc123 | SUCCESS | |
-| 2 | Large jar yellow lid | asset_def456 | SUCCESS | |
-| 5 | Medium jar blue lid | - | FAILED | Items overlap in source |
-| 7 | Small jar blue lid | - | FAILED | Extraction ambiguous |
+| 1 | Large [product] [variant A] | asset_abc123 | SUCCESS | |
+| 2 | Large [product] [variant B] | asset_def456 | SUCCESS | |
+| 5 | Medium [product] [variant A] | - | FAILED | Items overlap in source |
+| 7 | Small [product] [variant A] | - | FAILED | Extraction ambiguous |
 
 ### Failure Details (if any)
 
@@ -294,7 +313,7 @@ When extraction completes (with or without failures), report structured results:
 
 | Failure Type | Recovery Action |
 |--------------|-----------------|
-| Overlap/ambiguous | Retry with more specific position: "the leftmost jar in bottom row" |
+| Overlap/ambiguous | Retry with more specific position: "the leftmost [product] in bottom row" |
 | Not found at position | Verify Extraction Targets against actual image |
 | Quality issue | Retry with different extraction settings |
 | Persistent failure | Report to PM, continue with successful items |
@@ -305,7 +324,7 @@ When extraction completes (with or without failures), report structured results:
 
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
-| Treating multi-item as single unit | "the jars" instead of "9 jars" | Enumerate each item explicitly |
+| Treating multi-item as single unit | "the [products]" instead of "9 [products]" | Enumerate each item explicitly |
 | No position info | Can't target specific items | Always include position descriptors |
 | Ignoring variant structure | Miss size/color relationships | Identify variant axes |
 | Hardcoded strategy | Always INDIVIDUAL or always COMPOSITE | Select strategy from signals |

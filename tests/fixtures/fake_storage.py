@@ -94,6 +94,113 @@ class FakeStorage(StorageInterface):
         self.processed_messages.add(message_id)
         return False  # New message
 
+    # ========================================================================
+    # Pending Message Batching (PendingMessageMixin Implementation)
+    # ========================================================================
+
+    async def queue_pending_message(
+        self,
+        message_id: str,
+        sender_id: str,
+        thread_id: str,
+        message_type: str,
+        text_content: str | None,
+        media_id: str | None,
+        caption: str | None,
+        sender_name: str | None,
+        received_at: datetime,
+    ) -> dict[str, Any]:
+        """Queue a message for batch processing."""
+        if "pending_messages" not in self.tables:
+            self.tables["pending_messages"] = []
+
+        message = {
+            "id": str(uuid.uuid4()),
+            "message_id": message_id,
+            "sender_id": sender_id,
+            "thread_id": thread_id,
+            "batch_key": sender_id,
+            "message_type": message_type,
+            "text_content": text_content,
+            "media_id": media_id,
+            "caption": caption,
+            "sender_name": sender_name,
+            "received_at": received_at.isoformat() if isinstance(received_at, datetime) else received_at,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        self.tables["pending_messages"].append(message)
+        return message
+
+    async def fetch_and_clear_batch(self, batch_key: str) -> list[dict[str, Any]]:
+        """Atomically fetch and delete all pending messages for a sender."""
+        if "pending_messages" not in self.tables:
+            return []
+
+        # Find all messages for this batch_key
+        batch = [
+            msg for msg in self.tables["pending_messages"]
+            if msg.get("batch_key") == batch_key or msg.get("sender_id") == batch_key
+        ]
+
+        # Remove from table
+        self.tables["pending_messages"] = [
+            msg for msg in self.tables["pending_messages"]
+            if msg.get("batch_key") != batch_key and msg.get("sender_id") != batch_key
+        ]
+
+        # Sort by created_at
+        batch.sort(key=lambda x: x.get("created_at", ""))
+        return batch
+
+    async def has_recent_activity(
+        self, sender_id: str, window_seconds: int = 5
+    ) -> bool:
+        """Check if sender has recent activity within time window."""
+        if "pending_messages" not in self.tables:
+            return False
+
+        cutoff = datetime.now(UTC) - timedelta(seconds=window_seconds)
+
+        for msg in self.tables["pending_messages"]:
+            if msg.get("sender_id") == sender_id:
+                created_at = msg.get("created_at")
+                if created_at:
+                    if isinstance(created_at, str):
+                        created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                    if created_at > cutoff:
+                        return True
+        return False
+
+    async def has_pending_messages(self, sender_id: str) -> bool:
+        """Check if sender has any messages in the buffer."""
+        if "pending_messages" not in self.tables:
+            return False
+
+        return any(
+            msg.get("sender_id") == sender_id
+            for msg in self.tables["pending_messages"]
+        )
+
+    async def get_orphaned_batches(
+        self, age_seconds: int = 33
+    ) -> list[dict[str, Any]]:
+        """Get pending messages older than expected processing time."""
+        if "pending_messages" not in self.tables:
+            return []
+
+        cutoff = datetime.now(UTC) - timedelta(seconds=age_seconds)
+        orphaned = []
+
+        for msg in self.tables["pending_messages"]:
+            created_at = msg.get("created_at")
+            if created_at:
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                if created_at < cutoff:
+                    orphaned.append(msg)
+
+        return orphaned
+
     def save_workflow_outcome(self, outcome: WorkflowOutcome) -> str:
         """Save workflow outcome to in-memory list."""
         outcome_id = str(uuid.uuid4())
