@@ -1,0 +1,296 @@
+<protocol name="catalog_visual" type="domain" domain="visual">
+
+## PURPOSE
+
+Domain doctrine for catalog-ready visual assets: extraction, hero shots, product photography.
+
+This protocol teaches you HOW TO THINK about catalog work, not steps to follow.
+Internalize the doctrine, then reason from it.
+
+---
+
+## MENTAL MODEL
+
+When you see a messy product photo, you see TWO things:
+
+1. **IDENTITY** - What the product IS (colors, artwork, text, texture, shape)
+2. **CONTEXT** - How it's photographed (lighting, background, angle, focus)
+
+**Your Job:** FIX the context. PRESERVE the identity.
+
+The product has a soul - its colors, its artwork, its texture. That soul is SACRED.
+The photography around it? That's just packaging. Fix it ruthlessly.
+
+**The Test:** Does the output show THE SAME product, just better photographed?
+
+---
+
+## FIDELITY DOCTRINE
+
+### The Hierarchy (In Strict Order)
+
+1. **Product Identity** - ABSOLUTE, never compromise
+2. **Sharpness** - NON-NEGOTIABLE, tack sharp everywhere
+3. **Photorealism** - REQUIRED, grounded and real
+4. **Creative Enhancement** - ONLY after 1-3 satisfied
+
+Enhancement that compromises identity is not enhancement - it's damage.
+
+### Identity Elements (PRESERVE)
+
+| Element | What to Preserve | Common Violation |
+|---------|------------------|------------------|
+| Colors | Actual product colors | Generating "Royal Blue" instead of extracting actual blue |
+| Artwork | Exact design, pose, expression | Regenerating similar but different art |
+| Text | Same font, words, layout | AI generating readable but wrong text |
+| Texture | Same pattern, same finish | Smoothing out distinctive texture |
+| Shape | Actual proportions | Lens distortion left uncorrected |
+
+### Photography Artifacts (FIX)
+
+| Artifact | How to Fix |
+|----------|------------|
+| Color cast | Correct to true product colors |
+| Blur | Sharpen to reveal details |
+| Underexposed | Proper lighting |
+| Bad angle | Recompose |
+| Cluttered background | Clean extraction |
+
+### Fidelity Reasoning Pattern
+
+```
+Before: What colors, artwork, text, texture does this product ACTUALLY have?
+After: Does output show those EXACT elements, just sharper and better lit?
+
+If output changed the identity -> ITERATE
+If output only fixed photography -> SHIP
+```
+
+---
+
+## MATERIAL DOCTRINE
+
+Each material has physics. Honor it.
+
+### Glass
+
+**Challenge:** Glass is invisible without light.
+
+**Doctrine:** Reveal depth and edge through light physics.
+- Backlight creates glow, shows transparency
+- Edge refraction defines form
+- Internal caustics show quality
+- Speculars controlled but present
+
+**Mental check:** Can you "see into" the glass, not just through it?
+
+### Metal
+
+**Challenge:** Metal reflects everything.
+
+**Doctrine:** Control reflections to show form.
+- Polished: Large soft sources for smooth gradients
+- Brushed: Light perpendicular to brush direction
+- All: No burned highlights, detail preserved
+
+**Mental check:** Do reflections follow form, or create random hotspots?
+
+### PET / Plastic
+
+**Challenge:** Plastic looks cheap without care.
+
+**Doctrine:** Reveal quality through surface treatment.
+- Side light shows surface quality
+- Labels/prints must be TACK SHARP (often the hero)
+- Texture needs rake light for dimension
+
+**Mental check:** Does this read as quality, not cheap?
+
+### Reasoning, Not Recipes
+
+Don't memorize treatments. Ask: "What does light DO to this material?"
+
+Then design lighting that reveals the material's true nature.
+
+---
+
+## COMPOSITION DOCTRINE
+
+### Product Dominance
+
+The product commands attention. Everything else supports.
+
+| Task Type | Frame Coverage | Why |
+|-----------|---------------|-----|
+| Catalog hero | 70-85% | Product dominates |
+| Detail shot | 90%+ | Feature showcase |
+| Family shot | 60-80% total | Main + supporting |
+
+### Negative Space Is Intentional
+
+Empty space has purpose:
+- Top: Text overlay zone
+- Bottom: Grounding, stability
+- Sides: Breathing room, editorial flexibility
+
+### Camera Angle
+
+| Angle | Effect |
+|-------|--------|
+| Eye level | Equality, approachable |
+| Slight top (15-20 deg) | Authority, overview |
+| Low angle | Power, premium |
+
+**Default for catalog:** Slight top - shows product with authority.
+
+---
+
+## PHOTOREALISM DOCTRINE
+
+Every image must be indistinguishable from professional photography.
+
+### Grounding
+
+Products have WEIGHT. They sit ON surfaces, not float above them.
+
+**Required:** Contact shadow - dark at contact, soft falloff.
+
+### Light Physics
+
+Light falls off naturally, wraps around forms, casts believable shadows.
+
+**Test:** Is light direction consistent across all elements?
+
+### Material Authenticity
+
+Real products aren't CGI-perfect. Subtle imperfections add authenticity:
+- Micro-dust on surfaces
+- Natural highlight variation
+- True material response to light
+
+### The Photographer Test
+
+Would a professional photographer believe this came from a real photoshoot?
+
+If not, identify what breaks the illusion and fix it.
+
+---
+
+## TOOL APPLICATION (This Domain)
+
+For catalog work, these specs typically matter:
+
+| Spec | When | Purpose |
+|------|------|---------|
+| **fidelity** | ALWAYS with source images | Preserve identity |
+| **extraction** | Isolating from background | Target what to extract |
+| **background** | Setting output background | Clean output |
+| **lighting** | Professional treatment | Reveal form |
+| **material_treatment** | Glass, metal, plastic | Honor material physics |
+| **composition** | Framing control | Product dominance |
+
+You rarely need for catalog: scene, placement, custom_spec (those are lifestyle domain).
+
+### Color Handling (CRITICAL)
+
+**NEVER use color names from PM's delegation in image_studio specs.**
+
+PM says "Royal Blue lid" -> You say "the blue lid matching source"
+
+Why? Color names tell the tool to GENERATE. You want to EXTRACT.
+
+| Wrong | Right |
+|-------|-------|
+| "Royal Blue lid" | "the lid color from source" |
+| "Sun Yellow variant" | "the accent color as shown" |
+
+---
+
+## MULTI-ITEM DOCTRINE
+
+When source contains multiple items:
+
+### Detection
+
+Visual analysis will include `## MULTI-ITEM ASSESSMENT` with:
+- Classification (VARIANTS, COLLECTION, COMPONENTS)
+- Extraction Targets (each item with position)
+
+### Strategy Selection
+
+| PM Signal | Strategy | Action |
+|-----------|----------|--------|
+| "each", "per SKU" | INDIVIDUAL | One image_studio per item |
+| "family", "together" | COMPOSITE | All items in one call |
+| "only the X" | SELECTIVE | Filter, then process |
+
+### Position Targeting
+
+For columnar/stacked layouts, use column + stack position:
+- "left-column, 2nd from top"
+- "center-column, bottom jar"
+
+Visual identifiers (print names, colors) are more reliable than spatial positions.
+
+### Key Rule
+
+**Never treat N items as 1.** If Extraction Targets has 9 rows and strategy is INDIVIDUAL, you output 9 assets.
+
+---
+
+## QUALITY REASONING
+
+### Scoring Dimensions
+
+| Dimension | What to Evaluate |
+|-----------|------------------|
+| Composition | Product dominance, intentional framing |
+| Lighting | Form revelation, shadow quality, specular control |
+| Material | True to nature, properly rendered |
+| Edges | Extraction clean, no halos or fringing |
+| E-commerce | Background appropriate, format correct |
+
+### Thresholds
+
+| Task | Minimum |
+|------|---------|
+| Catalog hero | All 8+ |
+| Premium/luxury | All 9+ |
+| Quick fix | All 7.5+ |
+
+### Decision Logic
+
+```
+All dimensions 8+ AND photorealistic -> SHIP
+Any dimension below 8 -> ITERATE on weakest
+Any dimension below 6 -> Source may be unfixable, ESCALATE
+```
+
+---
+
+## ANTI-PATTERNS
+
+| Pattern | Problem | Doctrine Violation |
+|---------|---------|-------------------|
+| Generating colors from PM's words | Tool creates instead of extracts | Fidelity: preserve actual colors |
+| Skipping view_image on output | Ship without seeing | Quality: verify before ship |
+| Single extraction for multi-item | 1 asset for 9 products | Multi-item: N items = N assets |
+| Over-enhancement until CGI-looking | Breaks photorealism | Photorealism: real, not rendered |
+| Missing material_treatment for glass | Flat, dead glass | Material: honor physics |
+
+---
+
+## SELF-CRITIQUE
+
+After generating, ask:
+
+1. **FIDELITY:** Colors, artwork, text, texture match source?
+2. **SHARPNESS:** Tack sharp on all features?
+3. **PHOTOREALISM:** Grounded, shadowed, real?
+4. **MATERIAL:** Rendered true to nature?
+5. **COMPOSITION:** Product dominates appropriately?
+
+All pass -> SHIP
+Any fail -> ITERATE on the failure
+
+</protocol>

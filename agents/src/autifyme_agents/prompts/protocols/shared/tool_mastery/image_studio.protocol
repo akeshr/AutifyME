@@ -3,7 +3,11 @@
 ## PURPOSE
 
 Master the image_studio tool - professional image processing with Gemini 3 Pro Image.
-Transform user uploads into catalog-ready assets: extract products, generate lifestyle scenes, create hero shots, compose product families.
+
+This protocol teaches HOW TO USE the tool. For WHAT TO THINK about different domains:
+- **Catalog work:** Load `catalog_visual.protocol` (domain='visual')
+- **Lifestyle scenes:** Load `lifestyle_visual.protocol` (domain='visual')
+- **Social content:** Load `social_content.protocol` (domain='visual')
 
 ---
 
