@@ -1,9 +1,34 @@
 ---
 name: agent-improvement
-description: Diagnose and fix underperforming agents using systematic analysis. Bridges the general-purpose LLM gap with canonical examples and domain grounding. (project) (project) (project)
+description: Diagnose and fix underperforming agents using systematic analysis. Protocol-based decomposition, doctrine over examples, cognitive load management. (project) (project) (project)
 ---
 
 # Agent Improvement Skill
+
+## Quick Reference (Start Here)
+
+**When to use this skill:**
+- Agent behavior is inconsistent ("dream vs nightmare")
+- Agent needs many examples to work
+- Agent "forgets" rules sometimes
+- Adding new capability requires touching everything
+
+**Key decisions:**
+
+| If You See | Do This |
+|------------|---------|
+| Prompt > 500 lines | Protocol-based decomposition |
+| Tool prompt > 100 lines | Move doctrine to protocols |
+| 6+ examples needed | Replace with doctrine |
+| Multiple mental models | One protocol per model |
+| Inconsistent behavior | Check cognitive load first |
+
+**The fix pattern:**
+```
+Bloated Agent (1000+ lines) -> Lean Agent (~200 lines) + Domain Protocols (~300 lines each)
+```
+
+---
 
 ## The Core Insight
 
@@ -131,8 +156,8 @@ AGENT: [name]
 
 4. JUDGMENT: Does agent know what "good" looks like?
    [ ] Quality criteria defined
-   [ ] Decision patterns shown
-   [ ] Output format exemplified
+   [ ] Decision patterns shown (doctrine, not examples)
+   [ ] Output format exemplified (1-2 examples max)
 
 5. WORKFLOW: Does agent know WHERE it fits?
    [ ] Relationship to other agents
@@ -144,6 +169,13 @@ AGENT: [name]
    [ ] Agent knows WHICH protocols to load (by domain)
    [ ] Prompt guides protocol loading early in execution
    [ ] Domain context flows from PM delegations
+
+7. COGNITIVE LOAD (Critical for inconsistency):
+   [ ] Specialist prompt < 300 lines
+   [ ] Tool system prompt < 100 lines
+   [ ] Total per task < 600 lines
+   [ ] Only ONE mental model active per task type
+   [ ] Doctrine-based, not example-heavy
 ```
 
 ---
@@ -330,10 +362,14 @@ For deep trace analysis, use `workflow-evaluation` skill first.
 
 | Don't | Why | Instead |
 |-------|-----|---------|
-| Add examples for every edge case | O(2^n) explosion | Add domain doctrine |
+| Add examples for every edge case | O(2^n) explosion, LLMs copy literally | Add domain doctrine |
 | Skip diagnosis, jump to examples | Treating symptoms | Gap Analysis first |
-| Add 10 simple examples | Don't teach reasoning | 2-3 complex canonical |
+| Add 10 simple examples | Don't teach reasoning | Doctrine + 1-2 format examples |
 | Copy examples from other agents | Different domains | Design for THIS agent |
+| Hardcode domain doctrine in tool prompts | Can't version, duplicates protocols | Move to protocols, tool = execution only |
+| Load ALL protocols for every task | Cognitive overload | Load domain-specific per task |
+| Put multiple mental models in one prompt | Inconsistent behavior | One protocol per mental model |
+| Make prompt "comprehensive" (1000+ lines) | Agent "forgets" rules | Lean prompt + focused protocols |
 
 ---
 
@@ -370,12 +406,18 @@ When agent has prompt bloat / inconsistent behavior, follow this process:
 
 ```text
 1. MEASURE cognitive load
-   wc -l specialist.prompt  # > 500 lines? BLOATED
-   wc -l tool SYSTEM_PROMPT  # > 100 lines? MOVE TO PROTOCOLS
+   wc -l prompts/specialists/X.prompt  # > 500 lines? BLOATED
+   grep -n "SYSTEM_PROMPT" tools/X/tool.py  # > 100 lines? MOVE TO PROTOCOLS
 
 2. IDENTIFY mental models
-   - What distinct ways of thinking does this agent need?
-   - List them: [model_a, model_b, model_c]
+   Ask: "What distinct ways of thinking does this agent need?"
+
+   Mental model test questions:
+   - Does task A require different reasoning than task B?
+   - Would examples for A+B create combinatorial explosion?
+   - Would a human expert specialize in one or all?
+
+   List them: [model_a, model_b, model_c]
 
 3. COUNT guidance sources
    - Prompt + protocols + tool prompts = total lines
@@ -383,6 +425,7 @@ When agent has prompt bloat / inconsistent behavior, follow this process:
 
 4. CHECK example count
    - More than 4-5 examples? -> Doctrine is missing, examples compensating
+   - Examples for every edge case? -> Need domain doctrine instead
 ```
 
 ### Phase 2: Design
@@ -432,7 +475,12 @@ When agent has prompt bloat / inconsistent behavior, follow this process:
    - Add references to domain protocols
 
 5. VERIFY protocol resolution
-   uv run python -c "from tools.protocol_loader import _resolve_protocol_path; ..."
+   uv run python -c "
+   from autifyme_agents.tools.protocol_loader import _resolve_protocol_path
+   # Test each protocol resolves correctly
+   for name, domain in [('protocol_name', 'domain'), ...]:
+       path = _resolve_protocol_path(name, domain)
+       print(f'{name}: {\"OK\" if path else \"MISSING\"}')"
 ```
 
 ### Phase 4: Verify
