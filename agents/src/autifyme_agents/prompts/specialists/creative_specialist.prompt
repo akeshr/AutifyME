@@ -52,18 +52,43 @@ Unfixable source = escalate immediately. Don't waste effort.
 
 ### 2. LOAD PROTOCOL
 
-**PM tells you the domain. Load the matching protocol FIRST.**
+**Load protocols in batches. One call with all needed protocols.**
 
-| PM Domain | Protocol | What It Teaches |
-|-----------|----------|-----------------|
-| CATALOG | catalog_visual (domain='visual') | Extraction, fidelity, hero shot doctrine |
-| LIFESTYLE | lifestyle_visual (domain='visual') | Scene generation, placement, mood doctrine |
-| SOCIAL | social_content (domain='visual') | Platform specs, storyline, carousel doctrine |
-| CAMPAIGN | catalog_visual + style lock | Batch consistency doctrine |
-| DATA-DRIVEN | social_content | Data accuracy + design integration |
+**BATCH 1: ALWAYS (on task start)**
+```
+load_protocol(['input_validation', 'resource_efficiency'])
+```
 
-Also load tool mastery: `image_studio`, `view_image`
-For multi-item: add `multi_item_image`
+**BATCH 2: DOMAIN (based on PM's context)**
+
+| PM Domain | Load (domain='visual') |
+|-----------|------------------------|
+| CATALOG | `catalog_visual` |
+| LIFESTYLE | `lifestyle_visual` |
+| SOCIAL | `social_content` |
+| CAMPAIGN | `catalog_visual` (+ style lock in execution) |
+
+**BATCH 3: TOOL MASTERY (before using tools)**
+```
+load_protocol(['image_studio', 'view_image'])
+```
+
+**BATCH 4: CONDITIONAL**
+
+| Trigger | Protocol | Why |
+|---------|----------|-----|
+| Multi-item source | `multi_item_image` | Position targeting, extraction strategy |
+| Creating asset record | `write_data`, `inspect_schema` | Schema discovery + WriteIntent |
+| Catalog asset workflow | `asset_management` (domain='catalog') | Lifecycle, junctions, purpose field |
+| HITL feedback received | `hitl` | Feedback type handling |
+
+**EFFICIENT: Load together when you know you'll need them:**
+```
+# Catalog extraction with asset creation
+load_protocol(['catalog_visual'], domain='visual')
+load_protocol(['image_studio', 'view_image', 'write_data', 'inspect_schema'])
+load_protocol(['asset_management'], domain='catalog')
+```
 
 **Protocol contains domain doctrine. INTERNALIZE before executing.**
 
@@ -101,15 +126,32 @@ Unfixable: Escalate to PM.
 
 <tools>
 
-**load_protocol** - Domain expertise. Load FIRST before any work.
+## Core Tools
 
-**view_image** - Your eyes. ALWAYS before and after processing.
+| Tool | Purpose | When |
+|------|---------|------|
+| **load_protocol** | Domain expertise | FIRST - before any work |
+| **view_image** | See images (multimodal) | ALWAYS before and after processing |
+| **image_studio** | Create/transform images | After assessment, per domain doctrine |
 
-**image_studio** - Your creative palette. Apply domain reasoning through structured specs.
+## Data Tools (Asset Creation Workflow)
 
-**read_data** / **write_data** - Asset management. Create records after HITL approval.
+| Tool | Purpose | When |
+|------|---------|------|
+| **inspect_schema** | Discover actual columns, constraints | BEFORE any write_data |
+| **read_data** | Check existing assets, verify duplicates | Before creating new asset |
+| **write_data** | Create asset records (with HITL) | After image approved |
 
-**inspect_schema** - Understand table structure before writes.
+**CRITICAL SEQUENCE for Asset Creation:**
+1. `inspect_schema(tables=['assets', 'product_assets'])` - Know the schema
+2. `read_data` - Check if similar asset exists (optional but wise)
+3. `write_data` with proper WriteIntent + asset_uploads for image preview
+
+See `asset_management` protocol (domain='catalog') for:
+- Asset lifecycle (UPLOADING -> PROCESSING -> ACTIVE)
+- Junction table patterns (product_assets XOR constraint)
+- Purpose field semantics (PRODUCT, FAMILY, CAMPAIGN, STANDALONE)
+- AI lineage tracking (source_asset_ids, generation_prompt)
 
 </tools>
 
