@@ -1,0 +1,492 @@
+<protocol name="social_media" type="domain" domain="visual">
+
+## PURPOSE
+
+Expert knowledge for social media visual content creation.
+Platform requirements, storyline patterns, multi-image compositions, and carousel/sequence design.
+
+Load this when creating content for Instagram, Facebook, WhatsApp, Pinterest, or other social platforms.
+
+---
+
+## THE REALISM IMPERATIVE
+
+**CRITICAL: Every generated image must be indistinguishable from professional photography.**
+
+| Authentic | Fake (AVOID) |
+|-----------|--------------|
+| Natural lighting with proper falloff | Flat, even lighting everywhere |
+| Real shadows that ground the product | Floating products, missing shadows |
+| Material-accurate reflections | Plastic-looking surfaces |
+| Believable scene context | Product awkwardly placed in scene |
+| Natural color grading | Over-saturated, HDR look |
+| Subtle imperfections | Uncanny perfection |
+| Proper scale and proportion | Products too large/small for context |
+| Authentic textures | Smoothed, AI-generated textures |
+
+**The Test:** Would a professional photographer believe this came from a real photoshoot?
+
+### Realism Checklist
+
+Before shipping ANY social media image:
+
+```
+[ ] Shadows present and properly grounded?
+[ ] Lighting direction consistent across elements?
+[ ] Materials render true to their nature?
+[ ] Product scale matches environment?
+[ ] Colors natural, not over-processed?
+[ ] No AI artifacts (weird edges, texture repetition)?
+[ ] Scene feels lived-in, not sterile?
+[ ] Would fool a professional photographer?
+```
+
+**If ANY check fails, iterate before shipping.**
+
+---
+
+## PLATFORM SPECIFICATIONS
+
+### Instagram
+
+| Format | Aspect Ratio | Dimensions | Use Case |
+|--------|--------------|------------|----------|
+| Feed Square | 1:1 | 1080x1080 | Classic product shots |
+| Feed Portrait | 4:5 | 1080x1350 | Tall products, more detail |
+| Feed Landscape | 1.91:1 | 1080x566 | Wide scenes, multiple products |
+| Stories/Reels | 9:16 | 1080x1920 | Full-screen immersive |
+| Carousel | 1:1 or 4:5 | 1080x1080/1350 | Storyline, multiple angles |
+
+**Instagram Style:**
+- High aesthetic, curated look
+- Consistent filter/mood across feed
+- Generous negative space
+- Clean, aspirational
+
+### Facebook
+
+| Format | Aspect Ratio | Dimensions | Use Case |
+|--------|--------------|------------|----------|
+| Feed | 1.91:1 | 1200x628 | Link posts, ads |
+| Square | 1:1 | 1080x1080 | Engagement posts |
+| Portrait | 4:5 | 1080x1350 | Mobile-first |
+| Cover | 2.7:1 | 820x312 | Page branding |
+| Album | Mixed | 1080+ | Product collections |
+
+**Facebook Style:**
+- More informational than Instagram
+- Can include text overlays
+- Lifestyle context important
+- Shareable, relatable
+
+### WhatsApp
+
+| Format | Aspect Ratio | Dimensions | Use Case |
+|--------|--------------|------------|----------|
+| Status | 9:16 | 1080x1920 | Full-screen story |
+| Catalog | 1:1 | 1080x1080 | Product listings |
+| Message | Flexible | 1080+ width | Direct sharing |
+
+**WhatsApp Style:**
+- Direct, personal feel
+- Quick to understand
+- Mobile-optimized
+- Less polished OK (authentic)
+
+### Pinterest
+
+| Format | Aspect Ratio | Dimensions | Use Case |
+|--------|--------------|------------|----------|
+| Standard Pin | 2:3 | 1000x1500 | Primary format |
+| Square Pin | 1:1 | 1000x1000 | Alternative |
+| Long Pin | 1:2.1 | 1000x2100 | Infographics, sequences |
+
+**Pinterest Style:**
+- Inspirational, aspirational
+- Text overlays welcome
+- Vertical dominates
+- Lifestyle-heavy
+
+---
+
+## TEXT OVERLAY PATTERNS
+
+When social posts require text on images, follow these platform-specific patterns.
+
+### Text Placement by Platform
+
+| Platform | Safe Zone | Placement | Font Style |
+|----------|-----------|-----------|------------|
+| Instagram Feed | Bottom 20% | Centered or left-aligned | Clean sans-serif, bold |
+| Instagram Stories | Top 15% or bottom 20% | Avoid middle (tap zones) | Bold, high contrast |
+| Facebook | Top or bottom 25% | Flexible | Readable, medium weight |
+| Pinterest | Top third or bottom banner | Full-width OK | High contrast, decorative OK |
+| WhatsApp Status | Bottom 20% | Simple, minimal | Clean, large |
+
+### Text Overlay Principles
+
+**Realism with text:**
+- Text should feel DESIGNED, not slapped on
+- Respect brand typography ({font_family})
+- Ensure contrast for readability (WCAG AA minimum)
+- Never obscure key product features
+- Text should enhance, not compete with product
+
+**Text types and treatments:**
+
+| Type | Treatment | Example |
+|------|-----------|---------|
+| **Headline** | Large, bold, brand font | "NEW ARRIVAL" |
+| **Price/offer** | Accent color, prominent | "Rs 499" |
+| **CTA** | Button-style or underlined | "Shop Now" |
+| **Caption** | Smaller, supporting | "Limited edition" |
+| **Feature callout** | With arrow/pointer to product | "Honeycomb texture" |
+
+### Text Legibility Checklist
+
+```
+[ ] Contrast ratio sufficient (light on dark or dark on light)?
+[ ] Text size readable on mobile (min 24pt equivalent)?
+[ ] Font weight appropriate (not too thin)?
+[ ] Text doesn't obscure product hero feature?
+[ ] Brand typography used consistently?
+[ ] Text feels integrated, not pasted on?
+```
+
+### When NOT to Use Text
+
+- Catalog hero shots (product should speak)
+- Gallery/detail images
+- When product packaging has text (competing)
+- Lifestyle scenes where mood matters more than message
+
+---
+
+## STORYLINE PATTERNS
+
+### Pattern 1: Hero to Details
+
+**Sequence:** Overview -> Feature 1 -> Feature 2 -> Close-up -> CTA
+
+**Use for:** Product launches, feature highlights
+
+```
+Slide 1: Full product hero shot (establish)
+Slide 2: Key feature close-up (intrigue)
+Slide 3: Secondary feature (depth)
+Slide 4: Texture/material detail (quality)
+Slide 5: Product + CTA or lifestyle (convert)
+```
+
+**Realism notes:**
+- Each slide should feel like same photoshoot
+- Lighting direction MUST be consistent
+- Background should relate across slides
+
+### Pattern 2: Problem to Solution
+
+**Sequence:** Pain point -> Struggle -> Product intro -> Solution -> Result
+
+**Use for:** Conversion-focused, problem-solving products
+
+```
+Slide 1: Relatable problem scenario (connect)
+Slide 2: Failed alternatives (empathize)
+Slide 3: Product as hero (introduce)
+Slide 4: Product solving problem (demonstrate)
+Slide 5: Happy outcome (aspire)
+```
+
+**Realism notes:**
+- Problem scenarios must feel authentic
+- Product integration must be natural
+- Avoid "before/after" cliches
+
+### Pattern 3: Lifestyle Journey
+
+**Sequence:** Context -> Product in use -> Benefits -> Community -> Brand
+
+**Use for:** Brand building, emotional connection
+
+```
+Slide 1: Aspirational lifestyle scene (dream)
+Slide 2: Product naturally in scene (subtle intro)
+Slide 3: Product being used (action)
+Slide 4: Result/benefit shown (payoff)
+Slide 5: Brand/community element (belong)
+```
+
+**Realism notes:**
+- Scenes must feel lived-in
+- Product placement must be natural
+- Avoid staged, stock-photo look
+
+### Pattern 4: Product Family Showcase
+
+**Sequence:** Family hero -> Variant 1 -> Variant 2 -> Variant 3 -> Comparison
+
+**Use for:** Collections, size ranges, color variants
+
+```
+Slide 1: Full family composition (overview)
+Slide 2-4: Individual variant heroes (options)
+Slide 5: Comparison or selection guide (decide)
+```
+
+**Realism notes:**
+- Family shot must look cohesive
+- Each variant shot must match family lighting
+- Scale relationships must be accurate
+
+### Pattern 5: Unboxing/Journey
+
+**Sequence:** Sealed -> Opening -> Reveal -> Setup -> Enjoyment
+
+**Use for:** Premium products, gift items, experience products
+
+```
+Slide 1: Packaged product (anticipation)
+Slide 2: Unboxing moment (excitement)
+Slide 3: Product revealed (hero moment)
+Slide 4: Product in use (satisfaction)
+Slide 5: Happy usage scene (loyalty)
+```
+
+**Realism notes:**
+- Packaging must look real (not CGI)
+- Hands/context must be natural
+- Progression must feel authentic
+
+---
+
+## MULTI-IMAGE COMPOSITION
+
+### Carousel Design Principles
+
+**Consistency is king:**
+- Same lighting setup across all images
+- Same color temperature
+- Same background treatment (or intentional progression)
+- Same camera angle family
+
+**Visual flow:**
+- First image = hook (must stop the scroll)
+- Middle images = story (maintain interest)
+- Last image = CTA (drive action)
+
+**Swipe motivation:**
+- Each slide must promise more
+- Partial reveals work well
+- Text hints for next slide
+- Cliffhanger compositions
+
+### Collage/Mosaic Compositions
+
+| Type | Structure | Use Case |
+|------|-----------|----------|
+| Grid (2x2) | 4 equal sections | Variant showcase |
+| Feature (1+3) | 1 hero + 3 details | Product + features |
+| Comparison (1+1) | Side by side | Before/after, A vs B |
+| Story (3x1) | Horizontal strip | Sequence, timeline |
+| Mood board | Organic layout | Lifestyle, inspiration |
+
+**Realism in collages:**
+- Lighting must match across all elements
+- Scale relationships must be accurate
+- Shadows must be consistent direction
+- No harsh cutout edges
+
+---
+
+## PLATFORM-SPECIFIC QUALITY
+
+### Instagram Quality Rubric
+
+| Dimension | 8+ Criteria |
+|-----------|-------------|
+| Aesthetic | Matches brand visual identity, aspirational |
+| Stopping Power | Would stop mid-scroll |
+| Cohesion | Fits existing feed aesthetic |
+| Realism | Indistinguishable from professional photo |
+| Mobile Clarity | Details visible on phone screen |
+
+### Facebook Quality Rubric
+
+| Dimension | 8+ Criteria |
+|-----------|-------------|
+| Shareability | Would someone share this? |
+| Context | Product use case clear |
+| Authenticity | Feels real, not stock |
+| Realism | Could be real photograph |
+| Information | Conveys key message |
+
+### WhatsApp Quality Rubric
+
+| Dimension | 8+ Criteria |
+|-----------|-------------|
+| Clarity | Message understood instantly |
+| Mobile | Perfect on phone screen |
+| Personal | Feels like friend sharing |
+| Authentic | Real, not overly polished |
+| Quick | No need to study |
+
+---
+
+## E-COMMERCE GRAPHICS
+
+When PM provides product data, create compelling commerce-ready graphics.
+
+### Price Post Patterns
+
+| Platform | Layout | Key Elements |
+|----------|--------|--------------|
+| **Instagram Feed** | Product hero + price overlay | Large price, brand colors, minimal text |
+| **Instagram Story** | Full-screen, swipe-up ready | Price prominent, CTA clear |
+| **Facebook** | Product + description space | Price visible, shareable format |
+| **WhatsApp Status** | Quick, scannable | Price + product name, instant clarity |
+
+### Offer/Sale Graphics
+
+| Offer Type | Visual Treatment | Platform Notes |
+|------------|------------------|----------------|
+| **Percentage Off** | Large %, strike-through original | Works all platforms |
+| **Buy X Get Y** | Split visual showing both | Instagram carousel ideal |
+| **Limited Time** | Urgency elements (timer, "ends soon") | Stories format best |
+| **Bundle Deal** | All products visible, combined price | Feed posts |
+| **New Arrival** | "NEW" badge, fresh presentation | Launch posts |
+
+**Offer graphics excellence:**
+- Original price ALWAYS visible with strike-through
+- Savings amount/percentage prominent
+- Urgency without desperation
+- Brand colors, not generic sale red
+
+### Product Comparison Graphics
+
+For variant families or product ranges:
+
+| Layout | Best For | Structure |
+|--------|----------|-----------|
+| **Size Comparison** | Bottles, packages | Ascending order, scale accurate |
+| **Color Palette** | Variants, shades | Grid or spectrum arrangement |
+| **Before/After** | Results, transformations | Side-by-side, clear labels |
+| **Feature Matrix** | Tech products | Icons + checkmarks |
+
+### Data Integration Workflow
+
+When PM provides product data in delegation:
+
+```
+1. RECEIVE: Product data from PM (price, size, variants, specs)
+2. DESIGN: Choose appropriate graphic pattern
+3. INTEGRATE: Place data elements with brand styling
+4. VERIFY: Accuracy check (price correct, specs accurate)
+5. SHIP: Data-accurate, visually excellent
+```
+
+**Critical:** Data accuracy is non-negotiable. Verify every number, every spec.
+
+### Multi-Product Layouts
+
+| Product Count | Layout | Platform |
+|---------------|--------|----------|
+| 2 products | Split screen or stacked | All |
+| 3 products | Triangle or horizontal | Feed |
+| 4 products | 2x2 grid | Feed, Pinterest |
+| 5+ products | Carousel or collage | Instagram, Facebook |
+
+**Family showcase excellence:**
+- Hero product larger/central
+- Variants clearly differentiated
+- Price points visible if relevant
+- "View all" or "Swipe for more" CTA
+
+---
+
+## COMMON FAILURES
+
+### "Stock Photo Look"
+
+**Symptom:** Image feels generic, could be any product
+**Cause:** No brand personality, over-polished
+**Fix:** Add brand elements subtly, introduce authentic imperfections
+
+### "AI Generated Obvious"
+
+**Symptom:** Uncanny textures, weird edges, impossible lighting
+**Cause:** Over-reliance on generation without quality control
+**Fix:** Iterate on problem areas, use view_image to verify, score against realism checklist
+
+### "Carousel Inconsistency"
+
+**Symptom:** Slides feel like different photoshoots
+**Cause:** No style guide defined before processing
+**Fix:** Define EXACT specs for lighting, color, composition BEFORE first image
+
+### "Platform Mismatch"
+
+**Symptom:** Instagram image looks like corporate PowerPoint
+**Cause:** Didn't match platform culture/style
+**Fix:** Study platform, match native content style
+
+### "Forced Product Placement"
+
+**Symptom:** Product awkwardly inserted into scene
+**Cause:** Scale wrong, lighting doesn't match, no grounding shadow
+**Fix:** Match environmental lighting, proper scale, add natural shadow
+
+---
+
+## SOCIAL MEDIA WORKFLOW
+
+### Single Platform Post
+
+```
+1. UNDERSTAND: Platform, format, audience
+2. ENVISION: Story to tell, mood, style
+3. EXECUTE: Process with platform specs
+4. VERIFY: Realism checklist, platform rubric
+5. SHIP: All checks pass
+```
+
+### Multi-Platform Campaign
+
+```
+1. DEFINE: Master style guide (lighting, color, mood)
+2. CREATE: Hero image at highest resolution
+3. ADAPT: Resize/recompose for each platform
+4. VERIFY: Each adaptation maintains realism
+5. CONSISTENCY: All platforms feel like same campaign
+```
+
+### Carousel/Storyline
+
+```
+1. PLAN: Story arc, slide purposes
+2. STYLE: Lock lighting, color, composition rules
+3. EXECUTE: Process all slides with IDENTICAL treatment
+4. FLOW: Verify visual flow across slides
+5. REALISM: Each slide passes realism checklist
+6. SHIP: Cohesive, compelling sequence
+```
+
+---
+
+## SELF-CRITIQUE ADDITIONS
+
+For social media content, add to standard critique:
+
+```
+SOCIAL MEDIA CHECKS:
+[ ] Platform specs met (aspect ratio, size)?
+[ ] Platform style matched (aesthetic, mood)?
+[ ] Realism checklist passed?
+[ ] Scroll-stopping first impression?
+[ ] Story/sequence coherent?
+[ ] Brand identity present but not forced?
+[ ] Mobile clarity verified?
+```
+
+**Decision:** All standard checks 8+ AND all social checks pass = ship.
+
+</protocol>

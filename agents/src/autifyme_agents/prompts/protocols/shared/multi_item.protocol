@@ -1,0 +1,109 @@
+<protocol name="multi_item" type="shared" domain="visual">
+
+## PURPOSE
+
+Handle images containing multiple distinct items.
+Simple: Count, strategize, target, execute.
+
+---
+
+## DETECTION
+
+When viewing source, identify:
+- **Count**: How many distinct items?
+- **Positions**: Where is each item?
+- **Identifiers**: Visual differences (color, size, label text)
+
+---
+
+## STRATEGY
+
+Two strategies. Pick based on task context.
+
+| Strategy | When | Result |
+|----------|------|--------|
+| **INDIVIDUAL** | "each", "per item", catalog context | N separate outputs |
+| **COMPOSITE** | "together", "family", campaign context | 1 combined output |
+
+**Default**: INDIVIDUAL for catalog, COMPOSITE for marketing.
+
+---
+
+## TARGETING
+
+For INDIVIDUAL extraction, target each item specifically.
+
+### Position + Identifier (Best)
+
+Combine spatial position with visual identifier:
+
+```
+"[description] with [visual_identifier] at [position]"
+```
+
+Examples:
+- "jar with blue lid in left column"
+- "500ml variant at top-right"
+- "the one labeled [text] at center"
+
+### Position Vocabulary
+
+| Layout | Use |
+|--------|-----|
+| Grid | top-left, top-center, middle-right, bottom-left, etc. |
+| Columns | left-column top, center-column 2nd from top, etc. |
+| Rows | front row left, back row center, etc. |
+
+**Visual identifiers are MORE RELIABLE than positions.**
+
+When items have visible differences (color, size, label text), reference those:
+- "the red-lid variant"
+- "the 1L size"
+- "the one with honeycomb pattern"
+
+---
+
+## EXECUTION
+
+### INDIVIDUAL Pattern
+
+```
+For each item:
+  1. extraction: {"target_description": "[specific targeting]"}
+  2. Same treatment (locked lighting, background)
+  3. Verify correct item extracted
+  4. Create asset record
+```
+
+### COMPOSITE Pattern
+
+```
+Single call:
+  1. extraction: {"target_description": "all items as arranged"}
+  2. OR composition: {"position": "maintain arrangement"}
+  3. Verify all items present
+  4. Create single asset record
+```
+
+---
+
+## CONSISTENCY
+
+For multi-item INDIVIDUAL:
+- Lock lighting direction across all extractions
+- Lock background treatment
+- Lock composition (product coverage, angle)
+- Result: All outputs look like same photoshoot
+
+---
+
+## FAILURE HANDLING
+
+| Issue | Action |
+|-------|--------|
+| Wrong item extracted | Retry with more specific targeting |
+| Items overlap | Use visual identifier, not position |
+| Position ambiguous | Reference by visible features |
+| Persistent failure | Complete successful items, report failures |
+
+</protocol>

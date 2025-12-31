@@ -2,449 +2,135 @@
 
 ## PURPOSE
 
-Master the image_studio tool - professional image processing with Gemini 3 Pro Image.
-Transform user uploads into catalog-ready assets: extract products, generate lifestyle scenes, create hero shots, compose product families.
+Professional image processing with Gemini 3 Pro Image.
+Transform uploads into catalog-ready assets.
 
 ---
 
-## LABELED IMAGES ARCHITECTURE
+## LABELED IMAGES
 
-The key differentiator of this tool: **labeled images + structured specs = intelligent composition**.
-
-### Image Labels
+Each image has a label you reference in specs:
 
 ```json
-{
-  "images": [
-    {"path": "inbox/photo.jpg", "label": "product"},
-    {"path": "inbox/mood.jpg", "label": "style_ref"}
-  ]
-}
+{"images": [
+  {"path": "[source_path]", "label": "source"},
+  {"path": "[reference_path]", "label": "style_ref"}
+]}
 ```
 
-Common labels:
+Reference in specs: `"extract [source]"`, `"match [style_ref] lighting"`
+
 | Label | Purpose |
 |-------|---------|
-| `product` / `source` | Main product to feature |
-| `style_ref` | Lighting/mood reference - match its atmosphere |
-| `background` | Background/scene reference |
-| `product_variant` | Additional product for family shots |
+| source / product | Main item to process |
+| style_ref | Lighting/mood reference |
+| background | Scene reference |
+| variant | Additional product for family shots |
 
-### Label References in Specs
-
-Reference labels using `[label]` syntax in specs:
-
-```json
-{
-  "extraction": {"target_description": "glass jar in [source]"},
-  "lighting": {"special_requirements": "match [style_ref]"},
-  "placement": {"position": "place [product] on [background]"}
-}
-```
-
-**Max 15 images** per call (Gemini constraint).
+**Max 15 images per call.**
 
 ---
 
-## STRUCTURED SPECS (All Optional)
+## SPECS QUICK REFERENCE
 
-Use what applies to your use case:
+Use what applies. All optional. All accept free-form strings.
 
-### extraction
+| Spec | Key Fields | When |
+|------|------------|------|
+| **fidelity** | preserve_colors, preserve_artwork, hero_features | ALWAYS for source products |
+| **extraction** | target_description, isolation, edge_treatment | Isolating from background |
+| **background** | treatment (transparent/solid/scene), color | Setting background |
+| **lighting** | type, direction, special_requirements | Controlling light |
+| **material_treatment** | primary_material, rendering_notes | Glass/metal/specialty |
+| **composition** | product_coverage, position, camera_angle | Framing |
+| **scene** | environment, style, mood | Lifestyle generation |
+| **placement** | position, scale, surface | Product in scene |
+| **output** | format, size, aspect_ratio, filename | Output specs |
 
-```json
-{
-  "target_description": "glass jar on left in [source]",
-  "isolation": "complete",
-  "edge_treatment": "sharp"
-}
-```
-Purpose: Extract product from messy background.
-
-### background
-
-```json
-{
-  "treatment": "transparent | solid_color | scene",
-  "color": "white",
-  "scene_description": "modern kitchen counter"
-}
-```
-Purpose: Set the background after extraction or for compositing.
-
-### lighting
-
-```json
-{
-  "type": "natural_window | studio_3point",
-  "direction": "front | side | top",
-  "special_requirements": "match [style_ref]"
-}
-```
-Purpose: Control lighting style and direction.
-
-### composition
-
-```json
-{
-  "position": "center | [main] center [variant] right",
-  "camera_angle": "slight_top | eye_level | three_quarter",
-  "negative_space": "generous_top | balanced"
-}
-```
-Purpose: Control framing and arrangement.
-
-### scene
-
-```json
-{
-  "environment": "modern_kitchen | outdoor_garden",
-  "style": "match [style_ref]",
-  "mood": "warm_inviting | clean_minimal"
-}
-```
-Purpose: Lifestyle scene generation.
-
-### placement
-
-```json
-{
-  "position": "place [product] on marble counter",
-  "scale": "prominent | natural"
-}
-```
-Purpose: Position product in scene.
-
-### material_treatment
-
-```json
-{
-  "primary_material": "clear_glass | metal | plastic",
-  "rendering_notes": "preserve caustics and internal reflections"
-}
-```
-Purpose: Material-specific rendering instructions.
-
-### fidelity (CRITICAL for source images)
-
-```json
-{
-  "preserve_colors": "true product colors (fix color cast)",
-  "preserve_artwork": "bee mascot - same design",
-  "hero_features": "texture pattern is key differentiator"
-}
-```
-Purpose: FIX photography problems, PRESERVE product identity. Always include when processing [source]/[product].
-
-### enhancement
-
-```json
-{
-  "sharpness": "tack_sharp",
-  "color_treatment": "vibrant | natural | desaturated"
-}
-```
-Purpose: Post-processing enhancements.
-
-### custom_spec
-
-```json
-{
-  "instruction": "dramatic shot with water droplets",
-  "style_reference": "Apple product photography"
-}
-```
-Purpose: Fully open-ended creative direction.
-
-### output
-
-```json
-{
-  "format": "png | jpeg | webp",
-  "size": "1K | 2K",
-  "aspect_ratio": "1:1 | 16:9 | 4:3",
-  "filename": "product_hero"
-}
-```
-Purpose: Output specifications.
+**Fidelity is MANDATORY when processing source products.**
 
 ---
 
-## USE PATTERNS
+## PATTERNS
 
-### Pattern 1: Extract with Transparent Background
+Adapt these to your context. Never copy specific values.
 
-```python
-image_studio(
-    images=[{"path": "inbox/photo.jpg", "label": "source"}],
-    extraction={"target_description": "glass jar in [source]"},
-    background={"treatment": "transparent"},
-    material_treatment={"primary_material": "clear_glass"},
-    fidelity={"preserve_colors": "true colors", "hero_features": "glass clarity"}
-)
-```
-Result: Extracted jar, transparent PNG, identity preserved.
-
-### Pattern 2: Extract with White Background
-
-```python
-image_studio(
-    images=[{"path": "inbox/photo.jpg", "label": "source"}],
-    extraction={"target_description": "product in [source]"},
-    background={"treatment": "solid_color", "color": "white"}
-)
-```
-Result: Product on pure white background.
-
-### Pattern 3: Lifestyle Scene with Style Reference
-
-```python
-image_studio(
-    images=[
-        {"path": "inbox/t/product.jpg", "label": "product"},
-        {"path": "inbox/t/mood.jpg", "label": "style_ref"}
-    ],
-    scene={"environment": "modern kitchen", "style": "match [style_ref]"},
-    placement={"position": "place [product] on counter"},
-    lighting={"type": "natural_window", "special_requirements": "match [style_ref]"}
-)
-```
-Result: Product in kitchen matching reference mood/lighting.
-
-### Pattern 4: Product Family Composition
-
-```python
-image_studio(
-    images=[
-        {"path": "pending/t/jar_500ml.png", "label": "main"},
-        {"path": "pending/t/jar_1L.png", "label": "variant"}
-    ],
-    composition={"position": "[main] center front, [variant] right behind"},
-    background={"treatment": "solid_color", "color": "white"}
-)
-```
-Result: Family shot with main product prominent, variant supporting.
-
-### Pattern 5: Hero Shot Enhancement
-
-```python
-image_studio(
-    images=[{"path": "inbox/photo.jpg", "label": "source"}],
-    extraction={"target_description": "product in [source]"},
-    background={"treatment": "solid_color", "color": "#f5f5f5"},
-    lighting={"type": "studio_3point"},
-    material_treatment={"primary_material": "clear_glass"},
-    fidelity={"preserve_colors": "true colors", "hero_features": "key differentiator"}
-)
-```
-Result: Catalog-ready hero shot, identity preserved.
-
----
-
-## WORKFLOW INTEGRATION
-
-### Complete Pattern: Upload to Catalog
+### Catalog Hero
 
 ```
-1. view_image (diagnose)
-   - Assess quality, identify issues
-   - Understand what needs processing
-
-2. image_studio (process)
-   - Apply appropriate specs
-   - Returns storage_path in pending/
-
-3. view_image (verify)
-   - Check output quality
-   - Verify extraction/composition
-
-4. write_data (catalog)
-   - Create asset record with storage_path
-   - Link to product via junction table
+images: [source]
+specs: extraction + background (white) + fidelity + material_treatment
+result: Clean product on white, identity preserved
 ```
 
-### Storage Path Flow
+### Lifestyle Scene
 
 ```
-User upload -> inbox/filename.jpg
-     |
-     v
-image_studio processing
-     |
-     v
-Output -> pending/generated.png
-     |
-     v
-write_data creates asset with storage_url
-     |
-     v
-Asset linked to product via product_assets junction
+images: [product] + optional [style_ref]
+specs: scene + placement + lighting + fidelity
+result: Product in environment, photorealistic
 ```
 
----
+### Multi-Item Individual
 
-## OUTPUT STRUCTURE
-
-### Success
-
-```json
-{
-  "success": true,
-  "storage_path": "pending/20241217_studio_abc12345.png",
-  "local_path": "/tmp/media_downloads/20241217_studio_abc12345.png",
-  "metadata": {
-    "width": 1024,
-    "height": 1024,
-    "format": "png",
-    "size_bytes": 245678,
-    "aspect_ratio": "1024:1024"
-  },
-  "warnings": []
-}
+```
+images: [source with N items]
+loop: For each item, extraction targeting "[description] at [position]"
+result: N separate outputs
 ```
 
-Key field: `storage_path` - use this for creating asset records.
+### Family Composition
 
-### Error
-
-```json
-{
-  "success": false,
-  "error": "Failed to load any images",
-  "error_code": "FILE_NOT_FOUND",
-  "warnings": ["Attempted paths: [...]"],
-  "next_steps": [
-    "Verify file paths exist in storage",
-    "Check if paths were copied correctly",
-    "Use view_image tool first to confirm path works"
-  ]
-}
+```
+images: [main] + [variant1] + [variant2]
+specs: composition ("[main] center, [variants] supporting") + background
+result: Family shot
 ```
 
 ---
 
 ## ANTI-PATTERNS
 
-### Anti-Pattern 1: No view_image Before Processing
-
-```
-WRONG:
-Directly call image_studio without seeing the input
-
-CORRECT:
-1. view_image to assess input quality
-2. image_studio with appropriate specs
-3. view_image to verify output
-```
-
-### Anti-Pattern 2: Missing Fidelity Spec
-
-```
-WRONG: image_studio(images=[...], extraction={...})  # No fidelity
-
-CORRECT: image_studio(..., fidelity={"preserve_colors": "true", "hero_features": "key"})
-```
-Always include fidelity when processing [source]/[product].
-
-### Anti-Pattern 3: Missing Material Treatment for Glass/Metal
-
-```
-WRONG:
-image_studio(images=[...], extraction={...})
-# Glass looks flat, no caustics
-
-CORRECT:
-image_studio(
-    images=[...],
-    extraction={...},
-    material_treatment={"primary_material": "clear_glass", "rendering_notes": "preserve caustics"}
-)
-```
-
-### Anti-Pattern 4: Simple View When Processing Needed
-
-```
-WRONG:
-Use image_studio just to look at an image
-
-CORRECT:
-Use view_image for viewing
-Use image_studio only when transformation needed
-```
-
-### Anti-Pattern 5: Ignoring storage_path
-
-```
-WRONG:
-Call image_studio but not use storage_path for write_data
-
-CORRECT:
-Capture storage_path from output
-Use it when creating asset record:
-write_data(..., data={"storage_url": storage_path, ...})
-```
-
-### Anti-Pattern 6: Single Extraction for Multi-Item Image
-
-```
-WRONG:
-Source has 9 products, but:
-image_studio(extraction={"target_description": "the jars"})
-# Result: 1 asset for 9 products
-
-CORRECT:
-For each item in Extraction Targets:
-image_studio(extraction={"target_description": "Large jar with blue lid at top-left"})
-# Result: 9 assets, one per product
-```
-
-When source contains multiple items, extract each separately (unless explicitly asked for family shot).
+| Don't | Why | Instead |
+|-------|-----|---------|
+| Skip view_image before | Process blind | Always see source first |
+| Skip fidelity spec | Identity loss | Always include for products |
+| Skip material_treatment for glass/metal | Flat rendering | Specify material |
+| Copy example values | Wrong for your context | Adapt to what you SEE |
+| Single extraction for multi-item | 1 asset instead of N | Extract each separately |
+| Ignore storage_path output | Can't create asset record | Capture for write_data |
 
 ---
 
-## MULTI-ITEM EXTRACTION
+## OUTPUT
 
-When source image contains multiple items, use position-based targeting.
-
-**See `multi_item_image.protocol` for:**
-- Classification types (VARIANTS, COLLECTION, COMPONENTS)
-- Processing strategies (INDIVIDUAL, COMPOSITE, GROUPED)
-- Strategy selection signals
-- Full position vocabulary
-
-### Targeting Syntax
-
-**Single item:** `"{description} at {position}"`
+### Success
 ```json
-{"target_description": "Large jar with blue lid at top-left", "isolation": "complete"}
+{
+  "success": true,
+  "storage_path": "pending/[filename].png",
+  "metadata": {"width": N, "height": N, "format": "..."}
+}
 ```
 
-**Group:** `"all {description} items"`
+Use `storage_path` for write_data asset records.
+
+### Error
 ```json
-{"target_description": "all items in the top row", "isolation": "complete"}
+{
+  "success": false,
+  "error": "...",
+  "error_code": "FILE_NOT_FOUND | API_ERROR | ...",
+  "next_steps": ["..."]
+}
 ```
-
-**All together:** `"all items as arranged"`
-```json
-{"target_description": "all items as arranged", "isolation": "complete"}
-```
-
-### Position Vocabulary
-
-See `multi_item_image.protocol` for complete position vocabulary.
 
 ---
 
-## BEFORE image_studio
+## WORKFLOW
 
-1. **view_image**: See what you're working with
-2. **Check storage**: Verify image path exists (inbox/ or pending/)
-3. **Identify material**: Glass? Metal? Plastic? (affects rendering)
-
-## AFTER image_studio
-
-1. **view_image**: Verify output quality
-2. **write_data**: Create asset record with storage_path
-3. **Link to product**: Create product_assets junction record
+```
+view_image (see source) -> image_studio (process) -> view_image (verify) -> write_data (catalog)
+```
 
 </protocol>

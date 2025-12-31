@@ -1,0 +1,111 @@
+<protocol name="visual_quality" type="shared" domain="visual">
+
+## PURPOSE
+
+Single source of truth for visual quality standards.
+What makes professional output. When to ship vs iterate.
+
+---
+
+## THE PHOTOREALISM IMPERATIVE
+
+**Every output must be indistinguishable from professional photography.**
+
+| Authentic | Fake (NEVER) |
+|-----------|--------------|
+| Natural light falloff | Flat, even lighting |
+| Real shadows grounding product | Floating, no contact shadow |
+| Material-accurate surfaces | Plastic/CGI look |
+| Believable context | Awkward placement |
+| Natural colors | Over-saturated, HDR |
+| Subtle imperfection | Uncanny perfection |
+
+**Test**: Would a professional photographer believe this is real?
+
+---
+
+## QUALITY DIMENSIONS
+
+| Dimension | What to Evaluate |
+|-----------|------------------|
+| **Composition** | Product dominance, intentional negative space, framing |
+| **Lighting** | Reveals form, shadow quality, specular control |
+| **Material** | Surface reads true, texture visible, reflections correct |
+| **Edges** | Surgical extraction, no halos/fringing/artifacts |
+| **Photorealism** | Grounded, shadows, looks shot not rendered |
+
+---
+
+## SCORING
+
+| Score | Level | Action |
+|-------|-------|--------|
+| 9-10 | Exceptional | Ship with confidence |
+| 8-8.9 | Professional | Ship |
+| 7-7.9 | Acceptable | Consider iterating |
+| <7 | Below standard | Must iterate or escalate |
+
+**Ship threshold**: ALL dimensions 8+ AND photorealism checklist passes.
+
+---
+
+## PHOTOREALISM CHECKLIST
+
+Before shipping ANY image:
+
+```
+[ ] Contact shadow present? (product touches surface)
+[ ] Lighting direction consistent?
+[ ] Materials render true to nature?
+[ ] Product scale correct for context?
+[ ] Colors natural, not over-processed?
+[ ] No AI artifacts? (weird edges, texture repetition)
+[ ] Would fool a professional photographer?
+```
+
+**Any check fails = iterate before shipping.**
+
+---
+
+## FIDELITY VS CREATIVITY
+
+| Zone | Rule |
+|------|------|
+| **Fidelity (NO changes)** | Colors, artwork, text, shape, texture |
+| **Enhancement (YES changes)** | Background, lighting quality, sharpness, composition |
+
+**Fix photography problems. Never change product identity.**
+
+When processing source products:
+- Color cast from bad lighting -> FIX (correct to true colors)
+- Blur -> FIX (sharpen)
+- Product's actual color -> PRESERVE (never shift)
+- Product's artwork/labels -> PRESERVE (same design, sharper)
+
+---
+
+## COMMON FAILURES
+
+| Failure | Cause | Fix |
+|---------|-------|-----|
+| "Technically correct, emotionally dead" | No creative vision | Ask "what makes this product SPECIAL?" |
+| "Over-processed uncanny valley" | Enhancement too aggressive | Reduce, let imperfections remain |
+| "Generic studio shot" | Same treatment for everything | Let product character guide approach |
+| "Floating product" | Missing contact shadow | Add proper grounding shadow |
+| "CGI look" | Too perfect, wrong materials | Add subtle imperfection, fix material rendering |
+
+---
+
+## SELF-CRITIQUE
+
+After generating, ask:
+
+1. **Identity**: Same product, just better photographed?
+2. **Sharpness**: Tack sharp on product features?
+3. **Photorealism**: Grounded, shadowed, looks real?
+4. **Emotion**: Creates desire for the product?
+5. **Dimensions**: All 8+?
+
+**All yes = SHIP. Any no = ITERATE.**
+
+</protocol>

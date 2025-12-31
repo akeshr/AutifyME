@@ -1,0 +1,135 @@
+<protocol name="materials" type="domain" domain="visual">
+
+## PURPOSE
+
+Material-specific rendering knowledge.
+Different materials need different lighting and treatment for photorealistic results.
+
+Load when processing glass, metal, or specialty materials.
+
+---
+
+## GLASS (Clear, Colored, Frosted)
+
+**Challenge**: Glass is invisible without light. Must reveal depth and edge.
+
+| Technique | Purpose |
+|-----------|---------|
+| Backlight | Creates glow, reveals transparency |
+| Dark field | Defines edges against light background |
+| Gradient reflections | Shows form on curved surfaces |
+
+**Excellence markers**:
+- Internal caustics visible (light bending through)
+- Edge refraction sharp and clean
+- You can "see into" the glass, not just through
+- Speculars controlled but present (life, not flat)
+
+**material_treatment**: `"clear_glass"` or `"frosted_glass"` with `"preserve caustics, edge refraction"`
+
+---
+
+## METAL (Polished, Brushed, Matte)
+
+**Challenge**: Metal reflects everything. Must control reflections to show form.
+
+| Surface | Technique |
+|---------|-----------|
+| Polished | Large soft source, smooth gradients |
+| Brushed | Light perpendicular to brush direction |
+| Matte | Soft even light, avoid harsh speculars |
+
+**Excellence markers**:
+- Gradient reflections follow form (not random hotspots)
+- Controlled speculars define edges
+- Micro-texture visible (especially brushed)
+- No burned highlights
+
+**material_treatment**: `"polished_metal"` / `"brushed_metal"` with `"gradient reflections, controlled speculars"`
+
+---
+
+## PLASTIC / PET
+
+**Challenge**: Plastic looks cheap without care. Labels/prints are often hero features.
+
+| Aspect | Technique |
+|--------|-----------|
+| Surface sheen | Side light reveals quality |
+| Labels/prints | TACK SHARP - often the differentiator |
+| Texture (honeycomb, etc.) | Rake light at angle for depth |
+
+**Excellence markers**:
+- Surface reads as quality, not cheap
+- Text/graphics razor sharp
+- Texture has dimensional feel
+- Colors accurate, vibrant but not oversaturated
+
+**material_treatment**: `"glossy_plastic"` / `"matte_plastic"` with `"sharp labels, texture depth"`
+
+---
+
+## FABRIC / TEXTILE
+
+**Challenge**: Micro-texture defines quality. Must reveal weave.
+
+| Technique | Purpose |
+|-----------|---------|
+| Rake light | Reveals weave texture |
+| Soft key | Flattering drape shadows |
+| Low angle fill | Opens fold shadows |
+
+**Excellence markers**:
+- Weave texture visible
+- Drape shadows show dimensionality
+- Fiber detail at edges
+- Color accurate across folds
+
+---
+
+## CERAMIC / PORCELAIN
+
+| Surface | Technique |
+|---------|-----------|
+| Matte | Even soft lighting, avoid speculars |
+| Gloss | Controlled speculars define form |
+| Textured | Rake light + soft overall |
+
+**Excellence markers**:
+- Surface finish reads correctly
+- Even lighting without hotspots
+- Texture preserved
+
+---
+
+## FOOD & BEVERAGE
+
+**Challenge**: Must look fresh, appetizing, ready to consume.
+
+| Category | Key Techniques |
+|----------|----------------|
+| Beverages | Condensation, pour shots, liquid depth |
+| Baked goods | Warm light, crumb detail, golden tones |
+| Fresh produce | Water droplets, vibrant greens |
+| Honey/syrups | Drip shots, backlight for glow |
+
+**The Appetite Test**: Does this image make you hungry/thirsty?
+
+---
+
+## APPLICATION
+
+1. **Identify material** via view_image
+2. **Load this protocol** if specialty material
+3. **Apply technique** in material_treatment spec
+4. **Verify** material renders true in output
+
+**In image_studio**:
+```
+material_treatment: {
+  "primary_material": "[identified from source]",
+  "rendering_notes": "[technique from this protocol]"
+}
+```
+
+</protocol>
