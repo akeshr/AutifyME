@@ -327,6 +327,74 @@ Key field: `storage_path` - use this for creating asset records.
 
 ---
 
+## ERROR HANDLING
+
+### Error Codes and Recovery
+
+| Error Code | Meaning | Recovery Strategy |
+|------------|---------|-------------------|
+| `FILE_NOT_FOUND` | Image path doesn't exist | Verify path with view_image first; check for typos in storage_path |
+| `CORRUPT_FILE` | Image file is damaged | Request new upload from user |
+| `API_ERROR` | Gemini generation failed | Retry ONCE with same specs; if fails again, simplify specs |
+| `RATE_LIMIT` | Too many requests | Wait 30 seconds, retry |
+| `CONTENT_POLICY` | Image violates policy | Escalate to PM - cannot process this image |
+
+### Retry Decision Tree
+
+```
+image_studio fails
+    |
+    +-- FILE_NOT_FOUND?
+    |       -> Check path with view_image
+    |       -> If view_image works, path is correct - retry image_studio
+    |       -> If view_image fails, path is wrong - fix path first
+    |
+    +-- API_ERROR?
+    |       -> Retry ONCE with same specs
+    |       -> If fails again, SIMPLIFY: fewer specs, simpler instructions
+    |       -> If still fails, escalate to PM
+    |
+    +-- RATE_LIMIT?
+    |       -> Wait, retry
+    |
+    +-- CONTENT_POLICY?
+    |       -> DO NOT RETRY - escalate to PM
+    |
+    +-- Other?
+            -> Retry once; if fails, escalate with error details
+```
+
+### Common Failures and Fixes
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| "No image returned" | Gemini refused to generate | Simplify specs; check if request is reasonable |
+| "Failed to load images" | Path corrupted by LLM | Use view_image to get correct path; copy EXACTLY |
+| Output looks nothing like source | Missing fidelity spec | Add fidelity spec with preserve_colors, hero_features |
+| Glass/metal looks flat | Missing material_treatment | Add material_treatment spec for the material |
+| Wrong item extracted | Ambiguous target_description | Use position + visual identifiers ("jar with blue lid at top-left") |
+| Product colors wrong | Color cast not corrected | Add fidelity.preserve_colors: "true colors - fix color cast" |
+
+### When to Retry vs Escalate
+
+| Situation | Action |
+|-----------|--------|
+| First failure, recoverable error | Retry ONCE |
+| Second failure, same error | Simplify specs, retry ONCE more |
+| Third failure | Escalate to PM with full error details |
+| CONTENT_POLICY error | Escalate immediately - do not retry |
+| Source quality issue (blur, occlusion) | Escalate - source is unfixable |
+
+### Error Reporting to PM
+
+When escalating, include:
+1. What you tried (specs used)
+2. What failed (error code + message)
+3. What you tried to recover (retry attempts)
+4. Recommendation (new source needed, different approach, etc.)
+
+---
+
 ## ANTI-PATTERNS
 
 ### Anti-Pattern 1: No view_image Before Processing
