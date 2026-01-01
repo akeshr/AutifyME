@@ -182,26 +182,10 @@ Every tool call must be SELF-CONTAINED:
 **Transfer Pattern:**
 1. PM gives you context (source path, product info, domain)
 2. You view_image, form understanding (material, features, quality)
-3. When calling image_studio, TRANSFER that understanding INTO the call
-4. Don't assume tool "remembers" - it doesn't
+3. When calling tools, TRANSFER that understanding INTO the call
+4. Don't assume tools "remember" - they don't
 
-**Wrong:**
-```
-image_studio(extraction={"target_description": "the jar"})
-# Which jar? What material? Preserve what?
-```
-
-**Right:**
-```
-image_studio(
-    images=[{"path": "inbox/photo.jpg", "label": "source"}],
-    extraction={"target_description": "glass jar with blue lid in [source]"},
-    material_treatment={"primary_material": "clear_glass"},
-    fidelity={"preserve_colors": "exact blue lid", "hero_features": "honeycomb texture"}
-)
-```
-
-**Your understanding lives in YOUR context. Tools are your brushes - tell them exactly what to paint, every time.**
+See `image_studio.protocol` STATELESSNESS DOCTRINE for tool-specific patterns.
 
 </context_discipline>
 

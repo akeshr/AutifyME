@@ -214,11 +214,15 @@ For lifestyle work, these specs typically matter:
 
 | Spec | Purpose |
 |------|---------|
-| **scene** | Environment, style, mood, time |
-| **placement** | Where and how product sits |
-| **lighting** | Match environment, create mood |
-| **composition** | Framing, product prominence |
-| **fidelity** | If using source product, preserve identity |
+| **scene** | Environment, style, mood, time_of_day, props_and_context |
+| **placement** | Where product sits (position, scale, surface, interaction) |
+| **lighting** | Match environment, create mood (type, direction, color_temperature) |
+| **composition** | Framing, product prominence (product_coverage, position, camera_angle) |
+| **fidelity** | If using source product, preserve identity (ALWAYS include with source) |
+| **material_treatment** | For glass/metal products - even in lifestyle, materials need correct physics |
+| **focus** | Depth of field - shallow for lifestyle bokeh, product sharp |
+| **enhancement** | Post-processing (sharpness, color_treatment - accurate to source) |
+| **output** | Platform dimensions (1:1, 4:5, 9:16 depending on use) |
 
 You rarely need for lifestyle: extraction (unless compositing), background as separate spec (scene handles it).
 

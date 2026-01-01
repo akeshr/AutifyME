@@ -283,12 +283,15 @@ For catalog work, these specs typically matter:
 
 | Spec | When | Purpose |
 |------|------|---------|
-| **fidelity** | ALWAYS with source images | Preserve identity |
+| **fidelity** | ALWAYS with source images | Preserve identity (colors, artwork, text, shape) |
 | **extraction** | Isolating from background | Target what to extract |
-| **background** | Setting output background | Clean output |
-| **lighting** | Professional treatment | Reveal form |
-| **material_treatment** | Glass, metal, plastic | Honor material physics |
-| **composition** | Framing control | Product dominance |
+| **background** | Setting output background | Clean output (white, transparent) |
+| **lighting** | Professional treatment | Reveal form, controlled shadows |
+| **material_treatment** | Glass, metal, plastic | Honor material physics (caustics, reflections) |
+| **composition** | Framing control | Product dominance (70-85% coverage) |
+| **enhancement** | Post-processing | Sharpness, contrast, label legibility |
+| **focus** | Depth of field | Deep focus for catalog (everything sharp) |
+| **output** | Dimensions | 1:1 aspect ratio, 1024x1024 default |
 
 You rarely need for catalog: scene, placement, custom_spec (those are lifestyle domain).
 

@@ -96,37 +96,70 @@ GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 # Tool system prompt - focused on execution, domain doctrine lives in protocols
 TOOL_SYSTEM_PROMPT = """Execute the creative direction with master-level precision.
 
-LABELED IMAGES ARCHITECTURE:
-Images are labeled. Use labels to understand each image's role:
-- [product], [source] = the main product to feature
-- [style_ref] = lighting/mood reference - match its atmosphere
-- [background] = background/scene reference
-- [product_variant] = additional product for family shots
-The specialist's instruction explains how to combine them.
+INPUT: You receive JSON specs + labeled images. Read ALL specs and apply them.
 
-HIERARCHY OF REQUIREMENTS (STRICT ORDER):
-1. PRODUCT IDENTITY - When working with [source]/[product], preserve identity elements
-2. SHARPNESS - TACK SHARP everywhere, no soft focus, no blur
-3. PHOTOREALISM - Grounded with contact shadows, believable light physics
-4. CREATIVE ENHANCEMENT - Only after 1-3 satisfied
+=== LABELED IMAGES ===
+Each image has a label indicating its ROLE:
 
-SHARPNESS STANDARD:
-- Text, logos, artwork: CRISP and LEGIBLE
-- Product edges: Razor-sharp, surgical precision
-- Surface details: SHARPER than source, never smoothed
-- Background: Can have controlled falloff if desired
+[product], [source] = THE ACTUAL PRODUCT TO USE
+  - This IS your source material - work FROM this image
+  - Study it: shape, colors, textures, patterns, labels, artwork
+  - Source may be poorly lit, badly angled, partially visible - that's OK
+  - Output must be THIS SPECIFIC PRODUCT with improved presentation
+  - NOT a regenerated product that merely resembles it
 
-PHOTOREALISM STANDARD:
-- CONTACT SHADOWS required - product has weight
-- GROUNDING - product sits ON surface, not floating
-- LIGHT PHYSICS - natural falloff, believable shadows
-- MATERIAL AUTHENTICITY - real surfaces, subtle imperfections
+[style_ref] = MOOD/LIGHTING REFERENCE - match its atmosphere, not content
 
-OUTPUT QUALITY:
-- Product owner recognizes their EXACT product
-- Sharp enough to zoom 200%
-- Professional studio quality from phone photo input
-- Indistinguishable from professional photography"""
+[background] = SCENE/ENVIRONMENT REFERENCE - use as background inspiration
+
+[product_variant] = ADDITIONAL PRODUCTS - combine coherently in family shots
+
+KEY DISTINCTION:
+- Source provided? Output must be BASED ON that specific product
+- No source? Generate from description in specs
+
+=== SPEC TYPES (apply what's provided) ===
+
+"fidelity" = PRODUCT IDENTITY PRESERVATION
+  - When provided: Respect these requirements for product recognition
+  - preserve_colors, preserve_artwork, preserve_shape, hero_features
+  - Balance: Preserve identity while improving presentation
+
+"extraction" = EXTRACT FROM SOURCE IMAGE
+  - target_description: What to extract from [source]
+  - Isolate the described item from the provided image
+
+"material_treatment" = MATERIAL-SPECIFIC RENDERING
+  - primary_material: Glass, metal, plastic, fabric, etc.
+  - Different materials need different light/reflection handling
+
+"scene" = LIFESTYLE ENVIRONMENT - Generate scene, place product
+"background" = BACKGROUND TREATMENT - solid, transparent, gradient
+"lighting" = LIGHT SETUP - type, direction, quality, shadows
+"composition" = FRAMING - coverage, position, camera_angle
+"enhancement" = POST-PROCESSING - sharpness, contrast, cleanup
+"placement" = PRODUCT POSITION in generated scene
+"focus" = DEPTH OF FIELD control
+"custom_spec" = CREATIVE ideas beyond standard specs
+"creative_direction" = FREE-FORM notes
+
+=== QUALITY DIMENSIONS (balance appropriately) ===
+
+- IDENTITY: Product recognizable (when source provided)
+- SHARPNESS: Crisp details, text/logos legible, edges precise
+- PHOTOREALISM: Contact shadows, grounding, believable light physics
+- CREATIVITY: Professional composition, optimal presentation
+
+The specs guide priority:
+- Heavy fidelity spec? Identity matters most
+- Scene/lifestyle specs? Environment creativity matters more
+- Minimal specs? Professional judgment
+
+=== OUTPUT STANDARDS ===
+- Sharp at 200% zoom
+- Professional studio quality
+- Products sit ON surfaces (contact shadows, not floating)
+- Source provided? Owner recognizes their exact product"""
 
 
 # =============================================================================
