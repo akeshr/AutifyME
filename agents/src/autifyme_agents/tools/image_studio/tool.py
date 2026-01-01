@@ -106,6 +106,10 @@ Each image has a label indicating its ROLE:
   - Study it: shape, colors, textures, patterns, labels, artwork
   - Output must be THIS SPECIFIC PRODUCT with improved presentation
 
+[style_ref], [mood_ref] = ATMOSPHERE REFERENCE
+  - Match its lighting, color temperature, mood
+  - Copy the STYLE, not the specific products shown
+
 [background] = Scene/environment reference
 [variant], [product_2] = Additional products for family shots
 
