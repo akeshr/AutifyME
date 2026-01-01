@@ -367,8 +367,9 @@ Each image_studio call is independent AND Gemini is non-deterministic. Without c
 3. GENERATE ANCHOR - Process ONE variant with full specs
 4. VIEW ANCHOR - Use view_image to see the result
 5. EXTRACT STYLE AS TEXT - Describe what you see in precise terms
-6. PRESENT ANCHOR - write_data with style specs (triggers HITL)
-   - User approves image quality AND style for entire batch
+6. ANCHOR HITL - Call write_data with asset_uploads (shows image to user)
+   - Include style specs in hitl_summary
+   - STOP AND WAIT for approval before proceeding
 7. BATCH REMAINING - Pass ONLY source images + TEXT style specs in custom_spec
    - DO NOT pass anchor image to remaining calls
 8. GRID TEST - View all outputs, verify visual consistency
@@ -391,14 +392,42 @@ ANCHOR STYLE SPECS:
 
 ### Step 5: HITL Anchor Approval
 
-**What user sees:** The anchor image + your extracted style specs.
+**Call write_data to present anchor for approval:**
+
+```json
+{
+  "goal": "Create anchor asset + lock style for batch",
+  "reasoning": "Anchor variant selected. Style extracted. User approves before batch.",
+  "hitl_summary": "Anchor image for [Product] batch.\n\n**Style for ALL variants:**\n- Camera: [angle]\n- Lighting: [direction]\n- Framing: [coverage]\n\nApprove this style for the entire batch?",
+  "asset_uploads": [
+    {
+      "storage_path": "pending/anchor_image.png",
+      "returns": "anchor_img",
+      "caption": "[Variant name] - ANCHOR for batch style"
+    }
+  ],
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {"name": "[Variant] Hero", "storage_url": "@anchor_img.public_url", ...},
+      "returns": "anchor_asset"
+    }
+  ],
+  "impact": {"creates": {"assets": 1}, "asset_uploads": 1}
+}
+```
+
+**[CRITICAL] STOP and WAIT for user response before batching.**
+
+**What user sees:** The anchor image + style specs in hitl_summary.
 
 **What user approves:**
 - Image quality (is this good enough?)
 - Style for batch (this angle/lighting/framing for ALL variants?)
 
 **If user REJECTS:**
-1. Ask what's wrong (quality? angle? lighting?)
+1. Read their feedback (quality? angle? lighting?)
 2. Adjust specs based on feedback
 3. Regenerate anchor with new specs
 4. Re-present for approval
@@ -503,6 +532,7 @@ Any dimension below 6 -> Source may be unfixable, ESCALATE
 | **Cropping critical features** | **Customer can't compare** | **Feature visibility: all features shown** |
 | **Skipping batch consistency check** | **Ship inconsistent set** | **Consistency: grid test before ship** |
 | **Passing anchor image to batch calls** | **Gemini reproduces anchor instead of extracting** | **View-Then-Describe: anchor -> TEXT only** |
+| **Skipping anchor HITL approval** | **User never approves style, batch may be wrong** | **View-Then-Describe: STOP after anchor write_data** |
 
 ---
 
