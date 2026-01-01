@@ -328,17 +328,70 @@ Visual analysis will include `## MULTI-ITEM ASSESSMENT` with:
 | "family", "together" | COMPOSITE | All items in one call |
 | "only the X" | SELECTIVE | Filter, then process |
 
-### Position Targeting
+### Variant Identification (CRITICAL for targeting)
 
-For columnar/stacked layouts, use column + stack position:
-- "left-column, 2nd from top"
-- "center-column, bottom jar"
+**Use visual differentiators BEFORE position.** Position is ambiguous; visual characteristics are not.
 
-Visual identifiers (print names, colors) are more reliable than spatial positions.
+| Priority | Differentiator | Why Reliable |
+|----------|----------------|--------------|
+| 1 | **SIZE** | "the LARGEST jar" has ONE correct answer |
+| 2 | **VISUAL PATTERN** | Colors, prints, designs are intrinsic to product |
+| 3 | **TEXT/LABEL** | Explicit when readable |
+| 4 | **POSITION** | Last resort - only when visuals identical |
+
+**For size variants:** Lead with SIZE ("the LARGEST [product]", "the SMALLEST [product]")
+**For design variants:** Lead with VISUAL ("the [product] with [distinctive pattern]")
+**Combine for precision:** "the LARGEST jar with blue floral print"
 
 ### Key Rule
 
 **Never treat N items as 1.** If Extraction Targets has 9 rows and strategy is INDIVIDUAL, you output 9 assets.
+
+### Batch Consistency Doctrine (MANDATORY for variant sets)
+
+When creating base assets for multiple variants, ALL outputs must appear from the SAME photoshoot.
+
+**The Problem:**
+Each image_studio call is independent AND Gemini is non-deterministic. Without consistency enforcement:
+- Different camera angles across variants
+- Different lighting directions
+- Different framing/coverage
+- Result: Unusable as a cohesive set
+
+**The Solution: Style Anchor + Style Reference**
+
+```
+1. SELECT ANCHOR - Choose variant that is sharp, well-lit, shows full features in source
+2. GENERATE ANCHOR - Process ONE variant with full specs
+3. WRITE ANCHOR - Triggers HITL approval (user feedback applies to all)
+4. BATCH REMAINING - For each remaining variant:
+   - Pass approved anchor as [style_ref] image
+   - Use IDENTICAL specs (lighting, composition, enhancement)
+   - Add instruction: "match exact angle and framing of [style_ref]"
+5. GRID TEST - Verify consistency before shipping
+```
+
+**Anchor Selection (for catalog):**
+- Size variants: Prefer MEDIUM (transfers well to larger/smaller)
+- Design variants: Prefer the hero/bestseller SKU
+- Quality: Must be sharp and well-lit in source
+
+**User Communication:**
+When presenting anchor, communicate: this is the style anchor for batch processing, user should review photographic style (angle, lighting, framing) specifically, approval commits this style to all remaining variants.
+
+**Consistency Specs (must be IDENTICAL):**
+`composition.camera_angle`, `composition.product_coverage`, `lighting.*`, `enhancement`, `output.aspect_ratio`, `output.size`, `focus`
+
+**What CAN differ:**
+`extraction.target_description`, `fidelity.hero_features`, `output.filename`
+
+**Grid Test:**
+Before shipping: "Would these display correctly in a product listing grid where customers compare variants side-by-side?" If not, REDO outliers.
+
+**Recovery (if Grid Test fails):**
+1. First retry: Add explicit angle specs ("exact 15-degree top-down")
+2. Second retry: Use different anchor variant
+3. Third failure: Escalate - "Variant X resists consistency due to [reason]"
 
 ---
 

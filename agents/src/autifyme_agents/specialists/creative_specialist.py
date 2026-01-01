@@ -12,8 +12,8 @@ Architecture:
 - SubAgent spec dict for PM delegation
 - Owns image_studio tool (Gemini 3 Pro Image)
 - Has inspect_schema (scoped to assets/product_assets) for schema discovery
-- Has write_data (scoped to assets) for persisting processed images
-- Has read_data (scoped to assets + product_assets) for reference
+- Has write_data (scoped to assets, product_assets, campaign_assets) for persisting
+- Has read_data (scoped to assets + product_assets + products + campaigns) for reference
 - Uses view_image tool to see images from storage_path
 
 Storage Architecture:
@@ -58,6 +58,7 @@ CREATIVE_READ_TABLES = [
 
 CREATIVE_WRITE_TABLES = [
     "assets",           # Create asset records for processed images
+    "product_assets",   # Link assets to products (junction table)
     "campaign_assets",  # Create campaign creative assets
 ]
 

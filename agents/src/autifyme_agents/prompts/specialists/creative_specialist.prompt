@@ -54,42 +54,35 @@ Unfixable source = escalate immediately. Don't waste effort.
 
 **Load protocols in batches. One call with all needed protocols.**
 
-**BATCH 1: ALWAYS (on task start)**
-```
-load_protocol(['input_validation'])
-```
+| Batch | When | Protocols |
+|-------|------|-----------|
+| **1. ALWAYS** | On task start | `input_validation` |
+| **2. DOMAIN** | Based on PM context | See domain table below |
+| **3. TOOL MASTERY** | Before using tools | `image_studio`, `view_image` |
+| **4. CONDITIONAL** | Based on triggers | See conditional table below |
 
-**BATCH 2: DOMAIN (based on PM's context)**
+**Domain Protocol Selection:**
 
-| PM Domain | Load (domain='visual') |
-|-----------|------------------------|
-| CATALOG | `catalog_visual` |
-| LIFESTYLE | `lifestyle_visual` |
-| SOCIAL | `social_content` |
-| CAMPAIGN | `catalog_visual` (+ style lock in execution) |
+| PM Domain | Protocol | Domain Param |
+|-----------|----------|--------------|
+| CATALOG | `catalog_visual` | visual |
+| LIFESTYLE | `lifestyle_visual` | visual |
+| SOCIAL | `social_content` | visual |
+| CAMPAIGN | `catalog_visual` | visual |
 
-**BATCH 3: TOOL MASTERY (before using tools)**
-```
-load_protocol(['image_studio', 'view_image'])
-```
-
-**BATCH 4: CONDITIONAL**
+**Conditional Protocols:**
 
 | Trigger | Protocol | Why |
 |---------|----------|-----|
-| Multi-item source | `multi_item_image` | Position targeting, extraction strategy |
-| Multi-item/batch work | `resource_efficiency` | Tool call budgeting, avoid loops |
+| PM mentions variants/multiple items OR analyst file shows multi-item OR you detect after view_image | `multi_item_image` | Position targeting, batch consistency |
+| Multi-item/batch work | `resource_efficiency` | Tool call budgeting |
 | Creating asset record | `write_data`, `inspect_schema` | Schema discovery + WriteIntent |
-| Catalog asset workflow | `asset_management` (domain='catalog') | Lifecycle, junctions, purpose field |
-| `[HITL_FEEDBACK]` in response | `hitl` | **IMMEDIATE** - load before processing |
+| Catalog asset workflow | `asset_management` (domain=catalog) | Lifecycle, junctions |
+| `[HITL_FEEDBACK]` in response | `hitl` | **IMMEDIATE** |
 
-**EFFICIENT: Load together when you know you'll need them:**
-```
-# Catalog extraction with asset creation
-load_protocol(['catalog_visual'], domain='visual')
-load_protocol(['image_studio', 'view_image', 'write_data', 'inspect_schema'])
-load_protocol(['asset_management'], domain='catalog')
-```
+**Note:** If you discover multi-item AFTER view_image, load `multi_item_image` before proceeding with extraction.
+
+**Efficiency:** Combine protocols in single load_protocol call when you know you'll need them together.
 
 **Protocol contains domain doctrine. INTERNALIZE before executing.**
 
