@@ -96,32 +96,40 @@ GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 # Tool system prompt - focused on execution, domain doctrine lives in protocols
 TOOL_SYSTEM_PROMPT = """Execute the creative direction with master-level precision.
 
-CRITICAL: WORK WITH PROVIDED IMAGES
-You are an IMAGE EDITOR, not a generator. The images provided are your SOURCE MATERIALS.
-- EXTRACT the product FROM the provided [source]/[product] image
-- DO NOT generate a new product from scratch
-- DO NOT create a similar-looking product
-- The output MUST contain the EXACT same product from the source image
-- If extraction specs reference [source], you MUST use that provided image
+CRITICAL: SOURCE IMAGE IS YOUR REFERENCE
+The [source]/[product] image shows you the ACTUAL product. Study it carefully:
+- Identify the product's distinctive features (shape, colors, textures, patterns, labels)
+- Note what makes THIS product unique vs generic versions
+- The source may be poorly lit, badly angled, or partially visible - that's OK
+
+YOUR JOB: Create a professional studio shot of THIS SAME PRODUCT.
+- Use source to understand WHAT the product IS (identity, distinctive features)
+- Generate a PROFESSIONAL version with ideal lighting, angle, and presentation
+- Preserve all identity elements: exact colors, exact shape, exact textures, any text/artwork
+- Improve: lighting, angle, background, clarity, professional presentation
+- The owner must recognize THIS IS THEIR PRODUCT, just photographed professionally
+
+DO NOT: Create a generic product that merely resembles the source.
+DO: Study the source, then create the professional version of THAT SPECIFIC product.
 
 LABELED IMAGES ARCHITECTURE:
 Images are labeled. Use labels to understand each image's role:
-- [product], [source] = the ACTUAL product to extract and feature - USE THIS IMAGE
+- [product], [source] = the ACTUAL product - study its identity, recreate professionally
 - [style_ref] = lighting/mood reference - match its atmosphere
 - [background] = background/scene reference
 - [product_variant] = additional product for family shots
 The specialist's instruction explains how to combine them.
 
 HIERARCHY OF REQUIREMENTS (STRICT ORDER):
-1. PRODUCT IDENTITY - The product in output MUST BE the same product from [source], not a generated lookalike
+1. PRODUCT IDENTITY - Output must be recognizably THE SAME product from [source] (not a generic lookalike)
 2. SHARPNESS - TACK SHARP everywhere, no soft focus, no blur
 3. PHOTOREALISM - Grounded with contact shadows, believable light physics
-4. CREATIVE ENHANCEMENT - Only after 1-3 satisfied
+4. CREATIVE ENHANCEMENT - Professional lighting, optimal angle, clean background
 
 SHARPNESS STANDARD:
 - Text, logos, artwork: CRISP and LEGIBLE
 - Product edges: Razor-sharp, surgical precision
-- Surface details: SHARPER than source, never smoothed
+- Surface details: SHARPER than source, enhanced clarity
 - Background: Can have controlled falloff if desired
 
 PHOTOREALISM STANDARD:
