@@ -361,9 +361,13 @@ Each image_studio call is independent AND Gemini is non-deterministic. Without c
 **The Solution: View-Then-Describe**
 
 ```
+0. IF REFERENCE PROVIDED - View PM's reference image first
+   - Understand target style (angle, lighting, framing, background)
+   - Capture as TEXT specs to inform anchor generation
+   - Do NOT pass as style_ref (causes reproduction, not extraction)
 1. SELECT ANCHOR - Choose variant that is sharp, well-lit, shows full features in source
    - If NO variant is suitable: ESCALATE immediately (can't build batch on poor anchor)
-2. GENERATE ANCHOR - Process ONE variant with full specs, record the specs used
+2. GENERATE ANCHOR - Process ONE variant with full specs (informed by reference if provided)
 3. VIEW ANCHOR - Use view_image to see the result
 4. EXTRACT STYLE SPECS - Describe what you see in precise, measurable terms
 5. PRESENT ANCHOR - write_data with style specs in description (triggers HITL)
@@ -374,6 +378,25 @@ Each image_studio call is independent AND Gemini is non-deterministic. Without c
    - Add custom_spec.instruction with style specs to REINFORCE consistency
 7. GRID TEST - View all outputs, verify visual consistency
 ```
+
+### Step 0: Reference Image Handling (When PM Provides One)
+
+If PM's delegation includes a reference image:
+
+1. **VIEW the reference** - Use view_image to see the target style
+2. **CAPTURE as TEXT** - Describe what you see:
+   ```
+   REFERENCE STYLE (from [reference_path]):
+   - Camera: [describe angle, perspective]
+   - Lighting: [describe setup, shadow direction]
+   - Framing: [describe coverage, position]
+   - Background: [describe treatment]
+   - Quality: [describe sharpness, enhancement]
+   ```
+3. **USE in anchor generation** - Apply these specs to your anchor
+4. **Do NOT pass as style_ref** - Reference becomes TEXT in specs, not image label
+
+**Why text, not image?** When Gemini sees a finished product as style_ref during extraction, it reproduces the style_ref instead of extracting from source. Converting style to text avoids this.
 
 ### Step 4: Style Spec Extraction
 
@@ -422,28 +445,10 @@ custom_spec: {
 
 ### Step 7: Grid Test (Visual Verification)
 
-After generating all variants, create a verification grid:
-
-```python
-image_studio(
-    images=[
-        {"path": "pending/variant_1.png", "label": "v1"},
-        {"path": "pending/variant_2.png", "label": "v2"},
-        # ... all variants
-    ],
-    composition={"position": "grid layout - NxM, equal spacing"},
-    background={"treatment": "solid_color", "color": "white"},
-    output={"filename": "verification_grid"}
-)
-```
-
-Then view_image the grid and check:
-- Same camera angle across all?
-- Same framing/product coverage?
-- Shadows falling same direction?
-- Same lighting quality?
-
-**If ANY outlier:** REDO that variant with more explicit style specs.
+After generating all variants, apply Grid Test from `multi_item_image.protocol`:
+- Create verification grid using image_studio (see pattern there)
+- View the grid, check: angle, framing, shadows, lighting consistency
+- **If ANY outlier:** REDO that variant with more explicit style specs
 
 ### Anchor Selection
 

@@ -92,15 +92,11 @@ Unfixable source = escalate immediately. Don't waste effort.
 - **Read analyst files**: If PM references them, USE the material/item info
 - **Form creative vision**: What should this become?
 
-**Style Reference Handling (CRITICAL - Task Type Determines Approach):**
-
-| Task Type | Reference Handling | Why |
-|-----------|-------------------|-----|
-| **Single lifestyle scene** | Pass as `style_ref` label | Match mood/atmosphere from reference |
-| **Batch extraction** (multiple variants) | View reference, describe in `custom_spec` | style_ref causes Gemini to reproduce it instead of extracting from source |
-
-For lifestyle: `{"path": "reference.jpg", "label": "style_ref"}` is correct.
-For batch: View reference, then use text like `custom_spec.instruction: "Match style: warm lighting, soft shadows..."` for consistency.
+**Style Reference Handling:**
+PM's delegation tells you how to use any reference image. Follow PM's instructions:
+- If PM says "use as style_ref label" → Pass reference image with style_ref label
+- If PM says "view reference, capture style as text" → View it, describe in custom_spec
+- If PM provides no reference → Proceed without one
 
 ### 4. EXECUTE
 

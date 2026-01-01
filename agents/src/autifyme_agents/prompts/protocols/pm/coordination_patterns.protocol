@@ -1247,7 +1247,8 @@ For CATALOG domain."
 | **Variants** | Visual (all) -> Product (base research + variant dimensions) -> Catalog (variant structure) -> [Approval] -> Creative (all) -> Specialist (N linked products) | 1 visual_analysis, 1 product_research (covers variants), 1 catalog_analysis |
 | **Bulk (different)** | Visual (all, separate findings) -> For each: Product -> Catalog -> [Approval] -> Creative -> Specialist | N visual_analysis files, N product_research files, N catalog_analysis files |
 | **Comparison** | Visual (all) -> Present comparison to user | 1 comparison_analysis |
-| **Reference** | Identify reference; Visual (actual only) -> Product -> Catalog -> Creative (pass reference as style_ref) -> Specialist | Reference passed to creative for mood/atmosphere matching |
+| **Reference (lifestyle)** | Identify reference; Visual (actual only) -> Product -> Catalog -> Creative (pass reference as style_ref) -> Specialist | style_ref for mood/atmosphere matching |
+| **Reference (batch catalog)** | Identify reference type; Visual (all products) -> Product -> Catalog -> Creative (view reference, describe style as text) -> Specialist | Text-based style specs for batch consistency |
 
 ### Multi-Angle Workflow (1 Product, N Assets)
 
@@ -1456,16 +1457,30 @@ For CATALOG domain."
 
 ### Reference + Actual Workflow
 
+**PM must determine reference TYPE to route correctly.**
+
+#### Reference Type Decision
+
+| Reference Is | Task Type | PM Delegation |
+|--------------|-----------|---------------|
+| Mood/scene/lighting example | Lifestyle scene | Pass as style_ref |
+| Finished polished product shot | Batch catalog extraction | View, describe as text |
+| Raw/unprocessed sample | Any | Can pass as style_ref (safe) |
+
+**Why the distinction:** When Gemini sees a finished product as style_ref during extraction, it reproduces the style_ref instead of extracting from source. Mood/lighting references don't have this problem.
+
+#### Workflow: Reference for Lifestyle
+
 ```
-[2 images: "make it look like this" pointing to first]
+[2 images: "make it look like this" + product]
       |
       v
-[visual_analyst] -> Identify which is reference
+[visual_analyst] -> Identify reference vs product
    "Image 1: Reference/inspiration (lifestyle setting, warm lighting)
     Image 2: Actual product to process"
       |
       v
-[Standard workflow for Image 2, but creative gets reference context]
+[Standard workflow for product image]
       |
       v
 [creative_specialist]:
@@ -1473,6 +1488,30 @@ For CATALOG domain."
     Source product at: [actual_product_path]
     Style reference at: [reference_path] - Use as style_ref label to match mood/atmosphere.
     For LIFESTYLE domain."
+```
+
+#### Workflow: Reference for Batch Catalog
+
+```
+[Reference polished shot + multi-product source image]
+      |
+      v
+[visual_analyst] -> Identify reference and count products
+   "Image 1: Reference hero shot (polished, professional catalog style)
+    Image 2: 9 product variants to extract"
+      |
+      v
+[Standard workflow for product image]
+      |
+      v
+[creative_specialist]:
+   "Extract catalog variants from source.
+    Source image at: [multi_product_path]
+    Style reference at: [reference_path] - VIEW this image to understand the desired
+    style, then DESCRIBE that style in text for your batch consistency specs.
+    Do NOT pass as style_ref label - extract style as text instead.
+    Use View-Then-Describe pattern from multi_item_image protocol.
+    For CATALOG domain."
 ```
 
 ---

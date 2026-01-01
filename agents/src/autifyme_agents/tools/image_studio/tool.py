@@ -107,10 +107,10 @@ Each image has a label indicating its ROLE:
   - Source may be messy/cluttered - your job is to extract and improve
   - Output must be THIS SPECIFIC PRODUCT with improved presentation
 
-[style_ref], [mood_ref] = ATMOSPHERE REFERENCE (for lifestyle/scene generation)
+[style_ref], [mood_ref] = STYLE/ATMOSPHERE REFERENCE
   - Match its lighting quality, color temperature, mood
-  - Use for scene generation where you CREATE the environment
-  - NOT for batch extraction - don't copy this product, copy its STYLE
+  - Copy the STYLE and atmosphere, not the specific products shown
+  - Do NOT extract products from this image - it defines style only
 
 [background] = SCENE/ENVIRONMENT REFERENCE
 
