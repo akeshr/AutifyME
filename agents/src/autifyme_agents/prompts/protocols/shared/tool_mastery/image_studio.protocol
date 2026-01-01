@@ -48,6 +48,9 @@ image_studio(
 - [ ] `extraction.target_description` specific enough to identify THE item?
 - [ ] `material_treatment` specified for glass/metal/reflective surfaces?
 - [ ] `fidelity` included when processing source product images?
+- [ ] `focus` specified (deep for catalog, shallow for lifestyle)?
+- [ ] `enhancement` included for sharpness/contrast control?
+- [ ] `output.filename` specified for predictable output path?
 - [ ] Label references (`[source]`, `[style_ref]`) used in spec values?
 
 **Remember:** The tool is your brush. You must tell it exactly what to paint, every time.
@@ -102,11 +105,18 @@ Use what applies to your use case:
 ```json
 {
   "target_description": "glass jar on left in [source]",
+  "position_hint": "left side of frame",
   "isolation": "complete",
-  "edge_treatment": "sharp"
+  "edge_treatment": "sharp",
+  "custom": "preserve reflection under jar"
 }
 ```
 Purpose: Extract product from messy background.
+- `target_description`: REQUIRED - what to extract, reference [source] label
+- `position_hint`: Where in frame (left, center, foreground, etc.)
+- `isolation`: How complete (complete, soft with shadow, with context)
+- `edge_treatment`: Edge quality (surgical, natural soft, feathered)
+- `custom`: Special extraction needs
 
 ### background
 
@@ -114,106 +124,189 @@ Purpose: Extract product from messy background.
 {
   "treatment": "transparent | solid_color | scene",
   "color": "white",
-  "scene_description": "modern kitchen counter"
+  "scene_description": "modern kitchen counter",
+  "custom": "soft vignette at edges"
 }
 ```
 Purpose: Set the background after extraction or for compositing.
+- `treatment`: Type (transparent, solid_color, gradient, scene, blur of original)
+- `color`: Color value (#FFFFFF, warm cream, brand blue)
+- `scene_description`: For scene backgrounds - describe environment
+- `custom`: Special background effects
 
 ### lighting
 
 ```json
 {
   "type": "natural_window | studio_3point",
-  "direction": "front | side | top",
+  "direction": "front | side | 45 degrees camera-left",
+  "quality": "soft diffused | hard specular",
+  "color_temperature": "neutral daylight 5500K | warm 3200K",
+  "shadows": "soft natural falloff | hard dramatic",
   "special_requirements": "match [style_ref]"
 }
 ```
 Purpose: Control lighting style and direction.
+- `type`: Lighting setup (natural window, studio 3-point, rim, Rembrandt)
+- `direction`: Where light comes from (45 degrees left, directly above, behind for rim)
+- `quality`: Light character (soft diffused, hard specular, wraparound)
+- `color_temperature`: Warmth (5500K neutral, 3200K warm, cool blue)
+- `shadows`: Shadow treatment (soft falloff, no shadows, hard dramatic)
+- `special_requirements`: Special needs (match [style_ref], rim for glass edge)
 
 ### composition
 
 ```json
 {
-  "position": "center | [main] center [variant] right",
-  "camera_angle": "slight_top | eye_level | three_quarter",
-  "negative_space": "generous_top | balanced"
+  "product_coverage": "80% frame | 60% with breathing room",
+  "position": "centered | rule of thirds left",
+  "camera_angle": "slight_top | eye_level | 45 degree hero",
+  "negative_space": "generous_top for text | balanced all sides",
+  "crop_instruction": "crop to product bounds with 10% padding"
 }
 ```
 Purpose: Control framing and arrangement.
+- `product_coverage`: How much frame product occupies (80%, 60% with room)
+- `position`: Where in frame (centered, rule of thirds, offset right)
+- `camera_angle`: Viewing angle (eye level, 45 degree hero, top-down flat lay)
+- `negative_space`: Empty space usage (top for text, balanced, tight)
+- `crop_instruction`: Specific cropping (to bounds + padding, maintain original)
 
 ### scene
 
 ```json
 {
-  "environment": "modern_kitchen | outdoor_garden",
-  "style": "match [style_ref]",
-  "mood": "warm_inviting | clean_minimal"
+  "environment": "modern minimalist kitchen | outdoor garden patio",
+  "style": "match [style_ref] | Scandinavian clean",
+  "mood": "warm and inviting | fresh and energetic",
+  "time_of_day": "bright morning light | golden hour warmth",
+  "props_and_context": "fresh herbs and cutting board nearby | none"
 }
 ```
 Purpose: Lifestyle scene generation.
+- `environment`: Setting (modern kitchen, living room, outdoor patio)
+- `style`: Visual style (modern minimalist, warm rustic, match [style_ref])
+- `mood`: Emotional atmosphere (warm inviting, calm serene, professional)
+- `time_of_day`: Lighting context (morning light, golden hour, soft afternoon)
+- `props_and_context`: Supporting elements (coffee cup, fresh herbs, none)
 
 ### placement
 
 ```json
 {
-  "position": "place [product] on marble counter",
-  "scale": "prominent | natural"
+  "position": "place [product] on marble counter, left third",
+  "scale": "dominant hero | balanced with environment",
+  "surface": "white marble countertop | rustic wood table",
+  "interaction": "casting natural shadow | reflected on glossy surface"
 }
 ```
 Purpose: Position product in scene.
+- `position`: Where product goes (on counter left third, centered, being held)
+- `scale`: How prominent (dominant hero, balanced, contextual part of scene)
+- `surface`: What product sits on (marble, wood, glass shelf, floating)
+- `interaction`: How product relates to scene (shadow, reflection, surrounded by props)
 
 ### material_treatment
 
 ```json
 {
-  "primary_material": "clear_glass | metal | plastic",
-  "rendering_notes": "preserve caustics and internal reflections"
+  "primary_material": "clear glass | frosted glass | brushed metal | matte plastic",
+  "rendering_notes": "preserve caustics and internal reflections",
+  "preserve_details": "label legibility critical | embossed logo must be visible"
 }
 ```
 Purpose: Material-specific rendering instructions.
+- `primary_material`: Main material (clear glass, frosted glass, brushed metal, matte plastic)
+- `rendering_notes`: How to treat (glass: caustics + edge refraction, metal: gradient reflections)
+- `preserve_details`: Critical details (label legibility, embossed logo, texture)
 
 ### fidelity (CRITICAL for source images)
 
 ```json
 {
-  "preserve_colors": "true product colors (fix color cast)",
-  "preserve_artwork": "bee mascot - same design",
-  "hero_features": "texture pattern is key differentiator"
+  "preserve_colors": "true product colors - remove yellow cast from tungsten",
+  "preserve_artwork": "bee mascot - same pose, same expression, same details",
+  "preserve_text": "Wildflower Honey 500ml - sharpen but exact wording and font",
+  "preserve_texture": "honeycomb embossed pattern - sharpen, same design",
+  "preserve_shape": "true jar shape - fix any wide-angle distortion",
+  "hero_features": "texture pattern is key differentiator - must be visible and sharp"
 }
 ```
 Purpose: FIX photography problems, PRESERVE product identity. Always include when processing [source]/[product].
+- `preserve_colors`: True product colors (fix color cast, don't generate)
+- `preserve_artwork`: Exact graphics/prints (sharpen, don't regenerate)
+- `preserve_text`: Exact labels/text (sharpen, same font/words)
+- `preserve_texture`: Actual surface texture (enhance visibility, same pattern)
+- `preserve_shape`: Real proportions (fix lens distortion)
+- `hero_features`: 1-3 features that DEFINE this product (must be visible and sharp)
 
 ### enhancement
 
 ```json
 {
-  "sharpness": "tack_sharp",
-  "color_treatment": "vibrant | natural | desaturated"
+  "sharpness": "tack sharp | subtle | crisp on product soft on background",
+  "contrast": "subtle lift | medium punch | flat for flexibility",
+  "color_treatment": "accurate to source | vibrant | natural",
+  "detail_enhancement": "enhance label text legibility | bring out texture detail",
+  "cleanup": "remove dust and scratches | clean up reflections | none"
 }
 ```
 Purpose: Post-processing enhancements.
+- `sharpness`: Sharpening level (tack sharp, subtle, product sharp background soft)
+- `contrast`: Contrast adjustment (subtle lift, medium punch, S-curve for pop)
+- `color_treatment`: Color handling (accurate to source for products, vibrant, natural)
+- `detail_enhancement`: Specific improvements (label legibility, texture detail, shadow recovery)
+- `cleanup`: Retouching (remove dust, clean reflections, none for authentic)
+
+### focus
+
+```json
+{
+  "focus_point": "product center | front label | closest edge to camera",
+  "depth_of_field": "shallow - product sharp, background bokeh | deep - everything sharp",
+  "falloff": "gradual natural | sharp subject soft everything else"
+}
+```
+Purpose: Focus and depth of field control.
+- `focus_point`: Where to focus (product center, front label, logo, entire product)
+- `depth_of_field`: DOF treatment (shallow with bokeh, deep all sharp, medium)
+- `falloff`: How sharpness falls off (gradual natural, sharp cutoff, front-to-back)
 
 ### custom_spec
 
 ```json
 {
   "instruction": "dramatic shot with water droplets",
-  "style_reference": "Apple product photography"
+  "style_reference": "Apple product photography",
+  "color_palette": "muted earth tones with pops of teal",
+  "texture_overlay": "subtle film grain",
+  "special_effect": "product emerging from liquid splash",
+  "artistic_intent": "evoke nostalgia and warmth"
 }
 ```
-Purpose: Fully open-ended creative direction.
+Purpose: Fully open-ended creative direction for OOTB ideas.
+- `instruction`: Primary creative idea
+- `style_reference`: Reference style/photographer/aesthetic
+- `color_palette`: Custom color treatment beyond standard specs
+- `texture_overlay`: Texture or grain effects
+- `special_effect`: Special visual effects
+- `artistic_intent`: Emotional or conceptual goal
 
 ### output
 
 ```json
 {
-  "format": "png | jpeg | webp",
-  "size": "1K | 2K",
-  "aspect_ratio": "1:1 | 16:9 | 4:3",
+  "format": "PNG | JPEG | WEBP",
+  "size": "1K | 2K | 4K",
+  "aspect_ratio": "1:1 | 4:5 | 9:16 | 16:9 | original",
   "filename": "product_hero"
 }
 ```
 Purpose: Output specifications.
+- `format`: File format (PNG for transparency, JPEG for web, WEBP for modern)
+- `size`: Resolution (1K, 2K, 4K)
+- `aspect_ratio`: Dimensions (1:1 catalog, 4:5 Instagram, 9:16 stories, 16:9 banner)
+- `filename`: **IMPORTANT** - Specify to know exact output path. Without it, UUID is generated.
 
 ---
 
@@ -251,12 +344,16 @@ image_studio(
         {"path": "inbox/t/product.jpg", "label": "product"},
         {"path": "inbox/t/mood.jpg", "label": "style_ref"}
     ],
-    scene={"environment": "modern kitchen", "style": "match [style_ref]"},
-    placement={"position": "place [product] on counter"},
-    lighting={"type": "natural_window", "special_requirements": "match [style_ref]"}
+    scene={"environment": "modern kitchen", "style": "match [style_ref]", "time_of_day": "morning light"},
+    placement={"position": "place [product] on counter", "surface": "white marble", "interaction": "natural shadow"},
+    lighting={"type": "natural_window", "color_temperature": "warm 5000K", "special_requirements": "match [style_ref]"},
+    fidelity={"preserve_colors": "true product colors", "hero_features": "label and texture"},
+    focus={"depth_of_field": "shallow - product sharp, background bokeh"},
+    enhancement={"sharpness": "crisp on product", "color_treatment": "accurate to source"},
+    output={"aspect_ratio": "4:5", "filename": "product_lifestyle"}
 )
 ```
-Result: Product in kitchen matching reference mood/lighting.
+Result: Product in kitchen matching reference mood/lighting with shallow DOF.
 
 ### Pattern 4: Product Family Composition
 
@@ -272,19 +369,23 @@ image_studio(
 ```
 Result: Family shot with main product prominent, variant supporting.
 
-### Pattern 5: Hero Shot Enhancement
+### Pattern 5: Hero Shot Enhancement (Complete Catalog)
 
 ```python
 image_studio(
     images=[{"path": "inbox/photo.jpg", "label": "source"}],
-    extraction={"target_description": "product in [source]"},
-    background={"treatment": "solid_color", "color": "#f5f5f5"},
-    lighting={"type": "studio_3point"},
-    material_treatment={"primary_material": "clear_glass"},
-    fidelity={"preserve_colors": "true colors", "hero_features": "key differentiator"}
+    extraction={"target_description": "product in [source]", "edge_treatment": "surgical clean"},
+    background={"treatment": "solid_color", "color": "#ffffff"},
+    lighting={"type": "studio_3point", "shadows": "soft natural falloff"},
+    material_treatment={"primary_material": "clear_glass", "rendering_notes": "preserve caustics"},
+    fidelity={"preserve_colors": "true colors", "preserve_artwork": "label design", "hero_features": "key differentiator"},
+    focus={"depth_of_field": "deep - everything sharp", "focus_point": "entire product"},
+    enhancement={"sharpness": "tack sharp", "color_treatment": "accurate to source"},
+    composition={"product_coverage": "80% frame", "camera_angle": "slight top"},
+    output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1", "filename": "product_hero"}
 )
 ```
-Result: Catalog-ready hero shot, identity preserved.
+Result: Complete catalog-ready hero shot with all specs for maximum quality.
 
 ---
 
@@ -408,6 +509,20 @@ image_studio(
 )
 ```
 
+### Anti-Pattern 3b: Missing Focus Spec
+
+```
+WRONG:
+image_studio(images=[...], ...)
+# Unclear depth of field - may get shallow when you want deep
+
+CORRECT for catalog:
+image_studio(..., focus={"depth_of_field": "deep - everything sharp"})
+
+CORRECT for lifestyle:
+image_studio(..., focus={"depth_of_field": "shallow - product sharp, background bokeh"})
+```
+
 ### Anti-Pattern 4: Simple View When Processing Needed
 
 ```
@@ -430,6 +545,19 @@ Capture storage_path from output
 Use it when creating asset record:
 write_data(..., data={"storage_url": storage_path, ...})
 ```
+
+### Anti-Pattern 5b: Not Specifying output.filename
+
+```
+WRONG:
+image_studio(..., output={"format": "PNG"})
+# Output path is unpredictable UUID
+
+CORRECT:
+image_studio(..., output={"format": "PNG", "filename": "product_hero"})
+# Output path is predictable: pending/product_hero.png
+```
+Always specify filename for predictable paths in view_image and write_data.
 
 ### Anti-Pattern 6: Single Extraction for Multi-Item Image
 

@@ -234,19 +234,25 @@ Would this pass as professional photography in a professional feed?
 For social content, specs depend on sub-type:
 
 **Product-focused social:**
-- Use catalog_visual specs (fidelity, extraction, background)
-- Add composition for platform dimensions
+- Use catalog_visual specs (fidelity, extraction, background, material_treatment)
+- Add composition for platform dimensions (product_coverage, position)
+- Add enhancement (sharpness, contrast for scroll-stopping)
+- output with platform-specific aspect_ratio (1:1 feed, 9:16 stories)
 
 **Lifestyle social:**
-- Use lifestyle_visual specs (scene, placement, mood)
-- Add composition for platform dimensions
+- Use lifestyle_visual specs (scene, placement, lighting)
+- Add focus (shallow DOF for lifestyle feel)
+- Add enhancement (color_treatment for mood)
+- output with platform-specific aspect_ratio
 
 **Data-driven graphics:**
-- custom_spec for data integration
+- custom_spec for data integration (instruction, artistic_intent)
 - composition for platform dimensions
 - Focus on accuracy over aesthetics
 
-**Always:** output with correct platform dimensions.
+**All social content:**
+- output MUST include correct platform dimensions (see Platform Specs above)
+- output.filename for predictable paths
 
 ---
 
