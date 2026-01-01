@@ -1247,7 +1247,7 @@ For CATALOG domain."
 | **Variants** | Visual (all) -> Product (base research + variant dimensions) -> Catalog (variant structure) -> [Approval] -> Creative (all) -> Specialist (N linked products) | 1 visual_analysis, 1 product_research (covers variants), 1 catalog_analysis |
 | **Bulk (different)** | Visual (all, separate findings) -> For each: Product -> Catalog -> [Approval] -> Creative -> Specialist | N visual_analysis files, N product_research files, N catalog_analysis files |
 | **Comparison** | Visual (all) -> Present comparison to user | 1 comparison_analysis |
-| **Reference** | Identify reference; Visual (actual only) -> Product -> Catalog -> Creative (with reference style) -> Specialist | Reference noted in delegation to creative |
+| **Reference** | Identify reference; Visual (actual only) -> Product -> Catalog -> Creative (view reference, describe style) -> Specialist | Reference path noted in delegation for creative to view and describe |
 
 ### Multi-Angle Workflow (1 Product, N Assets)
 
@@ -1465,14 +1465,14 @@ For CATALOG domain."
     Image 2: Actual product to process"
       |
       v
-[Standard workflow for Image 2, but creative gets reference]
+[Standard workflow for Image 2, but creative gets reference context]
       |
       v
 [creative_specialist]:
    "Process product image.
     Source image at: [actual_product_path]
-    STYLE REFERENCE at: [reference_path] - Match this lighting/composition style.
-    ..."
+    Style inspiration at: [reference_path] - VIEW this image to understand the desired
+    lighting/mood, then DESCRIBE that style in text for your custom_spec."
 ```
 
 ---

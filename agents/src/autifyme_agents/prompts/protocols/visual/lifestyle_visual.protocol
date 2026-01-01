@@ -239,22 +239,23 @@ These work TOGETHER to create the final image.
 
 ---
 
-## STYLE REFERENCES
+## STYLE DIRECTION
 
-When PM provides style reference images, MATCH their essence:
+PM provides style direction via TEXT descriptions, not reference images.
 
-**What to match:**
-- Light quality and direction
-- Color temperature
-- Mood and atmosphere
-- Level of minimalism/richness
+**Capture style through specs:**
+- `scene.style`: Visual aesthetic ("warm minimalist", "industrial chic")
+- `scene.mood`: Emotional atmosphere ("cozy morning", "aspirational luxury")
+- `lighting.type` + `color_temperature`: Light quality ("natural_window", "warm 3200K")
+- `custom_spec.instruction`: Detailed creative direction
 
-**What NOT to copy:**
-- Exact composition
-- Specific props
-- Literal recreation
+**What to achieve:**
+- Light quality and direction matching the described mood
+- Color temperature appropriate to the scene
+- Atmosphere that evokes the intended feeling
+- Level of minimalism/richness per the style description
 
-Style references guide the FEELING, not the specifics.
+**The goal:** Translate text description into visual essence.
 
 ---
 

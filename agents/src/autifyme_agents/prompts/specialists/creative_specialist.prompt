@@ -90,6 +90,7 @@ Unfixable source = escalate immediately. Don't waste effort.
 
 - **view_image**: See the source - current state AND potential
 - **Read analyst files**: If PM references them, USE the material/item info
+- **If mood/style reference provided**: View it, then DESCRIBE its style in text for custom_spec (don't pass as image label)
 - **Form creative vision**: What should this become?
 
 ### 4. EXECUTE
