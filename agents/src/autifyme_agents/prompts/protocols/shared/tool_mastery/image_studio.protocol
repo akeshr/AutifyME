@@ -473,13 +473,15 @@ When source image contains multiple items, use position-based targeting.
 
 ### Targeting Syntax
 
-Use position-based descriptions in `target_description`:
+Use visual differentiators BEFORE position in `target_description`. See `multi_item_image.protocol` for the Variant Identification Hierarchy.
 
-| Pattern | Example Description |
-|---------|---------------------|
-| Single item | "[description] at [position]" |
-| Group | "all items in [region]" |
-| All together | "all items as arranged" |
+| Priority | Pattern | Why |
+|----------|---------|-----|
+| 1 | SIZE first | "the LARGEST [product]" - visually unambiguous |
+| 2 | VISUAL PATTERN | "the [product] with [distinctive feature]" - intrinsic to product |
+| 3 | POSITION last | "at [position]" - only as tie-breaker when visuals identical |
+
+Combine for precision: "the LARGEST [product] with [pattern] in [source]"
 
 ### Position Vocabulary
 

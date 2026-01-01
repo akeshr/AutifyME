@@ -345,19 +345,23 @@ Visual identifiers (print names, colors) are more reliable than spatial position
 When creating base assets for multiple variants, ALL outputs must appear from the SAME photoshoot.
 
 **The Problem:**
-Each image_studio call is independent. Without explicit consistency enforcement, outputs will have:
+Each image_studio call is independent AND Gemini is non-deterministic - even identical specs produce slightly different outputs. Without explicit consistency enforcement, outputs will have:
 - Different camera angles
 - Different lighting directions
 - Different framing/coverage
 - Result: Unusable as a cohesive set
 
-**The Solution: Style Anchor + Explicit Matching**
+**The Solution: Style Anchor + Style Reference**
 
 1. **Process ONE variant first** - This establishes the "style anchor"
 2. **Verify the anchor** - view_image to confirm quality and style
 3. **For ALL subsequent variants:**
+   - Pass the anchor output as `[style_ref]` image
    - Use IDENTICAL specs (copy the exact same lighting, composition, enhancement)
-   - Add explicit matching instruction in extraction or custom_spec
+   - Add explicit matching instruction: "match exact angle and framing of [style_ref]"
+
+**Why style_ref is essential:**
+Gemini is non-deterministic. Even identical text specs produce different results. Passing the first output AS AN IMAGE gives Gemini a visual target to match, dramatically improving consistency.
 
 **Consistency Specs (must be IDENTICAL across all variants):**
 
@@ -378,7 +382,7 @@ Each image_studio call is independent. Without explicit consistency enforcement,
 - `fidelity.hero_features` - Variant-specific features
 - `output.filename` - Unique per variant
 
-**Grid Test:** Before shipping, mentally arrange all outputs in a grid. Would a customer believe these came from one professional photoshoot?
+**Grid Test (Safety Net, Not Solution):** Before shipping, mentally arrange all outputs in a grid. Would a customer believe these came from one professional photoshoot? If not, REDO outliers with stricter style_ref matching. The style_ref technique prevents most failures; the Grid Test catches what slips through.
 
 ---
 
