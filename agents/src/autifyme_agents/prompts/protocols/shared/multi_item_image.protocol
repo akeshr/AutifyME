@@ -365,6 +365,118 @@ When extraction completes (with or without failures), report structured results:
 
 ---
 
+## BATCH CONSISTENCY WITH STYLE REFERENCE
+
+When processing multiple variants with INDIVIDUAL strategy, all outputs must appear from the SAME photoshoot. This section defines the universal pattern; domain protocols apply it.
+
+### The Problem
+
+Each image generation call is independent AND Gemini is non-deterministic - even identical specs produce slightly different outputs. Without explicit consistency enforcement:
+- Different camera angles across variants
+- Different lighting directions
+- Different framing/coverage
+- Result: Unusable as a cohesive set
+
+### The Solution: Style Anchor + Style Reference
+
+**Style_ref is ALWAYS used for batch processing. This is not optional.**
+
+```
+1. SELECT ANCHOR - Choose representative variant (see Anchor Selection below)
+2. GENERATE ANCHOR - Process ONE variant with full specs
+3. WRITE ANCHOR - Triggers HITL approval automatically
+   (User feedback on anchor gets baked into ALL subsequent variants)
+4. BATCH REMAINING - For each remaining variant:
+   - Pass approved anchor as [style_ref] image
+   - Use IDENTICAL specs (lighting, composition, enhancement)
+   - Add instruction: "match exact angle and framing of [style_ref]"
+5. GRID TEST - Verify consistency before shipping
+```
+
+### Anchor Selection (Reasoning, Not Rules)
+
+**Evaluate candidates against these criteria:**
+
+| Criterion | Why It Matters |
+|-----------|----------------|
+| **Sharp in source** | Blurry anchor = blurry reference for Gemini |
+| **Well-lit in source** | Shadows/darkness in anchor propagates to copies |
+| **Shows full features** | Partial visibility limits what Gemini can match |
+| **Representative proportions** | Extreme sizes may not transfer well to others |
+
+**Heuristics when criteria are equal:**
+- Size variants: Prefer MEDIUM (transfers well to both larger and smaller)
+- Design variants (same size): Prefer the "hero" or most common variant
+- Mixed: Combine both (medium size of hero design)
+
+**Never rigid rules.** Reason about which variant makes the best visual reference.
+
+### User Communication Template
+
+When presenting anchor for approval, communicate context:
+
+```
+"Here's the first variant ([variant name]). Once approved, I'll apply
+this exact angle, lighting, and framing to the remaining [N] variants.
+
+Please review the PHOTOGRAPHIC STYLE specifically:
+- Camera angle acceptable?
+- Lighting direction/shadows acceptable?
+- Framing/coverage acceptable?
+
+Product-specific feedback also welcome - will be applied to all."
+```
+
+This ensures user knows:
+- This is an anchor, not just one output
+- Approval commits to a style for the batch
+- What specifically to evaluate
+
+### Style_ref Limitations (Honest Acknowledgment)
+
+Style_ref IMPROVES consistency but does NOT GUARANTEE it:
+
+| Limitation | Reality |
+|------------|---------|
+| Extreme size differences | 50ml vs 500ml have different proportions - some variation unavoidable |
+| Complex products | Intricate details may render differently |
+| Gemini interpretation | "Match angle" is interpreted, not measured |
+
+**Grid Test is ESSENTIAL verification, not optional safety net.**
+
+### Recovery Steps for Grid Test Failures
+
+When Grid Test reveals inconsistent outputs:
+
+| Retry | Action | Rationale |
+|-------|--------|-----------|
+| **1st** | Add explicit angle specs | "exact 15-degree top-down, shadows falling left, product fills 70% of frame" |
+| **2nd** | Use DIFFERENT anchor | Maybe this variant is incompatible with the original anchor |
+| **3rd** | Accept partial variation | Report to user: "Variant X resists consistency due to [size difference/complexity]. Recommend separate photoshoot treatment." |
+
+**Never infinite retry.** Three attempts, then escalate with diagnosis.
+
+### Consistency Specs (Must Be IDENTICAL)
+
+| Spec | Why Identical |
+|------|---------------|
+| `composition.camera_angle` | Same viewing angle for all |
+| `composition.product_coverage` | Same framing percentage |
+| `lighting.type` | Same lighting setup |
+| `lighting.direction` | Shadows fall same direction |
+| `lighting.shadows` | Same shadow treatment |
+| `enhancement` | Same post-processing |
+| `output.aspect_ratio` | Same dimensions |
+| `output.size` | Same resolution |
+| `focus` | Same depth of field |
+
+**What CAN differ:**
+- `extraction.target_description` - Different for each variant
+- `fidelity.hero_features` - Variant-specific features
+- `output.filename` - Unique per variant
+
+---
+
 ## DOMAIN APPLICATION
 
 This protocol provides the PATTERN. Domain-specific protocols provide the VOCABULARY:

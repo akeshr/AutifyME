@@ -342,53 +342,24 @@ Visual identifiers (print names, colors) are more reliable than spatial position
 
 ### Batch Consistency Doctrine (MANDATORY for variant sets)
 
-When creating base assets for multiple variants, ALL outputs must appear from the SAME photoshoot.
+**See `multi_item_image.protocol` > BATCH CONSISTENCY WITH STYLE REFERENCE for the complete pattern.**
 
-**The Problem:**
-Each image_studio call is independent AND Gemini is non-deterministic - even identical specs produce slightly different outputs. Without explicit consistency enforcement, outputs will have:
-- Different camera angles
-- Different lighting directions
-- Different framing/coverage
-- Result: Unusable as a cohesive set
+This section adds catalog-specific application:
 
-**The Solution: Style Anchor + Approval Gate + Style Reference**
+**Catalog-Specific Anchor Selection:**
+- For product size variants: Prefer MEDIUM (best balance for e-commerce grids)
+- For design variants: Prefer the bestseller or hero SKU
+- Quality check: Anchor must be sharp and well-lit in source image
 
-1. **Select anchor variant** - Default to MEDIUM size (transfers well to larger/smaller) or PM-specified
-2. **Process ONE variant first** - This establishes the "style anchor"
-3. **Write the anchor** - write_data triggers HITL approval automatically
-   - User approves -> proceed to step 4
-   - User rejects with feedback -> iterate on anchor until approved
-4. **For ALL subsequent variants:**
-   - Pass the approved anchor as `[style_ref]` image
-   - Use IDENTICAL specs (copy the exact same lighting, composition, enhancement)
-   - Add explicit matching instruction: "match exact angle and framing of [style_ref]"
+**Catalog-Specific Grid Test:**
+Before shipping base assets, verify: "Would these display correctly in a product listing grid where customers compare variants side-by-side?"
 
-**Why approval gate matters:**
-One wrong anchor = N wrong copies. Approval BEFORE batch processing catches issues early, saves resources, and ensures user feedback is baked into all variants.
-
-**Why style_ref is essential:**
-Gemini is non-deterministic. Even identical text specs produce different results. Passing the approved anchor AS AN IMAGE gives Gemini a visual target to match, dramatically improving consistency.
-
-**Consistency Specs (must be IDENTICAL across all variants):**
-
-| Spec | Why Identical |
-|------|---------------|
-| `composition.camera_angle` | Same viewing angle for all |
-| `composition.product_coverage` | Same framing percentage |
-| `lighting.type` | Same lighting setup |
-| `lighting.direction` | Shadows fall same direction |
-| `lighting.shadows` | Same shadow treatment |
-| `enhancement` | Same post-processing |
-| `output.aspect_ratio` | Same dimensions |
-| `output.size` | Same resolution |
-| `focus` | Same depth of field |
-
-**What CAN differ:**
-- `extraction.target_description` - Different for each variant
-- `fidelity.hero_features` - Variant-specific features
-- `output.filename` - Unique per variant
-
-**Grid Test (Safety Net, Not Solution):** Before shipping, mentally arrange all outputs in a grid. Would a customer believe these came from one professional photoshoot? If not, REDO outliers with stricter style_ref matching. The style_ref technique prevents most failures; the Grid Test catches what slips through.
+**Base Asset Implications:**
+These are REUSABLE assets for future campaigns. Consistency investment pays off across:
+- E-commerce listings
+- Social media variants
+- Marketing collateral
+- Print catalogs
 
 ---
 
