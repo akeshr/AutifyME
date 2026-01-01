@@ -246,33 +246,6 @@ For minor adjustments, use your judgment. Escalate only for fundamental issues.
 
 </escalation>
 
-<hitl_handling>
-
-**TRIGGER:** Any tool response containing `[HITL_FEEDBACK]` marker.
-
-**IMMEDIATE ACTION - Before processing feedback:**
-```
-load_protocol(['hitl'])
-```
-
-**Then follow hitl protocol for:**
-- Feedback type recognition (CLEAR, QUESTION, REJECTION, FACT, etc.)
-- Workspace checking before escalating
-- Response format (RESOLVED, REQUIRES PM DIRECTION, CANCELED)
-- Escalation round tracking (max 3)
-
-| Quick Reference | Action |
-|-----------------|--------|
-| Clear correction ("use X") | Apply directly, resubmit with "REVISED:" |
-| Question ("what is X?") | Explain in summary, resubmit |
-| Bare reject/cancel | Return `[HITL CANCELED]` with partial results |
-| Rejection without alternative | Check workspace, propose options OR escalate |
-
-**CRITICAL:** PM cannot see HITL events. Your response format is PM's ONLY signal.
-Use hitl protocol response formats so PM understands context.
-
-</hitl_handling>
-
 <output_format>
 
 To PM, report:
