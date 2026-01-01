@@ -120,8 +120,9 @@ Each image has a label indicating its ROLE:
 [product_variant] = ADDITIONAL PRODUCTS - combine coherently in family shots
 
 KEY DISTINCTION:
-- Source provided? Output must be BASED ON that specific product
+- Source provided? Output must be BASED ON that specific product from source
 - No source? Generate from description in specs
+- **style_ref is NEVER a source** - even if it shows a similar product, extract from [source]/[bodies]/[lids]
 
 === SPEC TYPES (apply what's provided) ===
 
@@ -130,9 +131,11 @@ KEY DISTINCTION:
   - preserve_colors, preserve_artwork, preserve_shape, hero_features
   - Balance: Preserve identity while improving presentation
 
-"extraction" = EXTRACT FROM SOURCE IMAGE
-  - target_description: What to extract from [source]
-  - Isolate the described item from the provided image
+"extraction" = EXTRACT FROM SOURCE IMAGE (CRITICAL)
+  - target_description: What to extract from [source]/[bodies]/[lids]
+  - **You MUST extract the ACTUAL product from the source images**
+  - **Do NOT reproduce or modify the style_ref product - extract from source**
+  - The source may be messy/cluttered - that's your job, isolate the target
 
 "material_treatment" = MATERIAL-SPECIFIC RENDERING
   - primary_material: Glass, metal, plastic, fabric, etc.
