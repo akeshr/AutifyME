@@ -381,99 +381,92 @@ Each image generation call is independent AND Gemini is non-deterministic. Witho
 
 ```
 1. SELECT ANCHOR - Choose representative variant (see Anchor Selection below)
+   - If NO variant is suitable: ESCALATE (can't build batch on poor anchor)
 2. GENERATE ANCHOR - Process ONE variant with full specs, record specs used
 3. VIEW ANCHOR - Use view_image to see the result
-4. EXTRACT STYLE SPECS - Describe what you see in precise terms:
-   - Camera angle (e.g., "eye-level, 0 degrees")
-   - Lighting (e.g., "3-point studio, soft shadow bottom-right")
-   - Framing (e.g., "80% frame coverage, centered")
-   - Background (e.g., "pure white, contact shadow")
-5. WRITE ANCHOR - Triggers HITL approval (feedback refines style specs)
+4. EXTRACT STYLE SPECS - Describe what you see in precise terms
+5. PRESENT ANCHOR - write_data with style specs (triggers HITL)
+   - User approves image quality AND style for entire batch
 6. BATCH REMAINING - For each remaining variant:
-   - Use IDENTICAL base specs (lighting, composition, enhancement)
-   - Add style specs as TEXT in custom_spec
-7. GRID TEST - Verify consistency before shipping
+   - Use IDENTICAL structured specs (lighting, composition, enhancement)
+   - Add custom_spec.instruction to REINFORCE consistency
+7. GRID TEST - View all outputs, verify visual consistency
 ```
 
 ### Style Spec Extraction
 
-After viewing anchor, document these:
+After viewing anchor, document:
 
 | Spec | What to Describe | Example |
 |------|------------------|---------|
-| Camera | Angle, perspective | "eye-level, perfectly upfront (0 degrees)" |
-| Lighting | Setup, shadow direction | "3-point studio, soft shadow bottom-right" |
-| Framing | Coverage, position | "80% frame coverage, product centered" |
-| Background | Treatment, grounding | "pure white, soft contact shadow" |
-| Enhancement | Sharpness, color | "tack sharp, true-to-source colors" |
+| Camera | Angle, perspective | "eye-level, 0 degrees" |
+| Lighting | Setup, shadow direction | "3-point studio, shadow bottom-right" |
+| Framing | Coverage, position | "80% frame, centered" |
+| Background | Treatment, grounding | "pure white, contact shadow" |
+| Enhancement | Sharpness, color | "tack sharp, true colors" |
 
-### Using Style Specs in Subsequent Calls
+### HITL Anchor Approval
 
-Add to custom_spec as explicit text instruction:
+**What user approves:**
+- Image quality (good enough?)
+- Style for batch (this angle/lighting for ALL variants?)
+
+**If user REJECTS:**
+1. Ask what's wrong
+2. Adjust specs based on feedback
+3. Regenerate and re-present
+
+**If user APPROVES:** Proceed with locked style.
+
+### Batch with Consistency
+
+**Structured specs** = WHAT to generate.
+**custom_spec.instruction** = REINFORCE consistency.
 
 ```
 custom_spec: {
-  instruction: "Apply these EXACT style specs from the approved anchor:
-    Camera: eye-level, perfectly upfront (0 degrees)
-    Lighting: 3-point studio, soft shadow falling bottom-right
-    Framing: 80% frame coverage, centered
-    Background: pure white with soft contact shadow
-    The output must look like it came from the same photoshoot."
+  instruction: "Match the approved anchor EXACTLY:
+    Camera: eye-level, 0 degrees
+    Lighting: 3-point studio, shadow bottom-right
+    Framing: 80% frame, centered
+    Same photoshoot appearance."
 }
 ```
 
-### Anchor Selection (Reasoning, Not Rules)
+### Grid Test (Concrete Method)
 
-**Evaluate candidates against these criteria:**
+After generating all variants:
+1. View each output
+2. Check: Same aspect ratio? Same coverage? Shadows same direction?
+3. Ask: "Side-by-side, would these look like one photoshoot?"
+4. If outlier: REDO with more explicit style specs
 
-| Criterion | Why It Matters |
-|-----------|----------------|
-| **Sharp in source** | Blurry source = harder extraction |
-| **Well-lit in source** | Shadows/darkness in source affects quality |
-| **Shows full features** | Partial visibility limits accuracy |
-| **Representative proportions** | Extreme sizes may have different optimal angles |
+### Anchor Selection
 
-**Heuristics when criteria are equal:**
-- Size variants: Prefer MEDIUM (middle ground for all)
-- Design variants (same size): Prefer the "hero" or most common variant
-- Mixed: Combine both (medium size of hero design)
+| Criterion | If Not Met |
+|-----------|------------|
+| Sharp in source | Try different variant |
+| Well-lit in source | Try different variant |
+| Shows full features | Try different variant |
+| **ALL fail** | **ESCALATE to PM** |
 
-### User Communication
+**Heuristics when equal:**
+- Size variants: Prefer MEDIUM
+- Design variants: Prefer hero/bestseller
 
-When presenting anchor, communicate:
-- This is the style anchor for batch processing
-- User should review photographic style (angle, lighting, framing)
-- Approval commits this style to all remaining variants
-- Provide the extracted style specs for transparency
+### Consistency Specs (IDENTICAL)
 
-### Recovery Steps for Grid Test Failures
+`composition.camera_angle`, `composition.product_coverage`, `lighting.*`, `enhancement`, `output.aspect_ratio`, `output.size`, `focus`
 
-| Retry | Action | Rationale |
-|-------|--------|-----------|
-| **1st** | Make style specs MORE explicit | Add numeric values, be more precise |
-| **2nd** | Use DIFFERENT anchor | Maybe this variant's specs don't transfer well |
-| **3rd** | Accept partial variation | Escalate: "Variant X resists consistency due to [reason]" |
+**What CAN differ:** `extraction.target_description`, `fidelity.hero_features`, `output.filename`
 
-**Never infinite retry.** Three attempts, then escalate with diagnosis.
+### Recovery (3 attempts max)
 
-### Consistency Specs (Must Be IDENTICAL)
-
-| Spec | Why Identical |
-|------|---------------|
-| `composition.camera_angle` | Same viewing angle for all |
-| `composition.product_coverage` | Same framing percentage |
-| `lighting.type` | Same lighting setup |
-| `lighting.direction` | Shadows fall same direction |
-| `lighting.shadows` | Same shadow treatment |
-| `enhancement` | Same post-processing |
-| `output.aspect_ratio` | Same dimensions |
-| `output.size` | Same resolution |
-| `focus` | Same depth of field |
-
-**What CAN differ:**
-- `extraction.target_description` - Different for each variant
-- `fidelity.hero_features` - Variant-specific features
-- `output.filename` - Unique per variant
+| Attempt | Action |
+|---------|--------|
+| 1st | More explicit style specs |
+| 2nd | Different anchor variant |
+| 3rd | Escalate with diagnosis |
 
 ---
 

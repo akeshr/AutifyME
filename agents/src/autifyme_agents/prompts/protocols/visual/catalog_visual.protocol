@@ -362,66 +362,98 @@ Each image_studio call is independent AND Gemini is non-deterministic. Without c
 
 ```
 1. SELECT ANCHOR - Choose variant that is sharp, well-lit, shows full features in source
+   - If NO variant is suitable: ESCALATE immediately (can't build batch on poor anchor)
 2. GENERATE ANCHOR - Process ONE variant with full specs, record the specs used
 3. VIEW ANCHOR - Use view_image to see the result
-4. EXTRACT STYLE SPECS - Describe what you see in precise, measurable terms:
-   - Camera angle (e.g., "perfectly upfront eye-level, 0 degrees")
-   - Lighting (e.g., "3-point studio, soft shadows falling bottom-right")
-   - Framing (e.g., "product fills 80% frame, centered")
-   - Background (e.g., "pure white, soft contact shadow")
-5. WRITE ANCHOR - Triggers HITL approval (user feedback refines style specs)
+4. EXTRACT STYLE SPECS - Describe what you see in precise, measurable terms
+5. PRESENT ANCHOR - write_data with style specs in description (triggers HITL)
+   - User approves BOTH: image quality AND style for batch
+   - Include extracted style specs so user knows what they're committing to
 6. BATCH REMAINING - For each remaining variant:
-   - Use IDENTICAL base specs (lighting, composition, enhancement)
-   - Add extracted style specs to custom_spec as explicit text
-7. GRID TEST - Verify consistency before shipping
+   - Use IDENTICAL structured specs (lighting, composition, enhancement)
+   - Add custom_spec.instruction with style specs to REINFORCE consistency
+7. GRID TEST - View all outputs, verify visual consistency
 ```
 
-**Style Spec Extraction Template:**
+### Step 4: Style Spec Extraction
 
 After viewing anchor, document:
 ```
-ANCHOR STYLE SPECS (for subsequent variants):
-- Camera: [angle description, e.g., "eye-level, perfectly upfront (0 degrees)"]
-- Lighting: [setup + shadow direction, e.g., "3-point studio, soft shadow bottom-right"]
-- Framing: [coverage + position, e.g., "80% frame coverage, centered"]
-- Background: [treatment + shadow, e.g., "pure white, soft contact shadow grounding"]
-- Enhancement: [sharpness + color, e.g., "tack sharp, true-to-source colors"]
+ANCHOR STYLE SPECS:
+- Camera: [e.g., "eye-level, 0 degrees, perfectly upfront"]
+- Lighting: [e.g., "3-point studio, soft shadow bottom-right"]
+- Framing: [e.g., "80% frame, centered"]
+- Background: [e.g., "pure white, soft contact shadow"]
+- Enhancement: [e.g., "tack sharp, true colors"]
 ```
 
-**Using Style Specs in Subsequent Calls:**
+### Step 5: HITL Anchor Approval
+
+**What user sees:** The anchor image + your extracted style specs.
+
+**What user approves:**
+- Image quality (is this good enough?)
+- Style for batch (this angle/lighting/framing for ALL variants?)
+
+**If user REJECTS:**
+1. Ask what's wrong (quality? angle? lighting?)
+2. Adjust specs based on feedback
+3. Regenerate anchor with new specs
+4. Re-present for approval
+
+**If user APPROVES:** Proceed to batch with locked style.
+
+### Step 6: Batch with Consistency
+
+**Structured specs** define WHAT to generate (lighting.type, composition.camera_angle).
+**custom_spec.instruction** REINFORCES consistency ("match the anchor exactly").
+
+Both work together - structured specs set the parameters, custom_spec adds the "same photoshoot" constraint.
 
 ```
 custom_spec: {
-  instruction: "Apply these EXACT style specs from the approved anchor:
-    Camera: eye-level, perfectly upfront (0 degrees)
-    Lighting: 3-point studio, soft shadow falling bottom-right
-    Framing: 80% frame coverage, centered
-    Background: pure white with soft contact shadow
-    The output must look like it came from the same photoshoot as the anchor."
+  instruction: "Match the approved anchor EXACTLY:
+    Camera: eye-level, 0 degrees
+    Lighting: 3-point studio, shadow bottom-right
+    Framing: 80% frame, centered
+    This must look like the same photoshoot."
 }
 ```
 
-**Anchor Selection (for catalog):**
-- Size variants: Prefer MEDIUM (transfers well to larger/smaller)
-- Design variants: Prefer the hero/bestseller SKU
-- Quality: Must be sharp and well-lit in source
+### Step 7: Grid Test (Concrete Method)
 
-**User Communication:**
-When presenting anchor, communicate: this is the style anchor for batch processing, user should review photographic style (angle, lighting, framing) specifically, approval commits this style to all remaining variants.
+After generating all variants:
+1. View each output (you already do this)
+2. Check: Same aspect ratio? Same product coverage? Shadows same direction?
+3. Ask: "Side-by-side in a grid, would these look like one photoshoot?"
+4. If ANY outlier: REDO that variant with more explicit style specs
 
-**Consistency Specs (must be IDENTICAL):**
+### Anchor Selection
+
+| Criterion | Why | If Not Met |
+|-----------|-----|------------|
+| Sharp in source | Blur affects extraction | Try different variant |
+| Well-lit in source | Shadows affect quality | Try different variant |
+| Shows full features | Partial = incomplete | Try different variant |
+| **ALL fail** | No suitable anchor | **ESCALATE to PM** |
+
+**Heuristics when equal:**
+- Size variants: Prefer MEDIUM
+- Design variants: Prefer hero/bestseller
+
+### Consistency Specs (IDENTICAL across batch)
+
 `composition.camera_angle`, `composition.product_coverage`, `lighting.*`, `enhancement`, `output.aspect_ratio`, `output.size`, `focus`
 
-**What CAN differ:**
-`extraction.target_description`, `fidelity.hero_features`, `output.filename`
+**What CAN differ:** `extraction.target_description`, `fidelity.hero_features`, `output.filename`
 
-**Grid Test:**
-Before shipping: "Would these display correctly in a product listing grid where customers compare variants side-by-side?" If not, REDO outliers.
+### Recovery (3 attempts max)
 
-**Recovery (if Grid Test fails):**
-1. First retry: Make style specs MORE explicit (add numeric values where possible)
-2. Second retry: Use different anchor variant
-3. Third failure: Escalate - "Variant X resists consistency due to [reason]"
+| Attempt | Action |
+|---------|--------|
+| 1st | More explicit style specs (numeric values) |
+| 2nd | Different anchor variant |
+| 3rd | Escalate: "Variant X resists consistency due to [reason]" |
 
 ---
 
