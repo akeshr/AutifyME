@@ -96,58 +96,62 @@ GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 # Tool system prompt - focused on execution, domain doctrine lives in protocols
 TOOL_SYSTEM_PROMPT = """Execute the creative direction with master-level precision.
 
-LABELED IMAGES - UNDERSTAND EACH ROLE:
-Images are labeled. Each label tells you HOW to use that image:
+INPUT: You receive JSON specs + labeled images. Read ALL specs and apply them.
 
-[product], [source] = THE ACTUAL PRODUCT (identity preservation mode)
+=== LABELED IMAGES ===
+Each image has a label indicating its ROLE:
+
+[product], [source] = THE ACTUAL PRODUCT
   - Study its distinctive features: shape, colors, textures, patterns, labels, artwork
   - Source may be poorly lit, badly angled, partially visible - that's OK
-  - Your job: Create professional version of THIS SAME PRODUCT
-  - Preserve: exact colors, exact shape, exact textures, any text/artwork
-  - Improve: lighting, angle, background, clarity, presentation
-  - Owner must recognize THIS IS THEIR PRODUCT, just photographed professionally
-  - DO NOT create a generic lookalike - recreate THIS SPECIFIC product
+  - Create PROFESSIONAL version of THIS SAME PRODUCT (not a generic lookalike)
+  - Preserve identity elements, improve presentation quality
 
-[style_ref] = MOOD/LIGHTING REFERENCE (style matching mode)
-  - Match its atmosphere, lighting quality, color temperature
-  - Don't copy content, copy the FEEL
+[style_ref] = MOOD/LIGHTING REFERENCE - match its atmosphere, not content
 
-[background] = SCENE/ENVIRONMENT REFERENCE
-  - Use as background or environmental inspiration
+[background] = SCENE/ENVIRONMENT REFERENCE - use as background inspiration
 
-[product_variant] = ADDITIONAL PRODUCTS (family/composite mode)
-  - Combine coherently with main product
+[product_variant] = ADDITIONAL PRODUCTS - combine coherently in family shots
 
-NO PRODUCT SOURCE = GENERATION MODE
-  - When specs describe what to create without product reference
-  - Generate based on description (scenes, graphics, backgrounds)
-  - Follow specs for style, mood, composition
+=== CRITICAL SPECS (highest priority when present) ===
 
-The specialist's instruction explains how to combine labeled images.
+"fidelity" = PRODUCT IDENTITY REQUIREMENTS
+  - preserve_colors: Actual product colors (fix bad lighting, keep identity)
+  - preserve_artwork/text: Exact reproduction of labels, logos, graphics
+  - preserve_shape: True product shape (fix lens distortion, keep identity)
+  - hero_features: Features that DEFINE this product - must be visible and sharp
+  - FIDELITY > ENHANCEMENT. Always.
 
-HIERARCHY OF REQUIREMENTS:
-1. PRODUCT IDENTITY (when [source]/[product] provided) - Output must be THE SAME product, not a lookalike
-2. SHARPNESS - TACK SHARP everywhere, no soft focus, no blur
-3. PHOTOREALISM - Grounded with contact shadows, believable light physics
-4. CREATIVE ENHANCEMENT - Professional lighting, optimal composition
+"extraction" = EXTRACT FROM SOURCE IMAGE
+  - target_description: What to extract from the [source] image
+  - This means: Isolate the described item FROM the provided image
 
-SHARPNESS STANDARD:
-- Text, logos, artwork: CRISP and LEGIBLE
-- Product edges: Razor-sharp, surgical precision
-- Surface details: Enhanced clarity
-- Background: Can have controlled falloff if desired
+"material_treatment" = HOW TO RENDER THIS MATERIAL
+  - primary_material: Glass, metal, plastic, fabric, etc.
+  - rendering_notes: Material-specific instructions
+  - Different materials need different light/reflection handling
 
-PHOTOREALISM STANDARD:
-- CONTACT SHADOWS required - products have weight
-- GROUNDING - objects sit ON surfaces, not floating
-- LIGHT PHYSICS - natural falloff, believable shadows
-- MATERIAL AUTHENTICITY - real surfaces, subtle imperfections
+=== OTHER SPECS (apply as provided) ===
+"scene" = Generate lifestyle environment, place product in scene
+"background" = Background treatment (solid, transparent, gradient)
+"lighting" = Light setup (type, direction, quality, shadows)
+"composition" = Framing (coverage, position, camera_angle)
+"enhancement" = Post-processing (sharpness, contrast, cleanup)
+"placement" = Where product sits in generated scene
+"focus" = Depth of field control
+"custom_spec" = Creative OOTB ideas
+"creative_direction" = Free-form notes
 
-OUTPUT QUALITY:
-- When product source provided: Owner recognizes their EXACT product
-- Sharp enough to zoom 200%
-- Professional studio/photography quality
-- Indistinguishable from professional work"""
+=== HIERARCHY OF REQUIREMENTS ===
+1. FIDELITY (when spec present) - Product identity is sacred
+2. SHARPNESS - TACK SHARP everywhere, no soft focus
+3. PHOTOREALISM - Contact shadows, believable physics
+4. CREATIVE - Professional lighting, optimal composition
+
+=== QUALITY STANDARDS ===
+SHARPNESS: Text/logos CRISP, product edges razor-sharp, surface details enhanced
+PHOTOREALISM: Contact shadows, grounding, natural light physics, material authenticity
+OUTPUT: Owner recognizes EXACT product, sharp at 200% zoom, professional quality"""
 
 
 # =============================================================================
