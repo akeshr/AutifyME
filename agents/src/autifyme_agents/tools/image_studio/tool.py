@@ -108,11 +108,12 @@ Each image has a label indicating its ROLE:
   - Output must be THIS SPECIFIC PRODUCT with improved presentation
   - NOT a regenerated product that merely resembles it
 
-[style_ref] = STYLE/CONSISTENCY REFERENCE
-  - For mood/atmosphere: match its lighting quality, color temperature, shadow style
-  - For batch consistency: match EXACT angle, framing, coverage, lighting direction
-  - When specs say "match [style_ref] angle/framing/coverage" -> replicate precisely
-  - The style_ref is your VISUAL TARGET - study it carefully and match it
+[style_ref] = STYLE REFERENCE ONLY (NOT A SOURCE)
+  - **CRITICAL: Do NOT extract or copy the product from style_ref**
+  - **The product must come from [source]/[product]/[bodies]/[lids] - NOT from style_ref**
+  - style_ref is ONLY for matching: angle, framing, lighting direction, shadow style
+  - When specs say "match [style_ref]" -> match its PHOTOGRAPHIC STYLE, not its content
+  - Think: "Extract product from [source], present it like [style_ref] is presented"
 
 [background] = SCENE/ENVIRONMENT REFERENCE - use as background inspiration
 
