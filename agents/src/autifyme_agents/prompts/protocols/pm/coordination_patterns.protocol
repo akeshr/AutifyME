@@ -1465,7 +1465,9 @@ For CATALOG domain."
 [User provides reference + product images]
       |
       v
-[visual_analyst] -> Identify reference vs products
+[visual_analyst] -> Identify which is reference vs product
+   "Image 1: Reference/inspiration (lifestyle setting, warm lighting)
+    Image 2: Actual product to process"
       |
       v
 [Standard workflow for product image(s)]
