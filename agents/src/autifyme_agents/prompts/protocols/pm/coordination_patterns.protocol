@@ -1486,7 +1486,7 @@ For CATALOG domain."
 [creative_specialist]:
    "Create lifestyle scene for product.
     Source product at: [actual_product_path]
-    Style reference at: [reference_path] - Use as style_ref label to match mood/atmosphere.
+    Style reference at: [reference_path]
     For LIFESTYLE domain."
 ```
 
@@ -1507,12 +1507,11 @@ For CATALOG domain."
 [creative_specialist]:
    "Extract catalog variants from source.
     Source image at: [multi_product_path]
-    Style reference at: [reference_path] - VIEW this image to understand the desired
-    style, then DESCRIBE that style in text for your batch consistency specs.
-    Do NOT pass as style_ref label - extract style as text instead.
-    Use View-Then-Describe pattern from multi_item_image protocol.
+    Style reference at: [reference_path]
     For CATALOG domain."
 ```
+
+**Note:** Creative specialist sees the domain (CATALOG vs LIFESTYLE), the images, and the analyst files. It reasons about how to handle the reference based on context - PM doesn't need to spell out the approach.
 
 ---
 

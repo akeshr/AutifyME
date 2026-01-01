@@ -80,7 +80,15 @@ Common labels:
 | `background` | Background/scene reference |
 | `product_variant` | Additional product for family shots |
 
-**PM tells you which label to use for each image.** Follow PM's delegation.
+### style_ref Usage (Reason from Context)
+
+| Context | Use style_ref? | Why |
+|---------|----------------|-----|
+| Lifestyle scene | YES | Match mood/atmosphere from reference |
+| Batch extraction from multi-product source | NO | Causes Gemini to reproduce style_ref instead of extracting |
+| Single product extraction | Either | No batch consistency concern |
+
+For batch extraction: View reference, capture style as TEXT, use in `custom_spec.instruction`.
 
 ### Label References in Specs
 
