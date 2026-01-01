@@ -360,8 +360,6 @@ Each image_studio call is independent AND Gemini is non-deterministic. Without c
 
 **The Solution: View-Then-Describe**
 
-**Why text, not style_ref image?** When extracting FROM a source image, passing a finished product as style_ref causes Gemini to reproduce the style_ref instead of extracting from source. Text-based style specs avoid this problem.
-
 ```
 1. IF REFERENCE PROVIDED - View it first, understand target style
 2. SELECT ANCHOR - Choose variant that is sharp, well-lit, shows full features
