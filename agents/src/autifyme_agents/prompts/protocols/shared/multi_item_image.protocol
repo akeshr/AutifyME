@@ -377,18 +377,6 @@ Each image generation call is independent AND Gemini is non-deterministic. Witho
 - Different framing/coverage
 - Result: Unusable as a cohesive set
 
-### Why NOT Pass style_ref Image
-
-**Passing a finished product as style_ref causes Gemini to reproduce it instead of extracting from source.**
-
-When Gemini sees:
-- [source] = messy image with multiple products
-- [style_ref] = clean, professional single product
-
-It takes the "shortcut" of reproducing the style_ref with modifications, ignoring the actual source. This defeats the purpose.
-
-**Solution: Describe the style in TEXT, don't pass the image.**
-
 ### The Solution: View-Then-Describe
 
 ```
@@ -404,7 +392,6 @@ It takes the "shortcut" of reproducing the style_ref with modifications, ignorin
 6. BATCH REMAINING - For each remaining variant:
    - Use IDENTICAL base specs (lighting, composition, enhancement)
    - Add style specs as TEXT in custom_spec
-   - DO NOT pass anchor image as style_ref
 7. GRID TEST - Verify consistency before shipping
 ```
 

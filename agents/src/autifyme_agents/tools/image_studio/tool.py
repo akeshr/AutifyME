@@ -107,10 +107,6 @@ Each image has a label indicating its ROLE:
   - Source may be messy/cluttered - your job is to extract and improve
   - Output must be THIS SPECIFIC PRODUCT with improved presentation
 
-[style_ref] = MOOD/ATMOSPHERE REFERENCE (for lifestyle scenes, not extraction)
-  - Match its lighting quality, color temperature, atmosphere
-  - Used for lifestyle/scene generation, not batch extraction
-
 [background] = SCENE/ENVIRONMENT REFERENCE
 
 [product_variant] = ADDITIONAL PRODUCTS for family shots
@@ -706,8 +702,8 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "PURPOSE: Professional image processing (Gemini 3 Pro Image) - transform user uploads into catalog-ready assets. Extract products, generate lifestyle scenes, create hero shots, compose families. Your creative studio.\n\n"
             "LABELED IMAGES ARCHITECTURE (key differentiator):\n"
             "- Each image has label: [{path: 'inbox/photo.jpg', label: 'product'}]\n"
-            "- Reference labels in spec VALUES using [label] syntax: 'extract [product] from [source]', 'match [style_ref] lighting'\n"
-            "- Common labels: 'product'/'source' (main), 'style_ref' (mood/lighting), 'background' (scene), 'product_variant' (family)\n"
+            "- Reference labels in spec VALUES using [label] syntax: 'extract [product] from [source]', 'place [product] on [background]'\n"
+            "- Common labels: 'product'/'source' (main), 'background' (scene), 'product_variant' (family)\n"
             "- Model reasons about specs + labeled images to decide what to do\n"
             "- Max 15 images (Gemini constraint)\n\n"
             "USE WHEN:\n"
@@ -725,10 +721,10 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- fidelity: CRITICAL for source images - {preserve_colors: 'exact match', preserve_artwork: 'honeycomb pattern', hero_features: 'texture pattern'}\n"
             "- extraction: {target_description: 'glass jar on left in [source]', isolation: 'complete', edge_treatment: 'sharp'}\n"
             "- background: {treatment: 'transparent'/'solid_color'/'scene', color: 'white', scene_description: 'modern kitchen'}\n"
-            "- lighting: {type: 'natural_window'/'studio_3point', direction: 'front'/'side', special_requirements: 'match [style_ref]'}\n"
+            "- lighting: {type: 'natural_window'/'studio_3point', direction: 'front'/'side', shadows: 'soft falloff'}\n"
             "- composition: {position: 'center'/'[main] center [variant] right', camera_angle: 'slight_top', negative_space: 'generous_top'}\n"
             "- enhancement: {sharpness: 'tack_sharp', color_treatment: 'accurate to source'}\n"
-            "- scene: {environment: 'modern_kitchen', style: 'match [style_ref]', mood: 'warm_inviting'}\n"
+            "- scene: {environment: 'modern_kitchen', style: 'modern minimalist', mood: 'warm_inviting'}\n"
             "- placement: {position: 'place [product] on marble counter', scale: 'prominent'}\n"
             "- material_treatment: {primary_material: 'clear_glass', rendering_notes: 'preserve caustics'}\n"
             "- custom_spec: {instruction: 'dramatic shot with water droplets', style_reference: 'Apple product photography'}\n"
@@ -742,7 +738,7 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- Fidelity zone (no changes): product colors, artwork, text, shape, textures\n\n"
             "CRITICAL:\n"
             "- images parameter REQUIRED: Min 1 labeled image, max 15\n"
-            "- LABEL SYNTAX: Reference labels using [label] in spec STRING values (e.g., 'jar in [source]', 'match [style_ref]')\n"
+            "- LABEL SYNTAX: Reference labels using [label] in spec STRING values (e.g., 'jar in [source]', 'place [product] on [background]')\n"
             "- storage_path output: Use this for write_data assets (pending/ path)\n"
             "- Material matters: Glass, metal, plastic need different rendering (specify material_treatment)\n"
             "- One output per call: Not batch processing\n\n"

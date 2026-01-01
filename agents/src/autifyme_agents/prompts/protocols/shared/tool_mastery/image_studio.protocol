@@ -51,7 +51,7 @@ image_studio(
 - [ ] `focus` specified (deep for catalog, shallow for lifestyle)?
 - [ ] `enhancement` included for sharpness/contrast control?
 - [ ] `output.filename` specified for predictable output path?
-- [ ] Label references (`[source]`, `[style_ref]`) used in spec values?
+- [ ] Label references (`[source]`, `[product]`, `[background]`) used in spec values?
 
 **Remember:** The tool is your brush. You must tell it exactly what to paint, every time.
 
@@ -66,8 +66,8 @@ The key differentiator of this tool: **labeled images + structured specs = intel
 ```json
 {
   "images": [
-    {"path": "inbox/photo.jpg", "label": "product"},
-    {"path": "inbox/mood.jpg", "label": "style_ref"}
+    {"path": "inbox/photo.jpg", "label": "source"},
+    {"path": "inbox/background.jpg", "label": "background"}
   ]
 }
 ```
@@ -76,28 +76,8 @@ Common labels:
 | Label | Purpose |
 |-------|---------|
 | `product` / `source` | Main product to feature |
-| `style_ref` | Lighting/mood reference - match its atmosphere |
 | `background` | Background/scene reference |
 | `product_variant` | Additional product for family shots |
-
-### CAUTION: style_ref for Batch Consistency
-
-**DO NOT pass style_ref image for multi-variant batch extraction.**
-
-When doing batch extraction (e.g., extracting 9 variants from source images), passing a finished product as style_ref causes Gemini to reproduce the style_ref instead of extracting from source.
-
-**For batch consistency, use the View-Then-Describe approach:**
-1. Generate anchor WITHOUT style_ref
-2. View the anchor result
-3. Describe the style in TEXT (angle, lighting, framing)
-4. Use text description in custom_spec for remaining variants
-
-See `multi_item_image.protocol` > BATCH CONSISTENCY for full pattern.
-
-**When style_ref IS appropriate:**
-- Single image generation with mood reference (not extraction)
-- Lifestyle scenes where style_ref sets the environment mood
-- Non-extraction tasks where style_ref content won't be confused with source
 
 ### Label References in Specs
 
@@ -106,7 +86,6 @@ Reference labels using `[label]` syntax in specs:
 ```json
 {
   "extraction": {"target_description": "glass jar in [source]"},
-  "lighting": {"special_requirements": "match [style_ref]"},
   "placement": {"position": "place [product] on [background]"}
 }
 ```
@@ -141,7 +120,7 @@ Control lighting style and direction.
 - `quality`: Light character (soft diffused, hard specular, wraparound)
 - `color_temperature`: Warmth (5500K neutral, 3200K warm, cool blue)
 - `shadows`: Shadow treatment (soft falloff, no shadows, hard dramatic)
-- `special_requirements`: Special needs (match [style_ref], rim for glass edge)
+- `special_requirements`: Special needs (rim lighting for glass edge, dramatic shadows)
 
 ### composition
 Control framing and arrangement.
@@ -154,7 +133,7 @@ Control framing and arrangement.
 ### scene
 Lifestyle scene generation.
 - `environment`: Setting (modern kitchen, living room, outdoor patio)
-- `style`: Visual style (modern minimalist, warm rustic, match [style_ref])
+- `style`: Visual style (modern minimalist, warm rustic, industrial chic)
 - `mood`: Emotional atmosphere (warm inviting, calm serene, professional)
 - `time_of_day`: Lighting context (morning light, golden hour, soft afternoon)
 - `props_and_context`: Supporting elements (coffee cup, fresh herbs, none)
@@ -239,24 +218,21 @@ image_studio(
 ```
 Result: Product on pure white background.
 
-### Pattern 3: Lifestyle Scene with Style Reference
+### Pattern 3: Lifestyle Scene
 
 ```python
 image_studio(
-    images=[
-        {"path": "inbox/t/product.jpg", "label": "product"},
-        {"path": "inbox/t/mood.jpg", "label": "style_ref"}
-    ],
-    scene={"environment": "modern kitchen", "style": "match [style_ref]", "time_of_day": "morning light"},
+    images=[{"path": "inbox/t/product.jpg", "label": "product"}],
+    scene={"environment": "modern kitchen", "style": "warm minimalist", "time_of_day": "morning light"},
     placement={"position": "place [product] on counter", "surface": "white marble", "interaction": "natural shadow"},
-    lighting={"type": "natural_window", "color_temperature": "warm 5000K", "special_requirements": "match [style_ref]"},
+    lighting={"type": "natural_window", "color_temperature": "warm 5000K"},
     fidelity={"preserve_colors": "true product colors", "hero_features": "label and texture"},
     focus={"depth_of_field": "shallow - product sharp, background bokeh"},
     enhancement={"sharpness": "crisp on product", "color_treatment": "accurate to source"},
     output={"aspect_ratio": "4:5", "filename": "product_lifestyle"}
 )
 ```
-Result: Product in kitchen matching reference mood/lighting with shallow DOF.
+Result: Product in kitchen scene with shallow DOF.
 
 ### Pattern 4: Product Family Composition
 

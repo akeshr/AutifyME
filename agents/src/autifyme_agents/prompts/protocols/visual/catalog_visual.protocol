@@ -358,9 +358,7 @@ Each image_studio call is independent AND Gemini is non-deterministic. Without c
 - Different framing/coverage
 - Result: Unusable as a cohesive set
 
-**The Solution: View-Then-Describe (NO style_ref image)**
-
-**Why not pass style_ref image?** Gemini sees the "finished" anchor product and takes the shortcut of reproducing it instead of extracting from source. Text-only style specs force Gemini to actually extract from source.
+**The Solution: View-Then-Describe**
 
 ```
 1. SELECT ANCHOR - Choose variant that is sharp, well-lit, shows full features in source
@@ -375,7 +373,6 @@ Each image_studio call is independent AND Gemini is non-deterministic. Without c
 6. BATCH REMAINING - For each remaining variant:
    - Use IDENTICAL base specs (lighting, composition, enhancement)
    - Add extracted style specs to custom_spec as explicit text
-   - DO NOT pass anchor as style_ref image
 7. GRID TEST - Verify consistency before shipping
 ```
 

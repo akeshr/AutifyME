@@ -29,8 +29,8 @@ class ImageInput(BaseModel):
 
     Examples:
         ImageInput(path="inbox/product.jpg", label="product")
-        ImageInput(path="inbox/style_ref.jpg", label="lighting_reference")
-        ImageInput(path="pending/extracted.png", label="background_style")
+        ImageInput(path="inbox/source.jpg", label="source")
+        ImageInput(path="pending/extracted.png", label="background")
     """
 
     path: str = Field(
