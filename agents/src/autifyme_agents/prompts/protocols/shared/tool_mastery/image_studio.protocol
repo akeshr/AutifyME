@@ -11,6 +11,49 @@ This protocol teaches HOW TO USE the tool. For WHAT TO THINK about different dom
 
 ---
 
+## STATELESSNESS DOCTRINE (CRITICAL)
+
+**The image_studio tool is COMPLETELY STATELESS. Each call is independent.**
+
+| Reality | Consequence |
+|---------|-------------|
+| No memory between calls | EVERY call must include ALL details |
+| Doesn't know previous images | ALWAYS provide `images` array with paths |
+| Doesn't remember materials | ALWAYS specify `material_treatment` when relevant |
+| Doesn't retain fidelity context | ALWAYS include `fidelity` spec for source products |
+| Doesn't know extraction history | ALWAYS describe target in `extraction.target_description` |
+
+**Your job as the specialist:** You hold the context. The tool does not. Transfer your understanding INTO the tool call every time.
+
+### What This Means in Practice
+
+```python
+# WRONG - Assuming tool remembers the source
+image_studio(
+    extraction={"target_description": "extract the jar"}  # Which jar? From where?
+)
+
+# CORRECT - Complete, self-contained call
+image_studio(
+    images=[{"path": "inbox/photo.jpg", "label": "source"}],
+    extraction={"target_description": "glass jar with blue lid in [source]"},
+    material_treatment={"primary_material": "clear_glass"},
+    fidelity={"preserve_colors": "exact blue lid", "hero_features": "honeycomb pattern"}
+)
+```
+
+### Checklist Before EVERY Call
+
+- [ ] `images` array provided with all needed images and labels?
+- [ ] `extraction.target_description` specific enough to identify THE item?
+- [ ] `material_treatment` specified for glass/metal/reflective surfaces?
+- [ ] `fidelity` included when processing source product images?
+- [ ] Label references (`[source]`, `[style_ref]`) used in spec values?
+
+**Remember:** The tool is your brush. You must tell it exactly what to paint, every time.
+
+---
+
 ## LABELED IMAGES ARCHITECTURE
 
 The key differentiator of this tool: **labeled images + structured specs = intelligent composition**.
