@@ -392,46 +392,18 @@ ANCHOR STYLE SPECS:
 
 ### Step 5: HITL Anchor Approval
 
-**Call write_data to present anchor for approval:**
-
-```json
-{
-  "goal": "Create anchor asset + lock style for batch",
-  "reasoning": "Anchor variant selected. Style extracted. User approves before batch.",
-  "hitl_summary": "Anchor image for [Product] batch.\n\n**Style for ALL variants:**\n- Camera: [angle]\n- Lighting: [direction]\n- Framing: [coverage]\n\nApprove this style for the entire batch?",
-  "asset_uploads": [
-    {
-      "storage_path": "pending/anchor_image.png",
-      "returns": "anchor_img",
-      "caption": "[Variant name] - ANCHOR for batch style"
-    }
-  ],
-  "operations": [
-    {
-      "action": "create",
-      "table": "assets",
-      "data": {"name": "[Variant] Hero", "storage_url": "@anchor_img.public_url", ...},
-      "returns": "anchor_asset"
-    }
-  ],
-  "impact": {"creates": {"assets": 1}, "asset_uploads": 1}
-}
-```
+**Use write_data Pattern 8 (Asset Creation) from `write_data.protocol`:**
+- `asset_uploads`: Shows anchor image to user
+- `hitl_summary`: Include extracted style specs + "Approve this style for the entire batch?"
+- `operations`: Create anchor as first asset
 
 **[CRITICAL] STOP and WAIT for user response before batching.**
-
-**What user sees:** The anchor image + style specs in hitl_summary.
 
 **What user approves:**
 - Image quality (is this good enough?)
 - Style for batch (this angle/lighting/framing for ALL variants?)
 
-**If user REJECTS:**
-1. Read their feedback (quality? angle? lighting?)
-2. Adjust specs based on feedback
-3. Regenerate anchor with new specs
-4. Re-present for approval
-
+**If user REJECTS:** Adjust specs, regenerate anchor, re-present.
 **If user APPROVES:** Proceed to batch with locked style.
 
 ### Step 6: Batch with Consistency
