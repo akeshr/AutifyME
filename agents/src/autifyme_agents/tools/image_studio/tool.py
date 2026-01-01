@@ -96,53 +96,58 @@ GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 # Tool system prompt - focused on execution, domain doctrine lives in protocols
 TOOL_SYSTEM_PROMPT = """Execute the creative direction with master-level precision.
 
-CRITICAL: SOURCE IMAGE IS YOUR REFERENCE
-The [source]/[product] image shows you the ACTUAL product. Study it carefully:
-- Identify the product's distinctive features (shape, colors, textures, patterns, labels)
-- Note what makes THIS product unique vs generic versions
-- The source may be poorly lit, badly angled, or partially visible - that's OK
+LABELED IMAGES - UNDERSTAND EACH ROLE:
+Images are labeled. Each label tells you HOW to use that image:
 
-YOUR JOB: Create a professional studio shot of THIS SAME PRODUCT.
-- Use source to understand WHAT the product IS (identity, distinctive features)
-- Generate a PROFESSIONAL version with ideal lighting, angle, and presentation
-- Preserve all identity elements: exact colors, exact shape, exact textures, any text/artwork
-- Improve: lighting, angle, background, clarity, professional presentation
-- The owner must recognize THIS IS THEIR PRODUCT, just photographed professionally
+[product], [source] = THE ACTUAL PRODUCT (identity preservation mode)
+  - Study its distinctive features: shape, colors, textures, patterns, labels, artwork
+  - Source may be poorly lit, badly angled, partially visible - that's OK
+  - Your job: Create professional version of THIS SAME PRODUCT
+  - Preserve: exact colors, exact shape, exact textures, any text/artwork
+  - Improve: lighting, angle, background, clarity, presentation
+  - Owner must recognize THIS IS THEIR PRODUCT, just photographed professionally
+  - DO NOT create a generic lookalike - recreate THIS SPECIFIC product
 
-DO NOT: Create a generic product that merely resembles the source.
-DO: Study the source, then create the professional version of THAT SPECIFIC product.
+[style_ref] = MOOD/LIGHTING REFERENCE (style matching mode)
+  - Match its atmosphere, lighting quality, color temperature
+  - Don't copy content, copy the FEEL
 
-LABELED IMAGES ARCHITECTURE:
-Images are labeled. Use labels to understand each image's role:
-- [product], [source] = the ACTUAL product - study its identity, recreate professionally
-- [style_ref] = lighting/mood reference - match its atmosphere
-- [background] = background/scene reference
-- [product_variant] = additional product for family shots
-The specialist's instruction explains how to combine them.
+[background] = SCENE/ENVIRONMENT REFERENCE
+  - Use as background or environmental inspiration
 
-HIERARCHY OF REQUIREMENTS (STRICT ORDER):
-1. PRODUCT IDENTITY - Output must be recognizably THE SAME product from [source] (not a generic lookalike)
+[product_variant] = ADDITIONAL PRODUCTS (family/composite mode)
+  - Combine coherently with main product
+
+NO PRODUCT SOURCE = GENERATION MODE
+  - When specs describe what to create without product reference
+  - Generate based on description (scenes, graphics, backgrounds)
+  - Follow specs for style, mood, composition
+
+The specialist's instruction explains how to combine labeled images.
+
+HIERARCHY OF REQUIREMENTS:
+1. PRODUCT IDENTITY (when [source]/[product] provided) - Output must be THE SAME product, not a lookalike
 2. SHARPNESS - TACK SHARP everywhere, no soft focus, no blur
 3. PHOTOREALISM - Grounded with contact shadows, believable light physics
-4. CREATIVE ENHANCEMENT - Professional lighting, optimal angle, clean background
+4. CREATIVE ENHANCEMENT - Professional lighting, optimal composition
 
 SHARPNESS STANDARD:
 - Text, logos, artwork: CRISP and LEGIBLE
 - Product edges: Razor-sharp, surgical precision
-- Surface details: SHARPER than source, enhanced clarity
+- Surface details: Enhanced clarity
 - Background: Can have controlled falloff if desired
 
 PHOTOREALISM STANDARD:
-- CONTACT SHADOWS required - product has weight
-- GROUNDING - product sits ON surface, not floating
+- CONTACT SHADOWS required - products have weight
+- GROUNDING - objects sit ON surfaces, not floating
 - LIGHT PHYSICS - natural falloff, believable shadows
 - MATERIAL AUTHENTICITY - real surfaces, subtle imperfections
 
 OUTPUT QUALITY:
-- Product owner recognizes their EXACT product (same shape, same details, same everything)
+- When product source provided: Owner recognizes their EXACT product
 - Sharp enough to zoom 200%
-- Professional studio quality from phone photo input
-- Indistinguishable from professional photography"""
+- Professional studio/photography quality
+- Indistinguishable from professional work"""
 
 
 # =============================================================================
