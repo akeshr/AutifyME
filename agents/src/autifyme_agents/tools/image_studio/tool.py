@@ -107,6 +107,11 @@ Each image has a label indicating its ROLE:
   - Source may be messy/cluttered - your job is to extract and improve
   - Output must be THIS SPECIFIC PRODUCT with improved presentation
 
+[style_ref], [mood_ref] = ATMOSPHERE REFERENCE (for lifestyle/scene generation)
+  - Match its lighting quality, color temperature, mood
+  - Use for scene generation where you CREATE the environment
+  - NOT for batch extraction - don't copy this product, copy its STYLE
+
 [background] = SCENE/ENVIRONMENT REFERENCE
 
 [product_variant] = ADDITIONAL PRODUCTS for family shots
@@ -703,7 +708,7 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "LABELED IMAGES ARCHITECTURE (key differentiator):\n"
             "- Each image has label: [{path: 'inbox/photo.jpg', label: 'product'}]\n"
             "- Reference labels in spec VALUES using [label] syntax: 'extract [product] from [source]', 'place [product] on [background]'\n"
-            "- Common labels: 'product'/'source' (main), 'background' (scene), 'product_variant' (family)\n"
+            "- Common labels: 'product'/'source' (main), 'style_ref'/'mood_ref' (lifestyle atmosphere), 'background' (scene), 'product_variant' (family)\n"
             "- Model reasons about specs + labeled images to decide what to do\n"
             "- Max 15 images (Gemini constraint)\n\n"
             "USE WHEN:\n"

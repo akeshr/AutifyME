@@ -433,13 +433,31 @@ custom_spec: {
 }
 ```
 
-### Grid Test (Concrete Method)
+### Grid Test (Visual Verification)
 
-After generating all variants:
-1. View each output
-2. Check: Same aspect ratio? Same coverage? Shadows same direction?
-3. Ask: "Side-by-side, would these look like one photoshoot?"
-4. If outlier: REDO with more explicit style specs
+After generating all variants, CREATE a verification grid to see them side-by-side:
+
+```python
+image_studio(
+    images=[
+        {"path": "pending/variant_1.png", "label": "v1"},
+        {"path": "pending/variant_2.png", "label": "v2"},
+        {"path": "pending/variant_3.png", "label": "v3"},
+        # ... all variants
+    ],
+    composition={"position": "grid layout - NxM, equal spacing"},
+    background={"treatment": "solid_color", "color": "white"},
+    output={"filename": "verification_grid"}
+)
+```
+
+Then view_image the grid and check:
+- Same camera angle across all?
+- Same framing/product coverage?
+- Shadows falling same direction?
+- Same lighting quality?
+
+**If ANY outlier:** REDO that variant with more explicit style specs
 
 ### Anchor Selection
 

@@ -67,7 +67,7 @@ The key differentiator of this tool: **labeled images + structured specs = intel
 {
   "images": [
     {"path": "inbox/photo.jpg", "label": "source"},
-    {"path": "inbox/background.jpg", "label": "background"}
+    {"path": "inbox/mood.jpg", "label": "style_ref"}
   ]
 }
 ```
@@ -76,8 +76,18 @@ Common labels:
 | Label | Purpose |
 |-------|---------|
 | `product` / `source` | Main product to feature |
+| `style_ref` / `mood_ref` | Atmosphere reference for lifestyle scenes |
 | `background` | Background/scene reference |
 | `product_variant` | Additional product for family shots |
+
+### When to Use style_ref (CRITICAL)
+
+| Use Case | Use style_ref? | Why |
+|----------|----------------|-----|
+| **Single lifestyle scene** | YES | Match mood/atmosphere from reference |
+| **Batch extraction** (multiple variants) | NO | Causes Gemini to reproduce style_ref instead of extracting from source |
+
+**For batch extraction:** Use View-Then-Describe instead - see `multi_item_image.protocol`.
 
 ### Label References in Specs
 
@@ -86,6 +96,7 @@ Reference labels using `[label]` syntax in specs:
 ```json
 {
   "extraction": {"target_description": "glass jar in [source]"},
+  "scene": {"style": "match [style_ref] atmosphere"},
   "placement": {"position": "place [product] on [background]"}
 }
 ```
@@ -218,21 +229,24 @@ image_studio(
 ```
 Result: Product on pure white background.
 
-### Pattern 3: Lifestyle Scene
+### Pattern 3: Lifestyle Scene (with style_ref)
 
 ```python
 image_studio(
-    images=[{"path": "inbox/t/product.jpg", "label": "product"}],
-    scene={"environment": "modern kitchen", "style": "warm minimalist", "time_of_day": "morning light"},
+    images=[
+        {"path": "inbox/t/product.jpg", "label": "product"},
+        {"path": "inbox/t/mood.jpg", "label": "style_ref"}
+    ],
+    scene={"environment": "modern kitchen", "style": "match [style_ref]", "time_of_day": "morning light"},
     placement={"position": "place [product] on counter", "surface": "white marble", "interaction": "natural shadow"},
-    lighting={"type": "natural_window", "color_temperature": "warm 5000K"},
+    lighting={"type": "natural_window", "special_requirements": "match [style_ref] atmosphere"},
     fidelity={"preserve_colors": "true product colors", "hero_features": "label and texture"},
     focus={"depth_of_field": "shallow - product sharp, background bokeh"},
     enhancement={"sharpness": "crisp on product", "color_treatment": "accurate to source"},
     output={"aspect_ratio": "4:5", "filename": "product_lifestyle"}
 )
 ```
-Result: Product in kitchen scene with shallow DOF.
+Result: Product in kitchen scene matching style_ref mood/lighting.
 
 ### Pattern 4: Product Family Composition
 
@@ -265,6 +279,25 @@ image_studio(
 )
 ```
 Result: Complete catalog-ready hero shot with all specs for maximum quality.
+
+### Pattern 6: Verification Grid (Batch Consistency Check)
+
+After generating multiple variants, create a visual grid for consistency verification:
+
+```python
+image_studio(
+    images=[
+        {"path": "pending/variant_1.png", "label": "v1"},
+        {"path": "pending/variant_2.png", "label": "v2"},
+        {"path": "pending/variant_3.png", "label": "v3"},
+        {"path": "pending/variant_4.png", "label": "v4"}
+    ],
+    composition={"position": "grid layout - 2x2, equal spacing"},
+    background={"treatment": "solid_color", "color": "white"},
+    output={"aspect_ratio": "1:1", "filename": "verification_grid"}
+)
+```
+Result: Side-by-side grid to visually verify batch consistency before shipping.
 
 ---
 
