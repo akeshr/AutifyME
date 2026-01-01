@@ -63,10 +63,10 @@ load_protocol(['input_validation'])
 
 | PM Domain | Load (domain='visual') |
 |-----------|------------------------|
-| CATALOG | `catalog_visual` |
+| CATALOG | `catalog_visual` + `multi_item_image` (shared) |
 | LIFESTYLE | `lifestyle_visual` |
 | SOCIAL | `social_content` |
-| CAMPAIGN | `catalog_visual` (+ style lock in execution) |
+| CAMPAIGN | `catalog_visual` + `multi_item_image` (+ style lock in execution) |
 
 **BATCH 3: TOOL MASTERY (before using tools)**
 ```
@@ -77,16 +77,17 @@ load_protocol(['image_studio', 'view_image'])
 
 | Trigger | Protocol | Why |
 |---------|----------|-----|
-| Multi-item source | `multi_item_image` | Position targeting, extraction strategy |
 | Multi-item/batch work | `resource_efficiency` | Tool call budgeting, avoid loops |
 | Creating asset record | `write_data`, `inspect_schema` | Schema discovery + WriteIntent |
 | Catalog asset workflow | `asset_management` (domain='catalog') | Lifecycle, junctions, purpose field |
 | `[HITL_FEEDBACK]` in response | `hitl` | **IMMEDIATE** - load before processing |
 
+**Note:** `multi_item_image` is now loaded by default with catalog/campaign domains (contains Batch Consistency doctrine).
+
 **EFFICIENT: Load together when you know you'll need them:**
 ```
 # Catalog extraction with asset creation
-load_protocol(['catalog_visual'], domain='visual')
+load_protocol(['catalog_visual', 'multi_item_image'], domain='visual')
 load_protocol(['image_studio', 'view_image', 'write_data', 'inspect_schema'])
 load_protocol(['asset_management'], domain='catalog')
 ```
