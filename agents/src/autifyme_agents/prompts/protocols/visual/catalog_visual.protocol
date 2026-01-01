@@ -342,24 +342,51 @@ Visual identifiers (print names, colors) are more reliable than spatial position
 
 ### Batch Consistency Doctrine (MANDATORY for variant sets)
 
-**See `multi_item_image.protocol` > BATCH CONSISTENCY WITH STYLE REFERENCE for the complete pattern.**
+When creating base assets for multiple variants, ALL outputs must appear from the SAME photoshoot.
 
-This section adds catalog-specific application:
+**The Problem:**
+Each image_studio call is independent AND Gemini is non-deterministic. Without consistency enforcement:
+- Different camera angles across variants
+- Different lighting directions
+- Different framing/coverage
+- Result: Unusable as a cohesive set
 
-**Catalog-Specific Anchor Selection:**
-- For product size variants: Prefer MEDIUM (best balance for e-commerce grids)
-- For design variants: Prefer the bestseller or hero SKU
-- Quality check: Anchor must be sharp and well-lit in source image
+**The Solution: Style Anchor + Style Reference**
 
-**Catalog-Specific Grid Test:**
-Before shipping base assets, verify: "Would these display correctly in a product listing grid where customers compare variants side-by-side?"
+```
+1. SELECT ANCHOR - Choose variant that is sharp, well-lit, shows full features in source
+2. GENERATE ANCHOR - Process ONE variant with full specs
+3. WRITE ANCHOR - Triggers HITL approval (user feedback applies to all)
+4. BATCH REMAINING - For each remaining variant:
+   - Pass approved anchor as [style_ref] image
+   - Use IDENTICAL specs (lighting, composition, enhancement)
+   - Add instruction: "match exact angle and framing of [style_ref]"
+5. GRID TEST - Verify consistency before shipping
+```
 
-**Base Asset Implications:**
-These are REUSABLE assets for future campaigns. Consistency investment pays off across:
-- E-commerce listings
-- Social media variants
-- Marketing collateral
-- Print catalogs
+**Anchor Selection (for catalog):**
+- Size variants: Prefer MEDIUM (transfers well to larger/smaller)
+- Design variants: Prefer the hero/bestseller SKU
+- Quality: Must be sharp and well-lit in source
+
+**User Communication:**
+When presenting anchor: "Here's the first variant. Once approved, I'll apply this exact angle and framing to the remaining [N]. Please review the photographic style."
+
+**Consistency Specs (must be IDENTICAL):**
+`composition.camera_angle`, `composition.product_coverage`, `lighting.*`, `enhancement`, `output.aspect_ratio`, `output.size`, `focus`
+
+**What CAN differ:**
+`extraction.target_description`, `fidelity.hero_features`, `output.filename`
+
+**Grid Test:**
+Before shipping: "Would these display correctly in a product listing grid where customers compare variants side-by-side?" If not, REDO outliers.
+
+**Recovery (if Grid Test fails):**
+1. First retry: Add explicit angle specs ("exact 15-degree top-down")
+2. Second retry: Use different anchor variant
+3. Third failure: Escalate - "Variant X resists consistency due to [reason]"
+
+**For extended patterns** (detailed anchor criteria, full recovery ladder): Load `multi_item_image` protocol.
 
 ---
 
