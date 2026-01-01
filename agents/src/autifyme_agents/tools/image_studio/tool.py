@@ -113,45 +113,49 @@ Each image has a label indicating its ROLE:
 
 [product_variant] = ADDITIONAL PRODUCTS - combine coherently in family shots
 
-=== CRITICAL SPECS (highest priority when present) ===
+=== SPEC TYPES (apply what's provided) ===
 
-"fidelity" = PRODUCT IDENTITY REQUIREMENTS
-  - preserve_colors: Actual product colors (fix bad lighting, keep identity)
-  - preserve_artwork/text: Exact reproduction of labels, logos, graphics
-  - preserve_shape: True product shape (fix lens distortion, keep identity)
-  - hero_features: Features that DEFINE this product - must be visible and sharp
-  - FIDELITY > ENHANCEMENT. Always.
+"fidelity" = PRODUCT IDENTITY PRESERVATION
+  - When provided: Respect these requirements for product recognition
+  - preserve_colors, preserve_artwork, preserve_shape, hero_features
+  - Balance: Preserve identity while improving presentation
 
 "extraction" = EXTRACT FROM SOURCE IMAGE
-  - target_description: What to extract from the [source] image
-  - This means: Isolate the described item FROM the provided image
+  - target_description: What to extract from [source]
+  - Isolate the described item from the provided image
 
-"material_treatment" = HOW TO RENDER THIS MATERIAL
+"material_treatment" = MATERIAL-SPECIFIC RENDERING
   - primary_material: Glass, metal, plastic, fabric, etc.
-  - rendering_notes: Material-specific instructions
   - Different materials need different light/reflection handling
 
-=== OTHER SPECS (apply as provided) ===
-"scene" = Generate lifestyle environment, place product in scene
-"background" = Background treatment (solid, transparent, gradient)
-"lighting" = Light setup (type, direction, quality, shadows)
-"composition" = Framing (coverage, position, camera_angle)
-"enhancement" = Post-processing (sharpness, contrast, cleanup)
-"placement" = Where product sits in generated scene
-"focus" = Depth of field control
-"custom_spec" = Creative OOTB ideas
-"creative_direction" = Free-form notes
+"scene" = LIFESTYLE ENVIRONMENT - Generate scene, place product
+"background" = BACKGROUND TREATMENT - solid, transparent, gradient
+"lighting" = LIGHT SETUP - type, direction, quality, shadows
+"composition" = FRAMING - coverage, position, camera_angle
+"enhancement" = POST-PROCESSING - sharpness, contrast, cleanup
+"placement" = PRODUCT POSITION in generated scene
+"focus" = DEPTH OF FIELD control
+"custom_spec" = CREATIVE ideas beyond standard specs
+"creative_direction" = FREE-FORM notes
 
-=== HIERARCHY OF REQUIREMENTS ===
-1. FIDELITY (when spec present) - Product identity is sacred
-2. SHARPNESS - TACK SHARP everywhere, no soft focus
-3. PHOTOREALISM - Contact shadows, believable physics
-4. CREATIVE - Professional lighting, optimal composition
+=== BALANCED QUALITY APPROACH ===
 
-=== QUALITY STANDARDS ===
-SHARPNESS: Text/logos CRISP, product edges razor-sharp, surface details enhanced
-PHOTOREALISM: Contact shadows, grounding, natural light physics, material authenticity
-OUTPUT: Owner recognizes EXACT product, sharp at 200% zoom, professional quality"""
+All dimensions matter - balance them appropriately:
+- IDENTITY: Product must be recognizable (when working with source)
+- SHARPNESS: Professional clarity, crisp details
+- PHOTOREALISM: Believable lighting, shadows, physics
+- CREATIVITY: Professional presentation, optimal composition
+
+The specs tell you what matters most for THIS task:
+- Heavy fidelity spec? Identity preservation is priority
+- Scene/lifestyle specs? Creative environment matters more
+- No fidelity spec? Use professional judgment for balance
+
+=== OUTPUT STANDARDS ===
+- Sharp enough to zoom 200%
+- Professional studio quality
+- When source provided: Product owner recognizes their product
+- When generating: High-quality, believable result"""
 
 
 # =============================================================================
