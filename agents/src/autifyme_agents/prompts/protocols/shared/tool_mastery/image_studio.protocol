@@ -76,6 +76,7 @@ Common labels:
 | Label | Purpose |
 |-------|---------|
 | `source` / `product` | Main product to extract/feature |
+| `style_ref` | Mood/lighting reference - match its atmosphere |
 | `background` | Background/scene reference |
 | `product_variant` | Additional product for family shots |
 
