@@ -351,17 +351,23 @@ Each image_studio call is independent AND Gemini is non-deterministic - even ide
 - Different framing/coverage
 - Result: Unusable as a cohesive set
 
-**The Solution: Style Anchor + Style Reference**
+**The Solution: Style Anchor + Approval Gate + Style Reference**
 
-1. **Process ONE variant first** - This establishes the "style anchor"
-2. **Verify the anchor** - view_image to confirm quality and style
-3. **For ALL subsequent variants:**
-   - Pass the anchor output as `[style_ref]` image
+1. **Select anchor variant** - Default to MEDIUM size (transfers well to larger/smaller) or PM-specified
+2. **Process ONE variant first** - This establishes the "style anchor"
+3. **Write the anchor** - write_data triggers HITL approval automatically
+   - User approves -> proceed to step 4
+   - User rejects with feedback -> iterate on anchor until approved
+4. **For ALL subsequent variants:**
+   - Pass the approved anchor as `[style_ref]` image
    - Use IDENTICAL specs (copy the exact same lighting, composition, enhancement)
    - Add explicit matching instruction: "match exact angle and framing of [style_ref]"
 
+**Why approval gate matters:**
+One wrong anchor = N wrong copies. Approval BEFORE batch processing catches issues early, saves resources, and ensures user feedback is baked into all variants.
+
 **Why style_ref is essential:**
-Gemini is non-deterministic. Even identical text specs produce different results. Passing the first output AS AN IMAGE gives Gemini a visual target to match, dramatically improving consistency.
+Gemini is non-deterministic. Even identical text specs produce different results. Passing the approved anchor AS AN IMAGE gives Gemini a visual target to match, dramatically improving consistency.
 
 **Consistency Specs (must be IDENTICAL across all variants):**
 
