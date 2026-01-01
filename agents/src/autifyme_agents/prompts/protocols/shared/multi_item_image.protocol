@@ -45,6 +45,45 @@ When items are VARIANTS, identify the axes of variation:
 | Material | Glass/Plastic/Metal |
 | Configuration | 2-door/4-door, 1BR/2BR |
 
+### Variant Identification Doctrine (CRITICAL)
+
+**Position is AMBIGUOUS. Visual characteristics are UNAMBIGUOUS.**
+
+When identifying variants for extraction, use INTRINSIC visual characteristics before spatial position.
+
+**Identification Hierarchy (use in priority order):**
+
+| Priority | Differentiator | Why Reliable |
+|----------|----------------|--------------|
+| 1 | **SIZE** | Visually absolute - tallest/shortest/medium is unambiguous |
+| 2 | **VISUAL PATTERN** | Intrinsic to product - distinct colors, designs, prints |
+| 3 | **TEXT/LABEL** | Explicit identification when readable in image |
+| 4 | **POSITION** | Last resort - only when visual characteristics identical |
+
+**Why this order?**
+- Gemini is a VISUAL model - it perceives size differences with high accuracy
+- "The largest jar" has ONE correct answer
+- "Left column" is interpretation-dependent (how are columns counted?)
+- Visual characteristics are INTRINSIC to product, position is CONTEXTUAL
+
+**Compound Identification:**
+When multiple differentiators exist, COMBINE for precision:
+- Size narrows the candidate set
+- Visual pattern confirms the specific item
+- Position only as tie-breaker if needed
+
+**For size variants:** Lead with SIZE
+- "the LARGEST jar with blue floral print"
+- "the SMALLEST container"
+- "the MEDIUM-height bottle"
+
+**For design variants (same size):** Lead with VISUAL DIFFERENTIATOR
+- "the jar with BLUE flowers"
+- "the container with ORANGE lily design"
+- "the bottle labeled 'Spring Flowers'"
+
+**NEVER lead with position when visual differentiators exist.**
+
 ---
 
 ## ITEM MANIFEST FORMAT (CRITICAL OUTPUT)

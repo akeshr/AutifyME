@@ -340,6 +340,46 @@ Visual identifiers (print names, colors) are more reliable than spatial position
 
 **Never treat N items as 1.** If Extraction Targets has 9 rows and strategy is INDIVIDUAL, you output 9 assets.
 
+### Batch Consistency Doctrine (MANDATORY for variant sets)
+
+When creating base assets for multiple variants, ALL outputs must appear from the SAME photoshoot.
+
+**The Problem:**
+Each image_studio call is independent. Without explicit consistency enforcement, outputs will have:
+- Different camera angles
+- Different lighting directions
+- Different framing/coverage
+- Result: Unusable as a cohesive set
+
+**The Solution: Style Anchor + Explicit Matching**
+
+1. **Process ONE variant first** - This establishes the "style anchor"
+2. **Verify the anchor** - view_image to confirm quality and style
+3. **For ALL subsequent variants:**
+   - Use IDENTICAL specs (copy the exact same lighting, composition, enhancement)
+   - Add explicit matching instruction in extraction or custom_spec
+
+**Consistency Specs (must be IDENTICAL across all variants):**
+
+| Spec | Why Identical |
+|------|---------------|
+| `composition.camera_angle` | Same viewing angle for all |
+| `composition.product_coverage` | Same framing percentage |
+| `lighting.type` | Same lighting setup |
+| `lighting.direction` | Shadows fall same direction |
+| `lighting.shadows` | Same shadow treatment |
+| `enhancement` | Same post-processing |
+| `output.aspect_ratio` | Same dimensions |
+| `output.size` | Same resolution |
+| `focus` | Same depth of field |
+
+**What CAN differ:**
+- `extraction.target_description` - Different for each variant
+- `fidelity.hero_features` - Variant-specific features
+- `output.filename` - Unique per variant
+
+**Grid Test:** Before shipping, mentally arrange all outputs in a grid. Would a customer believe these came from one professional photoshoot?
+
 ---
 
 ## QUALITY REASONING
