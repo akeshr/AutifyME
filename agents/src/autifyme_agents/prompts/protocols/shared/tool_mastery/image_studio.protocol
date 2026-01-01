@@ -473,7 +473,7 @@ When source image contains multiple items, use position-based targeting.
 
 ### Targeting Syntax
 
-Use visual differentiators BEFORE position in `target_description`. See `multi_item_image.protocol` for the Variant Identification Hierarchy.
+Use visual differentiators BEFORE position in `target_description`.
 
 | Priority | Pattern | Why |
 |----------|---------|-----|
@@ -485,7 +485,12 @@ Combine for precision: "the LARGEST [product] with [pattern] in [source]"
 
 ### Position Vocabulary
 
-See `multi_item_image.protocol` for complete position vocabulary.
+| Position Type | Examples |
+|---------------|----------|
+| Grid positions | top-left, center, bottom-right |
+| Column + stack | left-column 2nd from top, center-column bottom |
+| Depth | foreground, midground, background |
+| Ordinal | 1st, 2nd, 3rd (for rows/columns) |
 
 ---
 

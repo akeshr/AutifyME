@@ -68,17 +68,19 @@ Unfixable source = escalate immediately. Don't waste effort.
 | CATALOG | `catalog_visual` | visual |
 | LIFESTYLE | `lifestyle_visual` | visual |
 | SOCIAL | `social_content` | visual |
-| CAMPAIGN | `catalog_visual` + style lock | visual |
+| CAMPAIGN | `catalog_visual` | visual |
 
 **Conditional Protocols:**
 
 | Trigger | Protocol | Why |
 |---------|----------|-----|
-| Multi-item source | `multi_item_image` | Position targeting, batch consistency |
+| PM mentions variants/multiple items OR analyst file shows multi-item OR you detect after view_image | `multi_item_image` | Position targeting, batch consistency |
 | Multi-item/batch work | `resource_efficiency` | Tool call budgeting |
 | Creating asset record | `write_data`, `inspect_schema` | Schema discovery + WriteIntent |
 | Catalog asset workflow | `asset_management` (domain=catalog) | Lifecycle, junctions |
 | `[HITL_FEEDBACK]` in response | `hitl` | **IMMEDIATE** |
+
+**Note:** If you discover multi-item AFTER view_image, load `multi_item_image` before proceeding with extraction.
 
 **Efficiency:** Combine protocols in single load_protocol call when you know you'll need them together.
 
