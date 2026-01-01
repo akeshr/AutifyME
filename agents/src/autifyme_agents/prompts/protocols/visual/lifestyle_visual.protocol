@@ -241,47 +241,16 @@ These work TOGETHER to create the final image.
 
 ## STYLE DIRECTION
 
-### Text-Based Direction (Default)
-
-PM provides style direction via specs when no reference image exists.
-
 **Capture style through specs:**
 - `scene.style`: Visual aesthetic ("warm minimalist", "industrial chic")
 - `scene.mood`: Emotional atmosphere ("cozy morning", "aspirational luxury")
 - `lighting.type` + `color_temperature`: Light quality ("natural_window", "warm 3200K")
 - `custom_spec.instruction`: Detailed creative direction
 
-### Reference Image Direction (When Available)
+**When PM provides a reference image:**
+View it, understand the mood/atmosphere, and translate that into your specs and creative direction.
 
-When PM provides a style reference image, use it to match mood/atmosphere:
-
-**Pass reference with `style_ref` or `mood_ref` label:**
-```python
-image_studio(
-    images=[
-        {"path": "source_product.jpg", "label": "source"},
-        {"path": "reference_lifestyle.jpg", "label": "style_ref"}
-    ],
-    scene={"style": "match the reference mood and lighting"},
-    placement={"position": "product in natural context"},
-    ...
-)
-```
-
-**What style_ref captures from reference:**
-- Lighting quality and direction
-- Color temperature and mood
-- Atmosphere and ambiance
-- Level of minimalism/richness
-
-**What style_ref does NOT copy:**
-- Specific products in reference (those are NOT sources)
-- Exact composition or layout
-- Background details
-
-### The Goal
-
-Whether from text or reference: Translate the intended style into visual essence that makes the viewer want to inhabit the moment.
+**The Goal:** Translate the intended style into visual essence that makes the viewer want to inhabit the moment.
 
 ---
 

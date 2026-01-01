@@ -361,42 +361,17 @@ Each image_studio call is independent AND Gemini is non-deterministic. Without c
 **The Solution: View-Then-Describe**
 
 ```
-0. IF REFERENCE PROVIDED - View PM's reference image first
-   - Understand target style (angle, lighting, framing, background)
-   - Capture as TEXT specs to inform anchor generation
-   - Do NOT pass as style_ref (causes reproduction, not extraction)
-1. SELECT ANCHOR - Choose variant that is sharp, well-lit, shows full features in source
-   - If NO variant is suitable: ESCALATE immediately (can't build batch on poor anchor)
-2. GENERATE ANCHOR - Process ONE variant with full specs (informed by reference if provided)
-3. VIEW ANCHOR - Use view_image to see the result
-4. EXTRACT STYLE SPECS - Describe what you see in precise, measurable terms
-5. PRESENT ANCHOR - write_data with style specs in description (triggers HITL)
-   - User approves BOTH: image quality AND style for batch
-   - Include extracted style specs so user knows what they're committing to
-6. BATCH REMAINING - For each remaining variant:
-   - Use IDENTICAL structured specs (lighting, composition, enhancement)
-   - Add custom_spec.instruction with style specs to REINFORCE consistency
-7. GRID TEST - View all outputs, verify visual consistency
+1. IF REFERENCE PROVIDED - View it first, understand target style
+2. SELECT ANCHOR - Choose variant that is sharp, well-lit, shows full features
+   - If NO variant is suitable: ESCALATE (can't build batch on poor anchor)
+3. GENERATE ANCHOR - Process ONE variant with full specs
+4. VIEW ANCHOR - Use view_image to see the result
+5. EXTRACT STYLE SPECS - Describe what you see in precise terms
+6. PRESENT ANCHOR - write_data with style specs (triggers HITL)
+   - User approves image quality AND style for entire batch
+7. BATCH REMAINING - Use IDENTICAL specs, reinforce consistency via custom_spec
+8. GRID TEST - View all outputs, verify visual consistency
 ```
-
-### Step 0: Reference Image Handling (When PM Provides One)
-
-If PM's delegation includes a reference image:
-
-1. **VIEW the reference** - Use view_image to see the target style
-2. **CAPTURE as TEXT** - Describe what you see:
-   ```
-   REFERENCE STYLE (from [reference_path]):
-   - Camera: [describe angle, perspective]
-   - Lighting: [describe setup, shadow direction]
-   - Framing: [describe coverage, position]
-   - Background: [describe treatment]
-   - Quality: [describe sharpness, enhancement]
-   ```
-3. **USE in anchor generation** - Apply these specs to your anchor
-4. **Do NOT pass as style_ref** - Reference becomes TEXT in specs, not image label
-
-**Why text, not image?** When Gemini sees a finished product as style_ref during extraction, it reproduces the style_ref instead of extracting from source. Converting style to text avoids this.
 
 ### Step 4: Style Spec Extraction
 

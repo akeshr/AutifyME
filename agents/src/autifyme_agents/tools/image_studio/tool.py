@@ -101,20 +101,12 @@ INPUT: You receive JSON specs + labeled images. Read ALL specs and apply them.
 === LABELED IMAGES ===
 Each image has a label indicating its ROLE:
 
-[product], [source], [bodies], [lids] = SOURCE MATERIAL
-  - This IS your source material - work FROM this image
-  - Study it: shape, colors, textures, patterns, labels, artwork
-  - Source may be messy/cluttered - your job is to extract and improve
-  - Output must be THIS SPECIFIC PRODUCT with improved presentation
+Labels indicate image ROLE. Common patterns:
+- [source], [product]: Extract/transform THIS product
+- [background]: Scene/environment reference
+- [variant], [product_2]: Additional products for family shots
 
-[style_ref], [mood_ref] = STYLE/ATMOSPHERE REFERENCE
-  - Match its lighting quality, color temperature, mood
-  - Copy the STYLE and atmosphere, not the specific products shown
-  - Do NOT extract products from this image - it defines style only
-
-[background] = SCENE/ENVIRONMENT REFERENCE
-
-[product_variant] = ADDITIONAL PRODUCTS for family shots
+Study labeled images. Apply specs to produce professional output.
 
 === SPEC TYPES (apply what's provided) ===
 

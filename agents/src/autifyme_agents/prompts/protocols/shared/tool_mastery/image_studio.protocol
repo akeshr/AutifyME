@@ -75,20 +75,11 @@ The key differentiator of this tool: **labeled images + structured specs = intel
 Common labels:
 | Label | Purpose |
 |-------|---------|
-| `product` / `source` | Main product to feature - extraction source |
-| `style_ref` / `mood_ref` | Style/atmosphere reference - match mood, not products |
+| `source` / `product` | Main product to extract/feature |
 | `background` | Background/scene reference |
 | `product_variant` | Additional product for family shots |
 
-### style_ref Usage (Reason from Context)
-
-| Context | Use style_ref? | Why |
-|---------|----------------|-----|
-| Lifestyle scene | YES | Match mood/atmosphere from reference |
-| Batch extraction from multi-product source | NO | Causes Gemini to reproduce style_ref instead of extracting |
-| Single product extraction | Either | No batch consistency concern |
-
-For batch extraction: View reference, capture style as TEXT, use in `custom_spec.instruction`.
+**Use descriptive labels that match your intent.** PM provides paths, you decide appropriate labels based on what each image IS.
 
 ### Label References in Specs
 
