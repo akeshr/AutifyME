@@ -294,7 +294,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
     To prevent this, specialists can use path references instead of full paths:
 
     - @0, @1, @2... - Reference by index (order paths appear in delegation)
-    - @product, @style_ref... - Reference by label (matched from image metadata)
+    - @product, @source, @background... - Reference by label (matched from image metadata)
 
     The middleware resolves these references to actual paths before tool execution.
 
@@ -577,7 +577,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                 )
                 return path
 
-        # Try label match (@product, @style_ref, etc.)
+        # Try label match (@product, @source, @background, etc.)
         # Currently labels are None, but could be populated from image metadata
         for stored_path, label in self._injected_paths:
             if label and label.lower() == ref.lower():

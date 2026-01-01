@@ -51,7 +51,7 @@ image_studio(
 - [ ] `focus` specified (deep for catalog, shallow for lifestyle)?
 - [ ] `enhancement` included for sharpness/contrast control?
 - [ ] `output.filename` specified for predictable output path?
-- [ ] Label references (`[source]`, `[style_ref]`) used in spec values?
+- [ ] Label references (`[source]`, `[product]`, `[background]`) used in spec values?
 
 **Remember:** The tool is your brush. You must tell it exactly what to paint, every time.
 
@@ -66,7 +66,7 @@ The key differentiator of this tool: **labeled images + structured specs = intel
 ```json
 {
   "images": [
-    {"path": "inbox/photo.jpg", "label": "product"},
+    {"path": "inbox/photo.jpg", "label": "source"},
     {"path": "inbox/mood.jpg", "label": "style_ref"}
   ]
 }
@@ -75,10 +75,12 @@ The key differentiator of this tool: **labeled images + structured specs = intel
 Common labels:
 | Label | Purpose |
 |-------|---------|
-| `product` / `source` | Main product to feature |
-| `style_ref` | Lighting/mood reference - match its atmosphere |
+| `source` / `product` | Main product to extract/feature |
+| `style_ref` | Mood/lighting reference - match its atmosphere |
 | `background` | Background/scene reference |
 | `product_variant` | Additional product for family shots |
+
+**Use descriptive labels that match your intent.** PM provides paths, you decide appropriate labels based on what each image IS.
 
 ### Label References in Specs
 
@@ -87,7 +89,7 @@ Reference labels using `[label]` syntax in specs:
 ```json
 {
   "extraction": {"target_description": "glass jar in [source]"},
-  "lighting": {"special_requirements": "match [style_ref]"},
+  "scene": {"style": "match [style_ref] atmosphere"},
   "placement": {"position": "place [product] on [background]"}
 }
 ```
@@ -122,7 +124,7 @@ Control lighting style and direction.
 - `quality`: Light character (soft diffused, hard specular, wraparound)
 - `color_temperature`: Warmth (5500K neutral, 3200K warm, cool blue)
 - `shadows`: Shadow treatment (soft falloff, no shadows, hard dramatic)
-- `special_requirements`: Special needs (match [style_ref], rim for glass edge)
+- `special_requirements`: Special needs (rim lighting for glass edge, dramatic shadows)
 
 ### composition
 Control framing and arrangement.
@@ -135,7 +137,7 @@ Control framing and arrangement.
 ### scene
 Lifestyle scene generation.
 - `environment`: Setting (modern kitchen, living room, outdoor patio)
-- `style`: Visual style (modern minimalist, warm rustic, match [style_ref])
+- `style`: Visual style (modern minimalist, warm rustic, industrial chic)
 - `mood`: Emotional atmosphere (warm inviting, calm serene, professional)
 - `time_of_day`: Lighting context (morning light, golden hour, soft afternoon)
 - `props_and_context`: Supporting elements (coffee cup, fresh herbs, none)
@@ -220,7 +222,7 @@ image_studio(
 ```
 Result: Product on pure white background.
 
-### Pattern 3: Lifestyle Scene with Style Reference
+### Pattern 3: Lifestyle Scene (with style_ref)
 
 ```python
 image_studio(
@@ -230,14 +232,14 @@ image_studio(
     ],
     scene={"environment": "modern kitchen", "style": "match [style_ref]", "time_of_day": "morning light"},
     placement={"position": "place [product] on counter", "surface": "white marble", "interaction": "natural shadow"},
-    lighting={"type": "natural_window", "color_temperature": "warm 5000K", "special_requirements": "match [style_ref]"},
+    lighting={"type": "natural_window", "special_requirements": "match [style_ref] atmosphere"},
     fidelity={"preserve_colors": "true product colors", "hero_features": "label and texture"},
     focus={"depth_of_field": "shallow - product sharp, background bokeh"},
     enhancement={"sharpness": "crisp on product", "color_treatment": "accurate to source"},
     output={"aspect_ratio": "4:5", "filename": "product_lifestyle"}
 )
 ```
-Result: Product in kitchen matching reference mood/lighting with shallow DOF.
+Result: Product in kitchen scene matching style_ref mood/lighting.
 
 ### Pattern 4: Product Family Composition
 
@@ -270,6 +272,25 @@ image_studio(
 )
 ```
 Result: Complete catalog-ready hero shot with all specs for maximum quality.
+
+### Pattern 6: Verification Grid (Batch Consistency Check)
+
+After generating multiple variants, create a visual grid for consistency verification:
+
+```python
+image_studio(
+    images=[
+        {"path": "pending/variant_1.png", "label": "v1"},
+        {"path": "pending/variant_2.png", "label": "v2"},
+        {"path": "pending/variant_3.png", "label": "v3"},
+        {"path": "pending/variant_4.png", "label": "v4"}
+    ],
+    composition={"position": "grid layout - 2x2, equal spacing"},
+    background={"treatment": "solid_color", "color": "white"},
+    output={"aspect_ratio": "1:1", "filename": "verification_grid"}
+)
+```
+Result: Side-by-side grid to visually verify batch consistency before shipping.
 
 ---
 

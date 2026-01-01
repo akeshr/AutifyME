@@ -365,115 +365,126 @@ When extraction completes (with or without failures), report structured results:
 
 ---
 
-## BATCH CONSISTENCY WITH STYLE REFERENCE
+## BATCH CONSISTENCY (View-Then-Describe)
 
 When processing multiple variants with INDIVIDUAL strategy, all outputs must appear from the SAME photoshoot. This section defines the universal pattern; domain protocols apply it.
 
 ### The Problem
 
-Each image generation call is independent AND Gemini is non-deterministic - even identical specs produce slightly different outputs. Without explicit consistency enforcement:
+Each image generation call is independent AND Gemini is non-deterministic. Without explicit consistency enforcement:
 - Different camera angles across variants
 - Different lighting directions
 - Different framing/coverage
 - Result: Unusable as a cohesive set
 
-### The Solution: Style Anchor + Style Reference
-
-**Style_ref is ALWAYS used for batch processing. This is not optional.**
+### The Solution: View-Then-Describe
 
 ```
 1. SELECT ANCHOR - Choose representative variant (see Anchor Selection below)
-2. GENERATE ANCHOR - Process ONE variant with full specs
-3. WRITE ANCHOR - Triggers HITL approval automatically
-   (User feedback on anchor gets baked into ALL subsequent variants)
-4. BATCH REMAINING - For each remaining variant:
-   - Pass approved anchor as [style_ref] image
-   - Use IDENTICAL specs (lighting, composition, enhancement)
-   - Add instruction: "match exact angle and framing of [style_ref]"
-5. GRID TEST - Verify consistency before shipping
+   - If NO variant is suitable: ESCALATE (can't build batch on poor anchor)
+2. GENERATE ANCHOR - Process ONE variant with full specs, record specs used
+3. VIEW ANCHOR - Use view_image to see the result
+4. EXTRACT STYLE SPECS - Describe what you see in precise terms
+5. PRESENT ANCHOR - write_data with style specs (triggers HITL)
+   - User approves image quality AND style for entire batch
+6. BATCH REMAINING - For each remaining variant:
+   - Use IDENTICAL structured specs (lighting, composition, enhancement)
+   - Add custom_spec.instruction to REINFORCE consistency
+7. GRID TEST - View all outputs, verify visual consistency
 ```
 
-### Anchor Selection (Reasoning, Not Rules)
+### Style Spec Extraction
 
-**Evaluate candidates against these criteria:**
+After viewing anchor, document:
 
-| Criterion | Why It Matters |
-|-----------|----------------|
-| **Sharp in source** | Blurry anchor = blurry reference for Gemini |
-| **Well-lit in source** | Shadows/darkness in anchor propagates to copies |
-| **Shows full features** | Partial visibility limits what Gemini can match |
-| **Representative proportions** | Extreme sizes may not transfer well to others |
+| Spec | What to Describe | Example |
+|------|------------------|---------|
+| Camera | Angle, perspective | "eye-level, 0 degrees" |
+| Lighting | Setup, shadow direction | "3-point studio, shadow bottom-right" |
+| Framing | Coverage, position | "80% frame, centered" |
+| Background | Treatment, grounding | "pure white, contact shadow" |
+| Enhancement | Sharpness, color | "tack sharp, true colors" |
 
-**Heuristics when criteria are equal:**
-- Size variants: Prefer MEDIUM (transfers well to both larger and smaller)
-- Design variants (same size): Prefer the "hero" or most common variant
-- Mixed: Combine both (medium size of hero design)
+### HITL Anchor Approval
 
-**Never rigid rules.** Reason about which variant makes the best visual reference.
+**What user approves:**
+- Image quality (good enough?)
+- Style for batch (this angle/lighting for ALL variants?)
 
-### User Communication Template
+**If user REJECTS:**
+1. Ask what's wrong
+2. Adjust specs based on feedback
+3. Regenerate and re-present
 
-When presenting anchor for approval, communicate context:
+**If user APPROVES:** Proceed with locked style.
+
+### Batch with Consistency
+
+**Structured specs** = WHAT to generate.
+**custom_spec.instruction** = REINFORCE consistency.
 
 ```
-"Here's the first variant ([variant name]). Once approved, I'll apply
-this exact angle, lighting, and framing to the remaining [N] variants.
-
-Please review the PHOTOGRAPHIC STYLE specifically:
-- Camera angle acceptable?
-- Lighting direction/shadows acceptable?
-- Framing/coverage acceptable?
-
-Product-specific feedback also welcome - will be applied to all."
+custom_spec: {
+  instruction: "Match the approved anchor EXACTLY:
+    Camera: eye-level, 0 degrees
+    Lighting: 3-point studio, shadow bottom-right
+    Framing: 80% frame, centered
+    Same photoshoot appearance."
+}
 ```
 
-This ensures user knows:
-- This is an anchor, not just one output
-- Approval commits to a style for the batch
-- What specifically to evaluate
+### Grid Test (Visual Verification)
 
-### Style_ref Limitations (Honest Acknowledgment)
+After generating all variants, CREATE a verification grid to see them side-by-side:
 
-Style_ref IMPROVES consistency but does NOT GUARANTEE it:
+```python
+image_studio(
+    images=[
+        {"path": "pending/variant_1.png", "label": "v1"},
+        {"path": "pending/variant_2.png", "label": "v2"},
+        {"path": "pending/variant_3.png", "label": "v3"},
+        # ... all variants
+    ],
+    composition={"position": "grid layout - NxM, equal spacing"},
+    background={"treatment": "solid_color", "color": "white"},
+    output={"filename": "verification_grid"}
+)
+```
 
-| Limitation | Reality |
-|------------|---------|
-| Extreme size differences | 50ml vs 500ml have different proportions - some variation unavoidable |
-| Complex products | Intricate details may render differently |
-| Gemini interpretation | "Match angle" is interpreted, not measured |
+Then view_image the grid and check:
+- Same camera angle across all?
+- Same framing/product coverage?
+- Shadows falling same direction?
+- Same lighting quality?
 
-**Grid Test is ESSENTIAL verification, not optional safety net.**
+**If ANY outlier:** REDO that variant with more explicit style specs
 
-### Recovery Steps for Grid Test Failures
+### Anchor Selection
 
-When Grid Test reveals inconsistent outputs:
+| Criterion | If Not Met |
+|-----------|------------|
+| Sharp in source | Try different variant |
+| Well-lit in source | Try different variant |
+| Shows full features | Try different variant |
+| **ALL fail** | **ESCALATE to PM** |
 
-| Retry | Action | Rationale |
-|-------|--------|-----------|
-| **1st** | Add explicit angle specs | "exact 15-degree top-down, shadows falling left, product fills 70% of frame" |
-| **2nd** | Use DIFFERENT anchor | Maybe this variant is incompatible with the original anchor |
-| **3rd** | Accept partial variation | Report to user: "Variant X resists consistency due to [size difference/complexity]. Recommend separate photoshoot treatment." |
+**Heuristics when equal:**
+- Size variants: Prefer MEDIUM
+- Design variants: Prefer hero/bestseller
 
-**Never infinite retry.** Three attempts, then escalate with diagnosis.
+### Consistency Specs (IDENTICAL)
 
-### Consistency Specs (Must Be IDENTICAL)
+`composition.camera_angle`, `composition.product_coverage`, `lighting.*`, `enhancement`, `output.aspect_ratio`, `output.size`, `focus`
 
-| Spec | Why Identical |
-|------|---------------|
-| `composition.camera_angle` | Same viewing angle for all |
-| `composition.product_coverage` | Same framing percentage |
-| `lighting.type` | Same lighting setup |
-| `lighting.direction` | Shadows fall same direction |
-| `lighting.shadows` | Same shadow treatment |
-| `enhancement` | Same post-processing |
-| `output.aspect_ratio` | Same dimensions |
-| `output.size` | Same resolution |
-| `focus` | Same depth of field |
+**What CAN differ:** `extraction.target_description`, `fidelity.hero_features`, `output.filename`
 
-**What CAN differ:**
-- `extraction.target_description` - Different for each variant
-- `fidelity.hero_features` - Variant-specific features
-- `output.filename` - Unique per variant
+### Recovery (3 attempts max)
+
+| Attempt | Action |
+|---------|--------|
+| 1st | More explicit style specs |
+| 2nd | Different anchor variant |
+| 3rd | Escalate with diagnosis |
 
 ---
 

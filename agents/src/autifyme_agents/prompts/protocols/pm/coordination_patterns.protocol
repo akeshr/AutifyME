@@ -1247,7 +1247,8 @@ For CATALOG domain."
 | **Variants** | Visual (all) -> Product (base research + variant dimensions) -> Catalog (variant structure) -> [Approval] -> Creative (all) -> Specialist (N linked products) | 1 visual_analysis, 1 product_research (covers variants), 1 catalog_analysis |
 | **Bulk (different)** | Visual (all, separate findings) -> For each: Product -> Catalog -> [Approval] -> Creative -> Specialist | N visual_analysis files, N product_research files, N catalog_analysis files |
 | **Comparison** | Visual (all) -> Present comparison to user | 1 comparison_analysis |
-| **Reference** | Identify reference; Visual (actual only) -> Product -> Catalog -> Creative (with reference style) -> Specialist | Reference noted in delegation to creative |
+| **Reference (lifestyle)** | Identify reference; Visual (product only) -> Product -> Catalog -> Creative (with reference) | For LIFESTYLE domain |
+| **Reference (batch)** | Identify reference; Visual (all products) -> Product -> Catalog -> Creative (with reference) | For CATALOG domain, multiple products |
 
 ### Multi-Angle Workflow (1 Product, N Assets)
 
@@ -1456,24 +1457,30 @@ For CATALOG domain."
 
 ### Reference + Actual Workflow
 
+**Two scenarios:**
+- **Reference (lifestyle):** User wants product in a scene matching reference mood
+- **Reference (batch):** User wants multiple products extracted matching reference style
+
 ```
-[2 images: "make it look like this" pointing to first]
+[User provides reference + product images]
       |
       v
-[visual_analyst] -> Identify which is reference
+[visual_analyst] -> Identify which is reference vs product
    "Image 1: Reference/inspiration (lifestyle setting, warm lighting)
     Image 2: Actual product to process"
       |
       v
-[Standard workflow for Image 2, but creative gets reference]
+[Standard workflow for product image(s)]
       |
       v
 [creative_specialist]:
-   "Process product image.
-    Source image at: [actual_product_path]
-    STYLE REFERENCE at: [reference_path] - Match this lighting/composition style.
-    ..."
+   "Process product image(s).
+    Source: [product_path(s)]
+    Reference: [reference_path]
+    For [LIFESTYLE/CATALOG] domain."
 ```
+
+**PM provides paths and domain. Specialist reasons about how to use the reference.**
 
 ---
 

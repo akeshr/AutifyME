@@ -80,7 +80,7 @@ class TestImageStudioSchemas:
 
     def test_image_input_various_labels(self):
         """Test ImageInput with various label types."""
-        labels = ["product", "style_ref", "mood", "background", "hero", "variant"]
+        labels = ["product", "source", "mood", "background", "hero", "variant"]
         for label in labels:
             img = ImageInput(path="inbox/test/img.jpg", label=label)
             assert img.label == label
@@ -108,7 +108,7 @@ class TestImageStudioSchemas:
         input_spec = ImageStudioInput(
             images=[
                 ImageInput(path="inbox/test/product.jpg", label="product"),
-                ImageInput(path="inbox/test/style.jpg", label="style_ref"),
+                ImageInput(path="inbox/test/background.jpg", label="background"),
             ],
             extraction=ExtractionSpec(
                 target_description="Extract [product] from background",
@@ -383,10 +383,10 @@ class TestImageProcessing:
         tool.invoke({
             "images": [
                 {"path": "/tmp/img1.png", "label": "product"},
-                {"path": "/tmp/img2.png", "label": "style_ref"},
+                {"path": "/tmp/img2.png", "label": "source"},
                 {"path": "/tmp/img3.png", "label": "background"},
             ],
-            "creative_direction": "Compose [product] with [style_ref] lighting on [background]",
+            "creative_direction": "Compose [product] from [source] on [background]",
         })
 
         # Should load all 3 images
