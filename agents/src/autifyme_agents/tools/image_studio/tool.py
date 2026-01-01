@@ -101,41 +101,30 @@ INPUT: You receive JSON specs + labeled images. Read ALL specs and apply them.
 === LABELED IMAGES ===
 Each image has a label indicating its ROLE:
 
-[product], [source] = THE ACTUAL PRODUCT TO USE
+[product], [source], [bodies], [lids] = SOURCE MATERIAL
   - This IS your source material - work FROM this image
   - Study it: shape, colors, textures, patterns, labels, artwork
-  - Source may be poorly lit, badly angled, partially visible - that's OK
+  - Source may be messy/cluttered - your job is to extract and improve
   - Output must be THIS SPECIFIC PRODUCT with improved presentation
-  - NOT a regenerated product that merely resembles it
 
-[style_ref] = STYLE REFERENCE ONLY (NOT A SOURCE)
-  - **CRITICAL: Do NOT extract or copy the product from style_ref**
-  - **The product must come from [source]/[product]/[bodies]/[lids] - NOT from style_ref**
-  - style_ref is ONLY for matching: angle, framing, lighting direction, shadow style
-  - When specs say "match [style_ref]" -> match its PHOTOGRAPHIC STYLE, not its content
-  - Think: "Extract product from [source], present it like [style_ref] is presented"
+[style_ref] = MOOD/ATMOSPHERE REFERENCE (for lifestyle scenes, not extraction)
+  - Match its lighting quality, color temperature, atmosphere
+  - Used for lifestyle/scene generation, not batch extraction
 
-[background] = SCENE/ENVIRONMENT REFERENCE - use as background inspiration
+[background] = SCENE/ENVIRONMENT REFERENCE
 
-[product_variant] = ADDITIONAL PRODUCTS - combine coherently in family shots
-
-KEY DISTINCTION:
-- Source provided? Output must be BASED ON that specific product from source
-- No source? Generate from description in specs
-- **style_ref is NEVER a source** - even if it shows a similar product, extract from [source]/[bodies]/[lids]
+[product_variant] = ADDITIONAL PRODUCTS for family shots
 
 === SPEC TYPES (apply what's provided) ===
 
+"extraction" = EXTRACT FROM SOURCE IMAGE
+  - target_description: What to extract from source images
+  - Isolate the described item from the provided source
+  - Source may be messy - your job is to isolate cleanly
+
 "fidelity" = PRODUCT IDENTITY PRESERVATION
-  - When provided: Respect these requirements for product recognition
   - preserve_colors, preserve_artwork, preserve_shape, hero_features
   - Balance: Preserve identity while improving presentation
-
-"extraction" = EXTRACT FROM SOURCE IMAGE (CRITICAL)
-  - target_description: What to extract from [source]/[bodies]/[lids]
-  - **You MUST extract the ACTUAL product from the source images**
-  - **Do NOT reproduce or modify the style_ref product - extract from source**
-  - The source may be messy/cluttered - that's your job, isolate the target
 
 "material_treatment" = MATERIAL-SPECIFIC RENDERING
   - primary_material: Glass, metal, plastic, fabric, etc.

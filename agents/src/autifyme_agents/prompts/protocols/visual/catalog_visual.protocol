@@ -358,17 +358,50 @@ Each image_studio call is independent AND Gemini is non-deterministic. Without c
 - Different framing/coverage
 - Result: Unusable as a cohesive set
 
-**The Solution: Style Anchor + Style Reference**
+**The Solution: View-Then-Describe (NO style_ref image)**
+
+**Why not pass style_ref image?** Gemini sees the "finished" anchor product and takes the shortcut of reproducing it instead of extracting from source. Text-only style specs force Gemini to actually extract from source.
 
 ```
 1. SELECT ANCHOR - Choose variant that is sharp, well-lit, shows full features in source
-2. GENERATE ANCHOR - Process ONE variant with full specs
-3. WRITE ANCHOR - Triggers HITL approval (user feedback applies to all)
-4. BATCH REMAINING - For each remaining variant:
-   - Pass approved anchor as [style_ref] image
-   - Use IDENTICAL specs (lighting, composition, enhancement)
-   - Add instruction: "match exact angle and framing of [style_ref]"
-5. GRID TEST - Verify consistency before shipping
+2. GENERATE ANCHOR - Process ONE variant with full specs, record the specs used
+3. VIEW ANCHOR - Use view_image to see the result
+4. EXTRACT STYLE SPECS - Describe what you see in precise, measurable terms:
+   - Camera angle (e.g., "perfectly upfront eye-level, 0 degrees")
+   - Lighting (e.g., "3-point studio, soft shadows falling bottom-right")
+   - Framing (e.g., "product fills 80% frame, centered")
+   - Background (e.g., "pure white, soft contact shadow")
+5. WRITE ANCHOR - Triggers HITL approval (user feedback refines style specs)
+6. BATCH REMAINING - For each remaining variant:
+   - Use IDENTICAL base specs (lighting, composition, enhancement)
+   - Add extracted style specs to custom_spec as explicit text
+   - DO NOT pass anchor as style_ref image
+7. GRID TEST - Verify consistency before shipping
+```
+
+**Style Spec Extraction Template:**
+
+After viewing anchor, document:
+```
+ANCHOR STYLE SPECS (for subsequent variants):
+- Camera: [angle description, e.g., "eye-level, perfectly upfront (0 degrees)"]
+- Lighting: [setup + shadow direction, e.g., "3-point studio, soft shadow bottom-right"]
+- Framing: [coverage + position, e.g., "80% frame coverage, centered"]
+- Background: [treatment + shadow, e.g., "pure white, soft contact shadow grounding"]
+- Enhancement: [sharpness + color, e.g., "tack sharp, true-to-source colors"]
+```
+
+**Using Style Specs in Subsequent Calls:**
+
+```
+custom_spec: {
+  instruction: "Apply these EXACT style specs from the approved anchor:
+    Camera: eye-level, perfectly upfront (0 degrees)
+    Lighting: 3-point studio, soft shadow falling bottom-right
+    Framing: 80% frame coverage, centered
+    Background: pure white with soft contact shadow
+    The output must look like it came from the same photoshoot as the anchor."
+}
 ```
 
 **Anchor Selection (for catalog):**
@@ -389,7 +422,7 @@ When presenting anchor, communicate: this is the style anchor for batch processi
 Before shipping: "Would these display correctly in a product listing grid where customers compare variants side-by-side?" If not, REDO outliers.
 
 **Recovery (if Grid Test fails):**
-1. First retry: Add explicit angle specs ("exact 15-degree top-down")
+1. First retry: Make style specs MORE explicit (add numeric values where possible)
 2. Second retry: Use different anchor variant
 3. Third failure: Escalate - "Variant X resists consistency due to [reason]"
 

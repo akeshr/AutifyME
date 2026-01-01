@@ -80,6 +80,25 @@ Common labels:
 | `background` | Background/scene reference |
 | `product_variant` | Additional product for family shots |
 
+### CAUTION: style_ref for Batch Consistency
+
+**DO NOT pass style_ref image for multi-variant batch extraction.**
+
+When doing batch extraction (e.g., extracting 9 variants from source images), passing a finished product as style_ref causes Gemini to reproduce the style_ref instead of extracting from source.
+
+**For batch consistency, use the View-Then-Describe approach:**
+1. Generate anchor WITHOUT style_ref
+2. View the anchor result
+3. Describe the style in TEXT (angle, lighting, framing)
+4. Use text description in custom_spec for remaining variants
+
+See `multi_item_image.protocol` > BATCH CONSISTENCY for full pattern.
+
+**When style_ref IS appropriate:**
+- Single image generation with mood reference (not extraction)
+- Lifestyle scenes where style_ref sets the environment mood
+- Non-extraction tasks where style_ref content won't be confused with source
+
 ### Label References in Specs
 
 Reference labels using `[label]` syntax in specs:

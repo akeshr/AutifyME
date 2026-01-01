@@ -365,32 +365,74 @@ When extraction completes (with or without failures), report structured results:
 
 ---
 
-## BATCH CONSISTENCY WITH STYLE REFERENCE
+## BATCH CONSISTENCY (View-Then-Describe)
 
 When processing multiple variants with INDIVIDUAL strategy, all outputs must appear from the SAME photoshoot. This section defines the universal pattern; domain protocols apply it.
 
 ### The Problem
 
-Each image generation call is independent AND Gemini is non-deterministic - even identical specs produce slightly different outputs. Without explicit consistency enforcement:
+Each image generation call is independent AND Gemini is non-deterministic. Without explicit consistency enforcement:
 - Different camera angles across variants
 - Different lighting directions
 - Different framing/coverage
 - Result: Unusable as a cohesive set
 
-### The Solution: Style Anchor + Style Reference
+### Why NOT Pass style_ref Image
 
-**Style_ref is ALWAYS used for batch processing. This is not optional.**
+**Passing a finished product as style_ref causes Gemini to reproduce it instead of extracting from source.**
+
+When Gemini sees:
+- [source] = messy image with multiple products
+- [style_ref] = clean, professional single product
+
+It takes the "shortcut" of reproducing the style_ref with modifications, ignoring the actual source. This defeats the purpose.
+
+**Solution: Describe the style in TEXT, don't pass the image.**
+
+### The Solution: View-Then-Describe
 
 ```
 1. SELECT ANCHOR - Choose representative variant (see Anchor Selection below)
-2. GENERATE ANCHOR - Process ONE variant with full specs
-3. WRITE ANCHOR - Triggers HITL approval automatically
-   (User feedback on anchor gets baked into ALL subsequent variants)
-4. BATCH REMAINING - For each remaining variant:
-   - Pass approved anchor as [style_ref] image
-   - Use IDENTICAL specs (lighting, composition, enhancement)
-   - Add instruction: "match exact angle and framing of [style_ref]"
-5. GRID TEST - Verify consistency before shipping
+2. GENERATE ANCHOR - Process ONE variant with full specs, record specs used
+3. VIEW ANCHOR - Use view_image to see the result
+4. EXTRACT STYLE SPECS - Describe what you see in precise terms:
+   - Camera angle (e.g., "eye-level, 0 degrees")
+   - Lighting (e.g., "3-point studio, soft shadow bottom-right")
+   - Framing (e.g., "80% frame coverage, centered")
+   - Background (e.g., "pure white, contact shadow")
+5. WRITE ANCHOR - Triggers HITL approval (feedback refines style specs)
+6. BATCH REMAINING - For each remaining variant:
+   - Use IDENTICAL base specs (lighting, composition, enhancement)
+   - Add style specs as TEXT in custom_spec
+   - DO NOT pass anchor image as style_ref
+7. GRID TEST - Verify consistency before shipping
+```
+
+### Style Spec Extraction
+
+After viewing anchor, document these:
+
+| Spec | What to Describe | Example |
+|------|------------------|---------|
+| Camera | Angle, perspective | "eye-level, perfectly upfront (0 degrees)" |
+| Lighting | Setup, shadow direction | "3-point studio, soft shadow bottom-right" |
+| Framing | Coverage, position | "80% frame coverage, product centered" |
+| Background | Treatment, grounding | "pure white, soft contact shadow" |
+| Enhancement | Sharpness, color | "tack sharp, true-to-source colors" |
+
+### Using Style Specs in Subsequent Calls
+
+Add to custom_spec as explicit text instruction:
+
+```
+custom_spec: {
+  instruction: "Apply these EXACT style specs from the approved anchor:
+    Camera: eye-level, perfectly upfront (0 degrees)
+    Lighting: 3-point studio, soft shadow falling bottom-right
+    Framing: 80% frame coverage, centered
+    Background: pure white with soft contact shadow
+    The output must look like it came from the same photoshoot."
+}
 ```
 
 ### Anchor Selection (Reasoning, Not Rules)
@@ -399,60 +441,31 @@ Each image generation call is independent AND Gemini is non-deterministic - even
 
 | Criterion | Why It Matters |
 |-----------|----------------|
-| **Sharp in source** | Blurry anchor = blurry reference for Gemini |
-| **Well-lit in source** | Shadows/darkness in anchor propagates to copies |
-| **Shows full features** | Partial visibility limits what Gemini can match |
-| **Representative proportions** | Extreme sizes may not transfer well to others |
+| **Sharp in source** | Blurry source = harder extraction |
+| **Well-lit in source** | Shadows/darkness in source affects quality |
+| **Shows full features** | Partial visibility limits accuracy |
+| **Representative proportions** | Extreme sizes may have different optimal angles |
 
 **Heuristics when criteria are equal:**
-- Size variants: Prefer MEDIUM (transfers well to both larger and smaller)
+- Size variants: Prefer MEDIUM (middle ground for all)
 - Design variants (same size): Prefer the "hero" or most common variant
 - Mixed: Combine both (medium size of hero design)
 
-**Never rigid rules.** Reason about which variant makes the best visual reference.
+### User Communication
 
-### User Communication Template
-
-When presenting anchor for approval, communicate context:
-
-```
-"Here's the first variant ([variant name]). Once approved, I'll apply
-this exact angle, lighting, and framing to the remaining [N] variants.
-
-Please review the PHOTOGRAPHIC STYLE specifically:
-- Camera angle acceptable?
-- Lighting direction/shadows acceptable?
-- Framing/coverage acceptable?
-
-Product-specific feedback also welcome - will be applied to all."
-```
-
-This ensures user knows:
-- This is an anchor, not just one output
-- Approval commits to a style for the batch
-- What specifically to evaluate
-
-### Style_ref Limitations (Honest Acknowledgment)
-
-Style_ref IMPROVES consistency but does NOT GUARANTEE it:
-
-| Limitation | Reality |
-|------------|---------|
-| Extreme size differences | 50ml vs 500ml have different proportions - some variation unavoidable |
-| Complex products | Intricate details may render differently |
-| Gemini interpretation | "Match angle" is interpreted, not measured |
-
-**Grid Test is ESSENTIAL verification, not optional safety net.**
+When presenting anchor, communicate:
+- This is the style anchor for batch processing
+- User should review photographic style (angle, lighting, framing)
+- Approval commits this style to all remaining variants
+- Provide the extracted style specs for transparency
 
 ### Recovery Steps for Grid Test Failures
 
-When Grid Test reveals inconsistent outputs:
-
 | Retry | Action | Rationale |
 |-------|--------|-----------|
-| **1st** | Add explicit angle specs | "exact 15-degree top-down, shadows falling left, product fills 70% of frame" |
-| **2nd** | Use DIFFERENT anchor | Maybe this variant is incompatible with the original anchor |
-| **3rd** | Accept partial variation | Report to user: "Variant X resists consistency due to [size difference/complexity]. Recommend separate photoshoot treatment." |
+| **1st** | Make style specs MORE explicit | Add numeric values, be more precise |
+| **2nd** | Use DIFFERENT anchor | Maybe this variant's specs don't transfer well |
+| **3rd** | Accept partial variation | Escalate: "Variant X resists consistency due to [reason]" |
 
 **Never infinite retry.** Three attempts, then escalate with diagnosis.
 
