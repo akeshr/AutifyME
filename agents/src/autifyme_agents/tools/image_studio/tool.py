@@ -101,17 +101,22 @@ INPUT: You receive JSON specs + labeled images. Read ALL specs and apply them.
 === LABELED IMAGES ===
 Each image has a label indicating its ROLE:
 
-[product], [source] = THE ACTUAL PRODUCT
-  - Study its distinctive features: shape, colors, textures, patterns, labels, artwork
+[product], [source] = THE ACTUAL PRODUCT TO USE
+  - This IS your source material - work FROM this image
+  - Study it: shape, colors, textures, patterns, labels, artwork
   - Source may be poorly lit, badly angled, partially visible - that's OK
-  - Create PROFESSIONAL version of THIS SAME PRODUCT (not a generic lookalike)
-  - Preserve identity elements, improve presentation quality
+  - Output must be THIS SPECIFIC PRODUCT with improved presentation
+  - NOT a regenerated product that merely resembles it
 
 [style_ref] = MOOD/LIGHTING REFERENCE - match its atmosphere, not content
 
 [background] = SCENE/ENVIRONMENT REFERENCE - use as background inspiration
 
 [product_variant] = ADDITIONAL PRODUCTS - combine coherently in family shots
+
+KEY DISTINCTION:
+- Source provided? Output must be BASED ON that specific product
+- No source? Generate from description in specs
 
 === SPEC TYPES (apply what's provided) ===
 
@@ -138,24 +143,23 @@ Each image has a label indicating its ROLE:
 "custom_spec" = CREATIVE ideas beyond standard specs
 "creative_direction" = FREE-FORM notes
 
-=== BALANCED QUALITY APPROACH ===
+=== QUALITY DIMENSIONS (balance appropriately) ===
 
-All dimensions matter - balance them appropriately:
-- IDENTITY: Product must be recognizable (when working with source)
-- SHARPNESS: Professional clarity, crisp details
-- PHOTOREALISM: Believable lighting, shadows, physics
-- CREATIVITY: Professional presentation, optimal composition
+- IDENTITY: Product recognizable (when source provided)
+- SHARPNESS: Crisp details, text/logos legible, edges precise
+- PHOTOREALISM: Contact shadows, grounding, believable light physics
+- CREATIVITY: Professional composition, optimal presentation
 
-The specs tell you what matters most for THIS task:
-- Heavy fidelity spec? Identity preservation is priority
-- Scene/lifestyle specs? Creative environment matters more
-- No fidelity spec? Use professional judgment for balance
+The specs guide priority:
+- Heavy fidelity spec? Identity matters most
+- Scene/lifestyle specs? Environment creativity matters more
+- Minimal specs? Professional judgment
 
 === OUTPUT STANDARDS ===
-- Sharp enough to zoom 200%
+- Sharp at 200% zoom
 - Professional studio quality
-- When source provided: Product owner recognizes their product
-- When generating: High-quality, believable result"""
+- Products sit ON surfaces (contact shadows, not floating)
+- Source provided? Owner recognizes their exact product"""
 
 
 # =============================================================================
