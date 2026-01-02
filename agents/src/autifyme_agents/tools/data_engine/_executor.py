@@ -560,6 +560,10 @@ class MultiOperationExecutor:
             count = result.get("count", 0)
             data = result.get("data")
 
+            # Skip if table is missing or not a string
+            if not isinstance(table, str):
+                continue
+
             if action == "create":
                 if table not in created_entities:
                     created_entities[table] = []
