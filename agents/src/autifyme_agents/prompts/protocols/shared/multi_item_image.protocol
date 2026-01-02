@@ -381,6 +381,8 @@ Each image_studio call is independent. Without consistency enforcement:
 
 Consistency comes from **IDENTICAL STYLE PARAMETERS**, not from text instructions or image references.
 
+**Core Principle:** The anchor call is a TEMPLATE. Batch calls copy the template and change only what's logically different for each item (extraction target, filename, item-specific fidelity).
+
 ```
 1. SELECT ANCHOR - Choose representative item (see Anchor Selection below)
 2. GENERATE ANCHOR - Process with full specs and source context
@@ -392,146 +394,34 @@ Consistency comes from **IDENTICAL STYLE PARAMETERS**, not from text instruction
 6. VERIFY - Grid test for visual consistency
 ```
 
-### Style Keys (What Makes Outputs Consistent)
+### Source Context
 
-These parameters define the "photoshoot look" and MUST be consistent across all batch calls:
+Not all source images apply to all batch items. **Decision rule:** If a source image shows a SHARED attribute (brand, material, style) include it in ALL batch calls. If it shows ONE SPECIFIC item's detail, include only for that item.
 
-| Style Key | Why It Matters |
-|-----------|----------------|
-| `lighting.*` | Same light direction, quality, shadows |
-| `composition.camera_angle` | Same perspective |
-| `composition.product_coverage` | Same framing |
-| `background.*` | Same backdrop treatment |
-| `enhancement.*` | Same sharpness, color treatment |
-| `focus.*` | Same depth of field |
-| `output.aspect_ratio` | Same dimensions |
-| `output.size` | Same resolution |
+### HITL Gate (MANDATORY)
 
-### Item-Specific Parameters (What Naturally Varies)
+Anchor approval BLOCKS batch generation. Use `write_data` (triggers HITL) NOT `write_todos` (internal tracking only).
 
-| Parameter | Why It Varies |
-|-----------|---------------|
-| `extraction.target_description` | Different item in source |
-| `extraction.position_hint` | Item location |
-| `output.filename` | Unique file per item |
-| `fidelity.*` | Item-specific features (colors, text, patterns) |
-| `material_treatment.*` | Only if items have different materials |
-
-### Source Context Reasoning
-
-Not all source images apply to all batch items. For each image in anchor's `images` array, ask:
-
-| Context Type | Include in Batch? | Examples |
-|--------------|-------------------|----------|
-| **Shared Context** | YES - all batch calls | Brand reference, style/mood reference, lighting reference |
-| **Item-Specific** | Only if relevant | Item closeup, item-specific detail |
-
-**Decision rule:** Does this source image provide information needed for the CURRENT item's fidelity?
-
-### HITL Gate: write_data (MANDATORY)
-
-Anchor approval BLOCKS batch generation until user approves.
-
-| Tool | Purpose | HITL Trigger? |
-|------|---------|---------------|
-| `write_todos` | Internal task tracking | NO |
-| `write_data` | User-facing decisions | YES |
-
-**What user approves:** The STYLE (lighting, angle, background, quality level) - not the specific anchor item.
-
-**After approval:** Style keys are LOCKED. Batch proceeds with locked parameters.
+User approves the STYLE, not the specific item. After approval, style is LOCKED for batch.
 
 ### Anchor Selection
 
-| Criterion | If Not Met |
-|-----------|------------|
-| Sharp in source | Try different item |
-| Well-lit in source | Try different item |
-| Shows representative features | Try different item |
-| **ALL fail** | **ESCALATE to PM** |
+Choose item that is sharp, well-lit, and representative. If equal: prefer MEDIUM size or hero variant. If none suitable: escalate to PM.
 
-**Heuristics when equal:**
-- Size variants: Prefer MEDIUM (shows typical proportions)
-- Design variants: Prefer hero/bestseller
+### Verification
 
-### Grid Test (Visual Verification)
-
-After batch generation, create verification grid:
-
-```
-image_studio(
-    images=[all generated outputs as labeled images],
-    composition={"position": "grid layout - NxM, equal spacing"},
-    background={"treatment": "solid_color", "color": "white"},
-    output={"filename": "verification_grid"}
-)
-```
-
-Check via view_image:
-- Same camera angle across all?
-- Same framing/product coverage?
-- Shadows falling same direction?
-- Same lighting quality?
-
-**If ANY outlier:** Regenerate that item with corrected style parameters.
-
-### Recovery (3 attempts max)
-
-| Attempt | Action |
-|---------|--------|
-| 1st | Verify style keys are identical, fix any drift |
-| 2nd | Try different anchor item |
-| 3rd | Escalate with diagnosis |
+After batch, create grid of all outputs and verify visual consistency. If ANY outlier, regenerate with template parameters.
 
 ---
 
 ## BATCH CONSISTENCY ANTI-PATTERNS
 
-### Anti-Pattern: Text-Based Consistency
+If you find yourself doing any of these, the core principle is being violated:
 
-**Symptom:** `custom_spec.instruction` contains "match anchor", "same as anchor", or references anchor filename.
-
-**Why Wrong:**
-- Anchor image is NOT in the images array - model cannot visually match it
-- Text instructions are unreliable for visual consistency
-- This is a WORKAROUND for non-identical style parameters
-
-**Root Cause:** Style parameters were modified instead of inherited.
-
-**The Test:** If you're writing "match anchor" anywhere, your style keys are not actually identical. Fix the parameters, remove the workaround text.
-
-### Anti-Pattern: Dropped Source Context
-
-**Symptom:** Anchor uses `[source, reference_1, reference_2]` but batch uses only `[source]`.
-
-**Why Wrong:**
-- Label references like `[reference_1]` in specs require the image to be present
-- Dropping source images breaks fidelity specifications
-- Batch items lose context they need for accurate extraction
-
-**Fix:** Include all SHARED context images in every batch call.
-
-### Anti-Pattern: HITL Bypass
-
-**Symptom:** Called `write_todos` after anchor, then immediately generated batch.
-
-**Why Wrong:**
-- `write_todos` is task tracking, NOT user approval
-- User never saw or approved the anchor style
-- Batch generated without style lock
-
-**Fix:** Use `write_data` with anchor preview. Wait for approval before batch.
-
-### Anti-Pattern: Modified Style Keys
-
-**Symptom:** Batch calls have different values for lighting, composition, enhancement, etc.
-
-**Why Wrong:**
-- Each call generates with different "photoshoot settings"
-- Outputs will look inconsistent
-- Defeats the purpose of anchor-first pattern
-
-**Fix:** Style keys must be IDENTICAL across anchor and all batch calls. Only extraction target and output filename change.
+- **Text workarounds** - Writing "match anchor" or "same style as anchor" in custom_spec means parameters aren't actually identical
+- **Dropped source context** - Batch calls missing shared reference images that anchor used
+- **HITL bypass** - Using `write_todos` instead of `write_data` after anchor generation
+- **Modified parameters** - Changing lighting, composition, background, etc. between anchor and batch
 
 ---
 
