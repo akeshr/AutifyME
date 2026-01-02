@@ -479,6 +479,7 @@ class ExtractionSpec(BaseModel):
     """Extract specific product(s) from multi-product image.
 
     For working with group photos containing multiple products/variants.
+    Supports precise bounding box targeting for multi-item images.
     """
 
     target_description: str = Field(
@@ -489,10 +490,30 @@ class ExtractionSpec(BaseModel):
             "'all three variants separately', 'just the main hero product in center'"
         )
     )
+    target_bbox: tuple[int, int, int, int] | None = Field(
+        default=None,
+        description=(
+            "RECOMMENDED: Bounding box coordinates for precise targeting. "
+            "Format: [y_min, x_min, y_max, x_max] normalized to 0-1000 scale. "
+            "Origin is top-left corner. "
+            "Examples: [0, 0, 300, 300] for top-left item, "
+            "[333, 333, 666, 666] for center item in 3x3 grid. "
+            "When provided, model focuses on this region for extraction. "
+            "Combine with target_description for best results."
+        )
+    )
+    target_item_id: str | None = Field(
+        default=None,
+        description=(
+            "Reference ID from ItemManifest for tracking. "
+            "Examples: 'item_1', 'item_5', 'variant_large_blue'. "
+            "Use to correlate extraction with upstream detection."
+        )
+    )
     position_hint: str | None = Field(
         default=None,
         description=(
-            "Where target product is located. "
+            "Where target product is located (DEPRECATED - prefer target_bbox). "
             "Examples: 'left side of frame', 'center foreground', 'right background', "
             "'the largest one', 'second from left', 'the one being held'"
         )

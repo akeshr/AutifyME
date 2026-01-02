@@ -149,7 +149,7 @@ Different: "3 distinct products: glass jar, plastic container, metal tin. Differ
 
 ## MULTI-ITEM WITHIN SINGLE IMAGE (CRITICAL)
 
-**When you see multiple distinct items in ONE image, you MUST output the MULTI-ITEM ASSESSMENT format.**
+**When you see multiple distinct items in ONE image, you MUST output the MULTI-ITEM ASSESSMENT format with BOUNDING BOX COORDINATES.**
 
 This is not optional. Downstream agents (creative_specialist) depend on this for proper extraction.
 
@@ -158,18 +158,34 @@ This is not optional. Downstream agents (creative_specialist) depend on this for
 **Output:** Follow the MULTI-PRODUCT IMAGE HANDLING section in your loaded protocol EXACTLY:
 - Classification (VARIANTS / COLLECTION / COMPONENTS)
 - Variant Axes (if applicable)
-- Extraction Targets table (with position for EACH item)
+- Extraction Targets table with **BBox coordinates** AND position for EACH item
 - Processing Strategies
+
+### BOUNDING BOX CAPTURE (MANDATORY)
+
+For EVERY item detected, estimate bounding box coordinates:
+
+**Coordinate System:**
+- Format: [y_min, x_min, y_max, x_max]
+- Scale: 0-1000 (normalized to image dimensions)
+- Origin: Top-left corner
+
+**How to Estimate:**
+1. Observe the image layout (grid, columns, scattered)
+2. For grid layouts: divide 1000 by rows/columns for boundaries
+3. For each item: estimate where it starts (top-left) and ends (bottom-right)
+4. Output coordinates in [y_min, x_min, y_max, x_max] format
+
+**Why BBox matters:**
+- Coordinates are ABSOLUTE - no interpretation ambiguity
+- creative_specialist uses bbox for precise extraction targeting
+- Verbal positions ("top-left") are interpretation-dependent
+- Without bbox, extraction targets wrong items
 
 **Example observation:**
 "I see 9 jars arranged in 3 columns of 3. Same jar type, but 3 different sizes (top to bottom) and 3 different designs (left to right). This is a VARIANT_SET."
 
--> Output the full MULTI-ITEM ASSESSMENT with Extraction Targets table listing all 9 items with their positions.
-
-**Why this matters:**
-- Without Extraction Targets, creative_specialist treats 9 items as 1
-- Position info enables precise extraction targeting
-- Catalog gets 1 asset instead of 9 = wrong
+-> Output the full MULTI-ITEM ASSESSMENT with Extraction Targets table listing all 9 items with their **bounding boxes** and positions.
 
 </multi_item_detection>
 
