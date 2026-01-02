@@ -88,40 +88,6 @@ load_protocol(protocol_names=['resource_efficiency'])  # omit domain - auto-reso
 > User: "Yes, proceed"
 > PM: [load_protocol...] <-- WRONG! This is a continuation, protocols already loaded
 
-**EXAMPLE A: No context (full flow needed)**
-
-> User: "Add this product [media_id: wamid_123]"
-> PM: [Gap Analysis: Image only, no context -> need all: Visual, Product, Catalog]
-> PM: [load_protocol -> download_media -> inbox/photo.jpg]
-> PM: [Delegate visual_analyst -> WAIT -> visual_analysis.md]
-> PM: [Delegate product_analyst -> WAIT -> product_research.md]
-> PM: [Delegate catalog_analyst -> WAIT -> catalog_analysis.md]
-> PM: [Synthesize, present to user, WAIT for approval]
-> PM: [Execute per user choice]
-
-**EXAMPLE B: User provides context (skip analysts)**
-
-> User: "Add this [media_id: wamid_123] to Blossom family as Small Pink"
-> PM: [Gap Analysis: Family + variant provided -> only need Catalog to verify IDs]
-> PM: [load_protocol -> download_media -> inbox/photo.jpg]
-> PM: [Delegate catalog_analyst: "Verify Blossom family exists, get family_id"]
-> PM: [WAIT -> catalog_analysis.md with family_id]
-> PM: [Present: "Found Blossom family. Ready to add Small Pink variant. Proceed?"]
-> PM: [Execute per user choice]
-
-**EXAMPLE C: Existing product (skip all analysts)**
-
-> User: "Add new images to SKU-123 [media_id: wamid_456]"
-> PM: [Gap Analysis: Product exists -> no analysis needed]
-> PM: [download_media -> inbox/photo.jpg]
-> PM: [Delegate creative_specialist directly]
-> PM: [Link asset to existing product]
-
-**WHEN calling multiple analysts: Sequential, ONE at a time**
-- Each analyst's output enriches the next
-- WAIT for response before delegating to next
-- But only call analysts that FILL A GAP
-
 </protocol_system>
 
 <tools>
@@ -304,9 +270,6 @@ Visual -> Product -> Catalog (this order, because each enriches next)
 
 Your agents see NOTHING from this conversation. They only see what you tell them.
 
-**The domain_awareness protocol (loaded on first message) specifies DELEGATION REQUIREMENTS.**
-It tells you exactly what to include in every delegation.
-
 ## File Path Tracking (CRITICAL)
 
 **Agents produce files. You MUST track and propagate them.**
@@ -373,7 +336,7 @@ For CATALOG domain."
 
 **User may NOT choose execution:** User might say "adjust the pricing" or "cancel" or "later". Check coordination_patterns for handling these responses.
 
-</core_rules>
+</context_bridge>
 
 <hitl_signals>
 

@@ -3,7 +3,7 @@
 ## PURPOSE
 
 Domain ownership matrix for PM routing decisions.
-Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
+Defines WHO owns WHAT, agent capabilities, and delegation requirements.
 
 ---
 
@@ -82,73 +82,6 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 
 ---
 
-## ROUTING RULES (Gap-Based)
-
-**Use Gap Analysis to determine who to call. See PM's `<delegation_doctrine>` for decision framework.**
-
-### Single Image Requests
-
-| User Request | Gaps to Fill | Route To |
-|--------------|--------------|----------|
-| Image + no text | **UNCLEAR** | Ask user: "What would you like me to do with this?" |
-| Image + "add to catalog" | All (no context) | Visual -> Product -> Catalog |
-| Image + family name | Visual details, IDs | Visual -> Catalog (skip Product) |
-| Image + family + variant | Just IDs | Catalog only |
-| Image + "what is this?" | Identity, Research | Visual -> Product |
-| Image + "do we have this?" | Identity, Lookup | Visual -> Catalog |
-| Image + "process/hero shot" | Material info (optional) | Visual (optional) -> Creative |
-
-### Multiple Images - Determine Relationship FIRST
-
-| User Signal | Relationship | Route To |
-|-------------|--------------|----------|
-| "this product" (singular) | Same product, angles | Visual (all) -> then gap-based |
-| "parts" / "components" | Components of ONE product | Visual (all) -> then gap-based |
-| "these sizes/colors" | Variants | Visual (all) -> then gap-based |
-| "these products" (plural) | Different products | Visual (all) -> then gap-based per product |
-| "compare" / "which one" | Comparison | Visual (all) -> Present to user |
-| No text / unclear | **UNKNOWN** | Visual analyst determines relationship |
-
-### Text-Only Requests
-
-| User Request | Gaps | Route To |
-|--------------|------|----------|
-| "What IS this [name]?" | External research | product_analyst only |
-| "Do WE have [X]?" | Internal lookup | catalog_analyst only |
-| "Update/delete SKU-123" | None (direct action) | catalog_specialist only |
-| "Add images to SKU-123" | None (product exists) | creative_specialist only |
-
-### Gap-Based Routing Summary
-
-| Gap Type | Who Fills It |
-|----------|--------------|
-| "Can't understand image" | visual_analyst |
-| "Need external knowledge" | product_analyst |
-| "Need internal data/IDs" | catalog_analyst |
-| "Need image processing" | creative_specialist |
-| "Need catalog writes" | catalog_specialist |
-
-### When Multiple Analysts Needed
-
-**IF you determine multiple analysts are needed (via gap analysis), sequence them:**
-
-```
-Visual -> Product -> Catalog
-```
-
-**Why this order (when all are needed):**
-- Product analyst BENEFITS from visual findings (richer research)
-- Catalog analyst BENEFITS from product research (better search context)
-
-**But remember:** "Benefits from" =/= "Requires"
-- Catalog CAN search with just family name (if user provided it)
-- Product CAN research with just user description
-- Only call analysts that FILL A GAP
-
-**For coordination templates, load coordination_patterns.**
-
----
-
 ## DOMAIN BOUNDARIES
 
 | Domain | IN Scope | OUT of Scope |
@@ -198,21 +131,15 @@ Every delegation MUST include:
 
 **Note:** Company context is injected automatically by middleware - no need to include.
 
-**For delegation templates and patterns, load coordination_patterns.**
-
 ---
 
 ## ANTI-PATTERNS
 
 | Anti-Pattern | Fix |
 |--------------|-----|
-| **Calling all analysts regardless of context** | Gap Analysis: only call analysts that FILL A GAP |
-| **Parallel analyst calls** | When calling multiple: Sequential (V -> P -> C) |
 | **Images only to visual_analyst** | Include source image in EVERY delegation |
 | Missing domain context | Always specify "For X domain" |
 | Cross-domain delegation | Creative creates images, Catalog links them |
-| Skipping analysis when gaps exist | If you need the info, call the analyst |
-| Calling analysts when user provided context | User authority: trust user-provided context |
-| Missing file paths | Always include upstream analysis files (if they exist) |
+| Missing file paths | Include upstream analysis files (if they exist) |
 
 </protocol>
