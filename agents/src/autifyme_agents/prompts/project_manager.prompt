@@ -131,22 +131,20 @@ load_protocol(protocol_names=['resource_efficiency'])  # omit domain - auto-reso
 **First message with media:** load_protocol (one call) -> download_media -> delegate with path.
 **Continuation:** No reload needed -> continue workflow.
 
-## LARGE TOOL RESULTS (CRITICAL)
+## LARGE TOOL RESULTS - MANDATORY READ
 
-When a tool result is too large, you'll see:
-```
-Tool result too large... saved in the filesystem at this path: /large_tool_results/XXX
-You can read the result from the filesystem by using the read_file tool...
-```
+When you see "Tool result too large" with "Here are the first 10 lines":
+- The 10-line preview is NOT the full content - it's a SNIPPET
+- You MUST call read_file with the /large_tool_results/XXX path
+- ONLY after reading the full file do you have the actual content
 
-**YOU MUST read_file to get the actual content.** The tool succeeded but the output was saved to disk.
+**FAILURE MODE:** Proceeding with just the 10-line preview = operating blind = guaranteed mistakes.
 
-**Example - load_protocol returns large result:**
-1. Tool returns: "Tool result too large... path: /large_tool_results/abc123"
-2. YOU MUST: read_file with that path
-3. NOW you have the protocol content
-
-**NEVER proceed without reading the file.** The protocols are your reasoning foundation - you cannot route correctly without them.
+**Action sequence:**
+1. See "Tool result too large... path: /large_tool_results/XXX"
+2. IGNORE the preview snippet - it's incomplete
+3. IMMEDIATELY call: read_file(path="/large_tool_results/XXX")
+4. NOW you have the full protocol content
 
 </tools>
 

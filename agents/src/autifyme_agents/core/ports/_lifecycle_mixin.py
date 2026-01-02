@@ -92,3 +92,31 @@ class LifecycleMixin(ABC):
         - Not raise exceptions (log errors instead)
         """
         pass
+
+    @abstractmethod
+    async def cleanup_subagent_checkpoints(self, thread_id: str) -> dict[str, int]:
+        """
+        Delete subagent checkpoints for a thread after workflow completion.
+
+        Subagents (specialists) are stateless - their checkpoints (tools:* namespace)
+        are only needed during HITL interrupts for resume. Once PM completes without
+        interrupt, all subagent checkpoints can be safely deleted to reclaim storage.
+
+        Args:
+            thread_id: Conversation thread ID to cleanup checkpoints for
+
+        Returns:
+            Dict with deletion counts:
+            {
+                'deleted_checkpoints': int,
+                'deleted_blobs': int,
+                'deleted_writes': int
+            }
+
+        Notes:
+            - Only deletes checkpoints in 'tools:%' namespace (subagents)
+            - PM checkpoints (root namespace) are preserved
+            - Safe to call even if no subagent checkpoints exist
+            - Does not raise on failure (logs warning instead)
+        """
+        pass

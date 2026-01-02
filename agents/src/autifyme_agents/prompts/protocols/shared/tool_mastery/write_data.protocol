@@ -80,6 +80,12 @@ Use `asset_uploads` when you need the user to SEE an image during HITL approval.
 - `@name.content_type` - MIME type
 - `@name.caption` - Caption text
 
+### [CRITICAL] NEVER Hallucinate Paths
+
+**Use EXACT paths from tool outputs. Never guess, reconstruct, or type from memory.**
+
+"File not found" errors are almost always caused by hallucinated paths - guessing filenames instead of using the exact path returned by a tool.
+
 See **Pattern 8-10** for creative specialist asset creation examples.
 
 ---
@@ -630,6 +636,15 @@ hitl_summary: "Creating some records. Approve?"
 CORRECT:
 hitl_summary: "Creating 4 new records:\n- CODE-001 (value: 30)\n- CODE-002 (value: 32)\n\nReply *approve* to proceed or *reject* to cancel."
 ```
+
+### Anti-Pattern 5: Hallucinated Paths
+
+```
+WRONG: Type path from memory -> "File not found"
+CORRECT: Copy EXACT path from tool output -> SUCCESS
+```
+
+If you're typing a path that wasn't returned by a tool, you're hallucinating.
 
 ---
 

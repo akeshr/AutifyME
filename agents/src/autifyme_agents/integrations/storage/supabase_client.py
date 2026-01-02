@@ -3473,6 +3473,59 @@ class SupabaseStorageClient(StorageInterface):
             self._async_client_loop = None
             logger.info("Async Supabase client cleanup completed")
 
+    async def cleanup_subagent_checkpoints(self, thread_id: str) -> dict[str, int]:
+        """Delete subagent checkpoints for a thread after workflow completion.
+
+        Subagents (specialists) are stateless - their checkpoints (tools:* namespace)
+        are only needed during HITL interrupts for resume. Once PM completes without
+        interrupt, all subagent checkpoints can be safely deleted to reclaim storage.
+
+        Uses the cleanup_thread_subagent_checkpoints RPC function which deletes
+        from checkpoint_writes, checkpoint_blobs, and checkpoints tables.
+
+        Args:
+            thread_id: Conversation thread ID to cleanup checkpoints for
+
+        Returns:
+            Dict with deletion counts:
+            {
+                'deleted_checkpoints': int,
+                'deleted_blobs': int,
+                'deleted_writes': int
+            }
+        """
+        try:
+            client = await self._ensure_async_client()
+            result = await client.rpc(
+                "cleanup_thread_subagent_checkpoints",
+                {"p_thread_id": thread_id}
+            ).execute()
+
+            if result.data and len(result.data) > 0:
+                row = result.data[0]
+                counts = {
+                    "deleted_checkpoints": row.get("deleted_checkpoints", 0) or 0,
+                    "deleted_blobs": row.get("deleted_blobs", 0) or 0,
+                    "deleted_writes": row.get("deleted_writes", 0) or 0,
+                }
+                total = sum(counts.values())
+                if total > 0:
+                    logger.debug(
+                        "Cleaned up subagent checkpoints",
+                        extra={"thread_id": thread_id, **counts},
+                    )
+                return counts
+
+            return {"deleted_checkpoints": 0, "deleted_blobs": 0, "deleted_writes": 0}
+
+        except Exception as e:
+            # Don't fail workflow on cleanup error - just log warning
+            logger.warning(
+                f"Failed to cleanup subagent checkpoints: {e}",
+                extra={"thread_id": thread_id, "error": str(e)},
+            )
+            return {"deleted_checkpoints": 0, "deleted_blobs": 0, "deleted_writes": 0}
+
 
 class SupabaseTransaction:
     """Transaction context manager for SupabaseStorageClient.

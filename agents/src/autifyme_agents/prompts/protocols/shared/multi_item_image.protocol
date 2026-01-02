@@ -47,36 +47,35 @@ When items are VARIANTS, identify the axes of variation:
 
 ### Variant Identification Doctrine (CRITICAL)
 
-**Position is AMBIGUOUS. Visual characteristics are UNAMBIGUOUS.**
+**Position is AMBIGUOUS. Visual characteristics are UNAMBIGUOUS. BOUNDING BOXES are ABSOLUTE.**
 
-When identifying variants for extraction, use INTRINSIC visual characteristics before spatial position.
+When identifying variants for extraction, use INTRINSIC visual characteristics AND bounding box coordinates.
 
 **Identification Hierarchy (use in priority order):**
 
 | Priority | Differentiator | Why Reliable |
 |----------|----------------|--------------|
-| 1 | **SIZE** | Visually absolute - tallest/shortest/medium is unambiguous |
-| 2 | **VISUAL PATTERN** | Intrinsic to product - distinct colors, designs, prints |
-| 3 | **TEXT/LABEL** | Explicit identification when readable in image |
-| 4 | **POSITION** | Last resort - only when visual characteristics identical |
+| 1 | **BOUNDING BOX** | Pixel-precise coordinates - [y_min, x_min, y_max, x_max] is ABSOLUTE |
+| 2 | **SIZE** | Visually absolute - tallest/shortest/medium is unambiguous |
+| 3 | **VISUAL PATTERN** | Intrinsic to product - distinct colors, designs, prints |
+| 4 | **TEXT/LABEL** | Explicit identification when readable in image |
+| 5 | **POSITION** | Last resort - only when visual characteristics identical |
 
-**Why this order?**
-- Gemini is a VISUAL model - it perceives size differences with high accuracy
-- "The largest jar" has ONE correct answer
-- "Left column" is interpretation-dependent (how are columns counted?)
-- Visual characteristics are INTRINSIC to product, position is CONTEXTUAL
+**Why bounding boxes first?**
+- Coordinates are ABSOLUTE - no interpretation needed
+- "bbox [50, 100, 450, 400]" has ONE correct answer
+- Visual characteristics are secondary confirmation
+- Position descriptions ("top-left") are interpretation-dependent
 
 **Compound Identification:**
 When multiple differentiators exist, COMBINE for precision:
-- Size narrows the candidate set
-- Visual pattern confirms the specific item
-- Position only as tie-breaker if needed
+- Bounding box provides pixel-precise location
+- Size/visual pattern confirms the specific item
+- Description provides semantic understanding
 
-**For size variants:** Lead with SIZE (e.g., "the LARGEST [product]", "the SMALLEST [product]")
+**For ALL extractions:** ALWAYS include bounding box coordinates when available.
 
-**For design variants (same size):** Lead with VISUAL DIFFERENTIATOR (e.g., "the [product] with [distinctive pattern/color]")
-
-**NEVER lead with position when visual differentiators exist.**
+**NEVER rely solely on verbal position when bbox coordinates exist.**
 
 ---
 
@@ -100,11 +99,15 @@ When multi-item detected, output a structured manifest that downstream agents ca
 
 ### Extraction Targets
 
-| # | Description | Position | Key Attributes |
-|---|-------------|----------|----------------|
-| 1 | [what it is] | [where in frame] | [domain-specific attributes] |
-| 2 | [what it is] | [where in frame] | [domain-specific attributes] |
-| ... | ... | ... | ... |
+| # | Description | BBox [y_min, x_min, y_max, x_max] | Position | Key Attributes |
+|---|-------------|-----------------------------------|----------|----------------|
+| 1 | [what it is] | [estimated_y_min, estimated_x_min, estimated_y_max, estimated_x_max] | [position] | [domain-specific] |
+| 2 | [what it is] | [estimated_y_min, estimated_x_min, estimated_y_max, estimated_x_max] | [position] | [domain-specific] |
+| ... | ... | ... | ... | ... |
+
+**CRITICAL:** BBox coordinates are MANDATORY. Scale: 0-1000 (normalized), origin top-left.
+- y_min, x_min = top-left corner of item (estimate based on visual location)
+- y_max, x_max = bottom-right corner of item (estimate based on visual extent)
 
 **Note:** Domain protocols extend "Key Attributes" with domain-specific columns (e.g., Size, Color for catalog).
 
@@ -150,6 +153,70 @@ Grid positions ("top-left", "bottom-right") ONLY work for images with true grid 
 - "the [color] lid variant, 3rd from top"
 
 Visual identifiers (print names, colors, sizes) are MORE RELIABLE than spatial positions alone.
+
+---
+
+## COORDINATE CAPTURE (CRITICAL FOR MULTI-ITEM)
+
+When assessing multi-item images, you MUST output bounding box coordinates for each detected item.
+
+### Coordinate System
+
+```
+Coordinates: [y_min, x_min, y_max, x_max]
+Scale: 0-1000 (normalized to image dimensions)
+Origin: Top-left corner of image
+```
+
+| Coordinate | Meaning |
+|------------|---------|
+| y_min | Top edge of item (0 = top of image) |
+| x_min | Left edge of item (0 = left of image) |
+| y_max | Bottom edge of item (1000 = bottom of image) |
+| x_max | Right edge of item (1000 = right of image) |
+
+### How to Estimate Bounding Boxes
+
+When viewing an image with multiple items:
+
+1. **Mentally divide the image into a 1000x1000 grid**
+2. **For each item, estimate the rectangular bounds:**
+   - Where does the item START (top-left corner)?
+   - Where does the item END (bottom-right corner)?
+3. **Output coordinates as [y_min, x_min, y_max, x_max]**
+
+### Estimation Strategy
+
+**For grid layouts (NxM items):**
+- Divide 1000 by number of columns for x boundaries
+- Divide 1000 by number of rows for y boundaries
+- Each cell's bbox = [row_start, col_start, row_end, col_end]
+
+**For irregular layouts:**
+- Estimate each item's visual bounds individually
+- Items may have different sizes - bounds should match actual item extent
+- Allow overlap in coordinates if items visually overlap
+
+### Precision Guidelines
+
+| Scenario | Precision Needed |
+|----------|------------------|
+| Well-separated items | Approximate bounds (+/- 50) acceptable |
+| Tightly packed items | More precise bounds needed |
+| Overlapping items | Include overlap area, note in description |
+| Items at edges | Extend to image boundary (0 or 1000) |
+
+### Why BBox > Position Descriptions
+
+| Verbal Description | Problem |
+|--------------------|---------|
+| "Top-left" | Which row? Which column boundary? Interpretation varies. |
+| "The large one" | Multiple large items? Subjective size judgment. |
+| "3rd from left" | Counting direction? Gaps between items? |
+
+**BBox solves this:** Numeric coordinates are unambiguous - the model uses exact pixel regions.
+
+**Rule:** Every item in Extraction Targets table MUST have a BBox column with coordinates.
 
 ---
 
@@ -365,126 +432,63 @@ When extraction completes (with or without failures), report structured results:
 
 ---
 
-## BATCH CONSISTENCY (View-Then-Describe)
+## BATCH CONSISTENCY (Anchor-First Pattern)
 
-When processing multiple variants with INDIVIDUAL strategy, all outputs must appear from the SAME photoshoot. This section defines the universal pattern; domain protocols apply it.
+When processing multiple items with INDIVIDUAL strategy, all outputs must appear from the SAME photoshoot.
 
 ### The Problem
 
-Each image generation call is independent AND Gemini is non-deterministic. Without explicit consistency enforcement:
-- Different camera angles across variants
+Each image_studio call is independent. Without consistency enforcement:
+- Different camera angles across items
 - Different lighting directions
 - Different framing/coverage
 - Result: Unusable as a cohesive set
 
-### The Solution: View-Then-Describe
+### The Solution: Style Parameter Inheritance
+
+Consistency comes from **IDENTICAL STYLE PARAMETERS**, not from text instructions or image references.
+
+**Core Principle:** The anchor call is a TEMPLATE. Batch calls copy the template and change only what's logically different for each item (extraction target, filename, item-specific fidelity).
 
 ```
-1. SELECT ANCHOR - Choose representative variant (see Anchor Selection below)
-   - If NO variant is suitable: ESCALATE (can't build batch on poor anchor)
-2. GENERATE ANCHOR - Process ONE variant with full specs, record specs used
-3. VIEW ANCHOR - Use view_image to see the result
-4. EXTRACT STYLE SPECS - Describe what you see in precise terms
-5. PRESENT ANCHOR - write_data with style specs (triggers HITL)
-   - User approves image quality AND style for entire batch
-6. BATCH REMAINING - For each remaining variant:
-   - Use IDENTICAL structured specs (lighting, composition, enhancement)
-   - Add custom_spec.instruction to REINFORCE consistency
-7. GRID TEST - View all outputs, verify visual consistency
+1. SELECT ANCHOR - Choose representative item (see Anchor Selection below)
+2. GENERATE ANCHOR - Process with full specs and source context
+3. VIEW ANCHOR - Verify quality via view_image
+4. HITL APPROVAL - Present anchor via write_data (MANDATORY gate)
+   - User approves STYLE for entire batch
+   - Batch generation BLOCKED until approval
+5. BATCH REMAINING - Apply SAME style parameters to each item
+6. VERIFY - Grid test for visual consistency
 ```
 
-### Style Spec Extraction
+### Source Context
 
-After viewing anchor, document:
+Not all source images apply to all batch items. **Decision rule:** If a source image shows a SHARED attribute (brand, material, style) include it in ALL batch calls. If it shows ONE SPECIFIC item's detail, include only for that item.
 
-| Spec | What to Describe | Example |
-|------|------------------|---------|
-| Camera | Angle, perspective | "eye-level, 0 degrees" |
-| Lighting | Setup, shadow direction | "3-point studio, shadow bottom-right" |
-| Framing | Coverage, position | "80% frame, centered" |
-| Background | Treatment, grounding | "pure white, contact shadow" |
-| Enhancement | Sharpness, color | "tack sharp, true colors" |
+### HITL Gate (MANDATORY)
 
-### HITL Anchor Approval
+Anchor approval BLOCKS batch generation. Use `write_data` (triggers HITL) NOT `write_todos` (internal tracking only).
 
-**What user approves:**
-- Image quality (good enough?)
-- Style for batch (this angle/lighting for ALL variants?)
-
-**If user REJECTS:**
-1. Ask what's wrong
-2. Adjust specs based on feedback
-3. Regenerate and re-present
-
-**If user APPROVES:** Proceed with locked style.
-
-### Batch with Consistency
-
-**Structured specs** = WHAT to generate.
-**custom_spec.instruction** = REINFORCE consistency.
-
-```
-custom_spec: {
-  instruction: "Match the approved anchor EXACTLY:
-    Camera: eye-level, 0 degrees
-    Lighting: 3-point studio, shadow bottom-right
-    Framing: 80% frame, centered
-    Same photoshoot appearance."
-}
-```
-
-### Grid Test (Visual Verification)
-
-After generating all variants, CREATE a verification grid to see them side-by-side:
-
-```python
-image_studio(
-    images=[
-        {"path": "pending/variant_1.png", "label": "v1"},
-        {"path": "pending/variant_2.png", "label": "v2"},
-        {"path": "pending/variant_3.png", "label": "v3"},
-        # ... all variants
-    ],
-    composition={"position": "grid layout - NxM, equal spacing"},
-    background={"treatment": "solid_color", "color": "white"},
-    output={"filename": "verification_grid"}
-)
-```
-
-Then view_image the grid and check:
-- Same camera angle across all?
-- Same framing/product coverage?
-- Shadows falling same direction?
-- Same lighting quality?
-
-**If ANY outlier:** REDO that variant with more explicit style specs
+User approves the STYLE, not the specific item. After approval, style is LOCKED for batch.
 
 ### Anchor Selection
 
-| Criterion | If Not Met |
-|-----------|------------|
-| Sharp in source | Try different variant |
-| Well-lit in source | Try different variant |
-| Shows full features | Try different variant |
-| **ALL fail** | **ESCALATE to PM** |
+Choose item that is sharp, well-lit, and representative. If equal: prefer MEDIUM size or hero variant. If none suitable: escalate to PM.
 
-**Heuristics when equal:**
-- Size variants: Prefer MEDIUM
-- Design variants: Prefer hero/bestseller
+### Verification
 
-### Consistency Specs (IDENTICAL)
+After batch, create grid of all outputs and verify visual consistency. If ANY outlier, regenerate with template parameters.
 
-`composition.camera_angle`, `composition.product_coverage`, `lighting.*`, `enhancement`, `output.aspect_ratio`, `output.size`, `focus`
+---
 
-**What CAN differ:** `extraction.target_description`, `fidelity.hero_features`, `output.filename`
+## BATCH CONSISTENCY ANTI-PATTERNS
 
-### Recovery (3 attempts max)
+If you find yourself doing any of these, the core principle is being violated:
 
-| Attempt | Action |
-|---------|--------|
-| 1st | More explicit style specs |
-| 2nd | Different anchor variant |
-| 3rd | Escalate with diagnosis |
+- **Text workarounds** - Writing "match anchor" or "same style as anchor" in custom_spec means parameters aren't actually identical
+- **Dropped source context** - Batch calls missing shared reference images that anchor used
+- **HITL bypass** - Using `write_todos` instead of `write_data` after anchor generation
+- **Modified parameters** - Changing lighting, composition, background, etc. between anchor and batch
 
 ---
 

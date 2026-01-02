@@ -121,8 +121,14 @@ KEY DISTINCTION:
 
 "extraction" = EXTRACT FROM SOURCE IMAGE
   - target_description: What to extract from source images
+  - target_bbox: PRECISE COORDINATES [y_min, x_min, y_max, x_max] (0-1000 scale)
+    * When bbox provided, FOCUS on that specific region
+    * Coordinates define the exact item location in the source image
+    * Origin is top-left corner, scale 0-1000 normalized
+    * Example: [333, 333, 666, 666] = center item in 3x3 grid
   - Isolate the described item from the provided source
   - Source may be messy - your job is to isolate cleanly
+  - PRIORITY: Use bbox for targeting when available, description for understanding
 
 "fidelity" = PRODUCT IDENTITY PRESERVATION
   - preserve_colors, preserve_artwork, preserve_shape, hero_features
@@ -141,6 +147,20 @@ KEY DISTINCTION:
 "focus" = DEPTH OF FIELD control
 "custom_spec" = CREATIVE ideas beyond standard specs
 "creative_direction" = FREE-FORM notes
+
+=== BOUNDING BOX TARGETING (for multi-item extraction) ===
+
+When extraction.target_bbox is provided:
+1. LOCATE the region defined by [y_min, x_min, y_max, x_max]
+2. FOCUS extraction on the item within that bounding box
+3. USE target_description to understand WHAT the item is
+4. IGNORE other items outside the bbox region
+
+Coordinate system:
+- [0, 0, 1000, 1000] = entire image
+- [0, 0, 333, 333] = top-left ninth
+- [333, 333, 666, 666] = center ninth
+- Values are normalized (0-1000), not pixels
 
 === QUALITY DIMENSIONS (balance appropriately) ===
 
@@ -628,6 +648,7 @@ def _image_studio_impl(
                         # Higher resolution for verification - agent needs to judge quality
                         width, height = pil_img.size
                         max_dim = 1024  # Higher than view_image's 512 for quality checks
+                        output_img: Image.Image = pil_img
                         if max(width, height) > max_dim:
                             if width > height:
                                 new_width = max_dim
@@ -635,19 +656,19 @@ def _image_studio_impl(
                             else:
                                 new_height = max_dim
                                 new_width = int(width * (max_dim / height))
-                            pil_img = pil_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                            output_img = output_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
                         # Convert to RGB if needed (for JPEG encoding)
-                        if pil_img.mode in ("RGBA", "LA", "P"):
-                            rgb_img = Image.new("RGB", pil_img.size, (255, 255, 255))
-                            if pil_img.mode == "RGBA":
-                                rgb_img.paste(pil_img, mask=pil_img.split()[-1])
+                        if output_img.mode in ("RGBA", "LA", "P"):
+                            rgb_img = Image.new("RGB", output_img.size, (255, 255, 255))
+                            if output_img.mode == "RGBA":
+                                rgb_img.paste(output_img, mask=output_img.split()[-1])
                             else:
-                                rgb_img.paste(pil_img)
-                            pil_img = rgb_img
+                                rgb_img.paste(output_img)
+                            output_img = rgb_img
 
                         buffer = io.BytesIO()
-                        pil_img.save(buffer, format="JPEG", quality=90)  # Higher quality for verification
+                        output_img.save(buffer, format="JPEG", quality=90)  # Higher quality for verification
                         encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
                         data_uri = f"data:image/jpeg;base64,{encoded}"
 
@@ -725,7 +746,8 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- Text extraction/analysis (use view_image)\n\n"
             "STRUCTURED SPECS (all optional - use what applies):\n"
             "- fidelity: CRITICAL for source images - {preserve_colors: 'exact match', preserve_artwork: 'honeycomb pattern', hero_features: 'texture pattern'}\n"
-            "- extraction: {target_description: 'glass jar on left in [source]', isolation: 'complete', edge_treatment: 'sharp'}\n"
+            "- extraction: {target_description: 'glass jar on left in [source]', target_bbox: [y_min, x_min, y_max, x_max], isolation: 'complete', edge_treatment: 'sharp'}\n"
+            "  * target_bbox: coordinates normalized 0-1000 - PREFERRED for multi-item precision\n"
             "- background: {treatment: 'transparent'/'solid_color'/'scene', color: 'white', scene_description: 'modern kitchen'}\n"
             "- lighting: {type: 'natural_window'/'studio_3point', direction: 'front'/'side', shadows: 'soft falloff'}\n"
             "- composition: {position: 'center'/'[main] center [variant] right', camera_angle: 'slight_top', negative_space: 'generous_top'}\n"

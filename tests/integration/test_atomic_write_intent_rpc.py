@@ -89,15 +89,31 @@ def make_value_data(value: str, axis_ref: str, sku_code: str | None = None) -> d
     }
 
 
-# Skip all tests if Supabase credentials not available
-# Check for both SUPABASE_KEY and SUPABASE_ANON_KEY (common variations)
-_has_credentials = bool(
-    os.getenv("SUPABASE_URL") and
-    (os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY"))
-)
+# Skip all tests if Supabase credentials not available or are dummy/placeholder values
+# The storage client requires SUPABASE_SERVICE_ROLE_KEY for RPC calls
+_supabase_url = os.getenv("SUPABASE_URL", "")
+_supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+
+def _is_real_credential(url: str, key: str | None) -> bool:
+    """Check if credentials are real (not dummy/placeholder values)."""
+    if not url or not key:
+        return False
+    # Detect placeholder/dummy values
+    dummy_patterns = ["dummy", "example", "placeholder", "test_", "fake", "mock"]
+    url_lower = url.lower()
+    key_lower = (key or "").lower()
+    for pattern in dummy_patterns:
+        if pattern in url_lower or pattern in key_lower:
+            return False
+    # Detect env var placeholders
+    if url.startswith("$") or (key and key.startswith("$")):
+        return False
+    return True
+
+_has_valid_credentials = _is_real_credential(_supabase_url, _supabase_key)
 pytestmark = pytest.mark.skipif(
-    not _has_credentials,
-    reason="Supabase credentials not available"
+    not _has_valid_credentials,
+    reason="Supabase credentials not available or are dummy/placeholder values"
 )
 
 

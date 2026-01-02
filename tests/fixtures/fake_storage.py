@@ -1142,12 +1142,140 @@ class FakeStorage(StorageInterface):
         }
 
     # ========================================================================
+    # Atomic Write Intent RPC (LifecycleMixin Implementation)
+    # ========================================================================
+
+    async def execute_write_intent_rpc(
+        self,
+        operations: list[dict[str, Any]],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Execute multi-operation write intent atomically.
+
+        In-memory implementation with snapshot-based rollback.
+        Supports @reference resolution between operations.
+        """
+        import copy
+        import re
+
+        # Create snapshot for rollback
+        snapshot = {
+            table_name: copy.deepcopy(table_data)
+            for table_name, table_data in self.tables.items()
+        }
+
+        # Initialize context for @references
+        ctx = dict(context) if context else {}
+        results: list[dict[str, Any]] = []
+
+        def resolve_references(value: Any) -> Any:
+            """Recursively resolve @reference.field patterns."""
+            if isinstance(value, str) and value.startswith("@"):
+                # Parse @name.field or @batch[index].field
+                match = re.match(r"@(\w+)(?:\[(\d+)\])?\.(\w+)", value)
+                if match:
+                    name, idx, field = match.groups()
+                    if name in ctx:
+                        ref_data = ctx[name]
+                        if idx is not None:
+                            ref_data = ref_data[int(idx)]
+                        return ref_data.get(field)
+                return value
+            elif isinstance(value, dict):
+                return {k: resolve_references(v) for k, v in value.items()}
+            elif isinstance(value, list):
+                return [resolve_references(v) for v in value]
+            return value
+
+        try:
+            for i, op in enumerate(operations):
+                action = op.get("action")
+                table = op.get("table")
+                returns = op.get("returns")
+
+                if action == "create":
+                    data = resolve_references(op.get("data", {}))
+                    # Handle both single entity and batch inserts
+                    if isinstance(data, list):
+                        entities = await self.insert_entities(table, data)
+                        result = {"action": action, "table": table, "data": entities, "count": len(entities)}
+                        results.append(result)
+                        if returns:
+                            ctx[returns] = entities
+                    else:
+                        entity = await self.insert_entity(table, data)
+                        result = {"action": action, "table": table, "data": entity, "count": 1}
+                        results.append(result)
+                        if returns:
+                            ctx[returns] = entity
+
+                elif action == "update":
+                    filters = resolve_references(op.get("filters", {}))
+                    updates = resolve_references(op.get("updates", {}))
+                    count = await self.update_entities(table, filters, updates)
+                    result = {"action": action, "table": table, "count": count}
+                    results.append(result)
+                    if returns:
+                        ctx[returns] = {"updated_count": count}
+
+                elif action == "delete":
+                    filters = resolve_references(op.get("filters", {}))
+                    soft_delete = op.get("soft_delete", True)
+                    count = await self.delete_entities(table, filters, soft_delete=soft_delete)
+                    result = {"action": action, "table": table, "count": count}
+                    results.append(result)
+                    if returns:
+                        ctx[returns] = {"deleted_count": count}
+
+                elif action == "upsert":
+                    data = resolve_references(op.get("data", {}))
+                    conflict_fields = op.get("conflict_fields")
+                    entity = await self.upsert_entity(table, data, conflict_fields)
+                    # Format result to match RPC response format
+                    result = {"action": action, "table": table, "data": entity, "count": 1}
+                    results.append(result)
+                    if returns:
+                        ctx[returns] = entity
+
+                else:
+                    raise ValueError(f"Unknown action: {action}")
+
+            return {
+                "success": True,
+                "results": results,
+                "context": ctx,
+                "operations_executed": len(operations),
+            }
+
+        except Exception as e:
+            # Rollback to snapshot
+            self.tables = snapshot
+            return {
+                "success": False,
+                "error": str(e),
+                "error_code": "execution_error",
+                "failed_operation_index": i,
+                "failed_operation": op,
+            }
+
+    # ========================================================================
     # Lifecycle Management
     # ========================================================================
 
     def cleanup(self) -> None:
         """Cleanup (no-op for in-memory storage)."""
         pass
+
+    async def cleanup_subagent_checkpoints(self, thread_id: str) -> dict[str, int]:
+        """Delete subagent checkpoints for a thread (no-op for in-memory storage).
+
+        FakeStorage doesn't persist checkpoints, so this is a no-op that returns zeros.
+        """
+        return {
+            "deleted_checkpoints": 0,
+            "deleted_blobs": 0,
+            "deleted_writes": 0,
+        }
 
 
 class FakeTransaction:

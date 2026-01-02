@@ -217,13 +217,19 @@ When multi-product detected, output this EXACT structure:
 | Color | [e.g., Blue, Yellow, Pink] |
 | Design | [e.g., Blossoms, Charming Flowers, Spring Flowers] |
 
-### Extraction Targets
+### Extraction Targets (with Bounding Boxes)
 
-| # | Description | Position | Size | Color | Design | Other Attributes |
-|---|-------------|----------|------|-------|--------|------------------|
-| 1 | [Full description] | [top-left] | [Large] | [Blue] | [Blossoms] | [any other] |
-| 2 | [Full description] | [top-center] | [Large] | [Yellow] | [Charming Flowers] | |
-| ... | ... | ... | ... | ... | ... | |
+| # | Description | BBox [y_min, x_min, y_max, x_max] | Position | Size | Color | Design |
+|---|-------------|-----------------------------------|----------|------|-------|--------|
+| 1 | [Full description] | [estimated bounds for item 1] | [position] | [Size] | [Color] | [Design] |
+| 2 | [Full description] | [estimated bounds for item 2] | [position] | [Size] | [Color] | [Design] |
+| ... | ... | ... | ... | ... | ... | ... |
+
+**CRITICAL:** BBox coordinates are MANDATORY for downstream extraction.
+- Coordinates: [y_min, x_min, y_max, x_max] normalized to 0-1000 scale
+- Origin: top-left corner of image
+- Estimate bounds by mentally dividing image into 1000x1000 grid
+- Each item gets UNIQUE coordinates based on its ACTUAL position in the image
 
 ### Processing Strategies
 
@@ -258,19 +264,21 @@ See `multi_item_image.protocol` for the full position vocabulary (top-left, cent
 | Size | [Size A] ([volume A]), [Size B] ([volume B]), [Size C] ([volume C]) |
 | Design | [Design A] ([color A] lid), [Design B] ([color B] lid), [Design C] ([color C] lid) |
 
-### Extraction Targets
+### Extraction Targets (with Bounding Boxes)
 
-| # | Description | Position | Size | Design |
-|---|-------------|----------|------|--------|
-| 1 | [Size A] [product] with [color A] lid, [Design A] print | top-left | [Size A] | [Design A] |
-| 2 | [Size A] [product] with [color B] lid, [Design B] print | top-center | [Size A] | [Design B] |
-| 3 | [Size A] [product] with [color C] lid, [Design C] print | top-right | [Size A] | [Design C] |
-| 4 | [Size B] [product] with [color A] lid, [Design A] print | middle-left | [Size B] | [Design A] |
-| 5 | [Size B] [product] with [color B] lid, [Design B] print | middle-center | [Size B] | [Design B] |
-| 6 | [Size B] [product] with [color C] lid, [Design C] print | middle-right | [Size B] | [Design C] |
-| 7 | [Size C] [product] with [color A] lid, [Design A] print | bottom-left | [Size C] | [Design A] |
-| 8 | [Size C] [product] with [color B] lid, [Design B] print | bottom-center | [Size C] | [Design B] |
-| 9 | [Size C] [product] with [color C] lid, [Design C] print | bottom-right | [Size C] | [Design C] |
+| # | Description | BBox [y_min, x_min, y_max, x_max] | Position | Size | Design |
+|---|-------------|-----------------------------------|----------|------|--------|
+| 1 | [Size A] [product] with [color A] lid, [Design A] print | [row1_y_start, col1_x_start, row1_y_end, col1_x_end] | top-left | [Size A] | [Design A] |
+| 2 | [Size A] [product] with [color B] lid, [Design B] print | [row1_y_start, col2_x_start, row1_y_end, col2_x_end] | top-center | [Size A] | [Design B] |
+| 3 | [Size A] [product] with [color C] lid, [Design C] print | [row1_y_start, col3_x_start, row1_y_end, col3_x_end] | top-right | [Size A] | [Design C] |
+| 4 | [Size B] [product] with [color A] lid, [Design A] print | [row2_y_start, col1_x_start, row2_y_end, col1_x_end] | middle-left | [Size B] | [Design A] |
+| 5 | [Size B] [product] with [color B] lid, [Design B] print | [row2_y_start, col2_x_start, row2_y_end, col2_x_end] | middle-center | [Size B] | [Design B] |
+| 6 | [Size B] [product] with [color C] lid, [Design C] print | [row2_y_start, col3_x_start, row2_y_end, col3_x_end] | middle-right | [Size B] | [Design C] |
+| 7 | [Size C] [product] with [color A] lid, [Design A] print | [row3_y_start, col1_x_start, row3_y_end, col1_x_end] | bottom-left | [Size C] | [Design A] |
+| 8 | [Size C] [product] with [color B] lid, [Design B] print | [row3_y_start, col2_x_start, row3_y_end, col2_x_end] | bottom-center | [Size C] | [Design B] |
+| 9 | [Size C] [product] with [color C] lid, [Design C] print | [row3_y_start, col3_x_start, row3_y_end, col3_x_end] | bottom-right | [Size C] | [Design C] |
+
+**Coordinate Estimation:** For 3x3 grid, divide 1000 by 3 for boundaries. Row 1 starts at 0, Row 2 at ~333, Row 3 at ~666. Same for columns.
 
 ### Processing Strategies
 

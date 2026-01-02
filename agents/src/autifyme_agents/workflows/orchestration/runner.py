@@ -305,6 +305,10 @@ class WorkflowRunner:
                     # HITL pending - nothing more to do
                     return
 
+                # Workflow completed successfully - cleanup subagent checkpoints
+                # Subagents are stateless; their tools:* checkpoints are only needed during HITL
+                await self._cleanup_subagent_checkpoints(thread_id)
+
                 if not result:
                     logger.warning(
                         "Batch workflow completed without result",
@@ -438,6 +442,10 @@ class WorkflowRunner:
                         )
                         await self._resume_with_command(thread_id, auto_reject, sender)
                     return
+
+                # Workflow completed successfully - cleanup subagent checkpoints
+                # Subagents are stateless; their tools:* checkpoints are only needed during HITL
+                await self._cleanup_subagent_checkpoints(thread_id)
 
                 if not result:
                     logger.warning("No result from PM - cannot send response", extra={"thread_id": thread_id})
@@ -924,6 +932,20 @@ class WorkflowRunner:
             get_async_checkpointer,
         )
         return await get_async_checkpointer()
+
+    async def _cleanup_subagent_checkpoints(self, thread_id: str) -> None:
+        """Cleanup subagent checkpoints after successful workflow completion.
+
+        Subagents (specialists) are stateless - their checkpoints (tools:* namespace)
+        are only needed during HITL interrupts for resume. Once PM completes without
+        interrupt, all subagent checkpoints can be safely deleted.
+
+        Called when interrupt_value is None after PM execution.
+
+        Args:
+            thread_id: Conversation thread ID to cleanup checkpoints for
+        """
+        await self.storage.cleanup_subagent_checkpoints(thread_id)
 
     async def _create_project_manager(self) -> Any:
         """Create PM instance with company context and channel.
