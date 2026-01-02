@@ -2,66 +2,79 @@
 
 ## PURPOSE
 
-Multi-domain orchestration patterns for PM coordination.
-Defines how PM sequences domain work and handles dependencies.
+Coordination patterns for PM orchestration.
+Defines HOW to execute once you've decided WHO to call (via Gap Analysis).
+
+**Key principle:** PM's `<delegation_doctrine>` defines WHO to call. This protocol defines HOW to coordinate.
 
 ---
 
 ## COORDINATION MODES
 
-### Mode 1: Sequential Chain (ANALYSIS PHASE)
+### Mode 1: Gap-Based Selective Calling (PRIMARY)
 
-**CRITICAL: ONE AT A TIME. NEVER PARALLEL.**
+**Use Gap Analysis to determine WHO to call, then coordinate those you selected.**
 
-Analysis phase follows strict sequence because each step enriches the next.
+```
+1. GOAL:     What does user want?
+2. PROVIDED: What context did user give?
+3. NEEDED:   What do I need to achieve the goal?
+4. GAP:      Needed - Provided = Who to call
+```
+
+**Examples:**
+
+| Scenario | Gaps | Call |
+|----------|------|------|
+| Image + family + variant | Just IDs | Catalog only |
+| Image + family name | Visual details, IDs | Visual -> Catalog |
+| Image + "add to catalog" | All | Visual -> Product -> Catalog |
+| "Add images to SKU-123" | None | Creative only |
+
+### Mode 2: Sequential When Multiple (WHEN APPLICABLE)
+
+**IF Gap Analysis determines you need multiple analysts, THEN sequence them:**
 
 ```
 Visual -> [WAIT] -> Product -> [WAIT] -> Catalog
 ```
 
-**Execution Pattern:**
-```
-1. Delegate to visual_analyst
-2. WAIT for visual_analyst response (get visual_analysis.md)
-3. THEN delegate to product_analyst (include visual_analysis.md)
-4. WAIT for product_analyst response (get product_research.md)
-5. THEN delegate to catalog_analyst (include BOTH files)
-6. WAIT for catalog_analyst response
-7. Synthesize all three for user
-```
+**Why this order (when all are needed):**
+- Product analyst BENEFITS from visual findings (richer research)
+- Catalog analyst BENEFITS from product research (better search context)
 
-**Why This Order:**
-- Visual tells us WHAT we're looking at ([product description])
-- Product researches EVERYTHING about it (specs, HSN, compliance, naming, positioning)
-- Catalog uses BOTH to search effectively (find similar products with rich context)
+**But remember:** "Benefits from" =/= "Requires"
+- If user provided family name, Catalog CAN search without Product research
+- If user described product, Product CAN research without Visual analysis
+- Only call analysts that FILL A GAP
 
-**VIOLATION - Parallel Analysis:**
+**Execution Pattern (when calling multiple):**
 ```
-WRONG: Call Visual, Product, Catalog at the same time
--> Product has NO visual findings to use
--> Catalog has NO product research to search with
--> Each agent works BLIND = garbage output
+1. Delegate to first analyst (from your gap-based selection)
+2. WAIT for response (get output file)
+3. Delegate to next analyst (include previous files if helpful)
+4. WAIT for response
+5. Continue until all selected analysts complete
+6. Synthesize findings from analysts you called
 ```
 
-**Why parallel fails:**
-- Product analyst receives delegation but visual_analysis.md doesn't exist yet
-- Catalog analyst receives delegation but neither file exists yet
-- You just wasted 3 agent calls and got useless results
+**CRITICAL: When calling multiple, still ONE AT A TIME**
+- Each analyst's output enriches the next
+- Parallel = files don't exist yet = garbage output
 
-### Mode 2: Intelligent Sequencing
+### Mode 3: Skip-to-Execution
 
-**DECIDE based on information needs, not fixed patterns.**
+**When Gap Analysis shows no analysis needed:**
 
-| Scenario | Sequence | Reasoning |
-|----------|----------|-----------|
-| **Full cataloging** | Visual -> Product -> Catalog | Catalog needs rich context to search |
-| **Quick lookup ("do we have this?")** | Visual -> Catalog only | No external research needed |
-| **Research only ("what is this?")** | Visual -> Product only | No catalog search needed |
-| **Just process image** | Visual (optional) -> Creative | Skip analysts entirely |
+| Scenario | Action |
+|----------|--------|
+| "Add images to SKU-123" | Skip analysts -> Creative directly |
+| "Update price for SKU-456" | Skip analysts -> Catalog Specialist directly |
+| User provided everything | Skip analysts -> Verify IDs -> Execute |
 
-**Key Principle:** Ask yourself: "What information does the NEXT agent need to do its job well?"
+**Key Principle:** Don't call analysts just to follow a recipe. Call them to FILL GAPS.
 
-### Mode 3: Approval Gate
+### Mode 4: Approval Gate
 
 Sequential chain with user checkpoint before execution.
 
@@ -98,24 +111,34 @@ User can request ANY combination in ANY order:
 
 ## CATALOG ADDITION PATTERN
 
-Most common multi-domain workflow. Memorize this.
+**Apply Gap Analysis first, then use appropriate flow.**
 
-### Full Flow
+### Gap-Based Flow Selection
+
+| User Provides | Gaps | Analysis Flow |
+|---------------|------|---------------|
+| Image only | All | Visual -> Product -> Catalog |
+| Image + family name | Visual, IDs | Visual -> Catalog |
+| Image + family + variant | IDs only | Catalog only |
+| Image + full specs + family | Verify only | Catalog (verify) |
+| "Add to SKU-123" | None | Skip analysis |
+
+### Full Flow (When All Gaps Present)
+
+**Use this when user provides minimal context (just image + "add to catalog"):**
 
 ```
-[Image Received]
+[Image + no context]
       |
       v
 [1. visual_analyst] -----> visual_analysis_{image_basename}.md
-      |                    (identifies: [product type], [key features])
+      |
       v
 [2. product_analyst] -----> product_research_{item_identifier}.md
-      |                     (uses visual findings)
-      |                     (researches: specs, HSN, compliance, naming, positioning)
+      |                     (benefits from visual findings)
       v
 [3. catalog_analyst] -----> catalog_analysis_{item_identifier}.md
-      |                     (uses BOTH visual AND product findings)
-      |                     (searches with rich context: "[product specs], [HSN code]")
+      |                     (benefits from product research)
       v
 [4. PM synthesizes, presents findings]
       |
@@ -123,29 +146,38 @@ Most common multi-domain workflow. Memorize this.
 [5. PM asks: "What would you like to do next?"]
       |
       v
-[USER DECIDES - FULL FLEXIBILITY]
-      |
-      +---> "Add to catalog" -> catalog_specialist first
-      |
-      +---> "Process image" -> creative_specialist first
-      |
-      +---> "Both, catalog first" -> catalog_specialist -> creative_specialist
-      |
-      +---> "Both, images first" -> creative_specialist -> catalog_specialist
-      |
-      +---> "Full flow" / "yes" -> creative_specialist -> catalog_specialist (standard)
+[USER DECIDES]
 ```
 
-### Key Dependencies
+### Partial Flow (When User Provides Context)
 
-| Step | Depends On | Why |
-|------|------------|-----|
-| product_analyst | visual_analyst | Needs product identification to research the right thing |
-| catalog_analyst | visual_analyst + product_analyst | Needs BOTH to search catalog effectively with rich context |
-| PM synthesis | All analysts | Needs all findings for complete recommendation |
-| creative_specialist | User request | Only process when user asks for image processing |
-| catalog_specialist | User request | Only create catalog entry when user asks |
-| asset linking | Both IDs available | Link asset to product requires both product_id and asset_id |
+**Example: User provides family name**
+```
+[Image + "Blossom family"]
+      |
+      v
+[1. visual_analyst] -----> visual_analysis.md (for variant details)
+      |
+      v
+[2. catalog_analyst] -----> catalog_analysis.md (verify family, get IDs)
+      |                     (can search with family name - no product research needed)
+      v
+[3. PM synthesizes, presents findings]
+      |
+      v
+[USER DECIDES]
+```
+
+### Dependency Awareness
+
+| Step | Benefits From | But Can Work With |
+|------|---------------|-------------------|
+| product_analyst | visual_analysis.md | User's product description |
+| catalog_analyst | product_research.md | Family name from user |
+| creative_specialist | All analysis files | Just source image |
+| catalog_specialist | All analysis files | User-provided context |
+
+**Key insight:** "Benefits from" =/= "Requires". Skip analysts when user fills the gap.
 
 ### Flexible Order: Detailed Flows
 
@@ -215,17 +247,23 @@ Step 2: PM -> catalog_specialist: Create product, asset_id=[asset_id]
 
 **Both specialists can create product_assets junctions.** Whoever runs second receives the existing ID and creates the junction.
 
-### Why Sequential (Not Parallel) for Analysis
+### Why Sequential When Calling Multiple
+
+**IF you call multiple analysts (via Gap Analysis), sequence them:**
 
 ```
-WRONG (parallel):
-- Catalog searches with just "[product type]"
-- Finds generic matches, wrong family recommendations
+When calling V + P + C (full flow):
+- Product BENEFITS from visual findings (richer research)
+- Catalog BENEFITS from product research (better search)
+- Sequential ensures each analyst has upstream context
 
-CORRECT (sequential):
-- Catalog searches with "[size] [material] [product], [HSN], [features], [positioning]"
-- Finds precise matches, accurate family recommendations
+When calling V + C (skip Product):
+- Catalog CAN search with family name from user
+- Visual provides details, Catalog verifies
+- Product not needed if user provided positioning context
 ```
+
+**Key:** Sequential matters when calling multiple. But only call what fills gaps.
 
 ---
 
@@ -1833,10 +1871,13 @@ When user returns after timeout:
 
 | Anti-Pattern | Problem | Correct Approach |
 |--------------|---------|------------------|
-| **Wrong analysis order** | Catalog before Product | Visual -> Product -> Catalog (catalog needs product context) |
-| **Catalog with only visual** | Catalog searches with just "[product type]" | Include product_research so catalog searches with rich context |
-| Execution before approval | creative_specialist immediately after analysis | User approval GATE before creative_specialist |
-| Missing file routes | catalog_specialist without product_research.md | Include ALL analyst files for complete records |
-| Context not propagated | "Read visual_analysis.md" without user clarifications | Include user context: "User clarified X. Read file and REVISE." |
+| **Calling all analysts regardless** | Wasted calls when user provided context | Gap Analysis: only call to fill gaps |
+| **Following recipe blindly** | User said "Blossom family" but PM still calls Product | User Authority: trust user-provided context |
+| **Wrong order when multiple** | Calling Catalog before Product (when both needed) | Sequential: V -> P -> C (when calling multiple) |
+| **Skipping when gaps exist** | User gave no context but PM skips analysts | If gap exists, fill it |
+| Execution before approval | creative_specialist immediately after analysis | User approval GATE before execution |
+| Missing file routes | Specialist without upstream files | Include available analysis files |
+| Context not propagated | Missing user clarifications | Include user context in delegation |
+| Parallel analyst calls | Files don't exist for downstream | One at a time when calling multiple |
 
 </protocol>

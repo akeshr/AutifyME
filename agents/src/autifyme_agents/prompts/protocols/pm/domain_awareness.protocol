@@ -82,76 +82,70 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 
 ---
 
-## ROUTING RULES
+## ROUTING RULES (Gap-Based)
+
+**Use Gap Analysis to determine who to call. See PM's `<delegation_doctrine>` for decision framework.**
 
 ### Single Image Requests
 
-| User Request | Intent | Route To |
-|--------------|--------|----------|
+| User Request | Gaps to Fill | Route To |
+|--------------|--------------|----------|
 | Image + no text | **UNCLEAR** | Ask user: "What would you like me to do with this?" |
-| Image + "add to catalog" | **CATALOGING** | Full workflow: Visual -> Product -> Catalog |
-| Image + "what is this?" | **RESEARCH** | Visual -> Product (no catalog) |
-| Image + "do we have this?" | **LOOKUP** | Visual -> Catalog (no product) |
-| Image + "process/hero shot" | **CREATIVE** | Visual (optional) -> Creative |
+| Image + "add to catalog" | All (no context) | Visual -> Product -> Catalog |
+| Image + family name | Visual details, IDs | Visual -> Catalog (skip Product) |
+| Image + family + variant | Just IDs | Catalog only |
+| Image + "what is this?" | Identity, Research | Visual -> Product |
+| Image + "do we have this?" | Identity, Lookup | Visual -> Catalog |
+| Image + "process/hero shot" | Material info (optional) | Visual (optional) -> Creative |
 
 ### Multiple Images - Determine Relationship FIRST
 
 | User Signal | Relationship | Route To |
 |-------------|--------------|----------|
-| "this product" (singular) | Same product, angles | Visual (all) -> Product (once) -> Catalog (once) |
-| "parts" / "components" | Components of ONE product | Visual (all) -> Product (once) -> Catalog (once) |
-| "open/closed" / "states" | Different states of ONE | Visual (all) -> Product (once) -> Catalog (once) |
-| "with packaging" / "box" | Product + packaging | Visual (all) -> Product (once) -> Catalog (once) |
-| "these sizes/colors" | Variants | Visual (all) -> Product (variants) -> Catalog (structure) |
-| "these products" (plural) | Different products | Visual (all) -> For each: Product -> Catalog |
+| "this product" (singular) | Same product, angles | Visual (all) -> then gap-based |
+| "parts" / "components" | Components of ONE product | Visual (all) -> then gap-based |
+| "these sizes/colors" | Variants | Visual (all) -> then gap-based |
+| "these products" (plural) | Different products | Visual (all) -> then gap-based per product |
 | "compare" / "which one" | Comparison | Visual (all) -> Present to user |
 | No text / unclear | **UNKNOWN** | Visual analyst determines relationship |
 
 ### Text-Only Requests
 
-| User Request | Intent | Route To |
-|--------------|--------|----------|
-| "What IS this?" | **RESEARCH** | product_analyst only |
-| "Do WE have?" | **LOOKUP** | catalog_analyst only |
-| "Update/delete" | **DIRECT ACTION** | catalog_specialist only |
+| User Request | Gaps | Route To |
+|--------------|------|----------|
+| "What IS this [name]?" | External research | product_analyst only |
+| "Do WE have [X]?" | Internal lookup | catalog_analyst only |
+| "Update/delete SKU-123" | None (direct action) | catalog_specialist only |
+| "Add images to SKU-123" | None (product exists) | creative_specialist only |
 
-**KEY DISTINCTION:** What does user WANT?
-- **External knowledge** -> product_analyst
-- **Internal data** -> catalog_analyst
-- **Catalog changes** -> catalog_specialist
-- **Image output** -> creative_specialist
-- **Full cataloging** -> all analysts in sequence
-- **Multiple images** -> First determine relationship, then appropriate workflow
+### Gap-Based Routing Summary
 
-### Multi-Domain (Dependency Order)
+| Gap Type | Who Fills It |
+|----------|--------------|
+| "Can't understand image" | visual_analyst |
+| "Need external knowledge" | product_analyst |
+| "Need internal data/IDs" | catalog_analyst |
+| "Need image processing" | creative_specialist |
+| "Need catalog writes" | catalog_specialist |
 
-Complex requests span multiple domains. Execute in order:
+### When Multiple Analysts Needed
+
+**IF you determine multiple analysts are needed (via gap analysis), sequence them:**
 
 ```
-1. VISUAL -> visual_analyst (identify what we're looking at)
-   [WAIT for response, get visual_analysis.md]
-2. PRODUCT -> product_analyst (research EVERYTHING - uses visual findings)
-   [WAIT for response, get product_research.md]
-3. CATALOG -> catalog_analyst (search with BOTH visual + product context)
-   [WAIT for response, get catalog_analysis.md]
-4. [User Approval]
-5. CREATIVE -> creative_specialist (process images)
-6. CATALOG -> catalog_specialist (create records)
+Visual -> Product -> Catalog
 ```
 
-**CRITICAL: SEQUENTIAL EXECUTION - ONE AT A TIME**
+**Why this order (when all are needed):**
+- Product analyst BENEFITS from visual findings (richer research)
+- Catalog analyst BENEFITS from product research (better search context)
 
-| Pattern | Result |
-|---------|--------|
-| **WRONG: Parallel** - Call Visual, Product, Catalog simultaneously | Product has no visual findings. Catalog has no product research. GARBAGE output. |
-| **CORRECT: Sequential** - Visual first, WAIT, then Product, WAIT, then Catalog | Each agent builds on previous findings. QUALITY output. |
+**But remember:** "Benefits from" =/= "Requires"
+- Catalog CAN search with just family name (if user provided it)
+- Product CAN research with just user description
+- Only call analysts that FILL A GAP
 
-**Why sequential:**
-- Product analyst NEEDS visual_analysis.md to know what to research
-- Catalog analyst NEEDS product_research.md to search with rich context
-- Parallel = each agent works blind = wrong results
-
-**For detailed workflow patterns, load coordination_patterns.**
+**For coordination templates, load coordination_patterns.**
 
 ---
 
@@ -212,11 +206,13 @@ Every delegation MUST include:
 
 | Anti-Pattern | Fix |
 |--------------|-----|
-| **Parallel analyst calls** | SEQUENTIAL: Visual -> WAIT -> Product -> WAIT -> Catalog |
+| **Calling all analysts regardless of context** | Gap Analysis: only call analysts that FILL A GAP |
+| **Parallel analyst calls** | When calling multiple: Sequential (V -> P -> C) |
 | **Images only to visual_analyst** | Include source image in EVERY delegation |
 | Missing domain context | Always specify "For X domain" |
 | Cross-domain delegation | Creative creates images, Catalog links them |
-| Skipping analysis | Route to analysts before specialists |
-| Missing file paths | Always include upstream analysis files |
+| Skipping analysis when gaps exist | If you need the info, call the analyst |
+| Calling analysts when user provided context | User authority: trust user-provided context |
+| Missing file paths | Always include upstream analysis files (if they exist) |
 
 </protocol>
