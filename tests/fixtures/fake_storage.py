@@ -1195,36 +1195,47 @@ class FakeStorage(StorageInterface):
 
                 if action == "create":
                     data = resolve_references(op.get("data", {}))
-                    result = await self.insert_entity(table, data)
-                    results.append(result)
-                    if returns:
-                        ctx[returns] = result
+                    # Handle both single entity and batch inserts
+                    if isinstance(data, list):
+                        entities = await self.insert_entities(table, data)
+                        result = {"action": action, "table": table, "data": entities, "count": len(entities)}
+                        results.append(result)
+                        if returns:
+                            ctx[returns] = entities
+                    else:
+                        entity = await self.insert_entity(table, data)
+                        result = {"action": action, "table": table, "data": entity, "count": 1}
+                        results.append(result)
+                        if returns:
+                            ctx[returns] = entity
 
                 elif action == "update":
                     filters = resolve_references(op.get("filters", {}))
                     updates = resolve_references(op.get("updates", {}))
                     count = await self.update_entities(table, filters, updates)
-                    result = {"updated_count": count}
+                    result = {"action": action, "table": table, "count": count}
                     results.append(result)
                     if returns:
-                        ctx[returns] = result
+                        ctx[returns] = {"updated_count": count}
 
                 elif action == "delete":
                     filters = resolve_references(op.get("filters", {}))
                     soft_delete = op.get("soft_delete", True)
                     count = await self.delete_entities(table, filters, soft_delete=soft_delete)
-                    result = {"deleted_count": count}
+                    result = {"action": action, "table": table, "count": count}
                     results.append(result)
                     if returns:
-                        ctx[returns] = result
+                        ctx[returns] = {"deleted_count": count}
 
                 elif action == "upsert":
                     data = resolve_references(op.get("data", {}))
                     conflict_fields = op.get("conflict_fields")
-                    result = await self.upsert_entity(table, data, conflict_fields)
+                    entity = await self.upsert_entity(table, data, conflict_fields)
+                    # Format result to match RPC response format
+                    result = {"action": action, "table": table, "data": entity, "count": 1}
                     results.append(result)
                     if returns:
-                        ctx[returns] = result
+                        ctx[returns] = entity
 
                 else:
                     raise ValueError(f"Unknown action: {action}")
