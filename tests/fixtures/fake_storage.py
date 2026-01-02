@@ -1266,6 +1266,17 @@ class FakeStorage(StorageInterface):
         """Cleanup (no-op for in-memory storage)."""
         pass
 
+    async def cleanup_subagent_checkpoints(self, thread_id: str) -> dict[str, int]:
+        """Delete subagent checkpoints for a thread (no-op for in-memory storage).
+
+        FakeStorage doesn't persist checkpoints, so this is a no-op that returns zeros.
+        """
+        return {
+            "deleted_checkpoints": 0,
+            "deleted_blobs": 0,
+            "deleted_writes": 0,
+        }
+
 
 class FakeTransaction:
     """Transaction context manager for FakeStorage.

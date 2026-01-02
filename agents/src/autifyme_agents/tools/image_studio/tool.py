@@ -648,6 +648,7 @@ def _image_studio_impl(
                         # Higher resolution for verification - agent needs to judge quality
                         width, height = pil_img.size
                         max_dim = 1024  # Higher than view_image's 512 for quality checks
+                        output_img: Image.Image = pil_img
                         if max(width, height) > max_dim:
                             if width > height:
                                 new_width = max_dim
@@ -655,19 +656,19 @@ def _image_studio_impl(
                             else:
                                 new_height = max_dim
                                 new_width = int(width * (max_dim / height))
-                            pil_img = pil_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                            output_img = output_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
                         # Convert to RGB if needed (for JPEG encoding)
-                        if pil_img.mode in ("RGBA", "LA", "P"):
-                            rgb_img = Image.new("RGB", pil_img.size, (255, 255, 255))
-                            if pil_img.mode == "RGBA":
-                                rgb_img.paste(pil_img, mask=pil_img.split()[-1])
+                        if output_img.mode in ("RGBA", "LA", "P"):
+                            rgb_img = Image.new("RGB", output_img.size, (255, 255, 255))
+                            if output_img.mode == "RGBA":
+                                rgb_img.paste(output_img, mask=output_img.split()[-1])
                             else:
-                                rgb_img.paste(pil_img)
-                            pil_img = rgb_img
+                                rgb_img.paste(output_img)
+                            output_img = rgb_img
 
                         buffer = io.BytesIO()
-                        pil_img.save(buffer, format="JPEG", quality=90)  # Higher quality for verification
+                        output_img.save(buffer, format="JPEG", quality=90)  # Higher quality for verification
                         encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
                         data_uri = f"data:image/jpeg;base64,{encoded}"
 
