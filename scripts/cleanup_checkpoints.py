@@ -36,6 +36,7 @@ Example INVALID triggers (do NOT run):
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 from pathlib import Path
@@ -48,6 +49,9 @@ from supabase import Client, create_client
 # Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "agents" / "src"))
+
+# Checkpoint tables in order (writes first due to potential future FK constraints)
+CHECKPOINT_TABLES = ["checkpoint_writes", "checkpoint_blobs", "checkpoints"]
 
 
 def get_supabase_client() -> Client:
@@ -64,10 +68,10 @@ def get_supabase_client() -> Client:
 
 
 def get_current_counts(client: Client) -> dict[str, int]:
-    """Get current record counts for all checkpoint tables."""
+    """Get current record counts using Supabase client."""
     counts: dict[str, int] = {}
 
-    for table in ["checkpoint_blobs", "checkpoint_writes", "checkpoints"]:
+    for table in CHECKPOINT_TABLES:
         result = client.table(table).select("*", count=CountMethod.exact, head=True).execute()
         counts[table] = result.count or 0
 
@@ -75,9 +79,28 @@ def get_current_counts(client: Client) -> dict[str, int]:
 
 
 def run_cleanup(client: Client) -> Any:
-    """Execute the cleanup function via RPC."""
+    """Execute cleanup via RPC function."""
     result = client.rpc("cleanup_checkpoint_tables").execute()
     return result.data
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Cleanup LangGraph checkpoint tables",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  uv run python scripts/cleanup_checkpoints.py          # Run cleanup
+  uv run python scripts/cleanup_checkpoints.py --count  # Show counts only
+        """,
+    )
+    parser.add_argument(
+        "--count",
+        action="store_true",
+        help="Only show current record counts, don't delete",
+    )
+    return parser.parse_args()
 
 
 def main() -> int:
@@ -89,28 +112,33 @@ def main() -> int:
         1 - Aborted by user
         2 - Error
     """
+    args = parse_args()
+
     print("\n" + "=" * 70)
     print("[CRITICAL] CHECKPOINT TABLES CLEANUP")
     print("=" * 70)
     print("\nThis will PERMANENTLY DELETE all data from:")
-    print("  - checkpoint_blobs")
-    print("  - checkpoint_writes")
-    print("  - checkpoints")
+    for table in CHECKPOINT_TABLES:
+        print(f"  - {table}")
     print("\nThis action CANNOT be undone.\n")
 
     try:
         client = get_supabase_client()
+        counts = get_current_counts(client)
 
         # Show current counts
         print("Current record counts:")
         print("-" * 40)
-        counts = get_current_counts(client)
         total = 0
         for table, count in counts.items():
             print(f"  {table}: {count:,} records")
             total += count
         print("-" * 40)
-        print(f"  TOTAL: {total:,} records will be deleted\n")
+        print(f"  TOTAL: {total:,} records\n")
+
+        # Count-only mode - exit after showing counts
+        if args.count:
+            return 0
 
         if total == 0:
             print("Tables are already empty. Nothing to do.")
