@@ -366,12 +366,17 @@ Each image_studio call is independent AND Gemini is non-deterministic. Without c
    - If NO variant is suitable: ESCALATE (can't build batch on poor anchor)
 3. GENERATE ANCHOR - Process ONE variant with full specs
 4. VIEW ANCHOR - Use view_image to see the result
-5. EXTRACT STYLE SPECS - Describe what you see in precise terms
-6. PRESENT ANCHOR - write_data with style specs (triggers HITL)
-   - User approves image quality AND style for entire batch
-7. BATCH REMAINING - Use IDENTICAL specs, reinforce consistency via custom_spec
+5. EXTRACT STYLE AS TEXT - Describe what you see in precise terms
+6. ANCHOR HITL - Call write_data with asset_uploads (shows image to user)
+   - Include style specs in hitl_summary
+   - STOP AND WAIT for approval before proceeding
+7. BATCH REMAINING - Pass ONLY source images + TEXT style specs in custom_spec
+   - DO NOT pass anchor image to remaining calls
 8. GRID TEST - View all outputs, verify visual consistency
 ```
+
+**[CRITICAL] Why TEXT, not anchor image?**
+Passing a generated image as reference causes Gemini to REPRODUCE that image instead of EXTRACTING from the new source. The anchor exists ONLY to establish style specs as TEXT. Once you've described it, the anchor's job is done - it should NOT appear in subsequent image_studio calls.
 
 ### Step 4: Style Spec Extraction
 
@@ -387,36 +392,37 @@ ANCHOR STYLE SPECS:
 
 ### Step 5: HITL Anchor Approval
 
-**What user sees:** The anchor image + your extracted style specs.
+**Use write_data Pattern 8 (Asset Creation) from `write_data.protocol`:**
+- `asset_uploads`: Shows anchor image to user
+- `hitl_summary`: Include extracted style specs + "Approve this style for the entire batch?"
+- `operations`: Create anchor as first asset
+
+**[CRITICAL] STOP and WAIT for user response before batching.**
 
 **What user approves:**
 - Image quality (is this good enough?)
 - Style for batch (this angle/lighting/framing for ALL variants?)
 
-**If user REJECTS:**
-1. Ask what's wrong (quality? angle? lighting?)
-2. Adjust specs based on feedback
-3. Regenerate anchor with new specs
-4. Re-present for approval
-
+**If user REJECTS:** Adjust specs, regenerate anchor, re-present.
 **If user APPROVES:** Proceed to batch with locked style.
 
 ### Step 6: Batch with Consistency
 
-**Structured specs** define WHAT to generate (lighting.type, composition.camera_angle).
-**custom_spec.instruction** REINFORCES consistency ("match the anchor exactly").
+**Images passed:** ONLY source/product images for the current variant
+**No anchor image:** The anchor is NOT passed - you extracted its style as text
 
-Both work together - structured specs set the parameters, custom_spec adds the "same photoshoot" constraint.
-
+**custom_spec contains TEXT description of anchor style:**
 ```
 custom_spec: {
-  instruction: "Match the approved anchor EXACTLY:
+  instruction: "Match the anchor style EXACTLY:
     Camera: eye-level, 0 degrees
     Lighting: 3-point studio, shadow bottom-right
     Framing: 80% frame, centered
-    This must look like the same photoshoot."
+    This must look like the same photoshoot as the anchor."
 }
 ```
+
+The style specs (camera angle, lighting direction, framing) come from your VIEW of the anchor, converted to TEXT. Gemini reads the text and applies that style to the NEW source.
 
 ### Step 7: Grid Test (Visual Verification)
 
@@ -497,6 +503,8 @@ Any dimension below 6 -> Source may be unfixable, ESCALATE
 | **Different dimensions per variant** | **Grid looks broken** | **Consistency: same output specs** |
 | **Cropping critical features** | **Customer can't compare** | **Feature visibility: all features shown** |
 | **Skipping batch consistency check** | **Ship inconsistent set** | **Consistency: grid test before ship** |
+| **Passing anchor image to batch calls** | **Gemini reproduces anchor instead of extracting** | **View-Then-Describe: anchor -> TEXT only** |
+| **Skipping anchor HITL approval** | **User never approves style, batch may be wrong** | **View-Then-Describe: STOP after anchor write_data** |
 
 ---
 
