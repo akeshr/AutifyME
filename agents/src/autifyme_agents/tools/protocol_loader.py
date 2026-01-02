@@ -278,7 +278,13 @@ def create_load_protocol_tool() -> StructuredTool:
             "- Follow protocols as authoritative domain expert guidance\n"
             "- Protocols contain validated patterns that prevent common mistakes\n\n"
             "RETURNS: Protocol content + metadata. The protocol_content field contains "
-            "the actual protocols to follow as domain expert guidance."
+            "the actual protocols to follow as domain expert guidance.\n\n"
+            "LARGE OUTPUT - MANDATORY ACTION:\n"
+            "If result contains 'Tool result too large... saved at path: /large_tool_results/XXX':\n"
+            "  1. STOP - You do NOT have the protocol content yet\n"
+            "  2. IMMEDIATELY call read_file with that exact path\n"
+            "  3. ONLY THEN proceed with the actual protocol content\n"
+            "FAILURE TO READ THE FILE = OPERATING WITHOUT PROTOCOLS = GUARANTEED MISTAKES"
         ),
         args_schema=LoadProtocolInput,
     )
