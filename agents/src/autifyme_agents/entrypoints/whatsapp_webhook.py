@@ -457,14 +457,14 @@ async def receive(
                     # Validate message type is supported
                     # WhatsApp sends "unsupported" for message types not enabled on the account
                     # (stickers, locations, contacts, reactions, etc.)
-                    SUPPORTED_MESSAGE_TYPES = {"text", "image", "video", "document", "audio", "voice"}
-                    if msg_type not in SUPPORTED_MESSAGE_TYPES:
+                    supported_message_types = {"text", "image", "video", "document", "audio", "voice"}
+                    if msg_type not in supported_message_types:
                         logger.warning(
                             f"TRACE[{trace_id}] SKIP: Unsupported message type '{msg_type}'",
                             extra={
                                 "trace_id": trace_id,
                                 "msg_type": msg_type,
-                                "supported_types": list(SUPPORTED_MESSAGE_TYPES),
+                                "supported_types": list(supported_message_types),
                                 "raw_message": message,
                                 "message_id": message_id,
                                 "sender": sender,
