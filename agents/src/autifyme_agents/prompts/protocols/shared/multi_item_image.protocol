@@ -365,126 +365,173 @@ When extraction completes (with or without failures), report structured results:
 
 ---
 
-## BATCH CONSISTENCY (View-Then-Describe)
+## BATCH CONSISTENCY (Anchor-First Pattern)
 
-When processing multiple variants with INDIVIDUAL strategy, all outputs must appear from the SAME photoshoot. This section defines the universal pattern; domain protocols apply it.
+When processing multiple items with INDIVIDUAL strategy, all outputs must appear from the SAME photoshoot.
 
 ### The Problem
 
-Each image generation call is independent AND Gemini is non-deterministic. Without explicit consistency enforcement:
-- Different camera angles across variants
+Each image_studio call is independent. Without consistency enforcement:
+- Different camera angles across items
 - Different lighting directions
 - Different framing/coverage
 - Result: Unusable as a cohesive set
 
-### The Solution: View-Then-Describe
+### The Solution: Style Parameter Inheritance
+
+Consistency comes from **IDENTICAL STYLE PARAMETERS**, not from text instructions or image references.
 
 ```
-1. SELECT ANCHOR - Choose representative variant (see Anchor Selection below)
-   - If NO variant is suitable: ESCALATE (can't build batch on poor anchor)
-2. GENERATE ANCHOR - Process ONE variant with full specs, record specs used
-3. VIEW ANCHOR - Use view_image to see the result
-4. EXTRACT STYLE SPECS - Describe what you see in precise terms
-5. PRESENT ANCHOR - write_data with style specs (triggers HITL)
-   - User approves image quality AND style for entire batch
-6. BATCH REMAINING - For each remaining variant:
-   - Use IDENTICAL structured specs (lighting, composition, enhancement)
-   - Add custom_spec.instruction to REINFORCE consistency
-7. GRID TEST - View all outputs, verify visual consistency
+1. SELECT ANCHOR - Choose representative item (see Anchor Selection below)
+2. GENERATE ANCHOR - Process with full specs and source context
+3. VIEW ANCHOR - Verify quality via view_image
+4. HITL APPROVAL - Present anchor via write_data (MANDATORY gate)
+   - User approves STYLE for entire batch
+   - Batch generation BLOCKED until approval
+5. BATCH REMAINING - Apply SAME style parameters to each item
+6. VERIFY - Grid test for visual consistency
 ```
 
-### Style Spec Extraction
+### Style Keys (What Makes Outputs Consistent)
 
-After viewing anchor, document:
+These parameters define the "photoshoot look" and MUST be consistent across all batch calls:
 
-| Spec | What to Describe | Example |
-|------|------------------|---------|
-| Camera | Angle, perspective | "eye-level, 0 degrees" |
-| Lighting | Setup, shadow direction | "3-point studio, shadow bottom-right" |
-| Framing | Coverage, position | "80% frame, centered" |
-| Background | Treatment, grounding | "pure white, contact shadow" |
-| Enhancement | Sharpness, color | "tack sharp, true colors" |
+| Style Key | Why It Matters |
+|-----------|----------------|
+| `lighting.*` | Same light direction, quality, shadows |
+| `composition.camera_angle` | Same perspective |
+| `composition.product_coverage` | Same framing |
+| `background.*` | Same backdrop treatment |
+| `enhancement.*` | Same sharpness, color treatment |
+| `focus.*` | Same depth of field |
+| `output.aspect_ratio` | Same dimensions |
+| `output.size` | Same resolution |
 
-### HITL Anchor Approval
+### Item-Specific Parameters (What Naturally Varies)
 
-**What user approves:**
-- Image quality (good enough?)
-- Style for batch (this angle/lighting for ALL variants?)
+| Parameter | Why It Varies |
+|-----------|---------------|
+| `extraction.target_description` | Different item in source |
+| `extraction.position_hint` | Item location |
+| `output.filename` | Unique file per item |
+| `fidelity.*` | Item-specific features (colors, text, patterns) |
+| `material_treatment.*` | Only if items have different materials |
 
-**If user REJECTS:**
-1. Ask what's wrong
-2. Adjust specs based on feedback
-3. Regenerate and re-present
+### Source Context Reasoning
 
-**If user APPROVES:** Proceed with locked style.
+Not all source images apply to all batch items. For each image in anchor's `images` array, ask:
 
-### Batch with Consistency
+| Context Type | Include in Batch? | Examples |
+|--------------|-------------------|----------|
+| **Shared Context** | YES - all batch calls | Brand reference, style/mood reference, lighting reference |
+| **Item-Specific** | Only if relevant | Item closeup, item-specific detail |
 
-**Structured specs** = WHAT to generate.
-**custom_spec.instruction** = REINFORCE consistency.
+**Decision rule:** Does this source image provide information needed for the CURRENT item's fidelity?
 
-```
-custom_spec: {
-  instruction: "Match the approved anchor EXACTLY:
-    Camera: eye-level, 0 degrees
-    Lighting: 3-point studio, shadow bottom-right
-    Framing: 80% frame, centered
-    Same photoshoot appearance."
-}
-```
+### HITL Gate: write_data (MANDATORY)
+
+Anchor approval BLOCKS batch generation until user approves.
+
+| Tool | Purpose | HITL Trigger? |
+|------|---------|---------------|
+| `write_todos` | Internal task tracking | NO |
+| `write_data` | User-facing decisions | YES |
+
+**What user approves:** The STYLE (lighting, angle, background, quality level) - not the specific anchor item.
+
+**After approval:** Style keys are LOCKED. Batch proceeds with locked parameters.
+
+### Anchor Selection
+
+| Criterion | If Not Met |
+|-----------|------------|
+| Sharp in source | Try different item |
+| Well-lit in source | Try different item |
+| Shows representative features | Try different item |
+| **ALL fail** | **ESCALATE to PM** |
+
+**Heuristics when equal:**
+- Size variants: Prefer MEDIUM (shows typical proportions)
+- Design variants: Prefer hero/bestseller
 
 ### Grid Test (Visual Verification)
 
-After generating all variants, CREATE a verification grid to see them side-by-side:
+After batch generation, create verification grid:
 
-```python
+```
 image_studio(
-    images=[
-        {"path": "pending/variant_1.png", "label": "v1"},
-        {"path": "pending/variant_2.png", "label": "v2"},
-        {"path": "pending/variant_3.png", "label": "v3"},
-        # ... all variants
-    ],
+    images=[all generated outputs as labeled images],
     composition={"position": "grid layout - NxM, equal spacing"},
     background={"treatment": "solid_color", "color": "white"},
     output={"filename": "verification_grid"}
 )
 ```
 
-Then view_image the grid and check:
+Check via view_image:
 - Same camera angle across all?
 - Same framing/product coverage?
 - Shadows falling same direction?
 - Same lighting quality?
 
-**If ANY outlier:** REDO that variant with more explicit style specs
-
-### Anchor Selection
-
-| Criterion | If Not Met |
-|-----------|------------|
-| Sharp in source | Try different variant |
-| Well-lit in source | Try different variant |
-| Shows full features | Try different variant |
-| **ALL fail** | **ESCALATE to PM** |
-
-**Heuristics when equal:**
-- Size variants: Prefer MEDIUM
-- Design variants: Prefer hero/bestseller
-
-### Consistency Specs (IDENTICAL)
-
-`composition.camera_angle`, `composition.product_coverage`, `lighting.*`, `enhancement`, `output.aspect_ratio`, `output.size`, `focus`
-
-**What CAN differ:** `extraction.target_description`, `fidelity.hero_features`, `output.filename`
+**If ANY outlier:** Regenerate that item with corrected style parameters.
 
 ### Recovery (3 attempts max)
 
 | Attempt | Action |
 |---------|--------|
-| 1st | More explicit style specs |
-| 2nd | Different anchor variant |
+| 1st | Verify style keys are identical, fix any drift |
+| 2nd | Try different anchor item |
 | 3rd | Escalate with diagnosis |
+
+---
+
+## BATCH CONSISTENCY ANTI-PATTERNS
+
+### Anti-Pattern: Text-Based Consistency
+
+**Symptom:** `custom_spec.instruction` contains "match anchor", "same as anchor", or references anchor filename.
+
+**Why Wrong:**
+- Anchor image is NOT in the images array - model cannot visually match it
+- Text instructions are unreliable for visual consistency
+- This is a WORKAROUND for non-identical style parameters
+
+**Root Cause:** Style parameters were modified instead of inherited.
+
+**The Test:** If you're writing "match anchor" anywhere, your style keys are not actually identical. Fix the parameters, remove the workaround text.
+
+### Anti-Pattern: Dropped Source Context
+
+**Symptom:** Anchor uses `[source, reference_1, reference_2]` but batch uses only `[source]`.
+
+**Why Wrong:**
+- Label references like `[reference_1]` in specs require the image to be present
+- Dropping source images breaks fidelity specifications
+- Batch items lose context they need for accurate extraction
+
+**Fix:** Include all SHARED context images in every batch call.
+
+### Anti-Pattern: HITL Bypass
+
+**Symptom:** Called `write_todos` after anchor, then immediately generated batch.
+
+**Why Wrong:**
+- `write_todos` is task tracking, NOT user approval
+- User never saw or approved the anchor style
+- Batch generated without style lock
+
+**Fix:** Use `write_data` with anchor preview. Wait for approval before batch.
+
+### Anti-Pattern: Modified Style Keys
+
+**Symptom:** Batch calls have different values for lighting, composition, enhancement, etc.
+
+**Why Wrong:**
+- Each call generates with different "photoshoot settings"
+- Outputs will look inconsistent
+- Defeats the purpose of anchor-first pattern
+
+**Fix:** Style keys must be IDENTICAL across anchor and all batch calls. Only extraction target and output filename change.
 
 ---
 
