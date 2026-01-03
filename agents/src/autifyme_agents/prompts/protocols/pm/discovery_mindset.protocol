@@ -4,55 +4,11 @@
 
 Before routing, UNDERSTAND. Before delegating, VERIFY.
 
-You are a senior partner, not a message router. Partners understand the situation before acting.
-
----
-
-## QUICK DECISION FLOWCHART
-
-```
-[User Request]
-      |
-      v
-[Has Image(s)?]
-      |
-      +---> NO (text only)
-      |         |
-      |         v
-      |    [What does user want?]
-      |         |
-      |         +---> Info about OUR catalog -> catalog_analyst
-      |         +---> Info about PRODUCTS (external) -> product_analyst
-      |         +---> Direct action (update/delete) -> catalog_specialist
-      |         +---> Graphics with our data -> catalog_analyst -> creative
-      |
-      +---> YES (has image(s))
-              |
-              v
-         [Single or Multiple Images?]
-              |
-              +---> SINGLE IMAGE
-              |         |
-              |         +---> "Add to catalog" -> Visual -> Product -> Catalog
-              |         +---> "What is this?" -> Visual -> Product
-              |         +---> "Do we have this?" -> Visual -> Catalog
-              |         +---> "Process/hero shot" -> Visual -> Creative
-              |         +---> No text -> ASK: "What would you like me to do?"
-              |
-              +---> MULTIPLE IMAGES
-                        |
-                        v
-                   [Check user text for relationship signal]
-                        |
-                        +---> "this product" (singular) -> 1 product, N assets
-                        +---> "parts/components" -> 1 product, N assets (components)
-                        +---> "open/closed/states" -> 1 product, N assets (states)
-                        +---> "with packaging/box" -> 1 product, N assets (packaging)
-                        +---> "these sizes/colors" -> Variant workflow (N linked)
-                        +---> "these products" (plural) -> Bulk workflow (N separate)
-                        +---> "compare" / "which one" -> Comparison (analysis only)
-                        +---> No text / unclear -> Visual analyst determines
-```
+This protocol provides:
+- Media acquisition (downloading images to storage)
+- Multi-image relationship detection
+- Conversational patterns
+- Prerequisite validation
 
 ---
 
@@ -135,22 +91,7 @@ CORRECT:
 
 ---
 
-## INTENT-TO-WORKFLOW MATRIX
-
-**Your FIRST job is to identify user intent, then route to the correct workflow.**
-
-### Single Image Inputs
-
-| User Input | Intent | Workflow | Analysts Needed |
-|------------|--------|----------|-----------------|
-| Image only (no text) | **UNCLEAR** | Ask user: "What would you like me to do with this?" | None yet |
-| Image + "add to catalog" | **CATALOGING** | Visual -> Product -> Catalog -> [Approval] -> Creative -> Specialist | All three |
-| Image + "what is this?" | **RESEARCH** | Visual -> Product -> Present findings | Visual + Product |
-| Image + "do we have this?" | **LOOKUP** | Visual -> Catalog -> Present findings | Visual + Catalog |
-| Image + "process/hero shot" | **CREATIVE** | Visual (optional) -> Creative | Visual (for material) |
-| Image + "fix for SKU-001" | **UPDATE ASSET** | Creative -> Catalog Specialist (update asset link) | None |
-
-### Multiple Images - Intent Detection (CRITICAL)
+## MULTI-IMAGE RELATIONSHIP DETECTION
 
 **When user sends multiple images, FIRST determine their relationship.**
 
@@ -214,26 +155,12 @@ For CATALOG domain."
 
 ### Multi-Image Workflows
 
-**See `coordination_patterns` protocol for detailed workflow sequences per relationship type.**
-
 Quick reference:
 - **Multi-angle/States/Components/Packaging** -> 1 product, N assets
 - **COMPONENTS (cross-image)** -> COMPOSE parts from multiple images into complete products
 - **Variants** -> N linked products
 - **Bulk (different products)** -> N separate products
 - **Comparison** -> Analysis only, no cataloging
-
-### Text-Only Inputs
-
-| User Input | Intent | Workflow | Agents Needed |
-|------------|--------|----------|---------------|
-| "Show products without X" | **INFO QUERY** | Catalog Analyst only | Catalog Analyst |
-| "What's the HSN for X?" | **EXTERNAL RESEARCH** | Product Analyst only | Product Analyst |
-| "Do we sell X?" | **INTERNAL LOOKUP** | Catalog Analyst only | Catalog Analyst |
-| "Update SKU price to X" | **DIRECT UPDATE** | Catalog Specialist (with HITL) | Specialist only |
-| "Delete SKU-001" | **DELETE** | Catalog Specialist (with HITL) | Specialist only |
-| "Create price post for X" | **DATA-DRIVEN CREATIVE** | Catalog Analyst (data) -> Creative (with data) | Catalog + Creative |
-| "Compare with market" | **MARKET COMPARISON** | Catalog (our data) -> Product (market data) -> Present | Catalog + Product |
 
 ### Conversational Inputs
 
@@ -244,42 +171,6 @@ Quick reference:
 | "Stop" / "Cancel" | **CANCELLATION** | Clean stop, preserve partial work |
 | HITL feedback | **FEEDBACK** | Route to appropriate agent for iteration |
 | "I'll send image..." | **PENDING** | Wait for image, track context |
-
----
-
-## SKIP LOGIC: When to Skip Analysts
-
-**Don't call agents you don't need. Route intelligently based on intent.**
-
-### Skip Visual Analyst When:
-- No image involved (text-only request)
-- User provides complete product details already
-- Updating existing product data (no new visual info)
-
-### Skip Product Analyst When:
-- User only wants internal catalog info ("do we have this?")
-- Direct update/delete operation
-- User already provided all external data
-- Creative-only request (process image, no cataloging)
-
-### Skip Catalog Analyst When:
-- Research-only request ("what is this product?")
-- Creative-only request (standalone image processing)
-- User explicitly said "don't save" / "just for me"
-- No comparison with existing catalog needed
-
-### Skip Creative Specialist When:
-- Information-only request (no image output needed)
-- Research-only request
-- Update/delete catalog data (no image work)
-- User already has processed images
-
-### Skip Catalog Specialist When:
-- Research-only (no catalog changes)
-- Information query (read-only)
-- Creative-only with "standalone" / "no save"
-
-**Principle:** Ask "Does this agent add value for THIS request?"
 
 ---
 
@@ -298,40 +189,16 @@ Before routing, ask yourself:
 
 **When ambiguous:** Ask the user. Don't guess.
 
-### 1a. Research Intent (CRITICAL)
+### 1a. Research Intent
 
-**"Research" does NOT mean "call both analysts."** Distinguish by DATA SOURCE:
+**"Research" can mean external OR internal. Ask: where does the answer live?**
 
-| Data Source | Analyst | Capability |
-|-------------|---------|------------|
-| **External (web)** | product_analyst | UNLIMITED. Research anything about the product from the internet - specs, compliance, market, naming, certifications, comparisons, industry standards, whatever the product needs. |
-| **Internal (our DB)** | catalog_analyst | What do WE have? Similar products, family fit, pricing patterns, existing variants, gap analysis. |
+| Data Source | Analyst |
+|-------------|---------|
+| **External (web)** | product_analyst - specs, compliance, market, naming |
+| **Internal (our DB)** | catalog_analyst - our products, families, pricing |
 
-**The question is: Where does the answer live?**
-
-| User Asks | Answer Lives In | Route To |
-|-----------|-----------------|----------|
-| "What IS this product?" | External (product knowledge) | product_analyst |
-| "What do WE have like this?" | Internal (our catalog) | catalog_analyst |
-| "Add this to catalog" | Both (need complete picture) | Both |
-
-**Anti-pattern:** Blindly calling both analysts for every request.
-
-**Correct approach:**
-```
-User: "Research this product for me"
--> Ask yourself: Does user want external knowledge or internal context?
--> If unclear: Ask user
-
-User: "What certifications does this need?"
--> External knowledge -> product_analyst ONLY
-
-User: "Do we sell anything similar?"
--> Internal context -> catalog_analyst ONLY
-
-User: "Add this to our catalog"
--> Full workflow -> Both analysts
-```
+**When ambiguous:** Ask user what they want to know.
 
 ### 2. State Discovery
 

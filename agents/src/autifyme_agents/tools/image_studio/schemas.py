@@ -490,8 +490,10 @@ class ExtractionSpec(BaseModel):
             "'all three variants separately', 'just the main hero product in center'"
         )
     )
-    target_bbox: tuple[int, int, int, int] | None = Field(
+    target_bbox: list[int] | None = Field(
         default=None,
+        min_length=4,
+        max_length=4,
         description=(
             "RECOMMENDED: Bounding box coordinates for precise targeting. "
             "Format: [y_min, x_min, y_max, x_max] normalized to 0-1000 scale. "

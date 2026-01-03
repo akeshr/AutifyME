@@ -3,7 +3,7 @@
 ## PURPOSE
 
 Domain ownership matrix for PM routing decisions.
-Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
+Defines WHO owns WHAT, agent capabilities, and delegation requirements.
 
 ---
 
@@ -82,79 +82,6 @@ Defines WHO owns WHAT. For HOW to coordinate, load coordination_patterns.
 
 ---
 
-## ROUTING RULES
-
-### Single Image Requests
-
-| User Request | Intent | Route To |
-|--------------|--------|----------|
-| Image + no text | **UNCLEAR** | Ask user: "What would you like me to do with this?" |
-| Image + "add to catalog" | **CATALOGING** | Full workflow: Visual -> Product -> Catalog |
-| Image + "what is this?" | **RESEARCH** | Visual -> Product (no catalog) |
-| Image + "do we have this?" | **LOOKUP** | Visual -> Catalog (no product) |
-| Image + "process/hero shot" | **CREATIVE** | Visual (optional) -> Creative |
-
-### Multiple Images - Determine Relationship FIRST
-
-| User Signal | Relationship | Route To |
-|-------------|--------------|----------|
-| "this product" (singular) | Same product, angles | Visual (all) -> Product (once) -> Catalog (once) |
-| "parts" / "components" | Components of ONE product | Visual (all) -> Product (once) -> Catalog (once) |
-| "open/closed" / "states" | Different states of ONE | Visual (all) -> Product (once) -> Catalog (once) |
-| "with packaging" / "box" | Product + packaging | Visual (all) -> Product (once) -> Catalog (once) |
-| "these sizes/colors" | Variants | Visual (all) -> Product (variants) -> Catalog (structure) |
-| "these products" (plural) | Different products | Visual (all) -> For each: Product -> Catalog |
-| "compare" / "which one" | Comparison | Visual (all) -> Present to user |
-| No text / unclear | **UNKNOWN** | Visual analyst determines relationship |
-
-### Text-Only Requests
-
-| User Request | Intent | Route To |
-|--------------|--------|----------|
-| "What IS this?" | **RESEARCH** | product_analyst only |
-| "Do WE have?" | **LOOKUP** | catalog_analyst only |
-| "Update/delete" | **DIRECT ACTION** | catalog_specialist only |
-
-**KEY DISTINCTION:** What does user WANT?
-- **External knowledge** -> product_analyst
-- **Internal data** -> catalog_analyst
-- **Catalog changes** -> catalog_specialist
-- **Image output** -> creative_specialist
-- **Full cataloging** -> all analysts in sequence
-- **Multiple images** -> First determine relationship, then appropriate workflow
-
-### Multi-Domain (Dependency Order)
-
-Complex requests span multiple domains. Execute in order:
-
-```
-1. VISUAL -> visual_analyst (identify what we're looking at)
-   [WAIT for response, get visual_analysis.md]
-2. PRODUCT -> product_analyst (research EVERYTHING - uses visual findings)
-   [WAIT for response, get product_research.md]
-3. CATALOG -> catalog_analyst (search with BOTH visual + product context)
-   [WAIT for response, get catalog_analysis.md]
-4. [User Approval]
-5. CREATIVE -> creative_specialist (process images)
-6. CATALOG -> catalog_specialist (create records)
-```
-
-**CRITICAL: SEQUENTIAL EXECUTION - ONE AT A TIME**
-
-| Pattern | Result |
-|---------|--------|
-| **WRONG: Parallel** - Call Visual, Product, Catalog simultaneously | Product has no visual findings. Catalog has no product research. GARBAGE output. |
-| **CORRECT: Sequential** - Visual first, WAIT, then Product, WAIT, then Catalog | Each agent builds on previous findings. QUALITY output. |
-
-**Why sequential:**
-- Product analyst NEEDS visual_analysis.md to know what to research
-- Catalog analyst NEEDS product_research.md to search with rich context
-- Parallel = each agent works blind = wrong results
-
-**For detailed workflow patterns, load coordination_patterns.**
-
----
-
 ## DOMAIN BOUNDARIES
 
 | Domain | IN Scope | OUT of Scope |
@@ -204,19 +131,15 @@ Every delegation MUST include:
 
 **Note:** Company context is injected automatically by middleware - no need to include.
 
-**For delegation templates and patterns, load coordination_patterns.**
-
 ---
 
 ## ANTI-PATTERNS
 
 | Anti-Pattern | Fix |
 |--------------|-----|
-| **Parallel analyst calls** | SEQUENTIAL: Visual -> WAIT -> Product -> WAIT -> Catalog |
 | **Images only to visual_analyst** | Include source image in EVERY delegation |
 | Missing domain context | Always specify "For X domain" |
 | Cross-domain delegation | Creative creates images, Catalog links them |
-| Skipping analysis | Route to analysts before specialists |
-| Missing file paths | Always include upstream analysis files |
+| Missing file paths | Include upstream analysis files (if they exist) |
 
 </protocol>
