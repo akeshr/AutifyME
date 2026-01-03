@@ -255,9 +255,20 @@ Product data expert. ANY catalog record operation.
 |-----------|-----------|---------------|
 | [image] + "add this" | Unknown product, need research + catalog | V -> P -> C |
 | [image] + "existing Stack Pro variants" | User knows product, verify in catalog | V -> C (skip P) |
+| [image] + "generate assets for existing variants" | Verify + full execution | V -> C -> Creative -> CS |
 | [image] + "just process, no catalog" | Image only, no DB | V -> Creative |
 | "what families do we have?" + "market trends?" | Text only, independent queries | P ‖ C |
 | [image] + "these are new, research specs" | User says new + wants research | V -> P -> C |
+
+#### When Verification Fails (Pivot Points)
+
+| User Said | Analyst Returns | PM Action |
+|-----------|-----------------|-----------|
+| "existing variants" | Catalog: "No match found" | Ask user: "I couldn't find these. Are they new products?" |
+| "our X product" | Catalog: "X not found" | Pivot: Run product_analyst for research |
+| "add to family Y" | Catalog: "Family Y doesn't exist" | Ask user: "Create new family or use existing?" |
+
+**Verification failure = opportunity to correct course, not error.**
 
 #### File Accumulation
 
@@ -360,52 +371,73 @@ Chain: Visual -> Catalog -> [Gate] -> Creative -> Catalog Specialist
 ### Pure image processing
 ```
 User: [image] + "remove background"
-Reasoning:
-- Image present -> but pure processing, no product context needed
-- No DB operation -> no verification needed
-- Direct to Creative
+
+Step 1: Which agents NEEDED?
+- Visual: Pure processing, no product context needed -> NO
+- Product: No research needed -> NO
+- Catalog: No DB operation -> NO
+- Creative: Visual output -> YES
+
+Step 2: Check dependencies
+- Creative: Have image path? YES -> run directly
+
 Chain: Creative only
 ```
 
 ### Data-driven graphics
 ```
 User: "create price post for Premium Jars"
-Reasoning:
-- No image -> text-only
-- Need product data -> Catalog analyst for prices/assets
-- Creative output needed -> Creative after data
-- Load data_driven protocol
+
+Step 1: Which agents NEEDED?
+- Visual: No image -> NO
+- Catalog: Need product data (prices, assets) -> YES
+- Creative: Visual output -> YES
+
+Step 2: Check dependencies
+- Catalog: Text query, no image dependency -> run
+- Creative: Need catalog data -> wait for Catalog
+
 Chain: Catalog Analyst -> [Gate] -> Creative
+(Load data_driven protocol for templates)
 ```
 
 ### Multiple images
 ```
 User: [multiple images] + "add these"
-Reasoning:
-- Multiple images -> Visual FIRST to detect relationship
-- Same product (angles)? Variants? Components? Different products?
-- Load multi_image protocol after Visual returns
-- Then route based on relationship + intent
-Chain: Visual (relationship) -> load multi_image -> then based on findings
+
+Step 1: Which agents NEEDED?
+- Visual: Multiple images, need relationship detection -> YES (first)
+- Others: Depends on relationship Visual finds
+
+Step 2: After Visual returns
+- ANGLES: Same product -> one product, N assets
+- VARIANTS: Different sizes -> N linked products
+- COMPONENTS: Parts to compose -> composition workflow
+- BULK: Different products -> N separate products
+
+Chain: Visual (relationship) -> load multi_image -> route based on findings
 ```
 
-### Simple update
+### Simple update (direct to specialist)
 ```
 User: "update price for Blue Jar to Rs 500"
-Reasoning:
-- Text only, clear instruction
-- "update" = modify existing
-- User provided exact target + value -> catalog_specialist can handle directly
-Chain: Catalog Specialist (direct update)
+
+Analysis needed? NO - User provided:
+- Exact target: "Blue Jar"
+- Exact action: "update price"
+- Exact value: "Rs 500"
+
+Chain: Catalog Specialist (direct update, no analysis phase)
 ```
 
-### Ambiguous update
+### Ambiguous update (needs clarification)
 ```
 User: "update the jar price"
-Reasoning:
-- "update" but which jar? what price?
-- Need Catalog to identify the jar first
-- Then confirm with user before updating
+
+Analysis needed? YES - Missing info:
+- Which jar? (need Catalog to find it)
+- What price? (need user to specify)
+
 Chain: Catalog Analyst -> [clarify with user] -> Catalog Specialist
 ```
 
