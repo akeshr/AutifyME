@@ -879,10 +879,11 @@ class ImageStudioInput(BaseModel):
     # Free-form Creative Direction
     # ==========================================================================
 
-    creative_direction: str = Field(
+    creative_direction: str | None = Field(
+        default=None,
         description=(
-            "REQUIRED: Creative direction for this image. "
-            "Describe the overall vision, artistic intent, or specific requirements."
+            "Overall vision, artistic intent, or specific requirements. "
+            "Use for notes beyond structured parameters."
         )
     )
 
