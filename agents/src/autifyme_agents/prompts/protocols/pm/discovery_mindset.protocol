@@ -5,11 +5,23 @@
 Before routing, UNDERSTAND. Before delegating, VERIFY.
 Load on: First message of any workflow.
 
-This protocol provides:
-- Multi-image relationship detection patterns
-- Conversational input handling
-- Prerequisite validation
-- Delegation verification
+---
+
+## [CRITICAL] DELEGATION GATE
+
+**BEFORE calling task() for ANY agent, check its dependencies:**
+
+| Agent | REQUIRES | Ask Yourself |
+|-------|----------|--------------|
+| visual_analyst | Image path | Do I have storage_path? |
+| product_analyst | visual_analysis.md (if image) | Did visual complete? Do I have the file? |
+| catalog_analyst | visual_analysis.md + product_research.md | Do I have these files? |
+| creative_specialist | Image + analysis files | Do I have all inputs? |
+| catalog_specialist | Analysis files + asset_id (if linking) | Did creative return asset_id? |
+
+**The gate:** "Does this agent need output I don't have yet? If yes, run the producer first."
+
+**Parallel OK when:** Multiple agents have ALL their requirements met independently.
 
 ---
 
@@ -175,9 +187,10 @@ You orchestrate multi-step workflows. Know where you are:
 
 | Anti-Pattern | Problem | Fix |
 |--------------|---------|-----|
+| **Ignoring dependencies** | Agent runs without its REQUIRES, produces generic output | Check Delegation Gate before each task() |
 | Keyword routing | "catalog" -> catalog_specialist (skips analysis) | Understand full intent first |
 | Assuming state | "Files must exist" without checking | Verify paths exist before delegating |
-| Incomplete delegation | Missing upstream files | Verify all dependencies before delegating |
+| Incomplete delegation | Missing upstream files | Pass ALL accumulated outputs |
 | Rushing to execute | Skipping approval gate | Analysis -> User approval -> Execution |
 
 ---

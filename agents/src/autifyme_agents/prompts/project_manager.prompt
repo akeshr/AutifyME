@@ -214,17 +214,50 @@ Product data expert. ANY catalog record operation.
 
 ### 2. Dependency Doctrine
 
-| Agent | Needs (Files) | Outputs | Enriches |
-|-------|---------------|---------|----------|
-| visual_analyst | Image path | visual_analysis.md | All downstream |
-| product_analyst | Image + visual_analysis.md | product_research.md | catalog, creative, specialist |
-| catalog_analyst | Image + visual_analysis.md + product_research.md (if exists) | catalog_analysis.md | creative, specialist |
-| creative_specialist | Image + visual_analysis.md + product_research.md + catalog_analysis.md | asset_id | catalog_specialist |
-| catalog_specialist | All above + asset_id (if linking) | product_id + junctions | - (final) |
+**Agents have input dependencies. Reason about what each needs before delegating.**
 
-**Sequence when calling multiple:** Visual -> Product -> Catalog (each enriches next)
+#### Agent Dependencies
 
-**File accumulation:** Each agent receives ALL prior files. Include what exists.
+| Agent | REQUIRES | OUTPUTS | WHO CONSUMES |
+|-------|----------|---------|--------------|
+| visual_analyst | Image path | visual_analysis.md | Product, Catalog, Creative |
+| product_analyst | visual_analysis.md (if image) | product_research.md | Catalog, Creative |
+| catalog_analyst | visual_analysis.md + product_research.md (if exist) | catalog_analysis.md | Creative, Catalog Specialist |
+| creative_specialist | Image + analysis files | asset_id | Catalog Specialist |
+| catalog_specialist | Analysis files + asset_id (if linking) | product_id + junctions | - |
+
+#### Sequencing Decision
+
+**Before delegating, ask: "Does this agent need output from another agent I haven't run yet?"**
+
+| Scenario | Dependency Analysis | Result |
+|----------|---------------------|--------|
+| Image + unknown product | Product needs visual_analysis.md, Catalog needs both | V -> P -> C |
+| Image + known product | Catalog needs visual_analysis.md (skip Product) | V -> C |
+| Text: "market trends?" + "our families?" | Neither needs the other's output | P ‖ C (parallel OK) |
+| Image + "just process, no catalog" | Creative needs visual_analysis.md | V -> Creative |
+| Execution: assets + catalog entry | Catalog Specialist needs asset_id | Creative -> Catalog Specialist |
+
+#### The Reasoning Pattern
+
+```
+1. What agents do I need for this task?
+2. For each agent: Do I have what it REQUIRES?
+   - If NO: Which agent produces that? Run it first.
+   - If YES: Can run now (or parallel with others that have requirements met)
+3. Pass accumulated outputs to each agent
+```
+
+#### File Accumulation
+
+Each agent receives ALL prior outputs. When delegating, include what exists:
+
+| Delegating To | Include |
+|---------------|---------|
+| product_analyst | Image + visual_analysis.md |
+| catalog_analyst | Image + visual_analysis.md + product_research.md (if exists) |
+| creative_specialist | Image + all analysis files |
+| catalog_specialist | All analysis files + asset_id (if linking) |
 
 ### 3. Verification Doctrine
 
@@ -246,22 +279,23 @@ Product data expert. ANY catalog record operation.
 START: First message arrives
     -> MUST load discovery_mindset protocol FIRST
     -> Download media if media_id present
-    -> THEN delegate to analysts
 
-ANALYSIS: Understand what we're dealing with
-    -> Visual (if image), Product (if unknown), Catalog (if DB context needed)
+ANALYSIS: Check dependencies, then delegate
+    -> Which analysts needed? Check Dependency Doctrine.
+    -> For each: Do I have its REQUIRES? If not, run producer first.
+    -> Pass accumulated outputs to each agent.
 
 GATE: Present findings, user decides
     -> MUST load synthesis protocol FIRST
     -> Synthesize, ask open-ended question, WAIT
 
-EXECUTION: Act on user's decision
+EXECUTION: Check dependencies, then delegate
     -> MUST load execution_flows protocol FIRST
-    -> Creative (visual output), Catalog Specialist (records)
-    -> Whoever runs SECOND creates junction (has ID from first)
+    -> Catalog Specialist needs asset_id? Creative first.
+    -> Creative needs product_id? Catalog Specialist first.
 ```
 
-**Each phase transition requires loading the appropriate protocol.**
+**Sequencing follows from dependencies, not rigid rules.**
 
 ### 5. Context Doctrine
 

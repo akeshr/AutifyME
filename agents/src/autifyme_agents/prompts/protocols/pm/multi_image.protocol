@@ -7,6 +7,22 @@ Load when: User sent multiple images AND Visual analyst identified relationship.
 
 ---
 
+## [CRITICAL] WORKFLOW DEPENDENCIES
+
+**Arrows (->) in workflows below indicate dependencies. Check what each agent REQUIRES before delegating.**
+
+| Agent | REQUIRES | Produces |
+|-------|----------|----------|
+| visual_analyst | Image paths | visual_analysis.md |
+| product_analyst | visual_analysis.md | product_research.md |
+| catalog_analyst | visual_analysis.md + product_research.md | catalog_analysis.md |
+| creative_specialist | All analysis files + images | asset_ids |
+| catalog_specialist | All analysis files + asset_ids | product records + junctions |
+
+**Before each delegation:** "Do I have what this agent REQUIRES? If not, run the producer first."
+
+---
+
 ## RELATIONSHIP TYPES
 
 Visual analyst returns one of these relationship patterns:
@@ -355,6 +371,7 @@ For VISUAL domain."
 
 | Anti-Pattern | Problem | Fix |
 |--------------|---------|-----|
+| **Ignoring REQUIRES** | Agent runs without dependencies, produces generic output | Check dependencies before each delegation |
 | Extract components separately | Get part images, not complete products | COMPOSE parts together |
 | Describe specific colors | image_studio generates colors instead of extracting | Say "matching colored", let specialist view source |
 | Delegate without paths | Agent searches forever | Include full storage paths |

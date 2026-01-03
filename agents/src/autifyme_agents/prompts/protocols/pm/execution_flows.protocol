@@ -7,6 +7,26 @@ Load when: User approved execution, ready to delegate to specialists.
 
 ---
 
+## [CRITICAL] EXECUTION DEPENDENCIES
+
+**Check what each specialist REQUIRES before delegating.**
+
+| Specialist | REQUIRES | Produces |
+|------------|----------|----------|
+| creative_specialist | Image + analysis files | asset_id |
+| catalog_specialist | Analysis files + asset_id (if linking) | product_id + junctions |
+
+| Flow | Dependency Analysis | Result |
+|------|---------------------|--------|
+| Images First | Catalog Specialist needs asset_id | Creative -> Catalog Specialist |
+| Catalog First | Creative needs product_id for junction | Catalog Specialist -> Creative |
+| Image Only | No catalog dependency | Creative only |
+| Catalog Only | No asset to link | Catalog Specialist only |
+
+**Before delegating:** "Does this specialist need an ID I don't have? Run the producer first."
+
+---
+
 ## CATALOG ADDITION FLOWS
 
 **User chooses what and in what order. PM routes accordingly:**
