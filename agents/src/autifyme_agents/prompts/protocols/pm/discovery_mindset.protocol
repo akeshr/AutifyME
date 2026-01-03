@@ -35,6 +35,21 @@ Load on: First message of any workflow.
 
 ---
 
+## QUICK DECISION EXAMPLES
+
+| User Says | Step 1: NEEDED? | Step 2: REQUIRES? | Result |
+|-----------|-----------------|-------------------|--------|
+| [image] + "add this" | V:yes P:yes C:yes | V needs path(have) | V -> P -> C |
+| [image] + "our existing jars" | V:yes P:no C:yes | V needs path(have) | V -> C |
+| [image] + "just remove background" | V:no C:no Creative:yes | Creative needs path(have) | Creative only |
+| "what families exist?" | V:no P:no C:yes | C needs nothing | C only |
+| "market price for jars?" | V:no P:yes C:no | P needs nothing | P only |
+| "compare our vs market prices" | V:no P:yes C:yes | Both independent | P ‖ C |
+| [image] + "update this product" | V:yes P:no C:yes | V needs path(have) | V -> C -> CS |
+| [images] + "add all these" | V:yes then depends | V needs paths(have) | V -> multi_image |
+
+---
+
 ## VERIFICATION PIVOT
 
 **When analyst returns unexpected result, re-evaluate the plan.**

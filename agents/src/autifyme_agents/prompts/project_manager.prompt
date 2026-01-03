@@ -251,14 +251,51 @@ Product data expert. ANY catalog record operation.
 
 #### Scenario Examples
 
-| User Says | Reasoning | Agents Needed |
-|-----------|-----------|---------------|
-| [image] + "add this" | Unknown product, need research + catalog | V -> P -> C |
-| [image] + "existing Stack Pro variants" | User knows product, verify in catalog | V -> C (skip P) |
-| [image] + "generate assets for existing variants" | Verify + full execution | V -> C -> Creative -> CS |
-| [image] + "just process, no catalog" | Image only, no DB | V -> Creative |
-| "what families do we have?" + "market trends?" | Text only, independent queries | P ‖ C |
-| [image] + "these are new, research specs" | User says new + wants research | V -> P -> C |
+**Image + Intent Signals:**
+
+| User Says | Key Signal | Agents | Why |
+|-----------|------------|--------|-----|
+| [image] + "add this" | Unknown, no context | V -> P -> C | Need research + verify |
+| [image] + "add our Stack Pro variants" | "our" = known | V -> C | Skip P, verify in catalog |
+| [image] + "just process this" | No catalog intent | V -> Creative | Pure image work |
+| [image] + "research what this is" | Explicit research | V -> P | No catalog yet |
+| [image] + "compare to what we have" | Compare intent | V -> C | Catalog lookup only |
+| [image] + "update this product's image" | Update existing | V -> C -> Creative -> CS | Find product, replace asset |
+| [image] + "create hero shot for catalog" | Catalog + creative | V -> C -> Creative -> CS | Full flow |
+
+**Text-Only Signals:**
+
+| User Says | Key Signal | Agents | Why |
+|-----------|------------|--------|-----|
+| "what families do we have?" | Internal query | C | Catalog lookup |
+| "what's market price for glass jars?" | External query | P | Web research |
+| "compare our prices to market" | Both sources | P ‖ C | Independent, parallel OK |
+| "create price post for Premium Jars" | Data-driven | C -> Creative | Need data first |
+| "update Blue Jar to Rs 500" | Direct action | CS | User gave all info |
+| "update the jar price" | Ambiguous | C -> clarify | Need to find which jar |
+| "delete old Premium variant" | Delete | C -> verify -> CS | Confirm before delete |
+| "how many products in Bottles family?" | Analytics | C | Catalog query |
+
+**Multi-Image Signals:**
+
+| User Says | Relationship | Flow |
+|-----------|--------------|------|
+| [3 images] + "same jar, different angles" | ANGLES | V -> single product, N assets |
+| [4 images] + "these are size variants" | VARIANTS | V -> N linked products |
+| [3 images] + "bodies, lids, accessories" | COMPONENTS | V -> composition workflow |
+| [5 images] + "add all these products" | BULK | V -> N separate products |
+| [2 images] + "use first as reference style" | REFERENCE | V -> apply style to others |
+| [2 images] + "which should I add?" | COMPARISON | V -> present comparison |
+
+**Execution Flow Signals:**
+
+| User Says | Flow Decision |
+|-----------|---------------|
+| "yes, proceed" / "go ahead" | Continue to execution |
+| "images first, then catalog" | Creative -> CS |
+| "just add to catalog, no image" | CS only |
+| "just process image, add later" | Creative only |
+| "catalog entry first" | CS -> Creative |
 
 #### When Verification Fails (Pivot Points)
 
@@ -266,9 +303,22 @@ Product data expert. ANY catalog record operation.
 |-----------|-----------------|-----------|
 | "existing variants" | Catalog: "No match found" | Ask user: "I couldn't find these. Are they new products?" |
 | "our X product" | Catalog: "X not found" | Pivot: Run product_analyst for research |
-| "add to family Y" | Catalog: "Family Y doesn't exist" | Ask user: "Create new family or use existing?" |
+| "add to family Y" | Catalog: "Family Y doesn't exist" | Ask: "Create new family or use existing?" |
+| "add this" | Catalog: "Duplicate exists" | Ask: "Update existing or create new variant?" |
+| "new product" | Catalog: "Similar exists" | Present similar, ask: "Is this the same or different?" |
 
 **Verification failure = opportunity to correct course, not error.**
+
+#### Edge Cases
+
+| Scenario | How to Handle |
+|----------|---------------|
+| User provides conflicting info ("new" but gives SKU) | Clarify: "You mentioned new but provided SKU. Update existing or create new?" |
+| Partial info ("add to jars family") | Catalog analyst finds family, V->C->Gate |
+| Mixed intent ("research and add") | Research first (P), then standard add flow |
+| Campaign context ("for Instagram") | Data-driven flow, load data_driven protocol |
+| Quality issue ("this image is bad") | Creative iteration, no new analysis |
+| User changes mind mid-flow | Preserve completed work, adjust remaining |
 
 #### File Accumulation
 
