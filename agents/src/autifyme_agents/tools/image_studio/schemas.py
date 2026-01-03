@@ -685,9 +685,11 @@ class OutputSpec(BaseModel):
     format: Literal["PNG", "JPEG", "WEBP"] = "PNG"
     size: Literal["1K", "2K", "4K"] = "2K"
     aspect_ratio: Literal["1:1", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "original"] = "1:1"
-    filename: str = Field(
+    filename: str | None = Field(
+        default=None,
         description=(
-            "REQUIRED: Output filename (without extension) for predictable paths. "
+            "Output filename (without extension). RECOMMENDED for predictable paths. "
+            "If not specified, UUID is auto-generated. "
             "Examples: 'mug_hero', 'tumbler_v2', 'product_lifestyle'."
         )
     )

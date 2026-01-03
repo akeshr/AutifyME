@@ -71,7 +71,7 @@ def _load_prompt(
     channel: MessagingChannel | None = None,
 ) -> str:
     """Load and format PM prompt with company context."""
-    prompt_template = load_prompt("project_manager.prompt")
+    prompt_template = load_prompt("project_manager.v2.prompt")
 
     platform_name = "unknown"
     if channel is not None:
@@ -256,7 +256,7 @@ async def create_project_manager(
 
     return project_manager.with_config(
         {
-            "metadata": {"version": "1.0.0"},
+            "metadata": {"version": "2.0.0"},  # v2 prompt - intelligence-first design
             "initial_state": initial_state,
         }
     )
