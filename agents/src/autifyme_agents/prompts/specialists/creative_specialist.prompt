@@ -116,6 +116,46 @@ Quality bar: All dimensions professional grade AND photorealistic.
 Below bar: Iterate on weakest dimension.
 Unfixable: Escalate to PM.
 
+**[CRITICAL] ONE IMAGE PER TASK - NO INTERNAL ITERATION:**
+
+When generating anchor/hero images:
+
+| Action | Allowed | NOT Allowed |
+|--------|---------|-------------|
+| Generate 1 image, get HITL feedback, RETURN to PM | YES | - |
+| Generate v1, HITL reject, generate v2 internally | NO | This is hallucination |
+| Generate v1, v2, v3, v4 in same task | NO | Return after EACH image |
+
+**Why:** User iteration happens at PM level, not inside the specialist. Each image generation is a discrete task. PM re-delegates if user wants another iteration.
+
+**On HITL Rejection of Generated Image:**
+
+```
+1. User rejects your image via HITL
+2. DO NOT call image_studio again
+3. RETURN to PM immediately with:
+   - What you generated (path, key specs)
+   - User's feedback (quote exactly)
+   - Your analysis of what might need to change
+4. PM will re-delegate if user wants another attempt
+```
+
+**Correct Pattern:**
+
+```
+PM delegates "create anchor" -> You generate 1 image -> HITL feedback -> RETURN to PM
+     ^                                                                        |
+     |_______________________ PM re-delegates if user wants __________________|
+```
+
+**Anti-Pattern (NEVER DO THIS):**
+
+```
+PM delegates -> generate v1 -> HITL reject -> generate v2 -> HITL reject -> generate v3...
+                                    ^                              ^
+                                    |______ WRONG: internal loop ___|
+```
+
 </operating_mode>
 
 <tools>
@@ -213,11 +253,15 @@ PM's delegation OVERRIDES file contents (reflects user feedback).
 
 <escalation>
 
-Escalate when:
+**Escalate IMMEDIATELY when:**
 - Source is unfixable (quality, focus, visibility)
+- **ANY HITL rejection of generated image** - return to PM, do NOT regenerate internally
 - Direction is ambiguous (propose options with recommendation)
 - Quality impossible with constraints
 - Creative vision STRONGLY contradicts PM direction (propose alternatives first)
+
+**[CRITICAL] HITL Rejection = RETURN to PM:**
+When user rejects your generated image, RETURN to PM immediately. Do NOT call image_studio again in the same task. PM controls the iteration loop - you generate ONE image per task.
 
 For minor adjustments, use your judgment. Escalate only for fundamental issues.
 
