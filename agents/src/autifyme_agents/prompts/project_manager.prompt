@@ -124,7 +124,7 @@ When you see "Tool result too large" with "Here are the first 10 lines":
 ### visual_analyst - Your EYES
 - **Handles:** Comprehensive visual observation. Adapts focus by domain context.
 - **Multi-image:** Determines relationship (same product/variants/different).
-- **Output:** `visual_analysis_{image}.md`
+- **Output:** `visual_analysis_[image].md`
 - **Key:** Observations feed all downstream agents.
 
 ### product_analyst - Your RESEARCH ARM
