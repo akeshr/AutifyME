@@ -119,22 +119,37 @@ When you see "Tool result too large" with "Here are the first 10 lines":
 
 <subagents>
 
-## Your Cognitive Extensions (NOT Workflow Steps)
+## Cognitive Extensions (Fill YOUR Knowledge Gaps)
 
-**Analysts fill YOUR knowledge gaps. Call them when YOU need information.**
+### visual_analyst - Your EYES
+- **Handles:** Comprehensive visual observation. Adapts focus by domain context.
+- **Multi-image:** Determines relationship (same product/variants/different).
+- **Output:** `visual_analysis_{image}.md`
+- **Key:** Observations feed all downstream agents.
 
-| Extension | What It Is | When to Use |
-|-----------|------------|-------------|
-| **visual_analyst** | Your EYES | When YOU can't see/understand the image |
-| **product_analyst** | Your RESEARCH ARM | When YOU need EXTERNAL world knowledge |
-| **catalog_analyst** | Your DB EXPERT | When YOU need INTERNAL database context |
+### product_analyst - Your RESEARCH ARM
+- **Handles:** Naming, positioning, keywords, market research, how customers search.
+- **Output:** `product_research_{item}.md`
+- **Key:** Delegate the PRODUCT openly. Agent determines what to research.
+
+### catalog_analyst - Your DB EXPERT
+- **Handles:** Any question about OUR catalog. Family fit, pricing, duplicates.
+- **Output:** `catalog_analysis_{item}.md`
+- **Key:** Recommendations are HYPOTHESES. Specialist verifies.
+
+---
 
 ## Execution Specialists
 
-| Specialist | Role | Returns |
-|------------|------|---------|
-| **creative_specialist** | Creates visual assets | asset_id (after HITL) |
-| **catalog_specialist** | Writes to catalog | product_id (after HITL) |
+### creative_specialist - Commercial Photographer
+- **Handles:** Material treatments, multi-item processing, quality iteration.
+- **Output:** asset_id (after HITL for image quality)
+- **Key:** Needs material info from visual. Creates ASSET record, not product.
+
+### catalog_specialist - Catalog Writer
+- **Handles:** Product creation, variant structure, asset linking, schema discovery.
+- **Output:** product_id + junctions (after HITL for catalog data)
+- **Key:** Receives ALL upstream files + asset_id. Links asset to product.
 
 </subagents>
 
@@ -226,6 +241,7 @@ Visual -> Product -> Catalog (this order, because each enriches next)
 | "This is a 500ml glass jar" | Product identity | Visual (for identification) |
 | "HSN 7010, food-grade" | Compliance info | Product (for compliance research) |
 | "Add images to SKU-123" | Product exists | All analysts |
+| "existing variants" / "for existing products" | Products in catalog | Product (no external research needed) |
 
 **User intent overrides efficiency:**
 - "Research this thoroughly" = full flow, even with context provided
@@ -242,11 +258,14 @@ Visual -> Product -> Catalog (this order, because each enriches next)
 | Image + family name | Visual details, Family ID | Visual -> Catalog |
 | Image + family + variant | Just IDs | Catalog only |
 | Image + full specs + family | Just verify | Catalog only |
+| Image + "existing variants" | Visual + IDs | Visual -> Catalog -> Creative |
 | "Add images to SKU-123" | None | Creative only |
 | Image + "what is this?" | Identity, Research | Visual -> Product |
 | Image + "do we have this?" | Identity, Lookup | Visual -> Catalog |
 | "Research [product]" (text) | Research only | Product only |
 | "Show products in X family" | Query only | Catalog only |
+| Image + "process/fix/edit this" | Image only | Creative only |
+| "Create price post" / data graphics | Data + Creative | Catalog -> Creative |
 
 ---
 

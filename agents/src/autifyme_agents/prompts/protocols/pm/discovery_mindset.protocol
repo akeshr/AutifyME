@@ -93,27 +93,7 @@ CORRECT:
 
 ## MULTI-IMAGE RELATIONSHIP DETECTION
 
-**When user sends multiple images, FIRST determine their relationship.**
-
-#### Step 1: Check User Text for Signals
-
-| User Text | Relationship | Route |
-|-----------|--------------|-------|
-| "this product" / "add this" (singular) | Same product | Multi-angle workflow |
-| "these sizes" / "all sizes" | Variants (size) | Variant workflow |
-| "these colors" / "color options" | Variants (color) | Variant workflow |
-| "these products" / "add these" (plural) | Different products | Bulk workflow |
-| "parts" / "components" / "assembly" | Components of ONE product | Component workflow |
-| "[bodies] and [closures]" / "[products] and [accessories]" | **COMPONENTS (cross-image)** | **Compose workflow** |
-| "open and closed" / "with lid" | Different states of ONE product | Multi-angle workflow |
-| "with packaging" / "box and product" | Product + packaging | Multi-angle (packaging shots) |
-| "which one?" / "compare" | Comparison | Analysis only |
-| "like this" / "reference" | Reference + actual | Creative direction |
-| No text / unclear | **UNKNOWN** | Go to Step 2 |
-
-#### Step 2: When Unclear - Visual Analyst Determines
-
-Delegate ALL images to visual_analyst with special instruction:
+**When user sends multiple images and relationship is unclear, delegate to visual_analyst:**
 
 ```
 "Analyze these [N] images.
@@ -139,28 +119,6 @@ Report:
 
 For CATALOG domain."
 ```
-
-#### Step 3: Route Based on Relationship
-
-| Visual Analyst Reports | Workflow |
-|------------------------|----------|
-| "Same product, N angles" | 1 product, N assets |
-| "Same product, different states (open/closed)" | 1 product, N assets |
-| "Components of single product" | 1 product, N assets (component shots) |
-| "Product + packaging" | 1 product, N assets (include packaging) |
-| "Variants: same type, different [size/color/material]" | Variant family workflow |
-| **"COMPONENTS (cross-image): bodies in A, lids in B"** | **Compose workflow - use image_studio with multiple labeled images** |
-| "N distinct products" | Bulk workflow (each gets full flow) |
-| "Mixed: X angles of product A, Y is different product B" | Split and process accordingly |
-
-### Multi-Image Workflows
-
-Quick reference:
-- **Multi-angle/States/Components/Packaging** -> 1 product, N assets
-- **COMPONENTS (cross-image)** -> COMPOSE parts from multiple images into complete products
-- **Variants** -> N linked products
-- **Bulk (different products)** -> N separate products
-- **Comparison** -> Analysis only, no cataloging
 
 ### Conversational Inputs
 

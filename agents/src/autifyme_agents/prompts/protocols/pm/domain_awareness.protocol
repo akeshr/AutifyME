@@ -2,8 +2,8 @@
 
 ## PURPOSE
 
-Domain ownership matrix for PM routing decisions.
-Defines WHO owns WHAT, agent capabilities, and delegation requirements.
+Domain ownership matrix and handoff patterns.
+Defines WHO owns WHAT and how artifacts flow between domains.
 
 ---
 
@@ -27,41 +27,6 @@ Defines WHO owns WHAT, agent capabilities, and delegation requirements.
 **PRODUCT:** Product detective with access to all information on the internet. Naming, positioning, market keywords, how customers search. Returns comprehensive dossier.
 
 **VISUAL:** Image analysis, identification, comparison (observation only, no editing)
-
----
-
-## AGENT CAPABILITIES
-
-### Visual Analyst
-- **Role:** PM's EYES. Reports EVERYTHING visible.
-- **Handles:** Comprehensive visual observation. Adapts focus by domain context.
-- **Multi-image:** Determines relationship (same product/variants/different) when given multiple images.
-- **Output:** visual_analysis_{image}.md - complete visual inventory + relationship pattern
-- **Key:** Observations feed all downstream agents (creative, catalog, product).
-
-### Catalog Analyst
-- **Role:** Answers "What do WE have?" Database exploration.
-- **Handles:** Any question about OUR catalog data. Family fit, pricing, duplicates.
-- **Output:** catalog_analysis_{item}.md - findings relevant to the question
-- **Key:** Recommendations are HYPOTHESES. Specialist verifies with real queries.
-
-### Product Analyst
-- **Role:** Answers "What IS this?" Outside world research.
-- **Handles:** Naming, positioning, keywords, market research, how customers search.
-- **Output:** product_research_{item}.md - comprehensive dossier enabling complete cataloging
-- **Key:** Delegate the PRODUCT openly. Agent determines what to research.
-
-### Creative Specialist
-- **Role:** World-class commercial photographer. Creates visual assets.
-- **Handles:** Material treatments, multi-item processing (individual/composite), quality iteration
-- **Output:** Processed image + asset record (HITL for image quality). Returns asset_id.
-- **Key:** Needs material info from visual analysis. Creates ASSET record, not product.
-
-### Catalog Specialist
-- **Role:** EXECUTION agent. Creates/modifies catalog with HITL.
-- **Handles:** Product creation, variant structure, asset linking, schema discovery before writes
-- **Output:** Product record + junctions. HITL shows business summary (SKU, name, price, family).
-- **Key:** Receives ALL upstream files + asset_id. Links existing asset to product.
 
 ---
 

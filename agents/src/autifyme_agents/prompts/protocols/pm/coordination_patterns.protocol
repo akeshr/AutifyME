@@ -516,117 +516,6 @@ WRONG: Route storage_path to catalog_specialist for asset creation
 
 ---
 
-## INFORMATION-ONLY PATTERN
-
-User wants data, not action. Single analyst, no execution.
-
-```
-[User Question]
-      |
-      v
-[Appropriate Analyst] -> findings
-      |
-      v
-[PM summarizes for user]
-```
-
-**Examples:**
-- "Show me products without images" -> catalog_analyst only
-- "What HSN code for this?" -> product_analyst only
-- "Is this damaged?" -> visual_analyst only
-
----
-
-## RESEARCH-ONLY PATTERN
-
-User wants product information without cataloging action.
-
-```
-[Image + "What is this?" / "Tell me about this"]
-      |
-      v
-[1. visual_analyst] -> identifies product
-      |
-      v
-[2. product_analyst] -> comprehensive research
-      |
-      v
-[PM presents findings to user]
-```
-
-**Triggers:**
-- "Research this" (no "catalog" or "add")
-- "What can you tell me about this?"
-- "Find information about this product"
-- Image + question about the product
-
-**Key:** No catalog_analyst needed unless user asks about existing catalog data.
-
----
-
-## CREATIVE-ONLY PATTERN
-
-User wants image processing without cataloging.
-
-### With Asset Record (Default)
-
-```
-[Image + "Fix/Edit/Process this"]
-      |
-      v
-[1. visual_analyst] -> assess image quality, identify content (optional)
-      |
-      v
-[2. creative_specialist] -> process image
-      |
-      v
-[creative_specialist creates asset record] -> [HITL: "Is this image acceptable?"]
-      |
-      v
-[PM returns confirmation + image to user]
-```
-
-**Triggers:**
-- "Process this image"
-- "Fix the background"
-- "Make this catalog-ready" (but no "add to catalog")
-- "Remove background and clean up"
-
-**Key:** Skip catalog_analyst and product_analyst entirely.
-User may later say "now add to catalog" - then catalog_specialist links existing asset.
-
-### Standalone (No Asset Record)
-
-```
-[Image + "Just fix this for me" / "Download only"]
-      |
-      v
-[creative_specialist] -> process image
-      |
-      v
-[Returns storage_path to PM] (NO write_data)
-      |
-      v
-[PM shows image to user]
-```
-
-**Triggers:**
-- "Just process, no need to save"
-- "For download only"
-- Quick fix for user's personal use
-
-**PM Delegation Template (Standalone):**
-```
-"Process this image.
-Source: [image_path]
-[Processing instructions]
-Standalone - no asset record needed."
-```
-
-**Key:** Creative returns storage_path only when explicitly told "standalone".
-
----
-
 ## CREATIVE->CATALOG ASSET HANDOFF PATTERN
 
 **[CRITICAL]** Creative specialist creates asset records (with HITL), catalog specialist creates product + junction.
@@ -818,20 +707,9 @@ When processing multiple images for same campaign:
 
 ---
 
-## DATA-DRIVEN CREATIVE PATTERN
-
-When user wants graphics with product data (prices, sizes, variants, offers).
+## DATA-DRIVEN CREATIVE EXECUTION
 
 **Key Insight:** PM delegates to catalog_analyst for data, then passes data to creative. Creative stays pure creative.
-
-### Triggers
-
-- "Create price post" / "Make price graphic"
-- "Show all sizes with prices"
-- "Create offer graphic" / "Sale post"
-- "Instagram post with price" / "WhatsApp status with details"
-- "Compare variants" / "Show size comparison"
-- Any request combining VISUAL OUTPUT + PRODUCT DATA
 
 ### Flow
 
@@ -1100,64 +978,7 @@ Options:
 
 ---
 
-## MULTI-IMAGE HANDLING (CRITICAL)
-
-When user sends multiple images, the FIRST task is determining their relationship.
-
-### Step 1: Text Signal Detection
-
-| User Text | Relationship | Strategy |
-|-----------|--------------|----------|
-| "this product" / "add this" (singular) | Same product | Multi-angle |
-| "these sizes" / "all sizes" / "size range" | Size variants | Variant set |
-| "these colors" / "color options" | Color variants | Variant set |
-| "[material A] and [material B]" / "material options" | Material variants | Variant set |
-| "these products" / "add these" (plural) | Different products | Bulk |
-| "parts" / "components" / "assembly" | Components of ONE product | Single product |
-| "open and closed" / "with lid off" | Different states | Single product |
-| "with box" / "with packaging" | Product + packaging | Single product |
-| "which one?" / "compare these" | Comparison | Analysis only |
-| "like this" / "make it look like" | Reference + actual | Creative direction |
-| No text / unclear | **UNKNOWN** | Visual analyst determines |
-
-### Step 2: Visual Analyst Relationship Detection
-
-When text signals are unclear, delegate ALL images to visual_analyst:
-
-```
-"Analyze these [N] images together.
-Source images at: [path1], [path2], [path3]...
-
-CRITICAL - Determine RELATIONSHIP between images:
-1. Same product, different angles? (front/back/side/detail)
-2. Same product, different states? (open/closed, assembled/disassembled)
-3. Components of ONE product? (body + lid + handle = single item)
-4. Product + its packaging/box?
-5. Same product TYPE, different variants? (sizes/colors/materials)
-6. Completely different products?
-7. One is reference/inspiration, others are actual products?
-
-Report:
-- Relationship pattern
-- Individual observations for each image
-- Which images belong together (if mixed)
-
-For CATALOG domain."
-```
-
-### Step 3: Route Based on Relationship
-
-| Relationship | Workflow | Output Files |
-|--------------|----------|--------------|
-| **Multi-angle** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
-| **Different states** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
-| **Components** | Visual (all) -> Product (once, note components) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
-| **Product + packaging** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
-| **Variants** | Visual (all) -> Product (base research + variant dimensions) -> Catalog (variant structure) -> [Approval] -> Creative (all) -> Specialist (N linked products) | 1 visual_analysis, 1 product_research (covers variants), 1 catalog_analysis |
-| **Bulk (different)** | Visual (all, separate findings) -> For each: Product -> Catalog -> [Approval] -> Creative -> Specialist | N visual_analysis files, N product_research files, N catalog_analysis files |
-| **Comparison** | Visual (all) -> Present comparison to user | 1 comparison_analysis |
-| **Reference (lifestyle)** | Identify reference; Visual (product only) -> Product -> Catalog -> Creative (with reference) | For LIFESTYLE domain |
-| **Reference (batch)** | Identify reference; Visual (all products) -> Product -> Catalog -> Creative (with reference) | For CATALOG domain, multiple products |
+## MULTI-IMAGE WORKFLOW EXECUTION
 
 ### Multi-Angle Workflow (1 Product, N Assets)
 
