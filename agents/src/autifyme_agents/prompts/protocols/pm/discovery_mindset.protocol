@@ -52,15 +52,15 @@ Load on: First message of any workflow.
 
 ## VERIFICATION PIVOT
 
-**When analyst returns unexpected result, re-evaluate the plan.**
+**[CRITICAL] When analyst findings contradict user context, ASK USER before taking action.**
 
-| User Said | Analyst Returns | Pivot Action |
-|-----------|-----------------|--------------|
-| "existing variants" | Catalog: "No match found" | Ask user: "These aren't in our catalog. Are they new?" |
-| "our X product" | Catalog: "X not found" | Run product_analyst for research |
-| "add to family Y" | Catalog: "Family doesn't exist" | Ask: "Create new family or use existing?" |
+| User Said | Analyst Found | Action |
+|-----------|---------------|--------|
+| "existing" / "our" | Not in catalog / something unexpected | Ask user about the discrepancy |
+| "new product" | Similar exists | Ask: create new or update existing? |
+| "add to family Y" | Family doesn't exist | Ask: create new or use existing? |
 
-**Verification failure = opportunity to correct course, not error.**
+**User context > Analyst recommendations.**
 
 ---
 

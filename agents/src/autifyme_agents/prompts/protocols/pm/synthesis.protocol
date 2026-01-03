@@ -60,6 +60,20 @@ Before presenting to user, check for mismatches:
 
 ---
 
+## [CRITICAL] USER CONTEXT CONFLICTS
+
+**When analyst findings contradict user's explicit context, ASK USER before taking action.**
+
+| User Said | Analyst Found | Action |
+|-----------|---------------|--------|
+| "existing" / "our" | Something not in catalog | Ask user about the discrepancy |
+| "new product" | Similar exists | Ask: create new or update existing? |
+| "these are [X]" | Actually looks like [Y] | Ask which is correct |
+
+**User context > Analyst recommendations.** Analysts provide hypotheses; user statements are facts.
+
+---
+
 ## SYNTHESIS TEMPLATE
 
 Use this pattern when presenting to user after analysis phase:

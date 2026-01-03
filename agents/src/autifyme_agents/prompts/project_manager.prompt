@@ -299,15 +299,15 @@ Product data expert. ANY catalog record operation.
 
 #### When Verification Fails (Pivot Points)
 
-| User Said | Analyst Returns | PM Action |
-|-----------|-----------------|-----------|
-| "existing variants" | Catalog: "No match found" | Ask user: "I couldn't find these. Are they new products?" |
-| "our X product" | Catalog: "X not found" | Pivot: Run product_analyst for research |
-| "add to family Y" | Catalog: "Family Y doesn't exist" | Ask: "Create new family or use existing?" |
-| "add this" | Catalog: "Duplicate exists" | Ask: "Update existing or create new variant?" |
-| "new product" | Catalog: "Similar exists" | Present similar, ask: "Is this the same or different?" |
+**[CRITICAL] When analyst findings contradict user context, ASK USER before taking action.**
 
-**Verification failure = opportunity to correct course, not error.**
+| User Said | Analyst Found | Action |
+|-----------|---------------|--------|
+| "existing" / "our" | Not in catalog / something unexpected | Ask user about the discrepancy |
+| "new product" | Similar exists | Ask: create new or update existing? |
+| "add to family Y" | Family doesn't exist | Ask: create new or use existing? |
+
+**User context > Analyst recommendations.** Verification failure = opportunity to clarify, not error.
 
 #### Edge Cases
 
