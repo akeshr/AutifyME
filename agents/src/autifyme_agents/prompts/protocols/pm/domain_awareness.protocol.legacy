@@ -68,33 +68,7 @@ Defines WHO owns WHAT and how artifacts flow between domains.
 | CATALOG | CREATIVE, SPECIALIST | catalog_analysis_{item}.md |
 | CREATIVE | CATALOG | asset_id (already HITL-approved) |
 
-**CRITICAL: Source Image Goes to EVERY Agent**
-
-All agents have multimodal capability. They can SEE images. Include source image path in EVERY delegation:
-
-| Agent | Gets Source Image? | Why |
-|-------|-------------------|-----|
-| visual_analyst | YES | Primary analysis |
-| product_analyst | YES | Can verify visual findings, see details |
-| catalog_analyst | YES | Can compare with existing products visually |
-| creative_specialist | YES | Source for processing |
-| catalog_specialist | YES | Reference during record creation |
-
-**WRONG:** Only passing images to visual_analyst
-**CORRECT:** Every delegation includes `Source image at: inbox/photo.jpg`
-
 **PM's role:** Route image paths, analysis files, and asset_ids between domains. Synthesize findings.
-
----
-
-## DELEGATION PRINCIPLES
-
-Every delegation MUST include:
-1. **Source image path** - When image-based workflow (agents have multimodal capability)
-2. **Domain context** - "For CATALOG domain"
-3. **Upstream analysis files** - All relevant files from prior agents
-
-**Note:** Company context is injected automatically by middleware - no need to include.
 
 ---
 

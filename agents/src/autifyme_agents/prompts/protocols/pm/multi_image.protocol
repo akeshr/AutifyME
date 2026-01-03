@@ -1,0 +1,363 @@
+<protocol name="multi_image" type="orchestration" agent="pm">
+
+## PURPOSE
+
+Execution patterns for multi-image workflows.
+Load when: User sent multiple images AND Visual analyst identified relationship.
+
+---
+
+## RELATIONSHIP TYPES
+
+Visual analyst returns one of these relationship patterns:
+
+| Pattern | Meaning | Execution Strategy |
+|---------|---------|-------------------|
+| **ANGLES** | Same product, different views | 1 product, N assets |
+| **COMPONENTS** | Parts that compose complete products | COMPOSE images together |
+| **VARIANTS** | Different variants of same product type | N linked products |
+| **BULK** | Different unrelated products | N separate products |
+| **COMPARISON** | User wants to compare | Analysis only, present comparison |
+| **REFERENCE** | One is style reference, others are products | Use reference for style |
+
+---
+
+## MULTI-ANGLE WORKFLOW (1 Product, N Assets)
+
+```
+[N images: front, back, side, detail of same product]
+      |
+      v
+[visual_analyst] -> Analyzes ALL images together
+   "Same [product] from N angles. Front shows [feature A], back shows [feature B]..."
+   -> visual_analysis_[product].md (covers all angles)
+      |
+      v
+[product_analyst] -> Research ONCE for the product
+   -> product_research_[product].md
+      |
+      v
+[catalog_analyst] -> Search ONCE for catalog placement
+   -> catalog_analysis_[product].md
+      |
+      v
+[USER APPROVAL]
+      |
+      v
+[creative_specialist] -> Process ALL N images
+   -> N assets created, returns: asset_id_1, asset_id_2, ..., asset_id_N
+      |
+      v
+[catalog_specialist] -> Create 1 product with N assets
+   -> Links all asset_ids to single product
+```
+
+---
+
+## COMPONENTS WORKFLOW (CRITICAL - COMPOSE, Don't Just Extract)
+
+**When visual_analyst identifies COMPONENTS pattern (e.g., [body] + [closures] + [accessories]):**
+
+The key insight: Components are PARTS of complete products. Hero shots must COMPOSE all parts together, not show each part separately.
+
+**WRONG approach:**
+- Image 1 ([bodies]) -> Extract each [body] separately
+- Image 2 ([closures]) -> Create "[closure] detail" image
+- Image 3 ([accessories]) -> Create "[accessory] detail" image
+- Result: Separate images of parts, no complete product shots
+
+**CORRECT approach:**
+- COMPOSE each variant by combining [body] + matching [closure] + [accessory]
+- Result: Complete hero shots showing assembled products
+
+```
+[3 images: [product] bodies, colored [closures], [accessories]]
+      |
+      v
+[visual_analyst] -> Identifies COMPONENTS relationship
+   "Image 1: 9 [product] bodies (3 sizes x 3 [axis values])
+    Image 2: [Closure] and [accessory] close-up
+    Image 3: 4 colored [closures]
+    RELATIONSHIP: COMPONENTS - parts of complete products"
+   -> visual_analysis_[product]_components.md
+      |
+      v
+[product_analyst] -> Research as COMPLETE product with components
+   -> product_research_[product_category].md
+      |
+      v
+[catalog_analyst] -> Recommend variant structure
+   -> catalog_analysis_[product_category].md
+      |
+      v
+[USER APPROVAL]
+      |
+      v
+[creative_specialist] -> COMPOSE complete products (NOT separate extractions)
+   -> See delegation template below
+      |
+      v
+[catalog_specialist] -> Create N variant products with assets
+```
+
+### PM Delegation Template for Creative (COMPONENTS)
+
+**[CRITICAL] Do NOT describe specific colors (e.g., "Royal Blue", "Sun Yellow").**
+Say "matching colored" and let specialist extract exact colors from source images.
+Color words in prompts cause image_studio to generate/shift colors instead of extracting accurately.
+
+```
+"Create COMPOSED hero shots for [product] variants.
+
+COMPONENT IMAGES (use ALL together):
+- Image 1: [path] (label: body) - Contains [product] bodies
+- Image 2: [path] (label: accessory) - Contains [accessories]
+- Image 3: [path] (label: closure) - Contains colored [closures]
+
+COMPOSITION REQUIREMENT:
+For EACH variant, create a COMPLETE product hero shot by COMPOSING:
+- The matching [product] body from [body] image
+- Its matching colored [closure] from [closure] image (view source to identify)
+- The [accessory] from [accessory] image
+
+Use image_studio with multiple labeled images:
+images=[
+  {path: 'image1.jpg', label: 'body'},
+  {path: 'image2.jpg', label: 'lid'},
+  {path: 'image3.jpg', label: 'accessory'}
+]
+composition={position: '[body] center, [lid] fitted on top, [accessory] beside'}
+
+Create N complete product shots (one per variant), NOT N component shots.
+
+Read visual analysis at: [visual_analysis_file]
+For CATALOG domain."
+```
+
+### Key Differences from Multi-Angle
+
+| Multi-Angle | Components |
+|-------------|------------|
+| Same product, different views | Different PARTS of products |
+| Process each image independently | COMPOSE images together |
+| Each image = 1 asset | Multiple images = 1 composed asset |
+| Simple extraction | Multi-image composition |
+
+---
+
+## VARIANT WORKFLOW (N Linked Products)
+
+```
+[N images: [Size A], [Size B], [Size C] of same product type]
+      |
+      v
+[visual_analyst] -> Identifies variant relationship
+   "N size variants of same [product] design. [Size A], [Size B], [Size C]."
+   -> visual_analysis_[product]_variants.md
+      |
+      v
+[product_analyst] -> Research base product + variant dimensions
+   "Base: [product]. Variants by [axis]. HSN same for all sizes."
+   -> product_research_[product]_variants.md
+      |
+      v
+[catalog_analyst] -> Recommend variant structure
+   "Family: [Family]. Variant axis: [axis]. Create N products linked."
+   -> catalog_analysis_[product]_variants.md
+      |
+      v
+[USER APPROVAL - Confirm variant structure]
+      |
+      v
+[creative_specialist] -> Process ALL N images
+   -> asset_id_[size_a], asset_id_[size_b], asset_id_[size_c]
+      |
+      v
+[catalog_specialist] -> Create N linked variant products
+   -> Creates family (if needed), N products, variant links, asset links
+```
+
+---
+
+## BULK WORKFLOW (N Separate Products)
+
+```
+[3 images: [product A], [product B], [product C]]
+      |
+      v
+[visual_analyst] -> Identifies as different products
+   "3 distinct products:
+    1. [Material A] [product] with [closure type]
+    2. [Material B] [product] with [closure type]
+    3. [Material C] [product] with [closure type]"
+   -> visual_analysis_bulk_3_products.md (or separate files)
+      |
+      v
+[For EACH product:]
+   [product_analyst] -> product_research_[product_A].md
+   [product_analyst] -> product_research_[product_B].md
+   [product_analyst] -> product_research_[product_C].md
+      |
+      v
+[For EACH product:]
+   [catalog_analyst] -> catalog_analysis_[product_A].md
+   [catalog_analyst] -> catalog_analysis_[product_B].md
+   [catalog_analyst] -> catalog_analysis_[product_C].md
+      |
+      v
+[USER APPROVAL - Confirm all N]
+      |
+      v
+[creative_specialist] -> Process all N images (can batch)
+      |
+      v
+[catalog_specialist] -> Create N separate products
+```
+
+---
+
+## COMPARISON WORKFLOW (Analysis Only)
+
+```
+[2 images: "which one should I add?"]
+      |
+      v
+[visual_analyst] -> Compare both products
+   "Product A: [Material], premium finish, estimated [size A]
+    Product B: [Material], utility grade, estimated [size B]
+    Key differences: material, positioning, capacity"
+      |
+      v
+[PM presents comparison to user]
+   "Here's what I see:
+    - Image 1: Premium [product A] ([size A])
+    - Image 2: Utility [product B] ([size B])
+    Which would you like to add to the catalog?"
+```
+
+---
+
+## REFERENCE + ACTUAL WORKFLOW
+
+**Two scenarios:**
+- **Reference (lifestyle):** User wants product in a scene matching reference mood
+- **Reference (batch):** User wants multiple products extracted matching reference style
+
+```
+[User provides reference + product images]
+      |
+      v
+[visual_analyst] -> Identify which is reference vs product
+   "Image 1: Reference/inspiration (lifestyle setting, warm lighting)
+    Image 2: Actual product to process"
+      |
+      v
+[Standard workflow for product image(s)]
+      |
+      v
+[creative_specialist]:
+   "Process product image(s).
+    Source: [product_path(s)]
+    Reference: [reference_path]
+    For [LIFESTYLE/CATALOG] domain."
+```
+
+**PM provides paths and domain. Specialist reasons about how to use the reference.**
+
+---
+
+## MIXED RELATIONSHIP HANDLING
+
+**When Visual returns mixed relationship (e.g., "3 are variants, 2 are different products"):**
+
+1. **Split into workflow groups:**
+   - Group A: The 3 variants -> Variant Workflow
+   - Group B: The 2 different products -> Bulk Workflow (or separate flows)
+
+2. **Process groups sequentially or ask user preference:**
+   ```
+   "I see 3 size variants of [Product Type A] and 2 separate products.
+   Should I:
+   - Process all together?
+   - Start with the variants, then the others?
+   - Handle them separately?"
+   ```
+
+3. **Track files per group** - don't mix analysis files across groups
+
+---
+
+## OUTPUT COMPARISON PATTERN
+
+When user provides feedback comparing multiple generated outputs.
+
+### Triggers
+
+- "This one is good, others are bad"
+- "Only the blue one looks right"
+- "X is junk" / "X worked but Y didn't"
+- Any feedback that compares generated outputs
+
+### The Critical Rule
+
+**NEVER delegate with just filenames. ALWAYS include full storage paths.**
+
+```
+WRONG:
+"Compare blossom_small_blue_final_hero.png with blossom_small_pink_final_hero.png"
+-> Agent has no idea WHERE these files are
+-> Agent loops through ls, glob, grep trying to FIND them
+-> Tokens wasted, agent stuck
+
+CORRECT:
+"Compare these generated images:
+SUCCESS: pending/blossom_small_blue_final_hero.png
+FAILURES:
+- pending/blossom_small_pink_final_hero.png
+- pending/blossom_medium_blue_final_hero.png
+- pending/blossom_large_yellow_final_hero.png"
+-> Agent can view_image directly
+-> No file search needed
+```
+
+### Delegation Template (Output Comparison)
+
+```
+"Compare the quality of these generated images.
+
+USER FEEDBACK: '[exact user feedback]'
+
+IMAGES TO COMPARE:
+SUCCESS (user approved):
+- [full_storage_path_1]
+
+FAILURES (user rejected):
+- [full_storage_path_2]
+- [full_storage_path_3]
+- [full_storage_path_4]
+
+MISSION:
+1. View ALL images using view_image
+2. Identify specific differences between SUCCESS and FAILURES:
+   - Lighting quality
+   - Edge/cutout quality
+   - Color accuracy
+   - Background consistency
+   - Overall photorealism
+3. Report findings to: /thread/quality_comparison.md
+
+For VISUAL domain."
+```
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| Extract components separately | Get part images, not complete products | COMPOSE parts together |
+| Describe specific colors | image_studio generates colors instead of extracting | Say "matching colored", let specialist view source |
+| Delegate without paths | Agent searches forever | Include full storage paths |
+| Mix analysis files across groups | Confusion on which files apply to which products | Track per group |
+
+</protocol>

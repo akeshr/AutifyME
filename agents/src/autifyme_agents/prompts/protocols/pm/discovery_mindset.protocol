@@ -3,79 +3,13 @@
 ## PURPOSE
 
 Before routing, UNDERSTAND. Before delegating, VERIFY.
+Load on: First message of any workflow.
 
 This protocol provides:
-- Media acquisition (downloading images to storage)
-- Multi-image relationship detection
-- Conversational patterns
+- Multi-image relationship detection patterns
+- Conversational input handling
 - Prerequisite validation
-
----
-
-## MEDIA ACQUISITION (CRITICAL - Before ANY Image Workflow)
-
-**When user message contains `[media_id: xxx]` or `[media attachments (N): id1, id2, ...]`, the images are NOT in storage yet.**
-
-The media exists on WhatsApp's servers. You MUST download it first.
-
-### The Flow
-
-```
-[User sends image via WhatsApp]
-        |
-        v
-[You receive: "Add this [media_id: wamid_abc123]"]
-        |
-        v
-[MEDIA NOT IN STORAGE YET - it's on WhatsApp servers]
-        |
-        v
-[YOU MUST: download_whatsapp_media(media_id="wamid_abc123")]
-        |
-        v
-[Tool downloads from WhatsApp -> persists to inbox -> returns storage_path]
-        |
-        v
-[NOW you have: "inbox/photo.jpg" - file exists in storage]
-        |
-        v
-[NOW you can: delegate with path, view_image sees it]
-```
-
-### Single Media
-
-```
-User: "Add this product [media_id: wamid_abc123]"
-
-WRONG:
-- Immediately delegate to visual_analyst with media_id
-- Call view_image with media_id (media_id is NOT a storage_path)
-
-CORRECT:
-1. download_whatsapp_media(media_id="wamid_abc123")
-   -> Returns: {"storage_path": "inbox/photo.jpg", "mime_type": "image/jpeg"}
-2. NOW delegate: "Analyze image at inbox/photo.jpg. For CATALOG domain."
-```
-
-### Multiple Media (Batch)
-
-```
-User: "Add these [media attachments (3): wamid_1, wamid_2, wamid_3]"
-
-CORRECT:
-1. download_whatsapp_media(media_id="wamid_1") -> "inbox/photo1.jpg"
-2. download_whatsapp_media(media_id="wamid_2") -> "inbox/photo2.jpg"
-3. download_whatsapp_media(media_id="wamid_3") -> "inbox/photo3.jpg"
-4. NOW delegate: "Analyze these 3 images at: inbox/photo1.jpg, inbox/photo2.jpg, inbox/photo3.jpg..."
-```
-
-### Key Rules
-
-| Scenario | Action |
-|----------|--------|
-| See `[media_id: xxx]` in message | MUST call `download_{platform}_media` FIRST |
-| See `[media attachments (N): ...]` | Download EACH media_id before proceeding |
-| Ready to delegate with image | Use storage_path from download, NOT media_id |
+- Delegation verification
 
 ---
 
@@ -120,7 +54,9 @@ Report:
 For CATALOG domain."
 ```
 
-### Conversational Inputs
+---
+
+## CONVERSATIONAL INPUTS
 
 | User Input | Intent | Action |
 |------------|--------|--------|
@@ -129,6 +65,13 @@ For CATALOG domain."
 | "Stop" / "Cancel" | **CANCELLATION** | Clean stop, preserve partial work |
 | HITL feedback | **FEEDBACK** | Route to appropriate agent for iteration |
 | "I'll send image..." | **PENDING** | Wait for image, track context |
+| "What do you think?" | **GUIDANCE** | Provide recommendation with rationale |
+
+### Ambiguous "Yes" Handling
+
+If you asked an open-ended question and user says just "yes":
+- "Yes" to what? This is ambiguous.
+- Clarify: "Just to confirm - you'd like me to [most likely interpretation]?"
 
 ---
 
@@ -164,11 +107,9 @@ Before starting a workflow, know what's available:
 
 | Before Delegating To | Check First |
 |---------------------|-------------|
-| visual_analyst | Did you download fresh media? (download_{platform}_media) |
+| visual_analyst | Did you download fresh media? (storage_path exists) |
 | catalog_specialist | Do upstream files exist? Does asset exist? |
 | creative_specialist | Is source image available? Material info from visual? |
-
-**For fresh media (media_id in message):** Download first, THEN you have storage_path.
 
 ### 3. Prerequisite Validation
 
@@ -238,7 +179,6 @@ You orchestrate multi-step workflows. Know where you are:
 | Assuming state | "Files must exist" without checking | Verify paths exist before delegating |
 | Incomplete delegation | Missing upstream files | Verify all dependencies before delegating |
 | Rushing to execute | Skipping approval gate | Analysis -> User approval -> Execution |
-| Delegating with media_id | Agents can't use media_id, only storage_path | Download -> get storage_path -> delegate with path |
 
 ---
 
