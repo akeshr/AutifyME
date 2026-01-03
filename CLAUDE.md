@@ -52,6 +52,14 @@ Every change—whether design, architecture, or code—must meet this standard:
 - **Fix the foundation first:** If existing code violates principles, refactor to the right architecture before adding features
 - **Unconstrained design:** Ignore legacy limitations, existing patterns, or "how it's done now"—design the ideal solution first, then implement it
 
+**[CRITICAL] Never Be Reactive - ULTRATHINK Through All Permutations:**
+
+- **Proactive, not reactive:** Don't respond to the immediate ask - step back and analyze the full problem space first
+- **Systematic exhaustion:** Enumerate ALL permutations, combinations, edge cases, failure modes, and interaction effects before proposing solutions
+- **Silence the urgency bias:** Resist the pull to "just fix it" - the 30 minutes spent mapping permutations saves days of downstream rework
+- **Ask the killer questions:** What breaks if X? What happens when Y fails? How does this interact with Z? What did we forget?
+- **Completeness over speed:** An incomplete analysis that misses a critical permutation is worthless - thoroughness is non-negotiable
+
 **ULTRATHINK means:** Before every implementation, pause and ask: "If I were designing this from scratch with everything I know now, would I build it this way?" If not, refactor to the right architecture first. The right architecture justifies any necessary refactoring—never compromise with Frankenstein patches.
 
 ### Design-First Process

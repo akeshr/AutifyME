@@ -441,6 +441,8 @@ Before escalating FACT or REJECTION feedback, check available context.
 
 When you resolved ALL feedback items:
 
+**[CRITICAL] After outputting [HITL RESOLVED], you MUST CALL the corrected tool (e.g., write_data, image_studio). Do NOT just describe or output the action as text - EXECUTE it.**
+
 ```
 [HITL RESOLVED]
 
@@ -448,14 +450,11 @@ When you resolved ALL feedback items:
 
 **Resolutions:**
 - [aspect]: [original] -> [new] (reason)
-- [aspect]: [original] -> [new] (reason)
 
-Proceeding with revised proposal.
-
----
-
-[Your revised WriteIntent or action]
+Proceeding with corrected action.
 ```
+
+**Then IMMEDIATELY call the tool with corrected parameters.** Do not output WriteIntent as text - call write_data with it.
 
 ### Format 2: Requires PM Direction
 
@@ -644,6 +643,34 @@ Round 3: "Unable to resolve after 2 rounds. Options: 1) exact value, 2) cancel, 
 -> Circuit breaker stops the loop
 ```
 
+### Anti-Pattern 6: Describing Action Instead of Executing
+
+```
+WRONG:
+[HITL RESOLVED]
+...
+Proceeding with corrected anchor.
+
+### Revised WriteIntent
+```json
+{"goal": "...", "operations": [...]}
+```
+-> WriteIntent OUTPUT AS TEXT - agent described but didn't execute!
+-> PM receives text, not actual result
+-> Task stalls
+
+CORRECT:
+[HITL RESOLVED]
+...
+Proceeding with corrected action.
+
+-> write_data(goal="...", operations=[...])  <-- ACTUAL TOOL CALL
+-> Returns actual result (asset_id, success/error)
+-> Task progresses
+```
+
+**[CRITICAL] "Proceeding with..." MUST be followed by a TOOL CALL, not a JSON description.**
+
 ---
 
 ## EXAMPLES
@@ -656,7 +683,7 @@ Round 3: "Unable to resolve after 2 rounds. Options: 1) exact value, 2) cancel, 
 Type: CLEAR
 Action: Apply directly
 
-Response:
+Step 1 - Output resolution:
 [HITL RESOLVED]
 
 **User Feedback:** "Price should be [new price], not [old price]"
@@ -664,11 +691,13 @@ Response:
 **Resolutions:**
 - Price: [old price] -> [new price] (per user feedback)
 
-Proceeding with revised proposal.
+Proceeding with corrected action.
 
----
-[Revised WriteIntent with price = 45]
+Step 2 - CALL the tool (do NOT output as text):
+-> write_data(goal="...", reasoning="...", operations=[{...price: [new price]...}])
 ```
+
+**[CRITICAL] Step 2 is a TOOL CALL, not text output. The agent EXECUTES write_data, not describes it.**
 
 ### Example 2: FACT with Workspace Check
 
@@ -681,7 +710,7 @@ Action: Check workspace
 [Check visual_analysis_[product].md]
 -> Found: "Colors: Blossoms (Blue), Charming Flowers (Yellow), Spring Flowers (Pink)"
 
-Response:
+Step 1 - Output resolution:
 [HITL RESOLVED]
 
 **User Feedback:** "there is colour variation as well"
@@ -689,10 +718,10 @@ Response:
 **Resolutions:**
 - Colors: Added 3 variants per visual analysis (Blossoms, Charming Flowers, Spring Flowers)
 
-Proceeding with revised proposal including color variants.
+Proceeding with corrected action.
 
----
-[Revised WriteIntent with color variants]
+Step 2 - CALL the tool:
+-> write_data(goal="...", operations=[{...includes color variants...}])
 ```
 
 ### Example 3: Compound Feedback (Multi-type)
