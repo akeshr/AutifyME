@@ -512,14 +512,6 @@ class ExtractionSpec(BaseModel):
             "Use to correlate extraction with upstream detection."
         )
     )
-    position_hint: str | None = Field(
-        default=None,
-        description=(
-            "Where target product is located (DEPRECATED - prefer target_bbox). "
-            "Examples: 'left side of frame', 'center foreground', 'right background', "
-            "'the largest one', 'second from left', 'the one being held'"
-        )
-    )
     isolation: str = Field(
         default="complete isolation",
         description=(
@@ -693,13 +685,10 @@ class OutputSpec(BaseModel):
     format: Literal["PNG", "JPEG", "WEBP"] = "PNG"
     size: Literal["1K", "2K", "4K"] = "2K"
     aspect_ratio: Literal["1:1", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "original"] = "1:1"
-    filename: str | None = Field(
-        default=None,
+    filename: str = Field(
         description=(
-            "Output filename (without extension). IMPORTANT: Specify this to know the "
-            "exact path for view_image and write_data. "
-            "Examples: 'mug_hero', 'tumbler_v2', 'product_lifestyle'. "
-            "If not specified, auto-generated UUID is used."
+            "REQUIRED: Output filename (without extension) for predictable paths. "
+            "Examples: 'mug_hero', 'tumbler_v2', 'product_lifestyle'."
         )
     )
 
@@ -814,8 +803,9 @@ class ImageStudioInput(BaseModel):
 
     images: list[ImageInput] = Field(
         min_length=1,
+        max_length=15,
         description=(
-            "REQUIRED: At least 1 labeled image (max 15). Each image has a label "
+            "REQUIRED: Labeled images (1-15). Each image has a label "
             "you reference in your specs/instructions. "
             "Example: [ImageInput(path='inbox/photo.jpg', label='product')]"
         )
@@ -889,12 +879,10 @@ class ImageStudioInput(BaseModel):
     # Free-form Creative Direction
     # ==========================================================================
 
-    creative_direction: str | None = Field(
-        default=None,
+    creative_direction: str = Field(
         description=(
-            "Additional creative notes beyond structured parameters. "
-            "Use for: overall vision, specific artistic direction, "
-            "references to styles/photographers, anything not covered above."
+            "REQUIRED: Creative direction for this image. "
+            "Describe the overall vision, artistic intent, or specific requirements."
         )
     )
 

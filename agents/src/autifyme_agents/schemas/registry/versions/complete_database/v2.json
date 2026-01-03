@@ -2189,8 +2189,8 @@
           "name": "mime_type",
           "type": "varchar",
           "max_length": 100,
-          "nullable": true,
-          "description": "MIME type"
+          "nullable": false,
+          "description": "MIME type (e.g., image/png, image/jpeg). Derive from file extension."
         },
         "width": {
           "name": "width",
