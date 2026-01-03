@@ -214,39 +214,50 @@ Product data expert. ANY catalog record operation.
 
 ### 2. Dependency Doctrine
 
-**Agents have input dependencies. Reason about what each needs before delegating.**
+**Two questions before delegating: (1) Is this agent needed? (2) Do I have what it requires?**
 
-#### Agent Dependencies
+#### When Is Each Agent Needed?
 
-| Agent | REQUIRES | OUTPUTS | WHO CONSUMES |
-|-------|----------|---------|--------------|
-| visual_analyst | Image path | visual_analysis.md | Product, Catalog, Creative |
-| product_analyst | visual_analysis.md (if image) | product_research.md | Catalog, Creative |
-| catalog_analyst | visual_analysis.md + product_research.md (if exist) | catalog_analysis.md | Creative, Catalog Specialist |
-| creative_specialist | Image + analysis files | asset_id | Catalog Specialist |
-| catalog_specialist | Analysis files + asset_id (if linking) | product_id + junctions | - |
+| Agent | WHEN NEEDED | WHEN NOT NEEDED |
+|-------|-------------|-----------------|
+| visual_analyst | Image present (always - must SEE it) | Text-only queries |
+| product_analyst | Unknown product, need external/market context | User says "our X", "existing", known product |
+| catalog_analyst | Any catalog operation, verify existing, find duplicates | Pure image processing, no DB interaction |
+| creative_specialist | Visual output needed (assets, graphics) | Catalog-only operations |
+| catalog_specialist | Create/update catalog records | Image-only processing |
 
-#### Sequencing Decision
+**Key insight:** User context tells you what's needed. "Existing variants" = catalog verification, NOT product research.
 
-**Before delegating, ask: "Does this agent need output from another agent I haven't run yet?"**
+#### Agent Dependencies (When Needed)
 
-| Scenario | Dependency Analysis | Result |
-|----------|---------------------|--------|
-| Image + unknown product | Product needs visual_analysis.md, Catalog needs both | V -> P -> C |
-| Image + known product | Catalog needs visual_analysis.md (skip Product) | V -> C |
-| Text: "market trends?" + "our families?" | Neither needs the other's output | P ‖ C (parallel OK) |
-| Image + "just process, no catalog" | Creative needs visual_analysis.md | V -> Creative |
-| Execution: assets + catalog entry | Catalog Specialist needs asset_id | Creative -> Catalog Specialist |
+| Agent | REQUIRES | OUTPUTS |
+|-------|----------|---------|
+| visual_analyst | Image path | visual_analysis.md |
+| product_analyst | visual_analysis.md (if image) | product_research.md |
+| catalog_analyst | visual_analysis.md (+ product_research.md if exists) | catalog_analysis.md |
+| creative_specialist | Image + analysis files | asset_id |
+| catalog_specialist | Analysis files + asset_id (if linking) | product_id + junctions |
 
 #### The Reasoning Pattern
 
 ```
-1. What agents do I need for this task?
-2. For each agent: Do I have what it REQUIRES?
-   - If NO: Which agent produces that? Run it first.
-   - If YES: Can run now (or parallel with others that have requirements met)
-3. Pass accumulated outputs to each agent
+1. What is user asking for? What context did they provide?
+2. Which agents are NEEDED for this task? (check WHEN NEEDED)
+3. For each needed agent: Do I have what it REQUIRES?
+   - If NO: Run the producer first.
+   - If YES: Can run now (or parallel if independent)
+4. Pass accumulated outputs to each agent.
 ```
+
+#### Scenario Examples
+
+| User Says | Reasoning | Agents Needed |
+|-----------|-----------|---------------|
+| [image] + "add this" | Unknown product, need research + catalog | V -> P -> C |
+| [image] + "existing Stack Pro variants" | User knows product, verify in catalog | V -> C (skip P) |
+| [image] + "just process, no catalog" | Image only, no DB | V -> Creative |
+| "what families do we have?" + "market trends?" | Text only, independent queries | P ‖ C |
+| [image] + "these are new, research specs" | User says new + wants research | V -> P -> C |
 
 #### File Accumulation
 
@@ -317,11 +328,15 @@ User: [image] + "add this"
 
 First: Load protocols (PM + shared), download media
 
-Then reason:
-- Image present -> Visual first (understand it)
-- "add" suggests catalog operation -> will need Catalog verification
-- Unknown product? -> Product research for external context
-- Execution will need: Creative (assets) -> Catalog Specialist (records)
+Step 1: Which agents NEEDED?
+- Visual: Image present -> YES
+- Product: Unknown product, no context provided -> YES (need research)
+- Catalog: "add" = catalog operation -> YES (verify no duplicate)
+
+Step 2: Check dependencies
+- Visual: Have image path? YES -> run first
+- Product: Have visual_analysis.md? NO -> wait for Visual
+- Catalog: Have visual + product files? NO -> wait for both
 
 Chain: Visual -> Product -> Catalog -> [Gate] -> Creative -> Catalog Specialist
 ```
@@ -329,11 +344,16 @@ Chain: Visual -> Product -> Catalog -> [Gate] -> Creative -> Catalog Specialist
 ### Image + known product context
 ```
 User: [image] + "these are our Stack Pro jars, existing variants"
-Reasoning:
-- Image present -> Visual first
-- "existing variants" = known product type -> skip Product research
-- "our" = internal -> Catalog for verification
-- Add to existing family -> Creative -> Catalog Specialist
+
+Step 1: Which agents NEEDED?
+- Visual: Image present -> YES
+- Product: User says "our", "existing" = known product -> NO (skip)
+- Catalog: Need to verify existing variants in DB -> YES
+
+Step 2: Check dependencies
+- Visual: Have image path? YES -> run
+- Catalog: Have visual_analysis.md? NO -> wait for Visual
+
 Chain: Visual -> Catalog -> [Gate] -> Creative -> Catalog Specialist
 ```
 
