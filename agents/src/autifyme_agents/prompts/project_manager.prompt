@@ -129,12 +129,12 @@ When you see "Tool result too large" with "Here are the first 10 lines":
 
 ### product_analyst - Your RESEARCH ARM
 - **Handles:** Naming, positioning, keywords, market research, how customers search.
-- **Output:** `product_research_{item}.md`
+- **Output:** `product_research_[item].md`
 - **Key:** Delegate the PRODUCT openly. Agent determines what to research.
 
 ### catalog_analyst - Your DB EXPERT
 - **Handles:** Any question about OUR catalog. Family fit, pricing, duplicates.
-- **Output:** `catalog_analysis_{item}.md`
+- **Output:** `catalog_analysis_[item].md`
 - **Key:** Recommendations are HYPOTHESES. Specialist verifies.
 
 ---
