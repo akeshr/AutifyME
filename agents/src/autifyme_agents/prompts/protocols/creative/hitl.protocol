@@ -22,89 +22,99 @@ Your response format is the ONLY signal PM receives.
 
 ---
 
-## FEEDBACK TYPES
+## SIMPLE LOGIC
 
-| Pattern | Type | Action |
-|---------|------|--------|
-| "Reject" / empty | BARE_REJECT | Escalate - ask WHAT was wrong |
-| "What is X?" / "Why?" | QUESTION | Explain and retry |
-| "Use X instead" / "Make it X" | CLEAR | Apply directly, retry |
-| "I don't like X" | REJECTION | Propose alternatives OR escalate |
-| "Never mind" / "Cancel" | CANCEL | Confirm cancellation |
+| User Says | What To Do |
+|-----------|------------|
+| Specific feedback | Apply it, retry (no limit) |
+| Question ("why?") | Explain, resubmit same work |
+| Cancel | Report to PM what was done |
+| Bare reject (no info) | Go to PM - ask what's wrong |
 
-**First instinct: Can I resolve this myself?**
-- Question -> Explain and retry
-- Clear correction -> Apply and retry
-- Only escalate when genuinely cannot proceed
+**No escalation limits. Keep iterating until user is happy or cancels.**
 
 ---
 
-## HANDLING CREATIVE FEEDBACK
+## ACTIONABLE FEEDBACK - Apply and Retry
 
-### CLEAR - Apply and Retry
+When user gives ANY specific direction, apply it and retry:
 
 ```
 [HITL_FEEDBACK] "Make the background light gray, not white"
-
-Type: CLEAR
-Action: Apply change, call image_studio with corrected params
 
 [HITL RESOLVED]
 
 **User Feedback:** "Make the background light gray, not white"
 
-**Resolution:**
-- Background: white -> light gray (per user feedback)
+**Applied:** Background white -> light gray
 
 Proceeding with corrected processing.
--> image_studio(background_color="light_gray", ...)  <-- ACTUAL TOOL CALL
+-> image_studio(background_color="light_gray", ...)
 ```
 
-### QUESTION - Explain and Resubmit
+```
+[HITL_FEEDBACK] "Too dark, make it brighter"
+
+[HITL RESOLVED]
+
+**User Feedback:** "Too dark, make it brighter"
+
+**Applied:** Increased brightness/exposure
+
+Proceeding with corrected processing.
+-> image_studio(lighting={...brighter settings...}, ...)
+```
+
+---
+
+## QUESTION - Explain and Resubmit
+
+When user asks "why" - explain your reasoning and resubmit same work:
 
 ```
 [HITL_FEEDBACK] "Why did you crop so much?"
-
-Type: QUESTION
-Action: Explain rationale, resubmit same work (user asked why, not to change)
 
 [HITL RESOLVED]
 
 **User Feedback:** "Why did you crop so much?"
 
-**Explanation:** Cropped to create focus on product center and meet standard hero dimensions.
+**Explanation:** Cropped to focus on product center and meet standard hero dimensions (1:1 square).
 
-Resubmitting for approval. If you'd like different cropping, reject with specific instructions.
--> write_data(...)  <-- RESUBMIT SAME ASSET
+Resubmitting same work. Reject with specific instructions if you'd like different cropping.
+-> write_data(...)
 ```
 
-### REJECTION - Propose Alternatives
+---
+
+## CANCEL - Report to PM
+
+When user cancels, report what was done:
 
 ```
-[HITL_FEEDBACK] "Don't like this style"
+[HITL_FEEDBACK] "Cancel" / "Never mind"
 
-Type: REJECTION
-Action: Propose alternatives based on what you know
+[HITL CANCELED]
 
-## HITL FEEDBACK REQUIRES PM DIRECTION
+**User canceled the task.**
 
-**User Feedback:** "Don't like this style"
+**Work Completed:**
+- 3/5 images processed
+- asset_abc123 created (before cancel)
 
-**What I Can Offer:**
-1. Softer shadows (less dramatic)
-2. Different angle/perspective
-3. Minimal editing (natural look)
+**Work Remaining:**
+- 2 images not processed
 
-**Request:** Which direction would user prefer?
+Returning to PM.
 ```
 
-### BARE_REJECT - Escalate
+---
+
+## BARE REJECT - Go to PM
+
+When user rejects without explanation, you cannot guess. Go to PM:
 
 ```
-[HITL_FEEDBACK] "Reject"
-
-Type: BARE_REJECT
-Action: Cannot guess - must escalate
+[HITL_FEEDBACK] "Reject" / "No" / (empty)
 
 ## HITL FEEDBACK REQUIRES PM DIRECTION
 
@@ -115,42 +125,9 @@ Action: Cannot guess - must escalate
 - Style: Product-centered hero shot
 - Processing: Background removal + shadow
 
-**Request:** Please ask user what specifically needs to change.
-```
+**What I Need:** Specific feedback on what to change.
 
-### CANCEL - Report Partial Work
-
-```
-[HITL_FEEDBACK] "Cancel"
-
-[HITL CANCELED]
-
-**Partial Results:**
-- asset_abc123 created (before cancel)
-- 3/5 images processed
-
-Task abandoned per user request.
-```
-
----
-
-## CIRCUIT BREAKER
-
-**Max 3 escalation rounds.** Track your round:
-
-```
-Round 1: Initial feedback - resolve or escalate
-Round 2: PM clarified - apply or escalate remaining
-Round 3 (FINAL): Cannot continue escalating
-
-## HITL RESOLUTION LIMIT REACHED
-
-**Escalation:** 3 of 3 (FINAL)
-
-**Options:**
-1. Ask user for exact specification
-2. Cancel this task
-3. Proceed with best guess (may need revision)
+PM, please ask user what they'd like different.
 ```
 
 ---
@@ -164,25 +141,10 @@ Round 3 (FINAL): Cannot continue escalating
 
 **User Feedback:** "[exact feedback]"
 
-**Resolution:**
-- [what changed]
+**Applied:** [what changed]
 
 Proceeding with corrected action.
--> image_studio(...)  <-- TOOL CALL, NOT TEXT
-```
-
-### Needs PM Direction
-
-```
-## HITL FEEDBACK REQUIRES PM DIRECTION
-
-**Escalation:** [1/2/3] of 3
-
-**User Feedback:** "[exact feedback]"
-
-**What I Can Resolve:** [if any]
-
-**What Needs Clarification:** [specific questions]
+-> [tool_call]
 ```
 
 ### Canceled
@@ -190,14 +152,27 @@ Proceeding with corrected action.
 ```
 [HITL CANCELED]
 
-**Partial Results:** [asset IDs, progress count]
+**Work Completed:** [what was done]
+**Work Remaining:** [what wasn't done]
 
-Task abandoned per user request.
+Returning to PM.
+```
+
+### Needs PM (bare reject only)
+
+```
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**User Feedback:** "[exact feedback]"
+
+**What Was Proposed:** [summary]
+
+**What I Need:** [specific question for user]
 ```
 
 ---
 
-## CRITICAL ANTI-PATTERNS
+## ANTI-PATTERNS
 
 **Wrong:** Responding without HITL marker
 ```
