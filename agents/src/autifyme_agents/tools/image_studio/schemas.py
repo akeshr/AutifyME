@@ -490,8 +490,10 @@ class ExtractionSpec(BaseModel):
             "'all three variants separately', 'just the main hero product in center'"
         )
     )
-    target_bbox: tuple[int, int, int, int] | None = Field(
+    target_bbox: list[int] | None = Field(
         default=None,
+        min_length=4,
+        max_length=4,
         description=(
             "RECOMMENDED: Bounding box coordinates for precise targeting. "
             "Format: [y_min, x_min, y_max, x_max] normalized to 0-1000 scale. "
@@ -508,14 +510,6 @@ class ExtractionSpec(BaseModel):
             "Reference ID from ItemManifest for tracking. "
             "Examples: 'item_1', 'item_5', 'variant_large_blue'. "
             "Use to correlate extraction with upstream detection."
-        )
-    )
-    position_hint: str | None = Field(
-        default=None,
-        description=(
-            "Where target product is located (DEPRECATED - prefer target_bbox). "
-            "Examples: 'left side of frame', 'center foreground', 'right background', "
-            "'the largest one', 'second from left', 'the one being held'"
         )
     )
     isolation: str = Field(
@@ -694,10 +688,9 @@ class OutputSpec(BaseModel):
     filename: str | None = Field(
         default=None,
         description=(
-            "Output filename (without extension). IMPORTANT: Specify this to know the "
-            "exact path for view_image and write_data. "
-            "Examples: 'mug_hero', 'tumbler_v2', 'product_lifestyle'. "
-            "If not specified, auto-generated UUID is used."
+            "Output filename (without extension). RECOMMENDED for predictable paths. "
+            "If not specified, UUID is auto-generated. "
+            "Examples: 'mug_hero', 'tumbler_v2', 'product_lifestyle'."
         )
     )
 
@@ -812,8 +805,9 @@ class ImageStudioInput(BaseModel):
 
     images: list[ImageInput] = Field(
         min_length=1,
+        max_length=15,
         description=(
-            "REQUIRED: At least 1 labeled image (max 15). Each image has a label "
+            "REQUIRED: Labeled images (1-15). Each image has a label "
             "you reference in your specs/instructions. "
             "Example: [ImageInput(path='inbox/photo.jpg', label='product')]"
         )
@@ -890,9 +884,8 @@ class ImageStudioInput(BaseModel):
     creative_direction: str | None = Field(
         default=None,
         description=(
-            "Additional creative notes beyond structured parameters. "
-            "Use for: overall vision, specific artistic direction, "
-            "references to styles/photographers, anything not covered above."
+            "Overall vision, artistic intent, or specific requirements. "
+            "Use for notes beyond structured parameters."
         )
     )
 

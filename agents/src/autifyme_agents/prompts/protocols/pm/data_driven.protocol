@@ -1,0 +1,221 @@
+<protocol name="data_driven" type="orchestration" agent="pm">
+
+## PURPOSE
+
+Data-driven creative execution: price posts, offer graphics, marketing content.
+Load when: User wants graphics that require catalog data (prices, variants, assets).
+
+**Key Insight:** PM delegates to catalog_analyst for data, then passes data to creative. Creative stays pure creative.
+
+---
+
+## FLOW
+
+```
+[User: "Create Instagram post with prices for [product] family"]
+      |
+      v
+[1. PM delegates to catalog_analyst for data]
+   "Fetch product data for [product] family.
+    Need: all variants with prices, sizes, and asset paths.
+    For DATA-DRIVEN graphics."
+      |
+      v
+[2. catalog_analyst returns structured data]
+   "Product family: [Family Name]
+    Variants:
+    - [Size A]: [Currency] [Price A], asset: products/[product]_[size_a].png
+    - [Size B]: [Currency] [Price B], asset: products/[product]_[size_b].png
+    - [Size C]: [Currency] [Price C], asset: products/[product]_[size_c].png"
+      |
+      v
+[3. PM delegates to creative_specialist WITH DATA]
+   "Create Instagram price post.
+    Platform: Instagram Feed (1:1).
+    Product data:
+    - [Size A]: [Currency] [Price A]
+    - [Size B]: [Currency] [Price B]
+    - [Size C]: [Currency] [Price C]
+    Source images at: [asset paths from catalog_analyst]
+    For DATA-DRIVEN domain."
+      |
+      v
+[4. creative_specialist]
+   - Designs visual layout
+   - Integrates data with brand styling
+   - Verifies data accuracy
+   - Creates asset (HITL)
+      |
+      v
+[5. PM returns to user]
+```
+
+---
+
+## DATA SOURCE DECISION
+
+| Data Needed | Delegate To | Why |
+|-------------|-------------|-----|
+| Prices, sizes, variants, assets (in DB) | catalog_analyst | Has read_data for products/families |
+| Market prices, competitor pricing | product_analyst | Has web research tools |
+| Comparison with market | catalog_analyst THEN product_analyst | DB data + market context |
+
+---
+
+## DATA TO FETCH BY REQUEST TYPE
+
+| Request Type | Data Needed | Source |
+|--------------|-------------|--------|
+| **Price post** | product.name, product.price, product.size, asset path | catalog_analyst |
+| **Family comparison** | All variants with prices, sizes, assets | catalog_analyst |
+| **Offer graphic** | Original price, offer price, discount % | catalog_analyst |
+| **Size comparison** | All sizes in family, ordered, with assets | catalog_analyst |
+| **Market comparison** | Our price + competitor prices | catalog_analyst + product_analyst |
+| **New launch** | Product details, launch date, hero asset | catalog_analyst |
+
+---
+
+## DELEGATION TEMPLATES
+
+### To catalog_analyst (DB Data)
+
+```
+"Fetch product data for [product/family].
+Need: [prices, sizes, variants, asset paths]
+For DATA-DRIVEN graphics."
+```
+
+### To product_analyst (Market Data)
+
+```
+"Research market pricing for [product type].
+Need: [competitor prices, market range, positioning context]
+For DATA-DRIVEN graphics."
+```
+
+### To creative_specialist (After Data)
+
+```
+"Create [graphic type] for [product/family].
+Platform: [Instagram Feed/Story/WhatsApp Status] ([aspect ratio]).
+
+Product data (from catalog_analyst):
+- [Variant 1]: Rs [Price], [Size]
+- [Variant 2]: Rs [Price], [Size]
+- [Variant 3]: Rs [Price], [Size]
+
+[Offer details if applicable]:
+- Original: Rs X
+- Offer: Rs Y
+- Discount: Z%
+
+Source images at: [asset paths from catalog_analyst]
+[Badge/Label if needed]: "NEW LAUNCH" / "LIMITED OFFER"
+
+For DATA-DRIVEN domain."
+```
+
+---
+
+## CRITICAL REQUIREMENTS
+
+1. **catalog_analyst fetches data** - PM doesn't have read_data
+2. **PM passes data to creative** - Include EXACT numbers from catalog_analyst
+3. **Include asset paths** - catalog_analyst provides paths from product_assets
+4. **Specify platform + format** - Creative needs aspect ratio
+5. **Mention badges/labels** - "NEW", "SALE", "LIMITED", etc.
+
+---
+
+## PLATFORM FORMATS
+
+| Platform | Format | Aspect Ratio |
+|----------|--------|--------------|
+| Instagram Feed | Square | 1:1 |
+| Instagram Story | Vertical | 9:16 |
+| WhatsApp Status | Vertical | 9:16 |
+| Facebook Post | Landscape | 16:9 or 1.91:1 |
+| Website Banner | Landscape | varies |
+
+---
+
+## COMMON GRAPHIC TYPES
+
+### Price Post
+
+```
+"Create Instagram price post for [Family].
+Platform: Instagram Feed (1:1).
+
+Product data:
+- [Product A] [Size]: Rs [Price]
+- [Product B] [Size]: Rs [Price]
+- [Product C] [Size]: Rs [Price]
+
+Source images at: [paths]
+For DATA-DRIVEN domain."
+```
+
+### Offer Graphic
+
+```
+"Create offer graphic for [Product].
+Platform: Instagram Story (9:16).
+
+Offer details:
+- Product: [Name]
+- Original: Rs [X]
+- Offer: Rs [Y]
+- Discount: [Z]%
+- Valid until: [Date]
+
+Badge: "LIMITED TIME OFFER"
+Source image at: [path]
+For DATA-DRIVEN domain."
+```
+
+### Size Comparison
+
+```
+"Create size comparison for [Family].
+Platform: Instagram Feed (1:1).
+
+Variants (smallest to largest):
+- [Size A]: Rs [Price A]
+- [Size B]: Rs [Price B]
+- [Size C]: Rs [Price C]
+
+Show relative sizes visually.
+Source images at: [paths]
+For DATA-DRIVEN domain."
+```
+
+### New Launch Announcement
+
+```
+"Create new launch graphic for [Product].
+Platform: Instagram Feed (1:1).
+
+Product: [Name]
+Price: Rs [Price]
+Key feature: [Feature]
+Launch date: [Date]
+
+Badge: "NEW LAUNCH"
+Source image at: [path]
+For DATA-DRIVEN domain."
+```
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| Delegate directly to creative without data | Creative can't query database | Fetch data first via catalog_analyst |
+| Ask creative to get prices | Creative doesn't have read_data | PM fetches via analyst, passes to creative |
+| Omit asset paths | Creative has no images to use | Include paths from catalog_analyst |
+| Vague platform spec | Wrong aspect ratio | Specify exact platform and format |
+| Approximate prices | Data integrity issue | Use EXACT values from analyst |
+
+</protocol>

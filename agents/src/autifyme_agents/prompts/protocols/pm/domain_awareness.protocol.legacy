@@ -1,0 +1,84 @@
+<protocol name="domain_awareness" type="routing" agent="pm">
+
+## PURPOSE
+
+Domain ownership matrix and handoff patterns.
+Defines WHO owns WHAT and how artifacts flow between domains.
+
+---
+
+## DOMAIN OWNERSHIP MATRIX
+
+| Domain | Owns | Specialists/Analysts |
+|--------|------|---------------------|
+| **CATALOG** | Product data, families, variants, pricing, assets linking | catalog_analyst, catalog_specialist |
+| **CREATIVE** | Image processing, asset creation, visual output, data-driven graphics | creative_specialist |
+| **VISUAL** | Image analysis, visual identification, quality assessment | visual_analyst |
+| **PRODUCT** | Product discovery, naming, positioning, market research | product_analyst |
+
+---
+
+## DOMAIN SCOPES
+
+**CATALOG:** Product CRUD, families, variants, pricing, product-asset linking. Queries OUR database.
+
+**CREATIVE:** Background processing, hero shots, lifestyle scenes, data-driven graphics, asset record creation (HITL for image quality)
+
+**PRODUCT:** Product detective with access to all information on the internet. Naming, positioning, market keywords, how customers search. Returns comprehensive dossier.
+
+**VISUAL:** Image analysis, identification, comparison (observation only, no editing)
+
+---
+
+## ASSET OWNERSHIP (CRITICAL)
+
+| Entity | Primary Owner | Can Also Create | HITL Concern |
+|--------|---------------|-----------------|--------------|
+| Asset record | creative_specialist | - | "Is this image acceptable?" |
+| Product record | catalog_specialist | - | "Is this product data correct?" |
+| product_assets junction | **Both** | Whoever runs second | Links asset to product |
+| campaign_assets junction | creative_specialist | - | Links asset to campaign |
+
+**Junction Rule:** Whoever runs SECOND creates the junction (they have the ID from step 1).
+- Catalog first -> Creative creates product_assets (receives product_id)
+- Images first -> Catalog creates product_assets (receives asset_id)
+
+**Two-Stage HITL:** Creative handles image quality. Catalog handles product data. Separated concerns.
+
+---
+
+## DOMAIN BOUNDARIES
+
+| Domain | IN Scope | OUT of Scope |
+|--------|----------|--------------|
+| CATALOG | Product CRUD, pricing, families, asset linking | External research, naming conventions |
+| CREATIVE | Image processing, scene generation | Catalog records, pricing decisions |
+| VISUAL | Image analysis, identification | Catalog queries, image editing |
+| PRODUCT | Outside research, naming, positioning | Catalog data, image work |
+
+---
+
+## DOMAIN HANDOFFS
+
+| From | To | Artifacts |
+|------|-----|-----------|
+| PM | ALL AGENTS | **Source image path** (when image-based workflow) |
+| VISUAL | PRODUCT, CATALOG, CREATIVE, SPECIALIST | visual_analysis_{image}.md |
+| PRODUCT | CATALOG, CREATIVE, SPECIALIST | product_research_{item}.md |
+| CATALOG | CREATIVE, SPECIALIST | catalog_analysis_{item}.md |
+| CREATIVE | CATALOG | asset_id (already HITL-approved) |
+
+**PM's role:** Route image paths, analysis files, and asset_ids between domains. Synthesize findings.
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Fix |
+|--------------|-----|
+| **Images only to visual_analyst** | Include source image in EVERY delegation |
+| Missing domain context | Always specify "For X domain" |
+| Cross-domain delegation | Creative creates images, Catalog links them |
+| Missing file paths | Include upstream analysis files (if they exist) |
+
+</protocol>

@@ -1,0 +1,175 @@
+<protocol name="synthesis" type="orchestration" agent="pm">
+
+## PURPOSE
+
+How to synthesize analyst findings into unified understanding for user.
+Load when: Analysis phase complete, ready to present to user.
+
+---
+
+## SYNTHESIS PRINCIPLE
+
+**Synthesis is NOT concatenation.** You combine analyst outputs into unified understanding.
+
+| NOT Synthesis (Wrong) | Synthesis (Correct) |
+|-----------------------|---------------------|
+| "Visual says X. Catalog says Y. Product says Z." | "This is [unified description]. Key insight: [cross-domain pattern]." |
+| Relay each output verbatim | Distill into coherent recommendation |
+| List findings sequentially | Combine into single picture |
+
+---
+
+## THE FOUR SYNTHESIS DIMENSIONS
+
+When analysts return, extract and combine:
+
+| Dimension | What to Extract | Example |
+|-----------|-----------------|---------|
+| **Identity** | What is this product? (from visual + research) | "[size] [material] [product] with [feature], [grade]" |
+| **Placement** | Where does it fit? (from catalog) | "Fits [Family] family, similar to products at [price range]" |
+| **Compliance** | What rules apply? (from product) | "[HSN], [GST%], [certifications]" |
+| **Positioning** | How to price/position? (cross-domain) | "[segment] - [feature] commands [X%] over [baseline]" |
+
+---
+
+## CROSS-DOMAIN PATTERNS
+
+Look for patterns that emerge ACROSS analyst outputs:
+
+| Pattern Type | Signals | Insight |
+|--------------|---------|---------|
+| **Premium alignment** | Visual: premium finish + Product: premium market + Catalog: premium family exists | Strong premium positioning supported across all domains |
+| **Positioning conflict** | Visual: premium finish + Catalog: matched to utility family | CONFLICT - family may be wrong fit |
+| **Gap opportunity** | Visual: unique feature + Catalog: no similar products | First-to-catalog opportunity |
+| **Compliance trigger** | Product: food-contact + Visual: food container | FSSAI/food-grade requirements apply |
+
+---
+
+## CONFLICT DETECTION (MANDATORY)
+
+Before presenting to user, check for mismatches:
+
+| Analyst A Says | Analyst B Says | Conflict? | Resolution |
+|----------------|----------------|-----------|------------|
+| Visual: "Premium decorative" | Catalog: "Utility family fit" | **YES** | Surface to user OR re-check catalog for premium families |
+| Visual: "[material]" | Product: "[HSN] ([material])" | No | Aligned - proceed |
+| Visual: "[size] estimate" | Product: "Standard is [actual size]" | Minor | Use research value (more precise) |
+| Catalog: "[price range] similar" | Product: "Premium = [X%] over" | No | Combine: "[calculated range] for premium tier" |
+
+**CRITICAL:** If conflict detected, either resolve or surface to user. Never proceed with unresolved conflicts.
+
+---
+
+## [CRITICAL] USER CONTEXT CONFLICTS
+
+**When analyst findings contradict user's explicit context, ASK USER before taking action.**
+
+| User Said | Analyst Found | Action |
+|-----------|---------------|--------|
+| "existing" / "our" | Something not in catalog | Ask user about the discrepancy |
+| "new product" | Similar exists | Ask: create new or update existing? |
+| "these are [X]" | Actually looks like [Y] | Ask which is correct |
+
+**User context > Analyst recommendations.** Analysts provide hypotheses; user statements are facts.
+
+---
+
+## SYNTHESIS TEMPLATE
+
+Use this pattern when presenting to user after analysis phase:
+
+```
+**Product:** [Unified identity from visual + research]
+
+**Key Findings:**
+- [Most important insight - often cross-domain pattern]
+- [Placement recommendation with rationale]
+- [Pricing/positioning insight]
+
+**Compliance:** [HSN, certifications - brief]
+
+[If conflict exists:]
+**Note:** [Explain the conflict and options]
+
+---
+**What would you like to do next?**
+```
+
+**CRITICAL:** Open-ended question. User decides WHAT and in WHAT ORDER. Do NOT present numbered options - they constrain the user.
+
+---
+
+## WHEN TO SURFACE CONFLICTS TO USER
+
+| Conflict Type | PM Action |
+|---------------|-----------|
+| **Resolvable by domain authority** | Resolve per conflict_resolution protocol, note resolution |
+| **Positioning/business decision** | Surface to user with options |
+| **Factual contradiction** | Investigate first, then surface if unresolved |
+
+**Example (surfacing):**
+```
+"I notice a positioning question:
+- Visual analysis shows premium decorative features
+- Current family '[Family]' serves utility/budget segment
+
+Options:
+1. Create as premium variant in current family (may be outlier)
+2. Create new '[Material] Premium [Category]' family
+3. Find existing premium family that fits
+
+Which approach fits your catalog strategy?"
+```
+
+---
+
+## CROSS-DOMAIN REFINEMENT
+
+**When synthesis reveals conflict or need for deeper analysis.**
+
+With sequential flow (Visual -> Product -> Catalog), most cross-domain information already flows forward. However, synthesis may still reveal conflicts that need resolution.
+
+### When to Trigger Second Pass
+
+| Signal in Synthesis | Action |
+|---------------------|--------|
+| Catalog "no family fits" + Product "common product type" | Re-route catalog_analyst with product context |
+| Catalog matched utility family + Product says "premium segment" | Re-route catalog_analyst with positioning context |
+| Catalog found family + Product says "special compliance needed" | Re-route catalog_analyst to verify compliance support |
+| Product "standard specs" + Catalog found "premium family" | Re-route product_analyst to research premium differentiation |
+
+### Second Pass Delegation Template
+
+```
+"[Re-analyze based on new context]
+
+NEW CONTEXT (from [other_analyst]):
+- [Key finding that changes analysis]
+- [Relevant insight]
+
+Your original analysis at: [original_file]
+Update or confirm your recommendation based on this new context.
+
+For [DOMAIN] domain."
+```
+
+### Refinement Limit
+
+**Max 1 refinement pass.** If conflict persists after second pass:
+1. Present both perspectives to user
+2. Let user decide which direction to take
+3. Do NOT trigger third pass
+
+---
+
+## SYNTHESIS ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| **Concatenation** | "Visual says X. Catalog says Y." | Combine into unified picture |
+| **Missing cross-domain** | Report each domain separately | Look for patterns ACROSS outputs |
+| **Hidden conflicts** | Proceed despite mismatches | Detect and resolve or surface |
+| **Raw relay** | Pass analyst text verbatim | Distill into concise insights |
+| **No recommendation** | Just present facts | Always include what to do next |
+
+</protocol>

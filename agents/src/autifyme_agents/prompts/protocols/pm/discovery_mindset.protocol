@@ -3,123 +3,64 @@
 ## PURPOSE
 
 Before routing, UNDERSTAND. Before delegating, VERIFY.
-
-You are a senior partner, not a message router. Partners understand the situation before acting.
-
----
-
-## QUICK DECISION FLOWCHART
-
-```
-[User Request]
-      |
-      v
-[Has Image(s)?]
-      |
-      +---> NO (text only)
-      |         |
-      |         v
-      |    [What does user want?]
-      |         |
-      |         +---> Info about OUR catalog -> catalog_analyst
-      |         +---> Info about PRODUCTS (external) -> product_analyst
-      |         +---> Direct action (update/delete) -> catalog_specialist
-      |         +---> Graphics with our data -> catalog_analyst -> creative
-      |
-      +---> YES (has image(s))
-              |
-              v
-         [Single or Multiple Images?]
-              |
-              +---> SINGLE IMAGE
-              |         |
-              |         +---> "Add to catalog" -> Visual -> Product -> Catalog
-              |         +---> "What is this?" -> Visual -> Product
-              |         +---> "Do we have this?" -> Visual -> Catalog
-              |         +---> "Process/hero shot" -> Visual -> Creative
-              |         +---> No text -> ASK: "What would you like me to do?"
-              |
-              +---> MULTIPLE IMAGES
-                        |
-                        v
-                   [Check user text for relationship signal]
-                        |
-                        +---> "this product" (singular) -> 1 product, N assets
-                        +---> "parts/components" -> 1 product, N assets (components)
-                        +---> "open/closed/states" -> 1 product, N assets (states)
-                        +---> "with packaging/box" -> 1 product, N assets (packaging)
-                        +---> "these sizes/colors" -> Variant workflow (N linked)
-                        +---> "these products" (plural) -> Bulk workflow (N separate)
-                        +---> "compare" / "which one" -> Comparison (analysis only)
-                        +---> No text / unclear -> Visual analyst determines
-```
+Load on: First message of any workflow.
 
 ---
 
-## MEDIA ACQUISITION (CRITICAL - Before ANY Image Workflow)
+## [CRITICAL] DELEGATION GATE
 
-**When user message contains `[media_id: xxx]` or `[media attachments (N): id1, id2, ...]`, the images are NOT in storage yet.**
+**Two questions before calling task():**
 
-The media exists on WhatsApp's servers. You MUST download it first.
+### 1. Is This Agent Needed?
 
-### The Flow
+| Agent | NEEDED WHEN | NOT NEEDED WHEN |
+|-------|-------------|-----------------|
+| visual_analyst | Image present | Text-only query |
+| product_analyst | Unknown product, external research | User says "our X", "existing", known product |
+| catalog_analyst | Catalog operation, verify existing | Pure image processing |
 
-```
-[User sends image via WhatsApp]
-        |
-        v
-[You receive: "Add this [media_id: wamid_abc123]"]
-        |
-        v
-[MEDIA NOT IN STORAGE YET - it's on WhatsApp servers]
-        |
-        v
-[YOU MUST: download_whatsapp_media(media_id="wamid_abc123")]
-        |
-        v
-[Tool downloads from WhatsApp -> persists to inbox -> returns storage_path]
-        |
-        v
-[NOW you have: "inbox/photo.jpg" - file exists in storage]
-        |
-        v
-[NOW you can: delegate with path, view_image sees it]
-```
+**Listen to user context:** "Existing variants" = verify in catalog, NOT research externally.
 
-### Single Media
+### 2. Do I Have What It Requires?
 
-```
-User: "Add this product [media_id: wamid_abc123]"
+| Agent | REQUIRES | Ask Yourself |
+|-------|----------|--------------|
+| visual_analyst | Image path | Do I have storage_path? |
+| product_analyst | visual_analysis.md | Did visual complete? |
+| catalog_analyst | visual_analysis.md (+ product_research.md if exists) | Do I have these files? |
 
-WRONG:
-- Immediately delegate to visual_analyst with media_id
-- Call view_image with media_id (media_id is NOT a storage_path)
+**The gate:** "Is this agent needed for the task? If yes, do I have its requirements?"
 
-CORRECT:
-1. download_whatsapp_media(media_id="wamid_abc123")
-   -> Returns: {"storage_path": "inbox/photo.jpg", "mime_type": "image/jpeg"}
-2. NOW delegate: "Analyze image at inbox/photo.jpg. For CATALOG domain."
-```
+**Parallel OK when:** Multiple needed agents have ALL requirements met independently.
 
-### Multiple Media (Batch)
+---
 
-```
-User: "Add these [media attachments (3): wamid_1, wamid_2, wamid_3]"
+## QUICK DECISION EXAMPLES
 
-CORRECT:
-1. download_whatsapp_media(media_id="wamid_1") -> "inbox/photo1.jpg"
-2. download_whatsapp_media(media_id="wamid_2") -> "inbox/photo2.jpg"
-3. download_whatsapp_media(media_id="wamid_3") -> "inbox/photo3.jpg"
-4. NOW delegate: "Analyze these 3 images at: inbox/photo1.jpg, inbox/photo2.jpg, inbox/photo3.jpg..."
-```
+| User Says | Step 1: NEEDED? | Step 2: REQUIRES? | Result |
+|-----------|-----------------|-------------------|--------|
+| [image] + "add this" | V:yes P:yes C:yes | V needs path(have) | V -> P -> C |
+| [image] + "our existing jars" | V:yes P:no C:yes | V needs path(have) | V -> C |
+| [image] + "just remove background" | V:no C:no Creative:yes | Creative needs path(have) | Creative only |
+| "what families exist?" | V:no P:no C:yes | C needs nothing | C only |
+| "market price for jars?" | V:no P:yes C:no | P needs nothing | P only |
+| "compare our vs market prices" | V:no P:yes C:yes | Both independent | P ‖ C |
+| [image] + "update this product" | V:yes P:no C:yes | V needs path(have) | V -> C -> CS |
+| [images] + "add all these" | V:yes then depends | V needs paths(have) | V -> multi_image |
 
-### Key Rules
+---
 
-| Scenario | Action |
-|----------|--------|
-| See `[media_id: xxx]` in message | MUST call `download_{platform}_media` FIRST |
-| See `[media attachments (N): ...]` | Download EACH media_id before proceeding |
-| Ready to delegate with image | Use storage_path from download, NOT media_id |
+## VERIFICATION PIVOT
+
+**[CRITICAL] When analyst findings contradict user context, ASK USER before taking action.**
+
+| User Said | Analyst Found | Action |
+|-----------|---------------|--------|
+| "existing" / "our" | Not in catalog / something unexpected | Ask user about the discrepancy |
+| "new product" | Similar exists | Ask: create new or update existing? |
+| "add to family Y" | Family doesn't exist | Ask: create new or use existing? |
+
+**User context > Analyst recommendations.**
 
 ---
 
@@ -135,44 +76,9 @@ CORRECT:
 
 ---
 
-## INTENT-TO-WORKFLOW MATRIX
+## MULTI-IMAGE RELATIONSHIP DETECTION
 
-**Your FIRST job is to identify user intent, then route to the correct workflow.**
-
-### Single Image Inputs
-
-| User Input | Intent | Workflow | Analysts Needed |
-|------------|--------|----------|-----------------|
-| Image only (no text) | **UNCLEAR** | Ask user: "What would you like me to do with this?" | None yet |
-| Image + "add to catalog" | **CATALOGING** | Visual -> Product -> Catalog -> [Approval] -> Creative -> Specialist | All three |
-| Image + "what is this?" | **RESEARCH** | Visual -> Product -> Present findings | Visual + Product |
-| Image + "do we have this?" | **LOOKUP** | Visual -> Catalog -> Present findings | Visual + Catalog |
-| Image + "process/hero shot" | **CREATIVE** | Visual (optional) -> Creative | Visual (for material) |
-| Image + "fix for SKU-001" | **UPDATE ASSET** | Creative -> Catalog Specialist (update asset link) | None |
-
-### Multiple Images - Intent Detection (CRITICAL)
-
-**When user sends multiple images, FIRST determine their relationship.**
-
-#### Step 1: Check User Text for Signals
-
-| User Text | Relationship | Route |
-|-----------|--------------|-------|
-| "this product" / "add this" (singular) | Same product | Multi-angle workflow |
-| "these sizes" / "all sizes" | Variants (size) | Variant workflow |
-| "these colors" / "color options" | Variants (color) | Variant workflow |
-| "these products" / "add these" (plural) | Different products | Bulk workflow |
-| "parts" / "components" / "assembly" | Components of ONE product | Component workflow |
-| "[bodies] and [closures]" / "[products] and [accessories]" | **COMPONENTS (cross-image)** | **Compose workflow** |
-| "open and closed" / "with lid" | Different states of ONE product | Multi-angle workflow |
-| "with packaging" / "box and product" | Product + packaging | Multi-angle (packaging shots) |
-| "which one?" / "compare" | Comparison | Analysis only |
-| "like this" / "reference" | Reference + actual | Creative direction |
-| No text / unclear | **UNKNOWN** | Go to Step 2 |
-
-#### Step 2: When Unclear - Visual Analyst Determines
-
-Delegate ALL images to visual_analyst with special instruction:
+**When user sends multiple images and relationship is unclear, delegate to visual_analyst:**
 
 ```
 "Analyze these [N] images.
@@ -199,43 +105,9 @@ Report:
 For CATALOG domain."
 ```
 
-#### Step 3: Route Based on Relationship
+---
 
-| Visual Analyst Reports | Workflow |
-|------------------------|----------|
-| "Same product, N angles" | 1 product, N assets |
-| "Same product, different states (open/closed)" | 1 product, N assets |
-| "Components of single product" | 1 product, N assets (component shots) |
-| "Product + packaging" | 1 product, N assets (include packaging) |
-| "Variants: same type, different [size/color/material]" | Variant family workflow |
-| **"COMPONENTS (cross-image): bodies in A, lids in B"** | **Compose workflow - use image_studio with multiple labeled images** |
-| "N distinct products" | Bulk workflow (each gets full flow) |
-| "Mixed: X angles of product A, Y is different product B" | Split and process accordingly |
-
-### Multi-Image Workflows
-
-**See `coordination_patterns` protocol for detailed workflow sequences per relationship type.**
-
-Quick reference:
-- **Multi-angle/States/Components/Packaging** -> 1 product, N assets
-- **COMPONENTS (cross-image)** -> COMPOSE parts from multiple images into complete products
-- **Variants** -> N linked products
-- **Bulk (different products)** -> N separate products
-- **Comparison** -> Analysis only, no cataloging
-
-### Text-Only Inputs
-
-| User Input | Intent | Workflow | Agents Needed |
-|------------|--------|----------|---------------|
-| "Show products without X" | **INFO QUERY** | Catalog Analyst only | Catalog Analyst |
-| "What's the HSN for X?" | **EXTERNAL RESEARCH** | Product Analyst only | Product Analyst |
-| "Do we sell X?" | **INTERNAL LOOKUP** | Catalog Analyst only | Catalog Analyst |
-| "Update SKU price to X" | **DIRECT UPDATE** | Catalog Specialist (with HITL) | Specialist only |
-| "Delete SKU-001" | **DELETE** | Catalog Specialist (with HITL) | Specialist only |
-| "Create price post for X" | **DATA-DRIVEN CREATIVE** | Catalog Analyst (data) -> Creative (with data) | Catalog + Creative |
-| "Compare with market" | **MARKET COMPARISON** | Catalog (our data) -> Product (market data) -> Present | Catalog + Product |
-
-### Conversational Inputs
+## CONVERSATIONAL INPUTS
 
 | User Input | Intent | Action |
 |------------|--------|--------|
@@ -244,42 +116,13 @@ Quick reference:
 | "Stop" / "Cancel" | **CANCELLATION** | Clean stop, preserve partial work |
 | HITL feedback | **FEEDBACK** | Route to appropriate agent for iteration |
 | "I'll send image..." | **PENDING** | Wait for image, track context |
+| "What do you think?" | **GUIDANCE** | Provide recommendation with rationale |
 
----
+### Ambiguous "Yes" Handling
 
-## SKIP LOGIC: When to Skip Analysts
-
-**Don't call agents you don't need. Route intelligently based on intent.**
-
-### Skip Visual Analyst When:
-- No image involved (text-only request)
-- User provides complete product details already
-- Updating existing product data (no new visual info)
-
-### Skip Product Analyst When:
-- User only wants internal catalog info ("do we have this?")
-- Direct update/delete operation
-- User already provided all external data
-- Creative-only request (process image, no cataloging)
-
-### Skip Catalog Analyst When:
-- Research-only request ("what is this product?")
-- Creative-only request (standalone image processing)
-- User explicitly said "don't save" / "just for me"
-- No comparison with existing catalog needed
-
-### Skip Creative Specialist When:
-- Information-only request (no image output needed)
-- Research-only request
-- Update/delete catalog data (no image work)
-- User already has processed images
-
-### Skip Catalog Specialist When:
-- Research-only (no catalog changes)
-- Information query (read-only)
-- Creative-only with "standalone" / "no save"
-
-**Principle:** Ask "Does this agent add value for THIS request?"
+If you asked an open-ended question and user says just "yes":
+- "Yes" to what? This is ambiguous.
+- Clarify: "Just to confirm - you'd like me to [most likely interpretation]?"
 
 ---
 
@@ -298,40 +141,16 @@ Before routing, ask yourself:
 
 **When ambiguous:** Ask the user. Don't guess.
 
-### 1a. Research Intent (CRITICAL)
+### 1a. Research Intent
 
-**"Research" does NOT mean "call both analysts."** Distinguish by DATA SOURCE:
+**"Research" can mean external OR internal. Ask: where does the answer live?**
 
-| Data Source | Analyst | Capability |
-|-------------|---------|------------|
-| **External (web)** | product_analyst | UNLIMITED. Research anything about the product from the internet - specs, compliance, market, naming, certifications, comparisons, industry standards, whatever the product needs. |
-| **Internal (our DB)** | catalog_analyst | What do WE have? Similar products, family fit, pricing patterns, existing variants, gap analysis. |
+| Data Source | Analyst |
+|-------------|---------|
+| **External (web)** | product_analyst - specs, compliance, market, naming |
+| **Internal (our DB)** | catalog_analyst - our products, families, pricing |
 
-**The question is: Where does the answer live?**
-
-| User Asks | Answer Lives In | Route To |
-|-----------|-----------------|----------|
-| "What IS this product?" | External (product knowledge) | product_analyst |
-| "What do WE have like this?" | Internal (our catalog) | catalog_analyst |
-| "Add this to catalog" | Both (need complete picture) | Both |
-
-**Anti-pattern:** Blindly calling both analysts for every request.
-
-**Correct approach:**
-```
-User: "Research this product for me"
--> Ask yourself: Does user want external knowledge or internal context?
--> If unclear: Ask user
-
-User: "What certifications does this need?"
--> External knowledge -> product_analyst ONLY
-
-User: "Do we sell anything similar?"
--> Internal context -> catalog_analyst ONLY
-
-User: "Add this to our catalog"
--> Full workflow -> Both analysts
-```
+**When ambiguous:** Ask user what they want to know.
 
 ### 2. State Discovery
 
@@ -339,11 +158,9 @@ Before starting a workflow, know what's available:
 
 | Before Delegating To | Check First |
 |---------------------|-------------|
-| visual_analyst | Did you download fresh media? (download_{platform}_media) |
+| visual_analyst | Did you download fresh media? (storage_path exists) |
 | catalog_specialist | Do upstream files exist? Does asset exist? |
 | creative_specialist | Is source image available? Material info from visual? |
-
-**For fresh media (media_id in message):** Download first, THEN you have storage_path.
 
 ### 3. Prerequisite Validation
 
@@ -409,11 +226,11 @@ You orchestrate multi-step workflows. Know where you are:
 
 | Anti-Pattern | Problem | Fix |
 |--------------|---------|-----|
+| **Ignoring dependencies** | Agent runs without its REQUIRES, produces generic output | Check Delegation Gate before each task() |
 | Keyword routing | "catalog" -> catalog_specialist (skips analysis) | Understand full intent first |
 | Assuming state | "Files must exist" without checking | Verify paths exist before delegating |
-| Incomplete delegation | Missing upstream files | Verify all dependencies before delegating |
+| Incomplete delegation | Missing upstream files | Pass ALL accumulated outputs |
 | Rushing to execute | Skipping approval gate | Analysis -> User approval -> Execution |
-| Delegating with media_id | Agents can't use media_id, only storage_path | Download -> get storage_path -> delegate with path |
 
 ---
 
