@@ -2,7 +2,7 @@
 
 ## PURPOSE
 
-Data operations for Creative Specialist: assets, product_assets, campaign_assets.
+Data operations for Creative Specialist across all domains: CATALOG, LIFESTYLE, SOCIAL, CAMPAIGN.
 Load when creating asset records after image processing.
 
 ---
@@ -12,10 +12,20 @@ Load when creating asset records after image processing.
 **Call inspect_schema BEFORE write_data. No exceptions.**
 
 ```
-inspect_schema(tables=['assets', 'product_assets'], details=['structure', 'constraints'])
+inspect_schema(tables=['assets', 'product_assets', 'campaign_assets'], details=['structure', 'constraints'])
 ```
 
-Schema reveals actual column names, required fields, enum values.
+---
+
+## DOMAIN -> JUNCTION MAPPING
+
+| Domain | Junction Table | Purpose Field | Typical Role |
+|--------|----------------|---------------|--------------|
+| CATALOG | product_assets | PRODUCT | PRIMARY, GALLERY, ZOOM |
+| LIFESTYLE | product_assets | PRODUCT | LIFESTYLE |
+| SOCIAL | campaign_assets OR none | SOCIAL | varies |
+| CAMPAIGN | campaign_assets | CAMPAIGN | varies |
+| STANDALONE | none | STANDALONE | n/a |
 
 ---
 
@@ -23,8 +33,8 @@ Schema reveals actual column names, required fields, enum values.
 
 | Stage | Path | Created By |
 |-------|------|------------|
-| User upload | `inbox/filename.ext` | download_media |
-| Processed | `pending/filename.ext` | image_studio |
+| User upload | `inbox/[filename]` | download_media |
+| Processed | `pending/[filename]` | image_studio |
 | Cataloged | URL in assets table | write_data after HITL |
 
 ---
@@ -33,53 +43,61 @@ Schema reveals actual column names, required fields, enum values.
 
 ### Required Fields
 
-| Field | Type | Notes |
-|-------|------|-------|
-| name | varchar(200) | "[Product] [Size] Hero" |
-| storage_url | text | Use @upload.public_url |
+| Field | Type | Values |
+|-------|------|--------|
+| name | varchar(200) | `"[descriptive name]"` |
+| storage_url | text | `@[upload_ref].public_url` |
 | storage_provider | varchar(50) | SUPABASE |
 | file_name | varchar(255) | From image_studio output |
 | mime_type | varchar(100) | image/png, image/jpeg, image/webp |
 | asset_type | varchar(30) | IMAGE, VIDEO, DOCUMENT |
 | status | varchar(20) | ACTIVE, ARCHIVED, DELETED |
-| purpose | varchar(20) | PRODUCT, FAMILY, CAMPAIGN, STANDALONE |
+| purpose | varchar(20) | PRODUCT, FAMILY, CAMPAIGN, SOCIAL, STANDALONE |
 
 ### AI Lineage (MANDATORY)
-
-Every AI-generated asset MUST include:
 
 | Field | Value |
 |-------|-------|
 | is_ai_generated | true |
 | source_asset_ids | [uuid] or null if from inbox/ |
-| generation_prompt | "extraction + [bg] + [lighting] for [material]" |
+| generation_prompt | `"[operation] + [background] + [lighting] for [material]"` |
 
 ---
 
 ## PRODUCT_ASSETS JUNCTION
+
+For CATALOG and LIFESTYLE domains.
 
 ### XOR Constraint (CRITICAL)
 
 **Exactly ONE of product_id OR product_family_id. Never both, never neither.**
 
 ```json
-// CORRECT: Link to product
-{"product_id": "uuid", "product_family_id": null, "asset_id": "@asset.id"}
-
-// CORRECT: Link to family
-{"product_id": null, "product_family_id": "uuid", "asset_id": "@asset.id"}
+{"product_id": "[uuid]", "product_family_id": null, "asset_id": "@asset.id"}
+{"product_id": null, "product_family_id": "[uuid]", "asset_id": "@asset.id"}
 ```
 
 ### Asset Roles
 
-| Role | Use |
-|------|-----|
-| PRIMARY | Main product image (ONE per product) |
-| GALLERY | Additional angles |
-| LIFESTYLE | In-context shots |
-| ZOOM | High-res detail |
+| Role | Domain | Use |
+|------|--------|-----|
+| PRIMARY | CATALOG | Main product image (ONE per product) |
+| GALLERY | CATALOG | Additional angles |
+| ZOOM | CATALOG | High-res detail |
+| LIFESTYLE | LIFESTYLE | In-context shots |
 
-**Check before assigning PRIMARY:** Query product_assets to see if PRIMARY exists.
+---
+
+## CAMPAIGN_ASSETS JUNCTION
+
+For CAMPAIGN and SOCIAL domains.
+
+| Field | Value |
+|-------|-------|
+| campaign_id | `[campaign-uuid]` |
+| asset_id | `@asset.id` |
+| usage_type | social_media, email, banner, etc. |
+| placement | `[platform or location]` |
 
 ---
 
@@ -89,28 +107,28 @@ Every AI-generated asset MUST include:
 
 | Parameter | Use For | Example |
 |-----------|---------|---------|
-| filters | Exact: IDs, booleans, enums | `{'id': 'uuid', 'status': 'ACTIVE'}` |
-| search_patterns | Fuzzy: names, text (with %) | `{'name': '%keyword%'}` |
+| filters | Exact: IDs, booleans, enums | `{'id': '[uuid]', 'status': 'ACTIVE'}` |
+| search_patterns | Fuzzy: names, text (with %) | `{'name': '%[keyword]%'}` |
 
-### Duplicate Check (Before Create)
+### Duplicate Check
 
 ```python
 read_data(
     table='assets',
-    search_patterns={'name': '%[product]%hero%'},
+    search_patterns={'name': '%[identifier]%'},
     columns=['id', 'name', 'status']
 )
 ```
 
-### Check PRIMARY Exists
+### Check PRIMARY Exists (CATALOG only)
 
 ```python
 read_data(
     table='product_assets',
-    filters={'product_id': 'uuid', 'asset_role': 'PRIMARY'},
+    filters={'product_id': '[uuid]', 'asset_role': 'PRIMARY'},
     columns=['id', 'asset_id']
 )
-# If results: new image is GALLERY. If empty: new image is PRIMARY.
+# Results exist -> new image is GALLERY. Empty -> new image is PRIMARY.
 ```
 
 ---
@@ -122,7 +140,7 @@ read_data(
 | Field | Purpose |
 |-------|---------|
 | goal | What you're creating |
-| reasoning | Validation done, quality verified |
+| reasoning | Quality verified, validation done |
 | hitl_summary | User approval message |
 | asset_uploads | Images to show in HITL |
 | operations | Database operations |
@@ -133,44 +151,49 @@ read_data(
 ```json
 "asset_uploads": [
   {
-    "storage_path": "pending/20241217_studio_abc.png",
-    "returns": "product_image",
-    "caption": "[Product] - catalog hero",
-    "target_folder": "products"
+    "storage_path": "pending/[file].png",
+    "returns": "[ref_name]",
+    "caption": "[descriptive caption]",
+    "target_folder": "[domain_folder]"
   }
 ]
 ```
 
-**Reference in operations:**
-- `@product_image.public_url` - Final URL after upload
-- `@product_image.caption` - Caption text
+**Reference:** `@[ref_name].public_url`, `@[ref_name].caption`
 
-### Pattern 1: Single Asset with HITL Preview
+---
+
+### Pattern: Single Asset (All Domains)
 
 ```json
 {
-  "goal": "Create asset for processed image",
-  "reasoning": "Quality verified: clean extraction, proper lighting.",
-  "hitl_summary": "Processed image ready.\n\n[Processing]: Background removed, hero shot created.\n\nApprove?",
+  "goal": "Create [domain] asset",
+  "reasoning": "Quality verified: [what was checked].",
+  "hitl_summary": "[Domain] image ready.\n\n[Processing summary]\n\nApprove?",
   "asset_uploads": [
-    {"storage_path": "pending/[file].png", "returns": "img", "caption": "[Product] hero", "target_folder": "products"}
+    {
+      "storage_path": "pending/[file].png",
+      "returns": "img",
+      "caption": "[descriptive caption]",
+      "target_folder": "[domain_folder]"
+    }
   ],
   "operations": [
     {
       "action": "create",
       "table": "assets",
       "data": {
-        "name": "[Product] Hero",
+        "name": "[descriptive name]",
         "storage_url": "@img.public_url",
         "storage_provider": "SUPABASE",
         "file_name": "[file].png",
         "mime_type": "image/png",
         "asset_type": "IMAGE",
-        "purpose": "PRODUCT",
+        "purpose": "[PRODUCT|CAMPAIGN|SOCIAL|STANDALONE]",
         "status": "ACTIVE",
         "is_ai_generated": true,
         "source_asset_ids": null,
-        "generation_prompt": "extraction + white bg + studio lighting",
+        "generation_prompt": "[operation] + [background] + [lighting]",
         "caption": "@img.caption"
       },
       "returns": "asset"
@@ -180,9 +203,9 @@ read_data(
 }
 ```
 
-### Pattern 2: Asset + Product Junction
+---
 
-When you have product_id from PM or catalog specialist:
+### Pattern: Asset + Product Junction (CATALOG/LIFESTYLE)
 
 ```json
 {
@@ -190,7 +213,7 @@ When you have product_id from PM or catalog specialist:
     {
       "action": "create",
       "table": "assets",
-      "data": {...},
+      "data": {"purpose": "PRODUCT", ...},
       "returns": "asset"
     },
     {
@@ -200,7 +223,7 @@ When you have product_id from PM or catalog specialist:
         "product_id": "[product-uuid]",
         "product_family_id": null,
         "asset_id": "@asset.id",
-        "asset_role": "PRIMARY",
+        "asset_role": "[PRIMARY|GALLERY|LIFESTYLE|ZOOM]",
         "sort_order": 0
       },
       "dependencies": ["asset"]
@@ -210,24 +233,17 @@ When you have product_id from PM or catalog specialist:
 }
 ```
 
-### Pattern 3: Campaign Asset + Junction
+---
+
+### Pattern: Asset + Campaign Junction (CAMPAIGN/SOCIAL)
 
 ```json
 {
-  "goal": "Create campaign asset",
-  "asset_uploads": [
-    {"storage_path": "pending/campaign.png", "returns": "img", "caption": "[Campaign] promo", "target_folder": "campaigns"}
-  ],
   "operations": [
     {
       "action": "create",
       "table": "assets",
-      "data": {
-        "name": "[Campaign] - [Theme]",
-        "storage_url": "@img.public_url",
-        "purpose": "CAMPAIGN",
-        ...
-      },
+      "data": {"purpose": "[CAMPAIGN|SOCIAL]", ...},
       "returns": "asset"
     },
     {
@@ -236,7 +252,7 @@ When you have product_id from PM or catalog specialist:
       "data": {
         "campaign_id": "[campaign-uuid]",
         "asset_id": "@asset.id",
-        "usage_type": "social_media",
+        "usage_type": "[social_media|email|banner]",
         "placement": "[platform]"
       },
       "dependencies": ["asset"]
@@ -245,22 +261,54 @@ When you have product_id from PM or catalog specialist:
 }
 ```
 
-### Pattern 4: Batch Assets (Variants)
+---
+
+### Pattern: Family-Level Asset
+
+Shared by all products in family:
 
 ```json
 {
-  "goal": "Create assets for N variants",
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {"purpose": "FAMILY", ...},
+      "returns": "asset"
+    },
+    {
+      "action": "create",
+      "table": "product_assets",
+      "data": {
+        "product_id": null,
+        "product_family_id": "[family-uuid]",
+        "asset_id": "@asset.id",
+        "asset_role": "LIFESTYLE"
+      },
+      "dependencies": ["asset"]
+    }
+  ]
+}
+```
+
+---
+
+### Pattern: Batch Assets (Variants)
+
+```json
+{
+  "goal": "Create assets for [N] variants",
   "asset_uploads": [
-    {"storage_path": "pending/variant_a.png", "returns": "img_a", "caption": "[Size A]"},
-    {"storage_path": "pending/variant_b.png", "returns": "img_b", "caption": "[Size B]"}
+    {"storage_path": "pending/[variant_a].png", "returns": "img_a", "caption": "[Variant A]"},
+    {"storage_path": "pending/[variant_b].png", "returns": "img_b", "caption": "[Variant B]"}
   ],
   "operations": [
     {
       "action": "create",
       "table": "assets",
       "data": [
-        {"name": "[Size A] Hero", "storage_url": "@img_a.public_url", ...},
-        {"name": "[Size B] Hero", "storage_url": "@img_b.public_url", ...}
+        {"name": "[Variant A]", "storage_url": "@img_a.public_url", ...},
+        {"name": "[Variant B]", "storage_url": "@img_b.public_url", ...}
       ],
       "returns": "assets_batch"
     }
@@ -268,13 +316,15 @@ When you have product_id from PM or catalog specialist:
 }
 ```
 
-Reference batch: `@assets_batch[0].id`, `@assets_batch[1].id`
+Reference: `@assets_batch[0].id`, `@assets_batch[1].id`
 
-### Pattern 5: Replace Image (Archive Old)
+---
+
+### Pattern: Replace Image (Archive Old)
 
 ```json
 {
-  "goal": "Replace PRIMARY image",
+  "goal": "Replace [role] image",
   "reasoning": "User requested replacement. Archiving old.",
   "operations": [
     {
@@ -291,33 +341,10 @@ Reference batch: `@assets_batch[0].id`, `@assets_batch[1].id`
     },
     {
       "action": "update",
-      "table": "product_assets",
-      "filters": {"product_id": "[product-uuid]", "asset_id": "[old-asset-uuid]"},
+      "table": "[product_assets|campaign_assets]",
+      "filters": {"asset_id": "[old-asset-uuid]"},
       "updates": {"asset_id": "@new_asset.id"},
       "dependencies": ["new_asset"]
-    }
-  ]
-}
-```
-
-### Pattern 6: Family-Level Asset
-
-Shared by all products in family:
-
-```json
-{
-  "operations": [
-    {"action": "create", "table": "assets", "data": {...}, "returns": "asset"},
-    {
-      "action": "create",
-      "table": "product_assets",
-      "data": {
-        "product_id": null,
-        "product_family_id": "[family-uuid]",
-        "asset_id": "@asset.id",
-        "asset_role": "LIFESTYLE"
-      },
-      "dependencies": ["asset"]
     }
   ]
 }
@@ -347,6 +374,8 @@ Output: Return pending/[file].png path only
 | Both product_id AND product_family_id | Exactly ONE, other null |
 | Assign PRIMARY without checking | Query junction first |
 | Hallucinate paths | Use EXACT paths from tool output |
-| Create asset record for standalone | Return path only, no write_data |
+| Create asset record for standalone | Return path only |
+| Use product_assets for CAMPAIGN | Use campaign_assets |
+| Hardcode purpose without checking domain | Match purpose to PM's domain |
 
 </protocol>
