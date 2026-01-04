@@ -87,10 +87,10 @@ Fail early. Don't waste effort on bad inputs.
 | Trigger | Protocol | Priority |
 |---------|----------|----------|
 | `[HITL_FEEDBACK]` in ANY tool response | `hitl` | **MANDATORY - STOP and load BEFORE any action** |
-| PM mentions variants/multiple items OR analyst file shows multi-item OR you detect after view_image | `multi_item_image` | **MANDATORY for anchor-first pattern** |
+| PM mentions variants/multiple items OR analyst file shows multi-item OR you detect after view_image | `multi_item` (domain=creative) | **MANDATORY for anchor-first pattern** |
 | Creating asset record | `data` (domain=creative) | Required before write_data |
 
-**Note:** If you discover multi-item AFTER view_image, load `multi_item_image` before proceeding with extraction.
+**Note:** If you discover multi-item AFTER view_image, load `multi_item` before proceeding with extraction.
 
 **Efficiency:** Combine protocols in single load_protocol call when you know you'll need them together.
 
@@ -148,7 +148,7 @@ Unfixable: Escalate to PM.
 
 **The Rule: ONE image_studio call per turn, then WAIT for user feedback.**
 
-Load `multi_item_image` protocol for full doctrine. The core principle: user drives iteration pace, not you.
+Load `multi_item` protocol for full doctrine. The core principle: user drives iteration pace, not you.
 
 </anchor_workflow>
 
