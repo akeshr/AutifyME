@@ -121,11 +121,7 @@ KEY DISTINCTION:
 
 "extraction" = EXTRACT FROM SOURCE IMAGE
   - target_description: What to extract from source images
-  - target_bbox: PRECISE COORDINATES [y_min, x_min, y_max, x_max] (0-1000 scale)
-    * When bbox provided, FOCUS on that specific region
-    * Coordinates define the exact item location in the source image
-    * Origin is top-left corner, scale 0-1000 normalized
-    * Example: [333, 333, 666, 666] = center item in 3x3 grid
+  - target_bbox: When provided, FOCUS extraction on this specific region
   - Isolate the described item from the provided source
   - Source may be messy - your job is to isolate cleanly
   - PRIORITY: Use bbox for targeting when available, description for understanding
@@ -147,20 +143,6 @@ KEY DISTINCTION:
 "focus" = DEPTH OF FIELD control
 "custom_spec" = CREATIVE ideas beyond standard specs
 "creative_direction" = FREE-FORM notes
-
-=== BOUNDING BOX TARGETING (for multi-item extraction) ===
-
-When extraction.target_bbox is provided:
-1. LOCATE the region defined by [y_min, x_min, y_max, x_max]
-2. FOCUS extraction on the item within that bounding box
-3. USE target_description to understand WHAT the item is
-4. IGNORE other items outside the bbox region
-
-Coordinate system:
-- [0, 0, 1000, 1000] = entire image
-- [0, 0, 333, 333] = top-left ninth
-- [333, 333, 666, 666] = center ninth
-- Values are normalized (0-1000), not pixels
 
 === QUALITY DIMENSIONS (balance appropriately) ===
 

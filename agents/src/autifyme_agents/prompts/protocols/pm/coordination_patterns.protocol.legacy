@@ -2,66 +2,36 @@
 
 ## PURPOSE
 
-Multi-domain orchestration patterns for PM coordination.
-Defines how PM sequences domain work and handles dependencies.
+Coordination patterns for PM orchestration.
+
+This protocol provides:
+- Sequential execution patterns (when calling multiple analysts)
+- Approval gate (user checkpoint before execution)
+- Output synthesis templates
+- File routing patterns
+- HITL handling
 
 ---
 
-## COORDINATION MODES
+## SEQUENTIAL EXECUTION (When Calling Multiple Analysts)
 
-### Mode 1: Sequential Chain (ANALYSIS PHASE)
-
-**CRITICAL: ONE AT A TIME. NEVER PARALLEL.**
-
-Analysis phase follows strict sequence because each step enriches the next.
+**When you call multiple analysts, execute ONE AT A TIME:**
 
 ```
-Visual -> [WAIT] -> Product -> [WAIT] -> Catalog
+1. Delegate to first analyst
+2. WAIT for response (get output file)
+3. Delegate to next analyst (include previous files)
+4. WAIT for response
+5. Synthesize findings from all analysts called
 ```
 
-**Execution Pattern:**
-```
-1. Delegate to visual_analyst
-2. WAIT for visual_analyst response (get visual_analysis.md)
-3. THEN delegate to product_analyst (include visual_analysis.md)
-4. WAIT for product_analyst response (get product_research.md)
-5. THEN delegate to catalog_analyst (include BOTH files)
-6. WAIT for catalog_analyst response
-7. Synthesize all three for user
-```
+**Why sequential:** Each analyst's output can enrich the next. Parallel = files don't exist yet.
 
-**Why This Order:**
-- Visual tells us WHAT we're looking at ([product description])
-- Product researches EVERYTHING about it (specs, HSN, compliance, naming, positioning)
-- Catalog uses BOTH to search effectively (find similar products with rich context)
+**Order when calling multiple:** Visual -> Product -> Catalog (earlier outputs help later analysts)
 
-**VIOLATION - Parallel Analysis:**
-```
-WRONG: Call Visual, Product, Catalog at the same time
--> Product has NO visual findings to use
--> Catalog has NO product research to search with
--> Each agent works BLIND = garbage output
-```
+---
 
-**Why parallel fails:**
-- Product analyst receives delegation but visual_analysis.md doesn't exist yet
-- Catalog analyst receives delegation but neither file exists yet
-- You just wasted 3 agent calls and got useless results
-
-### Mode 2: Intelligent Sequencing
-
-**DECIDE based on information needs, not fixed patterns.**
-
-| Scenario | Sequence | Reasoning |
-|----------|----------|-----------|
-| **Full cataloging** | Visual -> Product -> Catalog | Catalog needs rich context to search |
-| **Quick lookup ("do we have this?")** | Visual -> Catalog only | No external research needed |
-| **Research only ("what is this?")** | Visual -> Product only | No catalog search needed |
-| **Just process image** | Visual (optional) -> Creative | Skip analysts entirely |
-
-**Key Principle:** Ask yourself: "What information does the NEXT agent need to do its job well?"
-
-### Mode 3: Approval Gate
+## APPROVAL GATE
 
 Sequential chain with user checkpoint before execution.
 
@@ -96,58 +66,9 @@ User can request ANY combination in ANY order:
 
 ---
 
-## CATALOG ADDITION PATTERN
+## CATALOG ADDITION FLOWS
 
-Most common multi-domain workflow. Memorize this.
-
-### Full Flow
-
-```
-[Image Received]
-      |
-      v
-[1. visual_analyst] -----> visual_analysis_{image_basename}.md
-      |                    (identifies: [product type], [key features])
-      v
-[2. product_analyst] -----> product_research_{item_identifier}.md
-      |                     (uses visual findings)
-      |                     (researches: specs, HSN, compliance, naming, positioning)
-      v
-[3. catalog_analyst] -----> catalog_analysis_{item_identifier}.md
-      |                     (uses BOTH visual AND product findings)
-      |                     (searches with rich context: "[product specs], [HSN code]")
-      v
-[4. PM synthesizes, presents findings]
-      |
-      v
-[5. PM asks: "What would you like to do next?"]
-      |
-      v
-[USER DECIDES - FULL FLEXIBILITY]
-      |
-      +---> "Add to catalog" -> catalog_specialist first
-      |
-      +---> "Process image" -> creative_specialist first
-      |
-      +---> "Both, catalog first" -> catalog_specialist -> creative_specialist
-      |
-      +---> "Both, images first" -> creative_specialist -> catalog_specialist
-      |
-      +---> "Full flow" / "yes" -> creative_specialist -> catalog_specialist (standard)
-```
-
-### Key Dependencies
-
-| Step | Depends On | Why |
-|------|------------|-----|
-| product_analyst | visual_analyst | Needs product identification to research the right thing |
-| catalog_analyst | visual_analyst + product_analyst | Needs BOTH to search catalog effectively with rich context |
-| PM synthesis | All analysts | Needs all findings for complete recommendation |
-| creative_specialist | User request | Only process when user asks for image processing |
-| catalog_specialist | User request | Only create catalog entry when user asks |
-| asset linking | Both IDs available | Link asset to product requires both product_id and asset_id |
-
-### Flexible Order: Detailed Flows
+### Flexible Execution Order
 
 **User chooses what and in what order. PM routes accordingly:**
 
@@ -214,18 +135,6 @@ Step 2: PM -> catalog_specialist: Create product, asset_id=[asset_id]
 | Images first | asset_id | asset_id -> catalog | Product + junction |
 
 **Both specialists can create product_assets junctions.** Whoever runs second receives the existing ID and creates the junction.
-
-### Why Sequential (Not Parallel) for Analysis
-
-```
-WRONG (parallel):
-- Catalog searches with just "[product type]"
-- Finds generic matches, wrong family recommendations
-
-CORRECT (sequential):
-- Catalog searches with "[size] [material] [product], [HSN], [features], [positioning]"
-- Finds precise matches, accurate family recommendations
-```
 
 ---
 
@@ -607,117 +516,6 @@ WRONG: Route storage_path to catalog_specialist for asset creation
 
 ---
 
-## INFORMATION-ONLY PATTERN
-
-User wants data, not action. Single analyst, no execution.
-
-```
-[User Question]
-      |
-      v
-[Appropriate Analyst] -> findings
-      |
-      v
-[PM summarizes for user]
-```
-
-**Examples:**
-- "Show me products without images" -> catalog_analyst only
-- "What HSN code for this?" -> product_analyst only
-- "Is this damaged?" -> visual_analyst only
-
----
-
-## RESEARCH-ONLY PATTERN
-
-User wants product information without cataloging action.
-
-```
-[Image + "What is this?" / "Tell me about this"]
-      |
-      v
-[1. visual_analyst] -> identifies product
-      |
-      v
-[2. product_analyst] -> comprehensive research
-      |
-      v
-[PM presents findings to user]
-```
-
-**Triggers:**
-- "Research this" (no "catalog" or "add")
-- "What can you tell me about this?"
-- "Find information about this product"
-- Image + question about the product
-
-**Key:** No catalog_analyst needed unless user asks about existing catalog data.
-
----
-
-## CREATIVE-ONLY PATTERN
-
-User wants image processing without cataloging.
-
-### With Asset Record (Default)
-
-```
-[Image + "Fix/Edit/Process this"]
-      |
-      v
-[1. visual_analyst] -> assess image quality, identify content (optional)
-      |
-      v
-[2. creative_specialist] -> process image
-      |
-      v
-[creative_specialist creates asset record] -> [HITL: "Is this image acceptable?"]
-      |
-      v
-[PM returns confirmation + image to user]
-```
-
-**Triggers:**
-- "Process this image"
-- "Fix the background"
-- "Make this catalog-ready" (but no "add to catalog")
-- "Remove background and clean up"
-
-**Key:** Skip catalog_analyst and product_analyst entirely.
-User may later say "now add to catalog" - then catalog_specialist links existing asset.
-
-### Standalone (No Asset Record)
-
-```
-[Image + "Just fix this for me" / "Download only"]
-      |
-      v
-[creative_specialist] -> process image
-      |
-      v
-[Returns storage_path to PM] (NO write_data)
-      |
-      v
-[PM shows image to user]
-```
-
-**Triggers:**
-- "Just process, no need to save"
-- "For download only"
-- Quick fix for user's personal use
-
-**PM Delegation Template (Standalone):**
-```
-"Process this image.
-Source: [image_path]
-[Processing instructions]
-Standalone - no asset record needed."
-```
-
-**Key:** Creative returns storage_path only when explicitly told "standalone".
-
----
-
 ## CREATIVE->CATALOG ASSET HANDOFF PATTERN
 
 **[CRITICAL]** Creative specialist creates asset records (with HITL), catalog specialist creates product + junction.
@@ -909,20 +707,9 @@ When processing multiple images for same campaign:
 
 ---
 
-## DATA-DRIVEN CREATIVE PATTERN
-
-When user wants graphics with product data (prices, sizes, variants, offers).
+## DATA-DRIVEN CREATIVE EXECUTION
 
 **Key Insight:** PM delegates to catalog_analyst for data, then passes data to creative. Creative stays pure creative.
-
-### Triggers
-
-- "Create price post" / "Make price graphic"
-- "Show all sizes with prices"
-- "Create offer graphic" / "Sale post"
-- "Instagram post with price" / "WhatsApp status with details"
-- "Compare variants" / "Show size comparison"
-- Any request combining VISUAL OUTPUT + PRODUCT DATA
 
 ### Flow
 
@@ -1191,64 +978,7 @@ Options:
 
 ---
 
-## MULTI-IMAGE HANDLING (CRITICAL)
-
-When user sends multiple images, the FIRST task is determining their relationship.
-
-### Step 1: Text Signal Detection
-
-| User Text | Relationship | Strategy |
-|-----------|--------------|----------|
-| "this product" / "add this" (singular) | Same product | Multi-angle |
-| "these sizes" / "all sizes" / "size range" | Size variants | Variant set |
-| "these colors" / "color options" | Color variants | Variant set |
-| "[material A] and [material B]" / "material options" | Material variants | Variant set |
-| "these products" / "add these" (plural) | Different products | Bulk |
-| "parts" / "components" / "assembly" | Components of ONE product | Single product |
-| "open and closed" / "with lid off" | Different states | Single product |
-| "with box" / "with packaging" | Product + packaging | Single product |
-| "which one?" / "compare these" | Comparison | Analysis only |
-| "like this" / "make it look like" | Reference + actual | Creative direction |
-| No text / unclear | **UNKNOWN** | Visual analyst determines |
-
-### Step 2: Visual Analyst Relationship Detection
-
-When text signals are unclear, delegate ALL images to visual_analyst:
-
-```
-"Analyze these [N] images together.
-Source images at: [path1], [path2], [path3]...
-
-CRITICAL - Determine RELATIONSHIP between images:
-1. Same product, different angles? (front/back/side/detail)
-2. Same product, different states? (open/closed, assembled/disassembled)
-3. Components of ONE product? (body + lid + handle = single item)
-4. Product + its packaging/box?
-5. Same product TYPE, different variants? (sizes/colors/materials)
-6. Completely different products?
-7. One is reference/inspiration, others are actual products?
-
-Report:
-- Relationship pattern
-- Individual observations for each image
-- Which images belong together (if mixed)
-
-For CATALOG domain."
-```
-
-### Step 3: Route Based on Relationship
-
-| Relationship | Workflow | Output Files |
-|--------------|----------|--------------|
-| **Multi-angle** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
-| **Different states** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
-| **Components** | Visual (all) -> Product (once, note components) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
-| **Product + packaging** | Visual (all) -> Product (once) -> Catalog (once) -> [Approval] -> Creative (all) -> Specialist (1 product, N assets) | 1 visual_analysis, 1 product_research, 1 catalog_analysis |
-| **Variants** | Visual (all) -> Product (base research + variant dimensions) -> Catalog (variant structure) -> [Approval] -> Creative (all) -> Specialist (N linked products) | 1 visual_analysis, 1 product_research (covers variants), 1 catalog_analysis |
-| **Bulk (different)** | Visual (all, separate findings) -> For each: Product -> Catalog -> [Approval] -> Creative -> Specialist | N visual_analysis files, N product_research files, N catalog_analysis files |
-| **Comparison** | Visual (all) -> Present comparison to user | 1 comparison_analysis |
-| **Reference (lifestyle)** | Identify reference; Visual (product only) -> Product -> Catalog -> Creative (with reference) | For LIFESTYLE domain |
-| **Reference (batch)** | Identify reference; Visual (all products) -> Product -> Catalog -> Creative (with reference) | For CATALOG domain, multiple products |
+## MULTI-IMAGE WORKFLOW EXECUTION
 
 ### Multi-Angle Workflow (1 Product, N Assets)
 
@@ -1831,12 +1561,11 @@ When user returns after timeout:
 
 ## ANTI-PATTERNS
 
-| Anti-Pattern | Problem | Correct Approach |
-|--------------|---------|------------------|
-| **Wrong analysis order** | Catalog before Product | Visual -> Product -> Catalog (catalog needs product context) |
-| **Catalog with only visual** | Catalog searches with just "[product type]" | Include product_research so catalog searches with rich context |
-| Execution before approval | creative_specialist immediately after analysis | User approval GATE before creative_specialist |
-| Missing file routes | catalog_specialist without product_research.md | Include ALL analyst files for complete records |
-| Context not propagated | "Read visual_analysis.md" without user clarifications | Include user context: "User clarified X. Read file and REVISE." |
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| Execution before approval | Skipping user checkpoint | User approval GATE before execution |
+| Missing file routes | Specialist without upstream files | Include available analysis files |
+| Context not propagated | Missing user clarifications | Include user context in delegation |
+| Parallel analyst calls | Files don't exist yet | One at a time when calling multiple |
 
 </protocol>

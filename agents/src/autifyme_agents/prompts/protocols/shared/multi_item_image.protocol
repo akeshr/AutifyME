@@ -485,6 +485,7 @@ After batch, create grid of all outputs and verify visual consistency. If ANY ou
 
 If you find yourself doing any of these, the core principle is being violated:
 
+- **Rapid self-iteration** - Generating v1, v2, v3... without HITL between each. Each anchor attempt requires presenting via write_data and WAITING for user feedback before generating again. User drives iteration pace.
 - **Text workarounds** - Writing "match anchor" or "same style as anchor" in custom_spec means parameters aren't actually identical
 - **Dropped source context** - Batch calls missing shared reference images that anchor used
 - **HITL bypass** - Using `write_todos` instead of `write_data` after anchor generation
