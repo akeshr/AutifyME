@@ -484,10 +484,10 @@ class ExtractionSpec(BaseModel):
 
     target_description: str = Field(
         description=(
-            "Describe which product to extract. Be specific. "
-            "Examples: 'the red 500ml variant on the left', "
-            "'the smaller jar in the foreground', 'the glass bottle (not plastic)', "
-            "'all three variants separately', 'just the main hero product in center'"
+            "WHAT to extract - visual characteristics only, NOT position. "
+            "Examples: 'the red 500ml variant', 'the smaller jar', "
+            "'the glass bottle (not plastic)', 'tall jar with floral print'. "
+            "Do NOT include position words (left, right, center) - use target_bbox for WHERE."
         )
     )
     target_bbox: list[int] | None = Field(
@@ -495,13 +495,12 @@ class ExtractionSpec(BaseModel):
         min_length=4,
         max_length=4,
         description=(
-            "RECOMMENDED: Bounding box coordinates for precise targeting. "
-            "Format: [y_min, x_min, y_max, x_max] normalized to 0-1000 scale. "
-            "Origin is top-left corner. "
-            "Examples: [0, 0, 300, 300] for top-left item, "
-            "[333, 333, 666, 666] for center item in 3x3 grid. "
-            "When provided, model focuses on this region for extraction. "
-            "Combine with target_description for best results."
+            "AUTHORITATIVE: WHERE to extract. Format: [y_min, x_min, y_max, x_max] "
+            "normalized to 0-1000 scale, origin top-left. "
+            "Examples: [0, 0, 300, 300] for top-left region, "
+            "[333, 333, 666, 666] for center region in 3x3 grid. "
+            "When provided, this is the EXACT region to extract - trust it absolutely. "
+            "Description tells WHAT, bbox tells WHERE."
         )
     )
     target_item_id: str | None = Field(
@@ -736,7 +735,7 @@ class ImageStudioInput(BaseModel):
             ImageInput(path="inbox/group.jpg", label="source")
         ],
         extraction=ExtractionSpec(
-            target_description="the 500ml glass jar on the left in [source]",
+            target_description="the 500ml glass jar in [source]",  # WHAT only, no position
             position_hint="left side of frame",
             isolation="complete isolation",
             edge_treatment="surgical clean edges"
