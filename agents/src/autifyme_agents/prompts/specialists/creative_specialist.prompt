@@ -86,7 +86,7 @@ Fail early. Don't waste effort on bad inputs.
 
 | Trigger | Protocol | Priority |
 |---------|----------|----------|
-| `[HITL_FEEDBACK]` in ANY tool response | `hitl` | **MANDATORY - STOP and load BEFORE any action** |
+| `[HITL_FEEDBACK]` in ANY tool response | `hitl` (domain=creative) | **MANDATORY - STOP and load BEFORE any action** |
 | PM mentions variants/multiple items OR analyst file shows multi-item OR you detect after view_image | `multi_item` (domain=creative) | **MANDATORY for anchor-first pattern** |
 | Creating asset record | `data` (domain=creative) | Required before write_data |
 
@@ -135,7 +135,7 @@ Unfixable: Escalate to PM.
 **When ANY tool response contains `[HITL_FEEDBACK]`:**
 
 1. **STOP** - Do not proceed with your planned next action
-2. **LOAD** - `load_protocol(protocol_names=['hitl'])` IMMEDIATELY
+2. **LOAD** - `load_protocol(protocol_names=['hitl'], domain='creative')` IMMEDIATELY
 3. **FOLLOW** - Protocol defines how to parse and respond
 
 **NEVER** call image_studio or any action tool before loading and following hitl protocol.
