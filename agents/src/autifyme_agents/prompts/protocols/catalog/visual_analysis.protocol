@@ -169,7 +169,7 @@ Flag quality issues in analysis.
 
 ## MULTI-PRODUCT IMAGE HANDLING
 
-**CRITICAL:** This section applies the domain-agnostic `multi_item_image.protocol` to catalog products.
+**CRITICAL:** This section applies multi-item concepts to catalog products.
 
 When an image contains multiple products, you MUST output an actionable manifest that downstream agents can execute.
 
@@ -246,7 +246,7 @@ When multi-product detected, output this EXACT structure:
 
 ### Position Vocabulary
 
-See `multi_item_image.protocol` for the full position vocabulary (top-left, center, foreground, row-1, etc.).
+See `multi_item.protocol` (domain=creative) for the full position vocabulary (top-left, center, foreground, row-1, etc.).
 
 ### Canonical Example: 9-Jar Variant Set
 

@@ -426,7 +426,7 @@ The style specs (camera angle, lighting direction, framing) come from your VIEW 
 
 ### Step 7: Grid Test (Visual Verification)
 
-After generating all variants, apply Grid Test from `multi_item_image.protocol`:
+After generating all variants, apply Grid Test from `multi_item.protocol` (domain=creative):
 - Create verification grid using image_studio (see pattern there)
 - View the grid, check: angle, framing, shadows, lighting consistency
 - **If ANY outlier:** REDO that variant with more explicit style specs

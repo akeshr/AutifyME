@@ -495,15 +495,15 @@ If you find yourself doing any of these, the core principle is being violated:
 
 ## DOMAIN APPLICATION
 
-This protocol provides the PATTERN. Domain-specific protocols provide the VOCABULARY:
+This protocol provides the PATTERN. Domain visual protocols (catalog_visual, lifestyle_visual, etc.) apply the VOCABULARY:
 
-```
-Domain Protocol includes multi_item.protocol:
-- Maps "item" to domain entity (product, room, dish)
-- Maps attributes to domain fields (size, sqft, portion)
-- Applies domain-specific defaults
-```
+| Protocol Provides | Domain Protocol Provides |
+|-------------------|--------------------------|
+| Classification types | Domain entity mapping (product, room, dish) |
+| Manifest format | Domain-specific attributes (size, sqft, portion) |
+| Processing strategies | Domain defaults (catalog=INDIVIDUAL, marketing=COMPOSITE) |
+| Position vocabulary | N/A - universal |
 
-The pattern (classification, manifest, strategies) remains identical across domains.
+The pattern (classification, manifest, strategies) remains identical across all domains.
 
 </protocol>

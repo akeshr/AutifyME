@@ -486,7 +486,7 @@ When source contains multiple items, extract each separately (unless explicitly 
 
 When source image contains multiple items, use position-based targeting.
 
-**See `multi_item_image.protocol` for:**
+**See `multi_item.protocol` (domain=creative) for:**
 - Classification types (VARIANTS, COLLECTION, COMPONENTS)
 - Processing strategies (INDIVIDUAL, COMPOSITE, GROUPED)
 - Strategy selection signals
