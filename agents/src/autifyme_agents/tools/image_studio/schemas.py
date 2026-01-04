@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # =============================================================================
 # Image Input - Labeled images for flexible multi-image workflows
@@ -490,24 +490,22 @@ class ExtractionSpec(BaseModel):
             "Do NOT include position words (left, right, center) - use target_bbox for WHERE."
         )
     )
-    target_image: str | None = Field(
+    target_image: str | list[str] | None = Field(
         default=None,
         description=(
-            "WHICH image the bbox applies to - use the label from images array. "
-            "Format: '[label]' e.g., '[source]', '[product]'. "
-            "Required when target_bbox is provided to specify which image contains the region."
+            "WHICH image(s) to extract from - use labels from images array. "
+            "Single: '[source]' for one image. "
+            "List: ['[bodies]', '[lids]'] for multi-source composition. "
+            "When list, must match target_bbox list length."
         )
     )
-    target_bbox: list[int] | None = Field(
+    target_bbox: list[int] | list[list[int]] | None = Field(
         default=None,
-        min_length=4,
-        max_length=4,
         description=(
-            "AUTHORITATIVE: WHERE in target_image to extract. "
-            "Format: [y_min, x_min, y_max, x_max] normalized to 0-1000 scale, origin top-left. "
-            "Examples: [0, 0, 300, 300] for top-left region, "
-            "[333, 333, 666, 666] for center region in 3x3 grid. "
-            "Use with target_image to specify which image these coordinates apply to."
+            "AUTHORITATIVE: WHERE to extract. Format: [y_min, x_min, y_max, x_max] normalized 0-1000. "
+            "Single: [0, 0, 300, 300] for one region. "
+            "List: [[100, 50, 800, 600], [200, 100, 400, 300]] for multi-source composition. "
+            "When list, each bbox corresponds to same-index target_image."
         )
     )
     target_item_id: str | None = Field(
@@ -543,6 +541,27 @@ class ExtractionSpec(BaseModel):
             "Use for complex multi-product scenarios, special masking needs."
         )
     )
+
+    @model_validator(mode="after")
+    def validate_list_lengths(self) -> "ExtractionSpec":
+        """Ensure target_image and target_bbox lists have matching lengths."""
+        img = self.target_image
+        bbox = self.target_bbox
+
+        img_is_list = isinstance(img, list)
+        bbox_is_list = bbox is not None and isinstance(bbox[0], list) if bbox else False
+
+        if img_is_list and bbox_is_list:
+            if len(img) != len(bbox):
+                raise ValueError(
+                    f"target_image list ({len(img)}) must match target_bbox list ({len(bbox)})"
+                )
+        elif img_is_list != bbox_is_list:
+            if img_is_list or bbox_is_list:
+                raise ValueError(
+                    "target_image and target_bbox must both be single or both be lists"
+                )
+        return self
 
 
 class FocusSpec(BaseModel):

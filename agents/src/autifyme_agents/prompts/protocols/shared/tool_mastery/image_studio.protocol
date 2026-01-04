@@ -493,30 +493,29 @@ When source image contains multiple items, use precise targeting.
 
 ### [CRITICAL] Targeting: Separate WHAT from WHERE
 
-| Field | Purpose | Contains |
-|-------|---------|----------|
-| `target_image` | WHICH image | Label reference e.g., `[source]` |
-| `target_bbox` | WHERE in that image | Pixel-precise coordinates [y_min, x_min, y_max, x_max] |
-| `target_description` | WHAT to extract | Visual attributes only, NOT position |
+| Field | Purpose | Single | Multi-source (list) |
+|-------|---------|--------|---------------------|
+| `target_description` | WHAT to extract | Visual attributes | Describes final composite |
+| `target_image` | WHICH image(s) | `"[source]"` | `["[bodies]", "[lids]"]` |
+| `target_bbox` | WHERE | `[y,x,y,x]` | `[[...], [...]]` |
 
-**When bbox is provided, description must NOT contain position.**
-
+**Single source (default):**
 ```
-WRONG - Position in description (model gets confused):
-  target_description: "tall jar with floral print on the left"
-  target_image: "[source]"
-  target_bbox: [50, 20, 600, 350]
-
-CORRECT - Complete separation:
-  target_description: "tall jar with floral print"   # WHAT
-  target_image: "[source]"                           # WHICH image
-  target_bbox: [50, 20, 600, 350]                    # WHERE
+target_description: "tall jar with floral print"
+target_image: "[source]"
+target_bbox: [50, 20, 600, 350]
 ```
 
-**Why this matters:**
-- target_image + target_bbox = unambiguous location
-- Description with position creates ambiguity - model might ignore bbox
-- Result: wrong item extracted despite correct coordinates
+**Multi-source composition (COMPONENTS):**
+```
+target_description: "glass jar with blue lid"  # Describes final result
+target_image: ["[bodies]", "[lids]"]           # Extract from each
+target_bbox: [[100, 50, 800, 600], [200, 100, 400, 300]]  # Corresponding regions
+```
+
+Lists must be same length. Each bbox corresponds to same-index image.
+
+**Description must NOT contain position.** Position is in bbox coordinates.
 
 ### When Bbox NOT Available
 

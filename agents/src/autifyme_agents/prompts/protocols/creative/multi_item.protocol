@@ -129,10 +129,13 @@ WRONG: Description = "tall jar with floral print on the left"
 RIGHT: Description = "tall jar with floral print", target_image = "[source]", BBox = [50, 20, 600, 350]
 ```
 
-**Multi-source composition:**
+**Multi-source composition (single call with lists):**
 ```
-Item 1: target_image = "[bodies]", target_bbox = [100, 50, 800, 600]
-Item 2: target_image = "[lids]", target_bbox = [200, 100, 400, 300]
+image_studio(
+    target_description="glass jar with blue lid",    # Describes final composite
+    target_image=["[bodies]", "[lids]"],             # List of sources
+    target_bbox=[[100, 50, 800, 600], [200, 100, 400, 300]]  # Corresponding bboxes
+)
 ```
 
 **BBox coordinates:** Scale 0-1000 (normalized), origin top-left.
@@ -294,11 +297,30 @@ Keep all items together in arrangement, producing 1 output.
 - Family/range shots (show the full collection)
 - Lifestyle scenes (items in context together)
 - Marketing banners (complete offering)
+- COMPONENTS: Assemble parts from multiple sources
 
-**Execution pattern:**
+**Single source:**
 ```
-process(all_items, preserve_arrangement=True)
-output: one combined asset
+image_studio(
+    images=[{"path": "inbox/group.jpg", "label": "source"}],
+    composition={"arrangement": "preserve original"}
+)
+```
+
+**Multi-source (COMPONENTS - using lists):**
+```
+image_studio(
+    images=[
+        {"path": "inbox/bodies.jpg", "label": "bodies"},
+        {"path": "inbox/lids.jpg", "label": "lids"}
+    ],
+    extraction={
+        "target_description": "assembled jar with lid",
+        "target_image": ["[bodies]", "[lids]"],
+        "target_bbox": [[100, 50, 800, 600], [200, 100, 400, 300]]
+    }
+)
+output: one composed asset
 ```
 
 ### SELECTIVE
