@@ -99,25 +99,40 @@ When multi-item detected, output a structured manifest that downstream agents ca
 
 ### Extraction Targets
 
+**Single source (most common):**
+
 | # | Description (WHAT) | BBox (WHERE) | Position (ref only) | Key Attributes |
 |---|-------------------|--------------|---------------------|----------------|
-| 1 | [visual characteristics - NO position] | [y_min, x_min, y_max, x_max] | [for human ref] | [domain-specific] |
-| 2 | [visual characteristics - NO position] | [y_min, x_min, y_max, x_max] | [for human ref] | [domain-specific] |
+| 1 | [visual characteristics] | [y_min, x_min, y_max, x_max] | [for human ref] | [domain-specific] |
+| 2 | [visual characteristics] | [y_min, x_min, y_max, x_max] | [for human ref] | [domain-specific] |
+
+**Multiple sources (COMPONENTS scenario):**
+
+| # | Source | Description (WHAT) | BBox (WHERE) | Key Attributes |
+|---|--------|-------------------|--------------|----------------|
+| 1 | [bodies] | jar body, clear glass | [100, 50, 800, 600] | Large |
+| 2 | [lids] | blue lid | [200, 100, 400, 300] | matches #1 |
 
 **[CRITICAL] Column Purposes - DO NOT MIX:**
 
 | Column | Purpose | Goes to image_studio as |
 |--------|---------|-------------------------|
+| Source | WHICH image (when multi-source) | `target_image` |
 | Description | WHAT - visual characteristics only | `target_description` |
 | BBox | WHERE - pixel-precise coordinates | `target_bbox` |
 | Position | Human reference only | NOT used in tool call |
-| (implicit) | WHICH image - always the source | `target_image` = "[source]" |
 
 **Description must NOT contain position.** Position info goes in BBox coordinates.
 
 ```
 WRONG: Description = "tall jar with floral print on the left"
 RIGHT: Description = "tall jar with floral print", target_image = "[source]", BBox = [50, 20, 600, 350]
+```
+
+**Multi-source composition:**
+```
+Item 1: target_image = "[bodies]", target_bbox = [100, 50, 800, 600]
+Item 2: target_image = "[lids]", target_bbox = [200, 100, 400, 300]
 ```
 
 **BBox coordinates:** Scale 0-1000 (normalized), origin top-left.
@@ -249,7 +264,7 @@ Extract each item separately, producing N outputs.
 for each item in manifest:
     image_studio(
         target_description=item.description,  # WHAT only
-        target_image="[source]",              # WHICH image
+        target_image=item.source or "[source]", # WHICH image (per-item for multi-source)
         target_bbox=item.bbox                 # WHERE (authoritative)
     )
     output: one asset per item
