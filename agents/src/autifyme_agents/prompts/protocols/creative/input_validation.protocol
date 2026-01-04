@@ -2,52 +2,22 @@
 
 ## PURPOSE
 
-Verify PM's delegation before working. You cannot see PM's conversation - only what PM tells you.
+Validate PM's delegation before working. You only see what PM tells you.
 
 ---
 
-## VALIDATION CHECKLIST
+## REQUIRED CONTEXT
 
-### 1. Source Image (CRITICAL)
-
-When PM references an image path:
-
-| Step | Action |
-|------|--------|
-| 1. READ | `view_image(path)` - actually view it |
-| 2. VERIFY | Contains expected content for task |
-| 3. USE | Base processing decisions on what you see |
-
-**If missing:**
-```
-"Source image not found at [path]. Cannot proceed with processing."
-```
-
-### 2. Required Context by Task
-
-| Task Type | Required |
-|-----------|----------|
+| Task | Required From PM |
+|------|------------------|
 | Hero shot | Source image path |
-| Background removal | Source image path + material info (from visual_analysis) |
+| Background removal | Source image path + material info |
 | Lifestyle composite | Source image + scene description |
 | Asset creation | Source image + visual_analysis file |
 
-**If missing critical context:**
+**If missing:** Return error immediately.
 ```
-"Cannot proceed - missing: [what's missing]
-Action needed: PM should provide [specific requirement]"
-```
-
-### 3. Task Clarity
-
-| Clear | Ambiguous |
-|-------|-----------|
-| "Create hero shot with white background" | "Process this image" |
-| "Remove background, preserve transparency" | "Clean up the image" |
-
-**When ambiguous:** State interpretation before executing:
-```
-"I interpret this as: [your understanding]. Proceeding with [specific actions]."
+"Cannot proceed - missing: [what]. PM should provide [specific requirement]."
 ```
 
 ---
@@ -56,27 +26,25 @@ Action needed: PM should provide [specific requirement]"
 
 **PM's delegation > Analyst files > Your assumptions**
 
-PM's message includes user feedback. When PM overrides analyst findings, use PM's version:
+When PM overrides analyst findings (user feedback):
 ```
-"File says [X], PM clarifies [Y] per user feedback. Using [Y]."
+"File says [X], PM clarifies [Y]. Using [Y]."
 ```
+
+---
+
+## TASK CLARITY
+
+| Clear | Ambiguous |
+|-------|-----------|
+| "Create hero shot with white background" | "Process this image" |
+
+**When ambiguous:** State interpretation before executing.
 
 ---
 
 ## EARLY FAILURE
 
 Fail early, fail clearly. Don't proceed with bad inputs.
-
-```
-[Receive Delegation]
-      |
-      v
-[Check Source Image Exists]
-      |
-      +---> Exists? -> Continue
-      |
-      +---> Missing? -> STOP + Return error
-             "Cannot proceed: [what's missing]"
-```
 
 </protocol>

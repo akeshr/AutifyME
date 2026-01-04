@@ -2,105 +2,47 @@
 
 ## PURPOSE
 
-Master view_image - multimodal image viewing for visual analysis.
-This tool gives you EYES. You SEE images directly, not descriptions.
-
----
-
-## WHEN TO USE
-
-| Situation | Action |
-|-----------|--------|
-| Source image provided | view_image IMMEDIATELY |
-| After image_studio processing | Quality check output |
-| Material identification | See textures, transparency, edges |
-| Before background removal | Assess edge complexity |
+Multimodal image viewing. This tool gives you EYES.
 
 ---
 
 ## PARAMETERS
 
-### image_path (required)
-
-| Format | Example | Source |
-|--------|---------|--------|
-| Storage path | `inbox/photo.jpg` | User uploads via download_media |
-| Storage path | `pending/edit.png` | image_studio output |
-| URL | `https://example.com/image.jpg` | Direct URLs |
+| Parameter | Format | Example |
+|-----------|--------|---------|
+| image_path | Storage path | `inbox/photo.jpg`, `pending/edit.png` |
+| image_path | URL | `https://example.com/image.jpg` |
 
 ---
 
 ## WHAT YOU SEE
 
-When you call view_image:
-1. **Text metadata**: Source type, size, format
-2. **Image block**: The actual image in your context
+1. Text metadata (source, size, format)
+2. Actual image in context
 
-**Analyze for creative work:**
-- Material (transparency, texture, finish)
+**Assess for creative decisions:**
+- Material (transparency, texture)
 - Edges (clean, fuzzy, complex)
-- Background (solid, gradient, complex scene)
-- Lighting (even, shadows, reflections)
-- Quality (sharp, blurry, artifacts)
+- Background type
+- Quality (sharp, artifacts)
 
 ---
 
-## CREATIVE PATTERNS
+## WORKFLOW PATTERN
 
-### Pattern 1: Pre-Processing Assessment
-
-```python
-view_image(image_path="inbox/product.jpg")
-# You see: [material texture, edge complexity, background type]
-# Decision: [processing approach based on what you saw]
+```
+1. view_image(source)      # Assess BEFORE processing
+2. image_studio(...)       # Informed by what you saw
+3. view_image(output)      # Quality check AFTER
+4. [Done if good]
 ```
 
-### Pattern 2: Quality Check After Processing
-
-```python
-image_studio(operation="remove_bg", source="inbox/raw.jpg")
-# Output: pending/processed.png
-
-view_image(image_path="pending/processed.png")
-# You see: [verify edges clean, no artifacts, transparency correct]
-```
+**Critical:** Never process blind. Never re-view same unchanged image.
 
 ---
 
-## ANTI-PATTERNS
+## SIZE NOTE
 
-### Wrong: Processing Without Viewing
-
-```
-WRONG:
-User: "Process inbox/item.jpg"
-Agent: image_studio(remove_bg)  # Never saw the image!
-
-CORRECT:
-Agent: view_image(inbox/item.jpg)  # SEE first
-# Material is glass - needs different approach
-Agent: image_studio(remove_bg, preserve_transparency=true)
-```
-
-### Wrong: Repeated Viewing
-
-```
-WRONG:
-view_image(inbox/item.jpg)
-# ... later in same task ...
-view_image(inbox/item.jpg)  # Same image!
-
-CORRECT:
-view_image(inbox/item.jpg)
-# Remember what you saw, reference without re-viewing
-```
-
----
-
-## IMAGE SIZE NOTE
-
-- Images auto-resized to 1024px max dimension
-- Fine text may be harder to read
-- Good enough for material/edge/quality assessment
+Images auto-resized to 1024px max. Fine for material/edge assessment.
 
 </protocol>
