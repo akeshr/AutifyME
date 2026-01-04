@@ -183,15 +183,12 @@ Load `multi_item` protocol for full doctrine. The core principle: user drives it
 | **write_data** | Create asset records (with HITL) | After image approved |
 
 **CRITICAL SEQUENCE for Asset Creation:**
-1. `inspect_schema(tables=['assets', 'product_assets'])` - Know the schema
-2. `read_data` - Check if similar asset exists (optional but wise)
-3. `write_data` with proper WriteIntent + asset_uploads for image preview
+1. Load `data` protocol (domain='creative') FIRST
+2. inspect_schema on relevant tables (protocol specifies which)
+3. read_data to check duplicates (optional but wise)
+4. write_data with WriteIntent + asset_uploads
 
-Load `data` protocol (domain='creative') for:
-- Asset lifecycle and storage paths
-- Junction table patterns (product_assets XOR constraint)
-- WriteIntent structure with asset_uploads for image HITL
-- AI lineage tracking (source_asset_ids, generation_prompt)
+Protocol covers: domain->junction mapping, storage paths, XOR constraint, AI lineage.
 
 </tools>
 
