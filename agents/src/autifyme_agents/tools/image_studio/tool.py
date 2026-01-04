@@ -120,13 +120,14 @@ KEY DISTINCTION:
 === SPEC TYPES (apply what's provided) ===
 
 "extraction" = EXTRACT FROM SOURCE IMAGE
+  - target_image: WHICH image to extract from, e.g., "[source]"
   - target_bbox: AUTHORITATIVE location [y_min, x_min, y_max, x_max] normalized 0-1000
-    * When provided, extract from THIS EXACT REGION - no interpretation needed
-    * Bbox tells you WHERE - trust it absolutely
+    * When provided, extract from THIS EXACT REGION in target_image
+    * Bbox tells you WHERE - trust it absolutely, no interpretation needed
   - target_description: WHAT the item is (characteristics only, NOT position)
     * Describes visual attributes to help identify the item
     * If description contains position words, IGNORE them - use bbox coordinates
-  - PRIORITY: bbox is WHERE (authoritative), description is WHAT (supplementary)
+  - PRIORITY: target_image + target_bbox = WHERE (authoritative), description = WHAT
 
 "fidelity" = PRODUCT IDENTITY PRESERVATION
   - preserve_colors, preserve_artwork, preserve_shape, hero_features
@@ -730,8 +731,8 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- Text extraction/analysis (use view_image)\n\n"
             "STRUCTURED SPECS (all optional - use what applies):\n"
             "- fidelity: CRITICAL for source images - {preserve_colors: 'exact match', preserve_artwork: 'honeycomb pattern', hero_features: 'texture pattern'}\n"
-            "- extraction: {target_description: 'glass jar in [source]', target_bbox: [y_min, x_min, y_max, x_max], isolation: 'complete', edge_treatment: 'sharp'}\n"
-            "  * target_bbox: AUTHORITATIVE coordinates (0-1000) - description is WHAT, bbox is WHERE\n"
+            "- extraction: {target_description: 'glass jar', target_image: '[source]', target_bbox: [y_min, x_min, y_max, x_max]}\n"
+            "  * target_image + target_bbox: WHICH image + WHERE (authoritative). description: WHAT only.\n"
             "- background: {treatment: 'transparent'/'solid_color'/'scene', color: 'white', scene_description: 'modern kitchen'}\n"
             "- lighting: {type: 'natural_window'/'studio_3point', direction: 'front'/'side', shadows: 'soft falloff'}\n"
             "- composition: {position: 'center'/'[main] center [variant] right', camera_angle: 'slight_top', negative_space: 'generous_top'}\n"

@@ -495,23 +495,26 @@ When source image contains multiple items, use precise targeting.
 
 | Field | Purpose | Contains |
 |-------|---------|----------|
-| `target_bbox` | WHERE (authoritative) | Pixel-precise coordinates [y_min, x_min, y_max, x_max] |
-| `target_description` | WHAT (characteristics) | Visual attributes, NOT position |
+| `target_image` | WHICH image | Label reference e.g., `[source]` |
+| `target_bbox` | WHERE in that image | Pixel-precise coordinates [y_min, x_min, y_max, x_max] |
+| `target_description` | WHAT to extract | Visual attributes only, NOT position |
 
 **When bbox is provided, description must NOT contain position.**
 
 ```
-WRONG - Position in both (model gets confused):
+WRONG - Position in description (model gets confused):
   target_description: "tall jar with floral print on the left"
+  target_image: "[source]"
   target_bbox: [50, 20, 600, 350]
 
-CORRECT - Bbox is WHERE, description is WHAT:
-  target_description: "tall jar with floral print"
-  target_bbox: [50, 20, 600, 350]
+CORRECT - Complete separation:
+  target_description: "tall jar with floral print"   # WHAT
+  target_image: "[source]"                           # WHICH image
+  target_bbox: [50, 20, 600, 350]                    # WHERE
 ```
 
 **Why this matters:**
-- Bbox gives pixel-precise region - model should trust it absolutely
+- target_image + target_bbox = unambiguous location
 - Description with position creates ambiguity - model might ignore bbox
 - Result: wrong item extracted despite correct coordinates
 

@@ -490,17 +490,24 @@ class ExtractionSpec(BaseModel):
             "Do NOT include position words (left, right, center) - use target_bbox for WHERE."
         )
     )
+    target_image: str | None = Field(
+        default=None,
+        description=(
+            "WHICH image the bbox applies to - use the label from images array. "
+            "Format: '[label]' e.g., '[source]', '[product]'. "
+            "Required when target_bbox is provided to specify which image contains the region."
+        )
+    )
     target_bbox: list[int] | None = Field(
         default=None,
         min_length=4,
         max_length=4,
         description=(
-            "AUTHORITATIVE: WHERE to extract. Format: [y_min, x_min, y_max, x_max] "
-            "normalized to 0-1000 scale, origin top-left. "
+            "AUTHORITATIVE: WHERE in target_image to extract. "
+            "Format: [y_min, x_min, y_max, x_max] normalized to 0-1000 scale, origin top-left. "
             "Examples: [0, 0, 300, 300] for top-left region, "
             "[333, 333, 666, 666] for center region in 3x3 grid. "
-            "When provided, this is the EXACT region to extract - trust it absolutely. "
-            "Description tells WHAT, bbox tells WHERE."
+            "Use with target_image to specify which image these coordinates apply to."
         )
     )
     target_item_id: str | None = Field(
@@ -728,15 +735,16 @@ class ImageStudioInput(BaseModel):
 
     EXAMPLES:
 
-    1. Extract product with background removal:
+    1. Extract product with background removal (using bbox):
     ```python
     ImageStudioInput(
         images=[
             ImageInput(path="inbox/group.jpg", label="source")
         ],
         extraction=ExtractionSpec(
-            target_description="the 500ml glass jar in [source]",  # WHAT only, no position
-            position_hint="left side of frame",
+            target_description="the 500ml glass jar",  # WHAT only
+            target_image="[source]",                   # WHICH image
+            target_bbox=[50, 20, 450, 380],            # WHERE in that image
             isolation="complete isolation",
             edge_treatment="surgical clean edges"
         ),

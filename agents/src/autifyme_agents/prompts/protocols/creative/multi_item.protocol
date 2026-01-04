@@ -111,12 +111,13 @@ When multi-item detected, output a structured manifest that downstream agents ca
 | Description | WHAT - visual characteristics only | `target_description` |
 | BBox | WHERE - pixel-precise coordinates | `target_bbox` |
 | Position | Human reference only | NOT used in tool call |
+| (implicit) | WHICH image - always the source | `target_image` = "[source]" |
 
 **Description must NOT contain position.** Position info goes in BBox coordinates.
 
 ```
 WRONG: Description = "tall jar with floral print on the left"
-RIGHT: Description = "tall jar with floral print", BBox = [50, 20, 600, 350]
+RIGHT: Description = "tall jar with floral print", target_image = "[source]", BBox = [50, 20, 600, 350]
 ```
 
 **BBox coordinates:** Scale 0-1000 (normalized), origin top-left.
@@ -248,7 +249,8 @@ Extract each item separately, producing N outputs.
 for each item in manifest:
     image_studio(
         target_description=item.description,  # WHAT only
-        target_bbox=item.bbox                  # WHERE (authoritative)
+        target_image="[source]",              # WHICH image
+        target_bbox=item.bbox                 # WHERE (authoritative)
     )
     output: one asset per item
 ```
