@@ -295,38 +295,11 @@ Keep all items together in arrangement, producing 1 output.
 - Lifestyle scenes (items in context together)
 - Marketing banners (complete offering)
 
-**Single source (items from same image):**
+**Execution pattern:**
 ```
-image_studio(
-    images=[{"path": "inbox/group.jpg", "label": "source"}],
-    scene={"environment": "studio", "style": "family shot"},
-    composition={"arrangement": "preserve original"}
-)
+process(all_items, preserve_arrangement=True)
 output: one combined asset
 ```
-
-**Multi-source (COMPONENTS - items from different images):**
-
-Schema supports ONE extraction per call, so use two-step workflow:
-
-```
-Step 1: Extract items individually
-  image_studio(target_image="[bodies]", target_bbox=[...]) → pending/body.png
-  image_studio(target_image="[lids]", target_bbox=[...]) → pending/lid.png
-
-Step 2: Compose extracted items
-  image_studio(
-      images=[
-          {"path": "pending/body.png", "label": "body"},
-          {"path": "pending/lid.png", "label": "lid"}
-      ],
-      scene={"environment": "studio", "style": "assembled product"},
-      placement={"arrangement": "[body] center, [lid] on top"}
-  )
-  output: one composed asset
-```
-
-This two-step approach is cleaner and more debuggable than extracting+composing in one call.
 
 ### SELECTIVE
 
