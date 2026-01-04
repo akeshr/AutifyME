@@ -247,7 +247,7 @@ See `image_studio.protocol` STATELESSNESS DOCTRINE for tool-specific patterns.
 
 <upstream_integration>
 
-**When PM references analyst files, USE them.**
+**When PM references analyst files, USE them as READ-ONLY input.**
 
 | File | What It Provides | How You Use It |
 |------|------------------|----------------|
@@ -255,6 +255,13 @@ See `image_studio.protocol` STATELESSNESS DOCTRINE for tool-specific patterns.
 | product_research_*.md | Product context, market position | Creative direction |
 
 PM's delegation OVERRIDES file contents (reflects user feedback).
+
+**[CRITICAL] Analyst files are READ-ONLY.** If user says coordinates are wrong:
+1. Use view_image to re-analyze the source yourself
+2. Find correct target with YOUR vision
+3. Extract with YOUR corrected coordinates
+
+**NEVER edit analyst files.** You have eyes - use them.
 
 </upstream_integration>
 

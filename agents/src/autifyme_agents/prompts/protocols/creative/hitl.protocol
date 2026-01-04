@@ -172,6 +172,34 @@ Returning to PM.
 
 ---
 
+## TARGETING FEEDBACK - Re-analyze, Don't Edit Files
+
+**When user says extraction targeted wrong item or wrong coordinates:**
+
+1. **view_image** - Look at the source image yourself
+2. **Re-identify** - Find the correct item using user's description
+3. **Re-extract** - Call image_studio with YOUR corrected coordinates
+
+**NEVER edit analyst files.** Analyst files are upstream read-only outputs. You have vision - USE IT.
+
+```
+[HITL_FEEDBACK] "That's the wrong jar - I meant the tall one on the left"
+
+[HITL RESOLVED]
+
+**User Feedback:** "That's the wrong jar - I meant the tall one on the left"
+
+**Action:** Re-analyzing source image to locate correct target.
+-> [view_image on source]
+
+Found: Tall jar at left-column, bbox approximately [50, 20, 600, 350]
+
+Proceeding with corrected extraction.
+-> [call image_studio with corrected target and bbox]
+```
+
+---
+
 ## ANTI-PATTERNS
 
 **Wrong:** Responding without HITL marker
@@ -185,11 +213,17 @@ Returning to PM.
 Proceeding with: [parameters]  # TEXT, not tool call!
 ```
 
+**Wrong:** Editing analyst files instead of re-analyzing
+```
+[HITL_FEEDBACK] "Wrong item"
+-> [edit visual_analysis_*.md to change coordinates]  # NO! Files are READ-ONLY
+```
+
 **Correct:**
 ```
 [HITL RESOLVED]
 Proceeding with corrected action.
--> [ACTUALLY CALL image_studio with adjusted parameters]
+-> [view_image to re-analyze, then image_studio with YOUR coordinates]
 ```
 
 </protocol>
