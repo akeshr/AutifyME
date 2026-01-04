@@ -1,0 +1,352 @@
+<protocol name="data" type="tool_mastery" domain="creative">
+
+## PURPOSE
+
+Data operations for Creative Specialist: assets, product_assets, campaign_assets.
+Load when creating asset records after image processing.
+
+---
+
+## [CRITICAL] SCHEMA FIRST
+
+**Call inspect_schema BEFORE write_data. No exceptions.**
+
+```
+inspect_schema(tables=['assets', 'product_assets'], details=['structure', 'constraints'])
+```
+
+Schema reveals actual column names, required fields, enum values.
+
+---
+
+## STORAGE PATHS
+
+| Stage | Path | Created By |
+|-------|------|------------|
+| User upload | `inbox/filename.ext` | download_media |
+| Processed | `pending/filename.ext` | image_studio |
+| Cataloged | URL in assets table | write_data after HITL |
+
+---
+
+## ASSETS TABLE
+
+### Required Fields
+
+| Field | Type | Notes |
+|-------|------|-------|
+| name | varchar(200) | "[Product] [Size] Hero" |
+| storage_url | text | Use @upload.public_url |
+| storage_provider | varchar(50) | SUPABASE |
+| file_name | varchar(255) | From image_studio output |
+| mime_type | varchar(100) | image/png, image/jpeg, image/webp |
+| asset_type | varchar(30) | IMAGE, VIDEO, DOCUMENT |
+| status | varchar(20) | ACTIVE, ARCHIVED, DELETED |
+| purpose | varchar(20) | PRODUCT, FAMILY, CAMPAIGN, STANDALONE |
+
+### AI Lineage (MANDATORY)
+
+Every AI-generated asset MUST include:
+
+| Field | Value |
+|-------|-------|
+| is_ai_generated | true |
+| source_asset_ids | [uuid] or null if from inbox/ |
+| generation_prompt | "extraction + [bg] + [lighting] for [material]" |
+
+---
+
+## PRODUCT_ASSETS JUNCTION
+
+### XOR Constraint (CRITICAL)
+
+**Exactly ONE of product_id OR product_family_id. Never both, never neither.**
+
+```json
+// CORRECT: Link to product
+{"product_id": "uuid", "product_family_id": null, "asset_id": "@asset.id"}
+
+// CORRECT: Link to family
+{"product_id": null, "product_family_id": "uuid", "asset_id": "@asset.id"}
+```
+
+### Asset Roles
+
+| Role | Use |
+|------|-----|
+| PRIMARY | Main product image (ONE per product) |
+| GALLERY | Additional angles |
+| LIFESTYLE | In-context shots |
+| ZOOM | High-res detail |
+
+**Check before assigning PRIMARY:** Query product_assets to see if PRIMARY exists.
+
+---
+
+## READ PATTERNS
+
+### filters vs search_patterns
+
+| Parameter | Use For | Example |
+|-----------|---------|---------|
+| filters | Exact: IDs, booleans, enums | `{'id': 'uuid', 'status': 'ACTIVE'}` |
+| search_patterns | Fuzzy: names, text (with %) | `{'name': '%keyword%'}` |
+
+### Duplicate Check (Before Create)
+
+```python
+read_data(
+    table='assets',
+    search_patterns={'name': '%[product]%hero%'},
+    columns=['id', 'name', 'status']
+)
+```
+
+### Check PRIMARY Exists
+
+```python
+read_data(
+    table='product_assets',
+    filters={'product_id': 'uuid', 'asset_role': 'PRIMARY'},
+    columns=['id', 'asset_id']
+)
+# If results: new image is GALLERY. If empty: new image is PRIMARY.
+```
+
+---
+
+## WRITE PATTERNS
+
+### WriteIntent Structure
+
+| Field | Purpose |
+|-------|---------|
+| goal | What you're creating |
+| reasoning | Validation done, quality verified |
+| hitl_summary | User approval message |
+| asset_uploads | Images to show in HITL |
+| operations | Database operations |
+| impact | {creates: {assets: N}} |
+
+### asset_uploads (CRITICAL for Image HITL)
+
+```json
+"asset_uploads": [
+  {
+    "storage_path": "pending/20241217_studio_abc.png",
+    "returns": "product_image",
+    "caption": "[Product] - catalog hero",
+    "target_folder": "products"
+  }
+]
+```
+
+**Reference in operations:**
+- `@product_image.public_url` - Final URL after upload
+- `@product_image.caption` - Caption text
+
+### Pattern 1: Single Asset with HITL Preview
+
+```json
+{
+  "goal": "Create asset for processed image",
+  "reasoning": "Quality verified: clean extraction, proper lighting.",
+  "hitl_summary": "Processed image ready.\n\n[Processing]: Background removed, hero shot created.\n\nApprove?",
+  "asset_uploads": [
+    {"storage_path": "pending/[file].png", "returns": "img", "caption": "[Product] hero", "target_folder": "products"}
+  ],
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {
+        "name": "[Product] Hero",
+        "storage_url": "@img.public_url",
+        "storage_provider": "SUPABASE",
+        "file_name": "[file].png",
+        "mime_type": "image/png",
+        "asset_type": "IMAGE",
+        "purpose": "PRODUCT",
+        "status": "ACTIVE",
+        "is_ai_generated": true,
+        "source_asset_ids": null,
+        "generation_prompt": "extraction + white bg + studio lighting",
+        "caption": "@img.caption"
+      },
+      "returns": "asset"
+    }
+  ],
+  "impact": {"creates": {"assets": 1}, "asset_uploads": 1}
+}
+```
+
+### Pattern 2: Asset + Product Junction
+
+When you have product_id from PM or catalog specialist:
+
+```json
+{
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {...},
+      "returns": "asset"
+    },
+    {
+      "action": "create",
+      "table": "product_assets",
+      "data": {
+        "product_id": "[product-uuid]",
+        "product_family_id": null,
+        "asset_id": "@asset.id",
+        "asset_role": "PRIMARY",
+        "sort_order": 0
+      },
+      "dependencies": ["asset"]
+    }
+  ],
+  "impact": {"creates": {"assets": 1, "product_assets": 1}}
+}
+```
+
+### Pattern 3: Campaign Asset + Junction
+
+```json
+{
+  "goal": "Create campaign asset",
+  "asset_uploads": [
+    {"storage_path": "pending/campaign.png", "returns": "img", "caption": "[Campaign] promo", "target_folder": "campaigns"}
+  ],
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {
+        "name": "[Campaign] - [Theme]",
+        "storage_url": "@img.public_url",
+        "purpose": "CAMPAIGN",
+        ...
+      },
+      "returns": "asset"
+    },
+    {
+      "action": "create",
+      "table": "campaign_assets",
+      "data": {
+        "campaign_id": "[campaign-uuid]",
+        "asset_id": "@asset.id",
+        "usage_type": "social_media",
+        "placement": "[platform]"
+      },
+      "dependencies": ["asset"]
+    }
+  ]
+}
+```
+
+### Pattern 4: Batch Assets (Variants)
+
+```json
+{
+  "goal": "Create assets for N variants",
+  "asset_uploads": [
+    {"storage_path": "pending/variant_a.png", "returns": "img_a", "caption": "[Size A]"},
+    {"storage_path": "pending/variant_b.png", "returns": "img_b", "caption": "[Size B]"}
+  ],
+  "operations": [
+    {
+      "action": "create",
+      "table": "assets",
+      "data": [
+        {"name": "[Size A] Hero", "storage_url": "@img_a.public_url", ...},
+        {"name": "[Size B] Hero", "storage_url": "@img_b.public_url", ...}
+      ],
+      "returns": "assets_batch"
+    }
+  ]
+}
+```
+
+Reference batch: `@assets_batch[0].id`, `@assets_batch[1].id`
+
+### Pattern 5: Replace Image (Archive Old)
+
+```json
+{
+  "goal": "Replace PRIMARY image",
+  "reasoning": "User requested replacement. Archiving old.",
+  "operations": [
+    {
+      "action": "update",
+      "table": "assets",
+      "filters": {"id": "[old-asset-uuid]"},
+      "updates": {"status": "ARCHIVED"}
+    },
+    {
+      "action": "create",
+      "table": "assets",
+      "data": {...},
+      "returns": "new_asset"
+    },
+    {
+      "action": "update",
+      "table": "product_assets",
+      "filters": {"product_id": "[product-uuid]", "asset_id": "[old-asset-uuid]"},
+      "updates": {"asset_id": "@new_asset.id"},
+      "dependencies": ["new_asset"]
+    }
+  ]
+}
+```
+
+### Pattern 6: Family-Level Asset
+
+Shared by all products in family:
+
+```json
+{
+  "operations": [
+    {"action": "create", "table": "assets", "data": {...}, "returns": "asset"},
+    {
+      "action": "create",
+      "table": "product_assets",
+      "data": {
+        "product_id": null,
+        "product_family_id": "[family-uuid]",
+        "asset_id": "@asset.id",
+        "asset_role": "LIFESTYLE"
+      },
+      "dependencies": ["asset"]
+    }
+  ]
+}
+```
+
+---
+
+## STANDALONE PROCESSING
+
+**When PM says "Standalone" or "For user download":**
+
+Skip write_data entirely. Return storage_path to PM. No asset record.
+
+```
+Signal: "Standalone" in delegation -> No write_data
+Output: Return pending/[file].png path only
+```
+
+---
+
+## ANTI-PATTERNS
+
+| Wrong | Correct |
+|-------|---------|
+| Skip inspect_schema | Always call first |
+| Guess column names | Use schema-verified names |
+| Both product_id AND product_family_id | Exactly ONE, other null |
+| Assign PRIMARY without checking | Query junction first |
+| Hallucinate paths | Use EXACT paths from tool output |
+| Create asset record for standalone | Return path only, no write_data |
+
+</protocol>

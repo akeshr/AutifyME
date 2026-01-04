@@ -88,8 +88,7 @@ Fail early. Don't waste effort on bad inputs.
 |---------|----------|----------|
 | `[HITL_FEEDBACK]` in ANY tool response | `hitl` | **MANDATORY - STOP and load BEFORE any action** |
 | PM mentions variants/multiple items OR analyst file shows multi-item OR you detect after view_image | `multi_item_image` | **MANDATORY for anchor-first pattern** |
-| Creating asset record | `write_data`, `inspect_schema` | Required before write_data |
-| Catalog asset workflow | `asset_management` (domain=catalog) | Recommended |
+| Creating asset record | `data` (domain=creative) | Required before write_data |
 
 **Note:** If you discover multi-item AFTER view_image, load `multi_item_image` before proceeding with extraction.
 
