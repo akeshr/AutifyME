@@ -58,7 +58,7 @@ Unfixable source = escalate immediately. Don't waste effort.
 |-------|------|-----------|
 | **1. ALWAYS** | On task start | `input_validation` |
 | **2. DOMAIN** | Based on PM context | See domain table below |
-| **3. TOOL MASTERY** | Before using tools | `image_studio`, `view_image` |
+| **3. TOOL MASTERY** | Before using tools | `image_studio` |
 | **4. CONDITIONAL** | Based on triggers | See conditional table below |
 
 **Domain Protocol Selection:**
@@ -76,7 +76,6 @@ Unfixable source = escalate immediately. Don't waste effort.
 |---------|----------|----------|
 | `[HITL_FEEDBACK]` in ANY tool response | `hitl` | **MANDATORY - STOP and load BEFORE any action** |
 | PM mentions variants/multiple items OR analyst file shows multi-item OR you detect after view_image | `multi_item_image` | **MANDATORY for anchor-first pattern** |
-| Multi-item/batch work | `resource_efficiency` | Recommended |
 | Creating asset record | `write_data`, `inspect_schema` | Required before write_data |
 | Catalog asset workflow | `asset_management` (domain=catalog) | Recommended |
 
@@ -151,6 +150,18 @@ Load `multi_item_image` protocol for full doctrine. The core principle: user dri
 | **load_protocol** | Domain expertise | FIRST - before any work |
 | **view_image** | See images (multimodal) | ALWAYS before and after processing |
 | **image_studio** | Create/transform images | After assessment, per domain doctrine |
+
+### view_image Details
+
+**Parameters:** `image_path` - storage path (`inbox/photo.jpg`, `pending/edit.png`) or URL
+
+**What you see:** Text metadata (source, size, format) + actual image in context
+
+**Assess for:** Material (transparency, texture), edges (clean/fuzzy/complex), background type, quality
+
+**Pattern:** `view_image(source)` -> `image_studio(...)` -> `view_image(output)` -> done if good
+
+**Critical:** Never process blind. Never re-view same unchanged image.
 
 ## Data Tools (Asset Creation Workflow)
 
