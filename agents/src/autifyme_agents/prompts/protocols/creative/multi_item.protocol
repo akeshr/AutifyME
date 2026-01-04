@@ -467,7 +467,7 @@ Not all source images apply to all batch items. **Decision rule:** If a source i
 
 ### HITL Gate (MANDATORY)
 
-Anchor approval BLOCKS batch generation. Use `write_data` (triggers HITL) NOT `write_todos` (internal tracking only).
+Anchor approval BLOCKS batch generation. Use `write_data` (triggers HITL) - never skip the approval step.
 
 User approves the STYLE, not the specific item. After approval, style is LOCKED for batch.
 
@@ -488,7 +488,7 @@ If you find yourself doing any of these, the core principle is being violated:
 - **Rapid self-iteration** - Generating v1, v2, v3... without HITL between each. Each anchor attempt requires presenting via write_data and WAITING for user feedback before generating again. User drives iteration pace.
 - **Text workarounds** - Writing "match anchor" or "same style as anchor" in custom_spec means parameters aren't actually identical
 - **Dropped source context** - Batch calls missing shared reference images that anchor used
-- **HITL bypass** - Using `write_todos` instead of `write_data` after anchor generation
+- **HITL bypass** - Skipping `write_data` after anchor generation (user must approve style before batch)
 - **Modified parameters** - Changing lighting, composition, background, etc. between anchor and batch
 
 ---
@@ -498,7 +498,7 @@ If you find yourself doing any of these, the core principle is being violated:
 This protocol provides the PATTERN. Domain-specific protocols provide the VOCABULARY:
 
 ```
-Domain Protocol includes multi_item_image.protocol:
+Domain Protocol includes multi_item.protocol:
 - Maps "item" to domain entity (product, room, dish)
 - Maps attributes to domain fields (size, sqft, portion)
 - Applies domain-specific defaults

@@ -60,13 +60,13 @@ Proceeding with corrected processing.
 -> image_studio(background_color="light_gray", ...)  <-- ACTUAL TOOL CALL
 ```
 
-### QUESTION - Explain and Retry
+### QUESTION - Explain and Resubmit
 
 ```
 [HITL_FEEDBACK] "Why did you crop so much?"
 
 Type: QUESTION
-Action: Explain rationale, offer to adjust
+Action: Explain rationale, resubmit same work (user asked why, not to change)
 
 [HITL RESOLVED]
 
@@ -74,9 +74,8 @@ Action: Explain rationale, offer to adjust
 
 **Explanation:** Cropped to create focus on product center and meet standard hero dimensions.
 
-**Offer:** Would you like less aggressive cropping? I can preserve more of the original frame.
-
-Resubmitting with clarification...
+Resubmitting for approval. If you'd like different cropping, reject with specific instructions.
+-> write_data(...)  <-- RESUBMIT SAME ASSET
 ```
 
 ### REJECTION - Propose Alternatives

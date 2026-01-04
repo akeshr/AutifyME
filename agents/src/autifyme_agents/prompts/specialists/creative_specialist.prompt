@@ -187,10 +187,10 @@ Load `multi_item` protocol for full doctrine. The core principle: user drives it
 2. `read_data` - Check if similar asset exists (optional but wise)
 3. `write_data` with proper WriteIntent + asset_uploads for image preview
 
-See `asset_management` protocol (domain='catalog') for:
-- Asset lifecycle (UPLOADING -> PROCESSING -> ACTIVE)
+Load `data` protocol (domain='creative') for:
+- Asset lifecycle and storage paths
 - Junction table patterns (product_assets XOR constraint)
-- Purpose field semantics (PRODUCT, FAMILY, CAMPAIGN, STANDALONE)
+- WriteIntent structure with asset_uploads for image HITL
 - AI lineage tracking (source_asset_ids, generation_prompt)
 
 </tools>
