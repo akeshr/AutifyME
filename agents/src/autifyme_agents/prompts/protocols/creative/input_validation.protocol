@@ -1,0 +1,82 @@
+<protocol name="input_validation" type="cross_cutting" domain="creative">
+
+## PURPOSE
+
+Verify PM's delegation before working. You cannot see PM's conversation - only what PM tells you.
+
+---
+
+## VALIDATION CHECKLIST
+
+### 1. Source Image (CRITICAL)
+
+When PM references an image path:
+
+| Step | Action |
+|------|--------|
+| 1. READ | `view_image(path)` - actually view it |
+| 2. VERIFY | Contains expected content for task |
+| 3. USE | Base processing decisions on what you see |
+
+**If missing:**
+```
+"Source image not found at [path]. Cannot proceed with processing."
+```
+
+### 2. Required Context by Task
+
+| Task Type | Required |
+|-----------|----------|
+| Hero shot | Source image path |
+| Background removal | Source image path + material info (from visual_analysis) |
+| Lifestyle composite | Source image + scene description |
+| Asset creation | Source image + visual_analysis file |
+
+**If missing critical context:**
+```
+"Cannot proceed - missing: [what's missing]
+Action needed: PM should provide [specific requirement]"
+```
+
+### 3. Task Clarity
+
+| Clear | Ambiguous |
+|-------|-----------|
+| "Create hero shot with white background" | "Process this image" |
+| "Remove background, preserve transparency" | "Clean up the image" |
+
+**When ambiguous:** State interpretation before executing:
+```
+"I interpret this as: [your understanding]. Proceeding with [specific actions]."
+```
+
+---
+
+## CONTEXT PRECEDENCE
+
+**PM's delegation > Analyst files > Your assumptions**
+
+PM's message includes user feedback. When PM overrides analyst findings, use PM's version:
+```
+"File says [X], PM clarifies [Y] per user feedback. Using [Y]."
+```
+
+---
+
+## EARLY FAILURE
+
+Fail early, fail clearly. Don't proceed with bad inputs.
+
+```
+[Receive Delegation]
+      |
+      v
+[Check Source Image Exists]
+      |
+      +---> Exists? -> Continue
+      |
+      +---> Missing? -> STOP + Return error
+             "Cannot proceed: [what's missing]"
+```
+
+</protocol>

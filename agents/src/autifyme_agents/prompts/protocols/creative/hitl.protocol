@@ -1,0 +1,221 @@
+<protocol name="hitl" type="cross_cutting" domain="creative">
+
+## PURPOSE
+
+Handle Human-in-the-Loop feedback for creative processing.
+Load when ANY tool response contains `[HITL_FEEDBACK]` marker.
+
+---
+
+## CRITICAL: PM VISIBILITY
+
+**PM cannot see HITL events directly.**
+
+```
+[User] <--HITL--> [You] --response--> [PM]
+                    ^
+              PM cannot see this
+```
+
+Your response format is the ONLY signal PM receives.
+**Always include HITL markers in your response.**
+
+---
+
+## FEEDBACK TYPES
+
+| Pattern | Type | Action |
+|---------|------|--------|
+| "Reject" / empty | BARE_REJECT | Escalate - ask WHAT was wrong |
+| "What is X?" / "Why?" | QUESTION | Explain and retry |
+| "Use X instead" / "Make it X" | CLEAR | Apply directly, retry |
+| "I don't like X" | REJECTION | Propose alternatives OR escalate |
+| "Never mind" / "Cancel" | CANCEL | Confirm cancellation |
+
+**First instinct: Can I resolve this myself?**
+- Question -> Explain and retry
+- Clear correction -> Apply and retry
+- Only escalate when genuinely cannot proceed
+
+---
+
+## HANDLING CREATIVE FEEDBACK
+
+### CLEAR - Apply and Retry
+
+```
+[HITL_FEEDBACK] "Make the background light gray, not white"
+
+Type: CLEAR
+Action: Apply change, call image_studio with corrected params
+
+[HITL RESOLVED]
+
+**User Feedback:** "Make the background light gray, not white"
+
+**Resolution:**
+- Background: white -> light gray (per user feedback)
+
+Proceeding with corrected processing.
+-> image_studio(background_color="light_gray", ...)  <-- ACTUAL TOOL CALL
+```
+
+### QUESTION - Explain and Retry
+
+```
+[HITL_FEEDBACK] "Why did you crop so much?"
+
+Type: QUESTION
+Action: Explain rationale, offer to adjust
+
+[HITL RESOLVED]
+
+**User Feedback:** "Why did you crop so much?"
+
+**Explanation:** Cropped to create focus on product center and meet standard hero dimensions.
+
+**Offer:** Would you like less aggressive cropping? I can preserve more of the original frame.
+
+Resubmitting with clarification...
+```
+
+### REJECTION - Propose Alternatives
+
+```
+[HITL_FEEDBACK] "Don't like this style"
+
+Type: REJECTION
+Action: Propose alternatives based on what you know
+
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**User Feedback:** "Don't like this style"
+
+**What I Can Offer:**
+1. Softer shadows (less dramatic)
+2. Different angle/perspective
+3. Minimal editing (natural look)
+
+**Request:** Which direction would user prefer?
+```
+
+### BARE_REJECT - Escalate
+
+```
+[HITL_FEEDBACK] "Reject"
+
+Type: BARE_REJECT
+Action: Cannot guess - must escalate
+
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**User Feedback:** "Reject"
+
+**What Was Proposed:**
+- Background: White
+- Style: Product-centered hero shot
+- Processing: Background removal + shadow
+
+**Request:** Please ask user what specifically needs to change.
+```
+
+### CANCEL - Report Partial Work
+
+```
+[HITL_FEEDBACK] "Cancel"
+
+[HITL CANCELED]
+
+**Partial Results:**
+- asset_abc123 created (before cancel)
+- 3/5 images processed
+
+Task abandoned per user request.
+```
+
+---
+
+## CIRCUIT BREAKER
+
+**Max 3 escalation rounds.** Track your round:
+
+```
+Round 1: Initial feedback - resolve or escalate
+Round 2: PM clarified - apply or escalate remaining
+Round 3 (FINAL): Cannot continue escalating
+
+## HITL RESOLUTION LIMIT REACHED
+
+**Escalation:** 3 of 3 (FINAL)
+
+**Options:**
+1. Ask user for exact specification
+2. Cancel this task
+3. Proceed with best guess (may need revision)
+```
+
+---
+
+## RESPONSE FORMATS
+
+### Resolved (then CALL tool)
+
+```
+[HITL RESOLVED]
+
+**User Feedback:** "[exact feedback]"
+
+**Resolution:**
+- [what changed]
+
+Proceeding with corrected action.
+-> image_studio(...)  <-- TOOL CALL, NOT TEXT
+```
+
+### Needs PM Direction
+
+```
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**Escalation:** [1/2/3] of 3
+
+**User Feedback:** "[exact feedback]"
+
+**What I Can Resolve:** [if any]
+
+**What Needs Clarification:** [specific questions]
+```
+
+### Canceled
+
+```
+[HITL CANCELED]
+
+**Partial Results:** [asset IDs, progress count]
+
+Task abandoned per user request.
+```
+
+---
+
+## CRITICAL ANTI-PATTERNS
+
+**Wrong:** Responding without HITL marker
+```
+"What style would you prefer?"  # PM doesn't know this is HITL
+```
+
+**Wrong:** Describing action instead of executing
+```
+[HITL RESOLVED]
+Proceeding with: {"background": "gray"}  # TEXT, not tool call!
+```
+
+**Correct:**
+```
+[HITL RESOLVED]
+Proceeding with corrected action.
+-> image_studio(background="gray")  <-- ACTUAL CALL
+```
+
+</protocol>
