@@ -9,11 +9,14 @@ Load when creating asset records after image processing.
 
 ## [CRITICAL] SCHEMA FIRST
 
-**Call inspect_schema BEFORE write_data. No exceptions.**
+**Call inspect_schema BEFORE any read_data or write_data. No exceptions.**
 
-```
-inspect_schema(tables=['assets', 'product_assets', 'campaign_assets'], details=['structure', 'constraints'])
-```
+Inspect tables relevant to your domain:
+- CATALOG/LIFESTYLE: assets, product_assets
+- CAMPAIGN/SOCIAL: assets, campaign_assets
+
+Schema reveals actual column names, required fields, valid enum values.
+**Patterns below show structure. VERIFY column names match your schema.**
 
 ---
 
@@ -41,26 +44,26 @@ inspect_schema(tables=['assets', 'product_assets', 'campaign_assets'], details=[
 
 ## ASSETS TABLE
 
-### Required Fields
+### Required Fields (verify via inspect_schema)
 
 | Field | Type | Values |
 |-------|------|--------|
-| name | varchar(200) | `"[descriptive name]"` |
-| storage_url | text | `@[upload_ref].public_url` |
-| storage_provider | varchar(50) | SUPABASE |
-| file_name | varchar(255) | From image_studio output |
-| mime_type | varchar(100) | image/png, image/jpeg, image/webp |
-| asset_type | varchar(30) | IMAGE, VIDEO, DOCUMENT |
-| status | varchar(20) | ACTIVE, ARCHIVED, DELETED |
-| purpose | varchar(20) | PRODUCT, FAMILY, CAMPAIGN, SOCIAL, STANDALONE |
+| name | varchar | descriptive name |
+| storage_url | text | @[ref].public_url |
+| storage_provider | varchar | from schema enum |
+| file_name | varchar | from image_studio output |
+| mime_type | varchar | image/png, image/jpeg, image/webp |
+| asset_type | varchar | from schema enum |
+| status | varchar | from schema enum |
+| purpose | varchar | from schema enum |
 
 ### AI Lineage (MANDATORY)
 
 | Field | Value |
 |-------|-------|
 | is_ai_generated | true |
-| source_asset_ids | [uuid] or null if from inbox/ |
-| generation_prompt | `"[operation] + [background] + [lighting] for [material]"` |
+| source_asset_ids | [uuid] or null if from inbox |
+| generation_prompt | summarize operation + settings |
 
 ---
 
@@ -72,16 +75,11 @@ For CATALOG and LIFESTYLE domains.
 
 **Exactly ONE of product_id OR product_family_id. Never both, never neither.**
 
-```json
-{"product_id": "[uuid]", "product_family_id": null, "asset_id": "@asset.id"}
-{"product_id": null, "product_family_id": "[uuid]", "asset_id": "@asset.id"}
-```
-
-### Asset Roles
+### Asset Roles (verify enum values via schema)
 
 | Role | Domain | Use |
 |------|--------|-----|
-| PRIMARY | CATALOG | Main product image (ONE per product) |
+| PRIMARY | CATALOG | Main image (ONE per product) |
 | GALLERY | CATALOG | Additional angles |
 | ZOOM | CATALOG | High-res detail |
 | LIFESTYLE | LIFESTYLE | In-context shots |
@@ -92,12 +90,7 @@ For CATALOG and LIFESTYLE domains.
 
 For CAMPAIGN and SOCIAL domains.
 
-| Field | Value |
-|-------|-------|
-| campaign_id | `[campaign-uuid]` |
-| asset_id | `@asset.id` |
-| usage_type | social_media, email, banner, etc. |
-| placement | `[platform or location]` |
+Fields: campaign_id, asset_id, usage_type, placement (verify via schema)
 
 ---
 
@@ -105,31 +98,24 @@ For CAMPAIGN and SOCIAL domains.
 
 ### filters vs search_patterns
 
-| Parameter | Use For | Example |
-|-----------|---------|---------|
-| filters | Exact: IDs, booleans, enums | `{'id': '[uuid]', 'status': 'ACTIVE'}` |
-| search_patterns | Fuzzy: names, text (with %) | `{'name': '%[keyword]%'}` |
+| Parameter | Use For |
+|-----------|---------|
+| filters | Exact match: IDs, booleans, enum values |
+| search_patterns | Fuzzy match: names, text (use % wildcards) |
 
 ### Duplicate Check
 
-```python
-read_data(
-    table='assets',
-    search_patterns={'name': '%[identifier]%'},
-    columns=['id', 'name', 'status']
-)
-```
+Before creating, check if similar asset exists:
+- Table: assets
+- Use search_patterns on name field
+- Select only id, name, status columns
 
-### Check PRIMARY Exists (CATALOG only)
+### Check Role Exists (CATALOG only)
 
-```python
-read_data(
-    table='product_assets',
-    filters={'product_id': '[uuid]', 'asset_role': 'PRIMARY'},
-    columns=['id', 'asset_id']
-)
-# Results exist -> new image is GALLERY. Empty -> new image is PRIMARY.
-```
+Before assigning PRIMARY role, check if one exists:
+- Table: product_assets (verify name via schema)
+- Filter by product_id and role column (verify column name via schema)
+- If results: assign GALLERY. If empty: assign PRIMARY.
 
 ---
 
@@ -144,210 +130,119 @@ read_data(
 | hitl_summary | User approval message |
 | asset_uploads | Images to show in HITL |
 | operations | Database operations |
-| impact | {creates: {assets: N}} |
+| impact | Summary of changes |
 
 ### asset_uploads (CRITICAL for Image HITL)
 
-```json
-"asset_uploads": [
-  {
-    "storage_path": "pending/[file].png",
-    "returns": "[ref_name]",
-    "caption": "[descriptive caption]",
-    "target_folder": "[domain_folder]"
-  }
-]
-```
+Each upload needs:
+- storage_path: from image_studio output
+- returns: reference name for operations
+- caption: descriptive text for user
+- target_folder: domain-appropriate folder
 
-**Reference:** `@[ref_name].public_url`, `@[ref_name].caption`
+Reference in operations: @[ref_name].public_url, @[ref_name].caption
 
 ---
 
 ### Pattern: Single Asset (All Domains)
 
-```json
-{
-  "goal": "Create [domain] asset",
-  "reasoning": "Quality verified: [what was checked].",
-  "hitl_summary": "[Domain] image ready.\n\n[Processing summary]\n\nApprove?",
-  "asset_uploads": [
-    {
-      "storage_path": "pending/[file].png",
-      "returns": "img",
-      "caption": "[descriptive caption]",
-      "target_folder": "[domain_folder]"
-    }
-  ],
-  "operations": [
-    {
-      "action": "create",
-      "table": "assets",
-      "data": {
-        "name": "[descriptive name]",
-        "storage_url": "@img.public_url",
-        "storage_provider": "SUPABASE",
-        "file_name": "[file].png",
-        "mime_type": "image/png",
-        "asset_type": "IMAGE",
-        "purpose": "[PRODUCT|CAMPAIGN|SOCIAL|STANDALONE]",
-        "status": "ACTIVE",
-        "is_ai_generated": true,
-        "source_asset_ids": null,
-        "generation_prompt": "[operation] + [background] + [lighting]",
-        "caption": "@img.caption"
-      },
-      "returns": "asset"
-    }
-  ],
-  "impact": {"creates": {"assets": 1}, "asset_uploads": 1}
-}
+Structure (adapt field names from schema):
+
+```
+WriteIntent:
+  goal: "Create [domain] asset"
+  reasoning: "Quality verified: [checks done]"
+  hitl_summary: "[Domain] image ready. [Summary]. Approve?"
+  asset_uploads: [{storage_path, returns, caption, target_folder}]
+  operations:
+    - action: create
+      table: [assets table name]
+      data:
+        [name_field]: descriptive name
+        [url_field]: @ref.public_url
+        [provider_field]: from schema enum
+        [type_field]: from schema enum
+        [status_field]: from schema enum
+        [purpose_field]: match domain
+        [ai_generated_field]: true
+        [lineage_fields]: as required
+      returns: asset
+  impact: {creates: {assets: 1}}
 ```
 
 ---
 
 ### Pattern: Asset + Product Junction (CATALOG/LIFESTYLE)
 
-```json
-{
-  "operations": [
-    {
-      "action": "create",
-      "table": "assets",
-      "data": {"purpose": "PRODUCT", ...},
-      "returns": "asset"
-    },
-    {
-      "action": "create",
-      "table": "product_assets",
-      "data": {
-        "product_id": "[product-uuid]",
-        "product_family_id": null,
-        "asset_id": "@asset.id",
-        "asset_role": "[PRIMARY|GALLERY|LIFESTYLE|ZOOM]",
-        "sort_order": 0
-      },
-      "dependencies": ["asset"]
-    }
-  ],
-  "impact": {"creates": {"assets": 1, "product_assets": 1}}
-}
+Structure (adapt field names from schema):
+
+```
+operations:
+  1. Create asset (returns: asset)
+  2. Create junction:
+     - table: [product_assets table name]
+     - product_id: [uuid] OR product_family_id: [uuid] (XOR)
+     - asset_id: @asset.id
+     - role: from schema enum
+     - dependencies: [asset]
 ```
 
 ---
 
 ### Pattern: Asset + Campaign Junction (CAMPAIGN/SOCIAL)
 
-```json
-{
-  "operations": [
-    {
-      "action": "create",
-      "table": "assets",
-      "data": {"purpose": "[CAMPAIGN|SOCIAL]", ...},
-      "returns": "asset"
-    },
-    {
-      "action": "create",
-      "table": "campaign_assets",
-      "data": {
-        "campaign_id": "[campaign-uuid]",
-        "asset_id": "@asset.id",
-        "usage_type": "[social_media|email|banner]",
-        "placement": "[platform]"
-      },
-      "dependencies": ["asset"]
-    }
-  ]
-}
+Structure (adapt field names from schema):
+
+```
+operations:
+  1. Create asset with purpose CAMPAIGN or SOCIAL (returns: asset)
+  2. Create junction:
+     - table: [campaign_assets table name]
+     - campaign_id: [uuid]
+     - asset_id: @asset.id
+     - usage_type, placement: as appropriate
+     - dependencies: [asset]
 ```
 
 ---
 
 ### Pattern: Family-Level Asset
 
-Shared by all products in family:
+For assets shared by all products in family:
 
-```json
-{
-  "operations": [
-    {
-      "action": "create",
-      "table": "assets",
-      "data": {"purpose": "FAMILY", ...},
-      "returns": "asset"
-    },
-    {
-      "action": "create",
-      "table": "product_assets",
-      "data": {
-        "product_id": null,
-        "product_family_id": "[family-uuid]",
-        "asset_id": "@asset.id",
-        "asset_role": "LIFESTYLE"
-      },
-      "dependencies": ["asset"]
-    }
-  ]
-}
+```
+operations:
+  1. Create asset with purpose FAMILY (returns: asset)
+  2. Create junction:
+     - product_id: null
+     - product_family_id: [family-uuid]
+     - role: LIFESTYLE typically
 ```
 
 ---
 
 ### Pattern: Batch Assets (Variants)
 
-```json
-{
-  "goal": "Create assets for [N] variants",
-  "asset_uploads": [
-    {"storage_path": "pending/[variant_a].png", "returns": "img_a", "caption": "[Variant A]"},
-    {"storage_path": "pending/[variant_b].png", "returns": "img_b", "caption": "[Variant B]"}
-  ],
-  "operations": [
-    {
-      "action": "create",
-      "table": "assets",
-      "data": [
-        {"name": "[Variant A]", "storage_url": "@img_a.public_url", ...},
-        {"name": "[Variant B]", "storage_url": "@img_b.public_url", ...}
-      ],
-      "returns": "assets_batch"
-    }
-  ]
-}
-```
+For multiple variants:
 
-Reference: `@assets_batch[0].id`, `@assets_batch[1].id`
+```
+asset_uploads: one entry per variant with unique returns name
+operations:
+  1. Create assets as array (returns: assets_batch)
+
+Reference: @assets_batch[0].id, @assets_batch[1].id
+```
 
 ---
 
 ### Pattern: Replace Image (Archive Old)
 
-```json
-{
-  "goal": "Replace [role] image",
-  "reasoning": "User requested replacement. Archiving old.",
-  "operations": [
-    {
-      "action": "update",
-      "table": "assets",
-      "filters": {"id": "[old-asset-uuid]"},
-      "updates": {"status": "ARCHIVED"}
-    },
-    {
-      "action": "create",
-      "table": "assets",
-      "data": {...},
-      "returns": "new_asset"
-    },
-    {
-      "action": "update",
-      "table": "[product_assets|campaign_assets]",
-      "filters": {"asset_id": "[old-asset-uuid]"},
-      "updates": {"asset_id": "@new_asset.id"},
-      "dependencies": ["new_asset"]
-    }
-  ]
-}
+```
+operations:
+  1. Update old asset: status -> ARCHIVED
+  2. Create new asset (returns: new_asset)
+  3. Update junction: asset_id -> @new_asset.id
+     dependencies: [new_asset]
 ```
 
 ---
@@ -358,24 +253,19 @@ Reference: `@assets_batch[0].id`, `@assets_batch[1].id`
 
 Skip write_data entirely. Return storage_path to PM. No asset record.
 
-```
-Signal: "Standalone" in delegation -> No write_data
-Output: Return pending/[file].png path only
-```
-
 ---
 
 ## ANTI-PATTERNS
 
 | Wrong | Correct |
 |-------|---------|
-| Skip inspect_schema | Always call first |
-| Guess column names | Use schema-verified names |
+| Skip inspect_schema | Always verify schema first |
+| Copy patterns without checking column names | Verify ALL field names via schema |
+| Guess enum values | Get valid values from schema constraints |
 | Both product_id AND product_family_id | Exactly ONE, other null |
 | Assign PRIMARY without checking | Query junction first |
 | Hallucinate paths | Use EXACT paths from tool output |
-| Create asset record for standalone | Return path only |
+| Create record for standalone | Return path only |
 | Use product_assets for CAMPAIGN | Use campaign_assets |
-| Hardcode purpose without checking domain | Match purpose to PM's domain |
 
 </protocol>

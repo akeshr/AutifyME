@@ -49,7 +49,7 @@ When user gives ANY specific direction, apply it and retry:
 **Applied:** Background white -> light gray
 
 Proceeding with corrected processing.
--> image_studio(background_color="light_gray", ...)
+-> [call image_studio with adjusted background setting]
 ```
 
 ```
@@ -62,7 +62,7 @@ Proceeding with corrected processing.
 **Applied:** Increased brightness/exposure
 
 Proceeding with corrected processing.
--> image_studio(lighting={...brighter settings...}, ...)
+-> [call image_studio with adjusted lighting]
 ```
 
 ---
@@ -81,7 +81,7 @@ When user asks "why" - explain your reasoning and resubmit same work:
 **Explanation:** Cropped to focus on product center and meet standard hero dimensions (1:1 square).
 
 Resubmitting same work. Reject with specific instructions if you'd like different cropping.
--> write_data(...)
+-> [resubmit via write_data with same asset]
 ```
 
 ---
@@ -182,14 +182,14 @@ Returning to PM.
 **Wrong:** Describing action instead of executing
 ```
 [HITL RESOLVED]
-Proceeding with: {"background": "gray"}  # TEXT, not tool call!
+Proceeding with: [parameters]  # TEXT, not tool call!
 ```
 
 **Correct:**
 ```
 [HITL RESOLVED]
 Proceeding with corrected action.
--> image_studio(background="gray")  <-- ACTUAL CALL
+-> [ACTUALLY CALL image_studio with adjusted parameters]
 ```
 
 </protocol>
