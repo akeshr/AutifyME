@@ -99,15 +99,27 @@ When multi-item detected, output a structured manifest that downstream agents ca
 
 ### Extraction Targets
 
-| # | Description | BBox [y_min, x_min, y_max, x_max] | Position | Key Attributes |
-|---|-------------|-----------------------------------|----------|----------------|
-| 1 | [what it is] | [estimated_y_min, estimated_x_min, estimated_y_max, estimated_x_max] | [position] | [domain-specific] |
-| 2 | [what it is] | [estimated_y_min, estimated_x_min, estimated_y_max, estimated_x_max] | [position] | [domain-specific] |
-| ... | ... | ... | ... | ... |
+| # | Description (WHAT) | BBox (WHERE) | Position (ref only) | Key Attributes |
+|---|-------------------|--------------|---------------------|----------------|
+| 1 | [visual characteristics - NO position] | [y_min, x_min, y_max, x_max] | [for human ref] | [domain-specific] |
+| 2 | [visual characteristics - NO position] | [y_min, x_min, y_max, x_max] | [for human ref] | [domain-specific] |
 
-**CRITICAL:** BBox coordinates are MANDATORY. Scale: 0-1000 (normalized), origin top-left.
-- y_min, x_min = top-left corner of item (estimate based on visual location)
-- y_max, x_max = bottom-right corner of item (estimate based on visual extent)
+**[CRITICAL] Column Purposes - DO NOT MIX:**
+
+| Column | Purpose | Goes to image_studio as |
+|--------|---------|-------------------------|
+| Description | WHAT - visual characteristics only | `target_description` |
+| BBox | WHERE - pixel-precise coordinates | `target_bbox` |
+| Position | Human reference only | NOT used in tool call |
+
+**Description must NOT contain position.** Position info goes in BBox coordinates.
+
+```
+WRONG: Description = "tall jar with floral print on the left"
+RIGHT: Description = "tall jar with floral print", BBox = [50, 20, 600, 350]
+```
+
+**BBox coordinates:** Scale 0-1000 (normalized), origin top-left.
 
 **Note:** Domain protocols extend "Key Attributes" with domain-specific columns (e.g., Size, Color for catalog).
 
@@ -234,7 +246,10 @@ Extract each item separately, producing N outputs.
 **Execution pattern:**
 ```
 for each item in manifest:
-    process(target="{item.description} at {item.position}")
+    image_studio(
+        target_description=item.description,  # WHAT only
+        target_bbox=item.bbox                  # WHERE (authoritative)
+    )
     output: one asset per item
 ```
 

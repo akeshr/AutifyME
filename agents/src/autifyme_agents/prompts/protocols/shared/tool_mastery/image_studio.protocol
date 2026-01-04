@@ -484,27 +484,51 @@ When source contains multiple items, extract each separately (unless explicitly 
 
 ## MULTI-ITEM EXTRACTION
 
-When source image contains multiple items, use position-based targeting.
+When source image contains multiple items, use precise targeting.
 
 **See `multi_item.protocol` (domain=creative) for:**
 - Classification types (VARIANTS, COLLECTION, COMPONENTS)
 - Processing strategies (INDIVIDUAL, COMPOSITE, GROUPED)
 - Strategy selection signals
-- Full position vocabulary
 
-### Targeting Syntax
+### [CRITICAL] Targeting: Separate WHAT from WHERE
 
-Use visual differentiators BEFORE position in `target_description`.
+| Field | Purpose | Contains |
+|-------|---------|----------|
+| `target_bbox` | WHERE (authoritative) | Pixel-precise coordinates [y_min, x_min, y_max, x_max] |
+| `target_description` | WHAT (characteristics) | Visual attributes, NOT position |
 
-| Priority | Pattern | Why |
-|----------|---------|-----|
-| 1 | SIZE first | "the LARGEST [product]" - visually unambiguous |
-| 2 | VISUAL PATTERN | "the [product] with [distinctive feature]" - intrinsic to product |
-| 3 | POSITION last | "at [position]" - only as tie-breaker when visuals identical |
+**When bbox is provided, description must NOT contain position.**
 
-Combine for precision: "the LARGEST [product] with [pattern] in [source]"
+```
+WRONG - Position in both (model gets confused):
+  target_description: "tall jar with floral print on the left"
+  target_bbox: [50, 20, 600, 350]
 
-### Position Vocabulary
+CORRECT - Bbox is WHERE, description is WHAT:
+  target_description: "tall jar with floral print"
+  target_bbox: [50, 20, 600, 350]
+```
+
+**Why this matters:**
+- Bbox gives pixel-precise region - model should trust it absolutely
+- Description with position creates ambiguity - model might ignore bbox
+- Result: wrong item extracted despite correct coordinates
+
+### When Bbox NOT Available
+
+Only when bbox is unavailable, include position in description:
+
+```
+target_description: "the LARGEST jar with floral print at left-column"
+```
+
+Priority for description-only targeting:
+1. SIZE first - "the LARGEST", "the SMALLEST"
+2. VISUAL PATTERN - "with floral print", "blue lid"
+3. POSITION last - "at left-column" (tie-breaker only)
+
+### Position Vocabulary (for description-only cases)
 
 | Position Type | Examples |
 |---------------|----------|
