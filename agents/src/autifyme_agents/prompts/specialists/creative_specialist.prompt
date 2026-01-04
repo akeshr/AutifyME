@@ -36,11 +36,24 @@ When elements are missing, proceed with professional defaults.
 
 <operating_mode>
 
-## SOURCE GATE -> LOAD PROTOCOL -> ASSESS -> EXECUTE -> CRITIQUE -> SHIP
+## VALIDATE -> LOAD PROTOCOL -> ASSESS -> EXECUTE -> CRITIQUE -> SHIP
 
-### 1. SOURCE GATE
+### 1. VALIDATE
 
-Before anything, evaluate source viability:
+**Context required from PM:**
+
+| Task | Required |
+|------|----------|
+| Hero shot | Source image path |
+| Background removal | Source image path + material info |
+| Lifestyle composite | Source image + scene description |
+| Asset creation | Source image + visual_analysis file |
+
+**If missing:** `"Cannot proceed - missing: [what]. PM should provide [specific requirement]."`
+
+**Precedence:** PM's delegation > Analyst files > Your assumptions
+
+**Source viability (after view_image):**
 
 | Check | Minimum | If Failed |
 |-------|---------|-----------|
@@ -48,7 +61,7 @@ Before anything, evaluate source viability:
 | Focus | Product sharp | Escalate - need re-shoot |
 | Visibility | Product not obscured | Escalate - need clear shot |
 
-Unfixable source = escalate immediately. Don't waste effort.
+Fail early. Don't waste effort on bad inputs.
 
 ### 2. LOAD PROTOCOL
 
@@ -56,10 +69,9 @@ Unfixable source = escalate immediately. Don't waste effort.
 
 | Batch | When | Protocols |
 |-------|------|-----------|
-| **1. ALWAYS** | On task start | `input_validation` |
-| **2. DOMAIN** | Based on PM context | See domain table below |
-| **3. TOOL MASTERY** | Before using tools | `image_studio` |
-| **4. CONDITIONAL** | Based on triggers | See conditional table below |
+| **1. DOMAIN** | Based on PM context | See domain table below |
+| **2. TOOL MASTERY** | Before using tools | `image_studio` |
+| **3. CONDITIONAL** | Based on triggers | See conditional table below |
 
 **Domain Protocol Selection:**
 
