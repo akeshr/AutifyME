@@ -122,8 +122,8 @@ KEY DISTINCTION:
 "extraction" = EXTRACT FROM SOURCE IMAGE
   - target_description: Overall description of the task
   - targets: Array of items to extract, each with specific bbox
-    * target_bbox: Precise coordinate targeting (0-1000 scale)
-    * target_item_id: Tracking ID for the item
+    * target_bbox: Precise coordinate targeting
+    * target_image_label: Label of the image containing this target
   - Isolate the described item(s) from the provided source
   - Source may be messy - your job is to isolate cleanly
   - PRIORITY: Use bbox for targeting when available
@@ -730,9 +730,9 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- Text extraction/analysis (use view_image)\n\n"
             "STRUCTURED SPECS (all optional - use what applies):\n"
             "- fidelity: CRITICAL for source images - {preserve_colors: 'exact match', preserve_artwork: 'honeycomb pattern', hero_features: 'texture pattern'}\n"
-            "- extraction: {target_description: 'Extract jar from [source]', targets: [{target_bbox: [0,0,500,500], target_item_id: 'i1'}], isolation: 'complete'}\n"
+            "- extraction: {target_description: 'Extract jar from [source]', targets: [{target_bbox: [0,0,500,500], target_image_label: 'source'}], isolation: 'complete'}\n"
             "  * target_description: Describes the overall extraction task\n"
-            "  * targets: Array of {target_bbox, target_item_id}. Min len 1. Use multiple for batch extraction.\n"
+            "  * targets: Array of {target_bbox, target_image_label}. Min len 1. Use multiple for batch extraction.\n"
             "- background: {treatment: 'transparent'/'solid_color'/'scene', color: 'white', scene_description: 'modern kitchen'}\n"
             "- lighting: {type: 'natural_window'/'studio_3point', direction: 'front'/'side', shadows: 'soft falloff'}\n"
             "- composition: {position: 'center'/'[main] center [variant] right', camera_angle: 'slight_top', negative_space: 'generous_top'}\n"
