@@ -475,33 +475,28 @@ class FidelitySpec(BaseModel):
     )
 
 
-class ExtractionSpec(BaseModel):
-    """Extract specific product(s) from multi-product image.
+class ExtractionTarget(BaseModel):
+    """Target coordinates for extraction.
 
-    For working with group photos containing multiple products/variants.
-    Supports precise bounding box targeting for multi-item images.
+    Used within ExtractionSpec.targets array. Each target specifies
+    the bounding box and item ID for a specific product to extract.
+    The overall extraction description is in ExtractionSpec.target_description.
+
+    For single item: targets array has 1 element
+    For multiple items: targets array has N elements
     """
 
-    target_description: str = Field(
-        description=(
-            "Describe which product to extract. Be specific. "
-            "Examples: 'the red 500ml variant on the left', "
-            "'the smaller jar in the foreground', 'the glass bottle (not plastic)', "
-            "'all three variants separately', 'just the main hero product in center'"
-        )
-    )
     target_bbox: list[int] | None = Field(
         default=None,
         min_length=4,
         max_length=4,
         description=(
-            "RECOMMENDED: Bounding box coordinates for precise targeting. "
+            "Bounding box coordinates for precise targeting. "
             "Format: [y_min, x_min, y_max, x_max] normalized to 0-1000 scale. "
             "Origin is top-left corner. "
             "Examples: [0, 0, 300, 300] for top-left item, "
             "[333, 333, 666, 666] for center item in 3x3 grid. "
-            "When provided, model focuses on this region for extraction. "
-            "Combine with target_description for best results."
+            "When provided, model focuses on this region for extraction."
         )
     )
     target_item_id: str | None = Field(
@@ -512,10 +507,63 @@ class ExtractionSpec(BaseModel):
             "Use to correlate extraction with upstream detection."
         )
     )
+
+
+class ExtractionSpec(BaseModel):
+    """Extract specific product(s) from multi-product image.
+
+    For working with group photos containing multiple products/variants.
+    Supports precise bounding box targeting for multi-item images.
+
+    USAGE:
+    - target_description: Overall description of what to extract (the composition)
+    - targets: Array of {target_bbox, target_item_id} pairs
+      - Single item extraction: targets array has 1 element
+      - Multi-item extraction: targets array has N elements
+
+    Example single item:
+        ExtractionSpec(
+            target_description="Extract the glass honey jar from [source]",
+            targets=[{"target_bbox": [100, 100, 500, 500], "target_item_id": "item_1"}]
+        )
+
+    Example multiple items:
+        ExtractionSpec(
+            target_description="Extract all 3 honey jar variants from [source]",
+            targets=[
+                {"target_bbox": [0, 0, 333, 500], "target_item_id": "item_1"},
+                {"target_bbox": [333, 0, 666, 500], "target_item_id": "item_2"},
+                {"target_bbox": [666, 0, 1000, 500], "target_item_id": "item_3"}
+            ]
+        )
+    """
+
+    target_description: str = Field(
+        description=(
+            "Overall description of the extraction task. Describes the whole composition. "
+            "Examples: 'Extract the glass honey jar from [source]', "
+            "'Extract all 3 jar variants from the group photo in [source]', "
+            "'Isolate the product with blue lid from messy background in [source]', "
+            "'Extract each item from the 3x3 product grid in [source]'"
+        )
+    )
+
+    targets: list[ExtractionTarget] = Field(
+        min_length=1,
+        description=(
+            "Array of extraction targets with coordinates. "
+            "Each target specifies: target_bbox (coordinates) and target_item_id (tracking ID). "
+            "For single item extraction: array with 1 element. "
+            "For multi-item extraction: array with N elements (one per item). "
+            "Example: [{target_bbox: [0,0,300,300], target_item_id: 'item_1'}, "
+            "{target_bbox: [333,333,666,666], target_item_id: 'item_2'}]"
+        )
+    )
+
     isolation: str = Field(
         default="complete isolation",
         description=(
-            "How to isolate the product. "
+            "How to isolate the product(s). Applies to all targets. "
             "Examples: 'complete isolation - remove everything else', "
             "'soft isolation with subtle shadow', 'keep reflection but remove background', "
             "'extract with context preserved'"
@@ -524,7 +572,7 @@ class ExtractionSpec(BaseModel):
     edge_treatment: str = Field(
         default="clean professional",
         description=(
-            "How to handle extraction edges. "
+            "How to handle extraction edges. Applies to all targets. "
             "Examples: 'surgical clean edges', 'natural soft edges', "
             "'slight feathering for natural look', 'hard precise cutout', "
             "'preserve hair/fiber detail'"
