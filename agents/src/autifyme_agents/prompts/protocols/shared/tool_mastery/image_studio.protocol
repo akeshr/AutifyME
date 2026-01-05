@@ -108,7 +108,7 @@ Extract product(s) from messy background.
 - `target_description`: **REQUIRED** - Overall description of the extraction task (e.g., "Extract the jar", "Extract all 3 variants")
 - `targets`: **REQUIRED** - Array of target objects (min length 1), each with:
   - `target_bbox`: [y_min, x_min, y_max, x_max] normalized 0-1000 for precision
-  - `target_item_id`: Reference ID for tracking (e.g., 'item_1')
+  - `target_image_label`: The label of the image in the `images` array containing this target (e.g., 'source', 'product')
 
 **Shared Settings (apply to all targets):**
 - `isolation`: How complete (complete, soft with shadow, with context)
@@ -483,7 +483,7 @@ For each item in Extraction Targets:
 image_studio(
     extraction={
         "target_description": "Extract specific item", 
-        "targets": [{"target_bbox": [0,0,300,300], "target_item_id": "item_1"}]
+        "targets": [{"target_bbox": [0,0,300,300], "target_image_label": "source"}]
     }
 )
 # Result: 9 separate assets, one per product

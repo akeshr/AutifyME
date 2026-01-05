@@ -234,7 +234,7 @@ Extract each item separately, producing N outputs.
 **Execution pattern:**
 ```
 for each item in manifest:
-    process(targets=[{target_bbox: item.bbox, target_item_id: item.id}])
+    process(targets=[{target_bbox: item.bbox, target_image_label: "source"}])
     output: one asset per item
 ```
 
@@ -250,7 +250,7 @@ Group items by a variant axis, producing M outputs (M < N).
 **Execution pattern:**
 ```
 for each group in manifest.group_by(axis):
-    process(targets=[{target_bbox: i.bbox, target_item_id: i.id} for i in group])
+    process(targets=[{target_bbox: i.bbox, target_image_label: "source"} for i in group])
     output: one asset per group
 ```
 

@@ -499,12 +499,12 @@ class ExtractionTarget(BaseModel):
             "When provided, model focuses on this region for extraction."
         )
     )
-    target_item_id: str | None = Field(
+    target_image_label: str | None = Field(
         default=None,
         description=(
-            "Reference ID from ItemManifest for tracking. "
-            "Examples: 'item_1', 'item_5', 'variant_large_blue'. "
-            "Use to correlate extraction with upstream detection."
+            "The label of the image in the `images` array that contains this target. "
+            "Examples: 'source', 'product', 'group_photo'. "
+            "Essential for multi-image inputs to know WHICH image to extract from."
         )
     )
 
@@ -517,23 +517,23 @@ class ExtractionSpec(BaseModel):
 
     USAGE:
     - target_description: Overall description of what to extract (the composition)
-    - targets: Array of {target_bbox, target_item_id} pairs
+    - targets: Array of {target_bbox, target_image_label} pairs
       - Single item extraction: targets array has 1 element
       - Multi-item extraction: targets array has N elements
 
     Example single item:
         ExtractionSpec(
             target_description="Extract the glass honey jar from [source]",
-            targets=[{"target_bbox": [100, 100, 500, 500], "target_item_id": "item_1"}]
+            targets=[{"target_bbox": [100, 100, 500, 500], "target_image_label": "source"}]
         )
 
     Example multiple items:
         ExtractionSpec(
             target_description="Extract all 3 honey jar variants from [source]",
             targets=[
-                {"target_bbox": [0, 0, 333, 500], "target_item_id": "item_1"},
-                {"target_bbox": [333, 0, 666, 500], "target_item_id": "item_2"},
-                {"target_bbox": [666, 0, 1000, 500], "target_item_id": "item_3"}
+                {"target_bbox": [0, 0, 333, 500], "target_image_label": "source"},
+                {"target_bbox": [333, 0, 666, 500], "target_image_label": "source"},
+                {"target_bbox": [666, 0, 1000, 500], "target_image_label": "source"}
             ]
         )
     """
@@ -552,11 +552,10 @@ class ExtractionSpec(BaseModel):
         min_length=1,
         description=(
             "Array of extraction targets with coordinates. "
-            "Each target specifies: target_bbox (coordinates) and target_item_id (tracking ID). "
+            "Each target specifies: target_bbox (coordinates) and target_image_label (which image). "
             "For single item extraction: array with 1 element. "
             "For multi-item extraction: array with N elements (one per item). "
-            "Example: [{target_bbox: [0,0,300,300], target_item_id: 'item_1'}, "
-            "{target_bbox: [333,333,666,666], target_item_id: 'item_2'}]"
+            "Example: [{target_bbox: [0,0,300,300], target_image_label: 'source'}]"
         )
     )
 
