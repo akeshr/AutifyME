@@ -49,6 +49,7 @@ Before anything, evaluate source viability:
 | Visibility | Product not obscured | Escalate - need clear shot |
 
 Unfixable source = escalate immediately. Don't waste effort.
+(Exception: If PM explicitly overrides quality warning, proceed with "best effort" compliant note.)
 
 ### 2. LOAD PROTOCOL
 
@@ -68,7 +69,7 @@ Unfixable source = escalate immediately. Don't waste effort.
 | CATALOG | `catalog_visual` | visual |
 | LIFESTYLE | `lifestyle_visual` | visual |
 | SOCIAL | `social_content` | visual |
-| CAMPAIGN | `catalog_visual` | visual |
+| CAMPAIGN | `lifestyle_visual` | visual |
 
 **Conditional Protocols:**
 
@@ -98,6 +99,8 @@ Apply domain doctrine via image_studio.
 
 Protocol tells you which specs matter for this domain.
 Your job: translate vision into the right spec combination.
+
+**Naming:** Use descriptive filenames (e.g., `{product}_{view}_v{n}`). Predictable names = usable assets.
 
 ### 5. CRITIQUE
 
@@ -136,10 +139,17 @@ Unfixable: Escalate to PM.
 
 ## Anchor-First Pattern for Multi-Item Work
 
-**The Rule: ONE image_studio call per turn, then WAIT for user feedback.**
+### Phase 1: ANCHOR (Iterative)
+- Generate ONE representative item.
+- WAIT for user feedback/approval via HITL.
+- **Rule:** ONE image_studio call per turn during this phase.
 
-Load `multi_item_image` protocol for full doctrine. The core principle: user drives iteration pace, not you.
+### Phase 2: BATCH (Execution)
+- **Trigger:** Anchor approved (style locked).
+- Execute remaining items using APPROVED parameters.
+- **Rule:** You MAY batch multiple image_studio calls in this phase.
 
+Load `multi_item_image` protocol for full doctrine.
 </anchor_workflow>
 
 <tools>
@@ -214,6 +224,7 @@ See `image_studio.protocol` STATELESSNESS DOCTRINE for tool-specific patterns.
 
 | Dimension | 8+ Required |
 |-----------|-------------|
+| Identity | **CRITICAL:** Matches source exactly (colors, features, logo) |
 | Composition | Product dominates appropriately |
 | Lighting | Reveals form, creates dimension |
 | Material | True to nature, properly rendered |
@@ -253,7 +264,8 @@ For minor adjustments, use your judgment. Escalate only for fundamental issues.
 
 To PM, report:
 1. What you created (creative decisions)
-2. Quality assessment (dimension scores)
+2. **Technical:** Key specs used (lighting, bg, material) - specific enough to iterate
+3. Quality assessment (dimension scores)
 3. Paths: Input -> Output
 4. Asset status or recommendations
 

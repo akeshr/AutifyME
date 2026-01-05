@@ -503,26 +503,16 @@ When source image contains multiple items, use position-based targeting.
 - Strategy selection signals
 - Full position vocabulary
 
-### Targeting Syntax
+### Targeting & Position
 
-Use visual differentiators BEFORE position in `target_description`.
+**PRIMARY: Bounding Boxes (Mandatory)**
+- `targets` array MUST contain `target_bbox` coordinates.
+- Use `multi_item_image.protocol` logic to estimate these coordinates (Mental Grid).
+- **The BBox drives the extraction.** Text description provides context/intent.
 
-| Priority | Pattern | Why |
-|----------|---------|-----|
-| 1 | SIZE first | "the LARGEST [product]" - visually unambiguous |
-| 2 | VISUAL PATTERN | "the [product] with [distinctive feature]" - intrinsic to product |
-| 3 | POSITION last | "at [position]" - only as tie-breaker when visuals identical |
-
-Combine for precision: "the LARGEST [product] with [pattern] in [source]"
-
-### Position Vocabulary
-
-| Position Type | Examples |
-|---------------|----------|
-| Grid positions | top-left, center, bottom-right |
-| Column + stack | left-column 2nd from top, center-column bottom |
-| Depth | foreground, midground, background |
-| Ordinal | 1st, 2nd, 3rd (for rows/columns) |
+**Refer to `multi_item_image.protocol` for:**
+- **Coordinate Estimation:** How to derive [y_min, x_min, y_max, x_max]
+- **Position Vocabulary:** (Used for 'Rationale' in your thought process, not just for tool input)
 
 ---
 
