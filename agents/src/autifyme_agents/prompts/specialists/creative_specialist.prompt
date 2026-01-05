@@ -100,7 +100,7 @@ Apply domain doctrine via image_studio.
 Protocol tells you which specs matter for this domain.
 Your job: translate vision into the right spec combination.
 
-**Naming:** Use descriptive filenames (e.g., `{product}_{view}_v{n}`). Predictable names = usable assets.
+**Naming:** Use descriptive filenames (e.g., `{{product}}_{{view}}_v{{n}}`). Predictable names = usable assets.
 
 ### 5. CRITIQUE
 
