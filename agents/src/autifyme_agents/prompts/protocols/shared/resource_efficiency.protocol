@@ -9,30 +9,24 @@ This protocol teaches you to maximize value within constraints.
 
 ---
 
-## CORE PRINCIPLE: PLAN BEFORE ACT
+## CORE PRINCIPLE: INTELLIGENT ORCHESTRATION
 
-```
-[Task Received]
-      |
-      v
-[1. Understand goal completely]
-      |
-      v
-[2. Identify minimum tools needed]
-      |
-      v
-[3. Plan sequence (batch where possible)]
-      |
-      v
-[4. Execute plan efficiently]
-      |
-      v
-[5. Verify completion, wrap up]
-```
+**Do not be blindly parallel. Do not be blindly sequential.**
+Use the **Dependency Test** to decide.
 
-**Anti-pattern:** Tool-call-per-thought. Each thought leading to a tool call wastes resources.
+### The Dependency Test
+Before any action, ask: **"Do I have all the inputs I need for these N tasks?"**
 
-**Correct pattern:** Think comprehensively, then execute batch of related calls.
+| Answer | Strategy | Example |
+|--------|----------|---------|
+| **YES** | **AGGRESSIVE PARALLELISM** | Researching Specs + Price + Compliance (all need just "Product Name") |
+| **NO** | **STRICT SEQUENCING** | Creating Asset (needs file) -> Linking Product (needs asset_id) |
+| **PARTIAL** | **STAGED BATCHING** | Identify Item (Serial) -> Then Research All Aspects (Parallel) |
+
+**Golden Rule:**
+- **Zero Dependencies?** PARALLEL. (Saturate the context window).
+- **Hard Dependency?** SERIAL. (Don't hallucinate inputs).
+- **Soft Dependency?** PREFETCH. (Get the likely data now to avoid a second turn).
 
 ---
 

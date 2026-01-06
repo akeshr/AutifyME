@@ -7,23 +7,48 @@ Load when: User approved execution, ready to delegate to specialists.
 
 ---
 
-## [CRITICAL] EXECUTION DEPENDENCIES
+## [CRITICAL] OPTIMIZATION: PARALLEL ANALYSIS
 
-**Check what each specialist REQUIRES before delegating.**
+**Always run ANALYSIS in parallel BEFORE starting execution flows.**
 
-| Specialist | REQUIRES | Produces |
-|------------|----------|----------|
-| creative_specialist | Image + analysis files | asset_id |
-| catalog_specialist | Analysis files + asset_id (if linking) | product_id + junctions |
+Execution (Create Product -> Create Asset) is strictly sequential due to ID dependencies.
+Analysis (Visual + Catalog + Product) is INDEPENDENT.
 
-| Flow | Dependency Analysis | Result |
-|------|---------------------|--------|
-| Images First | Catalog Specialist needs asset_id | Creative -> Catalog Specialist |
-| Catalog First | Creative needs product_id for junction | Catalog Specialist -> Creative |
-| Image Only | No catalog dependency | Creative only |
-| Catalog Only | No asset to link | Catalog Specialist only |
+**Correct Pattern: Staged Parallelism**
 
-**Before delegating:** "Does this specialist need an ID I don't have? Run the producer first."
+The level of parallelism depends on Input Clarity.
+
+**Scenario A: Clear Input (User: "Research this Glass Jar")**
+*Dependency met: We know what it is.*
+```
+1. [PARALLEL] Delegate to ALL Analysts:
+    |-> visual_analyst (Confirm details)
+    |-> catalog_analyst (Find Glass Jar families)
+    |-> product_analyst (Research Glass Jar specs)
+```
+
+**Scenario B: Ambiguous Input (User: "What is this image?")**
+*Dependency missing: We don't know what to research.*
+```
+1. [SERIAL] Delegate to visual_analyst ONLY.
+    <- Returns: "It is a 500ml HDPE Bottle"
+
+2. [PARALLEL] Delegate to remaining Analysts (using new identity):
+    |-> catalog_analyst (Find HDPE Bottle families)
+    |-> product_analyst (Research HDPE Bottle specs)
+```
+
+**Rule:** If you don't know the *Product Type*, you cannot research it. Run Visual Analyst first. If you DO know it, run everyone.
+
+**Constraint: Creative Specialist Isolation (DB Writes)**
+When `creative_specialist` is expected to interactions with the DB (`write_data`):
+- **NEVER** run multiple Creative Specialists in parallel.
+- **NEVER** run Creative Specialist in parallel with other Write-Heavy agents.
+- **Reason:** DB writes require atomic handling and clear HITL focus.
+
+**Anti-Pattern:**
+Delegating to `catalog_specialist` and asking it to call `catalog_analyst`.
+NO. You (PM) call the analyst. You are the orchestrator.
 
 ---
 

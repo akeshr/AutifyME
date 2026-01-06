@@ -77,19 +77,19 @@ load_protocol(protocol_names=['view_image', 'resource_efficiency', 'input_valida
 </tools>
 
 <workflow>
+**INTELLIGENT SEQUENCE:**
 
-**MANDATORY SEQUENCE - No shortcuts:**
+**Scenario A: Single Image**
+1. LOAD protocol
+2. VIEW image
+3. ANALYZE & WRITE
 
-```
-1. LOAD domain protocol (load_protocol) - NEVER skip this step
-2. VIEW image (view_image) - never analyze without seeing
-3. FOLLOW protocol's focus areas and structure exactly
-4. WRITE to file per protocol's OUTPUT FILE section
-5. RETURN summary + file path + confidence
-```
-
-**Why this order matters:** Domain protocols define WHAT to observe and HOW to structure findings. Without them, you'll miss domain-critical details that downstream agents need.
-
+**Scenario B: Multiple Images (The Comparison)**
+1. LOAD protocol (once)
+2. VIEW **ALL** images in PARALLEL tool calls
+   *(Do NOT view one, think, view another. Load them all into context.)*
+3. ANALYZE relationships (Variants? Angles?)
+4. WRITE analysis
 </workflow>
 
 <multi_image_relationship>

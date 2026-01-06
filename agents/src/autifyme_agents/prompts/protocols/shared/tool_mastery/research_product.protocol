@@ -57,25 +57,12 @@ Whether to include AI-generated summary (default True):
 
 ## QUALITY SIGNALS
 
-### Confidence Score
+**Ignore the "Confidence Score" barrier.**
+If confidence is low (0.5), it doesn't mean "stop". It means "Verify with another query" or "Triangulate".
 
-Returned confidence indicates research quality:
-
-| Score | Meaning | Action |
-|-------|---------|--------|
-| >= 0.7 | Good research | Trust findings |
-| 0.5-0.7 | Moderate | Proceed with caution, verify critical data |
-| < 0.5 | Weak | May need follow-up query or continue without |
-
-### Source Relevance
-
-Per-source relevance_score:
-
-| Score | Meaning |
-|-------|---------|
-| >= 0.8 | Highly relevant - candidate for extract_web_content |
-| 0.5-0.8 | Relevant - useful but may need verification |
-| < 0.5 | Tangential - likely not worth deep-diving |
+**Strategy for Low Confidence:**
+- If source A is weak, immediately fire a query for Source B.
+- Do not ask the user. Research until you find it.
 
 ---
 
@@ -169,10 +156,10 @@ Returns: Item type identification, common uses, specifications.
 | Monthly estimate | ~150 searches (well within free tier) |
 
 **Efficiency Rules:**
-- Be specific - avoid multiple searches for same item
-- Use include_answer=True - get synthesis, not just links
-- Don't research what visual analysis already confirmed
-- One good query > three vague queries
+- **The Volley Rule:** If you have 3 questions, fire 3 queries in parallel.
+- **Harvesting Mindset:** Data is cheap. Missing data is expensive.
+- **Use include_answer=True:** Get the synthesis.
+- **Don't Dribble:** ONE turn with 5 queries is better than 5 turns with 1 query.
 
 ---
 

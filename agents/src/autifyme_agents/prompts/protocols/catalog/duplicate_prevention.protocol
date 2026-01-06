@@ -75,30 +75,28 @@ If Layer 2/3 indicate possible duplicate, compare images side-by-side.
 
 ## DECISION FLOW
 
+### Concurrent Execution Strategy
+
+**Execute Layer 1 and Layer 2 in PARALLEL.**
+Do not wait for SKU check failure to check names.
+
 ```
-Layer 1: Identifier Check
-    |
-    +-- Found? -> DUPLICATE (stop)
-    |
-    +-- Not found? -> Continue to Layer 2
-         |
-         Layer 2: Name Pattern Check
-              |
-              +-- No matches? -> UNIQUE (proceed)
-              |
-              +-- Matches found? -> Continue to Layer 3
-                   |
-                   Layer 3: Attribute Comparison
-                        |
-                        +-- 4/4 match? -> LIKELY DUPLICATE (stop)
-                        |
-                        +-- 3/4 match? -> Visual Comparison (Layer 4)
-                        |       |
-                        |       +-- Visually same? -> DUPLICATE
-                        |       +-- Visually different? -> UNIQUE
-                        |
-                        +-- 2/4 or less? -> UNIQUE (proceed)
+[Parallel Turn]
+   |--> Check Identifier (SKU/Barcode)
+   |--> Fuzzy Search Name (with key attributes)
+   |
+   v
+[Synthesize Results]
+   |
+   +-- Identifier Match? -> STOP (Duplicate)
+   +-- Name/Attr Match? -> Verify Attribute Detail
+   +-- No Matches? -> PROCEED
 ```
+
+**Why Parallel?**
+- Most checks return "Unique".
+- Serializing adds latency to the "Happy Path" (Create Product).
+- Cost of one extra query is negligible compared to latency savings.
 
 ---
 

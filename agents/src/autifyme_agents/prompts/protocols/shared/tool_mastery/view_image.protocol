@@ -193,20 +193,19 @@ view_image(image_path="inbox/item_type_500.jpg")
 # You SEE: [actual content - verify filename accuracy]
 ```
 
-### Wrong: Batch Viewing
+### Correct: Parallel Viewing
+**When comparing items, view them ALL in the same turn.**
 
+```python
+# View multiple images in parallel tool calls
+[
+  view_image(image_path="inbox/img1.jpg"),
+  view_image(image_path="inbox/img2.jpg")
+]
+# Result: Both images loaded in context. Compare immediately.
 ```
-WRONG:
-# Trying to view multiple images at once
-view_image(image_path=["img1.jpg", "img2.jpg", "img3.jpg"])
 
-CORRECT:
-# View one at a time
-view_image(image_path="inbox/img1.jpg")
-# Analyze first image...
-view_image(image_path="inbox/img2.jpg")
-# Analyze second image...
-```
+**Why:** You cannot compare validly if you see Image A, then forget it to see Image B. You need both "in eyes" simultaneously.
 
 ### Wrong: Repeated Viewing
 

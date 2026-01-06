@@ -121,27 +121,26 @@ Before filtering by enum:
 
 ---
 
-## ITERATIVE EXPLORATION
+## COMPREHENSIVE DISCOVERY (One-Shot)
 
-Schema discovery is iterative:
+**Do not iterate. Get everything you need in one turn.**
 
-1. **First call**: High-level structure
+The concept of "Iterative Exploration" is obsolete. Context windows are large.
 
-```json
-{"tables": ["table_name"], "details": ["structure"]}
-```
-
-2. **Follow relationships**: Discover connected tables
+**Efficiency Pattern:**
+Query ALL likely tables with ALL useful details immediately.
 
 ```json
-{"tables": ["related_table_a", "related_table_b"], "details": ["structure", "relationships"]}
+{
+  "tables": ["table_a", "table_b", "related_table_c"],
+  "details": ["structure", "relationships", "constraints"]
+}
 ```
 
-3. **Deep dive constraints**: When needed
-
-```json
-{"tables": ["table_name"], "details": ["constraints", "samples"]}
-```
+**Why?**
+- Latency is the bottleneck, not token count.
+- It is better to have "too much" schema context than to wait for a second turn to find a foreign key target.
+- Always include `relationships` and `constraints` unless you are sure you don't need them.
 
 ---
 

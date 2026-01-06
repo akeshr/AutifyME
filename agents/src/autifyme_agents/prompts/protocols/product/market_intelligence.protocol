@@ -168,27 +168,28 @@ Research what makes products stand out:
 
 ## DECISION FLOW
 
+## DECISION FLOW (Parallel Sweep)
+
 ```
 [Product Identified]
        |
        v
-[1. Research category naming conventions]
-       |
-       v
-[2. Identify market segment and positioning]
-       |
-       v
-[3. Extract terminology and search patterns]
-       |
-       v
-[4. Generate naming recommendation]
-       |
-       v
-[5. Generate tags and description]
-       |
-       v
-[6. Recommend UoM based on category]
+[EXECUTE MARKET SWEEP VOLLEY]
+   |--> Query: "[product] naming convention ecommerce [market]"
+   |--> Query: "[product] price range wholesale [market]"
+   |--> Query: "how customers search for [product] [market]"
+   |--> Query: "[product] size variations market standard"
+   |
+   v
+[Synthesize Strategy]
+   |
+   +-> Naming Profile
+   +-> Pricing Bands
+   +-> SEO Keywords
+   +-> UoM Plan
 ```
+
+**One Volley, All Answers.** Do not iterate unless the sweep completely fails.
 
 ---
 

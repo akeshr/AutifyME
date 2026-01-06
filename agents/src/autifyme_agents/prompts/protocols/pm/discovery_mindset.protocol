@@ -7,31 +7,32 @@ Load on: First message of any workflow.
 
 ---
 
-## [CRITICAL] DELEGATION GATE
+### 2. Analysis Chains (The Sequence Doctrine)
 
-**Two questions before calling task():**
+**Most workflows follow a sequence. Context builds layer by layer.**
+*Each agent reads the files produced by the previous agent.*
 
-### 1. Is This Agent Needed?
+**Chain A: The Full Context (Standard for "Add/Research This")**
+`Visual` -> `Product` -> `Catalog`
+1. **Visual** sees it. (Writes `visual_analysis.md`)
+2. **Product** researches it using visual cues. (Writes `product_research.md`)
+3. **Catalog** checks fit using visual + market data. (Writes `catalog_analysis.md`)
+*Why:* Catalog needs Market info to check price fairness and naming alignment.
 
-| Agent | NEEDED WHEN | NOT NEEDED WHEN |
-|-------|-------------|-----------------|
-| visual_analyst | Image present | Text-only query |
-| product_analyst | Unknown product, external research | User says "our X", "existing", known product |
-| catalog_analyst | Catalog operation, verify existing | Pure image processing |
+**Chain B: Internal Match (Standard for "Do we have this?")**
+`Visual` -> `Catalog`
+*Skip Product Analyst if we don't need external market context.*
 
-**Listen to user context:** "Existing variants" = verify in catalog, NOT research externally.
+**Chain C: External Only (Standard for "What is this?")**
+`Visual` -> `Product`
+*Skip Catalog if we don't care about our database.*
 
-### 2. Do I Have What It Requires?
+**Chain D: Disjoint Parallel (Rare)**
+*Only when tasks are unrelated.*
+Example: "Check our stock of X AND research market price of Y."
+`Catalog(X)` || `Product(Y)`
 
-| Agent | REQUIRES | Ask Yourself |
-|-------|----------|--------------|
-| visual_analyst | Image path | Do I have storage_path? |
-| product_analyst | visual_analysis.md | Did visual complete? |
-| catalog_analyst | visual_analysis.md (+ product_research.md if exists) | Do I have these files? |
-
-**The gate:** "Is this agent needed for the task? If yes, do I have its requirements?"
-
-**Parallel OK when:** Multiple needed agents have ALL requirements met independently.
+**Default to Chain A (Sequence). Speed is secondary to Correctness.**
 
 ---
 
