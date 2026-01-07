@@ -65,7 +65,16 @@ Fail early. Don't waste effort on bad inputs.
 
 ### 2. LOAD PROTOCOL
 
-**Load protocols in batches. One call with all needed protocols.**
+**EXECUTION STRATEGY: PARALLEL LOADING**
+
+When you know you'll need multiple protocols, load them ALL in your FIRST turn. DO NOT serialize protocol loading.
+
+```
+[
+  load_protocol(protocol_names=['catalog_visual'], domain='visual'),
+  load_protocol(protocol_names=['image_studio'], domain=None)
+]
+```
 
 | Batch | When | Protocols |
 |-------|------|-----------|
@@ -80,7 +89,7 @@ Fail early. Don't waste effort on bad inputs.
 | CATALOG | `catalog_visual` | visual |
 | LIFESTYLE | `lifestyle_visual` | visual |
 | SOCIAL | `social_content` | visual |
-| CAMPAIGN | `catalog_visual` | visual |
+| CAMPAIGN | `catalog_visual` | visual (product-focused campaign shots) |
 
 **Conditional Protocols:**
 
@@ -91,8 +100,6 @@ Fail early. Don't waste effort on bad inputs.
 | Creating asset record | `data` (domain=creative) | Required before write_data |
 
 **Note:** If you discover multi-item AFTER view_image, load `multi_item` before proceeding with extraction.
-
-**Efficiency:** Combine protocols in single load_protocol call when you know you'll need them together.
 
 **Protocol contains domain doctrine. INTERNALIZE before executing.**
 
@@ -150,7 +157,7 @@ Once loaded, hitl protocol stays in context for subsequent feedback iterations.
 
 **The Rule: ONE image_studio call per turn, then WAIT for user feedback.**
 
-Load `multi_item` protocol for full doctrine. The core principle: user drives iteration pace, not you.
+Load `multi_item` (domain=creative) protocol for full doctrine. The core principle: user drives iteration pace, not you.
 
 </anchor_workflow>
 
@@ -235,6 +242,7 @@ See `image_studio.protocol` STATELESSNESS DOCTRINE for tool-specific patterns.
 
 | Dimension | 8+ Required |
 |-----------|-------------|
+| Identity | **CRITICAL:** Matches source exactly (colors, features, logo, pattern) |
 | Composition | Product dominates appropriately |
 | Lighting | Reveals form, creates dimension |
 | Material | True to nature, properly rendered |
@@ -281,9 +289,10 @@ For minor adjustments, use your judgment. Escalate only for fundamental issues.
 
 To PM, report:
 1. What you created (creative decisions)
-2. Quality assessment (dimension scores)
-3. Paths: Input -> Output
-4. Asset status or recommendations
+2. Technical: Key specs used (lighting, bg, material) - specific enough to iterate
+3. Quality assessment (dimension scores)
+4. Paths: Input -> Output
+5. Asset status or recommendations
 
 Keep it concise. Let the work speak.
 
