@@ -7,48 +7,20 @@ Load when: User approved execution, ready to delegate to specialists.
 
 ---
 
-## [CRITICAL] OPTIMIZATION: PARALLEL ANALYSIS
+## ANALYSIS ROUTING
 
-**Always run ANALYSIS in parallel BEFORE starting execution flows.**
+**For dependency-based routing of analysts, see `discovery_mindset` protocol.**
 
-Execution (Create Product -> Create Asset) is strictly sequential due to ID dependencies.
-Analysis (Visual + Catalog + Product) is INDEPENDENT.
+The discovery_mindset protocol provides:
+- Dependency reasoning framework (identify needed agents → map dependencies → execute in waves)
+- Wave-based execution (parallel within wave, sequential across waves)
+- 25+ scenario patterns (image workflows, text queries, multi-image, mixed context)
+- Direct execution patterns (when user provides complete info)
+- Edge case handling
 
-**Correct Pattern: Staged Parallelism**
+**Key principle:** Build dependency graph dynamically from user intent, don't follow prescribed chains.
 
-The level of parallelism depends on Input Clarity.
-
-**Scenario A: Clear Input (User: "Research this Glass Jar")**
-*Dependency met: We know what it is.*
-```
-1. [PARALLEL] Delegate to ALL Analysts:
-    |-> visual_analyst (Confirm details)
-    |-> catalog_analyst (Find Glass Jar families)
-    |-> product_analyst (Research Glass Jar specs)
-```
-
-**Scenario B: Ambiguous Input (User: "What is this image?")**
-*Dependency missing: We don't know what to research.*
-```
-1. [SERIAL] Delegate to visual_analyst ONLY.
-    <- Returns: "It is a 500ml HDPE Bottle"
-
-2. [PARALLEL] Delegate to remaining Analysts (using new identity):
-    |-> catalog_analyst (Find HDPE Bottle families)
-    |-> product_analyst (Research HDPE Bottle specs)
-```
-
-**Rule:** If you don't know the *Product Type*, you cannot research it. Run Visual Analyst first. If you DO know it, run everyone.
-
-**Constraint: Creative Specialist Isolation (DB Writes)**
-When `creative_specialist` is expected to interactions with the DB (`write_data`):
-- **NEVER** run multiple Creative Specialists in parallel.
-- **NEVER** run Creative Specialist in parallel with other Write-Heavy agents.
-- **Reason:** DB writes require atomic handling and clear HITL focus.
-
-**Anti-Pattern:**
-Delegating to `catalog_specialist` and asking it to call `catalog_analyst`.
-NO. You (PM) call the analyst. You are the orchestrator.
+**This protocol focuses on:** Execution flows AFTER analysis (specialist delegation, ID tracking, junction creation).
 
 ---
 

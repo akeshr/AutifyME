@@ -143,42 +143,36 @@ Which approach fits your catalog strategy?"
 
 ---
 
-## CROSS-DOMAIN REFINEMENT
+## CONFLICT RESOLUTION AT SYNTHESIS
 
-**When synthesis reveals conflict or need for deeper analysis.**
+**With wave-based execution (see discovery_mindset), most conflicts are prevented.**
 
-With sequential flow (Visual -> Product -> Catalog), most cross-domain information already flows forward. However, synthesis may still reveal conflicts that need resolution.
+When PM delegates analysts in waves:
+- Wave 1: visual_analyst produces visual_analysis.md
+- Wave 2: product_analyst ‖ catalog_analyst (PM passes visual findings to both)
 
-### When to Trigger Second Pass
+Both P and C analyze WITH visual context from the start. Cross-domain conflicts are rare.
 
-| Signal in Synthesis | Action |
-|---------------------|--------|
-| Catalog "no family fits" + Product "common product type" | Re-route catalog_analyst with product context |
-| Catalog matched utility family + Product says "premium segment" | Re-route catalog_analyst with positioning context |
-| Catalog found family + Product says "special compliance needed" | Re-route catalog_analyst to verify compliance support |
-| Product "standard specs" + Catalog found "premium family" | Re-route product_analyst to research premium differentiation |
+### Rare Edge Case: Post-Synthesis Refinement
 
-### Second Pass Delegation Template
+**If synthesis reveals unexpected conflict requiring re-analysis:**
 
+| Conflict Type | Resolution |
+|---------------|------------|
+| **Business decision** | Surface to user with options (don't re-analyze) |
+| **Factual contradiction** | Trust domain authority per hierarchy (don't re-route) |
+| **Missing critical context** | RARE - delegate conditional agent in new wave |
+
+**Example (rare):**
 ```
-"[Re-analyze based on new context]
+Catalog: "No families match this unusual product type"
+Product: "Common product, widely available"
 
-NEW CONTEXT (from [other_analyst]):
-- [Key finding that changes analysis]
-- [Relevant insight]
-
-Your original analysis at: [original_file]
-Update or confirm your recommendation based on this new context.
-
-For [DOMAIN] domain."
+→ This suggests catalog search may have used wrong terms
+→ Delegate to catalog_analyst again with product's exact terminology
 ```
 
-### Refinement Limit
-
-**Max 1 refinement pass.** If conflict persists after second pass:
-1. Present both perspectives to user
-2. Let user decide which direction to take
-3. Do NOT trigger third pass
+**Principle:** With proper wave execution, refinement should be EXCEPTIONAL. If you're re-routing frequently, check dependency reasoning in discovery_mindset protocol.
 
 ---
 
