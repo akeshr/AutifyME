@@ -113,7 +113,7 @@ class TestImageStudioSchemas:
             ],
             extraction=ExtractionSpec(
                 target_description="Extract [product] from background",
-                targets=[ExtractionTarget(target_bbox=[0, 0, 1000, 1000], target_item_id="product")],
+                targets=[ExtractionTarget(target_bbox=[0, 0, 1000, 1000], target_image_label="product")],
                 isolation="complete",
             ),
             background=BackgroundSpec(treatment="pure white"),
@@ -128,7 +128,7 @@ class TestImageStudioSchemas:
             images=[ImageInput(path="inbox/test/jar.jpg", label="product")],
             extraction=ExtractionSpec(
                 target_description="Glass jar [product]",
-                targets=[ExtractionTarget(target_bbox=[100, 100, 900, 900], target_item_id="jar")]
+                targets=[ExtractionTarget(target_bbox=[100, 100, 900, 900], target_image_label="product")]
             ),
             background=BackgroundSpec(treatment="solid white", color="#FFFFFF"),
             lighting=LightingSpec(
@@ -212,19 +212,19 @@ class TestImageStudioSchemas:
         assert output.error_code == ImageStudioErrorCode.FILE_NOT_FOUND
 
     def test_extraction_target_structure(self):
-        """Test ExtractionTarget model structure (bbox + item_id only)."""
+        """Test ExtractionTarget model structure (bbox + image_label)."""
         target = ExtractionTarget(
             target_bbox=[0, 0, 500, 300],
-            target_item_id="item_1"
+            target_image_label="source"
         )
         assert target.target_bbox == [0, 0, 500, 300]
-        assert target.target_item_id == "item_1"
+        assert target.target_image_label == "source"
 
     def test_extraction_target_minimal(self):
         """Test ExtractionTarget with no fields (all optional)."""
         target = ExtractionTarget()
         assert target.target_bbox is None
-        assert target.target_item_id is None
+        assert target.target_image_label is None
 
     def test_extraction_spec_single_item(self):
         """Test ExtractionSpec with single item (targets array size 1)."""
@@ -233,7 +233,7 @@ class TestImageStudioSchemas:
             targets=[
                 ExtractionTarget(
                     target_bbox=[100, 100, 400, 400],
-                    target_item_id="item_1"
+                    target_image_label="source"
                 )
             ],
             isolation="complete isolation",
@@ -242,7 +242,7 @@ class TestImageStudioSchemas:
         assert spec.target_description == "Extract the glass jar from [source]"
         assert len(spec.targets) == 1
         assert spec.targets[0].target_bbox == [100, 100, 400, 400]
-        assert spec.targets[0].target_item_id == "item_1"
+        assert spec.targets[0].target_image_label == "source"
 
     def test_extraction_spec_multiple_items(self):
         """Test ExtractionSpec with multiple items (targets array size N)."""
@@ -251,24 +251,24 @@ class TestImageStudioSchemas:
             targets=[
                 ExtractionTarget(
                     target_bbox=[0, 0, 300, 300],
-                    target_item_id="item_1"
+                    target_image_label="source"
                 ),
                 ExtractionTarget(
                     target_bbox=[333, 333, 666, 666],
-                    target_item_id="item_2"
+                    target_image_label="source"
                 ),
                 ExtractionTarget(
                     target_bbox=[700, 700, 1000, 1000],
-                    target_item_id="item_3"
+                    target_image_label="source"
                 ),
             ],
             isolation="complete isolation",
             edge_treatment="clean professional"
         )
         assert len(spec.targets) == 3
-        assert spec.targets[0].target_item_id == "item_1"
+        assert spec.targets[0].target_image_label == "source"
         assert spec.targets[1].target_bbox == [333, 333, 666, 666]
-        assert spec.targets[2].target_item_id == "item_3"
+        assert spec.targets[2].target_image_label == "source"
         # Shared settings apply to all
         assert spec.isolation == "complete isolation"
         assert spec.edge_treatment == "clean professional"
@@ -293,11 +293,11 @@ class TestImageStudioSchemas:
                 targets=[
                     ExtractionTarget(
                         target_bbox=[0, 0, 333, 333],
-                        target_item_id="item_1"
+                        target_image_label="source"
                     ),
                     ExtractionTarget(
                         target_bbox=[333, 333, 666, 666],
-                        target_item_id="item_2"
+                        target_image_label="source"
                     ),
                 ],
                 isolation="complete",
@@ -307,7 +307,7 @@ class TestImageStudioSchemas:
         )
         assert input_spec.extraction.target_description == "Extract jars from [source]"
         assert len(input_spec.extraction.targets) == 2
-        assert input_spec.extraction.targets[0].target_item_id == "item_1"
+        assert input_spec.extraction.targets[0].target_image_label == "source"
         assert input_spec.extraction.targets[1].target_bbox == [333, 333, 666, 666]
 
 
@@ -388,8 +388,8 @@ class TestImageProcessing:
         tool.invoke({
             "images": [{"path": "/tmp/test.png", "label": "product"}],
             "extraction": {
-                "target_description": "Extract [product]", 
-                "targets": [{"target_bbox": [0,0,500,500], "target_item_id": "p1"}],
+                "target_description": "Extract [product]",
+                "targets": [{"target_bbox": [0,0,500,500], "target_image_label": "product"}],
                 "isolation": "complete"
             },
             "background": {"treatment": "pure white"},
