@@ -1,0 +1,229 @@
+<protocol name="hitl" type="cross_cutting" domain="creative">
+
+## PURPOSE
+
+Handle Human-in-the-Loop feedback for creative processing.
+Load when ANY tool response contains `[HITL_FEEDBACK]` marker.
+
+---
+
+## CRITICAL: PM VISIBILITY
+
+**PM cannot see HITL events directly.**
+
+```
+[User] <--HITL--> [You] --response--> [PM]
+                    ^
+              PM cannot see this
+```
+
+Your response format is the ONLY signal PM receives.
+**Always include HITL markers in your response.**
+
+---
+
+## SIMPLE LOGIC
+
+| User Says | What To Do |
+|-----------|------------|
+| Specific feedback | Apply it, retry (no limit) |
+| Question ("why?") | Explain, resubmit same work |
+| Cancel | Report to PM what was done |
+| Bare reject (no info) | Go to PM - ask what's wrong |
+
+**No escalation limits. Keep iterating until user is happy or cancels.**
+
+---
+
+## ACTIONABLE FEEDBACK - Apply and Retry
+
+When user gives ANY specific direction, apply it and retry:
+
+```
+[HITL_FEEDBACK] "Make the background light gray, not white"
+
+[HITL RESOLVED]
+
+**User Feedback:** "Make the background light gray, not white"
+
+**Applied:** Background white -> light gray
+
+Proceeding with corrected processing.
+-> [call image_studio with adjusted background setting]
+```
+
+```
+[HITL_FEEDBACK] "Too dark, make it brighter"
+
+[HITL RESOLVED]
+
+**User Feedback:** "Too dark, make it brighter"
+
+**Applied:** Increased brightness/exposure
+
+Proceeding with corrected processing.
+-> [call image_studio with adjusted lighting]
+```
+
+---
+
+## QUESTION - Explain and Resubmit
+
+When user asks "why" - explain your reasoning and resubmit same work:
+
+```
+[HITL_FEEDBACK] "Why did you crop so much?"
+
+[HITL RESOLVED]
+
+**User Feedback:** "Why did you crop so much?"
+
+**Explanation:** Cropped to focus on product center and meet standard hero dimensions (1:1 square).
+
+Resubmitting same work. Reject with specific instructions if you'd like different cropping.
+-> [resubmit via write_data with same asset]
+```
+
+---
+
+## CANCEL - Report to PM
+
+When user cancels, report what was done:
+
+```
+[HITL_FEEDBACK] "Cancel" / "Never mind"
+
+[HITL CANCELED]
+
+**User canceled the task.**
+
+**Work Completed:**
+- 3/5 images processed
+- asset_abc123 created (before cancel)
+
+**Work Remaining:**
+- 2 images not processed
+
+Returning to PM.
+```
+
+---
+
+## BARE REJECT - Go to PM
+
+When user rejects without explanation, you cannot guess. Go to PM:
+
+```
+[HITL_FEEDBACK] "Reject" / "No" / (empty)
+
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**User Feedback:** "Reject"
+
+**What Was Proposed:**
+- Background: White
+- Style: Product-centered hero shot
+- Processing: Background removal + shadow
+
+**What I Need:** Specific feedback on what to change.
+
+PM, please ask user what they'd like different.
+```
+
+---
+
+## RESPONSE FORMATS
+
+### Resolved (then CALL tool)
+
+```
+[HITL RESOLVED]
+
+**User Feedback:** "[exact feedback]"
+
+**Applied:** [what changed]
+
+Proceeding with corrected action.
+-> [tool_call]
+```
+
+### Canceled
+
+```
+[HITL CANCELED]
+
+**Work Completed:** [what was done]
+**Work Remaining:** [what wasn't done]
+
+Returning to PM.
+```
+
+### Needs PM (bare reject only)
+
+```
+## HITL FEEDBACK REQUIRES PM DIRECTION
+
+**User Feedback:** "[exact feedback]"
+
+**What Was Proposed:** [summary]
+
+**What I Need:** [specific question for user]
+```
+
+---
+
+## TARGETING FEEDBACK - Re-analyze, Don't Edit Files
+
+**When user says extraction targeted wrong item or wrong coordinates:**
+
+1. **view_image** - Look at the source image yourself
+2. **Re-identify** - Find the correct item using user's description
+3. **Re-extract** - Call image_studio with YOUR corrected coordinates
+
+**NEVER edit analyst files.** Analyst files are upstream read-only outputs. You have vision - USE IT.
+
+```
+[HITL_FEEDBACK] "That's the wrong jar - I meant the tall one on the left"
+
+[HITL RESOLVED]
+
+**User Feedback:** "That's the wrong jar - I meant the tall one on the left"
+
+**Action:** Re-analyzing source image to locate correct target.
+-> [view_image on source]
+
+Found: Tall jar at left-column, bbox approximately [50, 20, 600, 350]
+
+Proceeding with corrected extraction.
+-> [call image_studio with corrected target and bbox]
+```
+
+---
+
+## ANTI-PATTERNS
+
+**Wrong:** Responding without HITL marker
+```
+"What style would you prefer?"  # PM doesn't know this is HITL
+```
+
+**Wrong:** Describing action instead of executing
+```
+[HITL RESOLVED]
+Proceeding with: [parameters]  # TEXT, not tool call!
+```
+
+**Wrong:** Editing analyst files instead of re-analyzing
+```
+[HITL_FEEDBACK] "Wrong item"
+-> [edit visual_analysis_*.md to change coordinates]  # NO! Files are READ-ONLY
+```
+
+**Correct:**
+```
+[HITL RESOLVED]
+Proceeding with corrected action.
+-> [view_image to re-analyze, then image_studio with YOUR coordinates]
+```
+
+</protocol>

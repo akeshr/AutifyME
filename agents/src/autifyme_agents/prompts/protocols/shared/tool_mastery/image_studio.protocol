@@ -103,18 +103,12 @@ Reference labels using `[label]` syntax in specs:
 Use what applies to your use case. Describe YOUR situation - don't copy examples.
 
 ### extraction
-Extract product(s) from messy background.
-
-- `target_description`: **REQUIRED** - Overall description of the extraction task (e.g., "Extract the jar", "Extract all 3 variants")
-- `targets`: **REQUIRED** - Array of target objects (min length 1), each with:
-  - `target_bbox`: [y_min, x_min, y_max, x_max] normalized 0-1000 for precision
-  - `target_image_label`: The label of the image in the `images` array containing this target (e.g., 'source', 'product')
-
-**Shared Settings (apply to all targets):**
+Extract product from messy background.
+- `target_description`: **REQUIRED** - what to extract, reference [source] label
+- `position_hint`: Where in frame (left, center, foreground, etc.)
 - `isolation`: How complete (complete, soft with shadow, with context)
 - `edge_treatment`: Edge quality (surgical, natural soft, feathered)
 - `custom`: Special extraction needs
-
 
 ### background
 Set the background after extraction or for compositing.
@@ -475,44 +469,75 @@ Always specify filename for predictable paths in view_image and write_data.
 ```
 WRONG:
 Source has 9 products, but:
-image_studio(extraction={"target_description": "the jars", "targets": [...]})
-# Result: 1 asset containing all 9 products (COMPOSITE) when you wanted INDIVIDUAL assets
+image_studio(extraction={"target_description": "the jars"})
+# Result: 1 asset for 9 products
 
-CORRECT (for Catalog/Individual Assets):
+CORRECT:
 For each item in Extraction Targets:
-image_studio(
-    extraction={
-        "target_description": "Extract specific item", 
-        "targets": [{"target_bbox": [0,0,300,300], "target_image_label": "source"}]
-    }
-)
-# Result: 9 separate assets, one per product
+image_studio(extraction={"target_description": "Large jar with blue lid at top-left"})
+# Result: 9 assets, one per product
 ```
 
-When source contains multiple items, extract each separately (INDIVIDUAL strategy) unless explicitly asked for a group shot (COMPOSITE).
+When source contains multiple items, extract each separately (unless explicitly asked for family shot).
 
 ---
 
 ## MULTI-ITEM EXTRACTION
 
-When source image contains multiple items, use position-based targeting.
+When source image contains multiple items, use precise targeting.
 
-**See `multi_item_image.protocol` for:**
+**See `multi_item.protocol` (domain=creative) for:**
 - Classification types (VARIANTS, COLLECTION, COMPONENTS)
 - Processing strategies (INDIVIDUAL, COMPOSITE, GROUPED)
 - Strategy selection signals
-- Full position vocabulary
 
-### Targeting & Position
+### [CRITICAL] Targeting: Separate WHAT from WHERE
 
-**PRIMARY: Bounding Boxes (Mandatory)**
-- `targets` array MUST contain `target_bbox` coordinates.
-- Use `multi_item_image.protocol` logic to estimate these coordinates (Mental Grid).
-- **The BBox drives the extraction.** Text description provides context/intent.
+| Field | Purpose | Single | Multi-source (list) |
+|-------|---------|--------|---------------------|
+| `target_description` | WHAT to extract | Visual attributes | Describes final composite |
+| `target_image` | WHICH image(s) | `"[source]"` | `["[bodies]", "[lids]"]` |
+| `target_bbox` | WHERE | `[y,x,y,x]` | `[[...], [...]]` |
 
-**Refer to `multi_item_image.protocol` for:**
-- **Coordinate Estimation:** How to derive [y_min, x_min, y_max, x_max]
-- **Position Vocabulary:** (Used for 'Rationale' in your thought process, not just for tool input)
+**Single source (default):**
+```
+target_description: "tall jar with floral print"
+target_image: "[source]"
+target_bbox: [50, 20, 600, 350]
+```
+
+**Multi-source composition (COMPONENTS):**
+```
+target_description: "glass jar with blue lid"  # Describes final result
+target_image: ["[bodies]", "[lids]"]           # Extract from each
+target_bbox: [[100, 50, 800, 600], [200, 100, 400, 300]]  # Corresponding regions
+```
+
+Lists must be same length. Each bbox corresponds to same-index image.
+
+**Description must NOT contain position.** Position is in bbox coordinates.
+
+### When Bbox NOT Available
+
+Only when bbox is unavailable, include position in description:
+
+```
+target_description: "the LARGEST jar with floral print at left-column"
+```
+
+Priority for description-only targeting:
+1. SIZE first - "the LARGEST", "the SMALLEST"
+2. VISUAL PATTERN - "with floral print", "blue lid"
+3. POSITION last - "at left-column" (tie-breaker only)
+
+### Position Vocabulary (for description-only cases)
+
+| Position Type | Examples |
+|---------------|----------|
+| Grid positions | top-left, center, bottom-right |
+| Column + stack | left-column 2nd from top, center-column bottom |
+| Depth | foreground, midground, background |
+| Ordinal | 1st, 2nd, 3rd (for rows/columns) |
 
 ---
 

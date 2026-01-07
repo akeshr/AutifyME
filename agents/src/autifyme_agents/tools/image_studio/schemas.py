@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # =============================================================================
 # Image Input - Labeled images for flexible multi-image workflows
@@ -475,94 +475,51 @@ class FidelitySpec(BaseModel):
     )
 
 
-class ExtractionTarget(BaseModel):
-    """Target coordinates for extraction.
-
-    Used within ExtractionSpec.targets array. Each target specifies
-    the bounding box and item ID for a specific product to extract.
-    The overall extraction description is in ExtractionSpec.target_description.
-
-    For single item: targets array has 1 element
-    For multiple items: targets array has N elements
-    """
-
-    target_bbox: list[int] | None = Field(
-        default=None,
-        min_length=4,
-        max_length=4,
-        description=(
-            "Bounding box coordinates for precise targeting. "
-            "Format: [y_min, x_min, y_max, x_max] normalized to 0-1000 scale. "
-            "Origin is top-left corner. "
-            "Examples: [0, 0, 300, 300] for top-left item, "
-            "[333, 333, 666, 666] for center item in 3x3 grid. "
-            "When provided, model focuses on this region for extraction."
-        )
-    )
-    target_image_label: str | None = Field(
-        default=None,
-        description=(
-            "The label of the image in the `images` array that contains this target. "
-            "Examples: 'source', 'product', 'group_photo'. "
-            "Essential for multi-image inputs to know WHICH image to extract from."
-        )
-    )
-
-
 class ExtractionSpec(BaseModel):
     """Extract specific product(s) from multi-product image.
 
     For working with group photos containing multiple products/variants.
     Supports precise bounding box targeting for multi-item images.
-
-    USAGE:
-    - target_description: Overall description of what to extract (the composition)
-    - targets: Array of {target_bbox, target_image_label} pairs
-      - Single item extraction: targets array has 1 element
-      - Multi-item extraction: targets array has N elements
-
-    Example single item:
-        ExtractionSpec(
-            target_description="Extract the glass honey jar from [source]",
-            targets=[{"target_bbox": [100, 100, 500, 500], "target_image_label": "source"}]
-        )
-
-    Example multiple items:
-        ExtractionSpec(
-            target_description="Extract all 3 honey jar variants from [source]",
-            targets=[
-                {"target_bbox": [0, 0, 333, 500], "target_image_label": "source"},
-                {"target_bbox": [333, 0, 666, 500], "target_image_label": "source"},
-                {"target_bbox": [666, 0, 1000, 500], "target_image_label": "source"}
-            ]
-        )
     """
 
     target_description: str = Field(
         description=(
-            "Overall description of the extraction task. Describes the whole composition. "
-            "Examples: 'Extract the glass honey jar from [source]', "
-            "'Extract all 3 jar variants from the group photo in [source]', "
-            "'Isolate the product with blue lid from messy background in [source]', "
-            "'Extract each item from the 3x3 product grid in [source]'"
+            "WHAT to extract - visual characteristics only, NOT position. "
+            "Examples: 'the red 500ml variant', 'the smaller jar', "
+            "'the glass bottle (not plastic)', 'tall jar with floral print'. "
+            "Do NOT include position words (left, right, center) - use target_bbox for WHERE."
         )
     )
-
-    targets: list[ExtractionTarget] = Field(
-        min_length=1,
+    target_image: str | list[str] | None = Field(
+        default=None,
         description=(
-            "Array of extraction targets with coordinates. "
-            "Each target specifies: target_bbox (coordinates) and target_image_label (which image). "
-            "For single item extraction: array with 1 element. "
-            "For multi-item extraction: array with N elements (one per item). "
-            "Example: [{target_bbox: [0,0,300,300], target_image_label: 'source'}]"
+            "WHICH image(s) to extract from - use labels from images array. "
+            "Single: '[source]' for one image. "
+            "List: ['[bodies]', '[lids]'] for multi-source composition. "
+            "When list, must match target_bbox list length."
         )
     )
-
+    target_bbox: list[int] | list[list[int]] | None = Field(
+        default=None,
+        description=(
+            "AUTHORITATIVE: WHERE to extract. Format: [y_min, x_min, y_max, x_max] normalized 0-1000. "
+            "Single: [0, 0, 300, 300] for one region. "
+            "List: [[100, 50, 800, 600], [200, 100, 400, 300]] for multi-source composition. "
+            "When list, each bbox corresponds to same-index target_image."
+        )
+    )
+    target_item_id: str | None = Field(
+        default=None,
+        description=(
+            "Reference ID from ItemManifest for tracking. "
+            "Examples: 'item_1', 'item_5', 'variant_large_blue'. "
+            "Use to correlate extraction with upstream detection."
+        )
+    )
     isolation: str = Field(
         default="complete isolation",
         description=(
-            "How to isolate the product(s). Applies to all targets. "
+            "How to isolate the product. "
             "Examples: 'complete isolation - remove everything else', "
             "'soft isolation with subtle shadow', 'keep reflection but remove background', "
             "'extract with context preserved'"
@@ -571,7 +528,7 @@ class ExtractionSpec(BaseModel):
     edge_treatment: str = Field(
         default="clean professional",
         description=(
-            "How to handle extraction edges. Applies to all targets. "
+            "How to handle extraction edges. "
             "Examples: 'surgical clean edges', 'natural soft edges', "
             "'slight feathering for natural look', 'hard precise cutout', "
             "'preserve hair/fiber detail'"
@@ -584,6 +541,27 @@ class ExtractionSpec(BaseModel):
             "Use for complex multi-product scenarios, special masking needs."
         )
     )
+
+    @model_validator(mode="after")
+    def validate_list_lengths(self) -> "ExtractionSpec":
+        """Ensure target_image and target_bbox lists have matching lengths."""
+        img = self.target_image
+        bbox = self.target_bbox
+
+        img_is_list = isinstance(img, list)
+        bbox_is_list = bbox is not None and isinstance(bbox[0], list) if bbox else False
+
+        if img_is_list and bbox_is_list:
+            if len(img) != len(bbox):
+                raise ValueError(
+                    f"target_image list ({len(img)}) must match target_bbox list ({len(bbox)})"
+                )
+        elif img_is_list != bbox_is_list:
+            if img_is_list or bbox_is_list:
+                raise ValueError(
+                    "target_image and target_bbox must both be single or both be lists"
+                )
+        return self
 
 
 class FocusSpec(BaseModel):
@@ -776,15 +754,16 @@ class ImageStudioInput(BaseModel):
 
     EXAMPLES:
 
-    1. Extract product with background removal:
+    1. Extract product with background removal (using bbox):
     ```python
     ImageStudioInput(
         images=[
             ImageInput(path="inbox/group.jpg", label="source")
         ],
         extraction=ExtractionSpec(
-            target_description="the 500ml glass jar on the left in [source]",
-            position_hint="left side of frame",
+            target_description="the 500ml glass jar",  # WHAT only
+            target_image="[source]",                   # WHICH image
+            target_bbox=[50, 20, 450, 380],            # WHERE in that image
             isolation="complete isolation",
             edge_treatment="surgical clean edges"
         ),

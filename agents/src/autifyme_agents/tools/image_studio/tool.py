@@ -119,14 +119,16 @@ KEY DISTINCTION:
 
 === SPEC TYPES (apply what's provided) ===
 
-"extraction" = EXTRACT FROM SOURCE IMAGE
-  - target_description: Overall description of the task
-  - targets: Array of items to extract, each with specific bbox
-    * target_bbox: Precise coordinate targeting
-    * target_image_label: Label of the image containing this target
-  - Isolate the described item(s) from the provided source
-  - Source may be messy - your job is to isolate cleanly
-  - PRIORITY: Use bbox for targeting when available
+"extraction" = EXTRACT FROM SOURCE IMAGE(S)
+  - target_description: WHAT to extract (characteristics only, NOT position)
+  - target_image: WHICH image(s) - single "[source]" OR list ["[bodies]", "[lids]"]
+  - target_bbox: WHERE - single [y,x,y,x] OR list [[...], [...]] for multi-source
+
+  Single source: target_image="[source]", target_bbox=[0,0,500,500]
+  Multi-source:  target_image=["[bodies]","[lids]"], target_bbox=[[...],[...]]
+
+  When lists provided, extract from each image at corresponding bbox, compose together.
+  Lists must be same length. Description describes the final composite result.
 
 "fidelity" = PRODUCT IDENTITY PRESERVATION
   - preserve_colors, preserve_artwork, preserve_shape, hero_features
@@ -730,9 +732,8 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- Text extraction/analysis (use view_image)\n\n"
             "STRUCTURED SPECS (all optional - use what applies):\n"
             "- fidelity: CRITICAL for source images - {preserve_colors: 'exact match', preserve_artwork: 'honeycomb pattern', hero_features: 'texture pattern'}\n"
-            "- extraction: {target_description: 'Extract jar from [source]', targets: [{target_bbox: [0,0,500,500], target_image_label: 'source'}], isolation: 'complete'}\n"
-            "  * target_description: Describes the overall extraction task\n"
-            "  * targets: Array of {target_bbox, target_image_label}. Min len 1. Use multiple for batch extraction.\n"
+            "- extraction: {target_description: 'glass jar with lid', target_image: '[source]' or ['[bodies]','[lids]'], target_bbox: [...] or [[...],[...]]}\n"
+            "  * Single or list - lists for multi-source composition. description: WHAT (final result).\n"
             "- background: {treatment: 'transparent'/'solid_color'/'scene', color: 'white', scene_description: 'modern kitchen'}\n"
             "- lighting: {type: 'natural_window'/'studio_3point', direction: 'front'/'side', shadows: 'soft falloff'}\n"
             "- composition: {position: 'center'/'[main] center [variant] right', camera_angle: 'slight_top', negative_space: 'generous_top'}\n"
@@ -754,7 +755,7 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- LABEL SYNTAX: Reference labels using [label] in spec STRING values (e.g., 'jar in [source]', 'place [product] on [background]')\n"
             "- storage_path output: Use this for write_data assets (pending/ path)\n"
             "- Material matters: Glass, metal, plastic need different rendering (specify material_treatment)\n"
-            "- One output per call (unless using extraction.targets for batch)\n\n"
+            "- One output per call: Not batch processing\n\n"
             "PATTERNS: See image_studio.protocol for detailed use patterns (extract, lifestyle, family, hero shot).\n\n"
             "WORKFLOW:\n"
             "- view_image: BEFORE image_studio - see what you're working with\n"

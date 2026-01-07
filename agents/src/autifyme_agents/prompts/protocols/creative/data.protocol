@@ -1,0 +1,271 @@
+<protocol name="data" type="tool_mastery" domain="creative">
+
+## PURPOSE
+
+Data operations for Creative Specialist across all domains: CATALOG, LIFESTYLE, SOCIAL, CAMPAIGN.
+Load when creating asset records after image processing.
+
+---
+
+## [CRITICAL] SCHEMA FIRST
+
+**Call inspect_schema BEFORE any read_data or write_data. No exceptions.**
+
+Inspect tables relevant to your domain:
+- CATALOG/LIFESTYLE: assets, product_assets
+- CAMPAIGN/SOCIAL: assets, campaign_assets
+
+Schema reveals actual column names, required fields, valid enum values.
+**Patterns below show structure. VERIFY column names match your schema.**
+
+---
+
+## DOMAIN -> JUNCTION MAPPING
+
+| Domain | Junction Table | Purpose Field | Typical Role |
+|--------|----------------|---------------|--------------|
+| CATALOG | product_assets | PRODUCT | PRIMARY, GALLERY, ZOOM |
+| LIFESTYLE | product_assets | PRODUCT | LIFESTYLE |
+| SOCIAL | campaign_assets OR none | SOCIAL | varies |
+| CAMPAIGN | campaign_assets | CAMPAIGN | varies |
+| STANDALONE | none | STANDALONE | n/a |
+
+---
+
+## STORAGE PATHS
+
+| Stage | Path | Created By |
+|-------|------|------------|
+| User upload | `inbox/[filename]` | download_media |
+| Processed | `pending/[filename]` | image_studio |
+| Cataloged | URL in assets table | write_data after HITL |
+
+---
+
+## ASSETS TABLE
+
+### Required Fields (verify via inspect_schema)
+
+| Field | Type | Values |
+|-------|------|--------|
+| name | varchar | descriptive name |
+| storage_url | text | @[ref].public_url |
+| storage_provider | varchar | from schema enum |
+| file_name | varchar | from image_studio output |
+| mime_type | varchar | image/png, image/jpeg, image/webp |
+| asset_type | varchar | from schema enum |
+| status | varchar | from schema enum |
+| purpose | varchar | from schema enum |
+
+### AI Lineage (MANDATORY)
+
+| Field | Value |
+|-------|-------|
+| is_ai_generated | true |
+| source_asset_ids | [uuid] or null if from inbox |
+| generation_prompt | summarize operation + settings |
+
+---
+
+## PRODUCT_ASSETS JUNCTION
+
+For CATALOG and LIFESTYLE domains.
+
+### XOR Constraint (CRITICAL)
+
+**Exactly ONE of product_id OR product_family_id. Never both, never neither.**
+
+### Asset Roles (verify enum values via schema)
+
+| Role | Domain | Use |
+|------|--------|-----|
+| PRIMARY | CATALOG | Main image (ONE per product) |
+| GALLERY | CATALOG | Additional angles |
+| ZOOM | CATALOG | High-res detail |
+| LIFESTYLE | LIFESTYLE | In-context shots |
+
+---
+
+## CAMPAIGN_ASSETS JUNCTION
+
+For CAMPAIGN and SOCIAL domains.
+
+Fields: campaign_id, asset_id, usage_type, placement (verify via schema)
+
+---
+
+## READ PATTERNS
+
+### filters vs search_patterns
+
+| Parameter | Use For |
+|-----------|---------|
+| filters | Exact match: IDs, booleans, enum values |
+| search_patterns | Fuzzy match: names, text (use % wildcards) |
+
+### Duplicate Check
+
+Before creating, check if similar asset exists:
+- Table: assets
+- Use search_patterns on name field
+- Select only id, name, status columns
+
+### Check Role Exists (CATALOG only)
+
+Before assigning PRIMARY role, check if one exists:
+- Table: product_assets (verify name via schema)
+- Filter by product_id and role column (verify column name via schema)
+- If results: assign GALLERY. If empty: assign PRIMARY.
+
+---
+
+## WRITE PATTERNS
+
+### WriteIntent Structure
+
+| Field | Purpose |
+|-------|---------|
+| goal | What you're creating |
+| reasoning | Quality verified, validation done |
+| hitl_summary | User approval message |
+| asset_uploads | Images to show in HITL |
+| operations | Database operations |
+| impact | Summary of changes |
+
+### asset_uploads (CRITICAL for Image HITL)
+
+Each upload needs:
+- storage_path: from image_studio output
+- returns: reference name for operations
+- caption: descriptive text for user
+- target_folder: domain-appropriate folder
+
+Reference in operations: @[ref_name].public_url, @[ref_name].caption
+
+---
+
+### Pattern: Single Asset (All Domains)
+
+Structure (adapt field names from schema):
+
+```
+WriteIntent:
+  goal: "Create [domain] asset"
+  reasoning: "Quality verified: [checks done]"
+  hitl_summary: "[Domain] image ready. [Summary]. Approve?"
+  asset_uploads: [{storage_path, returns, caption, target_folder}]
+  operations:
+    - action: create
+      table: [assets table name]
+      data:
+        [name_field]: descriptive name
+        [url_field]: @ref.public_url
+        [provider_field]: from schema enum
+        [type_field]: from schema enum
+        [status_field]: from schema enum
+        [purpose_field]: match domain
+        [ai_generated_field]: true
+        [lineage_fields]: as required
+      returns: asset
+  impact: {creates: {assets: 1}}
+```
+
+---
+
+### Pattern: Asset + Product Junction (CATALOG/LIFESTYLE)
+
+Structure (adapt field names from schema):
+
+```
+operations:
+  1. Create asset (returns: asset)
+  2. Create junction:
+     - table: [product_assets table name]
+     - product_id: [uuid] OR product_family_id: [uuid] (XOR)
+     - asset_id: @asset.id
+     - role: from schema enum
+     - dependencies: [asset]
+```
+
+---
+
+### Pattern: Asset + Campaign Junction (CAMPAIGN/SOCIAL)
+
+Structure (adapt field names from schema):
+
+```
+operations:
+  1. Create asset with purpose CAMPAIGN or SOCIAL (returns: asset)
+  2. Create junction:
+     - table: [campaign_assets table name]
+     - campaign_id: [uuid]
+     - asset_id: @asset.id
+     - usage_type, placement: as appropriate
+     - dependencies: [asset]
+```
+
+---
+
+### Pattern: Family-Level Asset
+
+For assets shared by all products in family:
+
+```
+operations:
+  1. Create asset with purpose FAMILY (returns: asset)
+  2. Create junction:
+     - product_id: null
+     - product_family_id: [family-uuid]
+     - role: LIFESTYLE typically
+```
+
+---
+
+### Pattern: Batch Assets (Variants)
+
+For multiple variants:
+
+```
+asset_uploads: one entry per variant with unique returns name
+operations:
+  1. Create assets as array (returns: assets_batch)
+
+Reference: @assets_batch[0].id, @assets_batch[1].id
+```
+
+---
+
+### Pattern: Replace Image (Archive Old)
+
+```
+operations:
+  1. Update old asset: status -> ARCHIVED
+  2. Create new asset (returns: new_asset)
+  3. Update junction: asset_id -> @new_asset.id
+     dependencies: [new_asset]
+```
+
+---
+
+## STANDALONE PROCESSING
+
+**When PM says "Standalone" or "For user download":**
+
+Skip write_data entirely. Return storage_path to PM. No asset record.
+
+---
+
+## ANTI-PATTERNS
+
+| Wrong | Correct |
+|-------|---------|
+| Skip inspect_schema | Always verify schema first |
+| Copy patterns without checking column names | Verify ALL field names via schema |
+| Guess enum values | Get valid values from schema constraints |
+| Both product_id AND product_family_id | Exactly ONE, other null |
+| Assign PRIMARY without checking | Query junction first |
+| Hallucinate paths | Use EXACT paths from tool output |
+| Create record for standalone | Return path only |
+| Use product_assets for CAMPAIGN | Use campaign_assets |
+
+</protocol>
