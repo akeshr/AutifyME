@@ -115,26 +115,36 @@ When multi-item detected, output a structured manifest that downstream agents ca
 
 **[CRITICAL] Column Purposes - DO NOT MIX:**
 
-| Column | Purpose | Goes to image_studio as |
-|--------|---------|-------------------------|
-| Source | WHICH image (when multi-source) | `target_image` |
-| Description | WHAT - visual characteristics only | `target_description` |
+| Column | Purpose | Goes to ExtractionTarget as |
+|--------|---------|------------------------------|
+| Source | WHICH image (when multi-source) | `target_image_label` |
+| Description | Overall task description | Goes to ExtractionSpec `target_description` |
 | BBox | WHERE - pixel-precise coordinates | `target_bbox` |
 | Position | Human reference only | NOT used in tool call |
 
 **Description must NOT contain position.** Position info goes in BBox coordinates.
 
-```
-WRONG: Description = "tall jar with floral print on the left"
-RIGHT: Description = "tall jar with floral print", target_image = "[source]", BBox = [50, 20, 600, 350]
+**Single-source extraction (one item):**
+```python
+extraction=ExtractionSpec(
+    target_description="Extract tall jar with floral print from group photo",
+    targets=[
+        ExtractionTarget(
+            target_bbox=[50, 20, 600, 350],
+            target_image_label="source"
+        )
+    ]
+)
 ```
 
-**Multi-source composition (single call with lists):**
-```
-image_studio(
-    target_description="glass jar with blue lid",    # Describes final composite
-    target_image=["[bodies]", "[lids]"],             # List of sources
-    target_bbox=[[100, 50, 800, 600], [200, 100, 400, 300]]  # Corresponding bboxes
+**Multi-source composition (body from one image, lid from another):**
+```python
+extraction=ExtractionSpec(
+    target_description="Compose glass jar with blue lid",  # Describes final composite
+    targets=[
+        ExtractionTarget(target_bbox=[100, 50, 800, 600], target_image_label="bodies"),
+        ExtractionTarget(target_bbox=[200, 100, 400, 300], target_image_label="lids")
+    ]
 )
 ```
 
@@ -266,9 +276,15 @@ Extract each item separately, producing N outputs.
 ```
 for each item in manifest:
     image_studio(
-        target_description=item.description,  # WHAT only
-        target_image=item.source or "[source]", # WHICH image (per-item for multi-source)
-        target_bbox=item.bbox                 # WHERE (authoritative)
+        extraction=ExtractionSpec(
+            target_description=f"Extract {item.description} from source image",
+            targets=[
+                ExtractionTarget(
+                    target_bbox=item.bbox,
+                    target_image_label=item.source or "source"
+                )
+            ]
+        )
     )
     output: one asset per item
 ```
@@ -307,20 +323,23 @@ image_studio(
 )
 ```
 
-**Multi-source (COMPONENTS - using lists):**
-```
+**Multi-source (COMPONENTS - structured targets):**
+```python
 image_studio(
     images=[
         {"path": "inbox/bodies.jpg", "label": "bodies"},
         {"path": "inbox/lids.jpg", "label": "lids"}
     ],
-    extraction={
-        "target_description": "assembled jar with lid",
-        "target_image": ["[bodies]", "[lids]"],
-        "target_bbox": [[100, 50, 800, 600], [200, 100, 400, 300]]
-    }
+    extraction=ExtractionSpec(
+        target_description="Assemble jar body with blue lid",
+        targets=[
+            ExtractionTarget(target_bbox=[100, 50, 800, 600], target_image_label="bodies"),
+            ExtractionTarget(target_bbox=[200, 100, 400, 300], target_image_label="lids")
+        ]
+    )
 )
 output: one composed asset
+```
 ```
 
 ### SELECTIVE
