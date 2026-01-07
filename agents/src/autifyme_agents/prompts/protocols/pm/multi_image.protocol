@@ -15,7 +15,7 @@ Load when: User sent multiple images AND Visual analyst identified relationship.
 |-------|-----------------|------------------|----------|
 | visual_analyst | Image paths | (none) | visual_analysis.md |
 | product_analyst | visual_analysis.md | (none) | product_research.md |
-| catalog_analyst | visual_analysis.md | product_research.md (enriches pricing) | catalog_analysis.md |
+| catalog_analyst | visual_analysis.md | product_research.md (CRITICAL for novel products, enriches for familiar - see discovery_mindset: Dependency Hardness) | catalog_analysis.md |
 | creative_specialist | visual_analysis.md + images | product_research.md | asset_ids |
 | catalog_specialist | visual_analysis.md + asset_ids | product_research.md | product records + junctions |
 

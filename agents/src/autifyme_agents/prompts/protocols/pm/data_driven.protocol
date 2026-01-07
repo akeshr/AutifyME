@@ -24,9 +24,9 @@ Load when: User wants graphics that require catalog data (prices, variants, asse
 [2. catalog_analyst returns structured data]
    "Product family: [Family Name]
     Variants:
-    - [Size A]: [Currency] [Price A], asset: products/[product]_[size_a].png
-    - [Size B]: [Currency] [Price B], asset: products/[product]_[size_b].png
-    - [Size C]: [Currency] [Price C], asset: products/[product]_[size_c].png"
+    - [Size A]: [Currency] [Price A], asset: [asset_path_variant_a]
+    - [Size B]: [Currency] [Price B], asset: [asset_path_variant_b]
+    - [Size C]: [Currency] [Price C], asset: [asset_path_variant_c]"
       |
       v
 [3. PM delegates to creative_specialist WITH DATA]
@@ -36,7 +36,7 @@ Load when: User wants graphics that require catalog data (prices, variants, asse
     - [Size A]: [Currency] [Price A]
     - [Size B]: [Currency] [Price B]
     - [Size C]: [Currency] [Price C]
-    Source images at: [asset paths from catalog_analyst]
+    Source images at: [asset_path_1], [asset_path_2], [asset_path_3]
     For DATA-DRIVEN domain."
       |
       v
@@ -109,7 +109,7 @@ Product data (from catalog_analyst):
 - Offer: Rs Y
 - Discount: Z%
 
-Source images at: [asset paths from catalog_analyst]
+Source images at: [asset_path_1], [asset_path_2]
 [Badge/Label if needed]: "NEW LAUNCH" / "LIMITED OFFER"
 
 For DATA-DRIVEN domain."
@@ -152,7 +152,7 @@ Product data:
 - [Product B] [Size]: Rs [Price]
 - [Product C] [Size]: Rs [Price]
 
-Source images at: [paths]
+Source images at: [asset_path_a], [asset_path_b], [asset_path_c]
 For DATA-DRIVEN domain."
 ```
 
@@ -170,7 +170,7 @@ Offer details:
 - Valid until: [Date]
 
 Badge: "LIMITED TIME OFFER"
-Source image at: [path]
+Source image at: [asset_path_product]
 For DATA-DRIVEN domain."
 ```
 
@@ -186,7 +186,7 @@ Variants (smallest to largest):
 - [Size C]: Rs [Price C]
 
 Show relative sizes visually.
-Source images at: [paths]
+Source images at: [asset_path_small], [asset_path_medium], [asset_path_large]
 For DATA-DRIVEN domain."
 ```
 
@@ -202,7 +202,7 @@ Key feature: [Feature]
 Launch date: [Date]
 
 Badge: "NEW LAUNCH"
-Source image at: [path]
+Source image at: [asset_path_hero]
 For DATA-DRIVEN domain."
 ```
 

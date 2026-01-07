@@ -171,6 +171,41 @@ Wave 1: catalog_analyst (check if exists)
   → If not found: add product_analyst to NEEDED (Wave 2)
 ```
 
+### Dependency Hardness Assessment
+
+**Some dependencies vary by context - optional becomes required based on findings:**
+
+| Downstream Agent | Depends On | HARD When | SOFT When |
+|-----------------|-----------|-----------|-----------|
+| catalog_analyst | product_research | Novel product type, no family match, compliance-heavy category | Familiar type, clear family fit, existing similar products |
+| catalog_analyst | visual_analysis | Always HARD (material/features required) | Never soft |
+| product_analyst | visual_analysis | Complex multi-material products | Simple single-material (context accelerates) |
+
+**Reasoning pattern:**
+1. Initial agent completes (usually visual_analyst)
+2. PM reviews findings
+3. PM assesses: "Familiar territory or new ground?"
+   - **Familiar:** Glass jar → catalog knows this category → product_research enriches pricing (optional)
+   - **Novel:** Smart Bottle (glass + electronics) → catalog unsure of category → product_research provides HSN/classification (required)
+4. Build waves accordingly
+
+**Examples:**
+
+**Familiar Product:**
+- User: "Add Rose Gold Glass Bottle 500ml"
+- Wave 1: visual_analyst → Material=Glass, Size=500ml, Premium grade
+- PM reasoning: "Glass bottles are known category. catalog_analyst can find family from visual alone. product_research enriches pricing but not critical."
+- Wave 2: product_analyst ‖ catalog_analyst (parallel - both optional enhancement)
+
+**Novel Product:**
+- User: "Add Smart Water Bottle with Temperature Display"
+- Wave 1: visual_analyst → Glass + electronic display + USB port
+- PM reasoning: "This hybrid category is novel. catalog_analyst needs product classification (HSN, category, certifications) to position correctly. Product research is CRITICAL."
+- Wave 2: product_analyst (required - get HSN/category/compliance)
+- Wave 3: catalog_analyst (uses product context for correct positioning)
+
+**Why this matters:** Novel products miscategorized as familiar type → wrong HSN → wrong GST rate → legal compliance issue.
+
 ### Direct Execution (Skip Analysis)
 
 **When user provides COMPLETE information, skip analysis and execute directly:**
