@@ -120,6 +120,20 @@ from .trace_analysis import (
     list_test_assets,
 )
 
+# Evaluators for LangSmith Rule Automations
+from .evaluators import (
+    delegation_evaluator,
+    evaluate_and_record,
+    evaluate_delegation,
+    evaluate_protocol_loading,
+    evaluate_synthesis,
+    evaluate_tool_usage,
+    protocol_loading_evaluator,
+    run_all_evaluators,
+    synthesis_evaluator,
+    tool_usage_evaluator,
+)
+
 __all__ = [
     # PM Interaction
     "chat_with_pm",
@@ -186,4 +200,15 @@ __all__ = [
     "ScenarioHistory",
     "ScenarioRunSummary",
     "TraceBaseline",
+    # Evaluators
+    "evaluate_protocol_loading",
+    "evaluate_tool_usage",
+    "evaluate_delegation",
+    "evaluate_synthesis",
+    "run_all_evaluators",
+    "evaluate_and_record",
+    "protocol_loading_evaluator",
+    "tool_usage_evaluator",
+    "delegation_evaluator",
+    "synthesis_evaluator",
 ]
