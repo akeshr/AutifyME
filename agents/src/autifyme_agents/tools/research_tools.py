@@ -18,6 +18,7 @@ Cost Optimization:
 - Monitoring: LangSmith tracks usage and costs
 """
 
+import asyncio
 import logging
 import math
 from typing import Any, Literal
@@ -364,8 +365,18 @@ def create_research_product_tool(settings: Settings) -> StructuredTool:
                 ),
             )
 
-    # Return StructuredTool with explicit schema
+    # Sync wrapper for LangGraph compatibility (nested subagents run sync)
+    def _research_product_sync(
+        query: str,
+        max_results: int = 5,
+        include_answer: bool = True,
+    ) -> dict[str, Any]:
+        """Sync wrapper for async research implementation."""
+        return asyncio.run(_research_product_impl(query, max_results, include_answer))
+
+    # Return StructuredTool with explicit schema (both sync and async)
     return StructuredTool.from_function(
+        func=_research_product_sync,
         coroutine=_research_product_impl,
         name="research_product_tool",
         description=(
@@ -633,8 +644,17 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
                 ),
             )
 
-    # Return StructuredTool with explicit schema
+    # Sync wrapper for LangGraph compatibility (nested subagents run sync)
+    def _extract_web_content_sync(
+        url: str,
+        format: Literal["markdown", "text"] = "markdown",
+    ) -> dict[str, Any]:
+        """Sync wrapper for async extract implementation."""
+        return asyncio.run(_extract_web_content_impl(url, format))
+
+    # Return StructuredTool with explicit schema (both sync and async)
     return StructuredTool.from_function(
+        func=_extract_web_content_sync,
         coroutine=_extract_web_content_impl,
         name="extract_web_content_tool",
         description=(

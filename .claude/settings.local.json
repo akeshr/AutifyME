@@ -83,7 +83,9 @@
       "Skill(compact-custom)",
       "Skill(compact-custom:*)",
       "Bash(git fetch:*)",
-      "Bash(pushd:*)"
+      "Bash(pushd:*)",
+      "Skill(e2e-testing)",
+      "Skill(e2e-testing:*)"
     ],
     "deny": [],
     "ask": []

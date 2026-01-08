@@ -96,12 +96,26 @@ LangGraph (PM)                    <-- Root = PM
 
 ```python
 from tests.tools import chat_with_pm
+import os
 
-# 1. Execute scenario (scenario_id enables history queries)
+# IMPORTANT: Use ABSOLUTE paths for media files
+base_dir = os.path.abspath(".")
+
+# Single image scenario
 result = chat_with_pm(
     "Catalog this product",
-    media_path="path/to/image.jpg",
-    scenario_id="PM-01"  # Stored in LangSmith metadata for get_scenario_history()
+    media_path=f"{base_dir}/inbox/product.jpg",  # ABSOLUTE path
+    scenario_id="PM-01"
+)
+
+# Multiple images in ONE message (use media_paths)
+result = chat_with_pm(
+    "[2 media attachment(s)]",
+    media_paths=[  # List of ABSOLUTE paths
+        f"{base_dir}/inbox/image1.jpg",
+        f"{base_dir}/inbox/image2.jpg",
+    ],
+    scenario_id="PM-02"
 )
 
 # 2. Get trace data for evaluation
@@ -177,37 +191,72 @@ ORDER BY created_at DESC
 LIMIT 10;
 ```
 
-### Run Production Scenarios Directly
+### Get Test Assets from Supabase Storage
 
-**Reconstruct and replay production scenarios using `get_media_paths_from_trace()`:**
+**Download images from Supabase storage for test scenarios:**
 
 ```python
-from tests.tools import get_media_paths_from_trace, chat_with_pm
+from tests.tools import list_test_assets, download_test_asset, chat_with_pm
 
-# 1. Get a production trace from workflow_outcomes
-trace_id = "21cb94fc-2537-4e8a-a014-621bf608a9e8"  # From Supabase query
+# 1. List available assets (filter by pattern)
+assets = list_test_assets(pattern='stackpro')
+for a in assets:
+    print(f"{a['name']}: {a['path']}")
 
-# 2. Extract downloaded media paths from the trace
-paths = get_media_paths_from_trace(trace_id)
-# Returns: [MediaPath(storage_path="inbox/20260107_134205_xxx.jpg", mime_type="image/jpeg", media_id="123...")]
+# 2. Download asset to local inbox
+local_path = download_test_asset(assets[0]['path'])
+print(f"Downloaded to: {local_path}")
 
-# 3. Get original user message from workflow_outcomes
+# 3. Use in test scenario
+result = chat_with_pm(
+    message="I want to catalog these stackpro jars",
+    media_path=local_path,
+    scenario_id="STACKPRO-TEST-01"
+)
+```
+
+**Available folders in `assets` bucket:**
+
+- `pending/` - User-uploaded images awaiting processing
+- `inbox/` - Downloaded WhatsApp media (organized by thread)
+
+**Use case:** When you need real product images for testing but don't have WhatsApp media_id.
+
+### Replay Production Scenarios (EXACT User Input)
+
+**Use `download_media_from_trace()` to replay EXACTLY what user sent:**
+
+```python
+from tests.tools import download_media_from_trace, chat_with_pm
+
+# 1. Get trace_id and message from workflow_outcomes
 ```
 
 ```sql
-SELECT message_text FROM workflow_outcomes WHERE trace_id = '[TRACE_ID]';
+SELECT trace_id, message_text FROM workflow_outcomes
+WHERE media_id IS NOT NULL ORDER BY created_at DESC LIMIT 5;
 ```
 
 ```python
-# 4. Replay the exact scenario
+# 2. Download the EXACT media user sent (from Supabase storage)
+trace_id = "21cb94fc-2537-4e8a-a014-621bf608a9e8"
+local_paths = download_media_from_trace(trace_id)
+# Downloads from Supabase storage -> local inbox/
+# Returns ABSOLUTE paths: ["c:/path/to/inbox/20260107_xxx.jpg", ...]
+
+# 3. Replay with original message + ALL media (use media_paths for multiple)
 result = chat_with_pm(
-    message=original_message,
-    media_path=paths[0].storage_path if paths else None,
+    message="[2 media attachment(s)]",  # Or actual user text from query
+    media_paths=local_paths,  # Returns absolute paths, ready to use
     scenario_id="REPLAY-production-xxx"
 )
 ```
 
-**Use case:** When production traces show unexpected behavior, replay them locally for debugging without needing the original WhatsApp media_id.
+**This replicates EXACTLY what the user sent** - same media files (all of them), same message.
+
+**Note:** `download_media_from_trace()` returns **absolute paths** - ready to pass directly to `chat_with_pm()`.
+
+**Use case:** Debug production issues by replaying the exact user input locally.
 
 ### Create Scenarios from Production Data
 

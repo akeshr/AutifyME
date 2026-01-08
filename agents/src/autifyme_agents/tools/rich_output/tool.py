@@ -6,6 +6,7 @@ LLM-powered HTML generation with client company branding.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -261,7 +262,33 @@ def create_rich_output_tool(storage: Any = None) -> StructuredTool:
     """
     _set_storage_client(storage)
 
+    # Sync wrapper for LangGraph compatibility (nested subagents run sync)
+    def _generate_rich_output_sync(
+        title: str,
+        data: dict[str, Any] | list[dict[str, Any]],
+        context: str,
+        company_profile: CompanyProfile | dict[str, Any],
+        field_hints: dict[str, FieldHint | dict[str, Any]] | None = None,
+        images: list[str] | None = None,
+        layout_hint: str | None = None,
+        highlight_fields: list[str] | None = None,
+        ttl_days: int = 30,
+    ) -> dict[str, Any]:
+        """Sync wrapper for async rich output implementation."""
+        return asyncio.run(_generate_rich_output_impl(
+            title=title,
+            data=data,
+            context=context,
+            company_profile=company_profile,
+            field_hints=field_hints,
+            images=images,
+            layout_hint=layout_hint,
+            highlight_fields=highlight_fields,
+            ttl_days=ttl_days,
+        ))
+
     return StructuredTool.from_function(
+        func=_generate_rich_output_sync,
         coroutine=_generate_rich_output_impl,
         name="generate_rich_output",
         description="""Generate visual HTML output when text is insufficient.

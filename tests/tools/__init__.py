@@ -32,6 +32,10 @@ LangSmith Feedback Integration:
 - get_baseline: Get known-good trace for comparison
 - store_baseline: Save trace as reference baseline
 - compare_to_baseline: Compare trace against baseline (matches/deviations)
+
+Test Asset Management (Supabase Storage):
+- list_test_assets: List available images in Supabase storage
+- download_test_asset: Download image from Supabase to local for testing
 """
 
 # PM Interaction
@@ -109,6 +113,13 @@ from .trace_analysis import get_media_paths_from_trace, get_thread_traces
 # LangSmith Annotation Queue Integration
 from .trace_analysis import add_to_evaluation_queue, get_evaluation_queue_url
 
+# Test Asset Management (Supabase Storage)
+from .trace_analysis import (
+    download_media_from_trace,
+    download_test_asset,
+    list_test_assets,
+)
+
 __all__ = [
     # PM Interaction
     "chat_with_pm",
@@ -142,6 +153,10 @@ __all__ = [
     # LangSmith Annotation Queue
     "add_to_evaluation_queue",
     "get_evaluation_queue_url",
+    # Test Asset Management
+    "list_test_assets",
+    "download_test_asset",
+    "download_media_from_trace",
     # Models - Core
     "TraceOverview",
     "RunNode",

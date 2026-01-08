@@ -2372,3 +2372,211 @@ def get_evaluation_queue_url(queue_id: str = PM_EVALUATION_QUEUE_ID) -> str:
         LangSmith annotation queue URL
     """
     return f"https://smith.langchain.com/annotation-queues/{queue_id}"
+
+
+# ============================================================================
+# Test Asset Management (Supabase Storage)
+# ============================================================================
+
+
+def list_test_assets(
+    folder: str = "pending",
+    limit: int = 10,
+    pattern: str | None = None,
+) -> list[dict[str, str]]:
+    """List available test assets from Supabase storage.
+
+    Queries the 'assets' bucket to find images available for testing.
+    Use this to discover what test media is available.
+
+    Args:
+        folder: Storage folder to list (default: 'pending')
+        limit: Maximum files to return
+        pattern: Optional substring filter (e.g., 'stackpro', 'jar')
+
+    Returns:
+        List of dicts with 'name', 'path', and 'public_url'
+
+    Example:
+        >>> assets = list_test_assets(pattern='stackpro')
+        >>> for a in assets:
+        ...     print(f"{a['name']}: {a['public_url']}")
+    """
+    import os
+
+    from supabase import create_client
+
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+
+    if not url or not key:
+        raise ValueError("Missing SUPABASE_URL or key env vars")
+
+    client = create_client(url, key)
+
+    # List files in folder
+    try:
+        response = client.storage.from_("assets").list(folder, {"limit": 100})
+    except Exception as e:
+        raise ValueError(f"Failed to list assets: {e}") from e
+
+    assets = []
+    for item in response or []:
+        name = item.get("name", "")
+        if not name:
+            continue
+
+        # Apply pattern filter if specified
+        if pattern and pattern.lower() not in name.lower():
+            continue
+
+        storage_path = f"{folder}/{name}"
+        public_url = client.storage.from_("assets").get_public_url(storage_path)
+
+        assets.append({
+            "name": name,
+            "path": storage_path,
+            "public_url": public_url,
+        })
+
+        if len(assets) >= limit:
+            break
+
+    return assets
+
+
+def download_media_from_trace(
+    trace_id: str,
+    local_dir: str = "inbox",
+) -> list[str]:
+    """Download all media from a production trace to local filesystem.
+
+    This is the PRIMARY function for replaying production scenarios.
+    It extracts media paths from the trace and downloads them from Supabase storage.
+
+    Args:
+        trace_id: LangSmith trace ID (from workflow_outcomes)
+        local_dir: Local directory to save to (default: 'inbox')
+
+    Returns:
+        List of local file paths for use with chat_with_pm()
+
+    Example:
+        >>> # Replay a production scenario
+        >>> trace_id = "21cb94fc-2537-4e8a-a014-621bf608a9e8"
+        >>> local_paths = download_media_from_trace(trace_id)
+        >>> result = chat_with_pm("original message", media_path=local_paths[0])
+    """
+    import os
+    from pathlib import Path
+
+    from supabase import create_client
+
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+
+    if not url or not key:
+        raise ValueError("Missing SUPABASE_URL or key env vars")
+
+    client = create_client(url, key)
+
+    # Get media paths from trace
+    media_paths = get_media_paths_from_trace(trace_id)
+    if not media_paths:
+        return []
+
+    # Ensure local directory exists
+    local_path = Path(local_dir)
+    local_path.mkdir(parents=True, exist_ok=True)
+
+    downloaded = []
+    for mp in media_paths:
+        # The storage_path from trace is simplified (inbox/filename.jpg)
+        # Need to find actual path in Supabase which includes thread subfolder
+        filename = Path(mp.storage_path).name
+
+        # Search for the file in inbox subfolders
+        try:
+            # List inbox subfolders
+            subfolders = client.storage.from_("assets").list("inbox", {"limit": 100})
+            found_path = None
+
+            for folder in subfolders or []:
+                folder_name = folder.get("name", "")
+                if not folder_name or folder_name.startswith("."):
+                    continue
+
+                # Check if file exists in this subfolder
+                full_path = f"inbox/{folder_name}/{filename}"
+                try:
+                    file_bytes = client.storage.from_("assets").download(full_path)
+                    found_path = full_path
+                    break
+                except Exception:
+                    continue
+
+            if not found_path:
+                continue
+
+            # Save locally with ABSOLUTE path (required for chat_with_pm)
+            file_path = local_path / filename
+            file_path.write_bytes(file_bytes)
+            downloaded.append(str(file_path.absolute()))
+
+        except Exception:
+            continue
+
+    return downloaded
+
+
+def download_test_asset(
+    storage_path: str,
+    local_dir: str = "inbox",
+) -> str:
+    """Download a test asset from Supabase storage to local filesystem.
+
+    Use this to get images for test scenarios. The file is saved locally
+    so it can be passed to chat_with_pm(media_path=...).
+
+    Args:
+        storage_path: Full path in Supabase storage (e.g., 'inbox/thread_id/file.jpg')
+        local_dir: Local directory to save to (default: 'inbox')
+
+    Returns:
+        Local file path for use with chat_with_pm()
+
+    Example:
+        >>> # Download specific asset by full path
+        >>> local_path = download_test_asset('inbox/whatsapp_xxx/image.jpg')
+        >>> result = chat_with_pm("Catalog this", media_path=local_path)
+    """
+    import os
+    from pathlib import Path
+
+    from supabase import create_client
+
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+
+    if not url or not key:
+        raise ValueError("Missing SUPABASE_URL or key env vars")
+
+    client = create_client(url, key)
+
+    # Download file bytes
+    try:
+        file_bytes = client.storage.from_("assets").download(storage_path)
+    except Exception as e:
+        raise ValueError(f"Failed to download {storage_path}: {e}") from e
+
+    # Ensure local directory exists
+    local_path = Path(local_dir)
+    local_path.mkdir(parents=True, exist_ok=True)
+
+    # Save with original filename
+    filename = Path(storage_path).name
+    file_path = local_path / filename
+
+    file_path.write_bytes(file_bytes)
+
+    return str(file_path)
