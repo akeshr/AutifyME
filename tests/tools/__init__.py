@@ -64,6 +64,7 @@ from .models import (
     EvaluationResult,
     FileIOTrace,
     FileOperation,
+    MediaPath,
     ProtocolLoad,
     ProtocolLoadTrace,
     ScenarioHistory,
@@ -103,7 +104,7 @@ from .trace_analysis import (
 )
 
 # Multi-Turn Thread Analysis
-from .trace_analysis import get_thread_traces
+from .trace_analysis import get_media_paths_from_trace, get_thread_traces
 
 # LangSmith Annotation Queue Integration
 from .trace_analysis import add_to_evaluation_queue, get_evaluation_queue_url
@@ -134,8 +135,10 @@ __all__ = [
     "compare_to_baseline",
     # Multi-Turn Thread Analysis
     "get_thread_traces",
+    "get_media_paths_from_trace",
     "ThreadTrace",
     "ThreadTraces",
+    "MediaPath",
     # LangSmith Annotation Queue
     "add_to_evaluation_queue",
     "get_evaluation_queue_url",

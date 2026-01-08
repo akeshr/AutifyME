@@ -25,6 +25,7 @@ from .models import (
     HITLDecision,
     LLMCallNode,
     LLMTraceTree,
+    MediaPath,
     Message,
     ProtocolLoad,
     ProtocolLoadTrace,
@@ -789,6 +790,7 @@ TOOL_READ_DATA = "read_data"  # Data reading tool
 TOOL_WRITE_FILE = "write_file"  # File writing tool
 TOOL_VIEW_IMAGE = "view_image"  # Image viewing tool
 TOOL_IMAGE_STUDIO = "image_studio"  # Image generation tool
+TOOL_DOWNLOAD_MEDIA = "download_whatsapp_media"  # WhatsApp media download
 
 
 def _normalize_agent_name(name: str) -> str:
@@ -2236,6 +2238,91 @@ def get_thread_traces(
         total_traces=len(traces),
         total_duration_ms=total_duration,
     )
+
+
+def get_media_paths_from_trace(trace_id: str) -> list[MediaPath]:
+    """Extract downloaded media paths from a LangSmith trace.
+
+    Parses download_whatsapp_media tool outputs to extract storage_path.
+    Use this to reconstruct scenarios from production workflow_outcomes.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        List of MediaPath with storage paths and metadata
+
+    Example:
+        >>> # Reconstruct scenario from workflow_outcomes
+        >>> paths = get_media_paths_from_trace(trace_id)
+        >>> for p in paths:
+        ...     print(f"Media: {p.storage_path} ({p.mime_type})")
+    """
+    client = _get_client()
+
+    # Get all tool runs for this trace
+    runs = list(client.list_runs(trace_id=trace_id, run_type="tool"))
+
+    media_paths = []
+    for run in runs:
+        if run.name != TOOL_DOWNLOAD_MEDIA:
+            continue
+
+        # Extract media_id from input
+        media_id = None
+        if run.inputs:
+            input_val = run.inputs.get("input", run.inputs)
+            parsed = _safe_parse_dict(input_val)
+            if parsed:
+                media_id = parsed.get("media_id")
+
+        # Extract storage_path from output
+        if not run.outputs:
+            continue
+
+        output = run.outputs
+        # Handle nested structure: {'output': {'content': [{'type': 'text', 'text': '...'}]}}
+        if isinstance(output, dict):
+            inner = output.get("output") or output.get("result") or output
+            if isinstance(inner, dict) and "content" in inner:
+                # Extract text from content array
+                for item in inner.get("content", []):
+                    if isinstance(item, dict) and item.get("type") == "text":
+                        output = item.get("text", "")
+                        break
+                else:
+                    output = str(inner)
+            elif isinstance(inner, str):
+                output = inner
+            else:
+                output = str(inner)
+
+        if not isinstance(output, str):
+            output = str(output)
+
+        # Parse output text for storage_path and mime_type
+        storage_path = None
+        mime_type = None
+
+        # Look for "storage_path: xxx" pattern
+        path_match = re.search(r"storage_path:\s*(.+?)(?:\n|$)", output)
+        if path_match:
+            storage_path = path_match.group(1).strip()
+
+        mime_match = re.search(r"mime_type:\s*(.+?)(?:\n|$)", output)
+        if mime_match:
+            mime_type = mime_match.group(1).strip()
+
+        if storage_path:
+            media_paths.append(
+                MediaPath(
+                    storage_path=storage_path,
+                    mime_type=mime_type,
+                    media_id=media_id,
+                )
+            )
+
+    return media_paths
 
 
 # ============================================================================

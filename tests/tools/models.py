@@ -200,6 +200,22 @@ class ThreadTraces(BaseModel):
     """Total duration across all traces."""
 
 
+class MediaPath(BaseModel):
+    """Media file path extracted from download_whatsapp_media tool output.
+
+    Used to reconstruct scenarios from production traces.
+    """
+
+    storage_path: str
+    """Local path where media was downloaded (e.g., 'inbox/20260107_134205_123.jpg')."""
+
+    mime_type: str | None = None
+    """MIME type (e.g., 'image/jpeg')."""
+
+    media_id: str | None = None
+    """Original WhatsApp media ID from tool input."""
+
+
 class RunMetadata(BaseModel):
     """Metadata for a specific run."""
 
