@@ -156,6 +156,50 @@ class TraceOverview(BaseModel):
     """Hierarchical tree of all runs."""
 
 
+class ThreadTrace(BaseModel):
+    """Single trace in a conversation thread."""
+
+    trace_id: str
+    """LangSmith trace ID."""
+
+    turn: int
+    """Conversation turn (1-indexed)."""
+
+    timestamp: datetime
+    """When this trace started."""
+
+    duration_ms: int
+    """Trace duration in milliseconds."""
+
+    user_message: str | None = None
+    """User message that triggered this trace (from workflow_outcomes)."""
+
+    agent_message_preview: str | None = None
+    """Preview of agent's final message in this trace."""
+
+    agent_that_responded: str | None = None
+    """Which agent produced the final message (PM or specialist)."""
+
+
+class ThreadTraces(BaseModel):
+    """All traces in a conversation thread for multi-turn evaluation.
+
+    Use this to evaluate scenarios that span multiple conversation turns.
+    """
+
+    thread_id: str
+    """Thread ID linking all traces."""
+
+    traces: list[ThreadTrace]
+    """Traces in chronological order."""
+
+    total_traces: int
+    """Number of traces in thread."""
+
+    total_duration_ms: int
+    """Total duration across all traces."""
+
+
 class RunMetadata(BaseModel):
     """Metadata for a specific run."""
 

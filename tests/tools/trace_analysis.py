@@ -2125,3 +2125,163 @@ def compare_to_baseline(
         result["metrics"]["tool_count_diff"] = seq.total_tool_calls - baseline.baseline_tool_count
 
     return result
+
+
+# ============================================================================
+# Multi-Turn Thread Analysis
+# ============================================================================
+
+
+def get_thread_traces(
+    thread_id: str, enrich: bool = False, days: int = 7
+) -> "ThreadTraces":
+    """Get all traces in a conversation thread for multi-turn evaluation.
+
+    Queries workflow_outcomes by thread_id. Optionally enriches with agent messages.
+    Use this when evaluating scenarios that span multiple conversation turns.
+
+    Args:
+        thread_id: Thread ID linking conversation turns
+        enrich: If True, fetch final message for each trace (slow but detailed)
+        days: Only include traces from last N days (default: 7)
+
+    Returns:
+        ThreadTraces with all traces in chronological order
+
+    Example:
+        >>> # Quick: just get trace list
+        >>> thread = get_thread_traces("whatsapp:123:456")
+        >>> for t in thread.traces:
+        ...     print(f"Turn {t.turn}: {t.user_message[:50]}...")
+        >>>
+        >>> # Detailed: include agent responses (slower)
+        >>> thread = get_thread_traces("whatsapp:123:456", enrich=True)
+        >>> for t in thread.traces:
+        ...     print(f"  -> {t.agent_that_responded}: {t.agent_message_preview}")
+    """
+    from tests.tools.models import ThreadTrace, ThreadTraces
+
+    # Use supabase-py client directly with env vars
+    try:
+        import os
+
+        from supabase import create_client
+
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get(
+            "SUPABASE_ANON_KEY"
+        )
+
+        if not url or not key:
+            raise ValueError("Missing SUPABASE_URL or key env vars")
+
+        supabase = create_client(url, key)
+
+        # Calculate date filter
+        from datetime import timedelta
+
+        cutoff = datetime.now() - timedelta(days=days)
+        cutoff_str = cutoff.isoformat()
+
+        # Query workflow_outcomes for this thread (recent only, with trace_id)
+        response = (
+            supabase.table("workflow_outcomes")
+            .select("trace_id, message_text, created_at, duration_seconds")
+            .eq("thread_id", thread_id)
+            .gte("created_at", cutoff_str)
+            .not_.is_("trace_id", "null")
+            .order("created_at", desc=False)
+            .execute()
+        )
+
+        outcomes = response.data if response.data else []
+    except Exception:
+        outcomes = []
+
+    traces = []
+    total_duration = 0
+
+    for i, outcome in enumerate(outcomes, start=1):
+        trace_id = outcome.get("trace_id")
+        duration_ms = int((outcome.get("duration_seconds") or 0) * 1000)
+        total_duration += duration_ms
+
+        # Optionally enrich with final message (slow - makes API call per trace)
+        agent_preview = None
+        agent_name = None
+        if enrich and trace_id:
+            try:
+                msg = get_agent_final_message(trace_id, any_agent=True)
+                if msg:
+                    agent_preview = msg.message_preview
+                    agent_name = msg.agent
+            except Exception:
+                pass
+
+        traces.append(
+            ThreadTrace(
+                trace_id=trace_id or "",
+                turn=i,
+                timestamp=outcome.get("created_at"),
+                duration_ms=duration_ms,
+                user_message=outcome.get("message_text"),
+                agent_message_preview=agent_preview,
+                agent_that_responded=agent_name,
+            )
+        )
+
+    return ThreadTraces(
+        thread_id=thread_id,
+        traces=traces,
+        total_traces=len(traces),
+        total_duration_ms=total_duration,
+    )
+
+
+# ============================================================================
+# LangSmith Annotation Queue Integration
+# ============================================================================
+
+# Default queue ID for PM evaluations
+PM_EVALUATION_QUEUE_ID = "355dae58-585f-475d-89ce-f632a9d81af3"
+
+
+def add_to_evaluation_queue(
+    trace_id: str,
+    queue_id: str = PM_EVALUATION_QUEUE_ID,
+) -> bool:
+    """Add a trace to LangSmith annotation queue for human review.
+
+    Use this after running a scenario to queue it for structured evaluation
+    in the LangSmith UI.
+
+    Args:
+        trace_id: LangSmith trace ID to add
+        queue_id: Annotation queue ID (defaults to PM Evaluation queue)
+
+    Returns:
+        True if successfully added, False otherwise
+
+    Example:
+        >>> result = chat_with_pm("Catalog this", media_path="img.jpg")
+        >>> add_to_evaluation_queue(result.trace_id)
+        >>> print("Trace queued for review at: https://smith.langchain.com/annotation-queues")
+    """
+    client = _get_client()
+    try:
+        client.add_runs_to_annotation_queue(
+            queue_id=queue_id,
+            run_ids=[trace_id],
+        )
+        return True
+    except Exception:
+        return False
+
+
+def get_evaluation_queue_url(queue_id: str = PM_EVALUATION_QUEUE_ID) -> str:
+    """Get URL to view annotation queue in LangSmith.
+
+    Returns:
+        LangSmith annotation queue URL
+    """
+    return f"https://smith.langchain.com/annotation-queues/{queue_id}"

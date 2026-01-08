@@ -242,6 +242,34 @@ These functions store and retrieve evaluation data for continuous improvement:
 | `store_baseline(trace_id, scenario_id)` | Save trace as reference baseline |
 | `compare_to_baseline(trace_id, scenario_id)` | Compare trace to baseline (matches/deviations/metrics) |
 
+### LangSmith Annotation Queue (Dashboard)
+
+For structured evaluation with visual dashboards, use annotation queues:
+
+```python
+from tests.tools import add_to_evaluation_queue, get_evaluation_queue_url
+
+# After running a scenario, queue trace for human review
+result = chat_with_pm("Catalog this product", media_path="image.jpg")
+add_to_evaluation_queue(result.trace_id)
+
+# View evaluation dashboard
+print(get_evaluation_queue_url())
+# -> https://smith.langchain.com/annotation-queues/355dae58-585f-475d-89ce-f632a9d81af3
+```
+
+**Evaluation Rubric (configured in LangSmith UI):**
+
+| Criterion | Type | Description |
+|-----------|------|-------------|
+| `protocol_loading` | Binary | Did PM load protocol as FIRST action? |
+| `wave_structure` | Binary | Did PM execute correct wave structure? |
+| `approval_gate` | Binary | Did PM read analysis files and present approval? |
+| `open_question` | Binary | Did PM ask open-ended question (no numbered options)? |
+| `overall_quality` | 1-5 Scale | Overall workflow quality |
+
+**View Dashboard:** [PM Workflow Evaluation Queue](https://smith.langchain.com/annotation-queues/355dae58-585f-475d-89ce-f632a9d81af3)
+
 ### Evaluation Criteria Reference
 
 **Complete lookup table for all evaluation criteria.** When evaluating a scenario, find each criterion here and run the specified check.

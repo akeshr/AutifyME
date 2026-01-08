@@ -69,6 +69,8 @@ from .models import (
     ScenarioHistory,
     ScenarioRunSummary,
     SequencedToolCall,
+    ThreadTrace,
+    ThreadTraces,
     ToolCallSequence,
     TraceBaseline,
 )
@@ -100,6 +102,12 @@ from .trace_analysis import (
     store_baseline,
 )
 
+# Multi-Turn Thread Analysis
+from .trace_analysis import get_thread_traces
+
+# LangSmith Annotation Queue Integration
+from .trace_analysis import add_to_evaluation_queue, get_evaluation_queue_url
+
 __all__ = [
     # PM Interaction
     "chat_with_pm",
@@ -124,6 +132,13 @@ __all__ = [
     "get_baseline",
     "store_baseline",
     "compare_to_baseline",
+    # Multi-Turn Thread Analysis
+    "get_thread_traces",
+    "ThreadTrace",
+    "ThreadTraces",
+    # LangSmith Annotation Queue
+    "add_to_evaluation_queue",
+    "get_evaluation_queue_url",
     # Models - Core
     "TraceOverview",
     "RunNode",
