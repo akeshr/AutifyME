@@ -177,6 +177,90 @@ ORDER BY created_at DESC
 LIMIT 10;
 ```
 
+### Run Production Scenarios Directly
+
+**Reconstruct and replay production scenarios using `get_media_paths_from_trace()`:**
+
+```python
+from tests.tools import get_media_paths_from_trace, chat_with_pm
+
+# 1. Get a production trace from workflow_outcomes
+trace_id = "21cb94fc-2537-4e8a-a014-621bf608a9e8"  # From Supabase query
+
+# 2. Extract downloaded media paths from the trace
+paths = get_media_paths_from_trace(trace_id)
+# Returns: [MediaPath(storage_path="inbox/20260107_134205_xxx.jpg", mime_type="image/jpeg", media_id="123...")]
+
+# 3. Get original user message from workflow_outcomes
+```
+
+```sql
+SELECT message_text FROM workflow_outcomes WHERE trace_id = '[TRACE_ID]';
+```
+
+```python
+# 4. Replay the exact scenario
+result = chat_with_pm(
+    message=original_message,
+    media_path=paths[0].storage_path if paths else None,
+    scenario_id="REPLAY-production-xxx"
+)
+```
+
+**Use case:** When production traces show unexpected behavior, replay them locally for debugging without needing the original WhatsApp media_id.
+
+### Create Scenarios from Production Data
+
+**Build new test scenarios by mining production `workflow_outcomes`:**
+
+```python
+from tests.tools import get_media_paths_from_trace, get_thread_traces
+
+# 1. Find interesting production conversations
+```
+
+```sql
+-- Find successful multi-turn conversations with media
+SELECT DISTINCT thread_id, COUNT(*) as turns
+FROM workflow_outcomes
+WHERE media_id IS NOT NULL AND success = true
+GROUP BY thread_id
+HAVING COUNT(*) >= 2
+ORDER BY MAX(created_at) DESC
+LIMIT 10;
+```
+
+```python
+# 2. Get full conversation thread
+thread = get_thread_traces("whatsapp:phone:user_id", enrich=True)
+for t in thread.traces:
+    print(f"Turn {t.turn}: {t.user_message[:50]}...")
+    print(f"  -> {t.agent_that_responded}: {t.agent_message_preview}")
+
+# 3. Extract media for each turn
+for t in thread.traces:
+    if t.trace_id:
+        paths = get_media_paths_from_trace(t.trace_id)
+        print(f"  Media: {[p.storage_path for p in paths]}")
+
+# 4. Create scenario definition for SCENARIOS.md
+scenario = {
+    "id": "PROD-001",
+    "name": "Multi-turn cataloging with feedback",
+    "turns": [
+        {"message": t.user_message, "media": paths[0].storage_path if paths else None}
+        for t in thread.traces
+    ],
+    "source": f"Production thread: {thread.thread_id}"
+}
+```
+
+**This enables:**
+
+- Building regression tests from real user flows
+- Capturing edge cases discovered in production
+- Creating realistic multi-turn scenarios
+
 ### Correlate Test Runs with Production Data
 
 **Use `thread_id` to link test executions with Supabase data:**
@@ -224,11 +308,26 @@ These functions extract structured data from LangSmith traces for evaluation:
 | `get_file_io_trace(trace_id)` | File read/write operations | `operations`, `analysis_files_written`, `analysis_files_read_by_pm` |
 | `get_protocol_loads(trace_id)` | Protocol loading by agent | `protocol_loads`, `pm_first_action_was_protocol`, `agent_protocols` |
 | `get_agent_final_message(trace_id, agent, any_agent)` | Final message analysis | `agent`, `message`, `has_open_question`, `has_numbered_options` |
+| `get_media_paths_from_trace(trace_id)` | Extract downloaded media paths | `storage_path`, `mime_type`, `media_id` |
+| `get_thread_traces(thread_id, enrich, days)` | Multi-turn conversation traces | `traces`, `total_traces`, `user_message`, `agent_message_preview` |
 
 **Note on `get_agent_final_message`:**
+
 - Default: `get_agent_final_message(trace_id, "PM")` - Gets PM's final message
 - When PM orchestrates but specialists produce messages: `get_agent_final_message(trace_id, any_agent=True)`
 - The `agent` field in result shows which agent actually produced the message
+
+**Note on `get_media_paths_from_trace`:**
+
+- Extracts `storage_path` from `download_whatsapp_media` tool outputs in trace
+- Returns list of `MediaPath` objects with local file paths (e.g., `inbox/20260107_xxx.jpg`)
+- Use to replay production scenarios without needing original WhatsApp media_id
+
+**Note on `get_thread_traces`:**
+
+- Queries Supabase `workflow_outcomes` by `thread_id` to get all conversation turns
+- Set `enrich=True` to include agent final messages (slower, makes API calls per trace)
+- Set `days=N` to limit to recent traces (default: 7 days)
 
 ### LangSmith Feedback Integration
 
