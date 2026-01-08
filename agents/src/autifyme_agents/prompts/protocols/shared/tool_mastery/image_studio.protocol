@@ -103,9 +103,11 @@ Reference labels using `[label]` syntax in specs:
 Use what applies to your use case. Describe YOUR situation - don't copy examples.
 
 ### extraction
-Extract product from messy background.
+Extract product from messy background or multi-product image.
 - `target_description`: **REQUIRED** - what to extract, reference [source] label
-- `position_hint`: Where in frame (left, center, foreground, etc.)
+- `targets`: **REQUIRED** - array of `{target_bbox, target_image_label}` pairs (min 1)
+  - `target_bbox`: `[y_min, x_min, y_max, x_max]` normalized 0-1000 scale
+  - `target_image_label`: which image label to extract from
 - `isolation`: How complete (complete, soft with shadow, with context)
 - `edge_treatment`: Edge quality (surgical, natural soft, feathered)
 - `custom`: Special extraction needs
