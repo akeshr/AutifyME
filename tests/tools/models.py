@@ -474,7 +474,13 @@ class SequencedToolCall(BaseModel):
     """Name of the tool called."""
 
     tool_args: dict[str, Any] = Field(default_factory=dict)
-    """Arguments passed to tool."""
+    """Arguments passed to tool (raw, may be string repr)."""
+
+    parsed_args: dict[str, Any] = Field(default_factory=dict)
+    """Properly parsed arguments dict (use this for evaluation)."""
+
+    tool_output: Any = None
+    """Output/result from the tool call."""
 
     timestamp: datetime | None = None
     """When tool was called."""
@@ -487,6 +493,12 @@ class SequencedToolCall(BaseModel):
 
     parent_agent: str | None = None
     """Parent agent that delegated to this agent."""
+
+    status: str = "success"
+    """Run status: 'success' | 'error' | 'pending'."""
+
+    error: str | None = None
+    """Error message if tool failed."""
 
 
 class ToolCallSequence(BaseModel):
@@ -681,17 +693,31 @@ class AgentFinalMessage(BaseModel):
     Used for evaluating:
     - Did PM present open-ended question at approval gate?
     - Was message format correct?
+    - What model generated this response?
     """
 
     agent: str
     """Agent that sent message."""
 
     message: str
-    """The message content."""
+    """The message content (full)."""
+
+    message_preview: str = ""
+    """First 200 chars for quick glance."""
 
     timestamp: datetime | None = None
     """When message was sent."""
 
+    run_id: str | None = None
+    """LLM run ID for drilling down."""
+
+    model_name: str | None = None
+    """Model that generated the message (e.g., 'gpt-4', 'claude-3')."""
+
+    token_count: int | None = None
+    """Total tokens used for this LLM call."""
+
+    # Content analysis flags
     has_numbered_options: bool = False
     """Whether message contains numbered options (anti-pattern)."""
 
@@ -700,6 +726,15 @@ class AgentFinalMessage(BaseModel):
 
     is_approval_request: bool = False
     """Whether this is a HITL approval request."""
+
+    mentions_error: bool = False
+    """Whether message mentions error/failure."""
+
+    mentions_success: bool = False
+    """Whether message mentions success/completion."""
+
+    has_product_details: bool = False
+    """Whether message contains product-related details."""
 
 
 # ============================================================================

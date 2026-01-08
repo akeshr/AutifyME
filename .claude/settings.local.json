@@ -82,7 +82,8 @@
       "Skill(autonomous-testing)",
       "Skill(compact-custom)",
       "Skill(compact-custom:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(pushd:*)"
     ],
     "deny": [],
     "ask": []

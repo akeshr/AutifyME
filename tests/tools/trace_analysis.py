@@ -9,6 +9,7 @@ Token savings: 25x vs naive full dump approach.
 """
 import re
 from datetime import datetime, timedelta
+from typing import Any
 
 from dotenv import load_dotenv
 from langsmith import Client
@@ -892,6 +893,175 @@ def _find_parent_agent(run, runs_by_id: dict, task_agents: dict[str, str]) -> st
     return "unknown"
 
 
+def _extract_content_from_parts(content: Any) -> str:
+    """Extract text from content that may be string or list of parts.
+
+    Handles:
+    - Direct string: "hello"
+    - List of parts: [{"type": "text", "text": "hello"}, ...]
+    - Empty list/string: returns ""
+    """
+    if not content:
+        return ""
+
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        # Multi-part format: [{"type": "text", "text": "..."}, ...]
+        parts = []
+        for part in content:
+            if isinstance(part, dict):
+                text = part.get("text", "")
+                if text:
+                    parts.append(str(text))
+            elif isinstance(part, str):
+                parts.append(part)
+        return "\n".join(parts)
+
+    return str(content)
+
+
+def _extract_llm_message(outputs: Any) -> str:
+    """Extract message content from various LLM output formats.
+
+    LangSmith stores LLM outputs in different formats depending on:
+    - LangChain version
+    - LLM provider (OpenAI, Anthropic, Gemini, etc.)
+    - Whether using chat models or completion models
+
+    Common formats:
+    - {"generations": [[{"text": "...", "message": {"kwargs": {"content": [...]}}}]]}
+    - {"generations": [[{"text": "...", "message": {"content": "..."}}]]}
+    - {"content": "..."}
+    - {"output": "..."}
+    - {"messages": [{"content": "..."}]}
+    - AIMessage/BaseMessage objects with .content attribute
+
+    Content can be:
+    - String: "hello world"
+    - List of parts: [{"type": "text", "text": "hello"}, {"type": "image", ...}]
+
+    Returns:
+        Extracted message string, or empty string if not found
+    """
+    if not outputs:
+        return ""
+
+    # Handle string directly
+    if isinstance(outputs, str):
+        return outputs
+
+    # Handle objects with .content attribute (AIMessage, etc.)
+    if hasattr(outputs, "content"):
+        content = getattr(outputs, "content", "")
+        return _extract_content_from_parts(content)
+
+    # Must be dict-like from here
+    if not isinstance(outputs, dict):
+        return str(outputs)
+
+    # Try 'generations' format (LangChain standard)
+    # Format: {"generations": [[{"text": "...", "message": {"kwargs": {"content": ...}}}]]}
+    generations = outputs.get("generations")
+    if generations and isinstance(generations, list) and len(generations) > 0:
+        first_gen = generations[0]
+        if isinstance(first_gen, list) and len(first_gen) > 0:
+            gen_item = first_gen[0]
+            if isinstance(gen_item, dict):
+                # Try text first (often has the content for completion models)
+                text_val = gen_item.get("text")
+                if text_val and isinstance(text_val, str) and text_val.strip():
+                    return text_val
+
+                # Try message structure (chat models)
+                msg = gen_item.get("message")
+                if isinstance(msg, dict):
+                    # LangChain serialized format: {"kwargs": {"content": ...}}
+                    kwargs = msg.get("kwargs", {})
+                    if isinstance(kwargs, dict) and "content" in kwargs:
+                        return _extract_content_from_parts(kwargs["content"])
+
+                    # Direct content format: {"content": ...}
+                    if "content" in msg:
+                        return _extract_content_from_parts(msg["content"])
+
+    # Try direct content keys
+    for key in ["content", "output", "text", "response"]:
+        val = outputs.get(key)
+        if val:
+            extracted = _extract_content_from_parts(val)
+            if extracted:
+                return extracted
+
+    # Try messages array
+    messages = outputs.get("messages")
+    if messages and isinstance(messages, list) and len(messages) > 0:
+        last_msg = messages[-1]
+        if isinstance(last_msg, dict):
+            # Check kwargs.content first (LangChain serialized)
+            kwargs = last_msg.get("kwargs", {})
+            if isinstance(kwargs, dict) and "content" in kwargs:
+                return _extract_content_from_parts(kwargs["content"])
+            if "content" in last_msg:
+                return _extract_content_from_parts(last_msg["content"])
+        if hasattr(last_msg, "content"):
+            return _extract_content_from_parts(getattr(last_msg, "content", ""))
+
+    # Try output.content nested structure
+    output_obj = outputs.get("output")
+    if isinstance(output_obj, dict):
+        kwargs = output_obj.get("kwargs", {})
+        if isinstance(kwargs, dict) and "content" in kwargs:
+            return _extract_content_from_parts(kwargs["content"])
+        if "content" in output_obj:
+            return _extract_content_from_parts(output_obj["content"])
+    if hasattr(output_obj, "content"):
+        return _extract_content_from_parts(getattr(output_obj, "content", ""))
+
+    # Fallback: stringify entire output (indicates parsing failure)
+    return str(outputs)
+
+
+def _safe_parse_dict(value: Any) -> dict[str, Any]:
+    """Safely parse a string representation of a dict.
+
+    Handles:
+    - Already a dict -> return as-is
+    - String repr like "{'key': 'value'}" -> ast.literal_eval
+    - JSON string -> json.loads
+    - Unparseable -> return empty dict
+
+    This eliminates fragile regex parsing.
+    """
+    import ast
+    import json
+
+    if isinstance(value, dict):
+        return value
+
+    if not isinstance(value, str):
+        return {}
+
+    # Try ast.literal_eval first (handles Python dict repr)
+    try:
+        result = ast.literal_eval(value)
+        if isinstance(result, dict):
+            return result
+    except (ValueError, SyntaxError):
+        pass
+
+    # Try JSON parsing
+    try:
+        result = json.loads(value)
+        if isinstance(result, dict):
+            return result
+    except json.JSONDecodeError:
+        pass
+
+    return {}
+
+
 def _extract_subagent_type(inputs: dict | None) -> str | None:
     """Extract subagent_type from task tool inputs.
 
@@ -900,16 +1070,18 @@ def _extract_subagent_type(inputs: dict | None) -> str | None:
     if not inputs:
         return None
 
-    input_str = inputs.get("input", "")
-    if isinstance(input_str, str):
-        # Parse the string representation of dict
-        if "subagent_type" in input_str:
-            # Extract using regex
-            match = re.search(r"['\"]subagent_type['\"]:\s*['\"]([^'\"]+)['\"]", input_str)
-            if match:
-                return match.group(1)
-    elif isinstance(input_str, dict):
-        return input_str.get("subagent_type")
+    input_val = inputs.get("input", inputs)
+
+    # Parse to dict if string
+    parsed = _safe_parse_dict(input_val)
+    if parsed:
+        return parsed.get("subagent_type")
+
+    # Fallback to regex for edge cases
+    if isinstance(input_val, str) and "subagent_type" in input_val:
+        match = re.search(r"['\"]subagent_type['\"]:\s*['\"]([^'\"]+)['\"]", input_val)
+        if match:
+            return match.group(1)
 
     return None
 
@@ -982,31 +1154,61 @@ def get_tool_call_sequence(trace_id: str) -> ToolCallSequence:
         if run.end_time and run.start_time:
             duration_ms = int((run.end_time - run.start_time).total_seconds() * 1000)
 
-        # Extract tool arguments
+        # Extract tool arguments (raw)
         tool_args = {}
         if run.inputs:
             if isinstance(run.inputs, dict):
                 input_val = run.inputs.get("input", run.inputs)
                 if isinstance(input_val, str):
-                    # Try to parse string representation of dict
                     tool_args = {"input": input_val}
-                    # Extract key fields for convenience
-                    if "subagent_type" in input_val:
-                        subagent = _extract_subagent_type(run.inputs)
-                        if subagent:
-                            tool_args["subagent_type"] = subagent
                 elif isinstance(input_val, dict):
                     tool_args = input_val
+
+        # Parse arguments properly (eliminates need for regex in evaluation)
+        parsed_args = {}
+        if run.inputs:
+            input_val = run.inputs.get("input", run.inputs)
+            parsed_args = _safe_parse_dict(input_val)
+            if not parsed_args and isinstance(input_val, dict):
+                parsed_args = input_val
+
+        # Extract output
+        tool_output = None
+        if run.outputs:
+            if isinstance(run.outputs, dict):
+                # Common output patterns
+                tool_output = (
+                    run.outputs.get("output")
+                    or run.outputs.get("result")
+                    or run.outputs.get("content")
+                    or run.outputs
+                )
+            else:
+                tool_output = run.outputs
+
+        # Detect error status
+        status = "success"
+        error_msg = None
+        if run.error:
+            status = "error"
+            error_msg = str(run.error)
+        elif hasattr(run, "status") and run.status == "error":
+            status = "error"
+            error_msg = getattr(run, "error_message", None)
 
         tc = SequencedToolCall(
             sequence=seq_num,
             agent=parent_agent,
             tool_name=run.name,
             tool_args=tool_args,
+            parsed_args=parsed_args,
+            tool_output=tool_output,
             timestamp=run.start_time,
             duration_ms=duration_ms,
             run_id=str(run.id),
             parent_agent=parent_agent,
+            status=status,
+            error=error_msg,
         )
         tool_calls.append(tc)
 
@@ -1067,16 +1269,15 @@ def get_delegation_graph(trace_id: str) -> DelegationGraph:
 
     for tc in seq.delegation_calls:
         # 'task' tool uses subagent_type for target agent
-        to_agent = tc.tool_args.get("subagent_type")
+        # Use parsed_args (properly parsed dict) instead of tool_args (raw)
+        to_agent = tc.parsed_args.get("subagent_type")
 
-        # Extract description as context passed
+        # Extract description as context passed (using parsed_args)
         context_passed = []
-        input_str = tc.tool_args.get("input", "")
-        if isinstance(input_str, str) and "description" in input_str:
-            # Extract description from string representation
-            match = re.search(r"['\"]description['\"]:\s*['\"]([^'\"]{0,200})", input_str)
-            if match:
-                context_passed.append(match.group(1)[:100] + "...")
+        description = tc.parsed_args.get("description", "")
+        if description:
+            # Truncate long descriptions
+            context_passed.append(description[:100] + "..." if len(description) > 100 else description)
 
         if to_agent:
             to_agent = _normalize_agent_name(str(to_agent))
@@ -1322,6 +1523,8 @@ def get_agent_final_message(trace_id: str, agent: str = "PM") -> AgentFinalMessa
     Used to evaluate:
     - Did PM present open-ended question at approval gate?
     - Does message contain numbered options (anti-pattern)?
+    - What model generated the response?
+    - Token usage and performance metrics
 
     Args:
         trace_id: LangSmith trace ID
@@ -1334,6 +1537,7 @@ def get_agent_final_message(trace_id: str, agent: str = "PM") -> AgentFinalMessa
         >>> msg = get_agent_final_message(trace_id, "PM")
         >>> if msg and msg.has_open_question and not msg.has_numbered_options:
         ...     print("PM correctly used open-ended question")
+        >>> print(f"Model: {msg.model_name}, Tokens: {msg.token_count}")
     """
     client = _get_client()
 
@@ -1361,42 +1565,91 @@ def get_agent_final_message(trace_id: str, agent: str = "PM") -> AgentFinalMessa
     if not agent_llm_runs:
         return None
 
-    # Sort by time, get last one
-    agent_llm_runs.sort(key=lambda r: r.end_time if r.end_time else datetime.min)
-    last_run = agent_llm_runs[-1]
+    # Sort by time (newest first) and find last run WITH actual content
+    # LLM runs that only make tool calls often have empty content
+    agent_llm_runs.sort(key=lambda r: r.end_time if r.end_time else datetime.min, reverse=True)
 
-    # Extract message from outputs
+    last_run = None
     message = ""
-    if last_run.outputs:
-        if isinstance(last_run.outputs, dict):
-            # Common output patterns
-            message = (
-                last_run.outputs.get("content")
-                or last_run.outputs.get("output")
-                or last_run.outputs.get("text")
-                or str(last_run.outputs)
-            )
-        else:
-            message = str(last_run.outputs)
+    for run in agent_llm_runs:
+        extracted = _extract_llm_message(run.outputs)
+        if extracted and extracted.strip():
+            last_run = run
+            message = extracted
+            break
 
-    if not message:
+    if not last_run or not message:
         return None
 
-    # Analyze message
+    # Extract model name from various locations
+    model_name = None
+    extra = last_run.extra or {}
+    if isinstance(extra, dict):
+        # Try invocation_params first (most common)
+        invocation = extra.get("invocation_params", {})
+        model_name = (
+            invocation.get("model")
+            or invocation.get("model_name")
+            or extra.get("model")
+            or extra.get("model_name")
+        )
+    # Also check run.name for model info
+    if not model_name and last_run.name:
+        # Run names often contain model: "ChatOpenAI", "ChatAnthropic", etc.
+        if "gpt" in last_run.name.lower():
+            model_name = last_run.name
+        elif "claude" in last_run.name.lower():
+            model_name = last_run.name
+
+    # Extract token count from usage metadata
+    token_count = None
+    if hasattr(last_run, "total_tokens") and last_run.total_tokens:
+        token_count = last_run.total_tokens
+    elif isinstance(extra, dict):
+        usage = extra.get("usage", {})
+        if isinstance(usage, dict):
+            token_count = usage.get("total_tokens")
+
+    # Analyze message content
+    message_lower = message.lower()
+
     has_numbered_options = bool(re.search(r"^\s*[1-9]\.", message, re.MULTILINE))
     has_open_question = message.strip().endswith("?")
+
     is_approval_request = any(
-        phrase in message.lower()
+        phrase in message_lower
         for phrase in ["approve", "confirm", "proceed", "would you like", "what would you"]
+    )
+
+    mentions_error = any(
+        phrase in message_lower
+        for phrase in ["error", "failed", "failure", "couldn't", "unable to", "problem"]
+    )
+
+    mentions_success = any(
+        phrase in message_lower
+        for phrase in ["success", "completed", "saved", "created", "done", "ready"]
+    )
+
+    has_product_details = any(
+        phrase in message_lower
+        for phrase in ["price", "sku", "product", "catalog", "rs.", "rs ", "inr", "$"]
     )
 
     return AgentFinalMessage(
         agent=agent,
         message=message,
+        message_preview=message[:200] + "..." if len(message) > 200 else message,
         timestamp=last_run.end_time,
+        run_id=str(last_run.id),
+        model_name=model_name,
+        token_count=token_count,
         has_numbered_options=has_numbered_options,
         has_open_question=has_open_question,
         is_approval_request=is_approval_request,
+        mentions_error=mentions_error,
+        mentions_success=mentions_success,
+        has_product_details=has_product_details,
     )
 
 
