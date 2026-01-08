@@ -25,6 +25,46 @@ from langsmith import Client
 _client: Client | None = None
 
 
+def _safe_print(text: str) -> None:
+    """Print text safely, handling console encoding issues on Windows."""
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        # Fallback: encode to ASCII, replacing unencodable chars
+        print(text.encode("ascii", errors="replace").decode("ascii"))
+
+
+def _extract_content_from_parts(content) -> str:
+    """Extract text from content that may be string or list of parts.
+
+    LLM outputs can be:
+    - Direct string: "hello"
+    - List of parts: [{"type": "text", "text": "hello"}, {"type": "image", ...}]
+
+    Returns:
+        Extracted text string
+    """
+    if not content:
+        return ""
+
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        # Multi-part format: [{"type": "text", "text": "..."}, ...]
+        parts = []
+        for part in content:
+            if isinstance(part, dict):
+                text = part.get("text", "")
+                if text:
+                    parts.append(str(text))
+            elif isinstance(part, str):
+                parts.append(part)
+        return "\n".join(parts)
+
+    return str(content)
+
+
 def _get_client() -> Client:
     """Get or create LangSmith client."""
     global _client
@@ -387,10 +427,12 @@ def _print_llm_decision(outputs: dict) -> None:
                     print(f"    Tool: {name}({args_summary})")
             else:
                 # No tool calls, show content snippet
-                content = kwargs.get("content", "")
+                raw_content = kwargs.get("content", "")
+                # Handle multi-part content
+                content = _extract_content_from_parts(raw_content)
                 if content:
                     snippet = content[:100].replace("\n", " ")
-                    print(f"    Output: {snippet}...")
+                    _safe_print(f"    Output: {snippet}...")
     except Exception:
         print("    (Could not parse output)")
 
@@ -767,10 +809,20 @@ def parse_lc_output(outputs: dict) -> dict:
         if generations and generations[0]:
             gen = generations[0][0] if isinstance(generations[0], list) else generations[0]
             if isinstance(gen, dict):
+                # Try text first (completion models)
+                text_val = gen.get("text", "")
+                if text_val and isinstance(text_val, str) and text_val.strip():
+                    result["content"] = text_val
+
+                # Try message.kwargs (chat models with LangChain serialization)
                 msg = gen.get("message", {})
                 kwargs = msg.get("kwargs", {})
 
-                result["content"] = kwargs.get("content", "")
+                if not result["content"]:
+                    raw_content = kwargs.get("content", "")
+                    # Handle multi-part content (list of parts)
+                    result["content"] = _extract_content_from_parts(raw_content)
+
                 result["tool_calls"] = kwargs.get("tool_calls", [])
     except Exception:
         pass
@@ -826,7 +878,7 @@ def show_node(run_id: str) -> dict:
             print(f"Messages: {len(messages)}")
             for i, msg in enumerate(messages):
                 content_preview = msg["content"][:100] + "..." if len(msg["content"]) > 100 else msg["content"]
-                print(f"  [{i}] {msg['type']}: {content_preview}")
+                _safe_print(f"  [{i}] {msg['type']}: {content_preview}")
 
                 # Show tool calls in AIMessage
                 if msg["tool_calls"]:
@@ -838,9 +890,13 @@ def show_node(run_id: str) -> dict:
             print("Tool inputs:")
             for key, value in run.inputs.items():
                 val_str = str(value)
-                if len(val_str) > 100:
-                    val_str = val_str[:100] + "..."
-                print(f"  {key}: {val_str}")
+                # Show full description for task tool (critical for evaluation)
+                if key == "description" or (key == "input" and run.name == "task"):
+                    _safe_print(f"  {key}: {val_str}")
+                elif len(val_str) > 100:
+                    _safe_print(f"  {key}: {val_str[:100]}...")
+                else:
+                    _safe_print(f"  {key}: {val_str}")
                 result["inputs"][key] = value
 
     # === REASONING (for LLM nodes) ===
@@ -858,33 +914,43 @@ def show_node(run_id: str) -> dict:
     print("\n--- OUTPUT ---")
 
     if run.outputs:
-        parsed_output = parse_lc_output(run.outputs)
-        result["outputs"] = parsed_output
+        if run.run_type == "tool":
+            # Tool outputs - extract key fields for display
+            result["outputs"] = run.outputs
+            if isinstance(run.outputs, dict):
+                for key, value in run.outputs.items():
+                    val_str = str(value)
+                    if len(val_str) > 200:
+                        _safe_print(f"  {key}: {val_str[:200]}...")
+                    else:
+                        _safe_print(f"  {key}: {val_str}")
+            else:
+                _safe_print(f"  Result: {run.outputs}")
+        else:
+            # LLM outputs - parse using helper
+            parsed_output = parse_lc_output(run.outputs)
+            result["outputs"] = parsed_output
 
-        if parsed_output["content"]:
-            print(f"Content: {parsed_output['content']}")
+            if parsed_output["content"]:
+                _safe_print(f"Content: {parsed_output['content']}")
 
-        if parsed_output["tool_calls"]:
-            print(f"\nTool Calls: {len(parsed_output['tool_calls'])}")
-            result["tool_calls"] = parsed_output["tool_calls"]
+            if parsed_output["tool_calls"]:
+                print(f"\nTool Calls: {len(parsed_output['tool_calls'])}")
+                result["tool_calls"] = parsed_output["tool_calls"]
 
-            for tc in parsed_output["tool_calls"]:
-                name = tc.get("name", "unknown")
-                args = tc.get("args", {})
-                print(f"\n  -> {name}")
+                for tc in parsed_output["tool_calls"]:
+                    name = tc.get("name", "unknown")
+                    args = tc.get("args", {})
+                    print(f"\n  -> {name}")
 
-                # Show all args - NO truncation
-                for k, v in args.items():
-                    print(f"     {k}: {v}")
+                    # Show all args - NO truncation
+                    for k, v in args.items():
+                        _safe_print(f"     {k}: {v}")
 
-                # Mark if this is a task delegation
-                if name == "task":
-                    subagent = args.get("subagent_type", args.get("specialist", "unknown"))
-                    print(f"     [HANDOFF CHECK REQUIRED -> {subagent}]")
-
-    elif run.run_type == "tool":
-        # Tool outputs are usually in outputs directly
-        print(f"Tool result: {run.outputs}")
+                    # Mark if this is a task delegation
+                    if name == "task":
+                        subagent = args.get("subagent_type", args.get("specialist", "unknown"))
+                        print(f"     [HANDOFF CHECK REQUIRED -> {subagent}]")
 
     print(f"\n{'='*70}")
 
@@ -956,7 +1022,7 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
                     parent_context["file_from_tool"] = content[:150]
 
     for k, v in parent_context.items():
-        print(f"  {k}: {v}")
+        _safe_print(f"  {k}: {v}")
         result["parent_had"][k] = v
 
     if not parent_context:
@@ -1002,8 +1068,28 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
                         passed_context[key] = str(args[key])
                 break  # Found the matching call
 
+    # If couldn't get from parent LLM outputs, try extracting from child's inputs directly
+    if not passed_context and child.inputs:
+        import ast
+        import json
+
+        child_input = child.inputs.get("input", {})
+        # Parse string input if needed
+        if isinstance(child_input, str):
+            try:
+                child_input = ast.literal_eval(child_input)
+            except (ValueError, SyntaxError):
+                try:
+                    child_input = json.loads(child_input)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+        if isinstance(child_input, dict):
+            passed_context["subagent_type"] = child_input.get("subagent_type", "unknown")
+            passed_context["description"] = child_input.get("description", "")
+
     for k, v in passed_context.items():
-        print(f"  {k}: {v}")
+        _safe_print(f"  {k}: {v}")
         result["parent_passed"][k] = v
 
     if not passed_context:
@@ -1017,7 +1103,12 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
     if child.inputs:
         for k, v in child.inputs.items():
             if k != "messages":  # Skip raw messages
-                child_received[k] = str(v)[:100]
+                val_str = str(v)
+                # Show full content for key fields
+                if k in ("input", "description"):
+                    child_received[k] = val_str
+                else:
+                    child_received[k] = val_str[:100] if len(val_str) > 100 else val_str
 
         # Also check first message content
         if "messages" in child.inputs:
@@ -1028,7 +1119,7 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
                     child_received["first_message"] = first_human["content"][:150]
 
     for k, v in child_received.items():
-        print(f"  {k}: {v}")
+        _safe_print(f"  {k}: {v}")
         result["child_received"][k] = v
 
     if not child_received:
@@ -1055,7 +1146,7 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
                 child_output[k] = str(v)
 
     for k, v in child_output.items():
-        print(f"  {k}: {v}")
+        _safe_print(f"  {k}: {v}")
         result["child_output"] = child_output
 
     if not child_output:
@@ -1310,7 +1401,7 @@ def scan_all_handoffs(trace_id: str) -> list[dict]:
         file_marker = " [+file]" if task_has_file else ""
         print(f"\n{status_icon} {subagent}{file_marker}")
         print(f"    Task ID: {task_run.id}")
-        print(f"    Description: {task_description}")
+        _safe_print(f"    Description: {task_description}")
         if issue_found:
             print(f"    ISSUE: {issue_found}")
             issues.append({

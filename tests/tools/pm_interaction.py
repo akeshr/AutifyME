@@ -86,6 +86,7 @@ def _invoke_pm(
     message: str,
     thread_id: str,
     media_paths: list[str] | None = None,
+    scenario_id: str | None = None,
 ) -> tuple[str, bool, list[dict[str, Any]] | None, bool]:
     """Invoke PM and return response details.
 
@@ -95,6 +96,7 @@ def _invoke_pm(
         message: User message to send
         thread_id: Conversation thread ID
         media_paths: Optional list of paths to media files
+        scenario_id: Optional scenario ID for evaluation tracking
 
     Returns:
         Tuple of (response_text, is_approval_request, approval_products, workflow_complete)
@@ -142,10 +144,17 @@ def _invoke_pm(
             media_ids = ", ".join(valid_paths)
             content += f" [media attachments ({len(valid_paths)}): {media_ids}]"
 
+    # Build config with metadata for LangSmith tracking
+    config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
+
+    # Add scenario_id to metadata for evaluation queries
+    if scenario_id:
+        config["metadata"] = {"scenario_id": scenario_id}
+
     # Invoke PM (sync with sync checkpointer)
     result = pm.invoke(
         {"messages": [HumanMessage(content=content)]},
-        config={"configurable": {"thread_id": thread_id}},
+        config=config,
     )
 
     # Extract response
@@ -247,6 +256,7 @@ def chat_with_pm(
     thread_id: str | None = None,
     media_path: str | None = None,
     media_paths: list[str] | None = None,
+    scenario_id: str | None = None,
 ) -> PMChatResult:
     """Send a message to PM and get structured response.
 
@@ -260,16 +270,22 @@ def chat_with_pm(
                    Pass None to start a new conversation.
         media_path: Optional path to single media file (backward compat)
         media_paths: Optional list of paths to media files (multi-image)
+        scenario_id: Optional scenario ID for LangSmith tracking. When provided,
+                     this is stored in trace metadata enabling queries like
+                     get_scenario_history("PM-01").
 
     Returns:
         PMChatResult with response details for evaluation
 
     Examples:
-        # Start new conversation
-        >>> result = chat_with_pm("Catalog these sneakers for $79.99")
+        # Start new conversation with scenario tracking
+        >>> result = chat_with_pm(
+        ...     "Catalog these sneakers for $79.99",
+        ...     scenario_id="PM-01"
+        ... )
         >>> print(result.pm_response)
 
-        # Continue conversation
+        # Continue conversation (scenario_id auto-inherited from thread)
         >>> result = chat_with_pm("Approved", thread_id=result.thread_id)
 
         # With media
@@ -299,7 +315,7 @@ def chat_with_pm(
 
         # Invoke PM
         response_text, is_approval, products, complete = _invoke_pm(
-            message, actual_thread_id, all_media_paths
+            message, actual_thread_id, all_media_paths, scenario_id
         )
 
         # Calculate timing
@@ -317,6 +333,7 @@ def chat_with_pm(
             response_time_ms=elapsed_ms,
             trace_id=trace_id,
             trace_url=trace_url,
+            scenario_id=scenario_id,
             workflow_complete=complete,
             error=None,
         )

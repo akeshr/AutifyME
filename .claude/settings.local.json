@@ -82,7 +82,12 @@
       "Skill(autonomous-testing)",
       "Skill(compact-custom)",
       "Skill(compact-custom:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(pushd:*)",
+      "Skill(e2e-testing)",
+      "Skill(e2e-testing:*)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Abhi\\\\personal\\\\self\\\\AutifyME\\\\agents\\\\src\\\\autifyme_agents\\\\prompts\\\\protocols\" -Filter \"*.protocol\" -Recurse)",
+      "Bash(ForEach-Object { $content = Get-Content $_FullName)"
     ],
     "deny": [],
     "ask": []

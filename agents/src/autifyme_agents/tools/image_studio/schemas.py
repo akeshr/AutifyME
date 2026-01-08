@@ -783,8 +783,8 @@ class ImageStudioInput(BaseModel):
             ImageInput(path="inbox/group.jpg", label="source")
         ],
         extraction=ExtractionSpec(
-            target_description="the 500ml glass jar on the left in [source]",
-            position_hint="left side of frame",
+            target_description="Extract the 500ml glass jar from [source]",
+            targets=[ExtractionTarget(target_bbox=[0, 0, 500, 1000], target_image_label="source")],
             isolation="complete isolation",
             edge_treatment="surgical clean edges"
         ),
