@@ -1369,31 +1369,27 @@ def get_file_io_trace(trace_id: str) -> FileIOTrace:
         is_read = tc.tool_name == TOOL_READ_DATA
         op_type = "read" if is_read else "write"
 
-        # Extract relevant info from tool args
+        # Extract relevant info from parsed_args (properly parsed dict)
         file_path = ""
         content_preview = None
 
-        if isinstance(tc.tool_args, dict):
+        # Use parsed_args which has properly parsed the JSON input
+        args = tc.parsed_args if tc.parsed_args else {}
+
+        if is_read:
             # read_data uses 'table' and 'search_patterns'
-            # write_file uses 'path' and 'content'
-            if is_read:
-                # For read_data, capture table as "path"
-                input_str = tc.tool_args.get("input", "")
-                if isinstance(input_str, str):
-                    # Extract table name
-                    match = re.search(r"['\"]table['\"]:\s*['\"]([^'\"]+)['\"]", input_str)
-                    if match:
-                        file_path = f"table:{match.group(1)}"
-            else:
-                file_path = (
-                    tc.tool_args.get("path")
-                    or tc.tool_args.get("file_path")
-                    or tc.tool_args.get("filename")
-                    or ""
-                )
-                content = tc.tool_args.get("content", tc.tool_args.get("data", ""))
-                if isinstance(content, str):
-                    content_preview = content[:200]
+            file_path = f"table:{args.get('table', 'unknown')}" if args.get('table') else ""
+        else:
+            # write_file uses 'file_path' (or 'path') and 'content'
+            file_path = (
+                args.get("file_path")
+                or args.get("path")
+                or args.get("filename")
+                or ""
+            )
+            content = args.get("content", args.get("data", ""))
+            if isinstance(content, str):
+                content_preview = content[:200]
 
         op = FileOperation(
             operation=op_type,
@@ -1517,7 +1513,11 @@ def get_protocol_loads(trace_id: str) -> ProtocolLoadTrace:
     )
 
 
-def get_agent_final_message(trace_id: str, agent: str = "PM") -> AgentFinalMessage | None:
+def get_agent_final_message(
+    trace_id: str,
+    agent: str = "PM",
+    any_agent: bool = False,
+) -> AgentFinalMessage | None:
     """Get the final message from an agent to the user.
 
     Used to evaluate:
@@ -1529,15 +1529,19 @@ def get_agent_final_message(trace_id: str, agent: str = "PM") -> AgentFinalMessa
     Args:
         trace_id: LangSmith trace ID
         agent: Agent name to get final message for (default: PM)
+        any_agent: If True, find last message from ANY agent (ignores agent param).
+                   Useful when PM orchestrates but specialists produce user messages.
 
     Returns:
         AgentFinalMessage or None if no message found
 
     Example:
+        >>> # Get PM's final message
         >>> msg = get_agent_final_message(trace_id, "PM")
-        >>> if msg and msg.has_open_question and not msg.has_numbered_options:
-        ...     print("PM correctly used open-ended question")
-        >>> print(f"Model: {msg.model_name}, Tokens: {msg.token_count}")
+        >>>
+        >>> # Get last message from any agent (when PM just orchestrates)
+        >>> msg = get_agent_final_message(trace_id, any_agent=True)
+        >>> print(f"Message from {msg.agent}: {msg.message_preview}")
     """
     client = _get_client()
 
@@ -1553,29 +1557,36 @@ def get_agent_final_message(trace_id: str, agent: str = "PM") -> AgentFinalMessa
             if subagent:
                 task_agents[str(run.id)] = subagent
 
-    # Find LLM runs for this agent
-    agent_llm_runs = []
+    # Find LLM runs - either for specific agent or all agents
+    candidate_llm_runs = []
     for run in all_runs:
         if run.run_type == "llm":
-            # Use the updated agent attribution logic
             parent_agent = _find_parent_agent(run, runs_by_id, task_agents)
-            if parent_agent == agent:
-                agent_llm_runs.append(run)
+            if any_agent:
+                # Include all LLM runs with their attributed agent
+                candidate_llm_runs.append((run, parent_agent))
+            elif parent_agent == agent:
+                candidate_llm_runs.append((run, parent_agent))
 
-    if not agent_llm_runs:
+    if not candidate_llm_runs:
         return None
 
     # Sort by time (newest first) and find last run WITH actual content
     # LLM runs that only make tool calls often have empty content
-    agent_llm_runs.sort(key=lambda r: r.end_time if r.end_time else datetime.min, reverse=True)
+    candidate_llm_runs.sort(
+        key=lambda x: x[0].end_time if x[0].end_time else datetime.min,
+        reverse=True,
+    )
 
     last_run = None
     message = ""
-    for run in agent_llm_runs:
+    found_agent = agent
+    for run, run_agent in candidate_llm_runs:
         extracted = _extract_llm_message(run.outputs)
         if extracted and extracted.strip():
             last_run = run
             message = extracted
+            found_agent = run_agent
             break
 
     if not last_run or not message:
@@ -1637,7 +1648,7 @@ def get_agent_final_message(trace_id: str, agent: str = "PM") -> AgentFinalMessa
     )
 
     return AgentFinalMessage(
-        agent=agent,
+        agent=found_agent,
         message=message,
         message_preview=message[:200] + "..." if len(message) > 200 else message,
         timestamp=last_run.end_time,

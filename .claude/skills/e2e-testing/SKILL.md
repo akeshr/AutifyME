@@ -177,6 +177,38 @@ ORDER BY created_at DESC
 LIMIT 10;
 ```
 
+### Correlate Test Runs with Production Data
+
+**Use `thread_id` to link test executions with Supabase data:**
+
+```python
+# 1. Run scenario - capture thread_id
+result = chat_with_pm("Catalog this product", media_path="test.jpg")
+thread_id = result.thread_id
+trace_id = result.trace_id
+
+# 2. Query related production data using thread_id
+```
+
+```sql
+-- Get all workflow outcomes for this test session
+SELECT trace_id, message_text, intent, success, duration_seconds
+FROM workflow_outcomes
+WHERE thread_id = '[THREAD_ID]'
+ORDER BY created_at ASC;
+
+-- Get full conversation history
+SELECT created_at, message_text, intent, success
+FROM workflow_outcomes
+WHERE thread_id = '[THREAD_ID]'
+ORDER BY created_at;
+```
+
+**Key insight:** `thread_id` is the correlation key between:
+- LangSmith traces (stored in trace metadata)
+- Supabase `workflow_outcomes` table
+- Multi-turn conversation history
+
 ---
 
 ## Evaluation Tools Reference
@@ -191,7 +223,12 @@ These functions extract structured data from LangSmith traces for evaluation:
 | `get_delegation_graph(trace_id)` | Agent delegation hierarchy and waves | `delegations`, `waves`, `delegation_order`, `agents_involved` |
 | `get_file_io_trace(trace_id)` | File read/write operations | `operations`, `analysis_files_written`, `analysis_files_read_by_pm` |
 | `get_protocol_loads(trace_id)` | Protocol loading by agent | `protocol_loads`, `pm_first_action_was_protocol`, `agent_protocols` |
-| `get_agent_final_message(trace_id, agent)` | Final message analysis | `message`, `has_open_question`, `has_numbered_options` |
+| `get_agent_final_message(trace_id, agent, any_agent)` | Final message analysis | `agent`, `message`, `has_open_question`, `has_numbered_options` |
+
+**Note on `get_agent_final_message`:**
+- Default: `get_agent_final_message(trace_id, "PM")` - Gets PM's final message
+- When PM orchestrates but specialists produce messages: `get_agent_final_message(trace_id, any_agent=True)`
+- The `agent` field in result shows which agent actually produced the message
 
 ### LangSmith Feedback Integration
 
@@ -205,17 +242,121 @@ These functions store and retrieve evaluation data for continuous improvement:
 | `store_baseline(trace_id, scenario_id)` | Save trace as reference baseline |
 | `compare_to_baseline(trace_id, scenario_id)` | Compare trace to baseline (matches/deviations/metrics) |
 
-### Evaluation Criteria
+### Evaluation Criteria Reference
 
-When evaluating a trace, check these criteria:
+**Complete lookup table for all evaluation criteria.** When evaluating a scenario, find each criterion here and run the specified check.
 
-| Criterion | How to Check | Pass Condition |
-|-----------|--------------|----------------|
-| `protocol_loading` | `get_protocol_loads()` | `pm_first_action_was_protocol == True` |
-| `wave_execution` | `get_delegation_graph()` | `waves[1] == ['visual_analyst']` and `waves[2]` contains P+C |
-| `approval_gate` | `get_file_io_trace()` | `analysis_files_read_by_pm` is non-empty |
-| `open_question` | `get_agent_final_message()` | `has_open_question == True` and `has_numbered_options == False` |
-| `hitl_sequence` | Multi-trace analysis | Creative HITL before Catalog HITL |
+#### PM Protocol & Routing Criteria
+
+| Criterion | Function | Field | Pass Condition | Used In |
+|-----------|----------|-------|----------------|---------|
+| `pm_protocol_first` | `get_protocol_loads()` | `.pm_first_action_was_protocol` | `== True` | PM-01 to PM-07, GATE-*, EXEC-* |
+| `pm_protocol_discovery` | `get_protocol_loads()` | `.pm_protocol` | `== "discovery_mindset"` | PM-01 to PM-07 |
+| `pm_protocol_synthesis` | `get_protocol_loads()` | `.agent_protocols["PM"]` | contains `"synthesis"` | GATE-01, GATE-02 |
+| `pm_protocol_execution` | `get_protocol_loads()` | `.agent_protocols["PM"]` | contains `"execution_flows"` | EXEC-01 to EXEC-05 |
+
+#### Wave Execution Criteria
+
+| Criterion | Function | Field | Pass Condition | Used In |
+|-----------|----------|-------|----------------|---------|
+| `wave_1_visual` | `get_delegation_graph()` | `.waves.get(1)` | `== ["visual_analyst"]` | PM-01, PM-02 |
+| `wave_1_catalog` | `get_delegation_graph()` | `.waves.get(1)` | `== ["catalog_analyst"]` | PM-03, PM-05, PM-07 |
+| `wave_1_product` | `get_delegation_graph()` | `.waves.get(1)` | `== ["product_analyst"]` | PM-04 |
+| `wave_2_parallel` | `get_delegation_graph()` | `.waves.get(2)` | contains both `product_analyst` AND `catalog_analyst` | PM-01 |
+| `wave_2_catalog_only` | `get_delegation_graph()` | `.waves.get(2)` | `== ["catalog_analyst"]` | PM-02 |
+| `no_product_analyst` | `get_delegation_graph()` | `.agents_involved` | `"product_analyst" NOT in list` | PM-02, PM-03 |
+| `no_visual_analyst` | `get_delegation_graph()` | `.agents_involved` | `"visual_analyst" NOT in list` | PM-03, PM-04 |
+
+#### Approval Gate Criteria
+
+| Criterion | Function | Field | Pass Condition | Used In |
+|-----------|----------|-------|----------------|---------|
+| `approval_gate_reached` | `get_agent_final_message("PM")` | `.is_approval_request` | `== True` | PM-01, PM-02, GATE-* |
+| `pm_read_analysis_files` | `get_file_io_trace()` | `.analysis_files_read_by_pm` | `len() > 0` | GATE-01 |
+| `open_question` | `get_agent_final_message("PM")` | `.has_open_question` | `== True` | GATE-01, PM-01 |
+| `no_numbered_options` | `get_agent_final_message("PM")` | `.has_numbered_options` | `== False` | GATE-01, PM-01 |
+| `no_approval_gate` | `get_agent_final_message("PM")` | `.is_approval_request` | `== False` | PM-03, PM-04 (queries) |
+
+#### Execution Flow Criteria
+
+| Criterion | Function | Field | Pass Condition | Used In |
+|-----------|----------|-------|----------------|---------|
+| `creative_before_catalog` | `get_delegation_graph()` | `.delegation_order` | `creative_specialist` index < `catalog_specialist` index | EXEC-01 (Flow E) |
+| `catalog_before_creative` | `get_delegation_graph()` | `.delegation_order` | `catalog_specialist` index < `creative_specialist` index | EXEC-02 (Flow D) |
+| `catalog_only` | `get_delegation_graph()` | `.agents_involved` | contains `catalog_specialist`, NOT `creative_specialist` | EXEC-03 (Flow A) |
+| `creative_only` | `get_delegation_graph()` | `.agents_involved` | contains `creative_specialist`, NOT `catalog_specialist` | EXEC-04 (Flow B) |
+| `direct_execution` | `get_delegation_graph()` | `.agents_involved` | NO analysts, only specialists | EXEC-05 |
+
+#### Analyst Behavior Criteria
+
+| Criterion | Function | Field | Pass Condition | Used In |
+|-----------|----------|-------|----------------|---------|
+| `analyst_protocol_first` | `get_protocol_loads()` | check specific agent | first action was `load_protocol` | ANALYST-01, ANALYST-02 |
+| `analyst_wrote_file` | `get_file_io_trace()` | `.writes` | agent has write operation | ANALYST-01, ANALYST-02 |
+| `catalog_read_upstream` | `get_file_io_trace()` | `.reads` | `catalog_analyst` read visual analysis file | ANALYST-02 |
+
+#### Specialist Behavior Criteria
+
+| Criterion | Function | Field | Pass Condition | Used In |
+|-----------|----------|-------|----------------|---------|
+| `specialist_protocol_first` | `get_protocol_loads()` | check specific agent | first action was `load_protocol` | SPEC-01, SPEC-02 |
+| `specialist_verified` | `get_tool_call_sequence()` | check for verification tools | specialist ran own checks before write | SPEC-01 |
+
+#### HITL Criteria
+
+| Criterion | Function | Field | Pass Condition | Used In |
+|-----------|----------|-------|----------------|---------|
+| `hitl_creative_triggered` | Multi-trace | check thread | creative_specialist requested approval | HITL-01, HITL-02 |
+| `hitl_catalog_triggered` | Multi-trace | check thread | catalog_specialist requested approval | HITL-03, HITL-04 |
+| `hitl_iteration_no_pm` | Multi-trace | check thread | specialist iterated without PM involvement | HITL-02, HITL-04 |
+| `hitl_canceled_no_retry` | Multi-trace | check thread | specialist returned cancel, no retry | HITL-05 |
+
+#### Edge Case Criteria
+
+| Criterion | Function | Field | Pass Condition | Used In |
+|-----------|----------|-------|----------------|---------|
+| `media_downloaded` | `get_tool_call_sequence()` | `.tool_calls` | `download_whatsapp_media` called before delegation | EDGE-01 |
+| `no_delegation_without_path` | `get_delegation_graph()` | check delegations | visual_analyst delegation includes file path | EDGE-01 |
+| `clarification_on_ambiguous` | `get_agent_final_message("PM")` | `.message` | asks for clarification, doesn't assume | EDGE-03, EDGE-06 |
+| `handles_empty_input` | `get_agent_final_message("PM")` | `.message` | asks for input, no crash | EDGE-05 |
+
+#### Output Quality Criteria
+
+| Criterion | Function | Field | Pass Condition | Used In |
+|-----------|----------|-------|----------------|---------|
+| `pm_mentions_product` | `get_agent_final_message("PM")` | `.has_product_details` | `== True` | PM-01, GATE-01 |
+| `pm_no_error` | `get_agent_final_message("PM")` | `.mentions_error` | `== False` | All scenarios |
+| `pm_success_message` | `get_agent_final_message("PM")` | `.mentions_success` | `== True` | INT-01, INT-02 |
+
+---
+
+### Quick Evaluation Checklist
+
+For any scenario, run through this checklist:
+
+```
+1. PROTOCOL LOADING
+   protocols = get_protocol_loads(trace_id)
+   [ ] PM loaded protocol first? protocols.pm_first_action_was_protocol
+   [ ] Correct protocol? protocols.pm_protocol
+
+2. DELEGATION STRUCTURE
+   graph = get_delegation_graph(trace_id)
+   [ ] Correct agents involved? graph.agents_involved
+   [ ] Correct wave structure? graph.waves
+   [ ] Correct order? graph.delegation_order
+
+3. FILE I/O
+   fio = get_file_io_trace(trace_id)
+   [ ] Analysts wrote files? fio.writes
+   [ ] PM read analysis files? fio.analysis_files_read_by_pm
+
+4. FINAL MESSAGE
+   msg = get_agent_final_message(trace_id, "PM")
+   [ ] Open-ended question? msg.has_open_question
+   [ ] No numbered options? not msg.has_numbered_options
+   [ ] Appropriate content? msg.message_preview
+```
 
 ---
 
