@@ -1,0 +1,303 @@
+<protocol name="execution_flows" type="orchestration" agent="pm">
+
+## PURPOSE
+
+Execution patterns after user approval. ID tracking, junction rules, delegation templates.
+Load when: User approved execution, ready to delegate to specialists.
+
+---
+
+## ANALYSIS ROUTING
+
+**For dependency-based routing of analysts, see `discovery_mindset` protocol.**
+
+The discovery_mindset protocol provides:
+- Dependency reasoning framework (identify needed agents → map dependencies → execute in waves)
+- Wave-based execution (parallel within wave, sequential across waves)
+- 25+ scenario patterns (image workflows, text queries, multi-image, mixed context)
+- Direct execution patterns (when user provides complete info)
+- Edge case handling
+
+**Key principle:** Build dependency graph dynamically from user intent, don't follow prescribed chains.
+
+**This protocol focuses on:** Execution flows AFTER analysis (specialist delegation, ID tracking, junction creation).
+
+---
+
+## CATALOG ADDITION FLOWS
+
+**User chooses what and in what order. PM routes accordingly:**
+
+### Flow A: Catalog Only (no image)
+
+```
+User: "Just add to catalog" / "entry only"
+PM -> catalog_specialist: Create product (no asset_id)
+     <- Returns: product_id
+[DONE] Product exists without image. User can add image later.
+```
+
+### Flow B: Image Only (with asset)
+
+```
+User: "Process the image" / "create the asset"
+PM -> creative_specialist: Create asset
+     <- Returns: asset_id
+[DONE] Asset exists, not linked. User can create catalog entry later.
+```
+
+### Flow C: Image Only (ephemeral)
+
+```
+User: "Download only" / "just for me"
+PM -> creative_specialist: "Standalone - no asset record"
+     <- Returns: storage_path (no asset_id)
+[DONE] File in pending/. No asset record. Cannot link to catalog.
+```
+
+### Flow D: Catalog First (2 steps)
+
+```
+User: "Catalog first, then images"
+
+Step 1: PM -> catalog_specialist: Create product (no asset_id)
+        <- Returns: product_id (CAPTURE THIS)
+
+Step 2: PM -> creative_specialist: Create asset, product_id=[product_id]
+        <- Creative creates asset + product_assets junction
+        <- Returns: asset_id
+
+[DONE] Product + Asset + Junction all exist.
+```
+
+**Key:** Creative handles junction when given product_id (same pattern as campaign_assets).
+
+### Flow E: Images First (standard)
+
+```
+User: "Images first" / "yes" / "full flow"
+
+Step 1: PM -> creative_specialist: Create asset
+        <- Returns: asset_id
+
+Step 2: PM -> catalog_specialist: Create product, asset_id=[asset_id]
+        <- Returns: product_id + junction
+
+[DONE] Product + Asset + Junction all exist.
+```
+
+---
+
+## ID TRACKING
+
+**PM captures from Step 1, passes to Step 2:**
+
+| Flow | Step 1 Returns | Pass to Step 2 | Step 2 Creates |
+|------|----------------|----------------|----------------|
+| Catalog first | product_id | product_id -> creative | Asset + junction |
+| Images first | asset_id | asset_id -> catalog | Product + junction |
+
+**Both specialists can create product_assets junctions.** Whoever runs second receives the existing ID and creates the junction.
+
+---
+
+## CREATIVE->CATALOG ASSET HANDOFF
+
+**Creative specialist creates asset records (with HITL), catalog specialist creates product + junction.**
+
+### Why Creative Owns Assets
+
+| Concern | Old Model (storage_path) | New Model (asset_id) |
+|---------|-------------------------|----------------------|
+| Image rejection feedback | Goes to catalog_specialist (wrong expert) | Goes to creative_specialist (right expert) |
+| Iteration on visual issues | Back-and-forth PM<->creative | Creative iterates directly |
+| HITL focus | Mixed: image + catalog in one | Separated: image quality, then catalog data |
+| Expert handling | Catalog specialist can't fix images | Image expert handles image feedback |
+
+### Flow
+
+```
+[1. creative_specialist] -> processes image
+      |
+      v
+[creative_specialist calls write_data: CREATE asset] -> [HITL: "Is this image acceptable?"]
+      |
+      +---> REJECTED: Creative iterates, resubmits
+      |
+      +---> APPROVED: Asset created
+      |
+      v
+[Returns asset_id to PM]
+      |
+      v
+[2. PM receives asset_id]
+      |
+      v
+[3. PM delegates to catalog_specialist]:
+   "Create product entry with existing asset.
+    Read analysis files for context.
+    Asset already approved: [asset_id]
+    Create product + product_assets junction."
+      |
+      v
+[4. catalog_specialist] -> creates:
+   - Product record (if new)
+   - product_assets junction linking asset_id to product
+   [HITL approval for catalog data]
+```
+
+### Two-Stage HITL (Intentional)
+
+| Stage | Owner | HITL Question | User Focus |
+|-------|-------|---------------|------------|
+| 1. Asset creation | creative_specialist | "Is this image acceptable?" | Visual quality, accuracy |
+| 2. Catalog entry | catalog_specialist | "Is this product data correct?" | SKU, pricing, family, attributes |
+
+---
+
+## DELEGATION TEMPLATES
+
+### To Creative (Standard)
+
+```
+"Create catalog hero shot for [product].
+Source image at: [source_image_path]
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
+For CATALOG domain."
+```
+
+### To Creative (With Product Linking)
+
+```
+"Create catalog hero shot for [product].
+Source image at: [source_image_path]
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
+
+Link to existing product: [product_id]
+
+For CATALOG domain. Create asset and link to product."
+```
+
+### To Catalog (After Creative)
+
+```
+"Create catalog entry for [product].
+Source image at: [source_image_path]
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
+
+Asset already created and approved: [asset_id]
+
+For CATALOG domain. Create product and link to asset."
+```
+
+### To Catalog (No Asset)
+
+```
+"Create catalog entry for [product].
+Source image at: [source_image_path]
+Read visual analysis at: [visual_analysis_file]
+Read product research at: [product_research_file]
+Read catalog analysis at: [catalog_analysis_file]
+
+No asset yet - product entry only.
+
+For CATALOG domain. Create product without asset link."
+```
+
+---
+
+## UPDATE PATTERN
+
+Modify existing catalog data. May skip analysis.
+
+### Simple Update (Clear Instruction)
+
+```
+"Update [SKU] price to [price]"
+
+[catalog_specialist directly] -> updated
+```
+
+No analysis needed - user provided complete instruction.
+
+### Ambiguous Update (Needs Context)
+
+```
+"Update the [color] [product] price"
+
+[1. catalog_analyst] -> find product, current price
+[2. PM confirms with user] -> "You mean [SKU] at [current price]?"
+[3. catalog_specialist] -> update after confirmation
+```
+
+---
+
+## CAMPAIGN CREATIVE PATTERN
+
+### Current State (No Campaign Specialist)
+
+Creative specialist handles both asset creation AND campaign_assets junction:
+
+```
+[1. creative_specialist] -> processes campaign image
+      |
+      v
+[creative_specialist calls write_data: CREATE asset + campaign_assets] -> [HITL]
+      |
+      v
+[Returns asset_id to PM]
+```
+
+### PM Delegation Template (Campaign)
+
+```
+"Create promotional images for [campaign].
+Source images: [list of paths or product_ids]
+Campaign: [campaign_name] (campaign_id: [id])
+Style: [festive/seasonal/promotional direction]
+For CAMPAIGN domain."
+```
+
+### Campaign Consistency Requirement
+
+When processing multiple images for same campaign:
+- Define style guide BEFORE processing
+- Apply IDENTICAL treatment to all images
+- Verify consistency across outputs
+- Create assets in batch if possible
+
+---
+
+## FILE NAMING CONVENTIONS
+
+| Agent | Output Type | Pattern |
+|-------|-------------|---------|
+| visual_analyst | Analysis file | `visual_analysis_{image_basename}.md` |
+| catalog_analyst | Analysis file | `catalog_analysis_{item_identifier}.md` |
+| product_analyst | Research file | `product_research_{item_identifier}.md` |
+| creative_specialist | Asset ID | `asset_id` (UUID from HITL-approved asset record) |
+
+### Item Identifier Rules
+
+- Use image basename when available: `20251217_152547_photo`
+- Use descriptive slug when no image: `[product]_[size]`
+- For variants: `[product]_variant_set`
+- Never use generic names: `analysis.md`, `research.md` (will overwrite)
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| Route storage_path to catalog | catalog_specialist can't iterate on image rejection | Creative creates asset, returns asset_id |
+| Skip ID capture | Step 2 can't create junction | Always capture and pass IDs between steps |
+| Wrong flow for user intent | User wanted catalog only, PM did full flow | Listen to user's explicit request |
+
+</protocol>

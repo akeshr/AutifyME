@@ -73,9 +73,10 @@ DELETED     -> Soft deleted
 | Field | Type | Description |
 |-------|------|-------------|
 | name | varchar(200) | Asset name (e.g., "Product Hero Shot") |
-| storage_url | text | Full URL to asset |
+| storage_url | text | Full URL to asset (use @upload_ref.public_url) |
 | storage_provider | varchar(50) | SUPABASE, S3, GCS, CLOUDINARY, EXTERNAL |
 | file_name | varchar(255) | Original filename |
+| mime_type | varchar(100) | MIME type - derive from extension: .png->image/png, .jpg->image/jpeg, .webp->image/webp |
 | asset_type | varchar(30) | IMAGE, VIDEO, DOCUMENT, MODEL_3D, OTHER |
 | status | varchar(20) | UPLOADING, PROCESSING, ACTIVE, ARCHIVED, DELETED |
 | purpose | varchar(20) | PRODUCT, FAMILY, CAMPAIGN, BRAND, SOCIAL, STANDALONE |
@@ -121,7 +122,6 @@ DELETED     -> Soft deleted
 |-------|------|-------------|
 | description | text | Asset description |
 | file_size_bytes | bigint | File size |
-| mime_type | varchar(100) | MIME type (image/jpeg, etc.) |
 | width | integer | Width in pixels (images/videos) |
 | height | integer | Height in pixels |
 | category | varchar(100) | Visual style: HERO, LIFESTYLE, GALLERY, TECHNICAL |
@@ -263,15 +263,17 @@ Most common scenario. Create asset and junction in same transaction.
       "table": "assets",
       "data": {
         "name": "[Product] [Size] Hero",
-        "storage_url": "pending/[timestamp]_studio_[id].png",
+        "storage_url": "@product_image.public_url",
         "storage_provider": "SUPABASE",
         "file_name": "[timestamp]_studio_[id].png",
+        "mime_type": "image/png",
         "asset_type": "IMAGE",
+        "purpose": "PRODUCT",
         "status": "ACTIVE",
         "is_ai_generated": true,
         "source_asset_ids": null,
         "generation_prompt": "extraction + [background] + [lighting] for [texture]",
-        "caption": "[size] [material] [product] with [texture]"
+        "caption": "@product_image.caption"
       },
       "returns": "asset"
     },

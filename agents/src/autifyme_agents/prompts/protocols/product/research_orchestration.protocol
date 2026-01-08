@@ -139,27 +139,28 @@ The product type determines what to research. Here are EXAMPLES, not limits:
 
 ### Start Broad, Then Go Deep
 
-```
-[1. Identify product type/category]
-           |
-           v
-[2. Search for product specifications]
-           |
-           v
-[3. Find manufacturer/brand information]
-           |
-           v
-[4. Look for datasheets/spec sheets]
-           |
-           v
-[5. Research compliance/certifications]
-           |
-           v
-[6. Check market positioning/competition]
-           |
-           v
-[7. Fill gaps with targeted queries]
-```
+### Parallel Research Volleys
+
+**Do not serialize your research.** Group your queries into "Volleys" that cover multiple dimensions simultaneously.
+
+### Parallel Research Volleys
+
+**Group INDEPENDENT queries into "Volleys".**
+
+**Volley 1: Foundation (Independent Dimensions)**
+*Rule: These queries do not depend on each other.*
+- Specs
+- Price
+- Compliance Rules
+- Naming Patterns
+
+**Volley 2: Specifics (Dependent on Volley 1)**
+*Rule: Use terms discovered in Volley 1.*
+- "Specific manufacturer found in V1 spec sheet"
+- "Specific certification code found in V1 compliance"
+
+**WARNING: Do not hallucinate dependencies.**
+Do NOT query "Specs for [Brand X]" in Volley 1 if you don't know Brand X exists yet. Query "Top Brands" in V1, then "Brand X" in V2.
 
 ### Query Evolution
 
@@ -377,11 +378,15 @@ When brand-specific research yields no results:
 
 **Don't count queries. Evaluate information gain.**
 
-| Before Each Query, Ask | If NO | If YES |
-|------------------------|-------|--------|
-| Will this query likely return NEW information? | Skip it | Make the query |
-| Is this a different dimension than my last query? | You might be looping | Good, continue |
-| Do I already have enough on this dimension? | Move to next dimension | Continue if gaps remain |
+### Research Discipline: Strategic Batching
+
+**Don't ask one question at a time. Ask ALL related questions.**
+
+| Discipline | Principle |
+|------------|-----------|
+| **The Volley Rule** | Never fire a single query if you have 3 questions. Fire 3 queries. |
+| **Cross-Dimension** | Mix dimensions in a volley (Specs + Price + Compliance). |
+| **Stop Condition** | Stop when the *Volley* returns no new info, not just one query. |
 
 ### Dimension Completion Signals
 

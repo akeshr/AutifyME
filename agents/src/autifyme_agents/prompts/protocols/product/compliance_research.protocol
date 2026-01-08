@@ -33,20 +33,18 @@ Harmonized System of Nomenclature - standardized classification for GST and trad
 
 ### HSN Research Strategy
 
-**Step 1: Category Search**
+### HSN Research Strategy (Parallel)
+
+Instead of stepping 1-2-3, fire a broad volley:
+
 ```
-Query: "[product type] [material] HSN code India GST"
+[Volley 1: HSN Discovery]
+   |--> Query: "[product] [material] HSN code India GST"
+   |--> Query: "HSN [likely_chapter] [product] classification"
+   |--> Query: "[product] GST rate India"
 ```
 
-**Step 2: Verify and Narrow**
-```
-Query: "HSN [code found] meaning items covered"
-```
-
-**Step 3: Check Exceptions**
-```
-Query: "[product type] HSN classification exceptions [use case]"
-```
+**Synthesis:** Combine results to confirm Code + Rate + Description.
 
 ### Common HSN Chapters
 

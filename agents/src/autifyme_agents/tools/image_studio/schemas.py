@@ -475,53 +475,94 @@ class FidelitySpec(BaseModel):
     )
 
 
+class ExtractionTarget(BaseModel):
+    """Target coordinates for extraction.
+
+    Used within ExtractionSpec.targets array. Each target specifies
+    the bounding box and item ID for a specific product to extract.
+    The overall extraction description is in ExtractionSpec.target_description.
+
+    For single item: targets array has 1 element
+    For multiple items: targets array has N elements
+    """
+
+    target_bbox: list[int] | None = Field(
+        default=None,
+        min_length=4,
+        max_length=4,
+        description=(
+            "Bounding box coordinates for precise targeting. "
+            "Format: [y_min, x_min, y_max, x_max] normalized to 0-1000 scale. "
+            "Origin is top-left corner. "
+            "Examples: [0, 0, 300, 300] for top-left item, "
+            "[333, 333, 666, 666] for center item in 3x3 grid. "
+            "When provided, model focuses on this region for extraction."
+        )
+    )
+    target_image_label: str | None = Field(
+        default=None,
+        description=(
+            "The label of the image in the `images` array that contains this target. "
+            "Examples: 'source', 'product', 'group_photo'. "
+            "Essential for multi-image inputs to know WHICH image to extract from."
+        )
+    )
+
+
 class ExtractionSpec(BaseModel):
     """Extract specific product(s) from multi-product image.
 
     For working with group photos containing multiple products/variants.
     Supports precise bounding box targeting for multi-item images.
+
+    USAGE:
+    - target_description: Overall description of what to extract (the composition)
+    - targets: Array of {target_bbox, target_image_label} pairs
+      - Single item extraction: targets array has 1 element
+      - Multi-item extraction: targets array has N elements
+
+    Example single item:
+        ExtractionSpec(
+            target_description="Extract the glass honey jar from [source]",
+            targets=[{"target_bbox": [100, 100, 500, 500], "target_image_label": "source"}]
+        )
+
+    Example multiple items:
+        ExtractionSpec(
+            target_description="Extract all 3 honey jar variants from [source]",
+            targets=[
+                {"target_bbox": [0, 0, 333, 500], "target_image_label": "source"},
+                {"target_bbox": [333, 0, 666, 500], "target_image_label": "source"},
+                {"target_bbox": [666, 0, 1000, 500], "target_image_label": "source"}
+            ]
+        )
     """
 
     target_description: str = Field(
         description=(
-            "Describe which product to extract. Be specific. "
-            "Examples: 'the red 500ml variant on the left', "
-            "'the smaller jar in the foreground', 'the glass bottle (not plastic)', "
-            "'all three variants separately', 'just the main hero product in center'"
+            "Overall description of the extraction task. Describes the whole composition. "
+            "Examples: 'Extract the glass honey jar from [source]', "
+            "'Extract all 3 jar variants from the group photo in [source]', "
+            "'Isolate the product with blue lid from messy background in [source]', "
+            "'Extract each item from the 3x3 product grid in [source]'"
         )
     )
-    target_bbox: tuple[int, int, int, int] | None = Field(
-        default=None,
+
+    targets: list[ExtractionTarget] = Field(
+        min_length=1,
         description=(
-            "RECOMMENDED: Bounding box coordinates for precise targeting. "
-            "Format: [y_min, x_min, y_max, x_max] normalized to 0-1000 scale. "
-            "Origin is top-left corner. "
-            "Examples: [0, 0, 300, 300] for top-left item, "
-            "[333, 333, 666, 666] for center item in 3x3 grid. "
-            "When provided, model focuses on this region for extraction. "
-            "Combine with target_description for best results."
+            "Array of extraction targets with coordinates. "
+            "Each target specifies: target_bbox (coordinates) and target_image_label (which image). "
+            "For single item extraction: array with 1 element. "
+            "For multi-item extraction: array with N elements (one per item). "
+            "Example: [{target_bbox: [0,0,300,300], target_image_label: 'source'}]"
         )
     )
-    target_item_id: str | None = Field(
-        default=None,
-        description=(
-            "Reference ID from ItemManifest for tracking. "
-            "Examples: 'item_1', 'item_5', 'variant_large_blue'. "
-            "Use to correlate extraction with upstream detection."
-        )
-    )
-    position_hint: str | None = Field(
-        default=None,
-        description=(
-            "Where target product is located (DEPRECATED - prefer target_bbox). "
-            "Examples: 'left side of frame', 'center foreground', 'right background', "
-            "'the largest one', 'second from left', 'the one being held'"
-        )
-    )
+
     isolation: str = Field(
         default="complete isolation",
         description=(
-            "How to isolate the product. "
+            "How to isolate the product(s). Applies to all targets. "
             "Examples: 'complete isolation - remove everything else', "
             "'soft isolation with subtle shadow', 'keep reflection but remove background', "
             "'extract with context preserved'"
@@ -530,7 +571,7 @@ class ExtractionSpec(BaseModel):
     edge_treatment: str = Field(
         default="clean professional",
         description=(
-            "How to handle extraction edges. "
+            "How to handle extraction edges. Applies to all targets. "
             "Examples: 'surgical clean edges', 'natural soft edges', "
             "'slight feathering for natural look', 'hard precise cutout', "
             "'preserve hair/fiber detail'"
@@ -694,10 +735,9 @@ class OutputSpec(BaseModel):
     filename: str | None = Field(
         default=None,
         description=(
-            "Output filename (without extension). IMPORTANT: Specify this to know the "
-            "exact path for view_image and write_data. "
-            "Examples: 'mug_hero', 'tumbler_v2', 'product_lifestyle'. "
-            "If not specified, auto-generated UUID is used."
+            "Output filename (without extension). RECOMMENDED for predictable paths. "
+            "If not specified, UUID is auto-generated. "
+            "Examples: 'mug_hero', 'tumbler_v2', 'product_lifestyle'."
         )
     )
 
@@ -812,8 +852,9 @@ class ImageStudioInput(BaseModel):
 
     images: list[ImageInput] = Field(
         min_length=1,
+        max_length=15,
         description=(
-            "REQUIRED: At least 1 labeled image (max 15). Each image has a label "
+            "REQUIRED: Labeled images (1-15). Each image has a label "
             "you reference in your specs/instructions. "
             "Example: [ImageInput(path='inbox/photo.jpg', label='product')]"
         )
@@ -890,9 +931,8 @@ class ImageStudioInput(BaseModel):
     creative_direction: str | None = Field(
         default=None,
         description=(
-            "Additional creative notes beyond structured parameters. "
-            "Use for: overall vision, specific artistic direction, "
-            "references to styles/photographers, anything not covered above."
+            "Overall vision, artistic intent, or specific requirements. "
+            "Use for notes beyond structured parameters."
         )
     )
 

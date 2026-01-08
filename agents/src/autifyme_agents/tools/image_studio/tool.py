@@ -120,15 +120,13 @@ KEY DISTINCTION:
 === SPEC TYPES (apply what's provided) ===
 
 "extraction" = EXTRACT FROM SOURCE IMAGE
-  - target_description: What to extract from source images
-  - target_bbox: PRECISE COORDINATES [y_min, x_min, y_max, x_max] (0-1000 scale)
-    * When bbox provided, FOCUS on that specific region
-    * Coordinates define the exact item location in the source image
-    * Origin is top-left corner, scale 0-1000 normalized
-    * Example: [333, 333, 666, 666] = center item in 3x3 grid
-  - Isolate the described item from the provided source
+  - target_description: Overall description of the task
+  - targets: Array of items to extract, each with specific bbox
+    * target_bbox: Precise coordinate targeting
+    * target_image_label: Label of the image containing this target
+  - Isolate the described item(s) from the provided source
   - Source may be messy - your job is to isolate cleanly
-  - PRIORITY: Use bbox for targeting when available, description for understanding
+  - PRIORITY: Use bbox for targeting when available
 
 "fidelity" = PRODUCT IDENTITY PRESERVATION
   - preserve_colors, preserve_artwork, preserve_shape, hero_features
@@ -147,20 +145,6 @@ KEY DISTINCTION:
 "focus" = DEPTH OF FIELD control
 "custom_spec" = CREATIVE ideas beyond standard specs
 "creative_direction" = FREE-FORM notes
-
-=== BOUNDING BOX TARGETING (for multi-item extraction) ===
-
-When extraction.target_bbox is provided:
-1. LOCATE the region defined by [y_min, x_min, y_max, x_max]
-2. FOCUS extraction on the item within that bounding box
-3. USE target_description to understand WHAT the item is
-4. IGNORE other items outside the bbox region
-
-Coordinate system:
-- [0, 0, 1000, 1000] = entire image
-- [0, 0, 333, 333] = top-left ninth
-- [333, 333, 666, 666] = center ninth
-- Values are normalized (0-1000), not pixels
 
 === QUALITY DIMENSIONS (balance appropriately) ===
 
@@ -746,8 +730,9 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- Text extraction/analysis (use view_image)\n\n"
             "STRUCTURED SPECS (all optional - use what applies):\n"
             "- fidelity: CRITICAL for source images - {preserve_colors: 'exact match', preserve_artwork: 'honeycomb pattern', hero_features: 'texture pattern'}\n"
-            "- extraction: {target_description: 'glass jar on left in [source]', target_bbox: [y_min, x_min, y_max, x_max], isolation: 'complete', edge_treatment: 'sharp'}\n"
-            "  * target_bbox: coordinates normalized 0-1000 - PREFERRED for multi-item precision\n"
+            "- extraction: {target_description: 'Extract jar from [source]', targets: [{target_bbox: [0,0,500,500], target_image_label: 'source'}], isolation: 'complete'}\n"
+            "  * target_description: Describes the overall extraction task\n"
+            "  * targets: Array of {target_bbox, target_image_label}. Min len 1. Use multiple for batch extraction.\n"
             "- background: {treatment: 'transparent'/'solid_color'/'scene', color: 'white', scene_description: 'modern kitchen'}\n"
             "- lighting: {type: 'natural_window'/'studio_3point', direction: 'front'/'side', shadows: 'soft falloff'}\n"
             "- composition: {position: 'center'/'[main] center [variant] right', camera_angle: 'slight_top', negative_space: 'generous_top'}\n"
@@ -769,7 +754,7 @@ def create_image_studio_tool(storage: StorageUploader | None = None) -> Structur
             "- LABEL SYNTAX: Reference labels using [label] in spec STRING values (e.g., 'jar in [source]', 'place [product] on [background]')\n"
             "- storage_path output: Use this for write_data assets (pending/ path)\n"
             "- Material matters: Glass, metal, plastic need different rendering (specify material_treatment)\n"
-            "- One output per call: Not batch processing\n\n"
+            "- One output per call (unless using extraction.targets for batch)\n\n"
             "PATTERNS: See image_studio.protocol for detailed use patterns (extract, lifestyle, family, hero shot).\n\n"
             "WORKFLOW:\n"
             "- view_image: BEFORE image_studio - see what you're working with\n"

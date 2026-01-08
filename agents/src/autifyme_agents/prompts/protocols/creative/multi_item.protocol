@@ -1,4 +1,4 @@
-<protocol name="multi_item_image" type="exploration" domain="shared">
+<protocol name="multi_item" type="workflow" domain="creative">
 
 ## PURPOSE
 
@@ -99,15 +99,56 @@ When multi-item detected, output a structured manifest that downstream agents ca
 
 ### Extraction Targets
 
-| # | Description | BBox [y_min, x_min, y_max, x_max] | Position | Key Attributes |
-|---|-------------|-----------------------------------|----------|----------------|
-| 1 | [what it is] | [estimated_y_min, estimated_x_min, estimated_y_max, estimated_x_max] | [position] | [domain-specific] |
-| 2 | [what it is] | [estimated_y_min, estimated_x_min, estimated_y_max, estimated_x_max] | [position] | [domain-specific] |
-| ... | ... | ... | ... | ... |
+**Single source (most common):**
 
-**CRITICAL:** BBox coordinates are MANDATORY. Scale: 0-1000 (normalized), origin top-left.
-- y_min, x_min = top-left corner of item (estimate based on visual location)
-- y_max, x_max = bottom-right corner of item (estimate based on visual extent)
+| # | Description (WHAT) | BBox (WHERE) | Position (ref only) | Key Attributes |
+|---|-------------------|--------------|---------------------|----------------|
+| 1 | [visual characteristics] | [y_min, x_min, y_max, x_max] | [for human ref] | [domain-specific] |
+| 2 | [visual characteristics] | [y_min, x_min, y_max, x_max] | [for human ref] | [domain-specific] |
+
+**Multiple sources (COMPONENTS scenario):**
+
+| # | Source | Description (WHAT) | BBox (WHERE) | Key Attributes |
+|---|--------|-------------------|--------------|----------------|
+| 1 | [bodies] | jar body, clear glass | [100, 50, 800, 600] | Large |
+| 2 | [lids] | blue lid | [200, 100, 400, 300] | matches #1 |
+
+**[CRITICAL] Column Purposes - DO NOT MIX:**
+
+| Column | Purpose | Goes to ExtractionTarget as |
+|--------|---------|------------------------------|
+| Source | WHICH image (when multi-source) | `target_image_label` |
+| Description | Overall task description | Goes to ExtractionSpec `target_description` |
+| BBox | WHERE - pixel-precise coordinates | `target_bbox` |
+| Position | Human reference only | NOT used in tool call |
+
+**Description must NOT contain position.** Position info goes in BBox coordinates.
+
+**Single-source extraction (one item):**
+```python
+extraction=ExtractionSpec(
+    target_description="Extract tall jar with floral print from group photo",
+    targets=[
+        ExtractionTarget(
+            target_bbox=[50, 20, 600, 350],
+            target_image_label="source"
+        )
+    ]
+)
+```
+
+**Multi-source composition (body from one image, lid from another):**
+```python
+extraction=ExtractionSpec(
+    target_description="Compose glass jar with blue lid",  # Describes final composite
+    targets=[
+        ExtractionTarget(target_bbox=[100, 50, 800, 600], target_image_label="bodies"),
+        ExtractionTarget(target_bbox=[200, 100, 400, 300], target_image_label="lids")
+    ]
+)
+```
+
+**BBox coordinates:** Scale 0-1000 (normalized), origin top-left.
 
 **Note:** Domain protocols extend "Key Attributes" with domain-specific columns (e.g., Size, Color for catalog).
 
@@ -234,7 +275,17 @@ Extract each item separately, producing N outputs.
 **Execution pattern:**
 ```
 for each item in manifest:
-    process(target="{item.description} at {item.position}")
+    image_studio(
+        extraction=ExtractionSpec(
+            target_description=f"Extract {item.description} from source image",
+            targets=[
+                ExtractionTarget(
+                    target_bbox=item.bbox,
+                    target_image_label=item.source or "source"
+                )
+            ]
+        )
+    )
     output: one asset per item
 ```
 
@@ -262,11 +313,33 @@ Keep all items together in arrangement, producing 1 output.
 - Family/range shots (show the full collection)
 - Lifestyle scenes (items in context together)
 - Marketing banners (complete offering)
+- COMPONENTS: Assemble parts from multiple sources
 
-**Execution pattern:**
+**Single source:**
 ```
-process(all_items, preserve_arrangement=True)
-output: one combined asset
+image_studio(
+    images=[{"path": "inbox/group.jpg", "label": "source"}],
+    composition={"arrangement": "preserve original"}
+)
+```
+
+**Multi-source (COMPONENTS - structured targets):**
+```python
+image_studio(
+    images=[
+        {"path": "inbox/bodies.jpg", "label": "bodies"},
+        {"path": "inbox/lids.jpg", "label": "lids"}
+    ],
+    extraction=ExtractionSpec(
+        target_description="Assemble jar body with blue lid",
+        targets=[
+            ExtractionTarget(target_bbox=[100, 50, 800, 600], target_image_label="bodies"),
+            ExtractionTarget(target_bbox=[200, 100, 400, 300], target_image_label="lids")
+        ]
+    )
+)
+output: one composed asset
+```
 ```
 
 ### SELECTIVE
@@ -467,7 +540,7 @@ Not all source images apply to all batch items. **Decision rule:** If a source i
 
 ### HITL Gate (MANDATORY)
 
-Anchor approval BLOCKS batch generation. Use `write_data` (triggers HITL) NOT `write_todos` (internal tracking only).
+Anchor approval BLOCKS batch generation. Use `write_data` (triggers HITL) - never skip the approval step.
 
 User approves the STYLE, not the specific item. After approval, style is LOCKED for batch.
 
@@ -485,24 +558,25 @@ After batch, create grid of all outputs and verify visual consistency. If ANY ou
 
 If you find yourself doing any of these, the core principle is being violated:
 
+- **Rapid self-iteration** - Generating v1, v2, v3... without HITL between each. Each anchor attempt requires presenting via write_data and WAITING for user feedback before generating again. User drives iteration pace.
 - **Text workarounds** - Writing "match anchor" or "same style as anchor" in custom_spec means parameters aren't actually identical
 - **Dropped source context** - Batch calls missing shared reference images that anchor used
-- **HITL bypass** - Using `write_todos` instead of `write_data` after anchor generation
+- **HITL bypass** - Skipping `write_data` after anchor generation (user must approve style before batch)
 - **Modified parameters** - Changing lighting, composition, background, etc. between anchor and batch
 
 ---
 
 ## DOMAIN APPLICATION
 
-This protocol provides the PATTERN. Domain-specific protocols provide the VOCABULARY:
+This protocol provides the PATTERN. Domain visual protocols (catalog_visual, lifestyle_visual, etc.) apply the VOCABULARY:
 
-```
-Domain Protocol includes multi_item_image.protocol:
-- Maps "item" to domain entity (product, room, dish)
-- Maps attributes to domain fields (size, sqft, portion)
-- Applies domain-specific defaults
-```
+| Protocol Provides | Domain Protocol Provides |
+|-------------------|--------------------------|
+| Classification types | Domain entity mapping (product, room, dish) |
+| Manifest format | Domain-specific attributes (size, sqft, portion) |
+| Processing strategies | Domain defaults (catalog=INDIVIDUAL, marketing=COMPOSITE) |
+| Position vocabulary | N/A - universal |
 
-The pattern (classification, manifest, strategies) remains identical across domains.
+The pattern (classification, manifest, strategies) remains identical across all domains.
 
 </protocol>

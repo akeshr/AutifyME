@@ -256,7 +256,7 @@ async def create_project_manager(
 
     return project_manager.with_config(
         {
-            "metadata": {"version": "1.0.0"},
+            "metadata": {"version": "2.0.0"},  # v2 prompt - intelligence-first design
             "initial_state": initial_state,
         }
     )

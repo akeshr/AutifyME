@@ -85,7 +85,7 @@ def _get_or_create_session(thread_id: str | None) -> tuple[str, dict[str, Any]]:
 def _invoke_pm(
     message: str,
     thread_id: str,
-    media_path: str | None = None,
+    media_paths: list[str] | None = None,
 ) -> tuple[str, bool, list[dict[str, Any]] | None, bool]:
     """Invoke PM and return response details.
 
@@ -94,7 +94,7 @@ def _invoke_pm(
     Args:
         message: User message to send
         thread_id: Conversation thread ID
-        media_path: Optional path to media file
+        media_paths: Optional list of paths to media files
 
     Returns:
         Tuple of (response_text, is_approval_request, approval_products, workflow_complete)
@@ -125,14 +125,22 @@ def _invoke_pm(
 
     pm = asyncio.run(_create_pm())
 
-    # Build message content
+    # Build message content with media attachments
     content = message
-    if media_path:
-        path = Path(media_path)
-        if path.exists():
-            content += f" [media_id: {path}]"
-        else:
-            logger.warning(f"Media file not found: {media_path}")
+    if media_paths:
+        valid_paths = []
+        for media_path in media_paths:
+            path = Path(media_path)
+            if path.exists():
+                valid_paths.append(str(path))
+            else:
+                logger.warning(f"Media file not found: {media_path}")
+
+        if len(valid_paths) == 1:
+            content += f" [media_id: {valid_paths[0]}]"
+        elif len(valid_paths) > 1:
+            media_ids = ", ".join(valid_paths)
+            content += f" [media attachments ({len(valid_paths)}): {media_ids}]"
 
     # Invoke PM (sync with sync checkpointer)
     result = pm.invoke(
@@ -238,6 +246,7 @@ def chat_with_pm(
     message: str,
     thread_id: str | None = None,
     media_path: str | None = None,
+    media_paths: list[str] | None = None,
 ) -> PMChatResult:
     """Send a message to PM and get structured response.
 
@@ -249,7 +258,8 @@ def chat_with_pm(
         message: User message to send to PM
         thread_id: Thread ID from previous call to continue conversation.
                    Pass None to start a new conversation.
-        media_path: Optional path to media file (image, video, etc.)
+        media_path: Optional path to single media file (backward compat)
+        media_paths: Optional list of paths to media files (multi-image)
 
     Returns:
         PMChatResult with response details for evaluation
@@ -277,9 +287,19 @@ def chat_with_pm(
     )
 
     try:
+        # Combine media_path and media_paths into single list
+        all_media_paths: list[str] | None = None
+        if media_paths:
+            all_media_paths = list(media_paths)
+        if media_path:
+            if all_media_paths:
+                all_media_paths.insert(0, media_path)
+            else:
+                all_media_paths = [media_path]
+
         # Invoke PM
         response_text, is_approval, products, complete = _invoke_pm(
-            message, actual_thread_id, media_path
+            message, actual_thread_id, all_media_paths
         )
 
         # Calculate timing

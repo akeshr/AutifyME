@@ -1,0 +1,189 @@
+<protocol name="synthesis" type="orchestration" agent="pm">
+
+## PURPOSE
+
+How to synthesize analyst findings into unified understanding for user.
+Load when: Analysis phase complete, ready to present to user.
+
+---
+
+## PREREQUISITE: INGEST INTELLIGENCE
+
+**Summaries are lies. Files are truth.**
+Before you synthesize, you MUST read the actual findings.
+
+**Action:**
+1. Identify relevant files: `visual_analysis_*.md`, `product_research_*.md`, `catalog_analysis_*.md`.
+2. Call `read_file` on them (if you haven't already).
+3. **THEN** synthesize.
+
+**Why?** Agent summaries ("Found 3 items") lack the nuance ("Item 2 is a darker shade") needed for conflict detection.
+
+## SYNTHESIS PRINCIPLE: HIERARCHICAL TRUTH
+
+**Synthesis is NOT democracy. It is a Hierarchy of Authority.**
+Resolve conflicts by deferring to the Domain Expert.
+
+**The Authority Matrix:**
+| Question | Authority Agent | Why |
+|----------|-----------------|-----|
+| **What does it look like?** | **Visual Analyst** | It has the eyes. |
+| **What are the specs/rules?** | **Product Analyst** | It has the internet. |
+| **Do we have it?** | **Catalog Analyst** | It has the database. |
+| **How should we price it?** | **Catalog Analyst** | Internal strategy overrides market. |
+
+**Conflict Resolution:**
+- If Visual says "Glass" and Product says "Plastic" -> **Visual Wins** (Physical Truth).
+- If Product says "Price $10" and Catalog says "Our Price $15" -> **Catalog Wins** (Business Truth).
+- If Catalog says "New Product" and User says "Existing" -> **User Wins** (Absolute Truth).
+
+---
+
+## THE FOUR SYNTHESIS DIMENSIONS
+
+When analysts return, extract and combine:
+
+| Dimension | What to Extract | Example |
+|-----------|-----------------|---------|
+| **Identity** | What is this product? (from visual + research) | "[size] [material] [product] with [feature], [grade]" |
+| **Placement** | Where does it fit? (from catalog) | "Fits [Family] family, similar to products at [price range]" |
+| **Compliance** | What rules apply? (from product) | "[HSN], [GST%], [certifications]" |
+| **Positioning** | How to price/position? (cross-domain) | "[segment] - [feature] commands [X%] over [baseline]" |
+
+---
+
+## CROSS-DOMAIN PATTERNS
+
+Look for patterns that emerge ACROSS analyst outputs:
+
+| Pattern Type | Signals | Insight |
+|--------------|---------|---------|
+| **Premium alignment** | Visual: premium finish + Product: premium market + Catalog: premium family exists | Strong premium positioning supported across all domains |
+| **Positioning conflict** | Visual: premium finish + Catalog: matched to utility family | CONFLICT - family may be wrong fit |
+| **Gap opportunity** | Visual: unique feature + Catalog: no similar products | First-to-catalog opportunity |
+| **Compliance trigger** | Product: food-contact + Visual: food container | FSSAI/food-grade requirements apply |
+
+---
+
+## CONFLICT DETECTION (MANDATORY)
+
+Before presenting to user, check for mismatches:
+
+| Analyst A Says | Analyst B Says | Conflict? | Resolution |
+|----------------|----------------|-----------|------------|
+| Visual: "Premium decorative" | Catalog: "Utility family fit" | **YES** | Surface to user OR re-check catalog for premium families |
+| Visual: "[material]" | Product: "[HSN] ([material])" | No | Aligned - proceed |
+| Visual: "[size] estimate" | Product: "Standard is [actual size]" | Minor | Use research value (more precise) |
+| Catalog: "[price range] similar" | Product: "Premium = [X%] over" | No | Combine: "[calculated range] for premium tier" |
+
+**CRITICAL:** If conflict detected, either resolve or surface to user. Never proceed with unresolved conflicts.
+
+---
+
+## [CRITICAL] USER CONTEXT CONFLICTS
+
+**When analyst findings contradict user's explicit context, ASK USER before taking action.**
+
+| User Said | Analyst Found | Action |
+|-----------|---------------|--------|
+| "existing" / "our" | Something not in catalog | Ask user about the discrepancy |
+| "new product" | Similar exists | Ask: create new or update existing? |
+| "these are [X]" | Actually looks like [Y] | Ask which is correct |
+
+**User context > Analyst recommendations.** Analysts provide hypotheses; user statements are facts.
+
+---
+
+## SYNTHESIS TEMPLATE
+
+Use this pattern when presenting to user after analysis phase:
+
+```
+**Product:** [Unified identity from visual + research]
+
+**Key Findings:**
+- [Most important insight - often cross-domain pattern]
+- [Placement recommendation with rationale]
+- [Pricing/positioning insight]
+
+**Compliance:** [HSN, certifications - brief]
+
+[If conflict exists:]
+**Note:** [Explain the conflict and options]
+
+---
+**What would you like to do next?**
+```
+
+**CRITICAL:** Open-ended question. User decides WHAT and in WHAT ORDER. Do NOT present numbered options - they constrain the user.
+
+---
+
+## WHEN TO SURFACE CONFLICTS TO USER
+
+| Conflict Type | PM Action |
+|---------------|-----------|
+| **Resolvable by domain authority** | Resolve per conflict_resolution protocol, note resolution |
+| **Positioning/business decision** | Surface to user with options |
+| **Factual contradiction** | Investigate first, then surface if unresolved |
+
+**Example (surfacing):**
+```
+"I notice a positioning question:
+- Visual analysis shows premium decorative features
+- Current family '[Family]' serves utility/budget segment
+
+Options:
+1. Create as premium variant in current family (may be outlier)
+2. Create new '[Material] Premium [Category]' family
+3. Find existing premium family that fits
+
+Which approach fits your catalog strategy?"
+```
+
+---
+
+## CONFLICT RESOLUTION AT SYNTHESIS
+
+**With wave-based execution (see discovery_mindset), most conflicts are prevented.**
+
+When PM delegates analysts in waves:
+- Wave 1: visual_analyst produces visual_analysis.md
+- Wave 2: product_analyst ‖ catalog_analyst (PM passes visual findings to both)
+
+Both P and C analyze WITH visual context from the start. Cross-domain conflicts are rare.
+
+### Rare Edge Case: Post-Synthesis Refinement
+
+**If synthesis reveals unexpected conflict requiring re-analysis:**
+
+| Conflict Type | Resolution |
+|---------------|------------|
+| **Business decision** | Surface to user with options (don't re-analyze) |
+| **Factual contradiction** | Trust domain authority per hierarchy (don't re-route) |
+| **Missing critical context** | RARE - delegate conditional agent in new wave |
+
+**Example (rare):**
+```
+Catalog: "No families match this unusual product type"
+Product: "Common product, widely available"
+
+→ This suggests catalog search may have used wrong terms
+→ Delegate to catalog_analyst again with product's exact terminology
+```
+
+**Principle:** With proper wave execution, refinement should be EXCEPTIONAL. If you're re-routing frequently, check dependency reasoning in discovery_mindset protocol.
+
+---
+
+## SYNTHESIS ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| **Concatenation** | "Visual says X. Catalog says Y." | Combine into unified picture |
+| **Missing cross-domain** | Report each domain separately | Look for patterns ACROSS outputs |
+| **Hidden conflicts** | Proceed despite mismatches | Detect and resolve or surface |
+| **Raw relay** | Pass analyst text verbatim | Distill into concise insights |
+| **No recommendation** | Just present facts | Always include what to do next |
+
+</protocol>

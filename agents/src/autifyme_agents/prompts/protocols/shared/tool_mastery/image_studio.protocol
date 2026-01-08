@@ -484,27 +484,53 @@ When source contains multiple items, extract each separately (unless explicitly 
 
 ## MULTI-ITEM EXTRACTION
 
-When source image contains multiple items, use position-based targeting.
+When source image contains multiple items, use precise targeting.
 
-**See `multi_item_image.protocol` for:**
+**See `multi_item.protocol` (domain=creative) for:**
 - Classification types (VARIANTS, COLLECTION, COMPONENTS)
 - Processing strategies (INDIVIDUAL, COMPOSITE, GROUPED)
 - Strategy selection signals
-- Full position vocabulary
 
-### Targeting Syntax
+### [CRITICAL] Targeting: Separate WHAT from WHERE
 
-Use visual differentiators BEFORE position in `target_description`.
+| Field | Purpose | Single | Multi-source (list) |
+|-------|---------|--------|---------------------|
+| `target_description` | WHAT to extract | Visual attributes | Describes final composite |
+| `target_image` | WHICH image(s) | `"[source]"` | `["[bodies]", "[lids]"]` |
+| `target_bbox` | WHERE | `[y,x,y,x]` | `[[...], [...]]` |
 
-| Priority | Pattern | Why |
-|----------|---------|-----|
-| 1 | SIZE first | "the LARGEST [product]" - visually unambiguous |
-| 2 | VISUAL PATTERN | "the [product] with [distinctive feature]" - intrinsic to product |
-| 3 | POSITION last | "at [position]" - only as tie-breaker when visuals identical |
+**Single source (default):**
+```
+target_description: "tall jar with floral print"
+target_image: "[source]"
+target_bbox: [50, 20, 600, 350]
+```
 
-Combine for precision: "the LARGEST [product] with [pattern] in [source]"
+**Multi-source composition (COMPONENTS):**
+```
+target_description: "glass jar with blue lid"  # Describes final result
+target_image: ["[bodies]", "[lids]"]           # Extract from each
+target_bbox: [[100, 50, 800, 600], [200, 100, 400, 300]]  # Corresponding regions
+```
 
-### Position Vocabulary
+Lists must be same length. Each bbox corresponds to same-index image.
+
+**Description must NOT contain position.** Position is in bbox coordinates.
+
+### When Bbox NOT Available
+
+Only when bbox is unavailable, include position in description:
+
+```
+target_description: "the LARGEST jar with floral print at left-column"
+```
+
+Priority for description-only targeting:
+1. SIZE first - "the LARGEST", "the SMALLEST"
+2. VISUAL PATTERN - "with floral print", "blue lid"
+3. POSITION last - "at left-column" (tie-breaker only)
+
+### Position Vocabulary (for description-only cases)
 
 | Position Type | Examples |
 |---------------|----------|

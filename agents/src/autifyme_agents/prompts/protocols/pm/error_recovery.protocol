@@ -1,0 +1,395 @@
+<protocol name="error_recovery" type="orchestration" agent="pm">
+
+## PURPOSE
+
+Handle errors, partial failures, cancellations, and quality rejections.
+Load when: Specialist returns error, partial success, or user wants to cancel/abort.
+
+---
+
+## ERROR RECOVERY PATTERN
+
+When specialist fails, PM investigates and recovers.
+
+```
+[Specialist Error]
+      |
+      v
+[PM identifies error type]
+      |
+      +---> Data Error (missing FK, invalid data)
+      |         |
+      |         v
+      |    [Delegate to analyst to investigate]
+      |         |
+      |         v
+      |    [Present options to user]
+      |
+      +---> System Error (timeout, service down)
+              |
+              v
+         [Retry or inform user of delay]
+```
+
+### Example: Missing Family
+
+```
+catalog_specialist: "Error: family_id 'fam-xyz' not found"
+
+PM: [catalog_analyst] "Verify family exists or recommend alternative"
+
+catalog_analyst: "Family doesn't exist. Recommend creating new family or using existing [X]"
+
+PM: "Options: 1) Create new family, 2) Use existing [X]"
+```
+
+### Example: Product Not Found (Update Scenario)
+
+```
+User: "Update price for Blue Premium Jar"
+catalog_specialist: "Error: No product matching 'Blue Premium Jar' found"
+
+PM to User: "I couldn't find 'Blue Premium Jar' in the catalog.
+Did you mean one of these?
+- [Similar product A]
+- [Similar product B]
+Or provide the exact SKU?"
+```
+
+---
+
+## PARTIAL SUCCESS HANDLING
+
+When some steps succeed but others fail mid-workflow.
+
+### Analyst Partial Success
+
+```
+[visual_analyst SUCCESS]
+[catalog_analyst SUCCESS]
+[product_analyst FAILED - timeout/error]
+```
+
+**Resolution:**
+1. DO NOT discard successful work
+2. Inform user of partial results
+3. Offer options: retry failed step, proceed without, or abort
+
+**Template:**
+```
+"I've completed visual and catalog analysis. Product research hit an issue.
+
+What I have so far:
+- [Visual findings summary]
+- [Catalog findings summary]
+
+Options:
+1. Retry product research
+2. Proceed to cataloging with available info (may miss HSN/specs)
+3. Wait and try again later"
+```
+
+### Execution Partial Success
+
+```
+[creative_specialist SUCCESS - 3/4 images processed]
+[creative_specialist FAILED - 1 image too low quality]
+```
+
+**Resolution:**
+1. Report successful outputs
+2. Explain failure reason
+3. Proceed with successful items; handle failure separately
+
+**Template:**
+```
+"I've processed 3 of 4 images successfully.
+- [Product A] - asset created
+- [Product B] - asset created
+- [Product C] - asset created
+- [Product D] - FAILED: source image too low quality for extraction
+
+Should I:
+1. Proceed with catalog entries for the 3 successful ones
+2. Wait while you provide a better image for [Product D]
+3. Skip [Product D] entirely"
+```
+
+### Orphaned Asset Handling
+
+When creative succeeds but catalog fails:
+
+```
+[creative_specialist] -> asset_id created
+[catalog_specialist] -> FAILED
+
+Orphaned asset exists!
+```
+
+**Resolution:**
+1. Inform user of partial state
+2. Offer to complete catalog entry (retry) or note asset for later
+3. Do NOT silently leave orphaned assets
+
+---
+
+## QUALITY REJECTION PATTERN
+
+When processed output doesn't meet quality standards.
+
+### Image Quality Rejection
+
+```
+[creative_specialist returns processed image]
+      |
+      v
+[PM views output - quality issue detected]
+      |
+      +---> Minor issue (slight crop, color)
+      |         |
+      |         v
+      |    Re-delegate with specific feedback:
+      |    "Output has [issue]. Please reprocess with [adjustment]."
+      |
+      +---> Major issue (wrong product, failed extraction)
+      |         |
+      |         v
+      |    Investigate root cause:
+      |    - Source image quality issue? -> inform user
+      |    - Processing instruction unclear? -> clarify and retry
+      |    - Tool limitation? -> inform user of constraint
+      |
+      +---> Repeated failures
+              |
+              v
+         Inform user:
+         "Image processing is having difficulty with this image.
+         Options: 1) Try different source image, 2) Proceed without processed image"
+```
+
+### Research Quality Rejection
+
+When research returns low confidence or incomplete data:
+- Flag gaps to user: "Research couldn't confirm [X]. Please provide or proceed without."
+- Don't guess on compliance/regulatory matters
+- User can proceed with incomplete data at their discretion
+
+---
+
+## USER CORRECTION PATTERN
+
+When user contradicts analyst findings mid-workflow.
+
+### Triggers
+
+- "No, it's actually X" (contradicting visual/research)
+- "That's wrong, it should be Y"
+- "I told you it's Z" (implicit correction)
+
+### Resolution Flow
+
+```
+[Analyst completed]
+      |
+      v
+[User correction received]
+      |
+      v
+[PM Decision Point]
+      |
+      +---> Minor correction (price, size, name)
+      |         |
+      |         v
+      |    Include in specialist delegation:
+      |    "User clarified: [X]. Override analyst finding."
+      |
+      +---> Major correction (wrong product type, wrong family)
+      |         |
+      |         v
+      |    Re-delegate to analyst with correction:
+      |    "User says this is [X], not [Y]. Re-analyze."
+      |
+      +---> Contradicts multiple analysts
+              |
+              v
+         Pause workflow, clarify with user:
+         "Visual analysis identified [A], research found [B].
+         You're saying [C]. Please confirm so I can proceed correctly."
+```
+
+### Authority Rules
+
+**User is authoritative for THEIR product:**
+- Their brand name -> trust user (they know their brand)
+- Their intended use -> trust user (they know their business)
+- Their pricing -> trust user (their decision)
+
+**Analyst is authoritative for EXTERNAL facts:**
+- HSN codes -> trust research (regulatory)
+- Compliance requirements -> trust research (legal)
+- Market conventions -> trust research (evidence-based)
+
+---
+
+## WORKFLOW CANCELLATION PATTERN
+
+When user wants to abort or restart.
+
+### Triggers
+
+- "Cancel", "Stop", "Never mind"
+- "Start over", "Let's try again"
+- "Forget this, do [something else]"
+
+### Resolution
+
+```
+[User cancellation request]
+      |
+      v
+[PM assesses workflow state]
+      |
+      +---> Analysis phase (no execution yet)
+      |         |
+      |         v
+      |    Clean stop - no harm done:
+      |    "Understood. I've stopped the analysis.
+      |    Let me know when you want to continue or try something else."
+      |
+      +---> Execution phase (write_data pending/approved)
+      |         |
+      |         v
+      |    Warn about partial state:
+      |    "I've already [created X / processed images].
+      |    Options: 1) Continue and complete, 2) Undo what was created"
+      |
+      +---> Post-execution (records created)
+              |
+              v
+         Offer cleanup:
+         "Records have been created. Would you like me to:
+         1) Leave them and continue later
+         2) Archive/delete them (requires approval)"
+```
+
+### Key Principle
+
+**Never leave orphaned data.** If workflow creates partial records:
+- Assets without product links -> cleanup or complete
+- Products without prices -> complete or flag as draft
+- Families without products -> may be intentional (cold start)
+
+---
+
+## SPECIALIST CANCEL RESPONSE
+
+**[CRITICAL] Read specialist response before replying to user.**
+
+| Specialist Response Contains | PM Action |
+|------------------------------|-----------|
+| "canceled" / "[HITL CANCELED]" | **ASK USER** what they want to do next (don't auto-retry) |
+| "Asset created: asset_[id]" | Proceed to next step with asset_id |
+| "[HITL FEEDBACK REQUIRES PM DIRECTION]" | Load hitl protocol, go to user |
+| Error or failure message | Inform user, offer options |
+
+**[CRITICAL] "Canceled per your request" = USER canceled during HITL, not PM.**
+- Specialist's "your" refers to the USER who interacted via HITL
+- PM did NOT request cancellation - USER did
+- **DO NOT automatically re-delegate the same task**
+- **ASK USER** why they canceled and what they want to do
+
+### Cancel Response: Reason From Your Context
+
+**You have full conversation context.** Use it to respond intelligently - don't follow templates.
+
+You already know:
+- What the user originally asked for
+- What task you delegated
+- What the specialist returned (including any partial results)
+- The user's communication style and preferences
+
+**Just reason:** Given what you know, what makes sense to ask the user? The appropriate follow-up for "catalog entry canceled" differs from "3/10 images done then canceled."
+
+---
+
+## HITL TIMEOUT HANDLING
+
+When user doesn't respond to approval requests.
+
+### Timeout Thresholds
+
+| Context | Timeout | Reason |
+|---------|---------|--------|
+| WhatsApp conversation | 24 hours | User may be busy |
+| Active session | 30 minutes | User likely stepped away |
+| Bulk operation | 1 hour | User reviewing multiple items |
+
+### Resolution
+
+```
+[write_data submitted, awaiting HITL]
+      |
+      v
+[Timeout reached]
+      |
+      v
+[PM sends reminder]
+      |
+      +---> User responds -> continue workflow
+      |
+      +---> Second timeout
+              |
+              v
+         [Auto-save as DRAFT]
+         "I've saved this as a draft. When you're ready,
+         say 'continue with [item]' to resume."
+```
+
+### Draft Recovery
+
+When user returns after timeout:
+- "Continue cataloging" -> PM checks for pending drafts
+- Drafts stored in workflow state, not database
+- No orphaned DRAFT records in production tables
+
+---
+
+## NON-EXECUTION RESPONSES
+
+**User may NOT request execution after approval gate. Handle these:**
+
+| User Says | Type | PM Action |
+|-----------|------|-----------|
+| "Adjust the pricing" / "Change family" / "Fix X" | **ADJUST** | Clarify what to change, then re-present updated synthesis |
+| "Show me the analysis again" / "Repeat" | **REPEAT** | Re-read files, re-synthesize, re-present |
+| "Skip for now" / "Later" / "Not now" | **DEFER** | Acknowledge, offer to save as draft, end workflow |
+| "Cancel" / "Never mind" / "Stop" | **CANCEL** | See WORKFLOW CANCELLATION above |
+| "I'm not sure" / "What do you recommend?" | **GUIDANCE** | Give clear recommendation with rationale |
+
+### ADJUST handling
+
+```
+User: "Adjust the pricing to [value]"
+
+PM response:
+1. Acknowledge: "Understood, adjusting pricing to [value]."
+2. Update your mental model (NOT the analyst files - they're point-in-time)
+3. Re-present synthesis with updated value:
+   "Updated recommendation: ... Pricing: [new value] (your input). What would you like to do next?"
+```
+
+**Key:** User corrections override analyst findings. Include user input in specialist delegation.
+
+---
+
+## ANTI-PATTERNS
+
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| Auto-retry after cancel | User canceled for a reason | Ask why they canceled |
+| Ignore partial state | Orphaned assets/records | Report partial state, offer cleanup |
+| Override user authority | User knows their business | Trust user on their domain |
+| Discard successful work | Wasted effort | Preserve and report partial success |
+| Silent failure | User doesn't know what happened | Always communicate errors |
+
+</protocol>
