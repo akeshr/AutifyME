@@ -1,6 +1,6 @@
 ---
 name: agent-improvement
-description: Diagnose and fix underperforming agents using systematic analysis. Protocol-based decomposition, doctrine over examples, cognitive load management. (project) (project) (project)
+description: Diagnose and fix underperforming agents using systematic analysis. Protocol-based decomposition, doctrine over examples, cognitive load management. (project)
 ---
 
 # Agent Improvement Skill
@@ -8,6 +8,7 @@ description: Diagnose and fix underperforming agents using systematic analysis. 
 ## Quick Reference (Start Here)
 
 **When to use this skill:**
+
 - Agent behavior is inconsistent ("dream vs nightmare")
 - Agent needs many examples to work
 - Agent "forgets" rules sometimes
@@ -24,7 +25,8 @@ description: Diagnose and fix underperforming agents using systematic analysis. 
 | Inconsistent behavior | Check cognitive load first |
 
 **The fix pattern:**
-```
+
+```text
 Bloated Agent (1000+ lines) -> Lean Agent (~200 lines) + Domain Protocols (~300 lines each)
 ```
 
@@ -74,11 +76,13 @@ Don't memorize treatments. Ask: "What does light DO to this material?"
 ```
 
 **When to use examples (sparingly):**
+
 - Output FORMAT demonstration (1-2 max)
 - Tool SYNTAX demonstration (in tool_mastery protocols)
 - Complex multi-step WORKFLOW illustration
 
 **When to use doctrine:**
+
 - Decision making (how to think about choices)
 - Quality reasoning (what "good" looks like and why)
 - Domain expertise (how an expert approaches problems)
@@ -112,6 +116,7 @@ Don't memorize treatments. Ask: "What does light DO to this material?"
 | Total guidance (prompt + protocols) | < 600 lines | 600-1000 lines | > 1000 lines per task |
 
 **Diagnosis:**
+
 ```bash
 # Check prompt sizes
 wc -l prompts/specialists/*.prompt
@@ -299,7 +304,7 @@ Questions to ask before shipping
 
 Specialist prompt should guide loading ALL needed protocols:
 
-```
+```text
 BATCH 1: ALWAYS (on task start)
   input_validation, resource_efficiency
 

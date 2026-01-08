@@ -46,6 +46,9 @@ class PMChatResult(BaseModel):
     trace_url: str | None = None
     """LangSmith trace URL for browser viewing."""
 
+    scenario_id: str | None = None
+    """Scenario ID for evaluation tracking (passed to LangSmith metadata)."""
+
     workflow_complete: bool = False
     """Whether the workflow has completed (PM sent completion message)."""
 
@@ -445,6 +448,449 @@ class LLMTraceTree(BaseModel):
 
     llm_tree: list[LLMCallNode]
     """Hierarchical tree of LLM calls (root calls only)."""
+
+
+# ============================================================================
+# Evaluation Data Extraction Models (for e2e-testing skill)
+# ============================================================================
+
+
+class SequencedToolCall(BaseModel):
+    """Single tool call with sequence and agent attribution.
+
+    Used by get_tool_call_sequence() for evaluating:
+    - Protocol loading order
+    - Delegation sequence
+    - Wave execution patterns
+    """
+
+    sequence: int
+    """Order in which tool was called (1-indexed)."""
+
+    agent: str
+    """Agent that made the tool call (e.g., 'PM', 'visual_analyst')."""
+
+    tool_name: str
+    """Name of the tool called."""
+
+    tool_args: dict[str, Any] = Field(default_factory=dict)
+    """Arguments passed to tool."""
+
+    timestamp: datetime | None = None
+    """When tool was called."""
+
+    duration_ms: int | None = None
+    """How long tool took to execute."""
+
+    run_id: str
+    """Run ID for drilling down."""
+
+    parent_agent: str | None = None
+    """Parent agent that delegated to this agent."""
+
+
+class ToolCallSequence(BaseModel):
+    """Ordered sequence of all tool calls in a trace.
+
+    Primary model for evaluating:
+    - Did PM load protocol first?
+    - Did PM delegate in correct order?
+    - Did PM read files at approval gate?
+    """
+
+    trace_id: str
+    """LangSmith trace ID."""
+
+    total_tool_calls: int
+    """Total number of tool calls."""
+
+    tool_calls: list[SequencedToolCall]
+    """Ordered list of all tool calls."""
+
+    # Quick lookup helpers
+    first_tool_call: SequencedToolCall | None = None
+    """First tool call in sequence (for protocol check)."""
+
+    delegation_calls: list[SequencedToolCall] = Field(default_factory=list)
+    """All delegate_to_agent calls (for wave analysis)."""
+
+    file_read_calls: list[SequencedToolCall] = Field(default_factory=list)
+    """All read_file calls (for approval gate check)."""
+
+    file_write_calls: list[SequencedToolCall] = Field(default_factory=list)
+    """All write_file calls (for output tracking)."""
+
+
+class AgentDelegation(BaseModel):
+    """Single delegation from one agent to another."""
+
+    from_agent: str
+    """Agent that delegated."""
+
+    to_agent: str
+    """Agent that was delegated to."""
+
+    context_passed: list[str] = Field(default_factory=list)
+    """File paths or context keys passed to delegated agent."""
+
+    timestamp: datetime | None = None
+    """When delegation occurred."""
+
+    wave: int | None = None
+    """Wave number if part of wave execution (1, 2, etc)."""
+
+    parallel_with: list[str] = Field(default_factory=list)
+    """Other agents delegated in parallel (same wave)."""
+
+
+class DelegationGraph(BaseModel):
+    """Hierarchical graph of agent delegations.
+
+    Primary model for evaluating:
+    - Wave execution (V first, then P || C)
+    - Context handoff (file paths passed)
+    - Parallel vs serial execution
+    """
+
+    trace_id: str
+    """LangSmith trace ID."""
+
+    root_agent: str
+    """Root agent (usually 'PM')."""
+
+    delegations: list[AgentDelegation]
+    """All delegations in order."""
+
+    # Wave analysis
+    waves: dict[int, list[str]] = Field(default_factory=dict)
+    """Agents grouped by wave: {1: ['visual_analyst'], 2: ['product_analyst', 'catalog_analyst']}."""
+
+    # Quick lookups
+    agents_involved: list[str] = Field(default_factory=list)
+    """All agents that participated."""
+
+    delegation_order: list[str] = Field(default_factory=list)
+    """Order in which agents were delegated to."""
+
+
+class FileOperation(BaseModel):
+    """Single file read or write operation."""
+
+    operation: str
+    """Operation type: 'read' | 'write'."""
+
+    agent: str
+    """Agent that performed operation."""
+
+    file_path: str
+    """Path to file."""
+
+    timestamp: datetime | None = None
+    """When operation occurred."""
+
+    sequence: int
+    """Order in trace."""
+
+    content_preview: str | None = None
+    """First 200 chars of content (for writes)."""
+
+
+class FileIOTrace(BaseModel):
+    """All file operations in a trace.
+
+    Primary model for evaluating:
+    - Did analysts write analysis files?
+    - Did PM read analysis files at approval gate?
+    - Was file communication correct?
+    """
+
+    trace_id: str
+    """LangSmith trace ID."""
+
+    operations: list[FileOperation]
+    """All file operations in order."""
+
+    # Grouped by type
+    writes: list[FileOperation] = Field(default_factory=list)
+    """All write operations."""
+
+    reads: list[FileOperation] = Field(default_factory=list)
+    """All read operations."""
+
+    # Analysis-specific
+    analysis_files_written: list[str] = Field(default_factory=list)
+    """Analysis files written by analysts (visual_analysis_*.md, etc)."""
+
+    analysis_files_read_by_pm: list[str] = Field(default_factory=list)
+    """Analysis files read by PM at approval gate."""
+
+    protocol_files_read: list[str] = Field(default_factory=list)
+    """Protocol files read by any agent."""
+
+
+class ProtocolLoad(BaseModel):
+    """Single protocol load by an agent."""
+
+    agent: str
+    """Agent that loaded protocol."""
+
+    protocol_path: str
+    """Path to protocol file."""
+
+    protocol_name: str | None = None
+    """Extracted protocol name (e.g., 'discovery_mindset')."""
+
+    timestamp: datetime | None = None
+    """When protocol was loaded."""
+
+    sequence: int
+    """Order in trace (was this FIRST action?)."""
+
+    is_first_action: bool = False
+    """Whether this was the agent's first action."""
+
+
+class ProtocolLoadTrace(BaseModel):
+    """All protocol loads in a trace.
+
+    Primary model for evaluating:
+    - Did PM load protocol as FIRST action?
+    - Did each agent load their correct protocol?
+    """
+
+    trace_id: str
+    """LangSmith trace ID."""
+
+    protocol_loads: list[ProtocolLoad]
+    """All protocol loads."""
+
+    # Quick lookups
+    pm_first_action_was_protocol: bool = False
+    """Whether PM's first action was loading a protocol."""
+
+    pm_protocol: str | None = None
+    """Protocol loaded by PM."""
+
+    agent_protocols: dict[str, str] = Field(default_factory=dict)
+    """Map of agent -> protocol loaded."""
+
+
+class AgentFinalMessage(BaseModel):
+    """Final message from an agent to user.
+
+    Used for evaluating:
+    - Did PM present open-ended question at approval gate?
+    - Was message format correct?
+    """
+
+    agent: str
+    """Agent that sent message."""
+
+    message: str
+    """The message content."""
+
+    timestamp: datetime | None = None
+    """When message was sent."""
+
+    has_numbered_options: bool = False
+    """Whether message contains numbered options (anti-pattern)."""
+
+    has_open_question: bool = False
+    """Whether message ends with open-ended question."""
+
+    is_approval_request: bool = False
+    """Whether this is a HITL approval request."""
+
+
+# ============================================================================
+# Evaluation Feedback Models (for LangSmith storage)
+# ============================================================================
+
+
+class EvaluationCriterion(BaseModel):
+    """Single evaluation criterion result."""
+
+    criterion: str
+    """Criterion name: 'protocol_loading', 'wave_execution', etc."""
+
+    passed: bool
+    """Whether criterion passed."""
+
+    score: float = Field(ge=0.0, le=1.0)
+    """Score from 0.0 to 1.0."""
+
+    reasoning: str
+    """Why this score was given."""
+
+    evidence: dict[str, Any] = Field(default_factory=dict)
+    """Supporting evidence from trace."""
+
+
+class EvaluationResult(BaseModel):
+    """Complete evaluation result for a scenario run.
+
+    Stored in LangSmith feedback for historical tracking and pattern detection.
+    """
+
+    scenario_id: str
+    """Scenario that was evaluated."""
+
+    trace_id: str
+    """LangSmith trace ID."""
+
+    thread_id: str
+    """Thread ID for conversation."""
+
+    # Overall result
+    status: str
+    """Overall status: 'PASS' | 'PARTIAL' | 'FAIL' | 'ERROR'."""
+
+    overall_score: float = Field(ge=0.0, le=1.0)
+    """Aggregate score."""
+
+    # Per-criterion results
+    criteria_results: list[EvaluationCriterion]
+    """Results for each evaluation criterion."""
+
+    # Summary
+    passed_criteria: int
+    """Number of criteria that passed."""
+
+    failed_criteria: int
+    """Number of criteria that failed."""
+
+    failure_reasons: list[str] = Field(default_factory=list)
+    """Summary of why criteria failed."""
+
+    # Metadata
+    evaluated_at: datetime
+    """When evaluation was performed."""
+
+    evaluator: str = "claude"
+    """Who/what performed evaluation."""
+
+    notes: str | None = None
+    """Additional notes from evaluator."""
+
+
+# ============================================================================
+# Historical Analysis Models (for continuous improvement)
+# ============================================================================
+
+
+class ScenarioRunSummary(BaseModel):
+    """Summary of a single scenario run."""
+
+    trace_id: str
+    """LangSmith trace ID."""
+
+    run_date: datetime
+    """When scenario was run."""
+
+    status: str
+    """Result: 'PASS' | 'PARTIAL' | 'FAIL' | 'ERROR'."""
+
+    score: float
+    """Overall score."""
+
+    failed_criteria: list[str] = Field(default_factory=list)
+    """Which criteria failed."""
+
+    duration_ms: int | None = None
+    """Execution time."""
+
+    cost: float | None = None
+    """Execution cost."""
+
+
+class ScenarioHistory(BaseModel):
+    """Historical runs of a scenario for pattern detection.
+
+    Used for:
+    - Identifying common failure modes
+    - Detecting regressions
+    - Tracking improvement over time
+    """
+
+    scenario_id: str
+    """Scenario being analyzed."""
+
+    total_runs: int
+    """Total number of runs in history."""
+
+    date_range_days: int
+    """How many days of history."""
+
+    # Aggregate stats
+    pass_rate: float
+    """Percentage of runs that passed."""
+
+    avg_score: float
+    """Average score across runs."""
+
+    # Failure analysis
+    failure_counts: dict[str, int] = Field(default_factory=dict)
+    """Count of failures by criterion: {'wave_execution': 10, 'protocol_loading': 3}."""
+
+    most_common_failure: str | None = None
+    """Most frequently failed criterion."""
+
+    # Trend
+    recent_trend: str | None = None
+    """'improving' | 'degrading' | 'stable'."""
+
+    # Individual runs
+    runs: list[ScenarioRunSummary] = Field(default_factory=list)
+    """Individual run summaries, newest first."""
+
+
+class TraceBaseline(BaseModel):
+    """Known-good reference trace for comparison.
+
+    Used for:
+    - Regression detection
+    - Behavior comparison
+    - Evolving expected behavior
+    """
+
+    scenario_id: str
+    """Scenario this baseline is for."""
+
+    trace_id: str
+    """Reference trace ID."""
+
+    created_at: datetime
+    """When baseline was created."""
+
+    # Expected patterns
+    expected_tool_sequence: list[str] = Field(default_factory=list)
+    """Expected tool call sequence (tool names only)."""
+
+    expected_delegation_order: list[str] = Field(default_factory=list)
+    """Expected agent delegation order."""
+
+    expected_waves: dict[int, list[str]] = Field(default_factory=dict)
+    """Expected wave structure."""
+
+    expected_protocol_loads: dict[str, str] = Field(default_factory=dict)
+    """Expected agent -> protocol mapping."""
+
+    # Metrics for comparison
+    baseline_duration_ms: int | None = None
+    """Reference duration."""
+
+    baseline_cost: float | None = None
+    """Reference cost."""
+
+    baseline_tool_count: int | None = None
+    """Reference tool call count."""
+
+    # Metadata
+    notes: str | None = None
+    """Why this trace was chosen as baseline."""
+
+    superseded_by: str | None = None
+    """If baseline was updated, new baseline trace_id."""
 
 
 # Enable forward references for recursive models

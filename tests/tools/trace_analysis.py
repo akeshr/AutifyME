@@ -7,19 +7,36 @@ Implements 3-level hierarchical analysis for token efficiency:
 
 Token savings: 25x vs naive full dump approach.
 """
+import re
+from datetime import datetime, timedelta
+
 from dotenv import load_dotenv
 from langsmith import Client
 
 from .models import (
+    AgentDelegation,
+    AgentFinalMessage,
+    DelegationGraph,
+    EvaluationCriterion,
+    EvaluationResult,
+    FileIOTrace,
+    FileOperation,
     HITLDecision,
     LLMCallNode,
     LLMTraceTree,
     Message,
+    ProtocolLoad,
+    ProtocolLoadTrace,
     RunDetails,
     RunMessages,
     RunMetadata,
     RunNode,
+    ScenarioHistory,
+    ScenarioRunSummary,
+    SequencedToolCall,
     ToolCall,
+    ToolCallSequence,
+    TraceBaseline,
     TraceOverview,
     WorkflowStory,
     WorkflowTrace,
@@ -758,3 +775,1089 @@ def get_llm_trace_tree(trace_id: str) -> LLMTraceTree:
         total_cost=round(total_cost, 4),
         llm_tree=root_llm_nodes,
     )
+
+
+# ============================================================================
+# Evaluation Data Extraction Functions (for e2e-testing skill)
+# ============================================================================
+
+# Tool name constants (actual tool names from LangSmith traces)
+TOOL_DELEGATION = "task"  # PM delegates via 'task' tool with subagent_type
+TOOL_PROTOCOL = "load_protocol"  # Protocol loading tool
+TOOL_READ_DATA = "read_data"  # Data reading tool
+TOOL_WRITE_FILE = "write_file"  # File writing tool
+TOOL_VIEW_IMAGE = "view_image"  # Image viewing tool
+TOOL_IMAGE_STUDIO = "image_studio"  # Image generation tool
+
+
+def _normalize_agent_name(name: str) -> str:
+    """Normalize agent name to canonical form."""
+    if not name:
+        return "unknown"
+
+    name_lower = name.lower().replace(" ", "_").replace("-", "_")
+
+    # Known agent types
+    known_agents = {
+        "visual_analyst",
+        "product_analyst",
+        "catalog_analyst",
+        "creative_specialist",
+        "catalog_specialist",
+    }
+
+    if name_lower in known_agents:
+        return name_lower
+
+    # Pattern matching for variations
+    if "visual" in name_lower and "analyst" in name_lower:
+        return "visual_analyst"
+    if "product" in name_lower and "analyst" in name_lower:
+        return "product_analyst"
+    if "catalog" in name_lower and "analyst" in name_lower:
+        return "catalog_analyst"
+    if "creative" in name_lower and "specialist" in name_lower:
+        return "creative_specialist"
+    if "catalog" in name_lower and "specialist" in name_lower:
+        return "catalog_specialist"
+
+    return name
+
+
+def _get_parent_chain(run, runs_by_id: dict) -> list[str]:
+    """Get the full parent chain of run names from root to this run.
+
+    Returns list like ['LangGraph', 'tools', 'task', 'LangGraph', 'tools', 'load_protocol']
+    """
+    chain = [run.name]
+    current_id = run.parent_run_id
+
+    while current_id:
+        parent = runs_by_id.get(str(current_id))
+        if not parent:
+            break
+        chain.append(parent.name)
+        current_id = parent.parent_run_id
+
+    return list(reversed(chain))
+
+
+def _find_parent_agent(run, runs_by_id: dict, task_agents: dict[str, str]) -> str:
+    """Find which agent made this tool call using chain structure.
+
+    Logic:
+    - LangGraph > tools > X = PM called X (including task itself)
+    - LangGraph > tools > task > LangGraph > tools > X = subagent called X
+
+    The subagent identity comes from the 'task' tool's subagent_type argument,
+    which we track in task_agents dict.
+
+    Args:
+        run: The tool run to find parent for
+        runs_by_id: Dict of all runs keyed by ID
+        task_agents: Dict mapping task run_id -> subagent_type
+    """
+    chain = _get_parent_chain(run, runs_by_id)
+
+    # If this IS the task tool, PM called it
+    if run.name == TOOL_DELEGATION:
+        return "PM"
+
+    # Find if there's a 'task' in the PARENT chain (not including current run)
+    # Chain: LangGraph > tools > task > LangGraph > tools > X
+    # We want to find 'task' in parents, not in current run
+    parent_chain = chain[:-1]  # Exclude current run from chain
+
+    task_in_parents = TOOL_DELEGATION in parent_chain
+
+    if not task_in_parents:
+        # No task in parent chain = PM made this call directly
+        return "PM"
+
+    # Find the task run to get subagent_type
+    # Walk up from current run to find the task run
+    current_id = run.parent_run_id
+    while current_id:
+        parent = runs_by_id.get(str(current_id))
+        if not parent:
+            break
+        if parent.name == TOOL_DELEGATION:
+            # Found the task run - get its subagent_type
+            agent = task_agents.get(str(parent.id))
+            if agent:
+                return _normalize_agent_name(agent)
+            break
+        current_id = parent.parent_run_id
+
+    return "unknown"
+
+
+def _extract_subagent_type(inputs: dict | None) -> str | None:
+    """Extract subagent_type from task tool inputs.
+
+    Inputs look like: {'input': "{'subagent_type': 'creative_specialist', ...}"}
+    """
+    if not inputs:
+        return None
+
+    input_str = inputs.get("input", "")
+    if isinstance(input_str, str):
+        # Parse the string representation of dict
+        if "subagent_type" in input_str:
+            # Extract using regex
+            match = re.search(r"['\"]subagent_type['\"]:\s*['\"]([^'\"]+)['\"]", input_str)
+            if match:
+                return match.group(1)
+    elif isinstance(input_str, dict):
+        return input_str.get("subagent_type")
+
+    return None
+
+
+def get_tool_call_sequence(trace_id: str) -> ToolCallSequence:
+    """Get ordered sequence of ALL tool calls in a trace.
+
+    This is the PRIMARY function for evaluation. Returns every tool call
+    with agent attribution, timing, and arguments for analyzing:
+    - Protocol loading order (was load_protocol first for PM?)
+    - Delegation sequence (which subagent_type in which order?)
+    - File I/O patterns (who called read_data/write_file?)
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        ToolCallSequence with ordered tool calls and quick lookups
+
+    Example:
+        >>> seq = get_tool_call_sequence(trace_id)
+        >>> # Check if PM loaded protocol first
+        >>> if seq.first_tool_call and seq.first_tool_call.tool_name == "load_protocol":
+        ...     if seq.first_tool_call.agent == "PM":
+        ...         print("PM loaded protocol first")
+        >>> # Check delegation order
+        >>> for d in seq.delegation_calls:
+        ...     subagent = d.tool_args.get("subagent_type")
+        ...     print(f"{d.agent} -> {subagent}")
+    """
+    client = _get_client()
+
+    # Fetch all tool runs
+    runs = list(client.list_runs(trace_id=trace_id, run_type="tool"))
+
+    if not runs:
+        return ToolCallSequence(
+            trace_id=trace_id,
+            total_tool_calls=0,
+            tool_calls=[],
+        )
+
+    # Build lookup for parent resolution
+    all_runs = list(client.list_runs(trace_id=trace_id))
+    runs_by_id = {str(r.id): r for r in all_runs}
+
+    # Sort by start time
+    runs.sort(key=lambda r: r.start_time if r.start_time else datetime.min)
+
+    # First pass: build task_agents dict (task_run_id -> subagent_type)
+    task_agents: dict[str, str] = {}
+    for run in runs:
+        if run.name == TOOL_DELEGATION:
+            subagent = _extract_subagent_type(run.inputs)
+            if subagent:
+                task_agents[str(run.id)] = subagent
+
+    tool_calls = []
+    delegation_calls = []
+    file_read_calls = []
+    file_write_calls = []
+    protocol_load_calls = []
+
+    for seq_num, run in enumerate(runs, 1):
+        # Find parent agent using chain structure
+        parent_agent = _find_parent_agent(run, runs_by_id, task_agents)
+
+        # Calculate duration
+        duration_ms = None
+        if run.end_time and run.start_time:
+            duration_ms = int((run.end_time - run.start_time).total_seconds() * 1000)
+
+        # Extract tool arguments
+        tool_args = {}
+        if run.inputs:
+            if isinstance(run.inputs, dict):
+                input_val = run.inputs.get("input", run.inputs)
+                if isinstance(input_val, str):
+                    # Try to parse string representation of dict
+                    tool_args = {"input": input_val}
+                    # Extract key fields for convenience
+                    if "subagent_type" in input_val:
+                        subagent = _extract_subagent_type(run.inputs)
+                        if subagent:
+                            tool_args["subagent_type"] = subagent
+                elif isinstance(input_val, dict):
+                    tool_args = input_val
+
+        tc = SequencedToolCall(
+            sequence=seq_num,
+            agent=parent_agent,
+            tool_name=run.name,
+            tool_args=tool_args,
+            timestamp=run.start_time,
+            duration_ms=duration_ms,
+            run_id=str(run.id),
+            parent_agent=parent_agent,
+        )
+        tool_calls.append(tc)
+
+        # Categorize by actual tool names
+        if run.name == TOOL_DELEGATION:
+            delegation_calls.append(tc)
+        elif run.name == TOOL_READ_DATA:
+            file_read_calls.append(tc)
+        elif run.name == TOOL_WRITE_FILE:
+            file_write_calls.append(tc)
+        elif run.name == TOOL_PROTOCOL:
+            protocol_load_calls.append(tc)
+
+    return ToolCallSequence(
+        trace_id=trace_id,
+        total_tool_calls=len(tool_calls),
+        tool_calls=tool_calls,
+        first_tool_call=tool_calls[0] if tool_calls else None,
+        delegation_calls=delegation_calls,
+        file_read_calls=file_read_calls,
+        file_write_calls=file_write_calls,
+    )
+
+
+def get_delegation_graph(trace_id: str) -> DelegationGraph:
+    """Get hierarchical graph of agent delegations.
+
+    Extracts all 'task' tool calls (PM's delegation mechanism) and builds
+    a graph showing:
+    - Who delegated to whom (via subagent_type)
+    - Wave structure (parallel vs serial based on timing)
+    - Context passed between agents (description field)
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        DelegationGraph with delegations, waves, and involved agents
+
+    Example:
+        >>> graph = get_delegation_graph(trace_id)
+        >>> # Check wave structure
+        >>> print(f"Wave 1: {graph.waves.get(1, [])}")
+        >>> print(f"Wave 2: {graph.waves.get(2, [])}")
+        >>> # Verify creative_specialist was delegated
+        >>> if "creative_specialist" in graph.delegation_order:
+        ...     print("PM delegated to creative_specialist")
+    """
+    # Get tool call sequence first
+    seq = get_tool_call_sequence(trace_id)
+
+    delegations = []
+    agents_involved = set()
+    delegation_order = []
+
+    # Track timing for wave detection
+    delegation_times = []
+
+    for tc in seq.delegation_calls:
+        # 'task' tool uses subagent_type for target agent
+        to_agent = tc.tool_args.get("subagent_type")
+
+        # Extract description as context passed
+        context_passed = []
+        input_str = tc.tool_args.get("input", "")
+        if isinstance(input_str, str) and "description" in input_str:
+            # Extract description from string representation
+            match = re.search(r"['\"]description['\"]:\s*['\"]([^'\"]{0,200})", input_str)
+            if match:
+                context_passed.append(match.group(1)[:100] + "...")
+
+        if to_agent:
+            to_agent = _normalize_agent_name(str(to_agent))
+            delegation = AgentDelegation(
+                from_agent=tc.agent,  # Usually PM
+                to_agent=to_agent,
+                context_passed=context_passed,
+                timestamp=tc.timestamp,
+            )
+            delegations.append(delegation)
+            agents_involved.add(to_agent)
+            delegation_order.append(to_agent)
+            delegation_times.append((to_agent, tc.timestamp))
+
+    # Detect waves based on timing
+    # Wave = delegations that happen close together (within 5 seconds)
+    waves: dict[int, list[str]] = {}
+    if delegation_times:
+        current_wave = 1
+        wave_start = delegation_times[0][1]
+        waves[current_wave] = [delegation_times[0][0]]
+
+        for agent, timestamp in delegation_times[1:]:
+            if timestamp and wave_start:
+                time_diff = (timestamp - wave_start).total_seconds()
+                if time_diff > 5:  # More than 5 seconds = new wave
+                    current_wave += 1
+                    wave_start = timestamp
+                    waves[current_wave] = []
+            waves[current_wave].append(agent)
+
+        # Mark parallel delegations
+        for wave_num, wave_agents in waves.items():
+            if len(wave_agents) > 1:
+                for d in delegations:
+                    if d.to_agent in wave_agents:
+                        d.wave = wave_num
+                        d.parallel_with = [a for a in wave_agents if a != d.to_agent]
+
+    # Find root agent
+    root_agent = "PM"
+    if delegations:
+        root_agent = delegations[0].from_agent
+
+    return DelegationGraph(
+        trace_id=trace_id,
+        root_agent=root_agent,
+        delegations=delegations,
+        waves=waves,
+        agents_involved=list(agents_involved),
+        delegation_order=delegation_order,
+    )
+
+
+def get_file_io_trace(trace_id: str) -> FileIOTrace:
+    """Get all file operations in a trace.
+
+    Extracts all read_data and write_file calls to analyze:
+    - Did agents write output files?
+    - Did PM read analysis/output files?
+    - What data was queried?
+
+    Note: Protocol loading is tracked separately via get_protocol_loads()
+    which uses the load_protocol tool.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        FileIOTrace with all file operations categorized
+
+    Example:
+        >>> fio = get_file_io_trace(trace_id)
+        >>> # Check write operations
+        >>> for w in fio.writes:
+        ...     print(f"{w.agent} wrote {w.file_path}")
+    """
+    seq = get_tool_call_sequence(trace_id)
+
+    operations = []
+    writes = []
+    reads = []
+    analysis_files_written = []
+    analysis_files_read_by_pm = []
+    protocol_files_read = []
+
+    for tc in seq.file_read_calls + seq.file_write_calls:
+        # Determine operation type
+        is_read = tc.tool_name == TOOL_READ_DATA
+        op_type = "read" if is_read else "write"
+
+        # Extract relevant info from tool args
+        file_path = ""
+        content_preview = None
+
+        if isinstance(tc.tool_args, dict):
+            # read_data uses 'table' and 'search_patterns'
+            # write_file uses 'path' and 'content'
+            if is_read:
+                # For read_data, capture table as "path"
+                input_str = tc.tool_args.get("input", "")
+                if isinstance(input_str, str):
+                    # Extract table name
+                    match = re.search(r"['\"]table['\"]:\s*['\"]([^'\"]+)['\"]", input_str)
+                    if match:
+                        file_path = f"table:{match.group(1)}"
+            else:
+                file_path = (
+                    tc.tool_args.get("path")
+                    or tc.tool_args.get("file_path")
+                    or tc.tool_args.get("filename")
+                    or ""
+                )
+                content = tc.tool_args.get("content", tc.tool_args.get("data", ""))
+                if isinstance(content, str):
+                    content_preview = content[:200]
+
+        op = FileOperation(
+            operation=op_type,
+            agent=tc.agent,
+            file_path=str(file_path),
+            timestamp=tc.timestamp,
+            sequence=tc.sequence,
+            content_preview=content_preview,
+        )
+        operations.append(op)
+
+        if is_read:
+            reads.append(op)
+        else:
+            writes.append(op)
+            # Track analysis files written
+            path_lower = str(file_path).lower()
+            if any(p in path_lower for p in ["analysis", "research", "output"]):
+                analysis_files_written.append(str(file_path))
+
+    # Sort operations by sequence
+    operations.sort(key=lambda o: o.sequence)
+
+    return FileIOTrace(
+        trace_id=trace_id,
+        operations=operations,
+        writes=writes,
+        reads=reads,
+        analysis_files_written=analysis_files_written,
+        analysis_files_read_by_pm=analysis_files_read_by_pm,
+        protocol_files_read=protocol_files_read,  # Now handled by get_protocol_loads
+    )
+
+
+def get_protocol_loads(trace_id: str) -> ProtocolLoadTrace:
+    """Get all protocol loads in a trace.
+
+    Uses the load_protocol tool calls to identify which agents loaded
+    which protocols and whether protocol loading was the first action.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        ProtocolLoadTrace with all protocol loads and compliance info
+
+    Example:
+        >>> protocols = get_protocol_loads(trace_id)
+        >>> if protocols.pm_first_action_was_protocol:
+        ...     print(f"PM loaded {protocols.pm_protocol} first")
+        >>> for agent, protocol in protocols.agent_protocols.items():
+        ...     print(f"{agent} loaded {protocol}")
+    """
+    seq = get_tool_call_sequence(trace_id)
+
+    protocol_loads = []
+    agent_protocols: dict[str, str] = {}
+    agent_first_actions: dict[str, int] = {}
+
+    # Track first action per agent
+    for tc in seq.tool_calls:
+        if tc.agent not in agent_first_actions:
+            agent_first_actions[tc.agent] = tc.sequence
+
+    # Find load_protocol tool calls
+    for tc in seq.tool_calls:
+        if tc.tool_name != TOOL_PROTOCOL:
+            continue
+
+        # Extract protocol info from args
+        # Args look like: {'input': "{'protocol_names': ['hitl'], 'domain': 'pm'}"}
+        protocol_names = []
+        domain = None
+
+        input_str = tc.tool_args.get("input", "")
+        if isinstance(input_str, str):
+            # Extract protocol_names
+            names_match = re.search(r"['\"]protocol_names['\"]:\s*\[([^\]]+)\]", input_str)
+            if names_match:
+                # Parse list of names
+                names_str = names_match.group(1)
+                protocol_names = re.findall(r"['\"]([^'\"]+)['\"]", names_str)
+
+            # Extract domain
+            domain_match = re.search(r"['\"]domain['\"]:\s*['\"]([^'\"]+)['\"]", input_str)
+            if domain_match:
+                domain = domain_match.group(1)
+
+        is_first = agent_first_actions.get(tc.agent) == tc.sequence
+
+        for protocol_name in protocol_names:
+            pl = ProtocolLoad(
+                agent=tc.agent,
+                protocol_path=f"{domain}/{protocol_name}" if domain else protocol_name,
+                protocol_name=protocol_name,
+                timestamp=tc.timestamp,
+                sequence=tc.sequence,
+                is_first_action=is_first,
+            )
+            protocol_loads.append(pl)
+
+            # Track first protocol per agent
+            if tc.agent not in agent_protocols:
+                agent_protocols[tc.agent] = protocol_name
+
+    # Check PM compliance
+    pm_first_action_was_protocol = False
+    pm_protocol = None
+
+    pm_loads = [pl for pl in protocol_loads if pl.agent == "PM"]
+    if pm_loads:
+        pm_protocol = pm_loads[0].protocol_name
+        pm_first_action_was_protocol = pm_loads[0].is_first_action
+
+    return ProtocolLoadTrace(
+        trace_id=trace_id,
+        protocol_loads=protocol_loads,
+        pm_first_action_was_protocol=pm_first_action_was_protocol,
+        pm_protocol=pm_protocol,
+        agent_protocols=agent_protocols,
+    )
+
+
+def get_agent_final_message(trace_id: str, agent: str = "PM") -> AgentFinalMessage | None:
+    """Get the final message from an agent to the user.
+
+    Used to evaluate:
+    - Did PM present open-ended question at approval gate?
+    - Does message contain numbered options (anti-pattern)?
+
+    Args:
+        trace_id: LangSmith trace ID
+        agent: Agent name to get final message for (default: PM)
+
+    Returns:
+        AgentFinalMessage or None if no message found
+
+    Example:
+        >>> msg = get_agent_final_message(trace_id, "PM")
+        >>> if msg and msg.has_open_question and not msg.has_numbered_options:
+        ...     print("PM correctly used open-ended question")
+    """
+    client = _get_client()
+
+    # Get all runs to build lookups
+    all_runs = list(client.list_runs(trace_id=trace_id))
+    runs_by_id = {str(r.id): r for r in all_runs}
+
+    # Build task_agents dict from tool runs (needed for agent attribution)
+    task_agents: dict[str, str] = {}
+    for run in all_runs:
+        if run.run_type == "tool" and run.name == TOOL_DELEGATION:
+            subagent = _extract_subagent_type(run.inputs)
+            if subagent:
+                task_agents[str(run.id)] = subagent
+
+    # Find LLM runs for this agent
+    agent_llm_runs = []
+    for run in all_runs:
+        if run.run_type == "llm":
+            # Use the updated agent attribution logic
+            parent_agent = _find_parent_agent(run, runs_by_id, task_agents)
+            if parent_agent == agent:
+                agent_llm_runs.append(run)
+
+    if not agent_llm_runs:
+        return None
+
+    # Sort by time, get last one
+    agent_llm_runs.sort(key=lambda r: r.end_time if r.end_time else datetime.min)
+    last_run = agent_llm_runs[-1]
+
+    # Extract message from outputs
+    message = ""
+    if last_run.outputs:
+        if isinstance(last_run.outputs, dict):
+            # Common output patterns
+            message = (
+                last_run.outputs.get("content")
+                or last_run.outputs.get("output")
+                or last_run.outputs.get("text")
+                or str(last_run.outputs)
+            )
+        else:
+            message = str(last_run.outputs)
+
+    if not message:
+        return None
+
+    # Analyze message
+    has_numbered_options = bool(re.search(r"^\s*[1-9]\.", message, re.MULTILINE))
+    has_open_question = message.strip().endswith("?")
+    is_approval_request = any(
+        phrase in message.lower()
+        for phrase in ["approve", "confirm", "proceed", "would you like", "what would you"]
+    )
+
+    return AgentFinalMessage(
+        agent=agent,
+        message=message,
+        timestamp=last_run.end_time,
+        has_numbered_options=has_numbered_options,
+        has_open_question=has_open_question,
+        is_approval_request=is_approval_request,
+    )
+
+
+# ============================================================================
+# LangSmith Feedback Integration (for storing evaluations)
+# ============================================================================
+
+
+def record_evaluation(
+    trace_id: str,
+    scenario_id: str,
+    result: EvaluationResult,
+) -> bool:
+    """Store evaluation result in LangSmith as feedback.
+
+    Records each criterion as a separate feedback entry plus
+    an overall result, enabling queries like:
+    - "Show all traces where wave_execution failed"
+    - "What's the pass rate for PM-01?"
+
+    Args:
+        trace_id: LangSmith trace ID
+        scenario_id: Scenario that was evaluated
+        result: Complete evaluation result
+
+    Returns:
+        True if feedback was recorded successfully
+
+    Example:
+        >>> result = EvaluationResult(
+        ...     scenario_id="PM-01",
+        ...     trace_id=trace_id,
+        ...     status="FAIL",
+        ...     ...
+        ... )
+        >>> record_evaluation(trace_id, "PM-01", result)
+    """
+    client = _get_client()
+
+    try:
+        # Get root run ID for the trace
+        runs = list(client.list_runs(trace_id=trace_id, limit=1))
+        if not runs:
+            return False
+
+        run_id = str(runs[0].id)
+
+        # Record overall result
+        client.create_feedback(
+            run_id=run_id,
+            key="scenario_result",
+            score=result.overall_score,
+            value=result.status,
+            comment=f"Scenario {scenario_id}: {result.status}. "
+            f"Passed {result.passed_criteria}/{result.passed_criteria + result.failed_criteria} criteria.",
+        )
+
+        # Record each criterion
+        for criterion in result.criteria_results:
+            client.create_feedback(
+                run_id=run_id,
+                key=criterion.criterion,
+                score=criterion.score,
+                value="PASS" if criterion.passed else "FAIL",
+                comment=criterion.reasoning,
+            )
+
+        return True
+
+    except Exception as e:
+        print(f"Failed to record evaluation: {e}")
+        return False
+
+
+def get_scenario_history(
+    scenario_id: str,
+    days: int = 30,
+    project_name: str | None = None,
+) -> ScenarioHistory:
+    """Get historical runs and evaluations for a scenario.
+
+    Queries LangSmith for past runs of this scenario and aggregates
+    evaluation feedback for pattern detection.
+
+    Args:
+        scenario_id: Scenario to get history for
+        days: How many days of history (default: 30)
+        project_name: LangSmith project name (optional)
+
+    Returns:
+        ScenarioHistory with aggregate stats and individual runs
+
+    Example:
+        >>> history = get_scenario_history("PM-01", days=7)
+        >>> print(f"Pass rate: {history.pass_rate:.1%}")
+        >>> print(f"Most common failure: {history.most_common_failure}")
+    """
+    client = _get_client()
+
+    start_time = datetime.now() - timedelta(days=days)
+
+    # Query runs with scenario metadata
+    filter_str = f'eq(metadata.scenario_id, "{scenario_id}")'
+
+    try:
+        if project_name:
+            runs = list(
+                client.list_runs(
+                    project_name=project_name,
+                    filter=filter_str,
+                    start_time=start_time,
+                )
+            )
+        else:
+            # Try to find runs across projects
+            runs = list(
+                client.list_runs(
+                    filter=filter_str,
+                    start_time=start_time,
+                )
+            )
+    except Exception:
+        runs = []
+
+    if not runs:
+        return ScenarioHistory(
+            scenario_id=scenario_id,
+            total_runs=0,
+            date_range_days=days,
+            pass_rate=0.0,
+            avg_score=0.0,
+        )
+
+    # Collect run summaries and feedback
+    run_summaries = []
+    failure_counts: dict[str, int] = {}
+    total_score = 0.0
+    pass_count = 0
+
+    for run in runs:
+        # Get feedback for this run
+        try:
+            feedbacks = list(client.list_feedback(run_id=str(run.id)))
+        except Exception:
+            feedbacks = []
+
+        # Find overall result
+        status = "UNKNOWN"
+        score = 0.0
+        failed_criteria = []
+
+        for fb in feedbacks:
+            if fb.key == "scenario_result":
+                status = fb.value or "UNKNOWN"
+                score = fb.score or 0.0
+            elif fb.value == "FAIL":
+                failed_criteria.append(fb.key)
+                failure_counts[fb.key] = failure_counts.get(fb.key, 0) + 1
+
+        if status == "PASS":
+            pass_count += 1
+        total_score += score
+
+        # Calculate duration
+        duration_ms = None
+        if run.end_time and run.start_time:
+            duration_ms = int((run.end_time - run.start_time).total_seconds() * 1000)
+
+        summary = ScenarioRunSummary(
+            trace_id=str(run.trace_id) if run.trace_id else str(run.id),
+            run_date=run.start_time or datetime.now(),
+            status=status,
+            score=score,
+            failed_criteria=failed_criteria,
+            duration_ms=duration_ms,
+            cost=float(run.total_cost) if run.total_cost else None,
+        )
+        run_summaries.append(summary)
+
+    # Sort by date, newest first
+    run_summaries.sort(key=lambda r: r.run_date, reverse=True)
+
+    # Calculate aggregates
+    total_runs = len(run_summaries)
+    pass_rate = pass_count / total_runs if total_runs > 0 else 0.0
+    avg_score = total_score / total_runs if total_runs > 0 else 0.0
+
+    # Find most common failure
+    most_common_failure = None
+    if failure_counts:
+        most_common_failure = max(failure_counts, key=failure_counts.get)  # type: ignore
+
+    # Determine trend (compare recent 5 vs previous 5)
+    recent_trend = None
+    if len(run_summaries) >= 10:
+        recent_5 = run_summaries[:5]
+        previous_5 = run_summaries[5:10]
+        recent_pass = sum(1 for r in recent_5 if r.status == "PASS")
+        previous_pass = sum(1 for r in previous_5 if r.status == "PASS")
+        if recent_pass > previous_pass:
+            recent_trend = "improving"
+        elif recent_pass < previous_pass:
+            recent_trend = "degrading"
+        else:
+            recent_trend = "stable"
+
+    return ScenarioHistory(
+        scenario_id=scenario_id,
+        total_runs=total_runs,
+        date_range_days=days,
+        pass_rate=pass_rate,
+        avg_score=avg_score,
+        failure_counts=failure_counts,
+        most_common_failure=most_common_failure,
+        recent_trend=recent_trend,
+        runs=run_summaries,
+    )
+
+
+def get_baseline(scenario_id: str, dataset_name: str = "scenario-baselines") -> TraceBaseline | None:
+    """Get known-good baseline for a scenario.
+
+    Retrieves the reference trace from LangSmith dataset for comparison.
+
+    Args:
+        scenario_id: Scenario to get baseline for
+        dataset_name: LangSmith dataset name (default: scenario-baselines)
+
+    Returns:
+        TraceBaseline or None if no baseline exists
+
+    Example:
+        >>> baseline = get_baseline("PM-01")
+        >>> if baseline:
+        ...     print(f"Expected delegation order: {baseline.expected_delegation_order}")
+    """
+    client = _get_client()
+
+    try:
+        # Find dataset
+        datasets = list(client.list_datasets(dataset_name=dataset_name))
+        if not datasets:
+            return None
+
+        dataset = datasets[0]
+
+        # Find example for this scenario
+        examples = list(client.list_examples(dataset_id=dataset.id))
+        for example in examples:
+            if example.metadata and example.metadata.get("scenario_id") == scenario_id:
+                # Extract baseline from example
+                outputs = example.outputs or {}
+
+                return TraceBaseline(
+                    scenario_id=scenario_id,
+                    trace_id=outputs.get("trace_id", ""),
+                    created_at=example.created_at or datetime.now(),
+                    expected_tool_sequence=outputs.get("expected_tool_sequence", []),
+                    expected_delegation_order=outputs.get("expected_delegation_order", []),
+                    expected_waves=outputs.get("expected_waves", {}),
+                    expected_protocol_loads=outputs.get("expected_protocol_loads", {}),
+                    baseline_duration_ms=outputs.get("baseline_duration_ms"),
+                    baseline_cost=outputs.get("baseline_cost"),
+                    baseline_tool_count=outputs.get("baseline_tool_count"),
+                    notes=example.metadata.get("notes") if example.metadata else None,
+                )
+
+        return None
+
+    except Exception as e:
+        print(f"Failed to get baseline: {e}")
+        return None
+
+
+def store_baseline(
+    trace_id: str,
+    scenario_id: str,
+    dataset_name: str = "scenario-baselines",
+    notes: str | None = None,
+) -> bool:
+    """Store a trace as the known-good baseline for a scenario.
+
+    Extracts patterns from the trace and stores them in LangSmith
+    dataset for future comparison.
+
+    Args:
+        trace_id: Trace ID to use as baseline
+        scenario_id: Scenario this baseline is for
+        dataset_name: LangSmith dataset name (default: scenario-baselines)
+        notes: Why this trace was chosen as baseline
+
+    Returns:
+        True if baseline was stored successfully
+
+    Example:
+        >>> # After verifying a trace is correct
+        >>> store_baseline(trace_id, "PM-01", notes="Verified correct wave execution")
+    """
+    client = _get_client()
+
+    try:
+        # Get or create dataset
+        datasets = list(client.list_datasets(dataset_name=dataset_name))
+        if datasets:
+            dataset = datasets[0]
+        else:
+            dataset = client.create_dataset(
+                dataset_name=dataset_name,
+                description="Known-good baseline traces for scenario evaluation",
+            )
+
+        # Extract patterns from trace
+        seq = get_tool_call_sequence(trace_id)
+        graph = get_delegation_graph(trace_id)
+        protocols = get_protocol_loads(trace_id)
+        overview = get_trace_overview(trace_id)
+
+        # Build baseline data
+        baseline_data = {
+            "trace_id": trace_id,
+            "expected_tool_sequence": [tc.tool_name for tc in seq.tool_calls],
+            "expected_delegation_order": graph.delegation_order,
+            "expected_waves": {str(k): v for k, v in graph.waves.items()},
+            "expected_protocol_loads": protocols.agent_protocols,
+            "baseline_duration_ms": overview.total_latency_ms,
+            "baseline_cost": overview.total_cost,
+            "baseline_tool_count": seq.total_tool_calls,
+        }
+
+        # Check if example already exists for this scenario
+        existing_examples = list(client.list_examples(dataset_id=dataset.id))
+        for example in existing_examples:
+            if example.metadata and example.metadata.get("scenario_id") == scenario_id:
+                # Update existing - mark as superseded and create new
+                if example.outputs:
+                    example.outputs["superseded_by"] = trace_id
+                # Delete old and create new
+                client.delete_example(example.id)
+                break
+
+        # Create new example
+        client.create_example(
+            dataset_id=dataset.id,
+            inputs={"scenario_id": scenario_id},
+            outputs=baseline_data,
+            metadata={
+                "scenario_id": scenario_id,
+                "notes": notes,
+                "created_at": datetime.now().isoformat(),
+            },
+        )
+
+        return True
+
+    except Exception as e:
+        print(f"Failed to store baseline: {e}")
+        return False
+
+
+def compare_to_baseline(
+    trace_id: str,
+    scenario_id: str,
+    dataset_name: str = "scenario-baselines",
+) -> dict[str, Any]:
+    """Compare a trace to its known-good baseline.
+
+    Returns a structured comparison showing what matches and what deviates
+    from the expected behavior.
+
+    Args:
+        trace_id: Trace ID to compare
+        scenario_id: Scenario to get baseline for
+        dataset_name: LangSmith dataset name (default: scenario-baselines)
+
+    Returns:
+        Dict with comparison results:
+        {
+            "has_baseline": True/False,
+            "matches": ["delegation_order", "wave_structure"],
+            "deviations": [{"field": "protocol_loading", "expected": "hitl", "actual": None}],
+            "metrics": {"duration_diff_ms": 500, "cost_diff": 0.01, "tool_count_diff": 2}
+        }
+
+    Example:
+        >>> comparison = compare_to_baseline(trace_id, "PM-01")
+        >>> if comparison["deviations"]:
+        ...     for d in comparison["deviations"]:
+        ...         print(f"{d['field']}: expected {d['expected']}, got {d['actual']}")
+    """
+    result: dict[str, Any] = {
+        "has_baseline": False,
+        "matches": [],
+        "deviations": [],
+        "metrics": {},
+    }
+
+    # Get baseline
+    baseline = get_baseline(scenario_id, dataset_name)
+    if not baseline:
+        return result
+
+    result["has_baseline"] = True
+
+    # Get current trace data
+    seq = get_tool_call_sequence(trace_id)
+    graph = get_delegation_graph(trace_id)
+    protocols = get_protocol_loads(trace_id)
+    overview = get_trace_overview(trace_id)
+
+    # Compare delegation order
+    current_delegation = graph.delegation_order
+    if current_delegation == baseline.expected_delegation_order:
+        result["matches"].append("delegation_order")
+    else:
+        result["deviations"].append({
+            "field": "delegation_order",
+            "expected": baseline.expected_delegation_order,
+            "actual": current_delegation,
+        })
+
+    # Compare wave structure
+    current_waves = {str(k): v for k, v in graph.waves.items()}
+    expected_waves = {str(k): v for k, v in baseline.expected_waves.items()}
+    if current_waves == expected_waves:
+        result["matches"].append("wave_structure")
+    else:
+        result["deviations"].append({
+            "field": "wave_structure",
+            "expected": expected_waves,
+            "actual": current_waves,
+        })
+
+    # Compare protocol loading
+    if protocols.agent_protocols == baseline.expected_protocol_loads:
+        result["matches"].append("protocol_loads")
+    else:
+        result["deviations"].append({
+            "field": "protocol_loads",
+            "expected": baseline.expected_protocol_loads,
+            "actual": protocols.agent_protocols,
+        })
+
+    # Compare tool sequence (just count for now)
+    current_tools = [tc.tool_name for tc in seq.tool_calls]
+    if current_tools == baseline.expected_tool_sequence:
+        result["matches"].append("tool_sequence")
+    else:
+        result["deviations"].append({
+            "field": "tool_sequence",
+            "expected": baseline.expected_tool_sequence,
+            "actual": current_tools,
+        })
+
+    # Metrics comparison
+    if baseline.baseline_duration_ms and overview.total_latency_ms:
+        result["metrics"]["duration_diff_ms"] = overview.total_latency_ms - baseline.baseline_duration_ms
+
+    if baseline.baseline_cost and overview.total_cost:
+        result["metrics"]["cost_diff"] = round(overview.total_cost - baseline.baseline_cost, 4)
+
+    if baseline.baseline_tool_count:
+        result["metrics"]["tool_count_diff"] = seq.total_tool_calls - baseline.baseline_tool_count
+
+    return result
