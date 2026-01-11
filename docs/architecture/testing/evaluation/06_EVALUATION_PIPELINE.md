@@ -146,6 +146,127 @@ class EvaluationPipeline:
 
         return report
 
+    async def run_monitoring(
+        self,
+        options: "MonitoringOptions" = None
+    ) -> MonitoringReport:
+        """
+        Run monitoring evaluation on existing production traces.
+
+        This mode grades traces WITHOUT re-execution - useful for:
+        - Continuous quality monitoring
+        - Historical analysis
+        - Regression detection without re-running scenarios
+        - Sampling production traffic for quality
+
+        Unlike run(), this does NOT execute chat_with_pm().
+
+        Args:
+            options: Configuration for monitoring run
+
+        Returns:
+            MonitoringReport with aggregated scores and anomalies
+        """
+        options = options or MonitoringOptions()
+
+        # Step 1: Get traces to evaluate
+        trace_ids = await self.langsmith.get_traces_for_monitoring(
+            hours=options.time_window_hours,
+            sample_rate=options.sample_rate,
+            filters=options.filters
+        )
+
+        if not trace_ids:
+            return MonitoringReport(
+                id=str(uuid.uuid4()),
+                timestamp=datetime.now(),
+                time_window_hours=options.time_window_hours,
+                sample_rate=options.sample_rate,
+                total_traces_evaluated=0,
+                passed_count=0,
+                failed_count=0,
+                mean_score=0.0,
+                min_score=0.0,
+                max_score=0.0,
+                score_std_dev=0.0
+            )
+
+        # Step 2: Grade existing traces
+        judgments = await self.langsmith.grade_existing_traces(
+            trace_ids=trace_ids,
+            grading_config=options.grading_config
+        )
+
+        # Step 3: Calculate statistics
+        scores = [j.score for j in judgments]
+        passed = [j for j in judgments if j.passed]
+        failed = [j for j in judgments if not j.passed]
+
+        # Step 4: Detect anomalies (scores significantly below mean)
+        mean_score = sum(scores) / len(scores)
+        std_dev = statistics.stdev(scores) if len(scores) > 1 else 0
+        anomaly_threshold = mean_score - (2 * std_dev)  # 2 sigma below
+
+        anomalies = []
+        for j in judgments:
+            if j.score < anomaly_threshold:
+                j.is_anomaly = True
+                j.anomaly_reason = f"Score {j.score:.2f} is >2 std below mean {mean_score:.2f}"
+                anomalies.append(j)
+
+        # Step 5: Group by domain
+        domain_scores = {}
+        for j in judgments:
+            if j.domain not in domain_scores:
+                domain_scores[j.domain] = []
+            domain_scores[j.domain].append(j.score)
+
+        domain_means = {
+            domain: sum(scores) / len(scores)
+            for domain, scores in domain_scores.items()
+        }
+
+        # Step 6: Compare to baseline if available
+        baseline_comparison = None
+        if options.compare_to_baseline:
+            baseline = await self.tracker.get_monitoring_baseline()
+            if baseline:
+                delta = mean_score - baseline.mean_score
+                trending = "up" if delta > 0.02 else "down" if delta < -0.02 else "stable"
+                baseline_comparison = {
+                    "delta": delta,
+                    "trending": trending,
+                    "baseline_mean": baseline.mean_score
+                }
+
+        # Step 7: Build report
+        report = MonitoringReport(
+            id=str(uuid.uuid4()),
+            timestamp=datetime.now(),
+            time_window_hours=options.time_window_hours,
+            sample_rate=options.sample_rate,
+            total_traces_evaluated=len(judgments),
+            passed_count=len(passed),
+            failed_count=len(failed),
+            mean_score=mean_score,
+            min_score=min(scores),
+            max_score=max(scores),
+            score_std_dev=std_dev,
+            domain_scores=domain_means,
+            anomalies=anomalies,
+            judgments=judgments if options.include_all_judgments else [],
+            baseline_comparison=baseline_comparison
+        )
+
+        # Step 8: Trigger investigation for anomalies if configured
+        if anomalies and options.auto_investigate_anomalies:
+            await self.intelligence.investigate_anomalies(anomalies)
+
+        # Step 9: Store report
+        await self._store_monitoring_report(report)
+
+        return report
+
     def _is_hitl_scenario(self, scenario: Scenario) -> bool:
         """
         Determine if scenario requires HITL testing.

@@ -319,6 +319,115 @@ class LangSmithIntegration:
                 source="production"
             )
         )
+
+    # --- Direct Trace Evaluation (Monitoring Mode) ---
+    async def grade_existing_traces(
+        self,
+        trace_ids: list[str],
+        grading_config: "TraceGradingConfig"
+    ) -> list["TraceJudgment"]:
+        """
+        Grade existing production traces WITHOUT re-execution.
+
+        Use cases:
+        - Continuous quality monitoring
+        - Historical analysis
+        - Regression detection without re-running scenarios
+        - Batch evaluation of production traffic
+
+        Unlike run_evaluation(), this does NOT execute chat_with_pm().
+        It grades traces that already exist in LangSmith.
+
+        Args:
+            trace_ids: List of existing trace IDs to grade
+            grading_config: Configuration specifying which graders to run
+
+        Returns:
+            List of TraceJudgment with scores and analysis
+        """
+        judgments = []
+
+        for trace_id in trace_ids:
+            trace = await self.get_trace(trace_id)
+
+            # Run configured graders against existing trace
+            grader_outputs = []
+            for grader_spec in grading_config.graders:
+                grader = grading_config.registry.get(grader_spec.name)
+                grade = await grader.grade(
+                    output=trace.final_response,
+                    expected=None,  # No expected - inferring quality
+                    trace=trace,
+                    config=grader_spec.config
+                )
+                grader_outputs.append(GraderOutput(
+                    grader_name=grader_spec.name,
+                    grader_type=grader.grader_type,
+                    grade=grade,
+                    weight=grader_spec.weight
+                ))
+
+            # Calculate aggregate score
+            total_weight = sum(go.weight for go in grader_outputs)
+            weighted_score = sum(
+                go.grade.score * go.weight for go in grader_outputs
+            ) / total_weight if total_weight > 0 else 0.0
+
+            judgment = TraceJudgment(
+                trace_id=trace_id,
+                timestamp=trace.timestamp,
+                score=weighted_score,
+                passed=weighted_score >= grading_config.pass_threshold,
+                grader_outputs=grader_outputs,
+                user_message_preview=trace.user_message[:100],
+                domain=self._infer_domain(trace)
+            )
+            judgments.append(judgment)
+
+            # Store as feedback in LangSmith for UI visibility
+            self.client.create_feedback(
+                run_id=trace_id,
+                key="monitoring_grade",
+                score=weighted_score,
+                comment=f"Automated monitoring: {len(grader_outputs)} graders"
+            )
+
+        return judgments
+
+    async def get_traces_for_monitoring(
+        self,
+        hours: int = 24,
+        sample_rate: float = 1.0,
+        filters: dict | None = None
+    ) -> list[str]:
+        """
+        Get trace IDs for monitoring evaluation.
+
+        Args:
+            hours: Look back period
+            sample_rate: 0.1 = 10% sample, 1.0 = all traces
+            filters: Optional filters (e.g., {"error": True} for only errors)
+
+        Returns:
+            List of trace IDs to evaluate
+        """
+        runs = self.client.list_runs(
+            project_name=self.project_name,
+            filter=f"gt(start_time, datetime.now() - timedelta(hours={hours}))",
+            execution_order=1  # Top-level runs only
+        )
+
+        trace_ids = [str(run.id) for run in runs]
+
+        # Apply sampling
+        if sample_rate < 1.0:
+            import random
+            trace_ids = random.sample(
+                trace_ids,
+                int(len(trace_ids) * sample_rate)
+            )
+
+        return trace_ids
 ```
 
 ---

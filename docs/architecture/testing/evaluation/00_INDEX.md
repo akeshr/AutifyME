@@ -97,6 +97,18 @@ From Anthropic's "Demystifying Evals for AI Agents":
 
 ---
 
+## Three Evaluation Modes
+
+| Mode | Method | Executes PM? | Use Case |
+|------|--------|--------------|----------|
+| **Scenario Execution** | `pipeline.run()` | Yes | Regression testing, capability validation |
+| **Direct Trace Evaluation** | `pipeline.run_monitoring()` | No | Continuous monitoring, historical analysis |
+| **Trace-to-Scenario** | `langsmith.convert_feedback_to_scenario()` | No | Build regression suite from production failures |
+
+**Key Insight**: Not all evaluation requires re-execution. Direct Trace Evaluation grades existing production traces for continuous quality monitoring without the cost of re-running scenarios.
+
+---
+
 ## Data Flow
 
 ```text
