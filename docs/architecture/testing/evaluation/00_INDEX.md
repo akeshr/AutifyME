@@ -1,0 +1,236 @@
+# Universal Evaluation Framework for AutifyME
+
+**Date**: 2026-01-11
+**Status**: Design
+**Version**: 3.1 - Operational Reality Check
+
+---
+
+## Overview
+
+A **universal evaluation framework** for measuring and continuously improving ANY agent behavior across the AutifyME system.
+
+```text
++===========================================================================+
+|                    COMPLETE ARCHITECTURE (v3.1)                           |
++===========================================================================+
+|                                                                           |
+|  LANGSMITH FOUNDATION (with local fallback)                               |
+|  - Local-first tracing with async LangSmith sync                          |
+|  - Datasets for scenario storage (versioned)                              |
+|  - Annotation queues with SLA management                                  |
+|                                                                           |
+|  THREE-GRADER ARCHITECTURE                                                |
+|  - Code graders (preferred): Fast, deterministic, reproducible            |
+|  - Model graders (nuance): Flexible, handles semantics                    |
+|  - Human graders (SLA-managed): Gold standard via LangSmith               |
+|                                                                           |
+|  OUTPUT-ONLY GRADING (Default)                                            |
+|  - Grade final output, not path taken                                     |
+|  - Path deviations logged but not scored                                  |
+|  - PATH_STRICT only for safety-critical (HITL)                            |
+|                                                                           |
+|  INTELLIGENCE LAYER (CLAUDE)                                              |
+|  - Token-budgeted hierarchical trace loading                              |
+|  - Multi-track parallel investigation                                     |
+|  - Pattern detection across failure clusters                              |
+|  - k-out-of-n validated fix proposals                                     |
+|                                                                           |
+|  SECURITY & BOUNDARY TESTING (Category 7)                                 |
+|  - Prompt injection resistance                                            |
+|  - Tenant isolation verification                                          |
+|  - Sensitive data leak prevention                                         |
+|                                                                           |
+|  OPERATIONAL CONTROLS                                                     |
+|  - Cost tracking with budget caps                                         |
+|  - ROI-based investigation prioritization                                 |
+|  - Human review SLA with auto-fallback                                    |
+|  - Scenario versioning with migration                                     |
+|                                                                           |
++===========================================================================+
+```
+
+---
+
+## Core Philosophy
+
+From Anthropic's "Demystifying Evals for AI Agents":
+
+- **Start from failures**: Real failures become test cases
+- **Grade outputs, not paths**: Agents find creative solutions
+- **Prefer deterministic graders**: Code > Model > Human
+- **Balanced problem sets**: Test both positive and negative cases
+- **Continuous measurement**: Capability evals graduate to regression suites
+
+---
+
+## Document Structure
+
+| Document | Purpose | Key Topics |
+|----------|---------|------------|
+| [01_LANGSMITH_FOUNDATION.md](01_LANGSMITH_FOUNDATION.md) | Observability layer | Trace capture, datasets, fallback mechanism |
+| [02_FAILURE_TAXONOMY.md](02_FAILURE_TAXONOMY.md) | What can go wrong | Five pillars, agent-specific profiles |
+| [03_GRADER_ARCHITECTURE.md](03_GRADER_ARCHITECTURE.md) | How to evaluate | Code/Model/Human graders, output-only mode |
+| [04_SCENARIO_FRAMEWORK.md](04_SCENARIO_FRAMEWORK.md) | Test case design | 7 categories including security |
+| [05_INTELLIGENCE_LAYER.md](05_INTELLIGENCE_LAYER.md) | Deep analysis | Claude investigation, fix generation |
+| [06_EVALUATION_PIPELINE.md](06_EVALUATION_PIPELINE.md) | Execution flow | Pipeline, improvement loop, metrics |
+| [07_OPERATIONAL_GUIDE.md](07_OPERATIONAL_GUIDE.md) | Running in production | Cost, HITL testing, versioning, CLI |
+
+---
+
+## The Four Layers
+
+| Layer | Role | Components | When Active |
+|-------|------|------------|-------------|
+| **LangSmith** | Observability | Traces, Datasets, Annotation Queues | Always (every run) |
+| **Grader** | Automated Eval | Code Graders, Model Graders | On eval trigger |
+| **Intelligence** | Deep Analysis | Claude via skills | On failures |
+| **Improvement** | Enhancement | Tracker, Validator | Post-analysis |
+
+---
+
+## Data Flow
+
+```text
+                              PRODUCTION
++------------------------------------------------------------------------+
+|  User Message --> PM --> Specialists --> Tools --> Response             |
+|                     |                                                   |
+|                     v                                                   |
+|              [LANGSMITH TRACE]                                          |
++------------------------------------------------------------------------+
+                              |
+                              v
++------------------------------------------------------------------------+
+|                        EVALUATION TRIGGER                               |
+|  - Scheduled (daily regression)                                         |
+|  - On-demand (new feature validation)                                   |
+|  - On-commit (CI/CD integration)                                        |
++------------------------------------------------------------------------+
+                              |
+                              v
++------------------------------------------------------------------------+
+|                         GRADER LAYER                                    |
+|  +------------------+  +------------------+  +------------------+        |
+|  | CODE GRADERS     |  | MODEL GRADERS    |  | HUMAN GRADERS    |       |
+|  | (Preferred)      |  | (When nuance)    |  | (Calibration)    |       |
+|  +------------------+  +------------------+  +------------------+        |
+|                              |                                          |
+|                    [PASS/FAIL + SCORES]                                 |
++------------------------------------------------------------------------+
+                              |
+              +---------------+---------------+
+              |                               |
+              v (PASS)                        v (FAIL)
++-------------------------+    +------------------------------------------+
+| UPDATE BASELINE         |    |           INTELLIGENCE LAYER             |
+| - Store new scores      |    |  1. Load trace (L0 -> L1 -> L2)          |
+| - Graduate to regression|    |  2. Identify root cause                  |
++-------------------------+    |  3. Generate fix hypothesis              |
+                               |  4. Create regression scenarios          |
+                               +------------------------------------------+
+                                              |
+                                              v
+                               +------------------------------------------+
+                               |          IMPROVEMENT LAYER               |
+                               |  1. Implement proposed fix               |
+                               |  2. Run k-out-of-n validation            |
+                               |  3. If pass: update baseline             |
+                               |  4. Document pattern for future          |
+                               +------------------------------------------+
+```
+
+---
+
+## Quick Start
+
+```bash
+# 1. Ensure LangSmith is configured
+export LANGCHAIN_API_KEY=<your-key>
+export LANGCHAIN_PROJECT=autifyme-evals
+
+# 2. Create initial scenarios from real failures
+uv run python -m tests.evaluation.cli create-from-failures --hours 24
+
+# 3. Run first evaluation
+uv run python -m tests.evaluation.cli run --suite initial --parallelism 5
+
+# 4. Review report and investigation
+uv run python -m tests.evaluation.cli report --latest
+
+# 5. Validate fixes
+uv run python -m tests.evaluation.cli validate --all-pending
+```
+
+---
+
+## Success Criteria
+
+### Framework Health
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Grader accuracy | >90% agreement with human | LangSmith calibration |
+| Coverage | All 5 pillars + security tested | Scenario audit |
+| Regression detection | <1 day latency | CI integration |
+| Investigation success | >50% | Validated fixes / total |
+| Pattern reuse | >30% | Known patterns matched |
+
+### System Health (via evals)
+
+| Metric | Initial Target | Stretch Target |
+|--------|----------------|----------------|
+| Intent classification | >90% | >98% |
+| Routing accuracy | >90% | >98% |
+| Context utilization | >80% | >95% |
+| HITL compliance | 100% | 100% |
+| Schema compliance | 100% | 100% |
+| Hallucination rate | <10% | <2% |
+| pass^3 (consistency) | >80% | >95% |
+
+---
+
+## Integration Points
+
+| System | Integration | Purpose |
+|--------|-------------|---------|
+| **LangSmith** | Native SDK | Trace capture, datasets, annotation queues |
+| **chat_with_pm** | Direct call | Scenario execution |
+| **Claude Skills** | workflow-evaluation, agent-improvement | Intelligence layer |
+| **Supabase** | Storage | Baselines, scenarios, improvements |
+| **CI/CD** | GitHub Actions | Regression on commit |
+
+---
+
+## Skill Integration
+
+```yaml
+# e2e-testing skill - main entry point
+/e2e-testing:
+  - Run evaluation pipeline
+  - Report results
+  - If failures: auto-trigger workflow-evaluation
+
+# workflow-evaluation skill - investigation
+/workflow-evaluation:
+  - Invoke Intelligence Layer
+  - Present root cause and fix proposal
+  - On approval: trigger agent-improvement
+
+# agent-improvement skill - implementation
+/agent-improvement:
+  - Apply fix proposal
+  - Run k-out-of-n validation
+  - Update baseline
+  - Document pattern
+```
+
+---
+
+## Key Principle
+
+**Start small**: 20-50 scenarios from real failures.
+**Grade outputs, not paths**: Let agents find creative solutions.
+**Prefer deterministic graders**: Code > Model > Human.
+**Let Claude investigate failures**: Deep analysis on what matters.
+**Continuous measurement** beats big-bang evaluation.
