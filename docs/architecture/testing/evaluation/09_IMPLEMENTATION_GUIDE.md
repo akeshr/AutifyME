@@ -2,7 +2,7 @@
 
 **Part of**: [Universal Evaluation Framework](00_INDEX.md)
 
-**Version**: 3.2 - Bootstrap and Integration
+**Version**: 4.0 - Bootstrap, Integration & Skill Rewrite
 
 ---
 
@@ -865,10 +865,107 @@ result = await validator.validate_fix(fix_proposal, scenarios)
 - [ ] CI/CD workflow runs on push
 - [ ] Skills invoke pipeline correctly
 
+### Phase 7 Complete When:
+- [ ] /eval-writer skill created with all 6 modes
+- [ ] /eval-writer quality gates implemented
+- [ ] /workflow-evaluation rewritten with hierarchical loading
+- [ ] /agent-improvement rewritten with k-out-of-n validation
+- [ ] /e2e-testing rewritten as orchestrator
+- [ ] /eval-coverage skill created
+- [ ] Skill invocation contracts verified
+- [ ] autonomous-testing deprecated/merged
+
+---
+
+## Phase 7: Skill Rewrite
+
+**Full specification**: [10_SKILL_ARCHITECTURE.md](10_SKILL_ARCHITECTURE.md)
+
+This phase rewrites existing skills and creates new skills to align with the evaluation framework.
+
+### 7.1 /eval-writer (NEW - Priority 1)
+
+Foundation skill for all scenario creation. Must be created first.
+
+**Location**: `.claude/commands/eval-writer.md`
+
+**Modes to implement**:
+1. `from-trace` - Production trace to scenario
+2. `from-failure` - Investigation to regression scenario
+3. `from-spec` - Feature doc to capability scenarios
+4. `from-gap` - Coverage gap to synthetic scenarios
+5. `adversarial` - Security attack scenarios
+6. `mutate` - Existing scenario to variations
+
+**Quality gates to implement**:
+1. Schema validation
+2. Grader appropriateness
+3. Dry run (pass@1)
+4. Consistency check (pass^3)
+5. Balance check
+6. Duplicate check
+7. Abstraction validation
+
+### 7.2 /workflow-evaluation (REWRITE - Priority 2)
+
+Rewrite to implement LLM as Judge investigation.
+
+**Key changes**:
+- Add hierarchical trace loading (L0/L1/L2)
+- Add token budget management (50K total)
+- Add pattern matching against known failures
+- Add structured fix proposal generation
+- Add invocation of /agent-improvement on approval
+
+### 7.3 /agent-improvement (REWRITE - Priority 3)
+
+Rewrite to implement fix validation and documentation.
+
+**Key changes**:
+- Add k-out-of-n validation (default k=3, n=5)
+- Add baseline update logic with smoothing
+- Add pattern documentation to library
+- Add invocation of /eval-writer (from-failure) for regression
+
+### 7.4 /e2e-testing (REWRITE - Priority 4)
+
+Rewrite as the main orchestrator skill.
+
+**Key changes**:
+- Load scenarios from LangSmith datasets
+- Route HITL scenarios to StatefulHITLTestHarness
+- Use GradingOrchestrator for all grading
+- Invoke /workflow-evaluation on failures
+- Invoke /eval-coverage on schedule
+
+### 7.5 /eval-coverage (NEW - Priority 5)
+
+Gap analysis skill.
+
+**Location**: `.claude/commands/eval-coverage.md`
+
+**Implementation**:
+- Map scenarios to 5 failure pillars
+- Map scenarios to 7 categories
+- Calculate coverage percentages
+- Identify and prioritize gaps
+- Invoke /eval-writer (from-gap) for top gaps
+
+### 7.6 Deprecation: autonomous-testing
+
+The existing `autonomous-testing` skill functionality merges into `/e2e-testing`.
+
+**Migration path**:
+1. Extract reusable logic from autonomous-testing
+2. Integrate into /e2e-testing
+3. Update any references
+4. Archive autonomous-testing skill
+
 ---
 
 ## Related Documents
 
 - [08_SCHEMAS.md](08_SCHEMAS.md) - All schema definitions
 - [00_INDEX.md](00_INDEX.md) - Framework overview
+- [10_SKILL_ARCHITECTURE.md](10_SKILL_ARCHITECTURE.md) - Skill specifications and contracts
 

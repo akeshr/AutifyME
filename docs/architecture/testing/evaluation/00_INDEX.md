@@ -2,7 +2,7 @@
 
 **Date**: 2026-01-11
 **Status**: Design
-**Version**: 3.2 - Schema Unification & Implementation Ready
+**Version**: 4.0 - LLM as Judge & Eval Writer Skills
 
 ---
 
@@ -12,7 +12,7 @@ A **universal evaluation framework** for measuring and continuously improving AN
 
 ```text
 +===========================================================================+
-|                    COMPLETE ARCHITECTURE (v3.1)                           |
+|                    COMPLETE ARCHITECTURE (v4.0)                           |
 +===========================================================================+
 |                                                                           |
 |  LANGSMITH FOUNDATION (with local fallback)                               |
@@ -25,16 +25,21 @@ A **universal evaluation framework** for measuring and continuously improving AN
 |  - Model graders (nuance): Flexible, handles semantics                    |
 |  - Human graders (SLA-managed): Gold standard via LangSmith               |
 |                                                                           |
+|  LLM AS JUDGE (Two Modes)                                                 |
+|  - Automated: Model graders in GradingOrchestrator (per-scenario)         |
+|  - Deep Analysis: Claude skills for investigation (cross-scenario)        |
+|                                                                           |
 |  OUTPUT-ONLY GRADING (Default)                                            |
 |  - Grade final output, not path taken                                     |
 |  - Path deviations logged but not scored                                  |
 |  - PATH_STRICT only for safety-critical (HITL)                            |
 |                                                                           |
-|  INTELLIGENCE LAYER (CLAUDE)                                              |
-|  - Token-budgeted hierarchical trace loading                              |
-|  - Multi-track parallel investigation                                     |
-|  - Pattern detection across failure clusters                              |
-|  - k-out-of-n validated fix proposals                                     |
+|  SKILL ECOSYSTEM (Claude Code)                                            |
+|  - /e2e-testing: Orchestrate evaluation cycle                             |
+|  - /workflow-evaluation: Deep failure investigation                       |
+|  - /agent-improvement: Fix implementation & validation                    |
+|  - /eval-writer: Scenario generation (6 modes, 7 quality gates)           |
+|  - /eval-coverage: Gap analysis and prioritization                        |
 |                                                                           |
 |  SECURITY & BOUNDARY TESTING (Category 7)                                 |
 |  - Prompt injection resistance                                            |
@@ -77,6 +82,7 @@ From Anthropic's "Demystifying Evals for AI Agents":
 | [07_OPERATIONAL_GUIDE.md](07_OPERATIONAL_GUIDE.md) | Running in production | Cost, HITL testing, versioning, CLI |
 | [08_SCHEMAS.md](08_SCHEMAS.md) | **Data models** | **Single source of truth for all schemas** |
 | [09_IMPLEMENTATION_GUIDE.md](09_IMPLEMENTATION_GUIDE.md) | **How to build** | **Bootstrap order, dependencies, contracts** |
+| [10_SKILL_ARCHITECTURE.md](10_SKILL_ARCHITECTURE.md) | **LLM as Judge** | **Skill ecosystem, eval-writer, invocation contracts** |
 
 ---
 
@@ -212,25 +218,56 @@ For non-deterministic outputs (response wording, creative content), semantic equ
 
 ## Skill Integration
 
+**Full specification**: [10_SKILL_ARCHITECTURE.md](10_SKILL_ARCHITECTURE.md)
+
 ```yaml
-# e2e-testing skill - main entry point
+# e2e-testing skill - entry point (REWRITE)
 /e2e-testing:
-  - Run evaluation pipeline
-  - Report results
-  - If failures: auto-trigger workflow-evaluation
+  - Orchestrate evaluation cycle
+  - Load scenarios, execute, grade
+  - On failures: invoke /workflow-evaluation
+  - On gaps: invoke /eval-coverage
 
-# workflow-evaluation skill - investigation
+# workflow-evaluation skill - LLM as Judge investigation (REWRITE)
 /workflow-evaluation:
-  - Invoke Intelligence Layer
-  - Present root cause and fix proposal
-  - On approval: trigger agent-improvement
+  - Hierarchical trace loading (L0 -> L1 -> L2)
+  - Token-budgeted investigation
+  - Pattern matching against known failures
+  - Root cause + fix proposal generation
+  - On approval: invoke /agent-improvement
 
-# agent-improvement skill - implementation
+# agent-improvement skill - fix implementation (REWRITE)
 /agent-improvement:
-  - Apply fix proposal
+  - Apply fix proposal to codebase
   - Run k-out-of-n validation
-  - Update baseline
-  - Document pattern
+  - Update baseline on success
+  - Document pattern for reuse
+  - Create regression scenario via /eval-writer
+
+# eval-writer skill - scenario generation (NEW)
+/eval-writer:
+  modes:
+    - from-trace: Production trace -> scenario
+    - from-failure: Investigation -> regression scenario
+    - from-spec: Feature doc -> capability scenarios
+    - from-gap: Coverage gap -> synthetic scenarios
+    - adversarial: Security -> attack scenarios
+    - mutate: Existing -> edge case variations
+  quality_gates:
+    - Schema validation
+    - Grader appropriateness
+    - Dry run (pass@1)
+    - Consistency check (pass^3)
+    - Balance check
+    - Duplicate check
+    - Abstraction validation
+
+# eval-coverage skill - gap analysis (NEW)
+/eval-coverage:
+  - Map scenarios to 5 failure pillars
+  - Map scenarios to 7 categories
+  - Identify and prioritize gaps
+  - Invoke /eval-writer to fill gaps
 ```
 
 ---
