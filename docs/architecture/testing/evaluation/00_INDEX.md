@@ -2,7 +2,7 @@
 
 **Date**: 2026-01-11
 **Status**: Design
-**Version**: 3.1 - Operational Reality Check
+**Version**: 3.2 - Schema Unification & Implementation Ready
 
 ---
 
@@ -75,6 +75,8 @@ From Anthropic's "Demystifying Evals for AI Agents":
 | [05_INTELLIGENCE_LAYER.md](05_INTELLIGENCE_LAYER.md) | Deep analysis | Claude investigation, fix generation |
 | [06_EVALUATION_PIPELINE.md](06_EVALUATION_PIPELINE.md) | Execution flow | Pipeline, improvement loop, metrics |
 | [07_OPERATIONAL_GUIDE.md](07_OPERATIONAL_GUIDE.md) | Running in production | Cost, HITL testing, versioning, CLI |
+| [08_SCHEMAS.md](08_SCHEMAS.md) | **Data models** | **Single source of truth for all schemas** |
+| [09_IMPLEMENTATION_GUIDE.md](09_IMPLEMENTATION_GUIDE.md) | **How to build** | **Bootstrap order, dependencies, contracts** |
 
 ---
 
@@ -178,15 +180,21 @@ uv run python -m tests.evaluation.cli validate --all-pending
 
 ### System Health (via evals)
 
-| Metric | Initial Target | Stretch Target |
-|--------|----------------|----------------|
-| Intent classification | >90% | >98% |
-| Routing accuracy | >90% | >98% |
-| Context utilization | >80% | >95% |
-| HITL compliance | 100% | 100% |
-| Schema compliance | 100% | 100% |
-| Hallucination rate | <10% | <2% |
-| pass^3 (consistency) | >80% | >95% |
+| Metric | Initial Target | Stretch Target | Notes |
+|--------|----------------|----------------|-------|
+| Intent classification | >90% | >98% | |
+| Routing accuracy | >90% | >98% | |
+| Context utilization | >80% | >95% | |
+| HITL compliance | 100% | 100% | |
+| Schema compliance | 100% | 100% | |
+| Hallucination rate | <10% | <2% | |
+| pass^3 (consistency) | >80% | >95% | **See note below** |
+
+**pass^k Applicability Note**: pass^k measures consistency across k runs. Use pass^k ONLY for:
+- **Deterministic checks**: State changes, schema compliance, HITL compliance
+- **Do NOT use** for semantic quality (use pass@k instead - passes at least once in k tries)
+
+For non-deterministic outputs (response wording, creative content), semantic equivalence varies run-to-run. This is expected and not a consistency failure.
 
 ---
 

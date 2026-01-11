@@ -388,13 +388,25 @@ class HumanGraders:
 
 ---
 
-## Output-Only Grader
+## Grading Orchestration
 
-The default grader that implements "grade outputs, not paths":
+**IMPORTANT**: The single implementation of grading orchestration is `GradingOrchestrator` defined in [09_IMPLEMENTATION_GUIDE.md](09_IMPLEMENTATION_GUIDE.md). This section describes the conceptual approach.
+
+### Output-Only Grading (Default)
+
+The default mode implements "grade outputs, not paths":
 
 ```python
-class OutputOnlyGrader:
-    """Grade only the final output, not the path taken."""
+# See 09_IMPLEMENTATION_GUIDE.md for full GradingOrchestrator implementation
+
+class GradingOrchestrator:
+    """
+    SINGLE implementation of grading orchestration.
+    All grading flows through this class.
+    """
+
+    def __init__(self, registry: GraderRegistry):
+        self.registry = registry
 
     async def grade(
         self,
@@ -402,58 +414,67 @@ class OutputOnlyGrader:
         result: RolloutResult,
         trace: TraceForEval
     ) -> Judgment:
-        """Grade based on output matching expected."""
+        """
+        Grade a scenario execution.
 
-        output_grades = []
+        Implements output-only grading by default:
+        - Runs configured graders against output
+        - Logs path deviations but does NOT score them
+        - Only PATH_STRICT mode penalizes path deviations
 
-        # 1. Output type check (always)
-        if scenario.expected.output.type:
-            output_grades.append(
-                self._grade_output_type(result.output, scenario.expected.output.type)
+        Returns:
+            Judgment with aggregated scores and path analysis
+        """
+        grader_outputs: list[GraderOutput] = []
+        path_deviations: list[PathDeviation] = []
+
+        # 1. Run all configured graders
+        for spec in scenario.grading.graders:
+            grader = self.registry.get(spec.name)
+            grade = await grader.grade(
+                output=result.response,
+                expected=scenario.expected,
+                trace=trace,
+                config=spec.config
             )
+            grader_outputs.append(GraderOutput(
+                grader_name=spec.name,
+                grader_type=grader.grader_type,
+                grade=grade,
+                weight=spec.weight
+            ))
 
-        # 2. Required content check (always)
-        if scenario.expected.output.contains:
-            output_grades.append(
-                self._grade_contains(result.output, scenario.expected.output.contains)
-            )
-
-        # 3. Schema compliance check (always)
-        if scenario.expected.output.schema:
-            output_grades.append(
-                self._grade_schema(result.output, scenario.expected.output.schema)
-            )
-
-        # 4. State change verification (always - this IS output)
-        if scenario.expected.state_changes:
-            output_grades.append(
-                await self._grade_state_changes(scenario.expected.state_changes)
-            )
-
-        # 5. Path deviation logging (advisory only, never fails)
-        path_deviations = []
+        # 2. Log path deviations (all modes)
         if scenario.expected.routing:
             actual_routing = [d.target for d in trace.delegations]
             if set(actual_routing) != set(scenario.expected.routing):
-                path_deviations.append({
-                    "type": "routing",
-                    "expected": scenario.expected.routing,
-                    "actual": actual_routing,
-                    "analysis": self._analyze_routing_deviation(
+                path_deviations.append(PathDeviation(
+                    type="routing",
+                    expected=scenario.expected.routing,
+                    actual=actual_routing,
+                    analysis=self._analyze_routing_deviation(
                         scenario.expected.routing, actual_routing
                     )
-                })
+                ))
 
-        # Aggregate output grades only
-        final_score = sum(g.score * g.weight for g in output_grades) / sum(g.weight for g in output_grades)
+        # 3. Calculate weighted score (graders only)
+        total_weight = sum(go.weight for go in grader_outputs)
+        weighted_score = sum(
+            go.grade.score * go.weight for go in grader_outputs
+        ) / total_weight if total_weight > 0 else 0.0
+
+        # 4. Apply path penalty ONLY in PATH_STRICT mode
+        if scenario.grading.mode == GradingMode.PATH_STRICT and path_deviations:
+            weighted_score *= 0.5  # 50% penalty
 
         return Judgment(
             scenario_id=scenario.id,
-            passed=final_score >= scenario.grading.pass_threshold,
-            score=final_score,
-            output_grades=output_grades,
-            path_deviations=path_deviations,  # Logged but not scored
-            trace_id=result.trace_id
+            trace_id=result.trace_id,
+            passed=weighted_score >= scenario.grading.pass_threshold,
+            score=weighted_score,
+            grader_outputs=grader_outputs,
+            path_deviations=path_deviations,
+            grading_mode=scenario.grading.mode
         )
 
     def _analyze_routing_deviation(
@@ -468,6 +489,8 @@ class OutputOnlyGrader:
             return "Agent used additional specialists (more thorough)"
         return "Different routing strategy"
 ```
+
+**Key principle**: Path deviations are INFORMATION, not FAILURE. Only safety-critical scenarios (HITL) use PATH_STRICT.
 
 ---
 
@@ -493,3 +516,5 @@ class OutputOnlyGrader:
 - [01_LANGSMITH_FOUNDATION.md](01_LANGSMITH_FOUNDATION.md) - LangSmith evaluator integration
 - [04_SCENARIO_FRAMEWORK.md](04_SCENARIO_FRAMEWORK.md) - Scenario grading configuration
 - [07_OPERATIONAL_GUIDE.md](07_OPERATIONAL_GUIDE.md) - Human review SLA
+- [08_SCHEMAS.md](08_SCHEMAS.md) - Canonical schema definitions (GradeResult, Judgment, GraderRegistry)
+- [09_IMPLEMENTATION_GUIDE.md](09_IMPLEMENTATION_GUIDE.md) - GradingOrchestrator implementation details

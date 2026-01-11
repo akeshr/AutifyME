@@ -255,20 +255,38 @@ Respond in JSON format matching FixProposal schema.
 
 **Solution**: Dynamic token budgeting with chunked investigation.
 
+**NOTE**: Canonical token budgets defined in [08_SCHEMAS.md](08_SCHEMAS.md). HierarchicalTraceLoader returns `(data, tokens_used)` tuples.
+
 ```python
+# See 08_SCHEMAS.md for canonical TokenBudget definition
 @dataclass
 class TokenBudget:
-    """Token budget configuration."""
+    """
+    Token budget configuration.
 
-    investigation_total: int = 50000      # Max tokens per investigation
-    level_0_target: int = 1000            # Target, not guarantee
-    level_1_target: int = 3000
-    level_2_target: int = 10000
+    CANONICAL VALUES (from 08_SCHEMAS.md):
+    - L0: 500-1000 tokens (structure overview)
+    - L1: 1500-3000 tokens (focused investigation)
+    - L2: 5000-10000 tokens (deep dive)
+    """
+
+    investigation_total: int = 50000
+    level_0_target: int = 750       # ~500-1000 range
+    level_1_target: int = 2250      # ~1500-3000 range
+    level_2_target: int = 7500      # ~5000-10000 range
     overflow_strategy: str = "summarize"  # "summarize" | "chunk" | "abort"
 
 
 class BudgetAwareInvestigation:
-    """Investigation that respects token budget."""
+    """
+    Investigation that respects token budget.
+
+    Uses HierarchicalTraceLoader which returns (data, tokens_used) tuples.
+    See 01_LANGSMITH_FOUNDATION.md for loader implementation.
+    """
+
+    def __init__(self, trace_loader: HierarchicalTraceLoader):
+        self.trace_loader = trace_loader
 
     async def investigate(
         self,
@@ -277,17 +295,23 @@ class BudgetAwareInvestigation:
     ) -> InvestigationSession:
         """Investigate within token budget."""
         remaining = budget.investigation_total
-        session = InvestigationSession(failures=failures)
+        session = InvestigationSession(
+            trigger=InvestigationTrigger(type="eval_failure"),
+            failed_judgments=failures
+        )
 
         # Phase 1: Load all L0 (must fit)
         for failure in failures:
-            overview, tokens = await self.trace_loader.load_level_0(failure.trace_id)
+            # Loader returns (data, tokens_used) tuple
+            overview, tokens = await self.trace_loader.load_level_0(
+                failure.trace_id,
+                max_tokens=budget.level_0_target
+            )
             remaining -= tokens
             session.traces[failure.scenario_id] = {"l0": overview}
 
             if remaining <= 0:
                 session.budget_exceeded = True
-                session.analysis_depth = "overview_only"
                 return await self._shallow_analysis(session)
 
         # Phase 2: Prioritize which traces need L1
@@ -300,8 +324,11 @@ class BudgetAwareInvestigation:
             focus_areas = self._identify_focus_areas(session.traces[failure.scenario_id]["l0"])
 
             for focus in focus_areas[:2]:  # Max 2 focus areas per trace
+                # Pass max_tokens to respect budget
                 focus_data, tokens = await self.trace_loader.load_level_1(
-                    failure.trace_id, focus, remaining
+                    failure.trace_id,
+                    focus,
+                    max_tokens=min(remaining, budget.level_1_target)
                 )
                 remaining -= tokens
                 session.traces[failure.scenario_id][f"l1_{focus}"] = focus_data

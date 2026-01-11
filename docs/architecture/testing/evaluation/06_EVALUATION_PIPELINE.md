@@ -2,6 +2,8 @@
 
 **Part of**: [Universal Evaluation Framework](00_INDEX.md)
 
+**Version**: 3.2 - HITL Integration & Unified Grading
+
 ---
 
 ## Overview
@@ -60,21 +62,30 @@ The evaluation pipeline orchestrates scenario execution, grading, and improvemen
 
 ## Pipeline Implementation
 
+**NOTE**: All data models defined in [08_SCHEMAS.md](08_SCHEMAS.md). Grading uses the unified `GradingOrchestrator` from [03_GRADER_ARCHITECTURE.md](03_GRADER_ARCHITECTURE.md).
+
 ```python
 class EvaluationPipeline:
-    """Complete evaluation pipeline."""
+    """
+    Complete evaluation pipeline.
+
+    CRITICAL: Routes HITL scenarios to StatefulHITLTestHarness.
+    Uses GradingOrchestrator for all grading (no duplicate logic).
+    """
 
     def __init__(
         self,
         langsmith: LangSmithIntegration,
-        graders: GraderRegistry,
+        grading: GradingOrchestrator,  # Single grading implementation
         intelligence: IntelligenceLayer,
-        tracker: ImprovementTracker
+        tracker: ImprovementTracker,
+        hitl_harness: StatefulHITLTestHarness  # For HITL scenarios
     ):
         self.langsmith = langsmith
-        self.graders = graders
+        self.grading = grading  # Not GraderRegistry - use orchestrator
         self.intelligence = intelligence
         self.tracker = tracker
+        self.hitl_harness = hitl_harness
 
     async def run(
         self,
@@ -93,24 +104,33 @@ class EvaluationPipeline:
                 t in s.metadata.tags for t in options.filter_tags
             )]
 
-        # Step 2: Execute scenarios
-        results = await self._execute_batch(
-            scenarios,
-            parallelism=options.parallelism
+        # Step 2: Separate HITL from regular scenarios
+        hitl_scenarios = [s for s in scenarios if self._is_hitl_scenario(s)]
+        regular_scenarios = [s for s in scenarios if not self._is_hitl_scenario(s)]
+
+        # Step 3: Execute regular scenarios (auto-approve HITL)
+        regular_results = await self._execute_batch(
+            regular_scenarios,
+            parallelism=options.parallelism,
+            hitl_mode="auto_approve"
         )
 
-        # Step 3: Grade results
-        judgments = await self._grade_batch(results, scenarios)
+        # Step 4: Execute HITL scenarios through dedicated harness
+        hitl_results = await self._execute_hitl_batch(hitl_scenarios)
 
-        # Step 4: Compile report
+        # Step 5: Combine and grade all results
+        all_results = regular_results + hitl_results
+        judgments = await self._grade_batch(all_results, scenarios)
+
+        # Step 6: Compile report
         report = self._compile_report(judgments, scenarios)
 
-        # Step 5: Compare to baseline
+        # Step 7: Compare to baseline (with smoothing)
         if options.baseline_comparison:
             baseline = await self.tracker.get_baseline(suite)
             report.regression_analysis = self._compare_to_baseline(report, baseline)
 
-        # Step 6: Trigger investigation if needed
+        # Step 8: Trigger investigation if needed
         if report.failures and options.auto_investigate:
             report.investigation = await self.intelligence.investigate(
                 InvestigationTrigger(
@@ -121,23 +141,35 @@ class EvaluationPipeline:
                 report.failures
             )
 
-        # Step 7: Store report
+        # Step 9: Store report
         await self._store_report(report)
 
         return report
 
+    def _is_hitl_scenario(self, scenario: Scenario) -> bool:
+        """
+        Determine if scenario requires HITL testing.
+
+        HITL scenarios use StatefulHITLTestHarness instead of auto-approve.
+        """
+        return (
+            scenario.grading.mode == GradingMode.PATH_STRICT or
+            "hitl" in scenario.metadata.tags or
+            any("hitl" in str(b).lower() for b in scenario.expected.behavior)
+        )
+
     async def _execute_batch(
         self,
         scenarios: list[Scenario],
-        parallelism: int
+        parallelism: int,
+        hitl_mode: str = "auto_approve"
     ) -> list[RolloutResult]:
         """Execute scenarios with controlled parallelism."""
         semaphore = asyncio.Semaphore(parallelism)
-        results = []
 
         async def execute_one(scenario: Scenario) -> RolloutResult:
             async with semaphore:
-                return await self._execute_scenario(scenario)
+                return await self._execute_scenario(scenario, hitl_mode)
 
         tasks = [execute_one(s) for s in scenarios]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -146,14 +178,15 @@ class EvaluationPipeline:
 
     async def _execute_scenario(
         self,
-        scenario: Scenario
+        scenario: Scenario,
+        hitl_mode: str
     ) -> RolloutResult:
         """Execute single scenario via PM."""
         result = await chat_with_pm(
             message=scenario.input.message,
             media_paths=[m.path for m in scenario.input.media],
             context=scenario.input.context,
-            hitl_mode="auto_approve"  # For testing
+            hitl_mode=hitl_mode
         )
 
         return RolloutResult(
@@ -165,12 +198,58 @@ class EvaluationPipeline:
             success=not result.error
         )
 
+    async def _execute_hitl_batch(
+        self,
+        scenarios: list[Scenario]
+    ) -> list[RolloutResult]:
+        """
+        Execute HITL scenarios through StatefulHITLTestHarness.
+
+        This tests actual blocking behavior, approval flow, and edit handling.
+        """
+        results = []
+
+        for scenario in scenarios:
+            # Convert to HITLScenario format expected by harness
+            hitl_scenario = self._convert_to_hitl_scenario(scenario)
+
+            # Execute through harness (actually pauses, injects approval)
+            hitl_result = await self.hitl_harness.execute_hitl_scenario(hitl_scenario)
+
+            # Convert back to RolloutResult
+            results.append(RolloutResult(
+                scenario_id=scenario.id,
+                trace_id=hitl_result.trace_id if hasattr(hitl_result, 'trace_id') else "",
+                response=hitl_result.final_response if hasattr(hitl_result, 'final_response') else "",
+                routing=[],  # Extracted from trace if needed
+                tools_called=[],  # Extracted from trace if needed
+                success=hitl_result.passed
+            ))
+
+        return results
+
+    def _convert_to_hitl_scenario(self, scenario: Scenario) -> HITLScenario:
+        """Convert Scenario to HITLScenario format for harness."""
+        # Determine approval action from scenario expectations
+        approval_action = "approve"  # Default
+        if "reject" in str(scenario.expected.behavior).lower():
+            approval_action = "reject"
+        elif "edit" in str(scenario.expected.behavior).lower():
+            approval_action = "approve_with_edit"
+
+        return HITLScenario(
+            input=scenario.input,
+            expected_interrupt=scenario.expected.output,
+            approval_action=approval_action,
+            expected_post_approval=scenario.expected.state_changes
+        )
+
     async def _grade_batch(
         self,
         results: list[RolloutResult],
         scenarios: list[Scenario]
     ) -> list[Judgment]:
-        """Grade all results."""
+        """Grade all results using GradingOrchestrator."""
         scenario_map = {s.id: s for s in scenarios}
         judgments = []
 
@@ -178,47 +257,13 @@ class EvaluationPipeline:
             scenario = scenario_map[result.scenario_id]
             trace = await self.langsmith.get_trace(result.trace_id)
 
-            judgment = await self._grade_one(result, scenario, trace)
+            # Use unified GradingOrchestrator - NO duplicate logic here
+            judgment = await self.grading.grade(scenario, result, trace)
             judgments.append(judgment)
 
         return judgments
 
-    async def _grade_one(
-        self,
-        result: RolloutResult,
-        scenario: Scenario,
-        trace: TraceForEval
-    ) -> Judgment:
-        """Apply graders to single result."""
-        grader_results = []
-
-        for grader_config in scenario.grading.graders:
-            grader = self.graders.get(grader_config.name)
-            grade = await grader.grade(
-                output=result.response,
-                expected=scenario.expected,
-                trace=trace,
-                config=grader_config.config
-            )
-            grader_results.append(GraderResult(
-                grader=grader_config.name,
-                grade=grade,
-                weight=grader_config.weight
-            ))
-
-        # Calculate weighted score
-        total_weight = sum(gr.weight for gr in grader_results)
-        weighted_score = sum(
-            gr.grade.score * gr.weight for gr in grader_results
-        ) / total_weight
-
-        return Judgment(
-            scenario_id=scenario.id,
-            passed=weighted_score >= scenario.grading.pass_threshold,
-            score=weighted_score,
-            grader_results=grader_results,
-            trace_id=result.trace_id
-        )
+    # NOTE: _grade_one method REMOVED - use self.grading.grade() instead
 ```
 
 ---
@@ -437,6 +482,8 @@ uv run python -m tests.evaluation.cli investigate --report-id <id>
 ## Related Documents
 
 - [01_LANGSMITH_FOUNDATION.md](01_LANGSMITH_FOUNDATION.md) - Trace and dataset management
-- [03_GRADER_ARCHITECTURE.md](03_GRADER_ARCHITECTURE.md) - Graders used in pipeline
+- [03_GRADER_ARCHITECTURE.md](03_GRADER_ARCHITECTURE.md) - GradingOrchestrator (single grading implementation)
 - [05_INTELLIGENCE_LAYER.md](05_INTELLIGENCE_LAYER.md) - Investigation on failures
-- [07_OPERATIONAL_GUIDE.md](07_OPERATIONAL_GUIDE.md) - Cost and operational concerns
+- [07_OPERATIONAL_GUIDE.md](07_OPERATIONAL_GUIDE.md) - StatefulHITLTestHarness, cost concerns
+- [08_SCHEMAS.md](08_SCHEMAS.md) - All data models (EvaluationReport, Judgment, RolloutResult)
+- [09_IMPLEMENTATION_GUIDE.md](09_IMPLEMENTATION_GUIDE.md) - Bootstrap order and integration contracts

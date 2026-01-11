@@ -327,23 +327,37 @@ class LangSmithIntegration:
 
 3-level lazy loading for efficient trace analysis during investigation.
 
+**NOTE**: All data models defined in [08_SCHEMAS.md](08_SCHEMAS.md). Token budgets are canonical values from that document.
+
 ```python
 class HierarchicalTraceLoader:
-    """3-level lazy loading for efficient trace analysis."""
+    """
+    3-level lazy loading for efficient trace analysis.
+
+    All methods return (data, tokens_used) tuples for budget tracking.
+    See 08_SCHEMAS.md for TraceOverview, TraceFocus, TraceDeep definitions.
+    """
 
     def __init__(self, langsmith: LangSmithIntegration):
         self.langsmith = langsmith
 
-    async def load_level_0(self, trace_id: str) -> TraceOverview:
+    async def load_level_0(
+        self,
+        trace_id: str,
+        max_tokens: int | None = None
+    ) -> tuple[TraceOverview, int]:
         """
-        Level 0: Structure Overview (~500 tokens)
+        Level 0: Structure Overview (~500-1000 tokens)
         - Agent names and delegation chain
         - Tool names called (not params)
         - Pass/fail status
         - Total tokens and latency
+
+        Returns:
+            tuple of (TraceOverview, tokens_used)
         """
         run = self.langsmith.client.read_run(trace_id)
-        return TraceOverview(
+        overview = TraceOverview(
             trace_id=trace_id,
             agents=[r.name for r in self._get_agent_runs(run)],
             tools=[r.name for r in self._get_tool_runs(run)],
@@ -352,41 +366,87 @@ class HierarchicalTraceLoader:
             latency_ms=run.latency_ms,
             error_summary=run.error[:100] if run.error else None
         )
+        tokens_used = self._estimate_tokens(overview)
+        return overview, tokens_used
 
     async def load_level_1(
         self,
         trace_id: str,
-        focus_area: str
-    ) -> TraceFocus:
+        focus_area: str,
+        max_tokens: int | None = None
+    ) -> tuple[TraceFocus, int]:
         """
-        Level 1: Focused Investigation (~1,500 tokens)
+        Level 1: Focused Investigation (~1500-3000 tokens)
         - Full details for specific agent/tool
         - Inputs, outputs, reasoning
         - Surrounding context
+
+        Args:
+            trace_id: The trace to load
+            focus_area: Where to focus ("agent:pm", "tool:write_data", "error")
+            max_tokens: Optional token budget (truncate if exceeded)
+
+        Returns:
+            tuple of (TraceFocus, tokens_used)
         """
         run = self.langsmith.client.read_run(trace_id)
 
         if focus_area.startswith("agent:"):
             agent_name = focus_area.split(":")[1]
-            return self._extract_agent_details(run, agent_name)
+            focus = self._extract_agent_details(run, agent_name)
         elif focus_area.startswith("tool:"):
             tool_name = focus_area.split(":")[1]
-            return self._extract_tool_details(run, tool_name)
+            focus = self._extract_tool_details(run, tool_name)
         elif focus_area == "error":
-            return self._extract_error_context(run)
+            focus = self._extract_error_context(run)
+        else:
+            raise ValueError(f"Unknown focus area: {focus_area}")
 
-    async def load_level_2(self, trace_id: str) -> TraceDeep:
+        tokens_used = self._estimate_tokens(focus)
+
+        # Truncate if over budget
+        if max_tokens and tokens_used > max_tokens:
+            focus = self._truncate_focus(focus, max_tokens)
+            tokens_used = max_tokens
+
+        return focus, tokens_used
+
+    async def load_level_2(
+        self,
+        trace_id: str,
+        max_tokens: int | None = None
+    ) -> tuple[TraceDeep, int]:
         """
-        Level 2: Deep Dive (~5,000+ tokens)
+        Level 2: Deep Dive (~5000-10000 tokens)
         - Full trace with all details
         - Every input/output/reasoning
         - Complete error stack traces
+
+        Returns:
+            tuple of (TraceDeep, tokens_used)
         """
         run = self.langsmith.client.read_run(trace_id)
         children = list(self.langsmith.client.list_runs(
             parent_run_id=trace_id
         ))
-        return self._build_full_trace(run, children)
+        deep = self._build_full_trace(run, children)
+        tokens_used = self._estimate_tokens(deep)
+        return deep, tokens_used
+
+    async def load_level_2_chunked(
+        self,
+        trace_id: str,
+        budget: int
+    ) -> AsyncIterator[tuple[dict, int]]:
+        """Yield trace chunks within budget for very large traces."""
+        # Implementation yields chunks until budget exhausted
+        ...
+
+    def _estimate_tokens(self, data: Any) -> int:
+        """Estimate tokens for data structure (rough: 4 chars = 1 token)."""
+        import json
+        text = json.dumps(data, default=str)
+        return len(text) // 4
 ```
 
 ---
@@ -489,3 +549,5 @@ class OfflineEvaluationMode:
 - [03_GRADER_ARCHITECTURE.md](03_GRADER_ARCHITECTURE.md) - How graders integrate with LangSmith evaluators
 - [05_INTELLIGENCE_LAYER.md](05_INTELLIGENCE_LAYER.md) - Hierarchical trace loading for investigation
 - [07_OPERATIONAL_GUIDE.md](07_OPERATIONAL_GUIDE.md) - Human review SLA and annotation queues
+- [08_SCHEMAS.md](08_SCHEMAS.md) - Canonical data model definitions (TraceForEval, TraceOverview, etc.)
+- [09_IMPLEMENTATION_GUIDE.md](09_IMPLEMENTATION_GUIDE.md) - Implementation order and contracts
