@@ -2,7 +2,7 @@
 
 **Part of**: [Universal Evaluation Framework](00_INDEX.md)
 
-**Version**: 4.0 - LLM as Judge & Eval Writer
+**Version**: 4.1 - Claude Code as Judge
 
 **Status**: Design - Requires Full Skill Rewrite
 
@@ -10,68 +10,94 @@
 
 ## Overview
 
-This document defines how Claude Code skills implement the **LLM as Judge** paradigm for the evaluation framework. Skills ARE the intelligence layer - they contain domain expertise, process knowledge, and decision criteria. No additional tooling layer required.
+This document defines how Claude Code skills implement the **LLM as Judge** paradigm. The key insight: **Claude Code IS the judge** - no separate Python agent needed. The `/evaluate` skill engineers Claude Code to be a world-class evaluation expert.
 
 ---
 
-## Core Principle: Skills ARE the Interface
+## Core Principle: Claude Code IS the Judge
 
 ```text
-WRONG MENTAL MODEL:
-  Skill --> MCP Tool --> Python utility --> Result
-  (Unnecessary indirection, loses agency)
+CRITICAL INSIGHT:
+  Claude Code (with /evaluate skill) IS the evaluator.
+  No separate "Judge Agent" needed - the skill prompt engineers
+  Claude Code to be a world-class evaluation expert.
 
-CORRECT MENTAL MODEL:
-  Skill (with complete instructions) --> Claude reasons --> Uses existing tools
-  (Skills contain ALL the intelligence needed)
+THE ARCHITECTURE:
+  /evaluate skill --> Claude Code reasons --> Uses existing tools
+  (Read, MCP Supabase, Grep, Bash for trace extraction)
 ```
 
-**Key insight**: Claude already knows when to invoke skills. The skills themselves contain:
-- Domain expertise (what to look for)
-- Process knowledge (how to investigate)
-- Decision criteria (when to propose fixes)
-- Output format (structured findings per 08_SCHEMAS.md)
+**Key insight**: Claude Code already has all capabilities needed:
+- Trace analysis (Read files, query LangSmith)
+- Code inspection (Grep, Glob for patterns)
+- DB verification (MCP Supabase)
+- Reasoning (rubric-based evaluation with evidence)
+
+The skill prompt transforms Claude Code into a calibrated judge.
 
 ---
 
-## LLM as Judge: Two Modes
+## Philosophy: Model-First, Code for Verification
+
+```text
+OLD HIERARCHY (deprecated):
+  Code > Model > Human
+  (Code graders preferred for everything)
+
+NEW HIERARCHY:
+  Claude Code Skills > Model Graders (API) > Code Graders > Human
+  (LLM intelligence primary, code for structural verification only)
+```
+
+**Rationale**:
+- PM behavior is ~70% semantic (intent, routing appropriateness, synthesis)
+- Modern LLMs achieve 85-95% agreement with human judges
+- Code graders only for truly structural checks (schema, HITL, DB state)
+
+---
+
+## LLM as Judge: Three Modes
 
 | Mode | Location | Purpose | Implementation |
 |------|----------|---------|----------------|
-| **Automated** | Model Graders in GradingOrchestrator | Per-scenario judging | Rubric-based, semantic similarity |
-| **Deep Analysis** | Claude Code Skills | Cross-scenario investigation | /workflow-evaluation, /agent-improvement |
+| **Interactive** | /evaluate skill | Development-time judging | Claude Code with rubrics |
+| **Automated** | Model Graders (Python) | CI/CD pipeline | API calls with same rubrics |
+| **Investigation** | /workflow-evaluation | Failure analysis | Cross-scenario patterns |
 
 ```text
 +=========================================================================+
 |                        LLM AS JUDGE LAYER                               |
 +=========================================================================+
 |                                                                         |
-|  MODE 1: AUTOMATED JUDGING (per-scenario, in pipeline)                  |
+|  MODE 1: INTERACTIVE EVALUATION (primary - development time)            |
 |  +-------------------------------------------------------------------+  |
-|  | Model Graders (03_GRADER_ARCHITECTURE.md)                         |  |
+|  | /evaluate skill (Claude Code)                                     |  |
+|  | - Claude Code becomes the world-class evaluator                   |  |
+|  | - Rubric-based scoring with evidence                              |  |
+|  | - Nuanced 0.0-1.0 scores with reasoning                           |  |
+|  | - Modes: single, batch, comparative                               |  |
+|  | - Uses: Read, MCP Supabase, Grep, Bash                            |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                         |
+|  MODE 2: AUTOMATED PIPELINE (secondary - CI/CD)                         |
+|  +-------------------------------------------------------------------+  |
+|  | Model Graders (Python - thin API wrappers)                        |  |
+|  | - Reuse same rubrics from /evaluate skill                         |  |
 |  | - Runs during EvaluationPipeline._grade_batch()                   |  |
-|  | - Rubric-based scoring                                            |  |
-|  | - Semantic similarity checking                                    |  |
 |  | - Fast, parallel execution                                        |  |
 |  +-------------------------------------------------------------------+  |
 |                                                                         |
-|  MODE 2: DEEP INVESTIGATION (cross-scenario, on failures)               |
+|  MODE 3: DEEP INVESTIGATION (on failures)                               |
 |  +-------------------------------------------------------------------+  |
-|  | Claude Code Skills                                                |  |
-|  |                                                                   |  |
-|  | /workflow-evaluation                                              |  |
+|  | /workflow-evaluation skill                                        |  |
 |  |   - Load traces hierarchically (L0 -> L1 -> L2)                   |  |
-|  |   - Multi-track parallel investigation                            |  |
 |  |   - Pattern matching against known failures                       |  |
-|  |   - Root cause determination                                      |  |
-|  |   - Generate fix proposals with confidence scores                 |  |
+|  |   - Root cause + fix proposal generation                          |  |
 |  |                                                                   |  |
-|  | /agent-improvement                                                |  |
+|  | /agent-improvement skill                                          |  |
 |  |   - Implement approved fix proposals                              |  |
 |  |   - Run k-out-of-n validation                                     |  |
-|  |   - Update baselines on success                                   |  |
 |  |   - Document patterns for reuse                                   |  |
-|  |   - Create regression scenarios                                   |  |
 |  +-------------------------------------------------------------------+  |
 |                                                                         |
 +=========================================================================+
@@ -84,41 +110,44 @@ CORRECT MENTAL MODEL:
 ### Skill Dependency Graph
 
 ```text
-                    TRIGGER
-                       |
-                       v
-              +------------------+
-              |  /e2e-testing    |  <-- Entry Point
-              +------------------+
-                       |
-         +-------------+-------------+
-         |                           |
-         v                           v
-+------------------+        +------------------+
-| /workflow-       |        | /eval-coverage   |
-| evaluation       |        | (gap analysis)   |
-+------------------+        +------------------+
-         |                           |
-         v                           |
-+------------------+                 |
-| /agent-          |                 |
-| improvement      |                 |
-+------------------+                 |
-         |                           |
-         +-------------+-------------+
-                       |
-                       v
-              +------------------+
-              |  /eval-writer    |  <-- Scenario Generation
-              +------------------+
+                                  TRIGGER
+                                     |
+              +----------------------+----------------------+
+              |                                             |
+              v                                             v
+    +------------------+                          +------------------+
+    |   /evaluate      |  <-- PRIMARY             |  /e2e-testing    |  <-- Automation
+    | (Claude Code     |      Interactive         +------------------+
+    |  as Judge)       |      Evaluation                   |
+    +------------------+                     +-------------+-------------+
+              |                              |                           |
+              | (on failures)                v                           v
+              |                    +------------------+        +------------------+
+              +----------------->  | /workflow-       |        | /eval-coverage   |
+                                   | evaluation       |        | (gap analysis)   |
+                                   +------------------+        +------------------+
+                                            |                           |
+                                            v                           |
+                                   +------------------+                 |
+                                   | /agent-          |                 |
+                                   | improvement      |                 |
+                                   +------------------+                 |
+                                            |                           |
+                                            +-------------+-------------+
+                                                          |
+                                                          v
+                                                 +------------------+
+                                                 |  /eval-writer    |  <-- Scenario Gen
+                                                 +------------------+
 ```
 
 ### Skill Summary Table
 
 | Skill | Purpose | Triggers | Outputs | Invokes |
 |-------|---------|----------|---------|---------|
-| `/e2e-testing` | Orchestrate evaluation cycle | Manual, CI/CD, scheduled | EvaluationReport | /workflow-evaluation, /eval-coverage |
-| `/workflow-evaluation` | Deep failure investigation | Called by /e2e-testing | InvestigationSession | /agent-improvement |
+| `/evaluate` | **PRIMARY** - Claude Code as Judge | Manual during development | EvalResult with score, reasoning, evidence | /workflow-evaluation (on failures) |
+| `/e2e-testing` | Orchestrate automated evaluation | CI/CD, scheduled | EvaluationReport | /workflow-evaluation, /eval-coverage |
+| `/workflow-evaluation` | Deep failure investigation | Called by /evaluate or /e2e-testing | InvestigationSession | /agent-improvement |
 | `/agent-improvement` | Implement and validate fixes | Called by /workflow-evaluation | ImprovementResult | /eval-writer |
 | `/eval-writer` | Create evaluation scenarios | Multiple modes | Scenario | None |
 | `/eval-coverage` | Identify coverage gaps | Scheduled, manual | CoverageReport | /eval-writer |
@@ -127,7 +156,113 @@ CORRECT MENTAL MODEL:
 
 ## Skill Specifications
 
-### /e2e-testing (Entry Point)
+### /evaluate (PRIMARY - Claude Code as Judge)
+
+**Status**: NEW SKILL - Priority 1
+
+**Location**: `.claude/skills/evaluate/SKILL.md`
+
+**Purpose**: Transform Claude Code into a world-class evaluation expert for PM behavior assessment.
+
+**Key Insight**: Claude Code IS the judge. The skill prompt engineers Claude Code to be a calibrated evaluator with rubric-based scoring.
+
+**Modes**:
+
+```text
+/evaluate single [trace_id] [rubric]
+  - Evaluate one trace against specified rubric
+  - Load trace via Python helper or LangSmith
+  - Apply rubric, produce score + reasoning + evidence
+
+/evaluate batch [trace_ids...] [rubric]
+  - Evaluate multiple traces efficiently
+  - Aggregate results, identify patterns
+
+/evaluate comparative [trace_id_a] [trace_id_b]
+  - A/B comparison of two approaches
+  - Which performs better and why?
+```
+
+**Evaluation Rubrics** (embedded in skill):
+
+```text
+INTENT UNDERSTANDING (0.0 - 1.0)
+  1.0: Perfect - understood exactly what user wanted, acted appropriately
+  0.8: Good - understood core intent, minor gaps in execution
+  0.6: Partial - understood part of intent, missed significant aspect
+  0.4: Weak - misunderstood but still somewhat helpful
+  0.2: Poor - largely misunderstood, response not useful
+  0.0: Failed - completely wrong understanding or harmful
+
+ROUTING APPROPRIATENESS (0.0 - 1.0)
+  - Judge whether specialist selection was APPROPRIATE, not exact match
+  - Creative routing paths acceptable if they achieve the goal
+  - Penalize: wrong domain, unnecessary delegation, missing critical specialist
+
+SYNTHESIS QUALITY (0.0 - 1.0)
+  - Completeness: All specialist outputs incorporated
+  - Coherence: Unified narrative, not disjointed pieces
+  - Actionability: User can act on the response
+  - Conciseness: No unnecessary verbosity
+
+TOOL USAGE (0.0 - 1.0)
+  - Selection: Right tools for the task
+  - Parameters: Correct and complete parameters
+  - Error handling: Graceful recovery from failures
+  - Efficiency: No redundant tool calls
+
+HELPFULNESS (0.0 - 1.0)
+  - Overall response quality from user perspective
+  - Did it solve the user's problem?
+  - Was it clear and actionable?
+```
+
+**Output Format**:
+
+```text
+For each evaluation, provide:
+1. Score: 0.0 - 1.0 (nuanced, not binary)
+2. Reasoning: WHY this score (evidence-backed)
+3. Evidence: Specific trace data supporting judgment
+4. Suggestions: How to improve (optional)
+```
+
+**Tools Used by Claude Code**:
+
+- `Read` - Load trace files, rubrics
+- `Bash` - Run Python helpers for trace extraction
+- `mcp__supabase__execute_sql` - Verify DB state
+- `Grep/Glob` - Find patterns in code
+
+**Supporting Python Helpers**:
+
+```text
+tests/tools/
+  trace_loader.py    # Load trace in evaluation-friendly format
+  eval_results.py    # Store results in LangSmith + local JSON
+```
+
+**Invocation Example**:
+
+```text
+User: /evaluate single abc123 intent
+Claude Code: [Loads trace, applies intent rubric, produces judgment]
+
+Score: 0.85
+Reasoning: PM correctly understood user wanted to check order status.
+  Delegated to Order Analyst appropriately. Minor gap: didn't proactively
+  offer tracking link.
+Evidence:
+  - User message: "where is my order"
+  - PM classification: "order_status_inquiry" (correct)
+  - Delegation: Order Analyst (appropriate)
+  - Missing: proactive tracking link
+Suggestions: Add tracking link to order status responses
+```
+
+---
+
+### /e2e-testing (Automation Entry Point)
 
 **Status**: REWRITE REQUIRED
 

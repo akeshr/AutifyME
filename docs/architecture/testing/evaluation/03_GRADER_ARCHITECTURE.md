@@ -1,27 +1,53 @@
-# Three-Grader Architecture
+# Grader Architecture
 
 **Part of**: [Universal Evaluation Framework](00_INDEX.md)
+
+**Version**: 4.1 - Model-First, Code for Verification
 
 ---
 
 ## Overview
 
-The grader architecture follows a clear hierarchy: **Code > Model > Human**. Use the simplest, most deterministic grader that can accurately evaluate the target behavior.
+The grader architecture follows **Model-First, Code for Verification**:
+
+- **Claude Code Skills** (`/evaluate`): Primary evaluation during development
+- **Model Graders** (Python API calls): Automated CI/CD pipelines
+- **Code Graders**: Structural verification only (schema, HITL, DB state)
+- **Human Graders**: Calibration and edge cases
 
 ```text
-                    PREFER
-                      |
-                      v
-+------------------+     +------------------+     +------------------+
-|   CODE-BASED     | --> |   MODEL-BASED    | --> |   HUMAN-BASED    |
-+------------------+     +------------------+     +------------------+
-| Fast, cheap      |     | Flexible         |     | Gold standard    |
-| Deterministic    |     | Handles nuance   |     | Calibrates LLM   |
-| Reproducible     |     | Scalable         |     | Expensive, slow  |
-+------------------+     +------------------+     +------------------+
-
-Use code when possible. Use model when nuance needed. Use human to calibrate.
+                    EVALUATION HIERARCHY
+                           |
+       +-------------------+-------------------+
+       |                                       |
+       v                                       v
++-------------------+                +-------------------+
+| CLAUDE CODE       |                | AUTOMATED         |
+| /evaluate skill   |                | PIPELINE          |
+| (development)     |                | (CI/CD)           |
++-------------------+                +-------------------+
+       |                                       |
+       |                   +-------------------+-------------------+
+       |                   |                                       |
+       v                   v                                       v
++-------------------+  +-------------------+  +-------------------+
+| MODEL GRADERS     |  | CODE GRADERS      |  | HUMAN GRADERS     |
+| (~70% of evals)   |  | (~30% of evals)   |  | (calibration)     |
++-------------------+  +-------------------+  +-------------------+
+| Intent, Routing   |  | Schema compliance |  | Gold standard     |
+| Synthesis, Tools  |  | HITL compliance   |  | Edge cases        |
+| Helpfulness       |  | DB state          |  | 5-10% sample      |
++-------------------+  +-------------------+  +-------------------+
 ```
+
+**Rationale for Model-First**:
+
+- PM behavior is ~70% semantic (intent, routing appropriateness, synthesis quality)
+- Modern LLMs achieve 85-95% agreement with human judges
+- Model graders provide nuanced 0.0-1.0 scores with reasoning
+- Code graders only for truly structural checks
+
+**Full specification**: See [10_SKILL_ARCHITECTURE.md](10_SKILL_ARCHITECTURE.md) for /evaluate skill
 
 ---
 

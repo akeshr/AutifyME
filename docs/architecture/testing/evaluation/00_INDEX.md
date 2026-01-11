@@ -2,7 +2,7 @@
 
 **Date**: 2026-01-11
 **Status**: Design
-**Version**: 4.0 - LLM as Judge & Eval Writer Skills
+**Version**: 4.1 - Claude Code as Judge
 
 ---
 
@@ -12,7 +12,7 @@ A **universal evaluation framework** for measuring and continuously improving AN
 
 ```text
 +===========================================================================+
-|                    COMPLETE ARCHITECTURE (v4.0)                           |
+|                    COMPLETE ARCHITECTURE (v4.1)                           |
 +===========================================================================+
 |                                                                           |
 |  LANGSMITH FOUNDATION (with local fallback)                               |
@@ -20,14 +20,15 @@ A **universal evaluation framework** for measuring and continuously improving AN
 |  - Datasets for scenario storage (versioned)                              |
 |  - Annotation queues with SLA management                                  |
 |                                                                           |
-|  THREE-GRADER ARCHITECTURE                                                |
-|  - Code graders (preferred): Fast, deterministic, reproducible            |
-|  - Model graders (nuance): Flexible, handles semantics                    |
-|  - Human graders (SLA-managed): Gold standard via LangSmith               |
+|  CLAUDE CODE AS JUDGE (Primary)                                           |
+|  - /evaluate skill: Claude Code IS the evaluator                          |
+|  - Rubric-based scoring with evidence                                     |
+|  - Nuanced 0.0-1.0 scores with reasoning                                  |
 |                                                                           |
-|  LLM AS JUDGE (Two Modes)                                                 |
-|  - Automated: Model graders in GradingOrchestrator (per-scenario)         |
-|  - Deep Analysis: Claude skills for investigation (cross-scenario)        |
+|  MODEL-FIRST GRADER ARCHITECTURE                                          |
+|  - Model graders (~70%): Intent, routing, synthesis, helpfulness          |
+|  - Code graders (~30%): Schema, HITL, DB state (structural only)          |
+|  - Human graders: Calibration, edge cases (5-10% sample)                  |
 |                                                                           |
 |  OUTPUT-ONLY GRADING (Default)                                            |
 |  - Grade final output, not path taken                                     |
@@ -35,7 +36,8 @@ A **universal evaluation framework** for measuring and continuously improving AN
 |  - PATH_STRICT only for safety-critical (HITL)                            |
 |                                                                           |
 |  SKILL ECOSYSTEM (Claude Code)                                            |
-|  - /e2e-testing: Orchestrate evaluation cycle                             |
+|  - /evaluate: PRIMARY - Claude Code as Judge (development)                |
+|  - /e2e-testing: Orchestrate automated evaluation (CI/CD)                 |
 |  - /workflow-evaluation: Deep failure investigation                       |
 |  - /agent-improvement: Fix implementation & validation                    |
 |  - /eval-writer: Scenario generation (6 modes, 7 quality gates)           |
@@ -59,11 +61,13 @@ A **universal evaluation framework** for measuring and continuously improving AN
 
 ## Core Philosophy
 
-From Anthropic's "Demystifying Evals for AI Agents":
+**Key Insight**: Claude Code IS the judge. No separate "Judge Agent" needed.
+
+From Anthropic's "Demystifying Evals for AI Agents" + our Model-First approach:
 
 - **Start from failures**: Real failures become test cases
 - **Grade outputs, not paths**: Agents find creative solutions
-- **Prefer deterministic graders**: Code > Model > Human
+- **Model-first, code for verification**: LLM intelligence primary (~70%), code for structural checks (~30%)
 - **Balanced problem sets**: Test both positive and negative cases
 - **Continuous measurement**: Capability evals graduate to regression suites
 
@@ -233,14 +237,24 @@ For non-deterministic outputs (response wording, creative content), semantic equ
 **Full specification**: [10_SKILL_ARCHITECTURE.md](10_SKILL_ARCHITECTURE.md)
 
 ```yaml
-# e2e-testing skill - entry point (REWRITE)
+# evaluate skill - PRIMARY (NEW)
+/evaluate:
+  purpose: Claude Code as Judge - development-time evaluation
+  modes:
+    - single: Evaluate one trace against rubric
+    - batch: Evaluate multiple traces
+    - comparative: A/B comparison
+  rubrics: intent, routing, synthesis, tool_usage, helpfulness
+  output: Score (0.0-1.0) + Reasoning + Evidence
+
+# e2e-testing skill - automation entry point (REWRITE)
 /e2e-testing:
-  - Orchestrate evaluation cycle
+  - Orchestrate automated evaluation cycle (CI/CD)
   - Load scenarios, execute, grade
   - On failures: invoke /workflow-evaluation
   - On gaps: invoke /eval-coverage
 
-# workflow-evaluation skill - LLM as Judge investigation (REWRITE)
+# workflow-evaluation skill - deep investigation (REWRITE)
 /workflow-evaluation:
   - Hierarchical trace loading (L0 -> L1 -> L2)
   - Token-budgeted investigation
@@ -284,10 +298,11 @@ For non-deterministic outputs (response wording, creative content), semantic equ
 
 ---
 
-## Key Principle
+## Key Principles
 
-**Start small**: 20-50 scenarios from real failures.
-**Grade outputs, not paths**: Let agents find creative solutions.
-**Prefer deterministic graders**: Code > Model > Human.
-**Let Claude investigate failures**: Deep analysis on what matters.
-**Continuous measurement** beats big-bang evaluation.
+- **Claude Code IS the judge**: Use /evaluate skill for development-time evaluation
+- **Model-first, code for verification**: LLM intelligence (~70%), structural checks (~30%)
+- **Start small**: 20-50 scenarios from real failures
+- **Grade outputs, not paths**: Let agents find creative solutions
+- **Continuous measurement** beats big-bang evaluation
+- **Let Claude investigate failures**: Deep analysis on what matters
