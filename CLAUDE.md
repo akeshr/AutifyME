@@ -55,11 +55,17 @@ Invoke project skills automatically at the start of relevant work - do not wait 
 
 | Skill | Trigger |
 |-------|---------|
-| `agent-improvement` | Diagnosing underperforming agents, adding examples, domain grounding |
+| `eval` | Evaluating traces, testing PM behavior, diagnosing issues, improving system quality |
 | `prompt-engineering` | Creating, refactoring, or reviewing PM/specialist prompts |
 | `specialist-creation` | Adding new specialists or modifying specialist architecture |
 | `tool-development` | Building new tools, refactoring existing tools, reviewing tool implementations |
-| `autonomous-testing` | Testing workflows, validating PM behavior, post-implementation verification |
+
+**Evaluation Framework (`/eval`):**
+- `/eval analyze <trace>` - Score and investigate existing traces
+- `/eval test <scenario>` - Run scenarios, validate behavior
+- `/eval improve <agent>` - Diagnose and fix agent issues
+- `/eval trends` - Analyze system-wide patterns from workflow_outcomes
+- Design doc: `docs/architecture/testing/evaluation/EVALUATION_FRAMEWORK.md`
 
 #### Documentation Strategy
 
@@ -112,7 +118,7 @@ Modern LLMs are highly capable: massive context windows (200K+ tokens), strong r
 - **Design for reasoning, not automation:** Agents should analyze situations and decide, not follow scripts
 
 **[CRITICAL] The Domain Grounding Reality:**
-LLMs are general-purpose - they DON'T know your tools, business rules, or domain expectations. Canonical examples (2-4 complex, pattern-illustrative, ABSTRACT with `[placeholders]`) bridge this gap. Use `agent-improvement` skill to diagnose and fix underperforming agents.
+LLMs are general-purpose - they DON'T know your tools, business rules, or domain expectations. Canonical examples (2-4 complex, pattern-illustrative, ABSTRACT with `[placeholders]`) bridge this gap. Use `/eval improve` to diagnose and fix underperforming agents.
 
 #### Core Engineering Standards
 

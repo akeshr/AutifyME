@@ -1,8 +1,23 @@
 # Universal Evaluation Framework for AutifyME
 
+> **SUPERSEDED**: This document series (00-10) has been superseded by the unified design.
+>
+> **New Source of Truth**: [`UNIFIED_EVAL_REDESIGN.md`](UNIFIED_EVAL_REDESIGN.md)
+>
+> **Key Changes:**
+> - 5 skills consolidated into single `/eval` skill with modes (analyze, test, improve, trends)
+> - On-demand pipeline (Claude Code + LangSmith only, no CI/CD)
+> - Evaluation framework IS the learning system
+> - Goal-oriented skill, not procedural
+> - Layered grading: code graders first, model graders for depth
+>
+> These docs remain for historical reference. For implementation, use the unified design.
+
+---
+
 **Date**: 2026-01-11
-**Status**: Design
-**Version**: 4.1 - Claude Code as Judge
+**Status**: SUPERSEDED - See UNIFIED_EVAL_REDESIGN.md
+**Version**: 4.1 - Claude Code as Judge (legacy)
 
 ---
 
