@@ -76,11 +76,274 @@ class GradingMode(Enum):
 
 ## Code-Based Graders
 
-**When to use**: Deterministic outcomes, schema validation, state verification
+**When to use**: Deterministic outcomes, protocol compliance, structural verification
+
+### PM-Specific Graders (Derived from PM Prompts/Protocols)
+
+These graders verify PM behavioral rules from `project_manager.prompt` and protocols.
 
 ```python
-class CodeGraders:
-    """Deterministic graders - fast, cheap, reproducible."""
+class PMCodeGraders:
+    """PM-specific deterministic graders based on protocol rules."""
+
+    # --- Protocol Loading (CRITICAL) ---
+    @staticmethod
+    def protocol_load_first(trace: TraceForEval) -> GradeResult:
+        """PM must load protocol BEFORE delegation on new workflows.
+
+        Source: project_manager.prompt lines 19-101
+        Rule: "Your FIRST tool call on any new workflow MUST be load_protocol."
+        """
+        if not trace.tool_calls:
+            return GradeResult(passed=True, score=1.0, evidence="No tool calls")
+
+        # Check if first substantive action was protocol load
+        first_tool = trace.tool_calls[0]["tool_name"]
+        is_protocol_first = first_tool == "load_protocol"
+
+        return GradeResult(
+            passed=is_protocol_first,
+            score=1.0 if is_protocol_first else 0.0,
+            evidence=f"First tool: {first_tool}"
+        )
+
+    # --- Media Acquisition (CRITICAL) ---
+    @staticmethod
+    def media_download_first(trace: TraceForEval) -> GradeResult:
+        """When media_id present, download BEFORE delegation.
+
+        Source: project_manager.prompt lines 125-151
+        Rule: "When user message contains [media_id: xxx], images are NOT in storage yet."
+        """
+        # Check if user message has media_id
+        has_media_id = "[media_id:" in trace.user_message or "[media attachments" in trace.user_message
+
+        if not has_media_id:
+            return GradeResult(passed=True, score=1.0, evidence="No media_id in message")
+
+        # Find download and delegation calls
+        download_idx = None
+        delegate_idx = None
+        for i, tc in enumerate(trace.tool_calls):
+            if "download" in tc["tool_name"] and "media" in tc["tool_name"]:
+                download_idx = i
+                break
+        for i, tc in enumerate(trace.tool_calls):
+            if tc["tool_name"] == "delegate_to_agent":
+                delegate_idx = i
+                break
+
+        if download_idx is None:
+            return GradeResult(passed=False, score=0.0, evidence="Media not downloaded")
+        if delegate_idx is None:
+            return GradeResult(passed=True, score=1.0, evidence="Downloaded, no delegation")
+
+        passed = download_idx < delegate_idx
+        return GradeResult(
+            passed=passed,
+            score=1.0 if passed else 0.0,
+            evidence=f"download at {download_idx}, delegate at {delegate_idx}"
+        )
+
+    # --- Visual Analysis Boundary ---
+    @staticmethod
+    def visual_boundary(trace: TraceForEval) -> GradeResult:
+        """PM must delegate to visual_analyst when image present.
+
+        Source: project_manager.prompt lines 110-123
+        Rule: "YOU NEVER ANALYZE IMAGE CONTENT. That's visual_analyst's exclusive domain."
+        """
+        if not trace.has_image:
+            return GradeResult(passed=True, score=1.0, evidence="No image in workflow")
+
+        has_visual_analyst = "visual_analyst" in trace.delegation_order
+        return GradeResult(
+            passed=has_visual_analyst,
+            score=1.0 if has_visual_analyst else 0.0,
+            evidence=f"Delegation order: {trace.delegation_order}"
+        )
+
+    # --- File Reading Before Synthesis ---
+    @staticmethod
+    def file_read_before_synthesis(trace: TraceForEval) -> GradeResult:
+        """PM must read analysis files before synthesis/presentation.
+
+        Source: synthesis.protocol lines 10-20
+        Rule: "Summaries are lies. Files are truth. Before you synthesize, you MUST read."
+        """
+        # Check if read_file was called for analysis files
+        read_calls = [tc for tc in trace.tool_calls if tc["tool_name"] == "read_file"]
+        analysis_reads = [
+            rc for rc in read_calls
+            if any(pattern in str(rc.get("args", {}))
+                   for pattern in ["visual_analysis", "product_research", "catalog_analysis"])
+        ]
+
+        # Check if we had delegations that would produce analysis files
+        has_analysts = any(
+            agent in trace.delegation_order
+            for agent in ["visual_analyst", "product_analyst", "catalog_analyst"]
+        )
+
+        if not has_analysts:
+            return GradeResult(passed=True, score=1.0, evidence="No analysts delegated")
+
+        has_reads = len(analysis_reads) > 0
+        return GradeResult(
+            passed=has_reads,
+            score=1.0 if has_reads else 0.0,
+            evidence=f"Analysis file reads: {len(analysis_reads)}"
+        )
+
+    # --- Two-Phase Commit ---
+    @staticmethod
+    def analyst_before_specialist(trace: TraceForEval) -> GradeResult:
+        """Analysts must run before specialists (analysis -> execution).
+
+        Source: project_manager.prompt lines 320-341 (Flow Doctrine)
+        Rule: "Phase 1: INTELLIGENCE (analysts), Gate: USER APPROVAL, Phase 2: EXECUTION (specialists)"
+        """
+        analysts = ["visual_analyst", "product_analyst", "catalog_analyst"]
+        specialists = ["creative_specialist", "catalog_specialist"]
+
+        last_analyst_idx = -1
+        first_specialist_idx = len(trace.delegation_order)
+
+        for i, agent in enumerate(trace.delegation_order):
+            if agent in analysts:
+                last_analyst_idx = max(last_analyst_idx, i)
+            if agent in specialists and first_specialist_idx == len(trace.delegation_order):
+                first_specialist_idx = i
+
+        # If no specialists or no analysts, pass
+        if first_specialist_idx == len(trace.delegation_order) or last_analyst_idx == -1:
+            return GradeResult(passed=True, score=1.0, evidence="Single phase workflow")
+
+        passed = last_analyst_idx < first_specialist_idx
+        return GradeResult(
+            passed=passed,
+            score=1.0 if passed else 0.0,
+            evidence=f"Last analyst at {last_analyst_idx}, first specialist at {first_specialist_idx}"
+        )
+
+    # --- Dependency Order ---
+    @staticmethod
+    def visual_before_others(trace: TraceForEval) -> GradeResult:
+        """Visual analyst should run before product/catalog when image present.
+
+        Source: discovery_mindset.protocol lines 70-87
+        Rule: "When image is involved, visual_analyst is ALMOST ALWAYS Wave 1."
+        """
+        if not trace.has_image:
+            return GradeResult(passed=True, score=1.0, evidence="No image")
+
+        if "visual_analyst" not in trace.delegation_order:
+            return GradeResult(passed=False, score=0.0, evidence="Visual analyst not called for image workflow")
+
+        visual_idx = trace.delegation_order.index("visual_analyst")
+
+        # Check if product/catalog analysts ran before visual
+        violations = []
+        for other in ["product_analyst", "catalog_analyst"]:
+            if other in trace.delegation_order:
+                other_idx = trace.delegation_order.index(other)
+                if other_idx < visual_idx:
+                    violations.append(f"{other} at {other_idx}")
+
+        passed = len(violations) == 0
+        return GradeResult(
+            passed=passed,
+            score=1.0 if passed else 0.5,
+            evidence=f"Visual at {visual_idx}, violations: {violations}" if violations else f"Visual first at {visual_idx}"
+        )
+
+    # --- HITL Signal Handling ---
+    @staticmethod
+    def hitl_signal_handling(trace: TraceForEval) -> GradeResult:
+        """PM must load hitl protocol when subagent returns HITL markers.
+
+        Source: hitl.protocol - PM handles HITL signals FROM subagents
+        Rule: When agent response contains HITL markers, PM loads hitl protocol.
+
+        Note: HITL happens at subagent level. PM interprets the signals.
+        """
+        # Check if any delegation returned with HITL markers
+        # (This would be in the delegation results/agent responses)
+        # For now, check if hitl protocol was loaded when there were interrupts
+
+        if not trace.interrupts:
+            return GradeResult(passed=True, score=1.0, evidence="No HITL events")
+
+        hitl_loaded = trace.protocols_loaded.get("PM", "").find("hitl") >= 0
+        return GradeResult(
+            passed=hitl_loaded,
+            score=1.0 if hitl_loaded else 0.5,
+            evidence=f"HITL events: {len(trace.interrupts)}, hitl protocol loaded: {hitl_loaded}"
+        )
+
+    # --- File Path Propagation ---
+    @staticmethod
+    def file_propagation(trace: TraceForEval) -> GradeResult:
+        """Downstream agents must receive upstream analysis files.
+
+        Source: project_manager.prompt lines 495-522 (Context Bridge)
+        Rule: "Include source image AND all relevant upstream files"
+        """
+        # Check handoff_issues from trace_loader
+        issues = [hi for hi in trace.handoff_issues if hi.issues]
+
+        if not trace.delegations:
+            return GradeResult(passed=True, score=1.0, evidence="No delegations")
+
+        issue_count = len(issues)
+        delegation_count = len(trace.delegations)
+
+        score = 1.0 - (issue_count / delegation_count) if delegation_count > 0 else 1.0
+        return GradeResult(
+            passed=issue_count == 0,
+            score=max(0.0, score),
+            evidence=f"Handoff issues: {issue_count}/{delegation_count} delegations"
+        )
+
+    # --- Error Free ---
+    @staticmethod
+    def error_free(trace: TraceForEval) -> GradeResult:
+        """Trace completes without errors."""
+        has_error = trace.status == "error" or trace.error is not None
+        high_severity_issues = [i for i in trace.detected_issues if i.severity == "HIGH"]
+
+        if has_error:
+            return GradeResult(passed=False, score=0.0, evidence=trace.error or "Status: error")
+        if high_severity_issues:
+            return GradeResult(passed=False, score=0.3, evidence=f"High severity issues: {len(high_severity_issues)}")
+
+        return GradeResult(passed=True, score=1.0, evidence="No errors")
+
+    # --- Tool Success Rate ---
+    @staticmethod
+    def tool_success_rate(trace: TraceForEval) -> GradeResult:
+        """Tools execute successfully."""
+        if not trace.tool_calls:
+            return GradeResult(passed=True, score=1.0, evidence="No tool calls")
+
+        success_count = sum(1 for tc in trace.tool_calls if tc.get("status") == "success")
+        total = len(trace.tool_calls)
+        rate = success_count / total
+
+        return GradeResult(
+            passed=rate >= 0.9,
+            score=rate,
+            evidence=f"{success_count}/{total} tools succeeded"
+        )
+```
+
+### Generic Graders (Scenario-Specific)
+
+These are used when scenarios specify expected values:
+
+```python
+class GenericCodeGraders:
+    """Generic graders - parameterized by scenario."""
 
     # --- State Verification ---
     @staticmethod
@@ -117,93 +380,38 @@ class CodeGraders:
                 evidence=str(e.errors())
             )
 
-    # --- Tool Call Verification ---
+    # --- Required Tools ---
     @staticmethod
     def required_tools_called(
         trace: TraceForEval,
         required: list[str]
     ) -> GradeResult:
         """Check that required tools were called."""
-        called = {tc.tool_name for tc in trace.tool_calls}
+        called = {tc["tool_name"] for tc in trace.tool_calls}
         missing = set(required) - called
         return GradeResult(
             passed=len(missing) == 0,
-            score=len(called & set(required)) / len(required),
+            score=len(called & set(required)) / len(required) if required else 1.0,
             evidence=f"Missing: {missing}" if missing else "All required tools called"
         )
 
-    # --- Tool Sequence Verification ---
+    # --- Expected Routing ---
     @staticmethod
-    def tool_sequence(
+    def expected_routing(
         trace: TraceForEval,
-        expected_sequence: list[str]
+        expected_agents: list[str]
     ) -> GradeResult:
-        """Verify tools called in correct order."""
-        actual = [tc.tool_name for tc in trace.tool_calls]
-        # Check subsequence (allows other tools between)
-        seq_idx = 0
-        for tool in actual:
-            if seq_idx < len(expected_sequence) and tool == expected_sequence[seq_idx]:
-                seq_idx += 1
-        return GradeResult(
-            passed=seq_idx == len(expected_sequence),
-            score=seq_idx / len(expected_sequence),
-            evidence=f"Expected: {expected_sequence}, Actual: {actual}"
-        )
+        """Verify PM routed to expected agents."""
+        routed = set(trace.delegation_order)
+        expected = set(expected_agents)
+        missing = expected - routed
+        extra = routed - expected  # Not penalized, just noted
 
-    # --- Constraint Verification ---
-    @staticmethod
-    def business_rules(
-        output: dict,
-        rules: list[Callable[[dict], bool]]
-    ) -> GradeResult:
-        """Validate against business rules."""
-        violations = []
-        for rule in rules:
-            try:
-                if not rule(output):
-                    violations.append(rule.__name__)
-            except Exception as e:
-                violations.append(f"{rule.__name__}: {e}")
+        score = len(expected & routed) / len(expected) if expected else 1.0
         return GradeResult(
-            passed=len(violations) == 0,
-            score=1 - (len(violations) / len(rules)),
-            evidence=f"Violations: {violations}" if violations else "All rules passed"
-        )
-
-    # --- HITL Gate Verification ---
-    @staticmethod
-    def hitl_compliance(
-        trace: TraceForEval,
-        write_tools: list[str] = ["write_data"]
-    ) -> GradeResult:
-        """Verify HITL approval before writes."""
-        for tool_call in trace.tool_calls:
-            if tool_call.tool_name in write_tools:
-                # Check for interrupt before this tool
-                if not any(
-                    i.timestamp < tool_call.timestamp
-                    for i in trace.interrupts
-                ):
-                    return GradeResult(
-                        passed=False,
-                        score=0.0,
-                        evidence=f"Write tool {tool_call.tool_name} called without HITL approval"
-                    )
-        return GradeResult(passed=True, score=1.0)
-
-    # --- Routing Verification ---
-    @staticmethod
-    def correct_routing(
-        trace: TraceForEval,
-        expected_agent: str
-    ) -> GradeResult:
-        """Verify PM routed to correct specialist/analyst."""
-        routed_to = [d.target for d in trace.delegations]
-        return GradeResult(
-            passed=expected_agent in routed_to,
-            score=1.0 if expected_agent in routed_to else 0.0,
-            evidence=f"Expected: {expected_agent}, Routed to: {routed_to}"
+            passed=len(missing) == 0,
+            score=score,
+            evidence=f"Missing: {missing}, Extra: {extra}" if missing else f"All expected agents called"
         )
 ```
 
