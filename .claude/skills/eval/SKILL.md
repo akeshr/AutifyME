@@ -1,261 +1,203 @@
-# /eval - Unified Evaluation Skill
+---
+name: eval
+description: Unified Evaluation Skill (project)
+---
 
-## Purpose
+# /eval Skill
 
-Make AutifyME system better: higher autonomy, fewer HITL corrections, faster completion, no regressions.
-
-This is the single entry point for all evaluation activities. Claude Code reasons about approach; this skill provides tools and knowledge.
+Make AutifyME better: higher autonomy, fewer corrections, no regressions.
 
 ---
 
-## Modes
+## Mode Selection
 
-| Mode | Purpose | When Used |
-|------|---------|-----------|
-| `analyze` | Score, investigate, compare existing traces | Have trace_id, want to understand quality |
-| `test` | Execute scenarios, generate new traces | Want to validate behavior with controlled input |
-| `improve` | Diagnose and fix agent issues | Found problem, need to fix it |
-| `trends` | Analyze workflow_outcomes for patterns | Want system-wide insights |
-| (implicit) | Claude infers from context | User describes need, Claude determines mode |
-
----
-
-## Invocation
-
-```bash
-# Explicit modes
-/eval analyze <trace_id>              # Score and investigate trace
-/eval test <scenario>                 # Run scenario, evaluate result
-/eval improve <agent>                 # Diagnose and fix agent
-/eval trends                          # Analyze system-wide patterns
-
-# Sub-modes
-/eval analyze <trace_id> --quick      # Fast sanity check (code graders only)
-/eval analyze <trace_id> --thorough   # Full grader suite
-/eval analyze <trace_id> --compare <other_trace>  # A/B comparison
-/eval test <scenario> --save-baseline # Run and save as baseline
-/eval test --batch <scenario_list>    # Run multiple scenarios
-
-# Implicit (Claude infers)
-/eval trace123                        # Analyze mode
-/eval "test PM with sneaker image"    # Test mode
-/eval "PM is routing incorrectly"     # Investigate then improve
-```
+| Input Pattern | Mode | Action |
+|---------------|------|--------|
+| `/eval <trace_id>` | analyze | Score trace with graders |
+| `/eval analyze <trace_id>` | analyze | Score trace with graders |
+| `/eval test <scenario_id>` | test | Execute scenario, grade result |
+| `/eval improve <agent>` | improve | Diagnose and fix agent |
+| `/eval trends` | trends | Query workflow_outcomes patterns |
+| `/eval "<description>"` | (infer) | Determine from context |
 
 ---
 
-## Tools Available
+## Analyze Mode
 
-### trace_loader
-Load traces from LangSmith at different detail levels:
-- `load_overview(trace_id)` - Level 0: Metadata only (~500 tokens)
-- `load_for_eval(trace_id)` - Level 1: Evaluation-ready (~2000 tokens)
-- `load_full(trace_id)` - Level 2: Complete trace (~10000 tokens)
-- `load_node(run_id)` - Single node with INPUT/REASONING/OUTPUT
-- `load_handoff(parent_id, child_id)` - Context handoff analysis
+Score and investigate an existing trace.
 
-### graders
-Run evaluation checks:
-- Code graders: Fast, deterministic, catch rule violations
-- Model graders: Semantic evaluation, quality assessment
-
-### scenario_runner
-Execute scenarios against PM:
-- `run_scenario(scenario)` - Execute single scenario
-- `run_conversation(messages, media)` - Multi-turn interaction
-- `replay_production(trace_id)` - Replay production scenario
-
-### eval_storage
-Store and retrieve evaluation results:
-- `store_result(result)` - Store evaluation in LangSmith
-- `get_history(scenario_id)` - Historical results
-- `get_baseline(scenario_id)` - Known-good baseline
-- `set_baseline(result_id)` - Promote to baseline
-- `detect_regression(current, baseline)` - Compare against baseline
-
-### pattern_library
-Manage failure patterns:
-- `match(symptoms)` - Find matching known pattern
-- `store(pattern)` - Add new pattern
-- `list()` - All known patterns
-
----
-
-## Knowledge
-
-### Architecture
+### Workflow
 
 ```
-PM (Project Manager - Orchestrator)
-  |
-  +-- Analysts (Read-Only Research Layer)
-  |     +-- visual_analyst    - Image/visual analysis
-  |     +-- product_analyst   - External market research
-  |     +-- catalog_analyst   - Internal catalog lookup
-  |
-  +-- Specialists (Execution Layer with HITL)
-        +-- creative_specialist - Asset generation
-        +-- catalog_specialist  - Data persistence
+1. Load trace data
+   result = load_trace_for_eval(trace_id)
+
+2. Run code graders
+   grades = run_code_graders(trace_id)
+
+3. Branch on result
+   IF grades.verdict == "PASS":
+       Report summary and exit
+   ELSE:
+       Investigate failures
 ```
 
-### What Good Looks Like
+### Investigation (when graders fail)
 
-**PM:**
-- Protocol loaded FIRST (before any delegation)
-- Media downloaded FIRST (before delegation when image present)
-- Correct wave execution (analysts parallel, then specialists)
-- Two-phase: analysts before specialists
-- Files read before synthesis
-- Open-ended questions (not numbered options)
-- Good context handoff to delegated agents
+```python
+# For failed graders, drill into specifics:
+from tests.tools.evaluation.helpers import show_node, show_handoff
 
-**Analysts:**
-- Protocol loaded first
-- Complete observations
-- Accurate findings (no hallucination)
-- Findings written to FILE (not just returned)
-- Correct file format
+# Examine specific nodes
+show_node(run_id)  # Full INPUT/REASONING/OUTPUT
 
-**Specialists:**
-- Protocol loaded first
-- Read upstream analyst findings
-- Verified before acting
-- HITL triggered before persisting
-- HITL decision respected (approval/rejection/edit)
-- Domain-accurate output
+# Examine context handoffs
+show_handoff(parent_id, child_id)  # What was passed vs received
 
-### Common Failure Patterns
-
-| Pattern | Symptoms | Fix |
-|---------|----------|-----|
-| PROTOCOL_NOT_LOADED | Inconsistent behavior, missing domain reasoning | Add protocol loading to prompt |
-| CONTEXT_LOSS | Child missing info parent had | Fix PM delegation context |
-| HITL_SKIPPED | Data persisted without approval | Add HITL gate to specialist |
-| WRONG_ROUTING | Task to wrong agent | Fix PM routing logic |
-| PREMATURE_TERMINATION | Research tools unused | Fix analyst thoroughness |
-| COGNITIVE_OVERLOAD | "Dream vs nightmare" behavior | Protocol-based decomposition |
-
-### Metrics That Matter
-
-| Metric | Target | Source |
-|--------|--------|--------|
-| Autonomy Score | 8.5/10 | workflow_outcomes |
-| HITL Correction Rate | < 10% | Approval edits |
-| Workflow Completion | > 90% | Trace terminal state |
-| Time to Completion | < 2 min | Trace timing |
-
----
-
-## Evaluation Approach
-
-### Pillars (Universal)
-
-Every agent evaluated on same 5 pillars:
-1. **UNDERSTAND** - Did agent understand its input?
-2. **REASON** - Did agent reason correctly?
-3. **ACT** - Did agent take right actions?
-4. **COMMUNICATE** - Did agent communicate properly?
-5. **RECOVER** - Did agent handle errors?
-
-### Grading Strategy (Layered)
-
-```
-1. Run code graders (fast, free)
-   |
-   +-- All pass? Quick check done
-   |
-   +-- Failures? Already know what's structurally wrong
-         |
-         +-- Run model graders for severity/quality assessment
-         |
-         +-- Investigate root cause
+# Check delegation flow
+show_orchestrator_flow(trace_id)  # PM's decision sequence
 ```
 
-### Agent-Specific Checks
+### Output Template
 
-Same pillars, different checks per agent type:
-
-**ACT pillar example:**
-- PM: Routed correctly? Correct waves?
-- Analyst: Observed thoroughly? Wrote to file?
-- Specialist: Verified first? Triggered HITL?
-
----
-
-## Workflow
-
-Claude reasons dynamically (NOT rigid phases):
-
-1. **What mode?** Explicit or infer from input
-2. **What tools?** Select based on mode and need
-3. **What first?** Code graders for quick structural check
-4. **What did I find?** Pass -> report, Fail -> investigate
-5. **Known pattern?** Match -> suggest fix, New -> deeper analysis
-6. **Can I fix?** Suggest fix, implement with approval, validate
-7. **Store learning?** New pattern -> add to pattern library
-
-**Freedom to deviate:** If analysis reveals need to test, shift. If test reveals need to improve, shift. Modes prime but don't constrain.
-
----
-
-## Output Format
-
-### Analyze Mode Output
-
-```
+```markdown
 ## Trace Analysis: <trace_id>
 
-**Verdict:** PASS | NEEDS_IMPROVEMENT | FAILED
+**Verdict:** PASS | PARTIAL | FAIL
+**Score:** X.XX (N/M graders passed)
 
 ### Grader Results
-| Grader | Result | Evidence |
-|--------|--------|----------|
-| protocol_load_first | PASS | First call was load_protocol |
-| ... | ... | ... |
+| Grader | Result | Severity | Evidence |
+|--------|--------|----------|----------|
 
 ### Issues Found
-1. [Issue description with evidence]
+1. [Issue with evidence from show_node/show_handoff]
 
 ### Recommendations
-1. [Specific actionable recommendation]
+1. [Actionable fix - which file, what change]
+```
+
+---
+
+## Test Mode
+
+Execute scenario and grade the result.
+
+### Workflow
+
+```python
+1. Load scenario definition
+   from tests.scenarios import load_scenario
+   scenario = load_scenario(scenario_id)  # e.g., "PM-01"
+
+2. Execute against PM
+   from tests.tools.pm_interaction import chat_with_pm
+   result = chat_with_pm(
+       scenario.input.message,
+       media_paths=scenario.resolve_media_paths(test_assets_dir)
+   )
+
+3. Grade result
+   from tests.tools.graders import run_code_graders
+   grades = run_code_graders(result.trace_id)
+
+4. Compare to baseline (if exists)
+   IF scenario.baseline_trace_id:
+       compare_traces(scenario.baseline_trace_id, result.trace_id)
+
+5. Report pass/fail
+```
+
+### Available Scenarios
+
+```python
+from tests.scenarios import list_scenarios
+list_scenarios()  # Returns: ['PM-01', 'PM-02', 'PM-03', 'PM-04']
+```
+
+### Output Template
+
+```markdown
+## Test Result: <scenario_id>
+
+**Verdict:** PASS | FAIL
+**Trace ID:** <new_trace_id>
+**Scenario:** <scenario.name>
+
+### Grader Results
+[table from grades.format_summary()]
+
+### Baseline Comparison
+[if baseline exists - from compare_traces()]
 
 ### Next Steps
-- [What user should do next]
+- [If PASS: consider setting as new baseline]
+- [If FAIL: investigate with /eval analyze <trace_id>]
 ```
 
-### Test Mode Output
+---
+
+## Improve Mode
+
+Diagnose root cause and propose fix.
+
+### Workflow
 
 ```
-## Test Result: <scenario>
+1. Identify failing behavior
+   - From analyze mode results
+   - From user description
 
-**Trace ID:** <new_trace_id>
-**Verdict:** PASS | FAIL
+2. Diagnose root cause
+   - Match to known pattern (protocol_not_loaded, context_loss, etc.)
+   - Examine agent prompt in prompts/<agent>/
+   - Check tool implementations
 
-### Comparison to Baseline
-| Metric | Baseline | Current | Delta |
-|--------|----------|---------|-------|
-| ... | ... | ... | ... |
+3. Propose fix
+   - Show diff of proposed changes
+   - Explain why this fixes the issue
 
-### Regressions Detected
-- [Any regressions]
+4. Await approval
+   - DO NOT implement without explicit approval
 
-### Recommendations
-- [What to do if failed]
+5. Implement and validate
+   - Make changes
+   - Re-run test scenario
+   - Verify fix worked
 ```
 
-### Improve Mode Output
+### Pattern Matching
 
-```
+| Symptom | Pattern | Fix Location |
+|---------|---------|--------------|
+| First call not load_protocol | PROTOCOL_NOT_LOADED | Agent prompt instructions section |
+| Child missing parent's context | CONTEXT_LOSS | PM delegation description |
+| No HITL before persist | HITL_SKIPPED | Specialist interrupt gate |
+| Wrong agent selected | WRONG_ROUTING | PM routing logic |
+| Incomplete research | PREMATURE_TERMINATION | Analyst thoroughness instructions |
+
+### Output Template
+
+```markdown
 ## Improvement: <agent>
 
 ### Diagnosis
-[Root cause analysis]
+**Pattern:** <matched_pattern>
+**Root Cause:** [Explanation]
+**Evidence:** [From trace analysis]
 
 ### Proposed Fix
-[Specific changes to make]
+**File:** <path>
+**Change:**
+\`\`\`diff
+- old line
++ new line
+\`\`\`
 
 ### Validation Plan
-[How to verify fix works]
+1. Run `/eval test <scenario>`
+2. Verify grader `<grader_name>` passes
+3. Check no regressions in other scenarios
 
 ---
 Awaiting approval to implement fix.
@@ -263,9 +205,88 @@ Awaiting approval to implement fix.
 
 ---
 
-## Related Resources
+## Trends Mode
 
-- Design doc: `docs/architecture/testing/evaluation/UNIFIED_EVAL_REDESIGN.md`
-- Trace tools: `tests/tools/trace_analysis.py`, `tests/tools/trace_loader.py`
-- Graders: `tests/tools/graders/` (to be implemented)
-- Models: `tests/tools/models.py`
+Query workflow_outcomes for system-wide patterns.
+
+### Workflow
+
+```sql
+-- Via Supabase MCP or direct query
+SELECT outcome, count(*)
+FROM workflow_outcomes
+WHERE created_at > now() - interval '7 days'
+GROUP BY outcome
+ORDER BY count(*) DESC;
+
+-- Failure analysis
+SELECT trace_id, failure_reason, created_at
+FROM workflow_outcomes
+WHERE outcome = 'failed'
+ORDER BY created_at DESC
+LIMIT 10;
+```
+
+### Output Template
+
+```markdown
+## System Trends (Last 7 Days)
+
+### Outcome Distribution
+| Outcome | Count | Percentage |
+|---------|-------|------------|
+
+### Top Failure Patterns
+1. [Pattern]: N occurrences
+2. ...
+
+### Recommendations
+- [Prioritized improvements based on data]
+```
+
+---
+
+## Tool Reference
+
+### Trace Loading
+
+```python
+from tests.tools.trace_loader import load_trace_for_eval, TraceForEval
+result: TraceForEval = load_trace_for_eval(trace_id)
+# result.tool_call_sequence, result.delegation_graph, result.detected_issues
+```
+
+### Grading
+
+```python
+from tests.tools.graders import run_code_graders, GraderSuiteResult
+grades: GraderSuiteResult = run_code_graders(trace_id)
+# grades.verdict, grades.overall_score, grades.format_summary()
+```
+
+### Scenarios
+
+```python
+from tests.scenarios import load_scenario, list_scenarios
+scenario = load_scenario("PM-01")
+# scenario.input.message, scenario.expected, scenario.success_criteria
+```
+
+### REPL Helpers
+
+```python
+from tests.tools.evaluation.helpers import (
+    show_tree,           # Hierarchical trace view
+    show_node,           # Single node detail
+    show_handoff,        # Context handoff analysis
+    show_orchestrator_flow,  # PM decision sequence
+    detect_issues,       # Auto-detect problems
+    compare_traces,      # Before/after comparison
+)
+```
+
+---
+
+## Design Reference
+
+Full architecture: `docs/architecture/testing/evaluation/EVALUATION_FRAMEWORK.md`

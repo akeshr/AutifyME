@@ -1,0 +1,77 @@
+# PM-01: Single Product Catalog Workflow
+# Core scenario testing basic image cataloging flow
+id: PM-01
+name: Single Product Catalog
+description: |
+  Basic image cataloging workflow. PM receives single product image,
+  delegates to analysts for research, then specialists for execution,
+  with HITL approval gate before persistence.
+
+  Tests:
+  - Protocol loading
+  - Media download before delegation
+  - Two-phase delegation (analysts -> specialists)
+  - HITL gate triggering
+category: pm
+version: "1.0"
+
+input:
+  message: "Catalog these sneakers for $79.99"
+  media_paths:
+    - "[test_assets]/sneaker_single.jpg"
+  context:
+    product_type: "footwear"
+    price_hint: 79.99
+
+expected:
+  delegation_order:
+    - visual_analyst
+    - product_analyst
+    - catalog_analyst
+    - creative_specialist
+    - catalog_specialist
+
+  waves:
+    1:
+      - visual_analyst
+    2:
+      - product_analyst
+      - catalog_analyst
+    3:
+      - creative_specialist
+      - catalog_specialist
+
+  protocol_loads:
+    PM: hitl
+    visual_analyst: visual_analysis
+    catalog_specialist: catalog_writing
+
+  hitl_expected: true
+
+  tool_sequence_contains:
+    - download_whatsapp_media
+    - load_protocol
+    - task
+
+  final_response_contains:
+    - approve
+    - review
+
+success_criteria:
+  graders_must_pass:
+    - protocol_load_first
+    - media_download_first
+    - analyst_before_specialist
+    - wave_execution_correct
+
+  min_overall_score: 0.85
+  max_latency_ms: 120000
+  max_cost: 0.50
+
+tags:
+  - core
+  - image
+  - single-product
+  - hitl
+
+baseline_trace_id: null
