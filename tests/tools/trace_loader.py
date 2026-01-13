@@ -596,14 +596,15 @@ def load_traces_for_comparison(
     }
 
     # Verdict
+    latency_pct: float = float(comparison["latency_pct_change"])
     if trace_a.status != "success" and trace_b.status == "success":
         comparison["verdict"] = "FIX_SUCCESSFUL"
     elif trace_a.status == "success" and trace_b.status != "success":
         comparison["verdict"] = "REGRESSION"
-    elif comparison["latency_pct_change"] < -10:
-        comparison["verdict"] = f"IMPROVED ({-comparison['latency_pct_change']:.0f}% faster)"
-    elif comparison["latency_pct_change"] > 10:
-        comparison["verdict"] = f"DEGRADED ({comparison['latency_pct_change']:.0f}% slower)"
+    elif latency_pct < -10:
+        comparison["verdict"] = f"IMPROVED ({-latency_pct:.0f}% faster)"
+    elif latency_pct > 10:
+        comparison["verdict"] = f"DEGRADED ({latency_pct:.0f}% slower)"
     else:
         comparison["verdict"] = "NO_SIGNIFICANT_CHANGE"
 

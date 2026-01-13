@@ -35,6 +35,8 @@ from .models import (
     ScenarioHistory,
     ScenarioRunSummary,
     SequencedToolCall,
+    ThreadTrace,
+    ThreadTraces,
     ToolCall,
     ToolCallSequence,
     TraceBaseline,
@@ -1852,7 +1854,7 @@ def get_scenario_history(
     # Find most common failure
     most_common_failure = None
     if failure_counts:
-        most_common_failure = max(failure_counts, key=failure_counts.get)  # type: ignore
+        most_common_failure = max(failure_counts, key=lambda k: failure_counts[k])
 
     # Determine trend (compare recent 5 vs previous 5)
     recent_trend = None
@@ -2195,16 +2197,16 @@ def get_thread_traces(
             .execute()
         )
 
-        outcomes = response.data if response.data else []
+        outcomes: list[dict[str, Any]] = response.data if response.data else []
     except Exception:
-        outcomes = []
+        outcomes: list[dict[str, Any]] = []
 
     traces = []
     total_duration = 0
 
     for i, outcome in enumerate(outcomes, start=1):
-        trace_id = outcome.get("trace_id")
-        duration_ms = int((outcome.get("duration_seconds") or 0) * 1000)
+        trace_id = str(outcome.get("trace_id", ""))
+        duration_ms = int(float(outcome.get("duration_seconds") or 0) * 1000)
         total_duration += duration_ms
 
         # Optionally enrich with final message (slow - makes API call per trace)
@@ -2221,11 +2223,11 @@ def get_thread_traces(
 
         traces.append(
             ThreadTrace(
-                trace_id=trace_id or "",
+                trace_id=trace_id,
                 turn=i,
-                timestamp=outcome.get("created_at"),
+                timestamp=str(outcome.get("created_at") or ""),
                 duration_ms=duration_ms,
-                user_message=outcome.get("message_text"),
+                user_message=str(outcome.get("message_text") or ""),
                 agent_message_preview=agent_preview,
                 agent_that_responded=agent_name,
             )
