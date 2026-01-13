@@ -15,7 +15,7 @@ Usage:
                 print(f"FAILED: {r.name} - {r.reason}")
 """
 
-from .base import GraderResult, GraderSuiteResult, GraderCategory
+from .base import GraderCategory, GraderResult, GraderSuiteResult
 from .orchestrator import run_code_graders, run_pm_graders, run_specialist_graders
 
 __all__ = [

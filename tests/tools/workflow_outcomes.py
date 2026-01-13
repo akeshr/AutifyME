@@ -112,7 +112,6 @@ class ProductionScenario:
 
     # Input
     message: str
-    media_assets: list[MediaAsset] = field(default_factory=list)
 
     # Expected (from actual production outcome)
     expected_intent: str
@@ -121,12 +120,12 @@ class ProductionScenario:
 
     # Source
     source_tracking_id: str
-    source_trace_id: str | None
     source_thread_id: str
 
-    # Ground truth
+    # Fields with defaults must come last
+    source_trace_id: str | None = None
+    media_assets: list[MediaAsset] = field(default_factory=list)
     actual_result: dict[str, Any] | None = None
-
     tags: list[str] = field(default_factory=list)
 
 

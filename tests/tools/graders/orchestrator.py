@@ -9,7 +9,7 @@ Usage:
     print(result.format_summary())
 """
 
-from typing import Callable
+from collections.abc import Callable
 
 from ..trace_analysis import get_delegation_graph, get_tool_call_sequence
 from .base import GraderCategory, GraderResult, GraderSuiteResult
@@ -21,10 +21,7 @@ from .pm_graders import (
     wave_execution_correct,
 )
 from .specialist_graders import (
-    analyst_file_written,
     hitl_triggered,
-    output_file_written,
-    specialist_protocol_loaded,
 )
 
 # Type alias for grader functions

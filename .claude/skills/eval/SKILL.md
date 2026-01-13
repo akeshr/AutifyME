@@ -213,19 +213,15 @@ Query workflow_outcomes for system-wide patterns.
 ### Workflow
 
 ```python
-from tests.tools.workflow_outcomes import (
-    get_outcome_stats,
-    get_recent_outcomes,
-    get_cataloging_outcomes,
-)
+from tests.tools.workflow_outcomes import get_outcomes, get_outcome_stats
 
 # Get aggregate stats
 stats = get_outcome_stats(days=7)
 print(f"Success rate: {stats['success_rate']:.1%}")
-print(f"Top intent: {stats['top_intent']}")
+print(f"Top intent: {max(stats['intent_distribution'], key=stats['intent_distribution'].get)}")
 
 # Get recent failures for investigation
-failures = get_recent_outcomes(days=7, success=False, limit=10)
+failures = get_outcomes(days=7, success=False, limit=10)
 for f in failures:
     print(f"{f.error_type}: {f.message_text[:50]}...")
 ```
@@ -256,27 +252,20 @@ Replay production workflows for regression testing.
 ### Workflow
 
 ```python
-from tests.tools.workflow_outcomes import (
-    get_outcomes,
-    create_scenario_from_outcome,
-    get_media_for_outcome,
-)
+from tests.tools.replay_runner import replay_outcome, replay_batch, format_batch_summary
 
-# Get production outcomes with any filter
-outcomes = get_outcomes(days=7, with_media=True, success=True, limit=10)
+# Replay single outcome
+from tests.tools.workflow_outcomes import get_outcomes
+outcomes = get_outcomes(days=7, with_media=True, success=True, limit=1)
+result = replay_outcome(outcomes[0])
+print(f"Verdict: {result.grader_verdict}, Regression: {result.is_regression}")
 
-# Create scenario from production data
-outcome = outcomes[0]
-scenario = create_scenario_from_outcome(
-    outcome,
-    download_media_to="tests/test_assets/production"
-)
+# Replay batch with filters
+results = replay_batch(days=7, success=True, with_media=True, limit=5)
+print(format_batch_summary(results))
 
-# scenario.message = real user message
-# scenario.media_assets = list of MediaAsset with local_path set
-# scenario.expected_success = actual outcome (ground truth)
-
-# Execute with chat_with_pm and compare
+# Stop on first regression
+results = replay_batch(days=7, limit=10, stop_on_regression=True)
 ```
 
 ---
@@ -318,6 +307,39 @@ from tests.tools.workflow_outcomes import (
     create_scenario_from_outcome,  # Convert to replay scenario
     get_outcome_stats,         # Aggregate statistics
     list_distinct_values,      # List unique intents/departments/etc
+)
+```
+
+### Baseline Management
+
+```python
+from tests.tools.eval_results import (
+    store_baseline,          # Store grader results on trace (LangSmith feedback)
+    get_baseline,            # Get baseline from trace's feedback
+    compare_to_baseline,     # Compare trace against baseline
+    format_baseline_comparison,  # Format comparison for display
+)
+
+# Store baseline (then update scenario YAML's baseline_trace_id)
+store_baseline("PM-01", trace_id, score=0.85, grader_results={"protocol": True})
+
+# Compare new trace to baseline (pass baseline_trace_id from scenario)
+from tests.scenarios import load_scenario
+scenario = load_scenario("PM-01")
+comparison = compare_to_baseline(
+    "PM-01", new_trace_id, 0.80, {"protocol": True},
+    baseline_trace_id=scenario.baseline_trace_id
+)
+```
+
+### Replay Runner
+
+```python
+from tests.tools.replay_runner import (
+    replay_outcome,      # Replay single production outcome
+    replay_batch,        # Replay batch of outcomes
+    format_batch_summary,  # Format batch results
+    ReplayResult,        # Result dataclass
 )
 ```
 

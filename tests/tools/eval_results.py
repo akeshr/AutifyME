@@ -17,6 +17,7 @@ Usage:
     store_eval_result(result)
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
@@ -312,8 +313,303 @@ def get_aggregate_stats(days: int = 7) -> dict[str, Any]:
         "max_score": max(scores),
         "pass_rate": pass_rate,
         "verdict_distribution": verdict_counts,
-        "unique_traces": len(set(r.trace_id for r in results)),
+        "unique_traces": len({r.trace_id for r in results}),
     }
+
+
+# =============================================================================
+# Baseline Management
+# =============================================================================
+
+
+@dataclass
+class BaselineComparison:
+    """Result of comparing trace against baseline."""
+
+    trace_id: str
+    baseline_trace_id: str
+    scenario_id: str
+
+    # Overall verdict
+    regression: bool
+    improvement: bool
+    verdict: str  # REGRESSION | IMPROVEMENT | NO_CHANGE
+
+    # Score comparison
+    current_score: float
+    baseline_score: float
+    score_delta: float
+
+    # Grader comparison
+    graders_regressed: list[str]
+    graders_improved: list[str]
+    graders_unchanged: list[str]
+
+    # Performance
+    latency_delta_ms: int
+    cost_delta: float
+
+    details: dict[str, Any] = field(default_factory=dict)
+
+
+def store_baseline(
+    scenario_id: str,
+    trace_id: str,
+    score: float,
+    grader_results: dict[str, bool] | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> bool:
+    """Store a trace as the baseline for a scenario.
+
+    Stores grader results as LangSmith feedback on the trace.
+    You must also update the scenario YAML's baseline_trace_id field.
+
+    Args:
+        scenario_id: Scenario ID (e.g., "PM-01")
+        trace_id: LangSmith trace ID to use as baseline
+        score: Overall score for this baseline
+        grader_results: Dict of grader_name -> passed (optional)
+        metadata: Additional metadata (optional)
+
+    Returns:
+        True if stored successfully
+
+    Example:
+        >>> store_baseline("PM-01", "f264838e-...", 0.85)
+        True
+        >>> # Then update PM-01.yaml: baseline_trace_id: "f264838e-..."
+    """
+    try:
+        client = _get_client()
+
+        # Get root run for trace
+        runs = list(client.list_runs(trace_id=trace_id, limit=1))
+        if not runs:
+            print(f"Warning: No runs found for trace {trace_id}")
+            return False
+
+        run_id = str(runs[0].id)
+
+        # Build baseline data
+        baseline_data = {
+            "scenario_id": scenario_id,
+            "trace_id": trace_id,
+            "score": score,
+            "grader_results": grader_results or {},
+            "metadata": metadata or {},
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        # Store as LangSmith feedback on the trace
+        client.create_feedback(
+            run_id=run_id,
+            key=f"baseline_{scenario_id}",
+            score=score,
+            value=json.dumps(baseline_data),
+            comment=f"Baseline for scenario {scenario_id}",
+        )
+
+        print(f"Stored baseline for {scenario_id}: trace={trace_id[:12]}..., score={score:.2f}")
+        print(f"  -> Update scenario YAML: baseline_trace_id: \"{trace_id}\"")
+        return True
+
+    except Exception as e:
+        print(f"Failed to store baseline: {e}")
+        return False
+
+
+def get_baseline(scenario_id: str, baseline_trace_id: str | None = None) -> dict[str, Any] | None:
+    """Get baseline data for a scenario from LangSmith.
+
+    Fetches feedback from the baseline trace directly (no iteration).
+
+    Args:
+        scenario_id: Scenario ID (e.g., "PM-01")
+        baseline_trace_id: Trace ID from scenario's baseline_trace_id field.
+                          If None, loads from scenario definition.
+
+    Returns:
+        Baseline data dict or None if no baseline exists
+
+    Example:
+        >>> from tests.scenarios import load_scenario
+        >>> scenario = load_scenario("PM-01")
+        >>> baseline = get_baseline("PM-01", scenario.baseline_trace_id)
+    """
+    # Get baseline trace_id from scenario if not provided
+    if baseline_trace_id is None:
+        try:
+            from tests.scenarios import load_scenario
+            scenario = load_scenario(scenario_id)
+            baseline_trace_id = scenario.baseline_trace_id
+        except Exception:
+            return None
+
+    if not baseline_trace_id:
+        return None
+
+    try:
+        client = _get_client()
+
+        # Direct lookup - get the baseline trace's feedback
+        runs = list(client.list_runs(trace_id=baseline_trace_id, limit=1))
+        if not runs:
+            return None
+
+        feedbacks = list(client.list_feedback(run_ids=[str(runs[0].id)]))
+        # LangSmith normalizes keys to lowercase
+        expected_key = f"baseline_{scenario_id}".lower()
+        for fb in feedbacks:
+            if fb.key == expected_key and fb.value:
+                # Handle both dict and JSON string
+                if isinstance(fb.value, dict):
+                    return fb.value
+                return json.loads(fb.value)
+
+        return None
+
+    except Exception as e:
+        print(f"Failed to get baseline: {e}")
+        return None
+
+
+def compare_to_baseline(
+    scenario_id: str,
+    trace_id: str,
+    current_score: float,
+    current_grader_results: dict[str, bool],
+    baseline_trace_id: str | None = None,
+    latency_ms: int = 0,
+    cost: float = 0.0,
+) -> BaselineComparison | None:
+    """Compare a trace against the scenario baseline.
+
+    Args:
+        scenario_id: Scenario ID (e.g., "PM-01")
+        trace_id: New trace to compare
+        current_score: Current trace's overall score
+        current_grader_results: Dict of grader_name -> passed
+        baseline_trace_id: Baseline trace ID (loads from scenario if None)
+        latency_ms: Current trace latency (optional)
+        cost: Current trace cost (optional)
+
+    Returns:
+        BaselineComparison or None if no baseline exists
+
+    Example:
+        >>> comparison = compare_to_baseline("PM-01", "abc123...", 0.80, {"protocol": True})
+        >>> if comparison:
+        ...     print(f"Regression: {comparison.regression}")
+    """
+    baseline = get_baseline(scenario_id, baseline_trace_id)
+    if not baseline:
+        print(f"No baseline found for scenario {scenario_id}")
+        return None
+
+    baseline_score = baseline.get("score", 0.0)
+    baseline_graders = baseline.get("grader_results", {})
+    baseline_metadata = baseline.get("metadata", {})
+
+    # Calculate score delta
+    score_delta = current_score - baseline_score
+
+    # Compare graders
+    graders_regressed = []
+    graders_improved = []
+    graders_unchanged = []
+
+    all_graders = set(current_grader_results.keys()) | set(baseline_graders.keys())
+    for grader in all_graders:
+        current_passed = current_grader_results.get(grader, False)
+        baseline_passed = baseline_graders.get(grader, False)
+
+        if baseline_passed and not current_passed:
+            graders_regressed.append(grader)
+        elif not baseline_passed and current_passed:
+            graders_improved.append(grader)
+        else:
+            graders_unchanged.append(grader)
+
+    # Determine verdict
+    regression = len(graders_regressed) > 0 or score_delta < -0.05
+    improvement = len(graders_improved) > 0 and len(graders_regressed) == 0 and score_delta > 0.05
+
+    if regression:
+        verdict = "REGRESSION"
+    elif improvement:
+        verdict = "IMPROVEMENT"
+    else:
+        verdict = "NO_CHANGE"
+
+    # Calculate performance deltas
+    baseline_latency = baseline_metadata.get("latency_ms", 0)
+    baseline_cost = baseline_metadata.get("cost", 0.0)
+
+    return BaselineComparison(
+        trace_id=trace_id,
+        baseline_trace_id=baseline.get("trace_id", ""),
+        scenario_id=scenario_id,
+        regression=regression,
+        improvement=improvement,
+        verdict=verdict,
+        current_score=current_score,
+        baseline_score=baseline_score,
+        score_delta=score_delta,
+        graders_regressed=graders_regressed,
+        graders_improved=graders_improved,
+        graders_unchanged=graders_unchanged,
+        latency_delta_ms=latency_ms - baseline_latency,
+        cost_delta=cost - baseline_cost,
+        details={
+            "baseline_timestamp": baseline.get("timestamp"),
+            "baseline_metadata": baseline_metadata,
+        },
+    )
+
+
+def format_baseline_comparison(comparison: BaselineComparison) -> str:
+    """Format baseline comparison for display.
+
+    Args:
+        comparison: BaselineComparison result
+
+    Returns:
+        Formatted string for display
+    """
+    lines = [
+        f"\n{'='*60}",
+        f"BASELINE COMPARISON: {comparison.scenario_id}",
+        f"{'='*60}",
+        f"Verdict: {comparison.verdict}",
+        "",
+        "Scores:",
+        f"  Current:  {comparison.current_score:.2f}",
+        f"  Baseline: {comparison.baseline_score:.2f}",
+        f"  Delta:    {comparison.score_delta:+.2f}",
+    ]
+
+    if comparison.graders_regressed:
+        lines.append("")
+        lines.append("REGRESSIONS:")
+        for g in comparison.graders_regressed:
+            lines.append(f"  [!] {g}")
+
+    if comparison.graders_improved:
+        lines.append("")
+        lines.append("IMPROVEMENTS:")
+        for g in comparison.graders_improved:
+            lines.append(f"  [+] {g}")
+
+    if comparison.latency_delta_ms != 0:
+        lines.append("")
+        lines.append(f"Latency delta: {comparison.latency_delta_ms:+d}ms")
+
+    if comparison.cost_delta != 0:
+        lines.append(f"Cost delta: ${comparison.cost_delta:+.4f}")
+
+    lines.append(f"{'='*60}")
+
+    return "\n".join(lines)
 
 
 # CLI entry point

@@ -53,7 +53,7 @@ def load_scenario(scenario_id: str) -> ScenarioDefinition:
     if not yaml_path.exists():
         raise FileNotFoundError(f"Scenario not found: {yaml_path}")
 
-    with open(yaml_path, encoding="utf-8") as f:
+    with yaml_path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     return ScenarioDefinition(**data)

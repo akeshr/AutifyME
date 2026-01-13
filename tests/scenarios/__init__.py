@@ -14,7 +14,7 @@ Usage:
         print(scenario_id)
 """
 
-from .loader import list_scenarios, load_scenario
+from .loader import get_core_scenarios, get_scenarios_by_tag, list_scenarios, load_scenario
 from .schema import (
     ExpectedBehavior,
     ScenarioCategory,
@@ -31,4 +31,6 @@ __all__ = [
     "ScenarioCategory",
     "load_scenario",
     "list_scenarios",
+    "get_scenarios_by_tag",
+    "get_core_scenarios",
 ]
