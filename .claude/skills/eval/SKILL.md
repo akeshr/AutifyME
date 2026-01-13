@@ -1,6 +1,6 @@
 ---
 name: eval
-description: Unified Evaluation Skill (project)
+description: Analyze traces, run scenarios, diagnose issues, improve agents
 ---
 
 # /eval Skill
@@ -18,6 +18,7 @@ Make AutifyME better: higher autonomy, fewer corrections, no regressions.
 | `/eval test <scenario_id>` | test | Execute scenario, grade result |
 | `/eval improve <agent>` | improve | Diagnose and fix agent |
 | `/eval trends` | trends | Query workflow_outcomes patterns |
+| `/eval replay` | replay | Replay production workflows |
 | `/eval "<description>"` | (infer) | Determine from context |
 
 ---
@@ -211,20 +212,22 @@ Query workflow_outcomes for system-wide patterns.
 
 ### Workflow
 
-```sql
--- Via Supabase MCP or direct query
-SELECT outcome, count(*)
-FROM workflow_outcomes
-WHERE created_at > now() - interval '7 days'
-GROUP BY outcome
-ORDER BY count(*) DESC;
+```python
+from tests.tools.workflow_outcomes import (
+    get_outcome_stats,
+    get_recent_outcomes,
+    get_cataloging_outcomes,
+)
 
--- Failure analysis
-SELECT trace_id, failure_reason, created_at
-FROM workflow_outcomes
-WHERE outcome = 'failed'
-ORDER BY created_at DESC
-LIMIT 10;
+# Get aggregate stats
+stats = get_outcome_stats(days=7)
+print(f"Success rate: {stats['success_rate']:.1%}")
+print(f"Top intent: {stats['top_intent']}")
+
+# Get recent failures for investigation
+failures = get_recent_outcomes(days=7, success=False, limit=10)
+for f in failures:
+    print(f"{f.error_type}: {f.message_text[:50]}...")
 ```
 
 ### Output Template
@@ -242,6 +245,38 @@ LIMIT 10;
 
 ### Recommendations
 - [Prioritized improvements based on data]
+```
+
+---
+
+## Replay Mode
+
+Replay production workflows for regression testing.
+
+### Workflow
+
+```python
+from tests.tools.workflow_outcomes import (
+    get_outcomes,
+    create_scenario_from_outcome,
+    get_media_for_outcome,
+)
+
+# Get production outcomes with any filter
+outcomes = get_outcomes(days=7, with_media=True, success=True, limit=10)
+
+# Create scenario from production data
+outcome = outcomes[0]
+scenario = create_scenario_from_outcome(
+    outcome,
+    download_media_to="tests/test_assets/production"
+)
+
+# scenario.message = real user message
+# scenario.media_assets = list of MediaAsset with local_path set
+# scenario.expected_success = actual outcome (ground truth)
+
+# Execute with chat_with_pm and compare
 ```
 
 ---
@@ -270,6 +305,20 @@ grades: GraderSuiteResult = run_code_graders(trace_id)
 from tests.scenarios import load_scenario, list_scenarios
 scenario = load_scenario("PM-01")
 # scenario.input.message, scenario.expected, scenario.success_criteria
+```
+
+### Production Data (workflow_outcomes)
+
+```python
+from tests.tools.workflow_outcomes import (
+    get_outcomes,              # Query with any filter combination
+    get_outcome_by_trace,      # Get outcome for specific trace
+    get_outcome_by_thread,     # Get all outcomes for a thread
+    get_media_for_outcome,     # Get media from Supabase storage
+    create_scenario_from_outcome,  # Convert to replay scenario
+    get_outcome_stats,         # Aggregate statistics
+    list_distinct_values,      # List unique intents/departments/etc
+)
 ```
 
 ### REPL Helpers
