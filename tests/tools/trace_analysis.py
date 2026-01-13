@@ -2162,8 +2162,6 @@ def get_thread_traces(
         >>> for t in thread.traces:
         ...     print(f"  -> {t.agent_that_responded}: {t.agent_message_preview}")
     """
-    from tests.tools.models import ThreadTrace, ThreadTraces
-
     # Use supabase-py client directly with env vars
     try:
         import os
