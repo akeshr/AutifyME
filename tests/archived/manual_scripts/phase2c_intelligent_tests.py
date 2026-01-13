@@ -25,6 +25,7 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from tests.tools.intelligent_execution import intelligent_execute_scenario
+
 from tests.tools.trace_analysis import get_llm_trace_tree, get_trace_overview
 
 # =============================================================================

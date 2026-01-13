@@ -24,8 +24,14 @@ from langsmith import Client
 # Import shared parsing utilities
 from ..parsing import (
     extract_content_from_parts as _extract_content_from_parts,
+)
+from ..parsing import (
     extract_pm_output as _extract_pm_output,
+)
+from ..parsing import (
     extract_user_input as _extract_user_input,
+)
+from ..parsing import (
     parse_lc_messages,
     parse_lc_output,
 )
@@ -861,10 +867,10 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
             try:
                 child_input = ast.literal_eval(child_input)
             except (ValueError, SyntaxError):
-                try:
+                import contextlib
+
+                with contextlib.suppress(json.JSONDecodeError, TypeError):
                     child_input = json.loads(child_input)
-                except (json.JSONDecodeError, TypeError):
-                    pass
 
         if isinstance(child_input, dict):
             passed_context["subagent_type"] = child_input.get("subagent_type", "unknown")

@@ -1188,7 +1188,7 @@ class FakeStorage(StorageInterface):
             return value
 
         try:
-            for i, op in enumerate(operations):
+            for _i, op in enumerate(operations):
                 action = op.get("action")
                 table = op.get("table")
                 returns = op.get("returns")

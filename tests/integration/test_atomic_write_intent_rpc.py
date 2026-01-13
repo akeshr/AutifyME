@@ -29,12 +29,11 @@ env_path = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(env_path)
 
 # Now import rest
-import uuid
-from typing import Any
+import uuid  # noqa: E402
 
-import pytest
+import pytest  # noqa: E402
 
-from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient
+from autifyme_agents.integrations.storage.supabase_client import SupabaseStorageClient  # noqa: E402
 
 
 # Default values for required NOT NULL fields in product_families
@@ -106,9 +105,7 @@ def _is_real_credential(url: str, key: str | None) -> bool:
         if pattern in url_lower or pattern in key_lower:
             return False
     # Detect env var placeholders
-    if url.startswith("$") or (key and key.startswith("$")):
-        return False
-    return True
+    return not (url.startswith("$") or (key and key.startswith("$")))
 
 _has_valid_credentials = _is_real_credential(_supabase_url, _supabase_key)
 pytestmark = pytest.mark.skipif(
@@ -138,15 +135,15 @@ def unique_prefix():
 
 async def cleanup_test_data(storage: SupabaseStorageClient, table: str, prefix: str):
     """Clean up test data after tests."""
-    try:
+    import contextlib
+
+    with contextlib.suppress(Exception):
         # Delete test records by name prefix
         await storage.delete_entities(
             table=table,
             filters={"name": {"in": []}},  # Will be overwritten
             soft_delete=False
         )
-    except Exception:
-        pass  # Ignore cleanup errors
 
 
 # =============================================================================

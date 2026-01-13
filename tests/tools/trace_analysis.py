@@ -18,7 +18,6 @@ from .models import (
     AgentDelegation,
     AgentFinalMessage,
     DelegationGraph,
-    EvaluationCriterion,
     EvaluationResult,
     FileIOTrace,
     FileOperation,
@@ -1158,13 +1157,12 @@ def get_tool_call_sequence(trace_id: str) -> ToolCallSequence:
 
         # Extract tool arguments (raw)
         tool_args = {}
-        if run.inputs:
-            if isinstance(run.inputs, dict):
-                input_val = run.inputs.get("input", run.inputs)
-                if isinstance(input_val, str):
-                    tool_args = {"input": input_val}
-                elif isinstance(input_val, dict):
-                    tool_args = input_val
+        if run.inputs and isinstance(run.inputs, dict):
+            input_val = run.inputs.get("input", run.inputs)
+            if isinstance(input_val, str):
+                tool_args = {"input": input_val}
+            elif isinstance(input_val, dict):
+                tool_args = input_val
 
         # Parse arguments properly (eliminates need for regex in evaluation)
         parsed_args = {}
@@ -1607,12 +1605,13 @@ def get_agent_final_message(
             or extra.get("model_name")
         )
     # Also check run.name for model info
-    if not model_name and last_run.name:
-        # Run names often contain model: "ChatOpenAI", "ChatAnthropic", etc.
-        if "gpt" in last_run.name.lower():
-            model_name = last_run.name
-        elif "claude" in last_run.name.lower():
-            model_name = last_run.name
+    # Run names often contain model: "ChatOpenAI", "ChatAnthropic", etc.
+    if (
+        not model_name
+        and last_run.name
+        and ("gpt" in last_run.name.lower() or "claude" in last_run.name.lower())
+    ):
+        model_name = last_run.name
 
     # Extract token count from usage metadata
     token_count = None
