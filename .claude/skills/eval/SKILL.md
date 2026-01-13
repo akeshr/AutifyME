@@ -13,8 +13,10 @@ Make AutifyME better: higher autonomy, fewer corrections, no regressions.
 
 | Input Pattern | Mode | Action |
 |---------------|------|--------|
-| `/eval <trace_id>` | analyze | Score trace with graders |
-| `/eval analyze <trace_id>` | analyze | Score trace with graders |
+| `/eval <trace_id>` | analyze | Score trace with code graders |
+| `/eval analyze <trace_id>` | analyze | Score trace with code graders |
+| `/eval analyze <trace_id> --thorough` | analyze | Code graders + model criteria + outcome |
+| `/eval analyze <trace_id> --thread` | analyze | Multi-turn thread analysis |
 | `/eval test <scenario_id>` | test | Execute scenario, grade result |
 | `/eval improve <agent>` | improve | Diagnose and fix agent |
 | `/eval trends` | trends | Query workflow_outcomes patterns |
@@ -37,11 +39,31 @@ Score and investigate an existing trace.
    grades = run_code_graders(trace_id)
 
 3. Branch on result
-   IF grades.verdict == "PASS":
+   IF grades.verdict == "PASS" AND --quick:
        Report summary and exit
+   ELSE IF grades.verdict == "PASS" AND --thorough:
+       Continue to model criteria evaluation
    ELSE:
        Investigate failures
+
+4. Evaluate model criteria (--thorough or failures)
+   - Pull data specified in each rubric
+   - Evaluate against rubrics in EVALUATION_FRAMEWORK.md
+   - Include workflow_outcome_achieved for outcome quality
+
+5. Report efficiency metrics (always)
+   - Latency (total time)
+   - Cost (token estimate)
+   - Token breakdown per agent
 ```
+
+### Sub-modes
+
+| Flag | Behavior |
+|------|----------|
+| `--quick` | Code graders only |
+| `--thorough` | Code graders + model criteria + outcome evaluation |
+| `--thread` | Multi-turn: get all traces in thread, grade each, evaluate cross-trace concerns |
 
 ### Investigation (when graders fail)
 
@@ -59,17 +81,49 @@ show_handoff(parent_id, child_id)  # What was passed vs received
 show_orchestrator_flow(trace_id)  # PM's decision sequence
 ```
 
+### Model Criteria Evaluation
+
+When doing thorough analysis, evaluate these rubrics (see EVALUATION_FRAMEWORK.md for details):
+
+**PM:**
+- `pm_routing_appropriate` - Did PM route to correct specialists?
+- `pm_synthesis_quality` - Did PM synthesize outputs well?
+- `pm_context_handoff` - Did PM pass sufficient context?
+
+**Analyst:**
+- `analyst_observation_complete` - All aspects observed?
+- `analyst_finding_accuracy` - Findings match input?
+- `analyst_no_hallucination` - No fabricated details?
+
+**Specialist:**
+- `specialist_domain_accuracy` - Output correct for domain?
+
+**Outcome (always in thorough):**
+- `workflow_outcome_achieved` - Did workflow satisfy user's goal?
+
 ### Output Template
 
 ```markdown
 ## Trace Analysis: <trace_id>
 
 **Verdict:** PASS | PARTIAL | FAIL
-**Score:** X.XX (N/M graders passed)
+**Score:** X.XX (N/M code graders passed)
 
-### Grader Results
+### Efficiency Metrics
+- **Latency:** X.Xs
+- **Cost:** ~$X.XX (estimated)
+- **Tokens:** X,XXX total (PM: X, analysts: X, specialists: X)
+
+### Code Grader Results
 | Grader | Result | Severity | Evidence |
 |--------|--------|----------|----------|
+
+### Model Criteria (if --thorough)
+| Criterion | Pass/Fail | Notes |
+|-----------|-----------|-------|
+
+### Outcome Assessment
+[workflow_outcome_achieved evaluation]
 
 ### Issues Found
 1. [Issue with evidence from show_node/show_handoff]
@@ -149,22 +203,29 @@ Diagnose root cause and propose fix.
    - From analyze mode results
    - From user description
 
-2. Diagnose root cause
-   - Match to known pattern (protocol_not_loaded, context_loss, etc.)
-   - Examine agent prompt in prompts/<agent>/
-   - Check tool implementations
+2. Query known patterns first
+   - get_pattern_fixes() to retrieve historical fixes
+   - Match current symptoms to known patterns
 
-3. Propose fix
+3. Diagnose root cause
+   - If pattern matched: use known fix as starting point
+   - If new: examine agent prompt, check tool implementations
+
+4. Propose fix
    - Show diff of proposed changes
    - Explain why this fixes the issue
 
-4. Await approval
+5. Await approval
    - DO NOT implement without explicit approval
 
-5. Implement and validate
+6. Implement and validate
    - Make changes
    - Re-run test scenario
    - Verify fix worked
+
+7. Store pattern (if fix successful)
+   - store_pattern_fix() with symptoms, fix location, description
+   - Builds pattern library for future fixes
 ```
 
 ### Pattern Matching
@@ -270,6 +331,59 @@ results = replay_batch(days=7, limit=10, stop_on_regression=True)
 
 ---
 
+## Multi-Turn Analysis
+
+Evaluate conversation threads spanning multiple traces.
+
+### Workflow
+
+```
+1. Get starting trace
+   outcome = get_outcome_by_trace(trace_id)
+
+2. Get all traces in thread
+   thread_outcomes = get_outcome_by_thread(outcome.thread_id)
+
+3. Grade each trace individually
+   for outcome in thread_outcomes:
+       grades = run_code_graders(outcome.trace_id)
+
+4. Evaluate cross-trace concerns (Claude reasoning)
+   - Context continuity: Did PM remember prior conversation?
+   - HITL handling: Did PM respect approval/rejection/edit?
+   - State progression: Did workflow advance correctly?
+   - Error recovery: Did PM handle mid-conversation failures?
+```
+
+### Invocation
+
+```bash
+/eval analyze <trace_id> --thread
+```
+
+### Output Template
+
+```markdown
+## Multi-Turn Analysis: Thread <thread_id>
+
+**Traces in thread:** N
+**Overall verdict:** PASS | FAIL
+
+### Per-Trace Results
+| Trace | Verdict | Score | Key Issues |
+|-------|---------|-------|------------|
+
+### Cross-Trace Evaluation
+- **Context continuity:** [assessment]
+- **HITL handling:** [assessment]
+- **State progression:** [assessment]
+
+### Conversation Flow
+[Summary of how conversation progressed across turns]
+```
+
+---
+
 ## Tool Reference
 
 ### Trace Loading
@@ -330,6 +444,31 @@ comparison = compare_to_baseline(
     "PM-01", new_trace_id, 0.80, {"protocol": True},
     baseline_trace_id=scenario.baseline_trace_id
 )
+```
+
+### Pattern Storage (LangSmith Feedback)
+
+```python
+from tests.tools.eval_results import (
+    store_pattern_fix,       # Store fix pattern after successful improvement
+    get_pattern_fixes,       # Query historical fix patterns
+)
+
+# Store pattern after successful fix
+store_pattern_fix(
+    trace_id=trace_id,
+    pattern_name="PROTOCOL_NOT_LOADED",
+    symptoms=["first call not load_protocol", "inconsistent behavior"],
+    agent="catalog_specialist",
+    fix_location="prompts/specialists/catalog_specialist.prompt",
+    fix_description="Added protocol load instruction to Process section",
+    success=True
+)
+
+# Query patterns for matching
+fixes = get_pattern_fixes(pattern_name="PROTOCOL_NOT_LOADED")  # By name
+fixes = get_pattern_fixes(agent="catalog_specialist")  # By agent
+fixes = get_pattern_fixes()  # All patterns
 ```
 
 ### Replay Runner

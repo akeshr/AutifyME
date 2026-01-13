@@ -38,18 +38,20 @@ Claude Code (Intelligence)
           |     +-- test     - Generate new traces via scenarios
           |     +-- improve  - Fix agents based on findings
           |     +-- trends   - Analyze system-wide patterns
+          |     +-- replay   - Replay production workflows
           |
           +-- TOOLS
-          |     +-- trace_loader    - Load traces at any detail level
-          |     +-- graders         - Run code and model graders
-          |     +-- scenario_runner - Execute scenarios against PM
-          |     +-- eval_storage    - Store/retrieve results
-          |     +-- pattern_library - Match/store failure patterns
+          |     +-- trace_loader      - Load traces at any detail level
+          |     +-- graders           - Run code graders (model = Claude reasoning)
+          |     +-- scenario_runner   - Execute scenarios against PM
+          |     +-- eval_storage      - Store/retrieve results & patterns
+          |     +-- workflow_outcomes - Query production data
+          |     +-- replay_runner     - Orchestrate production replays
           |
           +-- KNOWLEDGE
-                +-- Agent behaviors - What good looks like per agent type
-                +-- Evaluation rubric - How to score
-                +-- Failure patterns - Common issues and fixes
+                +-- Agent behaviors   - What good looks like per agent type
+                +-- Model rubrics     - How Claude evaluates quality
+                +-- Failure patterns  - Common issues and fixes (LangSmith feedback)
 ```
 
 ---
@@ -328,13 +330,17 @@ Claude uses these rubrics when evaluating model criteria. For each, pull the spe
 /eval test <scenario>                 # Run scenario, evaluate result
 /eval improve <agent>                 # Diagnose and fix agent
 /eval trends                          # Analyze system-wide patterns
+/eval replay                          # Replay production workflows
 
 # Sub-modes
 /eval analyze <trace_id> --quick      # Code graders only
-/eval analyze <trace_id> --thorough   # Full grader suite
+/eval analyze <trace_id> --thorough   # Code + model criteria
+/eval analyze <trace_id> --thread     # Multi-turn thread analysis
 /eval analyze <trace_id> --compare <other>  # A/B comparison
 /eval test <scenario> --save-baseline # Save as baseline
 /eval test --batch <list>             # Run multiple scenarios
+/eval replay --days 7 --success       # Replay recent successes
+/eval replay --intent "catalog"       # Replay specific intent
 
 # Implicit (Claude infers mode)
 /eval trace123                        # Analyze mode
@@ -413,6 +419,11 @@ Results stored in LangSmith
 **Multi-turn workflow:**
 ```
 /eval analyze <trace_id> --thread
+```
+
+**Production regression check:**
+```
+/eval replay --days 7 --success --limit 10
 ```
 
 ### Multi-Turn Evaluation
@@ -543,28 +554,32 @@ class TraceLoader:
 
 ```
 graders/
-  base.py           # GraderResult, BaseGrader
-  code_graders.py   # Deterministic checks
-  model_graders.py  # LLM-as-judge evaluations
-  orchestrator.py   # GradingOrchestrator
+  base.py              # GraderResult, GraderSuiteResult
+  pm_graders.py        # PM-specific code graders
+  specialist_graders.py # Specialist/Analyst code graders
+  orchestrator.py      # run_code_graders(), run_pm_graders()
 ```
 
-**Code Graders:**
-- `protocol_load_first`
-- `media_download_first`
-- `analyst_before_specialist`
-- `wave_execution`
-- `hitl_triggered`
-- `hitl_respected`
-- `schema_compliance`
-- `error_free`
+**Code Graders (Implemented):**
+- `protocol_load_first` - Agent loaded protocol first
+- `media_download_first` - PM downloaded media before delegation
+- `analyst_before_specialist` - Two-phase delegation pattern
+- `wave_execution_correct` - Wave structure (needs taxonomy refactor)
+- `file_read_before_synthesis` - PM read outputs before synthesizing
+- `hitl_triggered` - Specialist requested approval before persist
 
-**Model Graders:**
-- `intent_classification`
-- `context_utilization`
-- `hallucination_check`
-- `synthesis_quality`
-- `helpfulness`
+**Code Graders (Planned):**
+- `specialist_read_upstream` - Specialist read analyst findings
+- `specialist_verified_before_act` - Verification before write
+- `specialist_hitl_respected` - Honored HITL decision
+- `error_recovery_attempted` - Recovery after tool error
+
+**Model Graders (Claude Reasoning - No Code):**
+- See "Model Grader Rubrics" section above
+- PM: `pm_routing_appropriate`, `pm_synthesis_quality`, `pm_context_handoff`
+- Analyst: `analyst_observation_complete`, `analyst_finding_accuracy`, `analyst_no_hallucination`
+- Specialist: `specialist_domain_accuracy`
+- Workflow: `workflow_outcome_achieved`
 
 ### EvalStorage
 
@@ -628,20 +643,20 @@ def get_pattern_fixes(
 
 ### Phase 1: Data Models
 
-| Task | Description |
-|------|-------------|
-| 1.1 | Define `EvalResult` schema |
-| 1.2 | Define `GraderResult` schema |
-| 1.3 | Define `TraceForEval` schema |
-| 1.4 | Define `Pattern` schema |
+| Task | Status | Description |
+|------|--------|-------------|
+| 1.1 | Done | Define `EvalResult` schema |
+| 1.2 | Done | Define `GraderResult` schema |
+| 1.3 | Done | Define `TraceForEval` schema |
+| 1.4 | Done | Define `Pattern` schema (using LangSmith feedback) |
 
 ### Phase 2: Trace Loader
 
-| Task | Description |
-|------|-------------|
-| 2.1 | Implement `TraceLoader` class |
-| 2.2 | Implement load methods |
-| 2.3 | Implement handoff analysis |
+| Task | Status | Description |
+|------|--------|-------------|
+| 2.1 | Done | Implement `TraceLoader` / `load_trace_for_eval()` |
+| 2.2 | Done | Implement hierarchical load methods (L0/L1/L2) |
+| 2.3 | Done | Implement handoff analysis helpers |
 
 ### Phase 3: Graders
 
@@ -661,40 +676,53 @@ def get_pattern_fixes(
 
 ### Phase 4: Storage & Patterns
 
-| Task | Description |
-|------|-------------|
-| 4.1 | Implement `EvalStorage` |
-| 4.2 | Implement `PatternLibrary` |
-| 4.3 | Seed common patterns |
+| Task | Status | Description |
+|------|--------|-------------|
+| 4.1 | Done | Implement `EvalStorage` (eval_results.py) |
+| 4.2 | Pending | Add `store_pattern_fix()` to eval_results.py |
+| 4.3 | Pending | Add `get_pattern_fixes()` to eval_results.py |
+| 4.4 | Pending | Seed common patterns after first few fixes |
 
 ### Phase 5: Validation
 
-| Task | Description |
-|------|-------------|
-| 5.1 | Test all modes on real traces |
-| 5.2 | Establish baselines |
-| 5.3 | Document initial patterns |
+| Task | Status | Description |
+|------|--------|-------------|
+| 5.1 | Pending | Test all modes on real traces |
+| 5.2 | Pending | Establish baselines for PM-01 to PM-04 |
+| 5.3 | Pending | Document initial patterns from first fixes |
 
 ---
 
 ## Directory Structure
 
 ```
-tests/tools/
-  models.py
-  trace_loader.py
-  trace_analysis.py
-  scenario_runner.py
-  eval_storage.py
-  graders/
-    __init__.py
-    base.py
-    code_graders.py
-    model_graders.py
-    orchestrator.py
+tests/
+  tools/
+    models.py              # All data models
+    trace_loader.py        # TraceForEval, load_trace_for_eval()
+    trace_analysis.py      # Hierarchical trace analysis (L0/L1/L2)
+    eval_results.py        # EvalStorage, pattern functions
+    workflow_outcomes.py   # Production data bridge
+    replay_runner.py       # Production replay orchestration
+    graders/
+      __init__.py
+      base.py              # GraderResult, GraderSuiteResult
+      pm_graders.py        # PM code graders
+      specialist_graders.py # Specialist/Analyst code graders
+      orchestrator.py      # run_code_graders()
+    evaluation/
+      helpers.py           # REPL helpers (show_node, detect_issues, etc.)
+  scenarios/
+    schema.py              # ScenarioDefinition
+    loader.py              # load_scenario(), list_scenarios()
+    pm/
+      PM-01.yaml           # Core scenarios
+      PM-02.yaml
+      PM-03.yaml
+      PM-04.yaml
 
 .claude/skills/eval/
-  SKILL.md
+  SKILL.md                 # /eval skill definition
 ```
 
 ---
