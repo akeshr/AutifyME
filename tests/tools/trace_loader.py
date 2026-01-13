@@ -139,7 +139,15 @@ def _extract_user_message_from_root(root_run) -> tuple[str, str, bool]:
         Tuple of (preview, full_message, has_image)
     """
     preview = _extract_user_input(root_run)
-    has_image = "[Image]" in preview
+
+    # Check for image indicators - multiple formats:
+    # - "[Image]" from multimodal parsing
+    # - "[1 media attachment(s):" from WhatsApp integration
+    # - "media attachment" general pattern
+    has_image = (
+        "[Image]" in preview
+        or "media attachment" in preview.lower()
+    )
 
     # Get full message if available
     full_message = ""
@@ -178,8 +186,9 @@ def load_trace_for_eval(trace_id: str, include_issues: bool = True) -> TraceForE
     client = _get_client()
 
     # Get root run directly for rich data extraction
+    # Note: No limit - large traces (200+ runs) need full fetch to find root
     try:
-        runs = list(client.list_runs(trace_id=trace_id, limit=100))
+        runs = list(client.list_runs(trace_id=trace_id))
         root_run = next((r for r in runs if not r.parent_run_id), None)
 
         if root_run:
