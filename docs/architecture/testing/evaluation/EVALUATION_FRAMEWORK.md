@@ -293,6 +293,29 @@ Claude uses these rubrics when evaluating model criteria. For each, pull the spe
 | Fail | Domain errors, violates protocol rules, contradicts analyst findings |
 | Evidence | Quote specific output and note domain issues |
 
+#### Outcome Model Criteria (Workflow-Level)
+
+**`workflow_outcome_achieved`**
+
+| Aspect | Details |
+|--------|---------|
+| Data to pull | User's original request, PM's final response, any generated artifacts (files, listings, etc.) |
+| Evaluate | Did the workflow achieve what the user asked for? Is the output complete and correct? |
+| Pass | Output directly addresses user's request, contains expected elements, no critical omissions |
+| Fail | Output misses user's intent, incomplete, or contains errors that defeat the purpose |
+| Evidence | Quote user request, summarize what was delivered, note any gaps |
+
+**Outcome vs Process:**
+- Process graders: Did agents follow correct steps?
+- Outcome grader: Did the result satisfy the user's goal?
+
+**Outcome evaluation questions:**
+1. What did the user ask for?
+2. What was actually delivered?
+3. Does delivery match request?
+4. Any critical omissions or errors?
+5. Would user accept this result?
+
 ---
 
 ## The /eval Skill
