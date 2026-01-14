@@ -144,9 +144,9 @@ class GraderSuiteResult:
             lines.extend([
                 "",
                 "### Trace Error",
-                f"```",
+                "```",
                 f"{self.trace_error[:200]}{'...' if len(self.trace_error) > 200 else ''}",
-                f"```",
+                "```",
             ])
 
         lines.extend([
