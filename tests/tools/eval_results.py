@@ -732,10 +732,7 @@ def get_pattern_fixes(
 
             # Parse pattern data
             try:
-                if isinstance(fb.value, dict):
-                    pattern_data = fb.value
-                else:
-                    pattern_data = json.loads(fb.value)
+                pattern_data = fb.value if isinstance(fb.value, dict) else json.loads(fb.value)
             except (json.JSONDecodeError, TypeError):
                 continue
 

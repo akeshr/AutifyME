@@ -10,7 +10,6 @@ Fast, deterministic checks for PM behavior:
 from ..models import DelegationGraph, ToolCallSequence
 from .base import GraderCategory, GraderResult
 
-
 # =============================================================================
 # Taxonomy-Based Agent Classification
 # =============================================================================

@@ -16,11 +16,12 @@ from .base import GraderCategory, GraderResult, GraderSuiteResult
 from .pm_graders import (
     analyst_before_specialist,
     file_read_before_synthesis,
+    is_analyst,
+    is_specialist,
     media_download_first,
     protocol_load_first,
     wave_execution_correct,
 )
-from .pm_graders import is_analyst, is_specialist
 from .specialist_graders import (
     analyst_file_written,
     analyst_protocol_first,
