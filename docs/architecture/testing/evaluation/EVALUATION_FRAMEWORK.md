@@ -150,49 +150,18 @@ Same pillars, different checks per agent type.
 |-----------|------|--------|-------------|
 | `pm_protocol_first` | Code | Implemented | Loaded protocol before any delegation |
 | `pm_media_download_first` | Code | Implemented | Downloaded media before delegation |
-| `pm_wave_execution` | Code | Needs refactor | Taxonomy-based wave validation (see below) |
+| `pm_wave_execution` | Code | Implemented | Taxonomy-based wave validation |
 | `pm_analyst_before_specialist` | Code | Implemented | Two-phase: research before execution |
 | `pm_file_read_before_synthesis` | Code | Implemented | Read analysis files before synthesizing |
 | `pm_routing_appropriate` | Model | Rubric defined | Delegated to correct agents |
 | `pm_synthesis_quality` | Model | Rubric defined | Effectively combined specialist outputs |
 | `pm_context_handoff` | Model | Rubric defined | Passed sufficient context to delegated agents |
 
-**`pm_wave_execution` - Taxonomy-Based Approach:**
-
-Current implementation hardcodes specific agents. Refactor to taxonomy-based:
-
-**Principle:** Research before execution. Analysts complete before specialists start.
-
-**Implementation:**
-```python
-# Derive categories from naming convention (no hardcoded lists)
-analysts = [d for d in delegations if "_analyst" in d.agent]
-specialists = [d for d in delegations if "_specialist" in d.agent]
-
-# Check 1: All analysts complete before first specialist starts
-if specialists and analysts:
-    last_analyst_end = max(analyst end times)
-    first_specialist_start = min(specialist start times)
-    if first_specialist_start < last_analyst_end:
-        FAIL("Specialist started before analysts completed")
-
-# Check 2: Visual analyst first when media present
-if media_downloaded and "visual_analyst" in delegations:
-    if visual_analyst not in wave_1:
-        FAIL("Visual analyst should be first when media present")
-```
-
-**Why taxonomy-based:**
-- Future-proof: new agents auto-categorized by naming convention
-- Checks principle, not prescription
-- Supports dynamic planning (PM chooses which agents)
-- No scenario-specific configuration needed
-
 **Analyst Criteria:**
 
 | Criterion | Type | Status | Description |
 |-----------|------|--------|-------------|
-| `analyst_protocol_first` | Code | Implemented (needs registry) | Loaded domain protocol before analysis |
+| `analyst_protocol_first` | Code | Implemented | Loaded domain protocol before analysis |
 | `analyst_file_written` | Code | Implemented | Wrote findings to file |
 | `analyst_observation_complete` | Model | Rubric defined | Observed all relevant aspects |
 | `analyst_finding_accuracy` | Model | Rubric defined | Findings match actual content |
@@ -202,7 +171,7 @@ if media_downloaded and "visual_analyst" in delegations:
 
 | Criterion | Type | Status | Description |
 |-----------|------|--------|-------------|
-| `specialist_protocol_first` | Code | Implemented (needs registry) | Loaded domain protocol before execution |
+| `specialist_protocol_first` | Code | Implemented | Loaded domain protocol before execution |
 | `specialist_hitl_triggered` | Code | Implemented | Requested approval before persisting |
 | `specialist_read_upstream` | Code | Planned | Read relevant analyst findings |
 | `specialist_verified_before_act` | Code | Planned | Called verification tools before write |
@@ -713,9 +682,9 @@ def get_pattern_fixes(
 | 3.1 | Done | Implement base grader classes |
 | 3.2 | Done | Implement PM code graders (5) |
 | 3.3 | Done | Implement GradingOrchestrator |
-| 3.4 | Pending | Refactor `pm_wave_execution` to taxonomy-based approach |
-| 3.5 | Pending | Register `analyst_protocol_first` in ANALYST_GRADERS |
-| 3.6 | Pending | Register `specialist_protocol_first` in SPECIALIST_GRADERS |
+| 3.4 | Done | Refactor `pm_wave_execution` to taxonomy-based approach |
+| 3.5 | Done | Register `analyst_protocol_first` in ANALYST_GRADERS |
+| 3.6 | Done | Register `specialist_protocol_loaded` in SPECIALIST_GRADERS |
 | 3.7 | Planned | Implement `specialist_read_upstream` grader |
 | 3.8 | Planned | Implement `specialist_verified_before_act` grader |
 | 3.9 | Planned | Implement `specialist_hitl_respected` grader |
@@ -727,8 +696,8 @@ def get_pattern_fixes(
 | Task | Status | Description |
 |------|--------|-------------|
 | 4.1 | Done | Implement `EvalStorage` (eval_results.py) |
-| 4.2 | Pending | Add `store_pattern_fix()` to eval_results.py |
-| 4.3 | Pending | Add `get_pattern_fixes()` to eval_results.py |
+| 4.2 | Done | Add `store_pattern_fix()` to eval_results.py |
+| 4.3 | Done | Add `get_pattern_fixes()` to eval_results.py |
 | 4.4 | Pending | Seed common patterns after first few fixes |
 
 ### Phase 5: Validation

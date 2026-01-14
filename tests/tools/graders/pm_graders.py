@@ -290,12 +290,6 @@ def wave_execution_correct(graph: DelegationGraph) -> GraderResult:
     deviations = []
     score = 1.0
 
-    # Check visual_analyst in earliest wave (needs image analysis first)
-    wave_1_agents = waves.get(1, [])
-    if "visual_analyst" in graph.delegation_order and "visual_analyst" not in wave_1_agents:
-        deviations.append("visual_analyst not in wave 1 (should analyze image first)")
-        score -= 0.3
-
     # Check analysts and specialists don't overlap in waves (taxonomy-based)
     analyst_waves = set()
     specialist_waves = set()

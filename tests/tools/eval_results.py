@@ -612,6 +612,153 @@ def format_baseline_comparison(comparison: BaselineComparison) -> str:
     return "\n".join(lines)
 
 
+# =============================================================================
+# Pattern Storage (LangSmith Feedback)
+# =============================================================================
+
+
+def store_pattern_fix(
+    trace_id: str,
+    pattern_name: str,
+    symptoms: list[str],
+    agent: str,
+    fix_location: str,
+    fix_description: str,
+    fix_diff: str | None = None,
+    success: bool = True,
+) -> bool:
+    """Store a fix pattern as LangSmith feedback on the trace.
+
+    After successfully fixing an agent issue, call this to build
+    the pattern library for future matching.
+
+    Args:
+        trace_id: LangSmith trace ID where issue was found
+        pattern_name: Pattern identifier (e.g., "PROTOCOL_NOT_LOADED")
+        symptoms: List of observable symptoms
+        agent: Agent that was affected
+        fix_location: Path to file that was changed
+        fix_description: What was changed and why
+        fix_diff: Optional diff or key changes
+        success: Whether the fix resolved the issue
+
+    Returns:
+        True if stored successfully
+
+    Example:
+        >>> store_pattern_fix(
+        ...     trace_id="f264838e-...",
+        ...     pattern_name="PROTOCOL_NOT_LOADED",
+        ...     symptoms=["first call not load_protocol", "inconsistent behavior"],
+        ...     agent="catalog_specialist",
+        ...     fix_location="prompts/specialists/catalog_specialist.prompt",
+        ...     fix_description="Added protocol load instruction to Process section",
+        ...     success=True
+        ... )
+        True
+    """
+    try:
+        client = _get_client()
+
+        # Get root run for trace
+        runs = list(client.list_runs(trace_id=trace_id, limit=1))
+        if not runs:
+            print(f"Warning: No runs found for trace {trace_id}")
+            return False
+
+        run_id = str(runs[0].id)
+
+        # Build pattern data
+        pattern_data = {
+            "pattern_name": pattern_name,
+            "symptoms": symptoms,
+            "agent": agent,
+            "fix_location": fix_location,
+            "fix_description": fix_description,
+            "fix_diff": fix_diff,
+            "success": success,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        # Store as LangSmith feedback
+        client.create_feedback(
+            run_id=run_id,
+            key="pattern_fix",
+            value=json.dumps(pattern_data),
+            comment=pattern_name,
+        )
+
+        print(f"Stored pattern '{pattern_name}' for agent '{agent}'")
+        return True
+
+    except Exception as e:
+        print(f"Failed to store pattern: {e}")
+        return False
+
+
+def get_pattern_fixes(
+    pattern_name: str | None = None,
+    agent: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Retrieve pattern fixes from LangSmith feedback.
+
+    Query the pattern library for known fixes. Use during improve mode
+    to match current symptoms to known patterns.
+
+    Args:
+        pattern_name: Filter by pattern name (optional)
+        agent: Filter by agent name (optional)
+        limit: Max patterns to return
+
+    Returns:
+        List of pattern dicts with symptoms, fix details
+
+    Example:
+        >>> fixes = get_pattern_fixes(pattern_name="PROTOCOL_NOT_LOADED")
+        >>> for fix in fixes:
+        ...     print(f"{fix['agent']}: {fix['fix_description']}")
+    """
+    results = []
+    client = _get_client()
+
+    try:
+        # Get recent feedback with pattern_fix key
+        feedbacks = list(client.list_feedback(feedback_key="pattern_fix"))
+
+        for fb in feedbacks:
+            if not fb.value:
+                continue
+
+            # Parse pattern data
+            try:
+                if isinstance(fb.value, dict):
+                    pattern_data = fb.value
+                else:
+                    pattern_data = json.loads(fb.value)
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+            # Apply filters
+            if pattern_name and pattern_data.get("pattern_name") != pattern_name:
+                continue
+            if agent and pattern_data.get("agent") != agent:
+                continue
+
+            # Add trace context
+            pattern_data["feedback_id"] = str(fb.id)
+            pattern_data["run_id"] = str(fb.run_id) if fb.run_id else None
+            results.append(pattern_data)
+
+            if len(results) >= limit:
+                break
+
+    except Exception as e:
+        print(f"Failed to get patterns: {e}")
+
+    return results
+
+
 # CLI entry point
 if __name__ == "__main__":
     import json
