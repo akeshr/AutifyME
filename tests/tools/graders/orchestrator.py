@@ -230,12 +230,14 @@ def run_code_graders(
         categories: Filter to specific categories (default: all)
 
     Returns:
-        GraderSuiteResult with all grader outcomes
+        GraderSuiteResult with all grader outcomes including trace status
 
     Usage:
         result = run_code_graders(trace_id)
-        if result.verdict == "PASS":
-            print("All checks passed!")
+        if result.overall_verdict == "PASS":
+            print("Trace succeeded and all behavioral checks passed!")
+        elif result.overall_verdict == "ERROR":
+            print(f"Trace failed: {result.trace_error}")
         else:
             for failure in result.get_failures():
                 print(f"FAILED: {failure.name} - {failure.reason}")
@@ -243,6 +245,12 @@ def run_code_graders(
     # Load trace data once (shared across all graders)
     seq = get_tool_call_sequence(trace_id)
     graph = get_delegation_graph(trace_id)
+
+    # Get trace status from LangSmith
+    from ..trace_loader import load_trace_for_eval
+    trace_data = load_trace_for_eval(trace_id, include_issues=False)
+    trace_status = trace_data.status or "unknown"
+    trace_error = trace_data.error
 
     results = []
     all_categories = categories or [
@@ -313,6 +321,8 @@ def run_code_graders(
             overall_score=1.0,
             results=[],
             verdict="PASS",
+            trace_status=trace_status,
+            trace_error=trace_error,
         )
 
     passed = sum(1 for r in results if r.passed)
@@ -338,4 +348,6 @@ def run_code_graders(
         failed=failed,
         overall_score=overall_score,
         results=results,
+        trace_status=trace_status,
+        trace_error=trace_error,
     )

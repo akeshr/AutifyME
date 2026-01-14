@@ -63,7 +63,10 @@ class GraderSuiteResult:
         failed: Number that failed
         overall_score: Weighted average score
         results: Individual grader results
-        verdict: PASS | PARTIAL | FAIL
+        verdict: PASS | PARTIAL | FAIL (behavioral checks only)
+        trace_status: Actual trace outcome (success | error | pending)
+        trace_error: Error message if trace failed
+        overall_verdict: Combined assessment (PASS | PASS_WITH_ERRORS | PARTIAL | FAIL | ERROR)
     """
 
     trace_id: str
@@ -73,9 +76,13 @@ class GraderSuiteResult:
     overall_score: float
     results: list[GraderResult] = field(default_factory=list)
     verdict: str = ""
+    trace_status: str = "unknown"
+    trace_error: str | None = None
+    overall_verdict: str = ""
 
     def __post_init__(self):
-        """Set verdict based on score if not provided."""
+        """Set verdicts based on score and trace status."""
+        # Behavioral verdict (graders only)
         if not self.verdict:
             if self.overall_score >= 0.85:
                 self.verdict = "PASS"
@@ -83,6 +90,20 @@ class GraderSuiteResult:
                 self.verdict = "PARTIAL"
             else:
                 self.verdict = "FAIL"
+
+        # Overall verdict (combines trace status + behavioral checks)
+        if not self.overall_verdict:
+            if self.trace_status == "error":
+                # Trace failed - can't be overall PASS regardless of graders
+                if self.verdict == "PASS":
+                    self.overall_verdict = "ERROR"  # Graders passed but trace failed
+                else:
+                    self.overall_verdict = "ERROR"  # Both failed
+            elif self.trace_status == "pending":
+                self.overall_verdict = "INCOMPLETE"
+            else:
+                # Trace succeeded - use behavioral verdict
+                self.overall_verdict = self.verdict
 
     def get_failures(self) -> list[GraderResult]:
         """Get list of failed graders."""
@@ -101,22 +122,44 @@ class GraderSuiteResult:
             "failed": self.failed,
             "overall_score": self.overall_score,
             "verdict": self.verdict,
+            "trace_status": self.trace_status,
+            "trace_error": self.trace_error,
+            "overall_verdict": self.overall_verdict,
             "results": [r.to_dict() for r in self.results],
         }
 
     def format_summary(self) -> str:
         """Format as human-readable summary."""
         lines = [
-            f"## Grader Results: {self.verdict}",
-            f"**Score:** {self.overall_score:.2f} ({self.passed}/{self.total_graders} passed)",
+            f"## Grader Results: {self.overall_verdict}",
             "",
+            "### Status",
+            f"- **Trace Status:** {self.trace_status.upper()}",
+            f"- **Behavioral Score:** {self.overall_score:.2f} ({self.passed}/{self.total_graders} passed)",
+            f"- **Grader Verdict:** {self.verdict}",
+        ]
+
+        # Show trace error prominently if present
+        if self.trace_error:
+            lines.extend([
+                "",
+                "### Trace Error",
+                f"```",
+                f"{self.trace_error[:200]}{'...' if len(self.trace_error) > 200 else ''}",
+                f"```",
+            ])
+
+        lines.extend([
+            "",
+            "### Behavioral Checks",
             "| Grader | Result | Severity | Reason |",
             "|--------|--------|----------|--------|",
-        ]
+        ])
 
         for r in self.results:
             result_icon = "PASS" if r.passed else "FAIL"
-            lines.append(f"| {r.name} | {result_icon} | {r.severity} | {r.reason[:50]}{'...' if len(r.reason) > 50 else ''} |")
+            reason_preview = r.reason[:50] + "..." if len(r.reason) > 50 else r.reason
+            lines.append(f"| {r.name} | {result_icon} | {r.severity} | {reason_preview} |")
 
         if self.get_failures():
             lines.extend([

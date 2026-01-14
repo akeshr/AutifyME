@@ -333,6 +333,12 @@ def file_read_before_synthesis(seq: ToolCallSequence) -> GraderResult:
 
     After analysts write files, PM should read them before responding to user.
 
+    Evaluation logic (all conditions must be met to evaluate PM):
+    1. PM delegated to analysts
+    2. At least one delegation succeeded
+    3. Successful analysts wrote output files
+    Only then: check if PM read those files
+
     Args:
         seq: ToolCallSequence from get_tool_call_sequence()
 
@@ -340,9 +346,6 @@ def file_read_before_synthesis(seq: ToolCallSequence) -> GraderResult:
         GraderResult with pass/fail and evidence
     """
     pm_calls = [tc for tc in seq.tool_calls if tc.agent == "PM"]
-
-    # Find file read calls
-    read_calls = [tc for tc in pm_calls if tc.tool_name in ("read_file", "read_data")]
 
     # Find delegation calls to analysts (taxonomy-based)
     analyst_delegations = [
@@ -352,6 +355,7 @@ def file_read_before_synthesis(seq: ToolCallSequence) -> GraderResult:
         and is_analyst(tc.parsed_args.get("subagent_type", ""))
     ]
 
+    # Case 1: No analyst delegations
     if not analyst_delegations:
         return GraderResult(
             name="file_read_before_synthesis",
@@ -363,38 +367,88 @@ def file_read_before_synthesis(seq: ToolCallSequence) -> GraderResult:
             severity="LOW",
         )
 
-    if not read_calls:
+    # Case 2: Check delegation success
+    successful_delegations = [tc for tc in analyst_delegations if tc.status == "success"]
+    failed_delegations = [tc for tc in analyst_delegations if tc.status != "success"]
+
+    if not successful_delegations:
         return GraderResult(
             name="file_read_before_synthesis",
-            passed=False,
-            score=0.0,
+            passed=True,
+            score=1.0,
             evidence={
                 "analyst_delegations": len(analyst_delegations),
-                "read_calls": 0,
+                "successful_delegations": 0,
+                "failed_delegations": len(failed_delegations),
             },
-            reason="PM delegated to analysts but did not read their output files",
+            reason="All analyst delegations failed - grader not applicable (upstream failure)",
             category=GraderCategory.PM,
-            severity="MEDIUM",
+            severity="LOW",
         )
 
-    # Check that reads come after delegations
-    last_analyst_delegation_seq = max(tc.sequence for tc in analyst_delegations)
-    read_after_delegation = [tc for tc in read_calls if tc.sequence > last_analyst_delegation_seq]
+    # Case 3: Check if successful analysts wrote output files
+    successful_analyst_names = {
+        tc.parsed_args.get("subagent_type") for tc in successful_delegations
+    }
 
-    passed = len(read_after_delegation) > 0
+    # Look for file write operations from successful analysts
+    file_write_tools = ("write_file", "write_data", "save_analysis", "persist_analysis")
+    analyst_file_writes = [
+        tc
+        for tc in seq.tool_calls
+        if tc.agent in successful_analyst_names
+        and tc.tool_name in file_write_tools
+        and tc.status == "success"
+    ]
+
+    if not analyst_file_writes:
+        return GraderResult(
+            name="file_read_before_synthesis",
+            passed=True,
+            score=1.0,
+            evidence={
+                "analyst_delegations": len(analyst_delegations),
+                "successful_delegations": len(successful_delegations),
+                "failed_delegations": len(failed_delegations),
+                "analyst_file_writes": 0,
+                "successful_analysts": list(successful_analyst_names),
+            },
+            reason="Analysts completed but wrote no output files - grader not applicable",
+            category=GraderCategory.PM,
+            severity="LOW",
+        )
+
+    # Case 4 & 5: Analysts wrote files - now evaluate if PM read them
+    pm_read_calls = [
+        tc for tc in pm_calls if tc.tool_name in ("read_file", "read_data")
+    ]
+
+    # Check reads came AFTER analyst delegations completed
+    last_delegation_seq = max(tc.sequence for tc in successful_delegations)
+    reads_after_delegation = [
+        tc for tc in pm_read_calls if tc.sequence > last_delegation_seq
+    ]
+
+    passed = len(reads_after_delegation) > 0
 
     return GraderResult(
         name="file_read_before_synthesis",
         passed=passed,
-        score=1.0 if passed else 0.5,
+        score=1.0 if passed else 0.0,
         evidence={
             "analyst_delegations": len(analyst_delegations),
-            "last_delegation_seq": last_analyst_delegation_seq,
-            "read_calls_after": len(read_after_delegation),
-            "total_read_calls": len(read_calls),
+            "successful_delegations": len(successful_delegations),
+            "failed_delegations": len(failed_delegations),
+            "analyst_file_writes": len(analyst_file_writes),
+            "files_written_by": [tc.agent for tc in analyst_file_writes],
+            "pm_reads_after_delegation": len(reads_after_delegation),
+            "last_delegation_seq": last_delegation_seq,
         },
-        reason=f"PM read {len(read_after_delegation)} files after analyst delegations"
-        + (" (CORRECT)" if passed else " (SHOULD READ ANALYST OUTPUT)"),
+        reason=(
+            f"PM read {len(reads_after_delegation)} files after analyst delegations (CORRECT)"
+            if passed
+            else f"PM did not read analyst output files ({len(analyst_file_writes)} files available from {list(successful_analyst_names)})"
+        ),
         category=GraderCategory.PM,
         severity="MEDIUM",
     )
