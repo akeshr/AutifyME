@@ -10,9 +10,68 @@ Fast, deterministic checks for PM behavior:
 from ..models import DelegationGraph, ToolCallSequence
 from .base import GraderCategory, GraderResult
 
-# Known agent types
-ANALYSTS = {"visual_analyst", "product_analyst", "catalog_analyst"}
-SPECIALISTS = {"creative_specialist", "catalog_specialist"}
+
+# =============================================================================
+# Taxonomy-Based Agent Classification
+# =============================================================================
+# Derive agent type from naming convention - no hardcoded lists.
+# New agents are auto-classified by suffix: _analyst, _specialist, _reviewer
+
+
+def is_analyst(agent_name: str) -> bool:
+    """Check if agent is an analyst (read-only research layer).
+
+    Analysts are identified by the '_analyst' suffix in their name.
+    Examples: visual_analyst, product_analyst, catalog_analyst, order_analyst
+    """
+    return agent_name.endswith("_analyst")
+
+
+def is_specialist(agent_name: str) -> bool:
+    """Check if agent is a specialist (execution layer with HITL).
+
+    Specialists are identified by the '_specialist' suffix in their name.
+    Examples: creative_specialist, catalog_specialist, pricing_specialist
+    """
+    return agent_name.endswith("_specialist")
+
+
+def is_reviewer(agent_name: str) -> bool:
+    """Check if agent is a reviewer (quality gate layer).
+
+    Reviewers are identified by the '_reviewer' suffix in their name.
+    Examples: compliance_reviewer, safety_reviewer, brand_reviewer
+    """
+    return agent_name.endswith("_reviewer")
+
+
+def classify_agents(agent_names: list[str]) -> dict[str, list[str]]:
+    """Classify agents by type based on naming convention.
+
+    Args:
+        agent_names: List of agent names from delegation order
+
+    Returns:
+        Dict with keys 'analysts', 'specialists', 'reviewers', 'other'
+    """
+    result: dict[str, list[str]] = {
+        "analysts": [],
+        "specialists": [],
+        "reviewers": [],
+        "other": [],
+    }
+
+    for name in agent_names:
+        if is_analyst(name):
+            result["analysts"].append(name)
+        elif is_specialist(name):
+            result["specialists"].append(name)
+        elif is_reviewer(name):
+            result["reviewers"].append(name)
+        else:
+            result["other"].append(name)
+
+    return result
 
 
 def protocol_load_first(seq: ToolCallSequence, agent: str = "PM") -> GraderResult:
@@ -133,6 +192,8 @@ def analyst_before_specialist(graph: DelegationGraph) -> GraderResult:
     The PM should delegate to analysts for research BEFORE delegating
     to specialists for execution.
 
+    Uses taxonomy-based classification: agents ending in '_analyst' or '_specialist'.
+
     Args:
         graph: DelegationGraph from get_delegation_graph()
 
@@ -141,9 +202,9 @@ def analyst_before_specialist(graph: DelegationGraph) -> GraderResult:
     """
     order = graph.delegation_order
 
-    # Find indices of analysts and specialists
-    analyst_indices = [i for i, agent in enumerate(order) if agent in ANALYSTS]
-    specialist_indices = [i for i, agent in enumerate(order) if agent in SPECIALISTS]
+    # Find indices of analysts and specialists using taxonomy-based classification
+    analyst_indices = [i for i, agent in enumerate(order) if is_analyst(agent)]
+    specialist_indices = [i for i, agent in enumerate(order) if is_specialist(agent)]
 
     # If either list is empty, grader may not apply
     if not analyst_indices:
@@ -203,10 +264,9 @@ def analyst_before_specialist(graph: DelegationGraph) -> GraderResult:
 def wave_execution_correct(graph: DelegationGraph) -> GraderResult:
     """Check correct parallel/serial wave structure.
 
-    Expected pattern for image cataloging:
-    - Wave 1: visual_analyst (needs image first)
-    - Wave 2: product_analyst || catalog_analyst (can run parallel)
-    - Wave 3: specialists (after analysts complete)
+    Principle: Research before execution. All analysts complete before specialists start.
+
+    Uses taxonomy-based classification: agents ending in '_analyst' or '_specialist'.
 
     Args:
         graph: DelegationGraph from get_delegation_graph()
@@ -236,15 +296,15 @@ def wave_execution_correct(graph: DelegationGraph) -> GraderResult:
         deviations.append("visual_analyst not in wave 1 (should analyze image first)")
         score -= 0.3
 
-    # Check analysts and specialists don't overlap in waves
+    # Check analysts and specialists don't overlap in waves (taxonomy-based)
     analyst_waves = set()
     specialist_waves = set()
 
     for wave_num, agents in waves.items():
         for agent in agents:
-            if agent in ANALYSTS:
+            if is_analyst(agent):
                 analyst_waves.add(wave_num)
-            if agent in SPECIALISTS:
+            if is_specialist(agent):
                 specialist_waves.add(wave_num)
 
     if analyst_waves and specialist_waves and max(analyst_waves) >= min(specialist_waves):
@@ -291,12 +351,12 @@ def file_read_before_synthesis(seq: ToolCallSequence) -> GraderResult:
     # Find file read calls
     read_calls = [tc for tc in pm_calls if tc.tool_name in ("read_file", "read_data")]
 
-    # Find delegation calls to analysts
+    # Find delegation calls to analysts (taxonomy-based)
     analyst_delegations = [
         tc
         for tc in pm_calls
         if tc.tool_name == "task"
-        and tc.parsed_args.get("subagent_type") in ANALYSTS
+        and is_analyst(tc.parsed_args.get("subagent_type", ""))
     ]
 
     if not analyst_delegations:

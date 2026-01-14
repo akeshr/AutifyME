@@ -20,8 +20,12 @@ from .pm_graders import (
     protocol_load_first,
     wave_execution_correct,
 )
+from .pm_graders import is_analyst, is_specialist
 from .specialist_graders import (
+    analyst_file_written,
+    analyst_protocol_first,
     hitl_triggered,
+    specialist_protocol_loaded,
 )
 
 # Type alias for grader functions
@@ -37,13 +41,17 @@ PM_GRADERS: list[tuple[str, GraderFn, dict]] = [
     ("file_read_before_synthesis", file_read_before_synthesis, {}),
 ]
 
-# Registry of specialist graders
+# Registry of specialist graders - these run against detected specialists
 SPECIALIST_GRADERS: list[tuple[str, GraderFn, dict]] = [
-    ("hitl_triggered", hitl_triggered, {"agent": "catalog_specialist"}),
+    ("hitl_triggered", hitl_triggered, {}),  # agent filled dynamically
+    ("specialist_protocol_loaded", specialist_protocol_loaded, {}),  # agent filled dynamically
 ]
 
-# Registry of analyst graders
-ANALYST_GRADERS: list[tuple[str, GraderFn, dict]] = []
+# Registry of analyst graders - these run against detected analysts
+ANALYST_GRADERS: list[tuple[str, GraderFn, dict]] = [
+    ("analyst_protocol_first", analyst_protocol_first, {}),  # agent filled dynamically
+    ("analyst_file_written", analyst_file_written, {}),  # agent filled dynamically
+]
 
 
 def _run_grader_safely(
@@ -118,6 +126,8 @@ def run_pm_graders(trace_id: str) -> GraderSuiteResult:
 def run_specialist_graders(trace_id: str) -> GraderSuiteResult:
     """Run all specialist-specific graders on a trace.
 
+    Dynamically detects specialists from trace using taxonomy-based classification.
+
     Args:
         trace_id: LangSmith trace ID
 
@@ -126,17 +136,70 @@ def run_specialist_graders(trace_id: str) -> GraderSuiteResult:
     """
     seq = get_tool_call_sequence(trace_id)
 
+    # Detect specialists from trace
+    detected_agents = {tc.agent for tc in seq.tool_calls}
+    specialists = [a for a in detected_agents if is_specialist(a)]
+
     results = []
 
-    for name, grader_fn, default_kwargs in SPECIALIST_GRADERS:
-        kwargs = dict(default_kwargs)
-        if "seq" in grader_fn.__code__.co_varnames:
-            kwargs["seq"] = seq
+    for specialist in specialists:
+        for name, grader_fn, default_kwargs in SPECIALIST_GRADERS:
+            kwargs = dict(default_kwargs)
+            kwargs["agent"] = specialist
+            if "seq" in grader_fn.__code__.co_varnames:
+                kwargs["seq"] = seq
 
-        result = _run_grader_safely(
-            name, grader_fn, GraderCategory.SPECIALIST, **kwargs
-        )
-        results.append(result)
+            grader_name = f"{name}:{specialist}"
+            result = _run_grader_safely(
+                grader_name, grader_fn, GraderCategory.SPECIALIST, **kwargs
+            )
+            results.append(result)
+
+    passed = sum(1 for r in results if r.passed)
+    failed = len(results) - passed
+    overall_score = sum(r.score for r in results) / len(results) if results else 0.0
+
+    return GraderSuiteResult(
+        trace_id=trace_id,
+        total_graders=len(results),
+        passed=passed,
+        failed=failed,
+        overall_score=overall_score,
+        results=results,
+    )
+
+
+def run_analyst_graders(trace_id: str) -> GraderSuiteResult:
+    """Run all analyst-specific graders on a trace.
+
+    Dynamically detects analysts from trace using taxonomy-based classification.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        GraderSuiteResult with analyst grader outcomes
+    """
+    seq = get_tool_call_sequence(trace_id)
+
+    # Detect analysts from trace
+    detected_agents = {tc.agent for tc in seq.tool_calls}
+    analysts = [a for a in detected_agents if is_analyst(a)]
+
+    results = []
+
+    for analyst in analysts:
+        for name, grader_fn, default_kwargs in ANALYST_GRADERS:
+            kwargs = dict(default_kwargs)
+            kwargs["agent"] = analyst
+            if "seq" in grader_fn.__code__.co_varnames:
+                kwargs["seq"] = seq
+
+            grader_name = f"{name}:{analyst}"
+            result = _run_grader_safely(
+                grader_name, grader_fn, GraderCategory.ANALYST, **kwargs
+            )
+            results.append(result)
 
     passed = sum(1 for r in results if r.passed)
     failed = len(results) - passed
@@ -199,29 +262,45 @@ def run_code_graders(
             result = _run_grader_safely(name, grader_fn, GraderCategory.PM, **kwargs)
             results.append(result)
 
-    # Run specialist graders
+    # Detect specialists and analysts from trace (taxonomy-based)
+    detected_agents = set()
+    for tc in seq.tool_calls:
+        detected_agents.add(tc.agent)
+
+    specialists_in_trace = [a for a in detected_agents if is_specialist(a)]
+    analysts_in_trace = [a for a in detected_agents if is_analyst(a)]
+
+    # Run specialist graders against each detected specialist
     if GraderCategory.SPECIALIST in all_categories:
-        for name, grader_fn, default_kwargs in SPECIALIST_GRADERS:
-            kwargs = dict(default_kwargs)
-            if "seq" in grader_fn.__code__.co_varnames:
-                kwargs["seq"] = seq
+        for specialist in specialists_in_trace:
+            for name, grader_fn, default_kwargs in SPECIALIST_GRADERS:
+                kwargs = dict(default_kwargs)
+                kwargs["agent"] = specialist  # Fill agent dynamically
+                if "seq" in grader_fn.__code__.co_varnames:
+                    kwargs["seq"] = seq
 
-            result = _run_grader_safely(
-                name, grader_fn, GraderCategory.SPECIALIST, **kwargs
-            )
-            results.append(result)
+                # Name includes agent for clarity
+                grader_name = f"{name}:{specialist}"
+                result = _run_grader_safely(
+                    grader_name, grader_fn, GraderCategory.SPECIALIST, **kwargs
+                )
+                results.append(result)
 
-    # Run analyst graders
+    # Run analyst graders against each detected analyst
     if GraderCategory.ANALYST in all_categories:
-        for name, grader_fn, default_kwargs in ANALYST_GRADERS:
-            kwargs = dict(default_kwargs)
-            if "seq" in grader_fn.__code__.co_varnames:
-                kwargs["seq"] = seq
+        for analyst in analysts_in_trace:
+            for name, grader_fn, default_kwargs in ANALYST_GRADERS:
+                kwargs = dict(default_kwargs)
+                kwargs["agent"] = analyst  # Fill agent dynamically
+                if "seq" in grader_fn.__code__.co_varnames:
+                    kwargs["seq"] = seq
 
-            result = _run_grader_safely(
-                name, grader_fn, GraderCategory.ANALYST, **kwargs
-            )
-            results.append(result)
+                # Name includes agent for clarity
+                grader_name = f"{name}:{analyst}"
+                result = _run_grader_safely(
+                    grader_name, grader_fn, GraderCategory.ANALYST, **kwargs
+                )
+                results.append(result)
 
     # Calculate aggregates
     if not results:

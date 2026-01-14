@@ -16,7 +16,12 @@ Usage:
 """
 
 from .base import GraderCategory, GraderResult, GraderSuiteResult
-from .orchestrator import run_code_graders, run_pm_graders, run_specialist_graders
+from .orchestrator import (
+    run_analyst_graders,
+    run_code_graders,
+    run_pm_graders,
+    run_specialist_graders,
+)
 
 __all__ = [
     "GraderResult",
@@ -25,4 +30,5 @@ __all__ = [
     "run_code_graders",
     "run_pm_graders",
     "run_specialist_graders",
+    "run_analyst_graders",
 ]

@@ -5,16 +5,64 @@
 
 ---
 
-## Related Skills Status
+## Entry Point
 
-| Skill | Status | Notes |
-|-------|--------|-------|
-| `/eval` | Current | This document |
-| `prompt-engineering` | Outdated | Needs update to reflect prompts + protocols pattern |
-| `tool-development` | Outdated | Needs update to reflect prompts + protocols pattern |
-| `specialist-creation` | Outdated | Needs update to reflect prompts + protocols pattern |
+**Primary interface:** `/eval` skill - all evaluation workflows go through this single entry point.
 
-**Action:** Update related skills to reflect current architecture (prompts + protocols separation) - deferred.
+**Deprecated commands:** `/evaluate` and `/test-intelligent` - use `/eval` modes instead.
+
+---
+
+## Bootstrap Sequence (CRITICAL - Start Here)
+
+The framework requires baselines before automated testing works. Follow this sequence:
+
+### Step 1: Manual Baseline Creation
+
+```bash
+# 1. Run PM workflow manually with known-good input
+uv run python -c "
+from tests.tools.pm_interaction import chat_with_pm
+result = chat_with_pm('Catalog these sneakers for \$79.99', media_paths=['tests/test_assets/sneaker_single.jpg'])
+print(f'Trace ID: {result.get(\"trace_id\")}')
+"
+
+# 2. Verify trace in LangSmith - confirm workflow completed successfully
+# 3. Note the trace_id for next step
+```
+
+### Step 2: Store Baseline
+
+```python
+from tests.tools.eval_results import store_baseline
+from tests.tools.graders import run_code_graders
+
+trace_id = "<trace_id_from_step_1>"
+grades = run_code_graders(trace_id)
+
+store_baseline(
+    scenario_id="PM-01",
+    trace_id=trace_id,
+    score=grades.overall_score,
+    grader_results={r.name: r.passed for r in grades.results},
+    metadata={"bootstrap": True, "date": "2026-01-14"}
+)
+```
+
+### Step 3: Update Scenario YAML
+
+```yaml
+# tests/scenarios/pm/PM-01.yaml
+baseline_trace_id: "<trace_id_from_step_1>"
+```
+
+### Step 4: Validate Framework
+
+```bash
+/eval analyze <trace_id> --thorough
+```
+
+**Without baselines, regression detection is impossible.**
 
 ---
 

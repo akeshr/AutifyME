@@ -1,21 +1,22 @@
 # Evaluate Trace
 
-Evaluate a LangSmith trace and improve the workflow.
+**DEPRECATED:** Use `/eval analyze <trace_id>` instead.
 
-## Arguments
+This command is a redirect to the consolidated `/eval` skill.
 
-- `$ARGUMENTS` - LangSmith trace ID (required)
+## Usage
+
+```bash
+# Instead of:
+/evaluate <trace_id>
+
+# Use:
+/eval analyze <trace_id>           # Quick analysis (code graders only)
+/eval analyze <trace_id> --thorough  # Full analysis (code + model graders)
+```
 
 ## Task
 
-1. **Invoke the workflow-evaluation skill** to load evaluation context
-2. **Analyze the trace** using helpers:
-   - `ids = show_tree(trace_id)` - structure with run IDs, models, tokens, decisions
-   - `show_llm_calls(trace_id)` - all LLM reasoning summaries
-   - `show_llm_detail(ids['<short_id>'])` - drill into specific LLM call
-3. **Evaluate** each LLM call across 6 dimensions (reasoning, decision, tools, context, output, compliance)
-4. **Identify root cause** - trace from symptom to actual cause
-5. **Fix it** - if prompt change needed, invoke `prompt-engineering` skill first
-6. **Verify** - re-run and compare traces
+Redirect to `/eval analyze $ARGUMENTS`.
 
-Print findings and recommendations. If actionable fix identified, propose the specific change.
+See `/eval` skill for full documentation: `.claude/skills/eval/SKILL.md`

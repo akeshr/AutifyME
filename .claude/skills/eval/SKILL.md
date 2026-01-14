@@ -397,9 +397,21 @@ result: TraceForEval = load_trace_for_eval(trace_id)
 ### Grading
 
 ```python
-from tests.tools.graders import run_code_graders, GraderSuiteResult
+from tests.tools.graders import (
+    run_code_graders,        # Run all graders (PM + specialists + analysts)
+    run_pm_graders,          # Run only PM graders
+    run_specialist_graders,  # Run only specialist graders (auto-detects from trace)
+    run_analyst_graders,     # Run only analyst graders (auto-detects from trace)
+    GraderSuiteResult,
+)
+
 grades: GraderSuiteResult = run_code_graders(trace_id)
 # grades.verdict, grades.overall_score, grades.format_summary()
+
+# Graders use taxonomy-based classification:
+# - Agents ending in _analyst are graded as analysts
+# - Agents ending in _specialist are graded as specialists
+# - New agents are auto-classified by naming convention
 ```
 
 ### Scenarios

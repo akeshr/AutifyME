@@ -197,3 +197,23 @@ def analyst_file_written(seq: ToolCallSequence, agent: str) -> GraderResult:
     result.name = "analyst_file_written"
     result.category = GraderCategory.ANALYST
     return result
+
+
+def analyst_protocol_first(seq: ToolCallSequence, agent: str) -> GraderResult:
+    """Check if analyst loaded protocol as first action.
+
+    Wrapper around protocol_load_first for analyst context.
+
+    Args:
+        seq: ToolCallSequence from get_tool_call_sequence()
+        agent: Analyst agent to check
+
+    Returns:
+        GraderResult with pass/fail and evidence
+    """
+    from .pm_graders import protocol_load_first
+
+    result = protocol_load_first(seq, agent)
+    result.name = "analyst_protocol_first"
+    result.category = GraderCategory.ANALYST
+    return result
