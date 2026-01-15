@@ -1,6 +1,5 @@
 """Unit tests for Rich Output sanitization utilities."""
 
-import pytest
 
 from autifyme_agents.tools.rich_output.utils.input_sanitization import (
     sanitize_input_data,

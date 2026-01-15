@@ -60,6 +60,7 @@ htmlcov/
 *.log
 nul
 *.txt
+*-cwd
 
 # OS
 Thumbs.db

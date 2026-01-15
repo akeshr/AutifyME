@@ -1,6 +1,5 @@
 """Unit tests for Rich Output validation utilities."""
 
-import pytest
 
 from autifyme_agents.tools.rich_output.utils.validation import (
     validate_html_structure,
