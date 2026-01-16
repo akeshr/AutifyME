@@ -178,6 +178,14 @@ Same pillars, different checks per agent type.
 | `specialist_hitl_respected` | Code | Implemented | Honored approval/rejection/edit (requires thread context for full check) |
 | `specialist_domain_accuracy` | Model | Rubric defined | Domain-specific output quality |
 
+**Creative Specialist Criteria (creative_specialist only):**
+
+| Criterion                          | Type | Status      | Description                                                                 |
+|------------------------------------|------|-------------|-----------------------------------------------------------------------------|
+| `image_studio_fidelity_included`   | Code | Implemented | Fidelity spec present (prevents product identity loss)                      |
+| `image_studio_core_specs_included` | Code | Implemented | Core specs present (fidelity, focus, lighting/material, composition/output) |
+| `image_studio_output_verified`     | Code | Implemented | view_image called after image_studio to verify quality                      |
+
 **Universal Criteria (all agents):**
 
 | Criterion | Type | Status | Description |
@@ -451,14 +459,40 @@ Results stored in LangSmith
 
 ### Multi-Turn Evaluation
 
-**Decision:** No special multi-turn infrastructure. Multi-turn = linked traces evaluated via thread chaining.
+**Decision:** No special multi-turn infrastructure. Multi-turn = linked traces evaluated via workflow window.
+
+#### Thread vs Workflow Distinction (CRITICAL)
+
+| Concept | Scope | Lifetime |
+|---------|-------|----------|
+| Thread ID | WhatsApp conversation | Potentially forever (lifetime chat) |
+| Session ID | LangSmith session | Also potentially very long |
+| Workflow Window | Bounded time range | Hours around starting trace |
+
+**The Problem:** Thread/session IDs can represent lifetime conversations with thousands of traces. Loading entire thread history is O(n) where n = entire conversation history - catastrophically slow.
+
+**The Solution:** Workflow Window - bounded trace retrieval around a starting point.
 
 **Approach:**
-1. Get starting trace (any trace in the thread)
-2. Extract `thread_id` from trace
-3. Call `get_outcome_by_thread(thread_id)` to get all related traces
-4. Run code graders on each trace individually
-5. Claude reasons about cross-trace concerns
+
+1. User provides starting trace (the trace they want to evaluate)
+2. Use `get_workflow_window(trace_id)` to get bounded context (default: +/- 2 hours)
+3. Window includes session boundary detection (gaps > 60 min)
+4. Run code graders on each trace in window
+5. Claude reasons about cross-trace concerns within the window
+
+```python
+from tests.tools.evaluation.helpers import get_workflow_window
+
+# Get workflow context - O(window) not O(thread history)
+window = get_workflow_window(trace_id, hours_before=2.0, hours_after=2.0)
+
+for t in window:
+    if t['session_break_before']:
+        print("--- session boundary ---")
+    marker = "*" if t['is_starting_trace'] else " "
+    print(f"{marker} {t['trace_id'][:8]}: {t['start_time']}")
+```
 
 **Cross-trace concerns Claude evaluates:**
 - **Context continuity:** Did PM remember prior conversation?
@@ -466,7 +500,23 @@ Results stored in LangSmith
 - **State progression:** Did workflow advance correctly across turns?
 - **Error recovery:** Did PM handle mid-conversation failures?
 
-**No special tooling needed.** Models exist (`ThreadTrace`, `WorkflowStory`, `HITLDecision`) as containers for Claude's reasoning, not automation.
+**Session Boundary Detection:**
+
+- Large gaps (>60 min by default) between traces indicate session boundaries
+- Window functions mark these boundaries in results
+- Helps distinguish "same workflow" from "different workflow in same thread"
+
+**Efficient Navigation:**
+```python
+from tests.tools.evaluation.helpers import prev_trace, next_trace
+
+# O(1) navigation with session boundary awareness
+prev_id = prev_trace(trace_id)  # Stops at session boundaries
+next_id = next_trace(trace_id)  # Stops at session boundaries
+
+# Ignore boundaries if needed
+prev_id = prev_trace(trace_id, session_gap_minutes=0)
+```
 
 #### Cross-Trace Model Rubrics
 
@@ -640,6 +690,12 @@ graders/
 - `specialist_hitl_respected` - Honored HITL decision (full verification requires thread context)
 - `error_recovery_attempted` - Universal: Recovery attempted after tool error
 
+**Creative Specialist Graders (Implemented):**
+
+- `image_studio_fidelity_included` - Fidelity spec present (product identity protection)
+- `image_studio_core_specs_included` - Core specs present (prevents garbage output)
+- `image_studio_output_verified` - view_image called after generation (quality check)
+
 **Code Graders (Planned):**
 
 - `specialist_verified_before_act` - Verification before write
@@ -738,9 +794,9 @@ def get_pattern_fixes(
 | 3.4 | Done | Refactor `pm_wave_execution` to taxonomy-based approach |
 | 3.5 | Done | Register `analyst_protocol_first` in ANALYST_GRADERS |
 | 3.6 | Done | Register `specialist_protocol_loaded` in SPECIALIST_GRADERS |
-| 3.7 | Planned | Implement `specialist_read_upstream` grader |
+| 3.7 | Done | Implement `specialist_read_upstream` grader |
 | 3.8 | Planned | Implement `specialist_verified_before_act` grader |
-| 3.9 | Planned | Implement `specialist_hitl_respected` grader |
+| 3.9 | Done | Implement `specialist_hitl_respected` grader |
 | 3.10 | Done | Implement `error_recovery_attempted` grader (universal) |
 | 3.11 | N/A | Model graders = Claude reasoning with rubrics (no code needed) |
 

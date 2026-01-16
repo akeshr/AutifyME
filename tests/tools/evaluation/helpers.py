@@ -1213,21 +1213,137 @@ def scan_all_handoffs(trace_id: str) -> list[dict]:
 
 
 # =============================================================================
-# prev_trace / next_trace: On-demand thread navigation
+# Workflow Window: Bounded trace retrieval for multi-turn evaluation
 # =============================================================================
 
 
-def prev_trace(trace_id: str) -> str | None:
+def get_workflow_window(
+    trace_id: str,
+    hours_before: float = 2.0,
+    hours_after: float = 2.0,
+    max_traces: int = 20,
+    session_gap_minutes: int = 60,
+) -> list[dict]:
+    """Get traces in a bounded window around the given trace.
+
+    This is the correct abstraction for multi-turn evaluation:
+    - Given a starting trace, find related traces in a reasonable time window
+    - Respects that threads/sessions can span lifetime of conversations
+    - Returns bounded results for efficient processing
+    - Optionally detects session boundaries via time gaps
+
+    IMPORTANT: Thread/session IDs can represent lifetime conversations.
+    This function provides bounded access instead of loading entire history.
+
+    Args:
+        trace_id: Starting LangSmith trace ID
+        hours_before: Hours to look back (default: 2)
+        hours_after: Hours to look forward (default: 2)
+        max_traces: Maximum traces to return (default: 20)
+        session_gap_minutes: Gap (in minutes) that indicates session boundary (default: 60)
+
+    Returns:
+        List of trace info dicts in chronological order, with session boundary markers:
+        [
+            {"trace_id": "...", "start_time": datetime, "is_starting_trace": bool, "session_break_before": bool},
+            ...
+        ]
+
+    Example:
+        >>> # Get workflow context around a trace
+        >>> window = get_workflow_window('abc123')
+        >>> for t in window:
+        ...     marker = "*" if t['is_starting_trace'] else " "
+        ...     break_marker = "---" if t.get('session_break_before') else ""
+        ...     print(f"{break_marker}{marker} {t['trace_id'][:8]}: {t['start_time']}")
+
+        >>> # Narrow window for recent workflow
+        >>> window = get_workflow_window('abc123', hours_before=0.5, hours_after=0.5)
+    """
+    client = _get_client()
+    run = client.read_run(trace_id)
+
+    if not run.session_id:
+        print(f"No session_id found for trace: {trace_id}")
+        return []
+
+    if not run.start_time:
+        print(f"No start_time found for trace: {trace_id}")
+        return []
+
+    # Calculate time window
+    window_start = run.start_time - timedelta(hours=hours_before)
+    window_end = run.start_time + timedelta(hours=hours_after)
+
+    # Format times for LangSmith filter (ISO format)
+    start_iso = window_start.isoformat()
+    end_iso = window_end.isoformat()
+
+    # Query with time bounds - O(window) instead of O(entire session)
+    session_runs = list(client.list_runs(
+        project_name="autifyme-dev",
+        is_root=True,
+        filter=f'and(eq(session_id, "{run.session_id}"), gte(start_time, "{start_iso}"), lte(start_time, "{end_iso}"))',
+        limit=max_traces,
+    ))
+
+    if not session_runs:
+        return []
+
+    # Sort by start_time (ascending = chronological)
+    session_runs.sort(key=lambda x: x.start_time or datetime.min)
+
+    # Build result with session boundary detection
+    result = []
+    prev_time = None
+    gap_threshold = timedelta(minutes=session_gap_minutes)
+
+    for r in session_runs:
+        is_starting = str(r.id) == trace_id or str(r.id).startswith(trace_id)
+
+        # Detect session break (large gap from previous trace)
+        session_break = False
+        if prev_time and r.start_time:
+            gap = r.start_time - prev_time
+            if gap > gap_threshold:
+                session_break = True
+
+        result.append({
+            "trace_id": str(r.id),
+            "start_time": r.start_time,
+            "end_time": r.end_time,
+            "is_starting_trace": is_starting,
+            "session_break_before": session_break,
+            "status": r.status,
+            "error": r.error if r.error else None,
+        })
+
+        prev_time = r.end_time or r.start_time
+
+    print(f"Workflow window: {len(result)} traces in {hours_before}h before / {hours_after}h after")
+    if any(t.get("session_break_before") for t in result):
+        print(f"  (session breaks detected - gaps > {session_gap_minutes} min)")
+
+    return result
+
+
+# =============================================================================
+# prev_trace / next_trace: Efficient O(1) thread navigation
+# =============================================================================
+
+
+def prev_trace(trace_id: str, session_gap_minutes: int = 60) -> str | None:
     """Get previous trace in same session, or None if first.
 
-    Enables on-demand navigation through conversation threads.
-    Use when you need to see what happened before the current trace.
+    Uses time-bounded query for O(1) performance instead of loading entire session.
+    Optionally respects session boundaries (large time gaps).
 
     Args:
         trace_id: LangSmith trace ID
+        session_gap_minutes: Gap that indicates session boundary (skips across boundaries)
 
     Returns:
-        Previous trace ID, or None if this is the first trace in session
+        Previous trace ID, or None if this is the first trace in session/window
 
     Example:
         >>> prev_id = prev_trace('a194cf05')
@@ -1241,51 +1357,57 @@ def prev_trace(trace_id: str) -> str | None:
         print(f"No session_id found for trace: {trace_id}")
         return None
 
-    # Get all root traces in this session, sorted by time
-    session_runs = list(client.list_runs(
+    if not run.start_time:
+        print(f"No start_time found for trace: {trace_id}")
+        return None
+
+    # Query for traces BEFORE current, ordered by time descending (most recent first)
+    # Only look back a reasonable window (24 hours) to avoid scanning entire history
+    window_start = run.start_time - timedelta(hours=24)
+    start_iso = window_start.isoformat()
+    current_iso = run.start_time.isoformat()
+
+    # Get traces before current time, limit to small batch
+    prev_runs = list(client.list_runs(
         project_name="autifyme-dev",
         is_root=True,
-        filter=f'eq(session_id, "{run.session_id}")'
+        filter=f'and(eq(session_id, "{run.session_id}"), gte(start_time, "{start_iso}"), lt(start_time, "{current_iso}"))',
+        limit=10,
     ))
 
-    if not session_runs:
+    if not prev_runs:
+        print("This is the first trace in the session (within 24h window)")
         return None
 
-    # Sort by start_time
-    session_runs.sort(key=lambda x: x.start_time or datetime.min)
+    # Sort descending to get most recent first
+    prev_runs.sort(key=lambda x: x.start_time or datetime.min, reverse=True)
 
-    # Find current trace position
-    current_idx = None
-    for i, r in enumerate(session_runs):
-        if str(r.id) == trace_id or str(r.id).startswith(trace_id):
-            current_idx = i
-            break
+    # Check for session boundary
+    prev_run = prev_runs[0]
+    if prev_run.end_time and run.start_time:
+        gap = run.start_time - (prev_run.end_time or prev_run.start_time)
+        if gap > timedelta(minutes=session_gap_minutes):
+            print(f"Session boundary detected (gap: {gap}). Previous trace is from different session.")
+            print(f"  Use prev_trace('{trace_id}', session_gap_minutes=0) to ignore boundaries.")
+            return None
 
-    if current_idx is None:
-        print(f"Trace {trace_id} not found in session")
-        return None
-
-    if current_idx == 0:
-        print("This is the first trace in the session")
-        return None
-
-    prev_run = session_runs[current_idx - 1]
     print(f"Previous trace: {prev_run.id}")
     print(f"  Time: {prev_run.start_time}")
     return str(prev_run.id)
 
 
-def next_trace(trace_id: str) -> str | None:
+def next_trace(trace_id: str, session_gap_minutes: int = 60) -> str | None:
     """Get next trace in same session, or None if last.
 
-    Enables on-demand navigation through conversation threads.
-    Use when you need to see what happened after the current trace.
+    Uses time-bounded query for O(1) performance instead of loading entire session.
+    Optionally respects session boundaries (large time gaps).
 
     Args:
         trace_id: LangSmith trace ID
+        session_gap_minutes: Gap that indicates session boundary (skips across boundaries)
 
     Returns:
-        Next trace ID, or None if this is the last trace in session
+        Next trace ID, or None if this is the last trace in session/window
 
     Example:
         >>> next_id = next_trace('f264838e')
@@ -1300,35 +1422,41 @@ def next_trace(trace_id: str) -> str | None:
         print(f"No session_id found for trace: {trace_id}")
         return None
 
-    # Get all root traces in this session, sorted by time
-    session_runs = list(client.list_runs(
+    if not run.start_time:
+        print(f"No start_time found for trace: {trace_id}")
+        return None
+
+    # Query for traces AFTER current, ordered by time ascending (earliest first)
+    # Only look forward a reasonable window (24 hours)
+    window_end = run.start_time + timedelta(hours=24)
+    current_iso = run.start_time.isoformat()
+    end_iso = window_end.isoformat()
+
+    # Get traces after current time, limit to small batch
+    next_runs = list(client.list_runs(
         project_name="autifyme-dev",
         is_root=True,
-        filter=f'eq(session_id, "{run.session_id}")'
+        filter=f'and(eq(session_id, "{run.session_id}"), gt(start_time, "{current_iso}"), lte(start_time, "{end_iso}"))',
+        limit=10,
     ))
 
-    if not session_runs:
+    if not next_runs:
+        print("This is the last trace in the session (within 24h window)")
         return None
 
-    # Sort by start_time
-    session_runs.sort(key=lambda x: x.start_time or datetime.min)
+    # Sort ascending to get earliest first
+    next_runs.sort(key=lambda x: x.start_time or datetime.min)
 
-    # Find current trace position
-    current_idx = None
-    for i, r in enumerate(session_runs):
-        if str(r.id) == trace_id or str(r.id).startswith(trace_id):
-            current_idx = i
-            break
+    # Check for session boundary
+    next_run = next_runs[0]
+    current_end = run.end_time or run.start_time
+    if current_end and next_run.start_time:
+        gap = next_run.start_time - current_end
+        if gap > timedelta(minutes=session_gap_minutes):
+            print(f"Session boundary detected (gap: {gap}). Next trace is from different session.")
+            print(f"  Use next_trace('{trace_id}', session_gap_minutes=0) to ignore boundaries.")
+            return None
 
-    if current_idx is None:
-        print(f"Trace {trace_id} not found in session")
-        return None
-
-    if current_idx == len(session_runs) - 1:
-        print("This is the last trace in the session")
-        return None
-
-    next_run = session_runs[current_idx + 1]
     print(f"Next trace: {next_run.id}")
     print(f"  Time: {next_run.start_time}")
     return str(next_run.id)
