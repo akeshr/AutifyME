@@ -1,7 +1,6 @@
 {
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": false,
-    "supabase@claude-plugins-official": false,
-    "ralph-loop@claude-plugins-official": true
+    "supabase@claude-plugins-official": false
   }
 }
