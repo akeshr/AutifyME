@@ -315,15 +315,35 @@ Each agent receives ALL prior outputs. When delegating, include what exists:
 
 **Only exception:** Pure image processing (no DB interaction)
 
-### 4. Flow Doctrine (Two-Phase Commit)
+### 4. Flow Doctrine (OODA-Based)
 
-**STRICT SEPARATION: Usage of Analysis vs Execution Agents.**
+**STRICT SEPARATION: Analysis vs Execution. OODA orchestration within Analysis.**
 
-**Phase 1: INTELLIGENCE (Parallel)**
-*Goal: Gather facts. Read-only. Safe to parallelize.*
+**Phase 1: INTELLIGENCE (OODA)**
+*Goal: Gather facts through incremental knowledge building.*
 - Agents: `visual_analyst`, `product_analyst`, `catalog_analyst`
 - Protocol: `discovery_mindset`
-- **Rule:** Fire all needed analysts in ONE turn (if identity known).
+- **Pattern:** OBSERVE -> ORIENT -> DECIDE -> (maybe more analysis) -> Gate
+
+**[CRITICAL] OODA Within Analysis:**
+```
+1. OBSERVE: visual_analyst (see what it is)
+   -> WAIT, READ file, CHECKPOINT
+
+2. ORIENT: catalog_analyst (check existing state)
+   -> WAIT, READ file, CHECKPOINT
+
+3. DECIDE: Based on findings, do I need more?
+   - Existing product found? -> Skip to Gate
+   - New but familiar category? -> Skip product_analyst, go to Gate
+   - New and novel category? -> Queue product_analyst, then Gate
+
+4. REPEAT if needed (product_analyst for novel categories)
+```
+
+**Parallelization Rule:** Only parallel when BOTH agents needed REGARDLESS of findings.
+- V -> (P || C): WRONG - C might find existing, making P unnecessary
+- User explicitly wants both: OK - "research AND check catalog"
 
 **Gate: USER APPROVAL**
 *Stop. Synthesize. Ask user.*
@@ -335,9 +355,9 @@ Each agent receives ALL prior outputs. When delegating, include what exists:
 - **Rule:** Follow the specific flow (A-E) defined in protocol.
 - **Rule:** NEVER run Creative and Catalog specialists in parallel.
 
-**Anti-Pattern:**
-"I will run visual_analyst AND creative_specialist together."
-**NO.** You cannot create (execute) until you have seen (analyzed).
+**Anti-Patterns:**
+- "I will run visual_analyst AND creative_specialist together." -> NO. Analyze before execute.
+- "I will fire V, P, C all at once for 'add this'." -> NO. OODA: observe, orient, THEN decide if P needed.
 
 ### 5. Context Doctrine
 
@@ -349,32 +369,62 @@ Each agent receives ALL prior outputs. When delegating, include what exists:
 
 ---
 
-## REASONING EXAMPLES (Not Rules)
+## REASONING EXAMPLES (OODA)
 
-**These illustrate doctrine application. Reason from principles, don't pattern match.**
+**These illustrate OODA doctrine. Reason from principles, don't pattern match.**
 
 ### Image + "add this" (Identity UNKNOWN)
 ```
 User: [image] + "add this"
-Identity: UNKNOWN (Visual inspection needed first)
-Chain: A (Visual -> Product -> Catalog)
-Logic:
-1. Visual runs FIRST. (BLOCKING)
-2. Product reads visual_analysis.md -> Researches specs.
-3. Catalog reads visual + product files -> Checks fit.
-Result: Serial Chain.
+OODA Flow:
+1. OBSERVE: visual_analyst (see what it is)
+   -> WAIT, READ visual_analysis.md
+   -> "Premium glass bottle, 500ml"
+
+2. ORIENT: catalog_analyst (does it exist? family fit?)
+   -> WAIT, READ catalog_analysis.md
+   -> "No exact match. Glass Premium family exists."
+
+3. DECIDE: Based on findings...
+   - Existing? NO
+   - Familiar category? YES (glass bottles known)
+   - Need product_analyst? NO (catalog has pricing context)
+
+4. Gate: Present to user
+Result: V -> C -> Gate (skipped P - familiar category)
 ```
 
-### Image + "research this iPhone 15" (Identity KNOWN)
+### Image + "add this" (NOVEL product)
+```
+User: [image] + "add this smart bottle with LED display"
+OODA Flow:
+1. OBSERVE: visual_analyst
+   -> "Glass + electronics + USB port"
+
+2. ORIENT: catalog_analyst
+   -> "No family for hybrid electronics"
+
+3. DECIDE: Novel category, need classification
+   -> Queue product_analyst
+
+4. product_analyst runs
+   -> "HSN 8543, BIS certification needed"
+
+5. Gate: Present to user with full context
+Result: V -> C -> [DECIDE: need P] -> P -> Gate
+```
+
+### Image + "research this iPhone 15" (Identity KNOWN + explicit request)
 ```
 User: [image] + "research this iPhone 15"
-Identity: KNOWN ("iPhone 15")
-Chain: A (Visual || Product || Catalog)
-Logic:
-1. Visual: Validates condition.
-2. Product: Researches "iPhone 15" specs immediately.
-3. Catalog: Checks "iPhone 15" in DB immediately.
-Result: PARALLEL LAUNCH.
+User explicitly wants research AND catalog check.
+Both needed REGARDLESS of findings -> parallel OK.
+
+1. OBSERVE: visual_analyst (validates condition)
+2. ORIENT: product_analyst || catalog_analyst (both explicitly requested)
+   -> parallel because user wants BOTH regardless
+
+Result: V -> (P || C) -> Gate
 ```
 
 ### Pure image processing

@@ -2,22 +2,82 @@
 
 ## PURPOSE
 
-How to synthesize analyst findings into unified understanding for user.
-Load when: Analysis phase complete, ready to present to user.
+How to synthesize analyst findings into unified understanding.
+Load when: At OODA checkpoints AND when ready to present to user.
+
+---
+
+## TWO SYNTHESIS MODES
+
+### Mode 1: Checkpoint Synthesis (OODA Decision Points)
+
+**When:** After each OODA phase completes (OBSERVE, ORIENT).
+**Purpose:** Decide what's next - not present to user.
+
+```
+READ the output file (not just summary)
+ASK: "What do I now know? What's still unknown?"
+DECIDE: What's needed next?
+  - Another analyst? -> Queue it
+  - User clarification? -> Ask
+  - Ready for gate? -> Proceed
+```
+
+**Checkpoint synthesis is INTERNAL reasoning, not user-facing.**
+
+### Mode 2: Gate Synthesis (User Presentation)
+
+**When:** All needed analysis complete, ready for user approval.
+**Purpose:** Present unified findings and get user decision.
 
 ---
 
 ## PREREQUISITE: INGEST INTELLIGENCE
 
 **Summaries are lies. Files are truth.**
-Before you synthesize, you MUST read the actual findings.
+Before you synthesize (either mode), you MUST read the actual findings.
 
 **Action:**
 1. Identify relevant files: `visual_analysis_*.md`, `product_research_*.md`, `catalog_analysis_*.md`.
 2. Call `read_file` on them (if you haven't already).
 3. **THEN** synthesize.
 
-**Why?** Agent summaries ("Found 3 items") lack the nuance ("Item 2 is a darker shade") needed for conflict detection.
+**Why?** Agent summaries ("Found 3 items") lack the nuance ("Item 2 is a darker shade") needed for conflict detection and OODA decisions.
+
+## CHECKPOINT SYNTHESIS (OODA DECISIONS)
+
+**At each checkpoint, synthesize to DECIDE, not to present.**
+
+### After OBSERVE (visual_analyst)
+
+| I Now Know | Next Step |
+|------------|-----------|
+| Product identity, material, features | ORIENT: Check catalog state |
+| Complex multi-material product | ORIENT: Catalog may need product research |
+| Simple familiar product | ORIENT: Catalog likely has context |
+
+### After ORIENT (catalog_analyst)
+
+| I Now Know | Next Step |
+|------------|-----------|
+| Exact match exists | Gate: present update options to user |
+| Similar exists, not exact | Gate: present create/update options |
+| No match, familiar category | Gate: proceed without product_analyst |
+| No match, novel category | Queue product_analyst for HSN/compliance |
+| Family doesn't exist | Gate: ask user about new family |
+
+### Checkpoint Decision Template
+
+```
+CHECKPOINT after [agent]:
+- What product/item? [identity]
+- Does it exist? [yes/no/similar]
+- Familiar category? [yes/no]
+- What's missing? [list gaps]
+- Next: [agent to queue OR gate OR ask user]
+```
+
+---
 
 ## SYNTHESIS PRINCIPLE: HIERARCHICAL TRUTH
 
@@ -185,5 +245,8 @@ Product: "Common product, widely available"
 | **Hidden conflicts** | Proceed despite mismatches | Detect and resolve or surface |
 | **Raw relay** | Pass analyst text verbatim | Distill into concise insights |
 | **No recommendation** | Just present facts | Always include what to do next |
+| **Skipping checkpoints** | Gate synthesis without checkpoint synthesis | Synthesize at EACH OODA phase |
+| **Summary-only decisions** | Deciding next step from agent summary | READ the file, then decide |
+| **Parallel without DECIDE** | Fire P and C without checking if both needed | Checkpoint: "Do findings eliminate need for other agent?" |
 
 </protocol>
