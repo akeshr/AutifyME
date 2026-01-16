@@ -266,13 +266,18 @@ def run_code_graders(
     """
     # Load trace data once (shared across all graders)
     seq = get_tool_call_sequence(trace_id)
-    graph = get_delegation_graph(trace_id)
+    graph = get_delegation_graph(trace_id, seq=seq)  # Pass seq to avoid re-fetch
 
-    # Get trace status from LangSmith
-    from ..trace_loader import load_trace_for_eval
-    trace_data = load_trace_for_eval(trace_id, include_issues=False)
-    trace_status = trace_data.status or "unknown"
-    trace_error = trace_data.error
+    # Get trace status directly from root run (O(1) instead of loading full trace)
+    from langsmith import Client
+    client = Client()
+    try:
+        root_run = client.read_run(trace_id)
+        trace_status = root_run.status or "unknown"
+        trace_error = str(root_run.error) if root_run.error else None
+    except Exception as e:
+        trace_status = "unknown"
+        trace_error = f"Failed to read trace: {e}"
 
     results = []
     warnings = []

@@ -1235,7 +1235,10 @@ def get_tool_call_sequence(trace_id: str) -> ToolCallSequence:
     )
 
 
-def get_delegation_graph(trace_id: str) -> DelegationGraph:
+def get_delegation_graph(
+    trace_id: str,
+    seq: ToolCallSequence | None = None,
+) -> DelegationGraph:
     """Get hierarchical graph of agent delegations.
 
     Extracts all 'task' tool calls (PM's delegation mechanism) and builds
@@ -1246,6 +1249,7 @@ def get_delegation_graph(trace_id: str) -> DelegationGraph:
 
     Args:
         trace_id: LangSmith trace ID
+        seq: Pre-loaded ToolCallSequence (optional, avoids re-fetching)
 
     Returns:
         DelegationGraph with delegations, waves, and involved agents
@@ -1259,8 +1263,9 @@ def get_delegation_graph(trace_id: str) -> DelegationGraph:
         >>> if "creative_specialist" in graph.delegation_order:
         ...     print("PM delegated to creative_specialist")
     """
-    # Get tool call sequence first
-    seq = get_tool_call_sequence(trace_id)
+    # Use provided seq or fetch
+    if seq is None:
+        seq = get_tool_call_sequence(trace_id)
 
     delegations = []
     agents_involved = set()

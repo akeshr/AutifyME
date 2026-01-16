@@ -1005,7 +1005,7 @@ def show_orchestrator_flow(trace_id: str) -> list[dict]:
     # Find root (orchestrator)
     root = next((r for r in runs if not r.parent_run_id), None)
     if not root:
-        print("No root found")
+        _safe_print("No root found")
         return []
 
     # Find LLM calls that are direct children of orchestrator's model chains
@@ -1021,17 +1021,17 @@ def show_orchestrator_flow(trace_id: str) -> list[dict]:
 
     orchestrator_llm_calls.sort(key=lambda x: x.start_time or datetime.min)
 
-    print(f"\n{'='*70}")
-    print("ORCHESTRATOR DECISION FLOW")
-    print(f"Trace: {trace_id}")
-    print(f"{'='*70}")
+    _safe_print(f"\n{'='*70}")
+    _safe_print("ORCHESTRATOR DECISION FLOW")
+    _safe_print(f"Trace: {trace_id}")
+    _safe_print(f"{'='*70}")
 
     decisions = []
 
     for i, run in enumerate(orchestrator_llm_calls, 1):
-        print(f"\n[{i}] Decision - {str(run.id)[:8]}")
-        print(f"    Full ID: {run.id}")
-        print(f"    Tokens: {run.total_tokens or 0:,}")
+        _safe_print(f"\n[{i}] Decision - {str(run.id)[:8]}")
+        _safe_print(f"    Full ID: {run.id}")
+        _safe_print(f"    Tokens: {run.total_tokens or 0:,}")
 
         decision = {
             "index": i,
@@ -1052,23 +1052,23 @@ def show_orchestrator_flow(trace_id: str) -> list[dict]:
                 if name == "task":
                     subagent = args.get("subagent_type", args.get("specialist", "?"))
                     desc = args.get("description", "")
-                    print(f"    -> task({subagent})")
-                    print(f"       desc: {desc}")
+                    _safe_print(f"    -> task({subagent})")
+                    _safe_print(f"       desc: {desc}")
                     call_info["args_summary"]["subagent"] = subagent
                     call_info["args_summary"]["description"] = desc
                 else:
-                    print(f"    -> {name}")
+                    _safe_print(f"    -> {name}")
                     # Show all args - NO truncation
                     for k, v in args.items():
-                        print(f"       {k}: {v}")
+                        _safe_print(f"       {k}: {v}")
                         call_info["args_summary"][k] = str(v)
 
                 decision["tool_calls"].append(call_info)
 
         decisions.append(decision)
 
-    print(f"\n{'='*70}")
-    print(f"Total orchestrator decisions: {len(decisions)}")
+    _safe_print(f"\n{'='*70}")
+    _safe_print(f"Total orchestrator decisions: {len(decisions)}")
 
     return decisions
 

@@ -72,13 +72,16 @@ Score and investigate an existing trace.
 
 ```python
 # For failed graders, drill into specifics:
-from tests.tools.evaluation.helpers import show_node, show_handoff
+from tests.tools.evaluation.helpers import show_node, show_handoff, show_tree
 
-# Examine specific nodes
+# First, see the trace hierarchy to get run_ids
+show_tree(trace_id)  # Shows all nodes with their run_ids
+
+# Examine specific nodes (use run_id from show_tree output)
 show_node(run_id)  # Full INPUT/REASONING/OUTPUT
 
-# Examine context handoffs
-show_handoff(parent_id, child_id)  # What was passed vs received
+# Examine context handoffs (requires TWO run UUIDs)
+show_handoff(parent_run_id, child_run_id)  # What was passed vs received
 
 # Check delegation flow
 show_orchestrator_flow(trace_id)  # PM's decision sequence
@@ -865,7 +868,20 @@ Full-depth evaluation: model criteria on every trace PLUS cross-trace rubrics.
 ```python
 from tests.tools.trace_loader import load_trace_for_eval, TraceForEval
 result: TraceForEval = load_trace_for_eval(trace_id)
-# result.tool_call_sequence, result.delegation_graph, result.detected_issues
+
+# Key fields (NOT nested objects - all flat attributes):
+# result.user_message          - Preview of user's message
+# result.user_message_raw      - Full untruncated message
+# result.has_image             - Whether input had images
+# result.media_paths           - List of media file paths
+# result.delegations           - List of dicts with delegation info
+# result.delegation_order      - List of agent names in order
+# result.waves                 - Dict of wave_num -> [agents]
+# result.tool_calls            - List of tool call dicts
+# result.final_response        - PM's final response text
+# result.detected_issues       - List of DetectedIssue objects
+# result.handoff_issues        - List of HandoffAnalysis objects
+# result.total_tokens, latency_ms, total_cost, status, error
 ```
 
 ### Grading
@@ -975,13 +991,16 @@ from tests.tools.replay_runner import (
 
 ```python
 from tests.tools.evaluation.helpers import (
-    show_tree,           # Hierarchical trace view
-    show_node,           # Single node detail
-    show_handoff,        # Context handoff analysis
-    show_orchestrator_flow,  # PM decision sequence
-    detect_issues,       # Auto-detect problems
-    compare_traces,      # Before/after comparison
+    show_tree,           # show_tree(trace_id) - Hierarchical trace view
+    show_node,           # show_node(run_id) - Single node INPUT/REASONING/OUTPUT
+    show_handoff,        # show_handoff(parent_run_id, child_run_id) - Context analysis
+                         # NOTE: Requires two RUN UUIDs, not trace_id + agent_name
+    show_orchestrator_flow,  # show_orchestrator_flow(trace_id) - PM decision sequence
+    detect_issues,       # detect_issues(trace_id) - Auto-detect problems
+    compare_traces,      # compare_traces(trace_id_a, trace_id_b) - Before/after
 )
+
+# To get run_ids for show_handoff, use show_tree first to see the hierarchy
 ```
 
 ### Multi-Turn Navigation
@@ -1002,6 +1021,63 @@ next_id = next_trace(trace_id)
 
 # Ignore boundaries if needed
 prev_id = prev_trace(trace_id, session_gap_minutes=0)
+```
+
+### Key Schemas
+
+**AgentDelegation** (from `get_delegation_graph().delegations`):
+
+```python
+AgentDelegation(
+    from_agent: str,           # "PM"
+    to_agent: str,             # "visual_analyst" (NOT child_agent)
+    context_passed: list[str], # File paths or context snippets
+    wave: int | None,          # Wave number (1, 2, etc.)
+    parallel_with: list[str],  # Other agents in same wave
+)
+# NOTE: No task_summary field - use context_passed
+```
+
+**SequencedToolCall** (from `get_tool_call_sequence().tool_calls`):
+
+```python
+SequencedToolCall(
+    sequence: int,             # Order (1-indexed)
+    agent: str,                # "PM" or "visual_analyst"
+    tool_name: str,            # "load_protocol", "task", etc.
+    parsed_args: dict,         # Use this (not tool_args)
+    status: str,               # "success" | "error" (NOT .success bool)
+    error: str | None,         # Error message if failed
+    run_id: str,               # UUID for drilling down
+)
+```
+
+**DelegationGraph** (from `get_delegation_graph()`):
+
+```python
+DelegationGraph(
+    trace_id: str,
+    root_agent: str,           # Usually "PM"
+    delegations: list[AgentDelegation],
+    waves: dict[int, list[str]],  # {1: ["visual_analyst"], 2: ["product_analyst", "catalog_analyst"]}
+    delegation_order: list[str],  # ["visual_analyst", "product_analyst", "catalog_analyst"]
+)
+```
+
+**AgentFinalMessage** (from `get_agent_final_message()`):
+
+```python
+AgentFinalMessage(
+    agent: str,
+    message: str,              # Full message text
+    message_preview: str,      # First 200 chars
+    has_numbered_options: bool,
+    has_open_question: bool,
+    is_approval_request: bool,
+    mentions_error: bool,
+    mentions_success: bool,
+)
+# Returns None if not found
 ```
 
 ---
