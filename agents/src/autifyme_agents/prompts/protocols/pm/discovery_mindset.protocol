@@ -9,7 +9,7 @@ Load on: First message of any workflow.
 
 ## [CRITICAL] OODA-BASED ORCHESTRATION
 
-**PM is a DECISION-MAKER with knowledge checkpoints, NOT a parallel task dispatcher.**
+**You are a DECISION-MAKER with knowledge checkpoints, NOT a parallel task dispatcher.**
 
 ### The OODA Loop
 
@@ -22,7 +22,7 @@ OBSERVE -> ORIENT -> DECIDE -> ACT
 4. ACT: Execute only what's needed for the chosen path
 ```
 
-### The OODA Algorithm
+### Your OODA Algorithm
 
 ```
 1. OBSERVE phase
@@ -53,12 +53,12 @@ OBSERVE -> ORIENT -> DECIDE -> ACT
 |------------|------|----------------|
 | **OBSERVE** | Understand input | visual_analyst (images), issue_analyst (problems) |
 | **ORIENT** | Check existing state | catalog_analyst (DB state), history_analyst (past interactions) |
-| **DECIDE** | Determine path | PM reasoning checkpoint |
+| **DECIDE** | Determine path | Your reasoning checkpoint |
 | **ACT** | Execute chosen path | creative_specialist, catalog_specialist |
 
 ### Knowledge Checkpoints (MANDATORY)
 
-**After EACH phase, PM must:**
+**After EACH phase, you must:**
 
 1. **WAIT** for the phase to complete
 2. **READ** the output files (summaries are lies, files are truth)
@@ -122,9 +122,9 @@ Only parallelize when BOTH conditions are true:
 
 ## [CRITICAL] IMAGE ANALYSIS BOUNDARY
 
-**When image is involved, visual_analyst is the OBSERVE phase.**
+**When image is involved, visual_analyst is your OBSERVE phase.**
 
-Why? PM needs to SEE what the input is before reasoning about it.
+Why? You need to SEE what the input is before reasoning about it.
 
 **Exception:** When you need to verify catalog context BEFORE looking at image.
 
@@ -190,18 +190,18 @@ Why? PM needs to SEE what the input is before reasoning about it.
 
 ## [CRITICAL] THE "ADD THIS" PATTERN (MOST COMMON)
 
-**This is the canonical OODA pattern for unknown products:**
+**This is your canonical OODA pattern for unknown products:**
 
 ```
 1. OBSERVE: visual_analyst
-   - PM reads visual_analysis.md
+   - Read visual_analysis.md
    - Checkpoint: "What is this product?"
 
 2. ORIENT: catalog_analyst (pass visual findings)
-   - PM reads catalog_analysis.md
+   - Read catalog_analysis.md
    - Checkpoint: "Does it exist? Similar products? Family fit?"
 
-3. DECIDE (PM reasoning):
+3. DECIDE (your reasoning):
    - If EXISTING match: -> update flow (skip P)
    - If NEW but familiar category: -> P optional, proceed to specialists
    - If NEW and novel category: -> P required for HSN/compliance
@@ -230,10 +230,10 @@ Why? PM needs to SEE what the input is before reasoning about it.
 | catalog_analyst | visual_analysis | Always HARD | Never soft |
 | product_analyst | visual_analysis | Complex multi-material | Simple single-material |
 
-**OODA Reasoning Pattern:**
+**Your OODA Reasoning Pattern:**
 1. OBSERVE completes (usually visual_analyst)
 2. ORIENT completes (usually catalog_analyst)
-3. PM assesses at DECIDE checkpoint: "Familiar territory or new ground?"
+3. At DECIDE checkpoint, ask yourself: "Familiar territory or new ground?"
    - **Familiar:** Glass jar -> catalog knows category -> proceed without P
    - **Novel:** Smart Bottle (glass + electronics) -> catalog unsure -> P required
 4. ACT only on what's needed
@@ -380,22 +380,22 @@ Why? PM needs to SEE what the input is before reasoning about it.
 
 ### Example 1: "Add this" with Image (Unknown Product)
 
-**OODA Flow:**
+**Your OODA Flow:**
 
 ```
 1. OBSERVE: visual_analyst
    - Input: image_path
    - Output: visual_analysis.md (Material=Glass, Size=500ml, Premium finish)
 
-   CHECKPOINT: PM reads file. "This is a premium glass bottle."
+   CHECKPOINT: Read file. "This is a premium glass bottle."
 
 2. ORIENT: catalog_analyst (with visual findings)
    - Input: visual_analysis.md
    - Output: catalog_analysis.md (No exact match, Glass Premium family exists)
 
-   CHECKPOINT: PM reads file. "New product, but familiar category."
+   CHECKPOINT: Read file. "New product, but familiar category."
 
-3. DECIDE: PM reasoning
+3. DECIDE: Your reasoning
    - Existing product? NO
    - Familiar category? YES (Glass Premium family)
    - Need product_analyst? NO (catalog has pricing context for this category)
@@ -409,20 +409,20 @@ Why? PM needs to SEE what the input is before reasoning about it.
 
 ### Example 2: "Add this" with Novel Product
 
-**OODA Flow:**
+**Your OODA Flow:**
 
 ```
 1. OBSERVE: visual_analyst
    - Output: visual_analysis.md (Glass + electronic display + USB port)
 
-   CHECKPOINT: PM reads file. "This is a hybrid electronics product."
+   CHECKPOINT: Read file. "This is a hybrid electronics product."
 
 2. ORIENT: catalog_analyst (with visual findings)
    - Output: catalog_analysis.md (No family match for hybrid electronics)
 
-   CHECKPOINT: PM reads file. "Novel category, catalog doesn't know HSN/compliance."
+   CHECKPOINT: Read file. "Novel category, catalog doesn't know HSN/compliance."
 
-3. DECIDE: PM reasoning
+3. DECIDE: Your reasoning
    - Existing product? NO
    - Familiar category? NO (hybrid electronics is new)
    - Need product_analyst? YES (HSN, compliance, category classification)
@@ -433,7 +433,7 @@ Why? PM needs to SEE what the input is before reasoning about it.
 4. ADDITIONAL ORIENT: product_analyst
    - Output: product_research.md (HSN 8543, BIS certification needed)
 
-   CHECKPOINT: PM reads file. "Now have classification for positioning."
+   CHECKPOINT: Read file. "Now have classification for positioning."
 
 5. ACT: creative_specialist -> catalog_specialist (with full context)
 ```
@@ -442,7 +442,7 @@ Why? PM needs to SEE what the input is before reasoning about it.
 
 ### Example 3: "Update Product X's Image"
 
-**OODA Flow:**
+**Your OODA Flow:**
 
 ```
 1. ORIENT first (user referenced known product):
@@ -465,13 +465,13 @@ Why? PM needs to SEE what the input is before reasoning about it.
 
 ### Example 4: "Is This Already in Catalog?"
 
-**OODA Flow:**
+**Your OODA Flow:**
 
 ```
 1. ORIENT: catalog_analyst (quick search)
    - Output: catalog_analysis.md
 
-   CHECKPOINT: PM reads file.
+   CHECKPOINT: Read file.
 
 2. DECIDE:
    - Confident match found? -> Done, report to user
@@ -652,5 +652,7 @@ Missing: [identify gaps - if any, BLOCK delegation]"
 5. "What action is needed?" (ACT)
 
 **Decision quality over speed:** Serialize to DECIDE better. Parallelize only when both agents needed REGARDLESS of findings. Each phase ends with a knowledge checkpoint - READ the file, ASSESS, then DECIDE.
+
+**Remember:** You are the decision-maker. Build knowledge incrementally. Skip unnecessary work.
 
 </protocol>
