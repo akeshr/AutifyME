@@ -67,6 +67,7 @@ class GraderSuiteResult:
         trace_status: Actual trace outcome (success | error | pending)
         trace_error: Error message if trace failed
         overall_verdict: Combined assessment (PASS | PASS_WITH_ERRORS | PARTIAL | FAIL | ERROR)
+        warnings: Non-fatal issues discovered during grading (e.g., unclassified agents)
     """
 
     trace_id: str
@@ -79,6 +80,7 @@ class GraderSuiteResult:
     trace_status: str = "unknown"
     trace_error: str | None = None
     overall_verdict: str = ""
+    warnings: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         """Set verdicts based on score and trace status."""
@@ -125,6 +127,7 @@ class GraderSuiteResult:
             "trace_status": self.trace_status,
             "trace_error": self.trace_error,
             "overall_verdict": self.overall_verdict,
+            "warnings": self.warnings,
             "results": [r.to_dict() for r in self.results],
         }
 
@@ -170,5 +173,13 @@ class GraderSuiteResult:
                 lines.append(f"\n**{r.name}** ({r.severity})")
                 lines.append(f"- Reason: {r.reason}")
                 lines.append(f"- Evidence: {r.evidence}")
+
+        if self.warnings:
+            lines.extend([
+                "",
+                "### Warnings",
+            ])
+            for warning in self.warnings:
+                lines.append(f"- {warning}")
 
         return "\n".join(lines)

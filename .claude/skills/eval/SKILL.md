@@ -398,7 +398,7 @@ result: TraceForEval = load_trace_for_eval(trace_id)
 
 ```python
 from tests.tools.graders import (
-    run_code_graders,        # Run all graders (PM + specialists + analysts)
+    run_code_graders,        # Run all graders (PM + specialists + analysts + universal)
     run_pm_graders,          # Run only PM graders
     run_specialist_graders,  # Run only specialist graders (auto-detects from trace)
     run_analyst_graders,     # Run only analyst graders (auto-detects from trace)
@@ -407,11 +407,14 @@ from tests.tools.graders import (
 
 grades: GraderSuiteResult = run_code_graders(trace_id)
 # grades.verdict, grades.overall_score, grades.format_summary()
+# grades.warnings - list of non-fatal issues (e.g., unclassified agents)
 
 # Graders use taxonomy-based classification:
 # - Agents ending in _analyst are graded as analysts
 # - Agents ending in _specialist are graded as specialists
-# - New agents are auto-classified by naming convention
+# - Agents ending in _reviewer are graded as reviewers
+# - Unclassified agents trigger a warning but still run universal graders
+# - Universal graders (like error_recovery_attempted) run on ALL agents
 ```
 
 ### Scenarios

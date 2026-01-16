@@ -15,8 +15,10 @@ from ..trace_analysis import get_delegation_graph, get_tool_call_sequence
 from .base import GraderCategory, GraderResult, GraderSuiteResult
 from .pm_graders import (
     analyst_before_specialist,
+    classify_agents,
     file_read_before_synthesis,
     is_analyst,
+    is_reviewer,
     is_specialist,
     media_download_first,
     protocol_load_first,
@@ -25,8 +27,14 @@ from .pm_graders import (
 from .specialist_graders import (
     analyst_file_written,
     analyst_protocol_first,
+    error_recovery_attempted,
     hitl_triggered,
+    image_studio_core_specs_included,
+    image_studio_fidelity_included,
+    image_studio_output_verified,
+    specialist_hitl_respected,
     specialist_protocol_loaded,
+    specialist_read_upstream,
 )
 
 # Type alias for grader functions
@@ -46,12 +54,26 @@ PM_GRADERS: list[tuple[str, GraderFn, dict]] = [
 SPECIALIST_GRADERS: list[tuple[str, GraderFn, dict]] = [
     ("hitl_triggered", hitl_triggered, {}),  # agent filled dynamically
     ("specialist_protocol_loaded", specialist_protocol_loaded, {}),  # agent filled dynamically
+    ("specialist_read_upstream", specialist_read_upstream, {}),  # agent filled dynamically
+    ("specialist_hitl_respected", specialist_hitl_respected, {}),  # agent filled dynamically
+]
+
+# Registry of creative specialist graders - these run only against creative_specialist
+CREATIVE_SPECIALIST_GRADERS: list[tuple[str, GraderFn, dict]] = [
+    ("image_studio_fidelity_included", image_studio_fidelity_included, {"agent": "creative_specialist"}),
+    ("image_studio_core_specs_included", image_studio_core_specs_included, {"agent": "creative_specialist"}),
+    ("image_studio_output_verified", image_studio_output_verified, {"agent": "creative_specialist"}),
 ]
 
 # Registry of analyst graders - these run against detected analysts
 ANALYST_GRADERS: list[tuple[str, GraderFn, dict]] = [
     ("analyst_protocol_first", analyst_protocol_first, {}),  # agent filled dynamically
     ("analyst_file_written", analyst_file_written, {}),  # agent filled dynamically
+]
+
+# Registry of universal graders - these run against ALL detected agents
+UNIVERSAL_GRADERS: list[tuple[str, GraderFn, dict]] = [
+    ("error_recovery_attempted", error_recovery_attempted, {}),  # agent filled dynamically
 ]
 
 
@@ -253,10 +275,12 @@ def run_code_graders(
     trace_error = trace_data.error
 
     results = []
+    warnings = []
     all_categories = categories or [
         GraderCategory.PM,
         GraderCategory.SPECIALIST,
         GraderCategory.ANALYST,
+        GraderCategory.UNIVERSAL,
     ]
 
     # Run PM graders
@@ -271,13 +295,27 @@ def run_code_graders(
             result = _run_grader_safely(name, grader_fn, GraderCategory.PM, **kwargs)
             results.append(result)
 
-    # Detect specialists and analysts from trace (taxonomy-based)
+    # Detect and classify all agents from trace (taxonomy-based)
     detected_agents = set()
     for tc in seq.tool_calls:
         detected_agents.add(tc.agent)
 
-    specialists_in_trace = [a for a in detected_agents if is_specialist(a)]
-    analysts_in_trace = [a for a in detected_agents if is_analyst(a)]
+    # Classify agents and detect unclassified ones
+    classified = classify_agents(list(detected_agents))
+    specialists_in_trace = classified["specialists"]
+    analysts_in_trace = classified["analysts"]
+    reviewers_in_trace = classified["reviewers"]
+    unclassified_agents = [
+        a for a in classified["other"]
+        if a not in ("PM", "pm", "Project Manager")  # PM is expected, not a warning
+    ]
+
+    # Add warning for unclassified agents (excluding PM)
+    if unclassified_agents:
+        warnings.append(
+            f"Unclassified agents detected (no graders run): {', '.join(sorted(unclassified_agents))}. "
+            f"Consider renaming to *_analyst, *_specialist, or *_reviewer for proper evaluation."
+        )
 
     # Run specialist graders against each detected specialist
     if GraderCategory.SPECIALIST in all_categories:
@@ -292,6 +330,18 @@ def run_code_graders(
                 grader_name = f"{name}:{specialist}"
                 result = _run_grader_safely(
                     grader_name, grader_fn, GraderCategory.SPECIALIST, **kwargs
+                )
+                results.append(result)
+
+        # Run creative specialist graders if creative_specialist is in trace
+        if "creative_specialist" in specialists_in_trace:
+            for name, grader_fn, default_kwargs in CREATIVE_SPECIALIST_GRADERS:
+                kwargs = dict(default_kwargs)
+                if "seq" in grader_fn.__code__.co_varnames:
+                    kwargs["seq"] = seq
+
+                result = _run_grader_safely(
+                    name, grader_fn, GraderCategory.SPECIALIST, **kwargs
                 )
                 results.append(result)
 
@@ -311,6 +361,22 @@ def run_code_graders(
                 )
                 results.append(result)
 
+    # Run universal graders against ALL detected agents (including PM)
+    if GraderCategory.UNIVERSAL in all_categories:
+        all_agents_for_universal = list(detected_agents)
+        for agent in all_agents_for_universal:
+            for name, grader_fn, default_kwargs in UNIVERSAL_GRADERS:
+                kwargs = dict(default_kwargs)
+                kwargs["agent"] = agent
+                if "seq" in grader_fn.__code__.co_varnames:
+                    kwargs["seq"] = seq
+
+                grader_name = f"{name}:{agent}"
+                result = _run_grader_safely(
+                    grader_name, grader_fn, GraderCategory.UNIVERSAL, **kwargs
+                )
+                results.append(result)
+
     # Calculate aggregates
     if not results:
         return GraderSuiteResult(
@@ -323,6 +389,7 @@ def run_code_graders(
             verdict="PASS",
             trace_status=trace_status,
             trace_error=trace_error,
+            warnings=warnings,
         )
 
     passed = sum(1 for r in results if r.passed)
@@ -350,4 +417,5 @@ def run_code_graders(
         results=results,
         trace_status=trace_status,
         trace_error=trace_error,
+        warnings=warnings,
     )

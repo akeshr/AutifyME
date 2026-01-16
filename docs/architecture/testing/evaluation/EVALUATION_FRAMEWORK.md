@@ -173,23 +173,29 @@ Same pillars, different checks per agent type.
 |-----------|------|--------|-------------|
 | `specialist_protocol_first` | Code | Implemented | Loaded domain protocol before execution |
 | `specialist_hitl_triggered` | Code | Implemented | Requested approval before persisting |
-| `specialist_read_upstream` | Code | Planned | Read relevant analyst findings |
+| `specialist_read_upstream` | Code | Implemented | Read relevant analyst findings before action |
 | `specialist_verified_before_act` | Code | Planned | Called verification tools before write |
-| `specialist_hitl_respected` | Code | Planned | Honored approval/rejection/edit |
+| `specialist_hitl_respected` | Code | Implemented | Honored approval/rejection/edit (requires thread context for full check) |
 | `specialist_domain_accuracy` | Model | Rubric defined | Domain-specific output quality |
 
 **Universal Criteria (all agents):**
 
 | Criterion | Type | Status | Description |
 |-----------|------|--------|-------------|
-| `error_recovery_attempted` | Code | Planned | If error occurred, agent attempted recovery |
+| `error_recovery_attempted` | Code | Implemented | If error occurred, agent attempted recovery |
 
 **`error_recovery_attempted` specification:**
 - Trigger: Any run with status=error or tool returning error
 - Check: Did agent make subsequent tool calls after the error?
 - Pass: No errors OR (error occurred AND agent continued with alternative action)
 - Fail: Error occurred AND agent stopped without attempting recovery
-- Evidence: `{had_error, error_details, recovery_attempted, subsequent_actions}`
+- Evidence: `{agent, total_calls, error_calls, first_error_seq, first_error_tool, calls_after_error}`
+
+**Taxonomy Warning System:**
+- Orchestrator detects agents that don't match `_analyst`, `_specialist`, or `_reviewer` naming convention
+- Warning added to `GraderSuiteResult.warnings` field
+- Unclassified agents skip type-specific graders but still run universal graders
+- PM is excluded from warnings (expected to not have suffix)
 
 ### Efficiency Metrics (Non-Graded)
 
@@ -462,6 +468,50 @@ Results stored in LangSmith
 
 **No special tooling needed.** Models exist (`ThreadTrace`, `WorkflowStory`, `HITLDecision`) as containers for Claude's reasoning, not automation.
 
+#### Cross-Trace Model Rubrics
+
+Claude uses these rubrics when evaluating `--thread` mode. For each, pull data from all traces in the thread.
+
+**`thread_context_continuity`**
+
+| Aspect | Details |
+|--------|---------|
+| Data to pull | Sequential PM messages across traces, user messages |
+| Evaluate | Does PM reference prior conversation appropriately? Does PM avoid unnecessary repetition? Does PM maintain awareness of what was already discussed? |
+| Pass | PM demonstrates awareness of conversation history without redundant re-explanation |
+| Fail | PM acts as if each turn is new, repeats information already provided, or loses track of conversation state |
+| Evidence | Quote PM references to prior context, note any context losses |
+
+**`thread_hitl_respected`**
+
+| Aspect | Details |
+|--------|---------|
+| Data to pull | HITL interrupt from trace N, user response, subsequent actions in trace N+1 |
+| Evaluate | Did user approve, reject, or edit? Did specialist act accordingly? |
+| Pass | Approved -> persisted; Rejected -> did not persist; Edited -> persisted with edits |
+| Fail | Actions contradict HITL decision (e.g., persisted after rejection, ignored edits) |
+| Evidence | HITL decision type, subsequent persist calls, data comparison if edited |
+
+**`thread_state_progression`**
+
+| Aspect | Details |
+|--------|---------|
+| Data to pull | Workflow state at end of each trace, delegations across traces |
+| Evaluate | Did workflow advance correctly? No stuck loops? Proper completion? |
+| Pass | Each trace moves workflow forward toward completion |
+| Fail | Workflow stuck in loop, regresses, or fails to progress |
+| Evidence | State transitions across traces, any repeated patterns |
+
+**`thread_error_recovery`**
+
+| Aspect | Details |
+|--------|---------|
+| Data to pull | Errors in any trace, subsequent traces in thread |
+| Evaluate | If error occurred mid-conversation, did PM attempt recovery in next turn? |
+| Pass | Error acknowledged and alternative approach taken, or graceful degradation |
+| Fail | Error ignored, same failing approach repeated, or conversation abandoned |
+| Evidence | Error details, recovery actions in subsequent traces |
+
 **Example:**
 ```python
 # Get all traces in a thread
@@ -585,11 +635,14 @@ graders/
 - `file_read_before_synthesis` - PM read outputs before synthesizing
 - `hitl_triggered` - Specialist requested approval before persist
 
-**Code Graders (Planned):**
+**Code Graders (Additional Implemented):**
 - `specialist_read_upstream` - Specialist read analyst findings
+- `specialist_hitl_respected` - Honored HITL decision (full verification requires thread context)
+- `error_recovery_attempted` - Universal: Recovery attempted after tool error
+
+**Code Graders (Planned):**
+
 - `specialist_verified_before_act` - Verification before write
-- `specialist_hitl_respected` - Honored HITL decision
-- `error_recovery_attempted` - Recovery after tool error
 
 **Model Graders (Claude Reasoning - No Code):**
 - See "Model Grader Rubrics" section above
@@ -688,7 +741,7 @@ def get_pattern_fixes(
 | 3.7 | Planned | Implement `specialist_read_upstream` grader |
 | 3.8 | Planned | Implement `specialist_verified_before_act` grader |
 | 3.9 | Planned | Implement `specialist_hitl_respected` grader |
-| 3.10 | Planned | Implement `error_recovery_attempted` grader (universal) |
+| 3.10 | Done | Implement `error_recovery_attempted` grader (universal) |
 | 3.11 | N/A | Model graders = Claude reasoning with rubrics (no code needed) |
 
 ### Phase 4: Storage & Patterns
