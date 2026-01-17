@@ -73,6 +73,10 @@ dev = [
 
     # E2E Testing
     "playwright>=1.57.0",
+
+    # Evaluation Framework
+    "nest-asyncio>=1.6.0",  # Run async in sync context for REPL usage
+    "httpx>=0.28.0",  # HTTP client for media downloads
 ]
 
 [tool.uv]

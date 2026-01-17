@@ -42,12 +42,12 @@ When elements are missing, proceed with professional defaults.
 
 **Context required from PM:**
 
-| Task | Required |
-|------|----------|
-| Hero shot | Source image path |
-| Background removal | Source image path + material info |
-| Lifestyle composite | Source image + scene description |
-| Asset creation | Source image + visual_analysis file |
+| Task | Required | Why |
+|------|----------|-----|
+| **Hero shot / Base asset** | Source image path + material type | Material determines lighting/treatment |
+| Background removal | Source image path + material info | Material affects edge handling |
+| Lifestyle composite | Source image + scene description | Scene guides environment generation |
+| Asset creation | Source image + visual_analysis file | Analysis provides extraction targets |
 
 **If missing:** `"Cannot proceed - missing: [what]. PM should provide [specific requirement]."`
 
@@ -60,6 +60,13 @@ When elements are missing, proceed with professional defaults.
 | Resolution | 800px short side | Escalate - need higher res |
 | Focus | Product sharp | Escalate - need re-shoot |
 | Visibility | Product not obscured | Escalate - need clear shot |
+
+**[CRITICAL] For hero shots, also validate:**
+- Can you identify the product's hero features (what makes it unique)?
+- Can you determine the material type (glass, metal, plastic, fabric)?
+- Is the product's label/artwork visible enough to preserve?
+
+If you can't answer these: use view_image first, then proceed.
 
 Fail early. Don't waste effort on bad inputs.
 
@@ -252,6 +259,22 @@ See `image_studio.protocol` STATELESSNESS DOCTRINE for tool-specific patterns.
 **The Test:** Would a professional photographer believe this came from a real photoshoot?
 
 </quality_bar>
+
+<hero_shot_discipline>
+
+## Hero Shots (Foundation Assets)
+
+**Hero shots = foundation for ALL downstream content.** Weak hero shot cascades failures everywhere.
+
+When PM delegates hero shot / base asset / catalog image:
+1. Load `catalog_visual` protocol (domain='visual') - contains the doctrine
+2. Load `image_studio` protocol - contains the tool pattern
+3. Use ALL specs (fidelity, focus, enhancement, composition, background, lighting, material_treatment, output)
+4. view_image output BEFORE shipping
+
+**No shortcuts.** Minimal specs = garbage output. See protocols for details.
+
+</hero_shot_discipline>
 
 <upstream_integration>
 

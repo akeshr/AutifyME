@@ -1,0 +1,66 @@
+# PM-03: Approval with Edits Flow
+# Tests HITL edit handling (user modifies before approval)
+id: PM-03
+name: Approval with Edits
+description: |
+  Multi-turn workflow where user requests edits before approving.
+  Tests PM's ability to handle HITL edits and re-process.
+
+  Flow:
+  1. PM presents product for approval
+  2. User requests edit (change title/price/description)
+  3. PM processes edit and re-presents
+  4. User approves
+
+  Tests:
+  - Edit handling
+  - Re-synthesis after edit
+  - State preservation across turns
+category: pm
+version: "1.0"
+
+input:
+  message: "Catalog this watch for $199"
+  media_paths:
+    - "[test_assets]/watch_single.jpg"
+  context:
+    product_type: "accessories"
+    price_hint: 199.00
+    multi_turn: true
+    follow_up_messages:
+      - "Change the title to 'Luxury Gold Watch'"
+      - "Approved"
+
+expected:
+  delegation_order:
+    - visual_analyst
+    - product_analyst
+    - catalog_analyst
+    - creative_specialist
+    - catalog_specialist
+
+  hitl_expected: true
+
+  final_response_contains:
+    - saved
+    - catalog
+
+  final_response_not_contains:
+    - error
+    - failed
+
+success_criteria:
+  graders_must_pass:
+    - protocol_load_first
+    - hitl_triggered
+
+  min_overall_score: 0.75
+  max_latency_ms: 300000
+
+tags:
+  - multi-turn
+  - hitl
+  - edit
+  - image
+
+baseline_trace_id: null

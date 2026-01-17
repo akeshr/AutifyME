@@ -21,6 +21,21 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from langsmith import Client
 
+# Import shared parsing utilities
+from ..parsing import (
+    extract_content_from_parts as _extract_content_from_parts,
+)
+from ..parsing import (
+    extract_pm_output as _extract_pm_output,
+)
+from ..parsing import (
+    extract_user_input as _extract_user_input,
+)
+from ..parsing import (
+    parse_lc_messages,
+    parse_lc_output,
+)
+
 # Initialize client lazily
 _client: Client | None = None
 
@@ -32,37 +47,6 @@ def _safe_print(text: str) -> None:
     except UnicodeEncodeError:
         # Fallback: encode to ASCII, replacing unencodable chars
         print(text.encode("ascii", errors="replace").decode("ascii"))
-
-
-def _extract_content_from_parts(content) -> str:
-    """Extract text from content that may be string or list of parts.
-
-    LLM outputs can be:
-    - Direct string: "hello"
-    - List of parts: [{"type": "text", "text": "hello"}, {"type": "image", ...}]
-
-    Returns:
-        Extracted text string
-    """
-    if not content:
-        return ""
-
-    if isinstance(content, str):
-        return content
-
-    if isinstance(content, list):
-        # Multi-part format: [{"type": "text", "text": "..."}, ...]
-        parts = []
-        for part in content:
-            if isinstance(part, dict):
-                text = part.get("text", "")
-                if text:
-                    parts.append(str(text))
-            elif isinstance(part, str):
-                parts.append(part)
-        return "\n".join(parts)
-
-    return str(content)
 
 
 def _get_client() -> Client:
@@ -77,101 +61,6 @@ def _get_client() -> Client:
 # =============================================================================
 # show_tree: Hierarchical trace view
 # =============================================================================
-
-
-def _extract_user_input(root_run) -> str:
-    """Extract user input preview from root run for show_tree header."""
-    if not root_run.inputs or "messages" not in root_run.inputs:
-        return "(no input found)"
-
-    messages = root_run.inputs["messages"]
-    if messages and isinstance(messages[0], list):
-        messages = messages[0]
-
-    for msg in messages:
-        if not isinstance(msg, dict):
-            continue
-
-        # Check for human message - two formats:
-        # 1. Simple format: {"type": "human", "content": ...}
-        # 2. LangChain serialization: {"id": ["...", "HumanMessage"], "kwargs": {"content": ...}}
-        is_human = False
-        content = ""
-
-        # Format 1: Simple format
-        if msg.get("type") == "human":
-            is_human = True
-            content = msg.get("content", "")
-            # Check for media attachment
-            if "[Media attachment:" in content:
-                return "[Image] (no text)"
-
-        # Format 2: LangChain serialization
-        msg_id = msg.get("id", [])
-        if isinstance(msg_id, list) and "HumanMessage" in msg_id:
-            is_human = True
-            content = msg.get("kwargs", {}).get("content", "")
-
-        if is_human:
-            # Handle multimodal content (list of parts)
-            if isinstance(content, list):
-                has_image = any(
-                    p.get("type") == "image_url"
-                    for p in content
-                    if isinstance(p, dict)
-                )
-                text_parts = [
-                    p.get("text", "")
-                    for p in content
-                    if isinstance(p, dict) and p.get("type") == "text"
-                ]
-                text = " ".join(text_parts).strip()
-
-                if has_image and text:
-                    return f"[Image] {text[:80]}..."
-                elif has_image:
-                    return "[Image] (no text)"
-                elif text:
-                    return f"{text[:100]}..."
-                else:
-                    return "(empty)"
-            else:
-                # Plain text
-                if content:
-                    return f"{content[:100]}..." if len(content) > 100 else content
-                return "(empty)"
-
-    return "(no HumanMessage found)"
-
-
-def _extract_pm_output(root_run) -> str:
-    """Extract PM output preview from root run for show_tree header."""
-    if not root_run.outputs:
-        return "(no output)"
-
-    # Try structured_response first (AutifyME pattern)
-    sr = root_run.outputs.get("structured_response", {})
-    if isinstance(sr, dict) and "message" in sr:
-        msg = sr["message"]
-        if msg:
-            # Truncate and clean up
-            preview = msg[:120].replace("\n", " ")
-            return f'"{preview}..."' if len(msg) > 120 else f'"{preview}"'
-
-    # Fallback: check messages output
-    messages = root_run.outputs.get("messages", [])
-    if messages:
-        # Get last AIMessage
-        for msg in reversed(messages):
-            if isinstance(msg, dict):
-                msg_id = msg.get("id", [])
-                if isinstance(msg_id, list) and "AIMessage" in msg_id:
-                    content = msg.get("kwargs", {}).get("content", "")
-                    if content:
-                        preview = content[:120].replace("\n", " ")
-                        return f'"{preview}..."' if len(content) > 120 else f'"{preview}"'
-
-    return "(no PM message found)"
 
 
 def show_tree(trace_id: str) -> dict[str, str]:
@@ -730,107 +619,6 @@ def list_recent(hours: int = 24, limit: int = 10) -> list[str]:
 
 
 # =============================================================================
-# parse_lc_messages: Parse LangChain serialization format
-# =============================================================================
-
-
-def parse_lc_messages(messages: list) -> list[dict]:
-    """Parse LangChain message serialization format into clean dicts.
-
-    LangChain serializes messages as: {lc: 1, type: "constructor", id: [...], kwargs: {...}}
-    This function extracts the useful parts.
-
-    Args:
-        messages: Raw messages from run.inputs['messages']
-
-    Returns:
-        List of dicts with keys: type, content, tool_calls
-    """
-    # Handle nested list (common in LangSmith)
-    if messages and isinstance(messages[0], list):
-        messages = messages[0]
-
-    parsed = []
-    for msg in messages:
-        if not isinstance(msg, dict):
-            continue
-
-        # Extract message type from id field
-        msg_id = msg.get("id", [])
-        msg_type = "unknown"
-        if isinstance(msg_id, list) and msg_id:
-            # id is like ["langchain_core", "messages", "HumanMessage"]
-            msg_type = msg_id[-1] if msg_id else "unknown"
-
-        # Extract content and tool_calls from kwargs
-        kwargs = msg.get("kwargs", {})
-        content = kwargs.get("content", "")
-        tool_calls = kwargs.get("tool_calls", [])
-
-        # Handle multimodal content (list of parts)
-        if isinstance(content, list):
-            text_parts = []
-            has_image = False
-            for part in content:
-                if isinstance(part, dict):
-                    if part.get("type") == "text":
-                        text_parts.append(part.get("text", ""))
-                    elif part.get("type") == "image_url":
-                        has_image = True
-            content = " ".join(text_parts)
-            if has_image:
-                content = f"[IMAGE] {content}" if content else "[IMAGE]"
-
-        parsed.append({
-            "type": msg_type,
-            "content": content,
-            "tool_calls": tool_calls,
-        })
-
-    return parsed
-
-
-def parse_lc_output(outputs: dict) -> dict:
-    """Parse LangChain LLM output format.
-
-    Args:
-        outputs: Raw outputs from run.outputs
-
-    Returns:
-        Dict with keys: content, tool_calls, raw
-    """
-    result = {"content": "", "tool_calls": [], "raw": outputs}
-
-    if not outputs:
-        return result
-
-    try:
-        generations = outputs.get("generations", [[]])
-        if generations and generations[0]:
-            gen = generations[0][0] if isinstance(generations[0], list) else generations[0]
-            if isinstance(gen, dict):
-                # Try text first (completion models)
-                text_val = gen.get("text", "")
-                if text_val and isinstance(text_val, str) and text_val.strip():
-                    result["content"] = text_val
-
-                # Try message.kwargs (chat models with LangChain serialization)
-                msg = gen.get("message", {})
-                kwargs = msg.get("kwargs", {})
-
-                if not result["content"]:
-                    raw_content = kwargs.get("content", "")
-                    # Handle multi-part content (list of parts)
-                    result["content"] = _extract_content_from_parts(raw_content)
-
-                result["tool_calls"] = kwargs.get("tool_calls", [])
-    except Exception:
-        pass
-
-    return result
-
-
-# =============================================================================
 # show_node: Comprehensive single node analysis
 # =============================================================================
 
@@ -1079,10 +867,10 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
             try:
                 child_input = ast.literal_eval(child_input)
             except (ValueError, SyntaxError):
-                try:
+                import contextlib
+
+                with contextlib.suppress(json.JSONDecodeError, TypeError):
                     child_input = json.loads(child_input)
-                except (json.JSONDecodeError, TypeError):
-                    pass
 
         if isinstance(child_input, dict):
             passed_context["subagent_type"] = child_input.get("subagent_type", "unknown")
@@ -1217,7 +1005,7 @@ def show_orchestrator_flow(trace_id: str) -> list[dict]:
     # Find root (orchestrator)
     root = next((r for r in runs if not r.parent_run_id), None)
     if not root:
-        print("No root found")
+        _safe_print("No root found")
         return []
 
     # Find LLM calls that are direct children of orchestrator's model chains
@@ -1233,17 +1021,17 @@ def show_orchestrator_flow(trace_id: str) -> list[dict]:
 
     orchestrator_llm_calls.sort(key=lambda x: x.start_time or datetime.min)
 
-    print(f"\n{'='*70}")
-    print("ORCHESTRATOR DECISION FLOW")
-    print(f"Trace: {trace_id}")
-    print(f"{'='*70}")
+    _safe_print(f"\n{'='*70}")
+    _safe_print("ORCHESTRATOR DECISION FLOW")
+    _safe_print(f"Trace: {trace_id}")
+    _safe_print(f"{'='*70}")
 
     decisions = []
 
     for i, run in enumerate(orchestrator_llm_calls, 1):
-        print(f"\n[{i}] Decision - {str(run.id)[:8]}")
-        print(f"    Full ID: {run.id}")
-        print(f"    Tokens: {run.total_tokens or 0:,}")
+        _safe_print(f"\n[{i}] Decision - {str(run.id)[:8]}")
+        _safe_print(f"    Full ID: {run.id}")
+        _safe_print(f"    Tokens: {run.total_tokens or 0:,}")
 
         decision = {
             "index": i,
@@ -1264,23 +1052,23 @@ def show_orchestrator_flow(trace_id: str) -> list[dict]:
                 if name == "task":
                     subagent = args.get("subagent_type", args.get("specialist", "?"))
                     desc = args.get("description", "")
-                    print(f"    -> task({subagent})")
-                    print(f"       desc: {desc}")
+                    _safe_print(f"    -> task({subagent})")
+                    _safe_print(f"       desc: {desc}")
                     call_info["args_summary"]["subagent"] = subagent
                     call_info["args_summary"]["description"] = desc
                 else:
-                    print(f"    -> {name}")
+                    _safe_print(f"    -> {name}")
                     # Show all args - NO truncation
                     for k, v in args.items():
-                        print(f"       {k}: {v}")
+                        _safe_print(f"       {k}: {v}")
                         call_info["args_summary"][k] = str(v)
 
                 decision["tool_calls"].append(call_info)
 
         decisions.append(decision)
 
-    print(f"\n{'='*70}")
-    print(f"Total orchestrator decisions: {len(decisions)}")
+    _safe_print(f"\n{'='*70}")
+    _safe_print(f"Total orchestrator decisions: {len(decisions)}")
 
     return decisions
 
@@ -1425,21 +1213,137 @@ def scan_all_handoffs(trace_id: str) -> list[dict]:
 
 
 # =============================================================================
-# prev_trace / next_trace: On-demand thread navigation
+# Workflow Window: Bounded trace retrieval for multi-turn evaluation
 # =============================================================================
 
 
-def prev_trace(trace_id: str) -> str | None:
+def get_workflow_window(
+    trace_id: str,
+    hours_before: float = 2.0,
+    hours_after: float = 2.0,
+    max_traces: int = 20,
+    session_gap_minutes: int = 60,
+) -> list[dict]:
+    """Get traces in a bounded window around the given trace.
+
+    This is the correct abstraction for multi-turn evaluation:
+    - Given a starting trace, find related traces in a reasonable time window
+    - Respects that threads/sessions can span lifetime of conversations
+    - Returns bounded results for efficient processing
+    - Optionally detects session boundaries via time gaps
+
+    IMPORTANT: Thread/session IDs can represent lifetime conversations.
+    This function provides bounded access instead of loading entire history.
+
+    Args:
+        trace_id: Starting LangSmith trace ID
+        hours_before: Hours to look back (default: 2)
+        hours_after: Hours to look forward (default: 2)
+        max_traces: Maximum traces to return (default: 20)
+        session_gap_minutes: Gap (in minutes) that indicates session boundary (default: 60)
+
+    Returns:
+        List of trace info dicts in chronological order, with session boundary markers:
+        [
+            {"trace_id": "...", "start_time": datetime, "is_starting_trace": bool, "session_break_before": bool},
+            ...
+        ]
+
+    Example:
+        >>> # Get workflow context around a trace
+        >>> window = get_workflow_window('abc123')
+        >>> for t in window:
+        ...     marker = "*" if t['is_starting_trace'] else " "
+        ...     break_marker = "---" if t.get('session_break_before') else ""
+        ...     print(f"{break_marker}{marker} {t['trace_id'][:8]}: {t['start_time']}")
+
+        >>> # Narrow window for recent workflow
+        >>> window = get_workflow_window('abc123', hours_before=0.5, hours_after=0.5)
+    """
+    client = _get_client()
+    run = client.read_run(trace_id)
+
+    if not run.session_id:
+        print(f"No session_id found for trace: {trace_id}")
+        return []
+
+    if not run.start_time:
+        print(f"No start_time found for trace: {trace_id}")
+        return []
+
+    # Calculate time window
+    window_start = run.start_time - timedelta(hours=hours_before)
+    window_end = run.start_time + timedelta(hours=hours_after)
+
+    # Format times for LangSmith filter (ISO format)
+    start_iso = window_start.isoformat()
+    end_iso = window_end.isoformat()
+
+    # Query with time bounds - O(window) instead of O(entire session)
+    session_runs = list(client.list_runs(
+        project_name="autifyme-dev",
+        is_root=True,
+        filter=f'and(eq(session_id, "{run.session_id}"), gte(start_time, "{start_iso}"), lte(start_time, "{end_iso}"))',
+        limit=max_traces,
+    ))
+
+    if not session_runs:
+        return []
+
+    # Sort by start_time (ascending = chronological)
+    session_runs.sort(key=lambda x: x.start_time or datetime.min)
+
+    # Build result with session boundary detection
+    result = []
+    prev_time = None
+    gap_threshold = timedelta(minutes=session_gap_minutes)
+
+    for r in session_runs:
+        is_starting = str(r.id) == trace_id or str(r.id).startswith(trace_id)
+
+        # Detect session break (large gap from previous trace)
+        session_break = False
+        if prev_time and r.start_time:
+            gap = r.start_time - prev_time
+            if gap > gap_threshold:
+                session_break = True
+
+        result.append({
+            "trace_id": str(r.id),
+            "start_time": r.start_time,
+            "end_time": r.end_time,
+            "is_starting_trace": is_starting,
+            "session_break_before": session_break,
+            "status": r.status,
+            "error": r.error if r.error else None,
+        })
+
+        prev_time = r.end_time or r.start_time
+
+    print(f"Workflow window: {len(result)} traces in {hours_before}h before / {hours_after}h after")
+    if any(t.get("session_break_before") for t in result):
+        print(f"  (session breaks detected - gaps > {session_gap_minutes} min)")
+
+    return result
+
+
+# =============================================================================
+# prev_trace / next_trace: Efficient O(1) thread navigation
+# =============================================================================
+
+
+def prev_trace(trace_id: str, session_gap_minutes: int = 60) -> str | None:
     """Get previous trace in same session, or None if first.
 
-    Enables on-demand navigation through conversation threads.
-    Use when you need to see what happened before the current trace.
+    Uses time-bounded query for O(1) performance instead of loading entire session.
+    Optionally respects session boundaries (large time gaps).
 
     Args:
         trace_id: LangSmith trace ID
+        session_gap_minutes: Gap that indicates session boundary (skips across boundaries)
 
     Returns:
-        Previous trace ID, or None if this is the first trace in session
+        Previous trace ID, or None if this is the first trace in session/window
 
     Example:
         >>> prev_id = prev_trace('a194cf05')
@@ -1453,51 +1357,57 @@ def prev_trace(trace_id: str) -> str | None:
         print(f"No session_id found for trace: {trace_id}")
         return None
 
-    # Get all root traces in this session, sorted by time
-    session_runs = list(client.list_runs(
+    if not run.start_time:
+        print(f"No start_time found for trace: {trace_id}")
+        return None
+
+    # Query for traces BEFORE current, ordered by time descending (most recent first)
+    # Only look back a reasonable window (24 hours) to avoid scanning entire history
+    window_start = run.start_time - timedelta(hours=24)
+    start_iso = window_start.isoformat()
+    current_iso = run.start_time.isoformat()
+
+    # Get traces before current time, limit to small batch
+    prev_runs = list(client.list_runs(
         project_name="autifyme-dev",
         is_root=True,
-        filter=f'eq(session_id, "{run.session_id}")'
+        filter=f'and(eq(session_id, "{run.session_id}"), gte(start_time, "{start_iso}"), lt(start_time, "{current_iso}"))',
+        limit=10,
     ))
 
-    if not session_runs:
+    if not prev_runs:
+        print("This is the first trace in the session (within 24h window)")
         return None
 
-    # Sort by start_time
-    session_runs.sort(key=lambda x: x.start_time or datetime.min)
+    # Sort descending to get most recent first
+    prev_runs.sort(key=lambda x: x.start_time or datetime.min, reverse=True)
 
-    # Find current trace position
-    current_idx = None
-    for i, r in enumerate(session_runs):
-        if str(r.id) == trace_id or str(r.id).startswith(trace_id):
-            current_idx = i
-            break
+    # Check for session boundary
+    prev_run = prev_runs[0]
+    if prev_run.end_time and run.start_time:
+        gap = run.start_time - (prev_run.end_time or prev_run.start_time)
+        if gap > timedelta(minutes=session_gap_minutes):
+            print(f"Session boundary detected (gap: {gap}). Previous trace is from different session.")
+            print(f"  Use prev_trace('{trace_id}', session_gap_minutes=0) to ignore boundaries.")
+            return None
 
-    if current_idx is None:
-        print(f"Trace {trace_id} not found in session")
-        return None
-
-    if current_idx == 0:
-        print("This is the first trace in the session")
-        return None
-
-    prev_run = session_runs[current_idx - 1]
     print(f"Previous trace: {prev_run.id}")
     print(f"  Time: {prev_run.start_time}")
     return str(prev_run.id)
 
 
-def next_trace(trace_id: str) -> str | None:
+def next_trace(trace_id: str, session_gap_minutes: int = 60) -> str | None:
     """Get next trace in same session, or None if last.
 
-    Enables on-demand navigation through conversation threads.
-    Use when you need to see what happened after the current trace.
+    Uses time-bounded query for O(1) performance instead of loading entire session.
+    Optionally respects session boundaries (large time gaps).
 
     Args:
         trace_id: LangSmith trace ID
+        session_gap_minutes: Gap that indicates session boundary (skips across boundaries)
 
     Returns:
-        Next trace ID, or None if this is the last trace in session
+        Next trace ID, or None if this is the last trace in session/window
 
     Example:
         >>> next_id = next_trace('f264838e')
@@ -1512,35 +1422,41 @@ def next_trace(trace_id: str) -> str | None:
         print(f"No session_id found for trace: {trace_id}")
         return None
 
-    # Get all root traces in this session, sorted by time
-    session_runs = list(client.list_runs(
+    if not run.start_time:
+        print(f"No start_time found for trace: {trace_id}")
+        return None
+
+    # Query for traces AFTER current, ordered by time ascending (earliest first)
+    # Only look forward a reasonable window (24 hours)
+    window_end = run.start_time + timedelta(hours=24)
+    current_iso = run.start_time.isoformat()
+    end_iso = window_end.isoformat()
+
+    # Get traces after current time, limit to small batch
+    next_runs = list(client.list_runs(
         project_name="autifyme-dev",
         is_root=True,
-        filter=f'eq(session_id, "{run.session_id}")'
+        filter=f'and(eq(session_id, "{run.session_id}"), gt(start_time, "{current_iso}"), lte(start_time, "{end_iso}"))',
+        limit=10,
     ))
 
-    if not session_runs:
+    if not next_runs:
+        print("This is the last trace in the session (within 24h window)")
         return None
 
-    # Sort by start_time
-    session_runs.sort(key=lambda x: x.start_time or datetime.min)
+    # Sort ascending to get earliest first
+    next_runs.sort(key=lambda x: x.start_time or datetime.min)
 
-    # Find current trace position
-    current_idx = None
-    for i, r in enumerate(session_runs):
-        if str(r.id) == trace_id or str(r.id).startswith(trace_id):
-            current_idx = i
-            break
+    # Check for session boundary
+    next_run = next_runs[0]
+    current_end = run.end_time or run.start_time
+    if current_end and next_run.start_time:
+        gap = next_run.start_time - current_end
+        if gap > timedelta(minutes=session_gap_minutes):
+            print(f"Session boundary detected (gap: {gap}). Next trace is from different session.")
+            print(f"  Use next_trace('{trace_id}', session_gap_minutes=0) to ignore boundaries.")
+            return None
 
-    if current_idx is None:
-        print(f"Trace {trace_id} not found in session")
-        return None
-
-    if current_idx == len(session_runs) - 1:
-        print("This is the last trace in the session")
-        return None
-
-    next_run = session_runs[current_idx + 1]
     print(f"Next trace: {next_run.id}")
     print(f"  Time: {next_run.start_time}")
     return str(next_run.id)

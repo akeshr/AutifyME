@@ -95,7 +95,7 @@ jobs:
         uv venv
         uv pip install -e ".[dev]"
 
-    - name: Run Ruff linter
+    - name: Run Ruff linter (src)
       env:
         SUPABASE_URL: https://dummy.supabase.co
         SUPABASE_ANON_KEY: dummy_anon_key
@@ -107,7 +107,19 @@ jobs:
       run: |
         uv run ruff check agents/src
 
-    - name: Run MyPy type checker
+    - name: Run Ruff linter (tests)
+      env:
+        SUPABASE_URL: https://dummy.supabase.co
+        SUPABASE_ANON_KEY: dummy_anon_key
+        WHATSAPP_PHONE_NUMBER_ID: dummy_phone_id
+        WHATSAPP_ACCESS_TOKEN: dummy_access_token
+        WHATSAPP_WEBHOOK_VERIFY_TOKEN: dummy_verify_token
+        LANGCHAIN_API_KEY: dummy_langsmith_key
+        OPENAI_API_KEY: dummy_openai_key
+      run: |
+        uv run ruff check tests
+
+    - name: Run MyPy type checker (src)
       env:
         SUPABASE_URL: https://dummy.supabase.co
         SUPABASE_ANON_KEY: dummy_anon_key
@@ -118,3 +130,15 @@ jobs:
         OPENAI_API_KEY: dummy_openai_key
       run: |
         uv run mypy agents/src/autifyme_agents
+
+    - name: Run MyPy type checker (tests)
+      env:
+        SUPABASE_URL: https://dummy.supabase.co
+        SUPABASE_ANON_KEY: dummy_anon_key
+        WHATSAPP_PHONE_NUMBER_ID: dummy_phone_id
+        WHATSAPP_ACCESS_TOKEN: dummy_access_token
+        WHATSAPP_WEBHOOK_VERIFY_TOKEN: dummy_verify_token
+        LANGCHAIN_API_KEY: dummy_langsmith_key
+        OPENAI_API_KEY: dummy_openai_key
+      run: |
+        uv run mypy tests

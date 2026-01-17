@@ -18,7 +18,6 @@ from .models import (
     AgentDelegation,
     AgentFinalMessage,
     DelegationGraph,
-    EvaluationCriterion,
     EvaluationResult,
     FileIOTrace,
     FileOperation,
@@ -36,6 +35,8 @@ from .models import (
     ScenarioHistory,
     ScenarioRunSummary,
     SequencedToolCall,
+    ThreadTrace,
+    ThreadTraces,
     ToolCall,
     ToolCallSequence,
     TraceBaseline,
@@ -1158,13 +1159,12 @@ def get_tool_call_sequence(trace_id: str) -> ToolCallSequence:
 
         # Extract tool arguments (raw)
         tool_args = {}
-        if run.inputs:
-            if isinstance(run.inputs, dict):
-                input_val = run.inputs.get("input", run.inputs)
-                if isinstance(input_val, str):
-                    tool_args = {"input": input_val}
-                elif isinstance(input_val, dict):
-                    tool_args = input_val
+        if run.inputs and isinstance(run.inputs, dict):
+            input_val = run.inputs.get("input", run.inputs)
+            if isinstance(input_val, str):
+                tool_args = {"input": input_val}
+            elif isinstance(input_val, dict):
+                tool_args = input_val
 
         # Parse arguments properly (eliminates need for regex in evaluation)
         parsed_args = {}
@@ -1235,7 +1235,10 @@ def get_tool_call_sequence(trace_id: str) -> ToolCallSequence:
     )
 
 
-def get_delegation_graph(trace_id: str) -> DelegationGraph:
+def get_delegation_graph(
+    trace_id: str,
+    seq: ToolCallSequence | None = None,
+) -> DelegationGraph:
     """Get hierarchical graph of agent delegations.
 
     Extracts all 'task' tool calls (PM's delegation mechanism) and builds
@@ -1246,6 +1249,7 @@ def get_delegation_graph(trace_id: str) -> DelegationGraph:
 
     Args:
         trace_id: LangSmith trace ID
+        seq: Pre-loaded ToolCallSequence (optional, avoids re-fetching)
 
     Returns:
         DelegationGraph with delegations, waves, and involved agents
@@ -1259,8 +1263,9 @@ def get_delegation_graph(trace_id: str) -> DelegationGraph:
         >>> if "creative_specialist" in graph.delegation_order:
         ...     print("PM delegated to creative_specialist")
     """
-    # Get tool call sequence first
-    seq = get_tool_call_sequence(trace_id)
+    # Use provided seq or fetch
+    if seq is None:
+        seq = get_tool_call_sequence(trace_id)
 
     delegations = []
     agents_involved = set()
@@ -1607,12 +1612,13 @@ def get_agent_final_message(
             or extra.get("model_name")
         )
     # Also check run.name for model info
-    if not model_name and last_run.name:
-        # Run names often contain model: "ChatOpenAI", "ChatAnthropic", etc.
-        if "gpt" in last_run.name.lower():
-            model_name = last_run.name
-        elif "claude" in last_run.name.lower():
-            model_name = last_run.name
+    # Run names often contain model: "ChatOpenAI", "ChatAnthropic", etc.
+    if (
+        not model_name
+        and last_run.name
+        and ("gpt" in last_run.name.lower() or "claude" in last_run.name.lower())
+    ):
+        model_name = last_run.name
 
     # Extract token count from usage metadata
     token_count = None
@@ -1853,7 +1859,7 @@ def get_scenario_history(
     # Find most common failure
     most_common_failure = None
     if failure_counts:
-        most_common_failure = max(failure_counts, key=failure_counts.get)  # type: ignore
+        most_common_failure = max(failure_counts, key=lambda k: failure_counts[k])
 
     # Determine trend (compare recent 5 vs previous 5)
     recent_trend = None
@@ -2161,8 +2167,6 @@ def get_thread_traces(
         >>> for t in thread.traces:
         ...     print(f"  -> {t.agent_that_responded}: {t.agent_message_preview}")
     """
-    from tests.tools.models import ThreadTrace, ThreadTraces
-
     # Use supabase-py client directly with env vars
     try:
         import os
@@ -2196,16 +2200,16 @@ def get_thread_traces(
             .execute()
         )
 
-        outcomes = response.data if response.data else []
+        outcomes: list[dict[str, Any]] = response.data if response.data else []
     except Exception:
-        outcomes = []
+        outcomes: list[dict[str, Any]] = []
 
     traces = []
     total_duration = 0
 
     for i, outcome in enumerate(outcomes, start=1):
-        trace_id = outcome.get("trace_id")
-        duration_ms = int((outcome.get("duration_seconds") or 0) * 1000)
+        trace_id = str(outcome.get("trace_id", ""))
+        duration_ms = int(float(outcome.get("duration_seconds") or 0) * 1000)
         total_duration += duration_ms
 
         # Optionally enrich with final message (slow - makes API call per trace)
@@ -2222,11 +2226,11 @@ def get_thread_traces(
 
         traces.append(
             ThreadTrace(
-                trace_id=trace_id or "",
+                trace_id=trace_id,
                 turn=i,
-                timestamp=outcome.get("created_at"),
+                timestamp=str(outcome.get("created_at") or ""),
                 duration_ms=duration_ms,
-                user_message=outcome.get("message_text"),
+                user_message=str(outcome.get("message_text") or ""),
                 agent_message_preview=agent_preview,
                 agent_that_responded=agent_name,
             )

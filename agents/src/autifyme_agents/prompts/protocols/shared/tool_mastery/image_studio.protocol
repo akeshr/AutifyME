@@ -153,9 +153,9 @@ Position product in scene.
 
 ### material_treatment
 Material-specific rendering instructions.
-- `primary_material`: Main material (clear glass, frosted glass, brushed metal, matte plastic)
-- `rendering_notes`: How to treat (glass: caustics + edge refraction, metal: gradient reflections)
-- `preserve_details`: Critical details (label legibility, embossed logo, texture)
+- `primary_material`: Main material type (clear_plastic, opaque_plastic, glass, metal, fabric)
+- `rendering_notes`: How to treat the material (label sharpness, specular control, caustics, etc.)
+- `preserve_details`: Critical details to preserve (label legibility, cap details, texture)
 
 ### fidelity (CRITICAL for source images)
 FIX photography problems, PRESERVE product identity. **Always include when processing [source]/[product].**
@@ -257,23 +257,28 @@ image_studio(
 ```
 Result: Family shot with main product prominent, variant supporting.
 
-### Pattern 5: Hero Shot Enhancement (Complete Catalog)
+### Pattern 5: Hero Shot (Base Asset)
+
+**Hero shots are foundation assets. Use ALL relevant specs - don't skip.**
+
+See `catalog_visual.protocol` for domain doctrine. Here's the tool pattern:
 
 ```python
 image_studio(
-    images=[{"path": "inbox/photo.jpg", "label": "source"}],
-    extraction={"target_description": "product in [source]", "edge_treatment": "surgical clean"},
-    background={"treatment": "solid_color", "color": "#ffffff"},
-    lighting={"type": "studio_3point", "shadows": "soft natural falloff"},
-    material_treatment={"primary_material": "clear_glass", "rendering_notes": "preserve caustics"},
-    fidelity={"preserve_colors": "true colors", "preserve_artwork": "label design", "hero_features": "key differentiator"},
-    focus={"depth_of_field": "deep - everything sharp", "focus_point": "entire product"},
+    images=[{"path": "inbox/[source].jpg", "label": "source"}],
+    extraction={"target_description": "[product] in [source]", "edge_treatment": "surgical clean"},
+    fidelity={"preserve_colors": "exact match", "preserve_artwork": "exact labels", "hero_features": "[key features]"},
+    focus={"depth_of_field": "deep - everything sharp"},
     enhancement={"sharpness": "tack sharp", "color_treatment": "accurate to source"},
-    composition={"product_coverage": "80% frame", "camera_angle": "slight top"},
-    output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1", "filename": "product_hero"}
+    composition={"product_coverage": "75-85%", "camera_angle": "slight top (15-20 deg)"},
+    background={"treatment": "solid_color", "color": "[white or light gray based on product contrast]"},
+    lighting={"type": "studio_3point", "shadows": "soft contact shadow"},
+    material_treatment={"primary_material": "[clear_plastic|opaque_plastic|glass|metal]"},
+    output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1"}
 )
 ```
-Result: Complete catalog-ready hero shot with all specs for maximum quality.
+
+**Key principle:** Include ALL specs. Minimal calls produce garbage.
 
 ### Pattern 6: Verification Grid (Batch Consistency Check)
 
@@ -380,107 +385,16 @@ Key field: `storage_path` - use this for creating asset records.
 
 ## ANTI-PATTERNS
 
-### Anti-Pattern 1: No view_image Before Processing
-
-```
-WRONG:
-Directly call image_studio without seeing the input
-
-CORRECT:
-1. view_image to assess input quality
-2. image_studio with appropriate specs
-3. view_image to verify output
-```
-
-### Anti-Pattern 2: Missing Fidelity Spec
-
-```
-WRONG: image_studio(images=[...], extraction={...})  # No fidelity
-
-CORRECT: image_studio(..., fidelity={"preserve_colors": "true", "hero_features": "key"})
-```
-Always include fidelity when processing [source]/[product].
-
-### Anti-Pattern 3: Missing Material Treatment for Glass/Metal
-
-```
-WRONG:
-image_studio(images=[...], extraction={...})
-# Glass looks flat, no caustics
-
-CORRECT:
-image_studio(
-    images=[...],
-    extraction={...},
-    material_treatment={"primary_material": "clear_glass", "rendering_notes": "preserve caustics"}
-)
-```
-
-### Anti-Pattern 3b: Missing Focus Spec
-
-```
-WRONG:
-image_studio(images=[...], ...)
-# Unclear depth of field - may get shallow when you want deep
-
-CORRECT for catalog:
-image_studio(..., focus={"depth_of_field": "deep - everything sharp"})
-
-CORRECT for lifestyle:
-image_studio(..., focus={"depth_of_field": "shallow - product sharp, background bokeh"})
-```
-
-### Anti-Pattern 4: Simple View When Processing Needed
-
-```
-WRONG:
-Use image_studio just to look at an image
-
-CORRECT:
-Use view_image for viewing
-Use image_studio only when transformation needed
-```
-
-### Anti-Pattern 5: Ignoring storage_path
-
-```
-WRONG:
-Call image_studio but not use storage_path for write_data
-
-CORRECT:
-Capture storage_path from output
-Use it when creating asset record:
-write_data(..., data={"storage_url": storage_path, ...})
-```
-
-### Anti-Pattern 5b: Not Specifying output.filename
-
-```
-WRONG:
-image_studio(..., output={"format": "PNG"})
-# Output path is unpredictable UUID
-
-CORRECT:
-image_studio(..., output={"format": "PNG", "filename": "product_hero"})
-# Output path is predictable: pending/product_hero.png
-```
-Always specify filename for predictable paths in view_image and write_data.
-
-### Anti-Pattern 6: Single Extraction for Multi-Item Image
-
-```
-WRONG:
-Source has 9 products, but:
-image_studio(extraction={"target_description": "the jars"})
-# Result: 1 asset for 9 products
-
-CORRECT:
-For each item in Extraction Targets:
-image_studio(extraction={"target_description": "Large jar with blue lid at top-left"})
-# Result: 9 assets, one per product
-```
-
-When source contains multiple items, extract each separately (unless explicitly asked for family shot).
+| Pattern | Problem | Fix |
+|---------|---------|-----|
+| No view_image before/after | Ship blind | Always view input AND output |
+| Missing fidelity spec | AI generates wrong colors | Include fidelity for all source images |
+| Missing material_treatment | Glass looks flat | Specify material for glass/metal |
+| Missing focus spec | Random depth of field | Deep for catalog, shallow for lifestyle |
+| Ignoring storage_path | Can't create asset | Capture and use in write_data |
+| No output.filename | Unpredictable path | Always specify for predictable paths |
+| Single extraction for N items | 1 asset for 9 products | Extract each item separately |
+| Minimal specs for hero shots | Garbage quality | Use ALL specs (see Pattern 5) |
 
 ---
 

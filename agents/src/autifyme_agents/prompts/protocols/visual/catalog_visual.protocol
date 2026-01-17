@@ -2,146 +2,108 @@
 
 ## PURPOSE
 
-Domain doctrine for catalog-ready visual assets: extraction, hero shots, product photography.
+Transform messy phone photos into professional catalog assets.
 
-This protocol teaches you HOW TO THINK about catalog work, not steps to follow.
-Internalize the doctrine, then reason from it.
+**The Reality:** Users upload photos with bad lighting, cluttered backgrounds, harsh shadows, color casts. Your job is to transform these into images that look like they came from a professional studio.
 
----
-
-## MENTAL MODEL
-
-When you see a messy product photo, you see TWO things:
-
-1. **IDENTITY** - What the product IS (colors, artwork, text, texture, shape)
-2. **CONTEXT** - How it's photographed (lighting, background, angle, focus)
-
-**Your Job:** FIX the context. PRESERVE the identity.
-
-The product has a soul - its colors, its artwork, its texture. That soul is SACRED.
-The photography around it? That's just packaging. Fix it ruthlessly.
-
-**The Test:** Does the output show THE SAME product, just better photographed?
+**The Principle:** FIX the photography. PRESERVE the product identity.
 
 ---
 
-## FIDELITY DOCTRINE
+## CORE DOCTRINE
 
-### The Hierarchy (In Strict Order)
+### 1. IDENTITY IS SACRED
 
-1. **Product Identity** - ABSOLUTE, never compromise
-2. **Sharpness** - NON-NEGOTIABLE, tack sharp everywhere
-3. **Photorealism** - REQUIRED, grounded and real
-4. **Creative Enhancement** - ONLY after 1-3 satisfied
+Every product has an identity - its colors, artwork, texture, shape. This is non-negotiable:
 
-Enhancement that compromises identity is not enhancement - it's damage.
+| Preserve (IDENTITY) | Fix (PHOTOGRAPHY) |
+|---------------------|-------------------|
+| Actual product colors | Color cast from bad lighting |
+| Exact label artwork/text | Blur from camera shake |
+| Surface texture/pattern | Harsh shadows |
+| True proportions | Cluttered background |
+| Hero features (lid, cap, details) | Poor exposure |
 
-### Identity Elements (PRESERVE)
+**The Test:** Would the product owner recognize THIS EXACT PRODUCT?
 
-| Element | What to Preserve | Common Violation |
-|---------|------------------|------------------|
-| Colors | Actual product colors | Generating "Royal Blue" instead of extracting actual blue |
-| Artwork | Exact design, pose, expression | Regenerating similar but different art |
-| Text | Same font, words, layout | AI generating readable but wrong text |
-| Texture | Same pattern, same finish | Smoothing out distinctive texture |
-| Shape | Actual proportions | Lens distortion left uncorrected |
+If AI generated "similar" colors or "readable but different" text - you failed. Iterate.
 
-### Photography Artifacts (FIX)
+### 2. MATERIAL PHYSICS
 
-| Artifact | How to Fix |
-|----------|------------|
-| Color cast | Correct to true product colors |
-| Blur | Sharpen to reveal details |
-| Underexposed | Proper lighting |
-| Bad angle | Recompose |
-| Cluttered background | Clean extraction |
+Light behaves differently on different materials. Honor the physics:
 
-### Fidelity Reasoning Pattern
+| Material | What Light Does | Your Focus |
+|----------|-----------------|------------|
+| **Clear plastic** | Surface sheen, shows contents | Label sharp, no harsh speculars, surface looks quality |
+| **Opaque plastic** | Reveals form and texture | Clean shape, label readable, surface quality |
+| **Glass** | Refracts, creates caustics | Internal glow, edge definition, depth |
+| **Metal** | Reflects environment | Gradient reflections following form, no hot spots |
+
+Don't memorize lighting setups. Ask: "What does light DO to this material?" Then light it to reveal its nature.
+
+### 3. BACKGROUND FOR CONTRAST
+
+Background exists for ONE purpose: make the product pop.
+
+| Product Color | Background Choice | Why |
+|---------------|-------------------|-----|
+| Dark/black | White or light gray | Edge contrast |
+| Light/white | Light gray (not white) | Prevent lost edges |
+| Vibrant colors | Neutral white/gray | Let colors pop |
+
+**The Test:** Can you clearly see product edges against background? If edges blend, wrong background.
+
+### 4. PROFESSIONAL QUALITY BAR
+
+Every output must pass:
+
+- **Sharp:** Tack sharp at 200%, labels legible
+- **Grounded:** Contact shadow, product has weight
+- **Photorealistic:** Would a photographer believe this came from a real shoot?
+- **Clean:** No artifacts, halos, extraction errors
+
+If any dimension fails - iterate. Don't ship garbage.
+
+---
+
+## HERO SHOTS (Foundation Assets)
+
+Hero shots are the FLAGSHIP image. All downstream content builds on these - lifestyle scenes, social posts, campaigns, reels. A weak hero shot cascades failures through everything.
+
+### Hero Shot Principles
+
+1. **Dominance:** Product fills 75-85% of frame
+2. **Authority:** Slight top angle (15-20 deg) or eye level
+3. **Intention:** Negative space deliberate (top for text overlay)
+4. **Sharpness:** Everything tack sharp, labels legible
+5. **Identity:** Exact colors, artwork, texture from source
+
+### Before Shipping ANY Hero Shot
+
+Ask yourself:
+- Does it show THE SAME product, just better photographed?
+- Are labels fully legible at 200%?
+- Is the product grounded (contact shadow)?
+- Would this pass as professional studio photography?
+
+If ANY answer is "no" - iterate.
+
+### The Garbage Hero Shot (NEVER DO THIS)
 
 ```
-Before: What colors, artwork, text, texture does this product ACTUALLY have?
-After: Does output show those EXACT elements, just sharper and better lit?
-
-If output changed the identity -> ITERATE
-If output only fixed photography -> SHIP
+WRONG:
+image_studio(
+    images=[{"path": "inbox/photo.jpg", "label": "source"}],
+    extraction={"target_description": "the product"},
+    background={"treatment": "solid_color", "color": "white"}
+)
 ```
 
----
+This produces: Soft focus, wrong colors, no identity preservation, amateur quality.
 
-## MATERIAL DOCTRINE
+**Why it fails:** Missing fidelity (AI generates colors), missing focus (random DOF), missing lighting (flat), missing composition (bad framing), missing material_treatment (plastic looks cheap).
 
-Each material has physics. Honor it.
-
-### Glass
-
-**Challenge:** Glass is invisible without light.
-
-**Doctrine:** Reveal depth and edge through light physics.
-- Backlight creates glow, shows transparency
-- Edge refraction defines form
-- Internal caustics show quality
-- Speculars controlled but present
-
-**Mental check:** Can you "see into" the glass, not just through it?
-
-### Metal
-
-**Challenge:** Metal reflects everything.
-
-**Doctrine:** Control reflections to show form.
-- Polished: Large soft sources for smooth gradients
-- Brushed: Light perpendicular to brush direction
-- All: No burned highlights, detail preserved
-
-**Mental check:** Do reflections follow form, or create random hotspots?
-
-### PET / Plastic
-
-**Challenge:** Plastic looks cheap without care.
-
-**Doctrine:** Reveal quality through surface treatment.
-- Side light shows surface quality
-- Labels/prints must be TACK SHARP (often the hero)
-- Texture needs rake light for dimension
-
-**Mental check:** Does this read as quality, not cheap?
-
-### Reasoning, Not Recipes
-
-Don't memorize treatments. Ask: "What does light DO to this material?"
-
-Then design lighting that reveals the material's true nature.
-
----
-
-## COMPOSITION DOCTRINE
-
-### Product Dominance
-
-The product commands attention. Everything else supports.
-
-| Task Type | Frame Coverage | Why |
-|-----------|---------------|-----|
-| Catalog hero | 70-85% | Product dominates |
-| Detail shot | 90%+ | Feature showcase |
-| Family shot | 60-80% total | Main + supporting |
-
-### Negative Space Is Intentional
-
-Empty space has purpose:
-- Top: Text overlay zone
-- Bottom: Grounding, stability
-- Sides: Breathing room, editorial flexibility
-
-### Camera Angle
-
-| Angle | Effect |
-|-------|--------|
-| Eye level | Equality, approachable |
-| Slight top (15-20 deg) | Authority, overview |
-| Low angle | Power, premium |
-
-**Default for catalog:** Slight top - shows product with authority.
+**There is no "quick" hero shot.** Use ALL specs or escalate.
 
 ---
 
@@ -246,67 +208,13 @@ If ANY fails -> Fix before shipping.
 
 ---
 
-## PHOTOREALISM DOCTRINE
-
-Every image must be indistinguishable from professional photography.
-
-### Grounding
-
-Products have WEIGHT. They sit ON surfaces, not float above them.
-
-**Required:** Contact shadow - dark at contact, soft falloff.
-
-### Light Physics
-
-Light falls off naturally, wraps around forms, casts believable shadows.
-
-**Test:** Is light direction consistent across all elements?
-
-### Material Authenticity
-
-Real products aren't CGI-perfect. Subtle imperfections add authenticity:
-- Micro-dust on surfaces
-- Natural highlight variation
-- True material response to light
-
-### The Photographer Test
-
-Would a professional photographer believe this came from a real photoshoot?
-
-If not, identify what breaks the illusion and fix it.
-
----
-
-## TOOL APPLICATION (This Domain)
-
-For catalog work, these specs typically matter:
-
-| Spec | When | Purpose |
-|------|------|---------|
-| **fidelity** | ALWAYS with source images | Preserve identity (colors, artwork, text, shape) |
-| **extraction** | Isolating from background | Target what to extract |
-| **background** | Setting output background | Clean output (white, transparent) |
-| **lighting** | Professional treatment | Reveal form, controlled shadows |
-| **material_treatment** | Glass, metal, plastic | Honor material physics (caustics, reflections) |
-| **composition** | Framing control | Product dominance (70-85% coverage) |
-| **enhancement** | Post-processing | Sharpness, contrast, label legibility |
-| **focus** | Depth of field | Deep focus for catalog (everything sharp) |
-| **output** | Dimensions | 1:1 aspect ratio, 1024x1024 default |
-
-You rarely need for catalog: scene, placement, custom_spec (those are lifestyle domain).
-
-### Color Handling (CRITICAL)
+## COLOR HANDLING (CRITICAL)
 
 **NEVER use color names from PM's delegation in image_studio specs.**
 
 PM says "Royal Blue lid" -> You say "the blue lid matching source"
 
 Why? Color names tell the tool to GENERATE. You want to EXTRACT.
-
-| Wrong | Right |
-|-------|-------|
-| "Royal Blue lid" | "the lid color from source" |
-| "Sun Yellow variant" | "the accent color as shown" |
 
 ---
 
@@ -460,82 +368,19 @@ After generating all variants, apply Grid Test from `multi_item.protocol` (domai
 
 ---
 
-## QUALITY REASONING
-
-### Scoring Dimensions
-
-| Dimension | What to Evaluate |
-|-----------|------------------|
-| Composition | Product dominance, intentional framing |
-| Lighting | Form revelation, shadow quality, specular control |
-| Material | True to nature, properly rendered |
-| Edges | Extraction clean, no halos or fringing |
-| E-commerce | Background appropriate, format correct |
-
-### Thresholds
-
-| Task | Minimum |
-|------|---------|
-| Catalog hero | All 8+ |
-| Premium/luxury | All 9+ |
-| Quick fix | All 7.5+ |
-
-### Decision Logic
-
-```
-All dimensions 8+ AND photorealistic -> SHIP
-Any dimension below 8 -> ITERATE on weakest
-Any dimension below 6 -> Source may be unfixable, ESCALATE
-```
-
----
-
-## ANTI-PATTERNS
-
-| Pattern | Problem | Doctrine Violation |
-|---------|---------|-------------------|
-| Generating colors from PM's words | Tool creates instead of extracts | Fidelity: preserve actual colors |
-| Skipping view_image on output | Ship without seeing | Quality: verify before ship |
-| Single extraction for multi-item | 1 asset for 9 products | Multi-item: N items = N assets |
-| Over-enhancement until CGI-looking | Breaks photorealism | Photorealism: real, not rendered |
-| Missing material_treatment for glass | Flat, dead glass | Material: honor physics |
-| **Processing variants independently** | **Inconsistent angles/framing** | **Consistency: style lock first** |
-| **Different dimensions per variant** | **Grid looks broken** | **Consistency: same output specs** |
-| **Cropping critical features** | **Customer can't compare** | **Feature visibility: all features shown** |
-| **Skipping batch consistency check** | **Ship inconsistent set** | **Consistency: grid test before ship** |
-| **Passing anchor image to batch calls** | **Gemini reproduces anchor instead of extracting** | **View-Then-Describe: anchor -> TEXT only** |
-| **Skipping anchor HITL approval** | **User never approves style, batch may be wrong** | **View-Then-Describe: STOP after anchor write_data** |
-
----
-
 ## SELF-CRITIQUE
 
-### Single Image Check
+After generating, ask:
 
-After generating each image, ask:
+1. **IDENTITY:** Same product, just better photographed?
+2. **SHARPNESS:** Labels legible at 200%?
+3. **GROUNDED:** Contact shadow, has weight?
+4. **EDGES:** Clean against background?
 
-1. **FIDELITY:** Colors, artwork, text, texture match source?
-2. **SHARPNESS:** Tack sharp on all features?
-3. **PHOTOREALISM:** Grounded, shadowed, real?
-4. **MATERIAL:** Rendered true to nature?
-5. **COMPOSITION:** Product dominates appropriately?
-6. **FEATURES:** All critical features visible (label, size, differentiator)?
+For batches, add:
+5. **CONSISTENT:** Same angle, framing, shadows across all?
+6. **GRID TEST:** Would look professional side-by-side?
 
-### Batch/Family Check (After ALL variants processed)
-
-7. **ANGLE:** All variants shot from same angle?
-8. **FRAMING:** Products fill same percentage of frame?
-9. **LIGHTING:** Shadows fall same direction?
-10. **DIMENSIONS:** All same size and aspect ratio?
-11. **GRID TEST:** Would these look pro side-by-side?
-
-### Decision
-
-```
-Single image: All 1-6 pass -> SHIP
-Batch: All 1-11 pass -> SHIP
-Any fail -> ITERATE on the failure
-Consistency fail -> REDO outliers with locked style
-```
+Any "no" -> iterate. Don't ship garbage.
 
 </protocol>

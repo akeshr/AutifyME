@@ -1,0 +1,54 @@
+# PM-02: Multi-Product Batch Catalog Workflow
+# Tests batch extraction and batch HITL handling
+id: PM-02
+name: Multi-Product Batch Catalog
+description: |
+  Batch cataloging workflow with multiple products in single image.
+  Tests PM's ability to handle batch extraction from visual_analyst
+  and batch HITL approval for multiple products.
+
+  Tests:
+  - Batch product detection
+  - Batch context passing to specialists
+  - Batch HITL approval
+category: pm
+version: "1.0"
+
+input:
+  message: "Catalog all products in this image"
+  media_paths:
+    - "[test_assets]/multi_product_grid.jpg"
+  context:
+    expected_product_count: 3
+
+expected:
+  delegation_order:
+    - visual_analyst
+    - product_analyst
+    - catalog_analyst
+    - creative_specialist
+    - catalog_specialist
+
+  hitl_expected: true
+
+  final_response_contains:
+    - products
+    - batch
+    - approve
+
+success_criteria:
+  graders_must_pass:
+    - protocol_load_first
+    - analyst_before_specialist
+
+  min_overall_score: 0.80
+  max_latency_ms: 180000
+  max_cost: 0.75
+
+tags:
+  - batch
+  - multi-product
+  - hitl
+  - image
+
+baseline_trace_id: null

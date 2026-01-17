@@ -1,0 +1,63 @@
+# PM-04: Rejection Flow
+# Tests HITL rejection handling (user declines to save)
+id: PM-04
+name: Rejection Flow
+description: |
+  Multi-turn workflow where user rejects the cataloged product.
+  Tests PM's ability to handle HITL rejection gracefully.
+
+  Flow:
+  1. PM presents product for approval
+  2. User rejects ("No, don't save this")
+  3. PM acknowledges rejection without persisting
+
+  Tests:
+  - Rejection handling
+  - No persistence after rejection
+  - Graceful acknowledgment
+category: pm
+version: "1.0"
+
+input:
+  message: "Catalog this item"
+  media_paths:
+    - "[test_assets]/random_item.jpg"
+  context:
+    product_type: "unknown"
+    multi_turn: true
+    follow_up_messages:
+      - "No, don't save this"
+
+expected:
+  delegation_order:
+    - visual_analyst
+    - product_analyst
+    - catalog_analyst
+    - creative_specialist
+    - catalog_specialist
+
+  hitl_expected: true
+
+  final_response_contains:
+    - understood
+    - not saved
+
+  final_response_not_contains:
+    - successfully saved
+    - added to catalog
+
+success_criteria:
+  graders_must_pass:
+    - protocol_load_first
+    - hitl_triggered
+
+  min_overall_score: 0.75
+  max_latency_ms: 180000
+
+tags:
+  - multi-turn
+  - hitl
+  - rejection
+  - image
+
+baseline_trace_id: null

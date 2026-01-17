@@ -123,7 +123,7 @@ def _invoke_pm(
 
     # Windows event loop setup
     if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # type: ignore
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     pm = asyncio.run(_create_pm())
 
