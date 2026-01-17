@@ -37,7 +37,9 @@ from autifyme_agents.integrations.storage.supabase_client import SupabaseStorage
 
 
 # Default values for required NOT NULL fields in product_families
-def make_family_data(unique_prefix: str, name_suffix: str = "family", sku: str | None = None) -> dict:
+def make_family_data(
+    unique_prefix: str, name_suffix: str = "family", sku: str | None = None
+) -> dict:
     """Create product_families data with all required fields.
 
     Note: product_group_id and sku_prefix have unique constraints.
@@ -58,6 +60,7 @@ def make_family_data(unique_prefix: str, name_suffix: str = "family", sku: str |
 # Counter for generating unique axis names
 _axis_counter = 0
 
+
 def make_axis_data(unique_prefix: str, name_suffix: str, family_ref: str = "@family.id") -> dict:
     """Create variant_axes data with all required fields.
 
@@ -66,14 +69,14 @@ def make_axis_data(unique_prefix: str, name_suffix: str, family_ref: str = "@fam
     global _axis_counter
     _axis_counter += 1
     # Remove numbers from prefix AND suffix for valid axis name (constraint: ^[a-z_]+$)
-    clean_prefix = ''.join(c for c in unique_prefix if c.isalpha() or c == '_').lower()
-    clean_suffix = ''.join(c for c in name_suffix if c.isalpha() or c == '_').lower()
+    clean_prefix = "".join(c for c in unique_prefix if c.isalpha() or c == "_").lower()
+    clean_suffix = "".join(c for c in name_suffix if c.isalpha() or c == "_").lower()
     # Add counter to ensure uniqueness when suffix strips to same value
-    suffix_letter = chr(ord('a') + (_axis_counter % 26))
+    suffix_letter = chr(ord("a") + (_axis_counter % 26))
     return {
         "name": f"{clean_prefix}_{clean_suffix}_{suffix_letter}",
         "product_family_id": family_ref,
-        "display_label": name_suffix.replace('_', ' ').title(),
+        "display_label": name_suffix.replace("_", " ").title(),
     }
 
 
@@ -91,7 +94,12 @@ def make_value_data(value: str, axis_ref: str, sku_code: str | None = None) -> d
 # Skip all tests if Supabase credentials not available or are dummy/placeholder values
 # The storage client requires SUPABASE_SERVICE_ROLE_KEY for RPC calls
 _supabase_url = os.getenv("SUPABASE_URL", "")
-_supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+_supabase_key = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    or os.getenv("SUPABASE_KEY")
+    or os.getenv("SUPABASE_ANON_KEY")
+)
+
 
 def _is_real_credential(url: str, key: str | None) -> bool:
     """Check if credentials are real (not dummy/placeholder values)."""
@@ -107,10 +115,11 @@ def _is_real_credential(url: str, key: str | None) -> bool:
     # Detect env var placeholders
     return not (url.startswith("$") or (key and key.startswith("$")))
 
+
 _has_valid_credentials = _is_real_credential(_supabase_url, _supabase_key)
 pytestmark = pytest.mark.skipif(
     not _has_valid_credentials,
-    reason="Supabase credentials not available or are dummy/placeholder values"
+    reason="Supabase credentials not available or are dummy/placeholder values",
 )
 
 
@@ -142,7 +151,7 @@ async def cleanup_test_data(storage: SupabaseStorageClient, table: str, prefix: 
         await storage.delete_entities(
             table=table,
             filters={"name": {"in": []}},  # Will be overwritten
-            soft_delete=False
+            soft_delete=False,
         )
 
 
@@ -158,12 +167,14 @@ class TestBasicOperations:
     async def test_single_create_returns_entity_with_id(self, storage, unique_prefix):
         """CREATE should return the created entity with generated ID."""
         result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "create",
-                "table": "product_families",
-                "data": make_family_data(unique_prefix),
-                "returns": "family"
-            }]
+            operations=[
+                {
+                    "action": "create",
+                    "table": "product_families",
+                    "data": make_family_data(unique_prefix),
+                    "returns": "family",
+                }
+            ]
         )
 
         assert result["success"] is True
@@ -176,26 +187,24 @@ class TestBasicOperations:
         assert family["name"] == f"{unique_prefix}_family"
 
         # Cleanup
-        await storage.delete_entities(
-            "product_families",
-            {"id": family["id"]},
-            soft_delete=False
-        )
+        await storage.delete_entities("product_families", {"id": family["id"]}, soft_delete=False)
 
     @pytest.mark.asyncio
     async def test_batch_create_multiple_entities(self, storage, unique_prefix):
         """Batch CREATE should insert multiple entities atomically."""
         result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "create",
-                "table": "product_families",
-                "data": [
-                    {**make_family_data(unique_prefix, "batch1", "B1")},
-                    {**make_family_data(unique_prefix, "batch2", "B2")},
-                    {**make_family_data(unique_prefix, "batch3", "B3")},
-                ],
-                "returns": "families"
-            }]
+            operations=[
+                {
+                    "action": "create",
+                    "table": "product_families",
+                    "data": [
+                        {**make_family_data(unique_prefix, "batch1", "B1")},
+                        {**make_family_data(unique_prefix, "batch2", "B2")},
+                        {**make_family_data(unique_prefix, "batch3", "B3")},
+                    ],
+                    "returns": "families",
+                }
+            ]
         )
 
         assert result["success"] is True
@@ -209,77 +218,76 @@ class TestBasicOperations:
 
         # Cleanup
         for item in results_data:
-            await storage.delete_entities(
-                "product_families",
-                {"id": item["id"]},
-                soft_delete=False
-            )
+            await storage.delete_entities("product_families", {"id": item["id"]}, soft_delete=False)
 
     @pytest.mark.asyncio
     async def test_update_modifies_existing_records(self, storage, unique_prefix):
         """UPDATE should modify matching records and return count."""
         # First create a record
         create_result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "create",
-                "table": "product_families",
-                "data": make_family_data(unique_prefix, "update_test", "UPD"),
-                "returns": "family"
-            }]
+            operations=[
+                {
+                    "action": "create",
+                    "table": "product_families",
+                    "data": make_family_data(unique_prefix, "update_test", "UPD"),
+                    "returns": "family",
+                }
+            ]
         )
         family_id = create_result["context"]["family"]["id"]
 
         # Now update it
         update_result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "update",
-                "table": "product_families",
-                "filters": {"id": family_id},
-                "updates": {"name": f"{unique_prefix}_updated_name"}
-            }]
+            operations=[
+                {
+                    "action": "update",
+                    "table": "product_families",
+                    "filters": {"id": family_id},
+                    "updates": {"name": f"{unique_prefix}_updated_name"},
+                }
+            ]
         )
 
         assert update_result["success"] is True
         assert update_result["results"][0]["count"] == 1
 
         # Verify update applied
-        entities = await storage.query_entities(
-            "product_families",
-            filters={"id": family_id}
-        )
+        entities = await storage.query_entities("product_families", filters={"id": family_id})
         assert len(entities) == 1
         assert entities[0]["name"] == f"{unique_prefix}_updated_name"
 
         # Cleanup
-        await storage.delete_entities(
-            "product_families",
-            {"id": family_id},
-            soft_delete=False
-        )
+        await storage.delete_entities("product_families", {"id": family_id}, soft_delete=False)
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="RPC soft_delete uses deleted_at column but product_families uses is_active")
+    @pytest.mark.skip(
+        reason="RPC soft_delete uses deleted_at column but product_families uses is_active"
+    )
     async def test_soft_delete_sets_is_active_false(self, storage, unique_prefix):
         """Soft DELETE should set is_active=false, not remove record."""
         # Create record
         create_result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "create",
-                "table": "product_families",
-                "data": make_family_data(unique_prefix, "soft_delete", "SD"),
-                "returns": "family"
-            }]
+            operations=[
+                {
+                    "action": "create",
+                    "table": "product_families",
+                    "data": make_family_data(unique_prefix, "soft_delete", "SD"),
+                    "returns": "family",
+                }
+            ]
         )
         family_id = create_result["context"]["family"]["id"]
 
         # Soft delete
         delete_result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "delete",
-                "table": "product_families",
-                "filters": {"id": family_id},
-                "soft_delete": True  # Default
-            }]
+            operations=[
+                {
+                    "action": "delete",
+                    "table": "product_families",
+                    "filters": {"id": family_id},
+                    "soft_delete": True,  # Default
+                }
+            ]
         )
 
         assert delete_result["success"] is True
@@ -287,52 +295,46 @@ class TestBasicOperations:
 
         # Verify is_active=false but record exists
         # Query with include_inactive
-        entities = await storage.query_entities(
-            "product_families",
-            filters={"id": family_id}
-        )
+        entities = await storage.query_entities("product_families", filters={"id": family_id})
         # Record should exist but is_active should be false
         assert len(entities) == 1
         assert entities[0]["is_active"] is False
 
         # Cleanup - hard delete
-        await storage.delete_entities(
-            "product_families",
-            {"id": family_id},
-            soft_delete=False
-        )
+        await storage.delete_entities("product_families", {"id": family_id}, soft_delete=False)
 
     @pytest.mark.asyncio
     async def test_hard_delete_removes_record(self, storage, unique_prefix):
         """Hard DELETE should permanently remove the record."""
         # Create record
         create_result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "create",
-                "table": "product_families",
-                "data": make_family_data(unique_prefix, "hard_delete", "HD"),
-                "returns": "family"
-            }]
+            operations=[
+                {
+                    "action": "create",
+                    "table": "product_families",
+                    "data": make_family_data(unique_prefix, "hard_delete", "HD"),
+                    "returns": "family",
+                }
+            ]
         )
         family_id = create_result["context"]["family"]["id"]
 
         # Hard delete
         delete_result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "delete",
-                "table": "product_families",
-                "filters": {"id": family_id},
-                "soft_delete": False  # Hard delete
-            }]
+            operations=[
+                {
+                    "action": "delete",
+                    "table": "product_families",
+                    "filters": {"id": family_id},
+                    "soft_delete": False,  # Hard delete
+                }
+            ]
         )
 
         assert delete_result["success"] is True
 
         # Verify record gone
-        entities = await storage.query_entities(
-            "product_families",
-            filters={"id": family_id}
-        )
+        entities = await storage.query_entities("product_families", filters={"id": family_id})
         assert len(entities) == 0
 
 
@@ -353,14 +355,14 @@ class TestReferenceResolution:
                     "action": "create",
                     "table": "product_families",
                     "data": make_family_data(unique_prefix, "parent"),
-                    "returns": "family"
+                    "returns": "family",
                 },
                 {
                     "action": "create",
                     "table": "variant_axes",
                     "data": make_axis_data(unique_prefix, "axis"),
-                    "returns": "axis"
-                }
+                    "returns": "axis",
+                },
             ]
         )
 
@@ -385,7 +387,7 @@ class TestReferenceResolution:
                     "action": "create",
                     "table": "product_families",
                     "data": make_family_data(unique_prefix, "for_batch"),
-                    "returns": "family"
+                    "returns": "family",
                 },
                 {
                     "action": "create",
@@ -394,14 +396,14 @@ class TestReferenceResolution:
                         make_axis_data(unique_prefix, "axis1"),
                         make_axis_data(unique_prefix, "axis2"),
                     ],
-                    "returns": "axes"
+                    "returns": "axes",
                 },
                 {
                     "action": "create",
                     "table": "variant_values",
                     "data": make_value_data(f"{unique_prefix}_value", "@axes[0].id"),
-                    "returns": "value"
-                }
+                    "returns": "value",
+                },
             ]
         )
 
@@ -417,7 +419,9 @@ class TestReferenceResolution:
         await storage.delete_entities("variant_values", {"id": value["id"]}, soft_delete=False)
         for axis in axes_data:
             await storage.delete_entities("variant_axes", {"id": axis["id"]}, soft_delete=False)
-        await storage.delete_entities("product_families", {"id": result["context"]["family"]["id"]}, soft_delete=False)
+        await storage.delete_entities(
+            "product_families", {"id": result["context"]["family"]["id"]}, soft_delete=False
+        )
 
     @pytest.mark.asyncio
     async def test_multiple_references_in_single_operation(self, storage, unique_prefix):
@@ -428,19 +432,19 @@ class TestReferenceResolution:
                     "action": "create",
                     "table": "product_families",
                     "data": make_family_data(unique_prefix, "fam"),
-                    "returns": "family"
+                    "returns": "family",
                 },
                 {
                     "action": "create",
                     "table": "variant_axes",
                     "data": make_axis_data(unique_prefix, "size"),
-                    "returns": "size_axis"
+                    "returns": "size_axis",
                 },
                 {
                     "action": "create",
                     "table": "variant_axes",
                     "data": make_axis_data(unique_prefix, "color"),
-                    "returns": "color_axis"
+                    "returns": "color_axis",
                 },
                 {
                     "action": "create",
@@ -449,8 +453,8 @@ class TestReferenceResolution:
                         make_value_data("Small", "@size_axis.id", "S"),
                         make_value_data("Large", "@size_axis.id", "L"),
                     ],
-                    "returns": "size_values"
-                }
+                    "returns": "size_values",
+                },
             ]
         )
 
@@ -464,9 +468,15 @@ class TestReferenceResolution:
         # Cleanup
         for v in size_values:
             await storage.delete_entities("variant_values", {"id": v["id"]}, soft_delete=False)
-        await storage.delete_entities("variant_axes", {"id": result["context"]["size_axis"]["id"]}, soft_delete=False)
-        await storage.delete_entities("variant_axes", {"id": result["context"]["color_axis"]["id"]}, soft_delete=False)
-        await storage.delete_entities("product_families", {"id": result["context"]["family"]["id"]}, soft_delete=False)
+        await storage.delete_entities(
+            "variant_axes", {"id": result["context"]["size_axis"]["id"]}, soft_delete=False
+        )
+        await storage.delete_entities(
+            "variant_axes", {"id": result["context"]["color_axis"]["id"]}, soft_delete=False
+        )
+        await storage.delete_entities(
+            "product_families", {"id": result["context"]["family"]["id"]}, soft_delete=False
+        )
 
 
 # =============================================================================
@@ -504,13 +514,13 @@ class TestMultiTableAtomicity:
                     "action": "create",
                     "table": "product_families",
                     "data": make_family_data(unique_prefix, "rollback_test"),
-                    "returns": "family"
+                    "returns": "family",
                 },
                 {
                     "action": "create",
                     "table": "variant_axes",
                     "data": make_axis_data(unique_prefix, "axis_rollback"),
-                    "returns": "axis"
+                    "returns": "axis",
                 },
                 {
                     "action": "create",
@@ -518,8 +528,8 @@ class TestMultiTableAtomicity:
                     "data": {
                         **make_value_data(f"{unique_prefix}_value", invalid_axis_id),
                         "variant_axis_id": invalid_axis_id,  # INVALID! Will cause FK violation
-                    }
-                }
+                    },
+                },
             ]
         )
 
@@ -529,14 +539,12 @@ class TestMultiTableAtomicity:
 
         # CRITICAL: Verify family and axis were NOT created
         families = await storage.query_entities(
-            "product_families",
-            filters={"name": f"{unique_prefix}_rollback_test"}
+            "product_families", filters={"name": f"{unique_prefix}_rollback_test"}
         )
         assert len(families) == 0, "Family should NOT exist after rollback!"
 
         axes = await storage.query_entities(
-            "variant_axes",
-            filters={"name": f"{unique_prefix}_axis_rollback"}
+            "variant_axes", filters={"name": f"{unique_prefix}_axis_rollback"}
         )
         assert len(axes) == 0, "Axis should NOT exist after rollback!"
 
@@ -554,42 +562,49 @@ class TestMultiTableAtomicity:
                     "action": "create",
                     "table": "product_families",
                     "data": make_family_data(unique_prefix, "fam5", "F5"),
-                    "returns": "family"
+                    "returns": "family",
                 },
                 # 2. Create axis 1
                 {
                     "action": "create",
                     "table": "variant_axes",
                     "data": make_axis_data(unique_prefix, "ax1"),
-                    "returns": "axis1"
+                    "returns": "axis1",
                 },
                 # 3. Create axis 2
                 {
                     "action": "create",
                     "table": "variant_axes",
                     "data": make_axis_data(unique_prefix, "ax2"),
-                    "returns": "axis2"
+                    "returns": "axis2",
                 },
                 # 4. FAIL: Create value with invalid axis
                 {
                     "action": "create",
                     "table": "variant_values",
-                    "data": {**make_value_data("Bad", invalid_uuid), "variant_axis_id": invalid_uuid},
+                    "data": {
+                        **make_value_data("Bad", invalid_uuid),
+                        "variant_axis_id": invalid_uuid,
+                    },
                 },
                 # 5. This should never execute
                 {
                     "action": "create",
                     "table": "variant_values",
                     "data": make_value_data("Never", "@axis1.id"),
-                }
+                },
             ]
         )
 
         assert result["success"] is False
 
         # Verify NOTHING persisted
-        families = await storage.query_entities("product_families", {"name": f"{unique_prefix}_fam5"})
-        axes = await storage.query_entities("variant_axes", {"name": {"in": [f"{unique_prefix}_ax1", f"{unique_prefix}_ax2"]}})
+        families = await storage.query_entities(
+            "product_families", {"name": f"{unique_prefix}_fam5"}
+        )
+        axes = await storage.query_entities(
+            "variant_axes", {"name": {"in": [f"{unique_prefix}_ax1", f"{unique_prefix}_ax2"]}}
+        )
 
         assert len(families) == 0, "Family should be rolled back"
         assert len(axes) == 0, "Axes should be rolled back"
@@ -601,12 +616,16 @@ class TestMultiTableAtomicity:
         """
         # First, create a family with a specific code_prefix
         setup_result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "create",
-                "table": "product_families",
-                "data": make_family_data(unique_prefix, "dup_setup", f"{unique_prefix[:6]}_DUP"),
-                "returns": "setup"
-            }]
+            operations=[
+                {
+                    "action": "create",
+                    "table": "product_families",
+                    "data": make_family_data(
+                        unique_prefix, "dup_setup", f"{unique_prefix[:6]}_DUP"
+                    ),
+                    "returns": "setup",
+                }
+            ]
         )
         setup_id = setup_result["context"]["setup"]["id"]
 
@@ -618,14 +637,18 @@ class TestMultiTableAtomicity:
                     {
                         "action": "create",
                         "table": "product_families",
-                        "data": make_family_data(unique_prefix, "first", f"{unique_prefix[:6]}_NEW"),
-                        "returns": "first"
+                        "data": make_family_data(
+                            unique_prefix, "first", f"{unique_prefix[:6]}_NEW"
+                        ),
+                        "returns": "first",
                     },
                     {
                         "action": "create",
                         "table": "product_families",
-                        "data": make_family_data(unique_prefix, "dup", f"{unique_prefix[:6]}_DUP"),  # Duplicate!
-                    }
+                        "data": make_family_data(
+                            unique_prefix, "dup", f"{unique_prefix[:6]}_DUP"
+                        ),  # Duplicate!
+                    },
                 ]
             )
 
@@ -633,17 +656,20 @@ class TestMultiTableAtomicity:
             if not result["success"]:
                 # Verify first family was rolled back
                 families = await storage.query_entities(
-                    "product_families",
-                    {"name": f"{unique_prefix}_first"}
+                    "product_families", {"name": f"{unique_prefix}_first"}
                 )
-                assert len(families) == 0, "First family should be rolled back on constraint violation"
+                assert len(families) == 0, (
+                    "First family should be rolled back on constraint violation"
+                )
             else:
                 # If no constraint (test might pass if code_prefix isn't unique)
                 # Clean up both
                 for r in result["results"]:
                     if r.get("data"):
                         data = r["data"] if isinstance(r["data"], dict) else r["data"][0]
-                        await storage.delete_entities("product_families", {"id": data["id"]}, soft_delete=False)
+                        await storage.delete_entities(
+                            "product_families", {"id": data["id"]}, soft_delete=False
+                        )
         finally:
             # Cleanup setup
             await storage.delete_entities("product_families", {"id": setup_id}, soft_delete=False)
@@ -662,23 +688,27 @@ class TestFilterOperators:
         """Test explicit eq operator."""
         # Create test data
         create_result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "create",
-                "table": "product_families",
-                "data": make_family_data(unique_prefix, "eq_test", "EQ"),
-                "returns": "family"
-            }]
+            operations=[
+                {
+                    "action": "create",
+                    "table": "product_families",
+                    "data": make_family_data(unique_prefix, "eq_test", "EQ"),
+                    "returns": "family",
+                }
+            ]
         )
         family_id = create_result["context"]["family"]["id"]
 
         # Update using eq operator
         update_result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "update",
-                "table": "product_families",
-                "filters": {"id": {"eq": family_id}},
-                "updates": {"name": f"{unique_prefix}_eq_updated"}
-            }]
+            operations=[
+                {
+                    "action": "update",
+                    "table": "product_families",
+                    "filters": {"id": {"eq": family_id}},
+                    "updates": {"name": f"{unique_prefix}_eq_updated"},
+                }
+            ]
         )
 
         assert update_result["success"] is True
@@ -692,16 +722,18 @@ class TestFilterOperators:
         """Test IN operator for multiple values."""
         # Create multiple families
         create_result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "create",
-                "table": "product_families",
-                "data": [
-                    {**make_family_data(unique_prefix, "in1", "IN1")},
-                    {**make_family_data(unique_prefix, "in2", "IN2")},
-                    {**make_family_data(unique_prefix, "in3", "IN3")},
-                ],
-                "returns": "families"
-            }]
+            operations=[
+                {
+                    "action": "create",
+                    "table": "product_families",
+                    "data": [
+                        {**make_family_data(unique_prefix, "in1", "IN1")},
+                        {**make_family_data(unique_prefix, "in2", "IN2")},
+                        {**make_family_data(unique_prefix, "in3", "IN3")},
+                    ],
+                    "returns": "families",
+                }
+            ]
         )
 
         ids = [f["id"] for f in create_result["results"][0]["data"]]
@@ -709,12 +741,14 @@ class TestFilterOperators:
         # Update using IN operator (only first 2)
         # Note: Can't update sku_prefix as it has unique constraint
         update_result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "update",
-                "table": "product_families",
-                "filters": {"id": {"in": ids[:2]}},
-                "updates": {"description": "Updated via IN operator"}
-            }]
+            operations=[
+                {
+                    "action": "update",
+                    "table": "product_families",
+                    "filters": {"id": {"in": ids[:2]}},
+                    "updates": {"description": "Updated via IN operator"},
+                }
+            ]
         )
 
         assert update_result["success"] is True
@@ -737,13 +771,17 @@ class TestUpsertConflictHandling:
     async def test_upsert_creates_when_no_conflict(self, storage, unique_prefix):
         """UPSERT should create when no matching record exists."""
         result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "upsert",
-                "table": "product_families",
-                "data": make_family_data(unique_prefix, "upsert_new", f"{unique_prefix[:6]}_UP"),
-                "conflict_fields": ["sku_prefix"],
-                "returns": "family"
-            }]
+            operations=[
+                {
+                    "action": "upsert",
+                    "table": "product_families",
+                    "data": make_family_data(
+                        unique_prefix, "upsert_new", f"{unique_prefix[:6]}_UP"
+                    ),
+                    "conflict_fields": ["sku_prefix"],
+                    "returns": "family",
+                }
+            ]
         )
 
         assert result["success"] is True
@@ -766,12 +804,14 @@ class TestEdgeCases:
     async def test_update_matching_zero_rows_succeeds(self, storage, unique_prefix):
         """UPDATE matching 0 rows should succeed (not error)."""
         result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "update",
-                "table": "product_families",
-                "filters": {"id": "00000000-0000-0000-0000-000000000000"},  # Non-existent
-                "updates": {"name": "Never Applied"}
-            }]
+            operations=[
+                {
+                    "action": "update",
+                    "table": "product_families",
+                    "filters": {"id": "00000000-0000-0000-0000-000000000000"},  # Non-existent
+                    "updates": {"name": "Never Applied"},
+                }
+            ]
         )
 
         assert result["success"] is True
@@ -781,12 +821,14 @@ class TestEdgeCases:
     async def test_delete_matching_zero_rows_succeeds(self, storage, unique_prefix):
         """DELETE matching 0 rows should succeed (not error)."""
         result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "delete",
-                "table": "product_families",
-                "filters": {"id": "00000000-0000-0000-0000-000000000000"},
-                "soft_delete": False
-            }]
+            operations=[
+                {
+                    "action": "delete",
+                    "table": "product_families",
+                    "filters": {"id": "00000000-0000-0000-0000-000000000000"},
+                    "soft_delete": False,
+                }
+            ]
         )
 
         assert result["success"] is True
@@ -798,12 +840,14 @@ class TestEdgeCases:
         family_data = make_family_data(unique_prefix, "unicode_test")
         family_data["description"] = "Cafe avec creme - 日本語テスト"  # Override with unicode
         result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "create",
-                "table": "product_families",
-                "data": family_data,
-                "returns": "family"
-            }]
+            operations=[
+                {
+                    "action": "create",
+                    "table": "product_families",
+                    "data": family_data,
+                    "returns": "family",
+                }
+            ]
         )
 
         assert result["success"] is True
@@ -819,12 +863,14 @@ class TestEdgeCases:
         family_data = make_family_data(unique_prefix, "null_test")
         family_data["google_product_category"] = None  # Explicit NULL on nullable field
         result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "create",
-                "table": "product_families",
-                "data": family_data,
-                "returns": "family"
-            }]
+            operations=[
+                {
+                    "action": "create",
+                    "table": "product_families",
+                    "data": family_data,
+                    "returns": "family",
+                }
+            ]
         )
 
         assert result["success"] is True
@@ -851,7 +897,7 @@ class TestEdgeCases:
                     "action": "create",
                     "table": "product_families",
                     "data": make_family_data(unique_prefix, "ref_error", "RE"),
-                    "returns": "family"
+                    "returns": "family",
                 },
                 {
                     "action": "create",
@@ -859,13 +905,16 @@ class TestEdgeCases:
                     "data": {
                         **make_axis_data(unique_prefix, "bad_ref", "@nonexistent.id"),
                         "product_family_id": "@nonexistent.id",  # Reference doesn't exist!
-                    }
-                }
+                    },
+                },
             ]
         )
 
         assert result["success"] is False
-        assert "not found" in result.get("error", "").lower() or "reference" in result.get("error", "").lower()
+        assert (
+            "not found" in result.get("error", "").lower()
+            or "reference" in result.get("error", "").lower()
+        )
 
     @pytest.mark.asyncio
     async def test_context_passed_from_outside(self, storage, unique_prefix):
@@ -874,18 +923,20 @@ class TestEdgeCases:
         external_context = {
             "uploaded_image": {
                 "public_url": "https://example.com/image.png",
-                "storage_path": "products/image.png"
+                "storage_path": "products/image.png",
             }
         }
 
         result = await storage.execute_write_intent_rpc(
-            operations=[{
-                "action": "create",
-                "table": "product_families",
-                "data": make_family_data(unique_prefix, "with_context"),
-                "returns": "family"
-            }],
-            context=external_context
+            operations=[
+                {
+                    "action": "create",
+                    "table": "product_families",
+                    "data": make_family_data(unique_prefix, "with_context"),
+                    "returns": "family",
+                }
+            ],
+            context=external_context,
         )
 
         assert result["success"] is True
@@ -926,21 +977,21 @@ class TestComplexWorkflows:
                     "action": "create",
                     "table": "product_families",
                     "data": make_family_data(unique_prefix, "complex_fam"),
-                    "returns": "family"
+                    "returns": "family",
                 },
                 # 2. Create Size axis
                 {
                     "action": "create",
                     "table": "variant_axes",
                     "data": make_axis_data(unique_prefix, "size"),
-                    "returns": "size_axis"
+                    "returns": "size_axis",
                 },
                 # 3. Create Color axis
                 {
                     "action": "create",
                     "table": "variant_axes",
                     "data": make_axis_data(unique_prefix, "color"),
-                    "returns": "color_axis"
+                    "returns": "color_axis",
                 },
                 # 4. Create Size values (batch)
                 {
@@ -950,7 +1001,7 @@ class TestComplexWorkflows:
                         make_value_data("Small", "@size_axis.id", "S"),
                         make_value_data("Large", "@size_axis.id", "L"),
                     ],
-                    "returns": "size_values"
+                    "returns": "size_values",
                 },
                 # 5. Create Color values (batch)
                 {
@@ -960,8 +1011,8 @@ class TestComplexWorkflows:
                         make_value_data("Red", "@color_axis.id", "R"),
                         make_value_data("Blue", "@color_axis.id", "B"),
                     ],
-                    "returns": "color_values"
-                }
+                    "returns": "color_values",
+                },
             ]
         )
 

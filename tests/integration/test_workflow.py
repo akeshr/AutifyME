@@ -24,7 +24,9 @@ class RecordingWhatsAppClient:
     def __init__(self) -> None:
         self.sent_messages: list[dict[str, Any]] = []
 
-    def send_text(self, recipient: str, message: str, *, preview_url: bool = False) -> dict[str, Any]:
+    def send_text(
+        self, recipient: str, message: str, *, preview_url: bool = False
+    ) -> dict[str, Any]:
         payload = {
             "recipient": recipient,
             "message": message,

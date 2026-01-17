@@ -56,40 +56,31 @@ class ColumnSchema(BaseModel):
     unique: bool = Field(default=False, description="Has UNIQUE constraint")
     default: Any | None = Field(None, description="Default value")
     max_length: int | None = Field(None, description="For VARCHAR - max length")
-    references: str | None = Field(
-        None, description="Foreign key reference (format: table.column)"
-    )
+    references: str | None = Field(None, description="Foreign key reference (format: table.column)")
     description: str | None = Field(None, description="Column description")
 
     # Agent-critical fields for autonomous operations
     valid_values: list[str | int] | None = Field(
-        None,
-        description="Allowed enum values. Agent MUST use one of these values."
+        None, description="Allowed enum values. Agent MUST use one of these values."
     )
     valid_values_descriptions: dict[str, str] | None = Field(
-        None,
-        description="Business meaning for each valid value: {value: description}"
+        None, description="Business meaning for each valid value: {value: description}"
     )
     pattern: str | None = Field(
         None,
-        description="Regex pattern for validation (e.g., GST: '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$')"
+        description="Regex pattern for validation (e.g., GST: '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$')",
     )
     computed: bool = Field(
         default=False,
-        description="True if column is computed/readonly. Agent should NOT update this column."
+        description="True if column is computed/readonly. Agent should NOT update this column.",
     )
     element_type: str | None = Field(
-        None,
-        description="For ARRAY type - element data type (e.g., 'text', 'uuid')"
+        None, description="For ARRAY type - element data type (e.g., 'text', 'uuid')"
     )
     jsonb_schema: dict[str, Any] | None = Field(
-        None,
-        description="For JSONB type - expected structure with key descriptions"
+        None, description="For JSONB type - expected structure with key descriptions"
     )
-    examples: list[Any] | None = Field(
-        None,
-        description="Sample valid values for agent guidance"
-    )
+    examples: list[Any] | None = Field(None, description="Sample valid values for agent guidance")
 
 
 # =============================================================================
@@ -111,15 +102,9 @@ class Relationship(BaseModel):
     type: RelationshipType = Field(..., description="Relationship type")
     target_table: str = Field(..., description="Target table name")
     foreign_key: str = Field(..., description="Foreign key column name in this table")
-    target_column: str = Field(
-        default="id", description="Referenced column in target table"
-    )
-    cascade_delete: bool = Field(
-        default=False, description="CASCADE on DELETE if true"
-    )
-    cascade_update: bool = Field(
-        default=False, description="CASCADE on UPDATE if true"
-    )
+    target_column: str = Field(default="id", description="Referenced column in target table")
+    cascade_delete: bool = Field(default=False, description="CASCADE on DELETE if true")
+    cascade_update: bool = Field(default=False, description="CASCADE on UPDATE if true")
     description: str | None = Field(None, description="Relationship description")
 
 
@@ -147,9 +132,7 @@ class BusinessRule(BaseModel):
         description="Rule type (e.g., 'generate_sku', 'validate_price', 'calculate_total')",
     )
     trigger: BusinessRuleTrigger = Field(..., description="When to execute rule")
-    handler: str = Field(
-        ..., description="Python function name in BusinessRuleHandlers"
-    )
+    handler: str = Field(..., description="Python function name in BusinessRuleHandlers")
     parameters: dict[str, Any] = Field(
         default_factory=dict, description="Handler-specific parameters"
     )
@@ -167,9 +150,7 @@ class TableSchema(BaseModel):
 
     name: str = Field(..., description="Table name")
     description: str | None = Field(None, description="Table description")
-    columns: dict[str, ColumnSchema] = Field(
-        ..., description="Map of column_name -> ColumnSchema"
-    )
+    columns: dict[str, ColumnSchema] = Field(..., description="Map of column_name -> ColumnSchema")
     primary_key: str = Field(default="id", description="Primary key column name")
     relationships: list[Relationship] = Field(
         default_factory=list, description="Foreign key relationships"
@@ -189,7 +170,11 @@ class TableSchema(BaseModel):
 
     def get_foreign_keys(self) -> dict[str, Relationship]:
         """Get all foreign key relationships."""
-        return {rel.foreign_key: rel for rel in self.relationships if rel.type == RelationshipType.PARENT}
+        return {
+            rel.foreign_key: rel
+            for rel in self.relationships
+            if rel.type == RelationshipType.PARENT
+        }
 
     def get_required_columns(self) -> list[str]:
         """Get columns that cannot be NULL and have no default."""
@@ -201,11 +186,7 @@ class TableSchema(BaseModel):
 
     def get_unique_columns(self) -> list[str]:
         """Get columns with UNIQUE constraints (excluding primary key)."""
-        return [
-            name
-            for name, col in self.columns.items()
-            if col.unique and not col.primary_key
-        ]
+        return [name for name, col in self.columns.items() if col.unique and not col.primary_key]
 
     def get_enum_columns(self) -> dict[str, list[str | int]]:
         """Get columns with valid_values (enum constraints).
@@ -213,19 +194,11 @@ class TableSchema(BaseModel):
         Returns:
             Dict of column_name -> list of valid values
         """
-        return {
-            name: col.valid_values
-            for name, col in self.columns.items()
-            if col.valid_values
-        }
+        return {name: col.valid_values for name, col in self.columns.items() if col.valid_values}
 
     def get_computed_columns(self) -> list[str]:
         """Get computed/readonly columns that agents should NOT update."""
-        return [
-            name
-            for name, col in self.columns.items()
-            if col.computed
-        ]
+        return [name for name, col in self.columns.items() if col.computed]
 
     def get_pattern_columns(self) -> dict[str, str]:
         """Get columns with regex pattern constraints.
@@ -233,11 +206,7 @@ class TableSchema(BaseModel):
         Returns:
             Dict of column_name -> regex pattern
         """
-        return {
-            name: col.pattern
-            for name, col in self.columns.items()
-            if col.pattern
-        }
+        return {name: col.pattern for name, col in self.columns.items() if col.pattern}
 
     def get_jsonb_schemas(self) -> dict[str, dict[str, Any]]:
         """Get JSONB columns with their expected schemas.
@@ -245,11 +214,7 @@ class TableSchema(BaseModel):
         Returns:
             Dict of column_name -> jsonb_schema
         """
-        return {
-            name: col.jsonb_schema
-            for name, col in self.columns.items()
-            if col.jsonb_schema
-        }
+        return {name: col.jsonb_schema for name, col in self.columns.items() if col.jsonb_schema}
 
     # =========================================================================
     # Executable Schema: Validation Methods
@@ -294,29 +259,20 @@ class TableSchema(BaseModel):
             try:
                 # Batch check via storage port (single query)
                 existing = await storage.check_existing_values(
-                    table=self.name,
-                    column=col,
-                    values=values
+                    table=self.name, column=col, values=values
                 )
 
                 if existing:
-                    result.add_error(
-                        f"Duplicate values for unique column '{col}': {existing}"
-                    )
+                    result.add_error(f"Duplicate values for unique column '{col}': {existing}")
                     logger.warning(
                         f"Unique constraint violation on {self.name}.{col}",
-                        extra={"duplicates": existing}
+                        extra={"duplicates": existing},
                     )
 
             except Exception as e:
                 # Don't fail validation if check fails (graceful degradation)
-                result.add_warning(
-                    f"Could not verify uniqueness for column '{col}': {str(e)}"
-                )
-                logger.error(
-                    f"Uniqueness check failed for {self.name}.{col}",
-                    exc_info=True
-                )
+                result.add_warning(f"Could not verify uniqueness for column '{col}': {str(e)}")
+                logger.error(f"Uniqueness check failed for {self.name}.{col}", exc_info=True)
 
         # Special validation for variant_axes: case-insensitive name uniqueness within family
         if self.name == "variant_axes":
@@ -363,16 +319,14 @@ class TableSchema(BaseModel):
         exclude_ids = []
         try:
             target_records = await storage.query_entities(
-                table=self.name,
-                filters=filters,
-                columns=["id"]
+                table=self.name, filters=filters, columns=["id"]
             )
             exclude_ids = [str(rec["id"]) for rec in target_records if "id" in rec]
         except Exception:
             logger.warning(
                 f"Could not query target record IDs for {self.name}",
                 exc_info=True,
-                extra={"filters": filters}
+                extra={"filters": filters},
             )
             # Continue without exclude_ids - will do basic uniqueness check
 
@@ -384,7 +338,7 @@ class TableSchema(BaseModel):
                         table=self.name,
                         column=col,
                         values=[updates[col]],
-                        exclude_ids=exclude_ids if exclude_ids else None
+                        exclude_ids=exclude_ids if exclude_ids else None,
                     )
 
                     if existing:
@@ -393,9 +347,7 @@ class TableSchema(BaseModel):
                         )
 
                 except Exception as e:
-                    result.add_warning(
-                        f"Could not verify uniqueness for column '{col}': {str(e)}"
-                    )
+                    result.add_warning(f"Could not verify uniqueness for column '{col}': {str(e)}")
 
         return result
 
@@ -429,8 +381,7 @@ class TableSchema(BaseModel):
             try:
                 # Query existing axes for this product family
                 existing_axes = await storage.query_entities(
-                    table="variant_axes",
-                    filters={"product_family_id": family_id}
+                    table="variant_axes", filters={"product_family_id": family_id}
                 )
 
                 # Check for case-insensitive name collision
@@ -449,13 +400,16 @@ class TableSchema(BaseModel):
                             extra={
                                 "attempted_name": name,
                                 "existing_name": existing_name,
-                                "family_id": family_id
-                            }
+                                "family_id": family_id,
+                            },
                         )
 
                 # Check within the batch being inserted (prevent duplicates in same operation)
-                batch_names = [e.get("name", "").lower() for e in entities
-                              if e.get("product_family_id") == family_id and e.get("name")]
+                batch_names = [
+                    e.get("name", "").lower()
+                    for e in entities
+                    if e.get("product_family_id") == family_id and e.get("name")
+                ]
                 if batch_names.count(name.lower()) > 1:
                     result.add_error(
                         f"Duplicate variant axis name '{name}' found in operation. "
@@ -470,7 +424,7 @@ class TableSchema(BaseModel):
                 logger.error(
                     "Case-insensitive uniqueness check failed for variant_axes",
                     exc_info=True,
-                    extra={"axis_name": name, "family_id": family_id}
+                    extra={"axis_name": name, "family_id": family_id},
                 )
 
         return result
@@ -501,7 +455,7 @@ class TableSchema(BaseModel):
             records_to_delete = await storage.query_entities(
                 table=self.name,
                 filters=filters,
-                columns=["id"]  # Only need IDs for cascade check
+                columns=["id"],  # Only need IDs for cascade check
             )
             impact[self.name] = len(records_to_delete)
 
@@ -521,7 +475,7 @@ class TableSchema(BaseModel):
                                 child_records = await storage.query_entities(
                                     table=other_table_name,
                                     filters={rel.foreign_key: record_id},
-                                    columns=["id"]
+                                    columns=["id"],
                                 )
                                 child_count += len(child_records)
 
@@ -536,10 +490,7 @@ class TableSchema(BaseModel):
             }
 
         except Exception as e:
-            logger.error(
-                f"Cascade impact calculation failed for {self.name}",
-                exc_info=True
-            )
+            logger.error(f"Cascade impact calculation failed for {self.name}", exc_info=True)
             return {
                 "status": "calculation_failed",
                 "error": str(e),
@@ -558,16 +509,12 @@ class SchemaRegistry(BaseModel):
     version: str = Field(..., description="Schema version (e.g., 'v1', 'v2')")
     domain: str = Field(..., description="Domain name (e.g., 'product_catalog')")
     description: str | None = Field(None, description="Schema description")
-    tables: dict[str, TableSchema] = Field(
-        ..., description="Map of table_name -> TableSchema"
-    )
+    tables: dict[str, TableSchema] = Field(..., description="Map of table_name -> TableSchema")
 
     def get_table(self, name: str) -> TableSchema:
         """Get table schema by name."""
         if name not in self.tables:
-            raise ValueError(
-                f"Table '{name}' not found in schema {self.domain}:{self.version}"
-            )
+            raise ValueError(f"Table '{name}' not found in schema {self.domain}:{self.version}")
         return self.tables[name]
 
     def get_table_names(self) -> list[str]:
@@ -611,7 +558,9 @@ class SchemaRegistry(BaseModel):
         return cls.from_json(path.read_text())
 
     @classmethod
-    def get_version(cls, version: str = "latest", domain: str = "product_catalog") -> "SchemaRegistry":
+    def get_version(
+        cls, version: str = "latest", domain: str = "product_catalog"
+    ) -> "SchemaRegistry":
         """
         Load schema by version from registry.
 
@@ -632,9 +581,7 @@ class SchemaRegistry(BaseModel):
             # Find latest version
             version_files = sorted(schema_dir.glob("v*.json"), reverse=True)
             if not version_files:
-                raise FileNotFoundError(
-                    f"No schema versions found for domain '{domain}'"
-                )
+                raise FileNotFoundError(f"No schema versions found for domain '{domain}'")
             schema_file = version_files[0]
         else:
             # Load specific version
@@ -726,9 +673,7 @@ class SchemaValidator:
 
         return result
 
-    def validate_entity(
-        self, table_name: str, entity: dict[str, Any]
-    ) -> ValidationResult:
+    def validate_entity(self, table_name: str, entity: dict[str, Any]) -> ValidationResult:
         """Validate entity against table schema."""
         result = ValidationResult(valid=True)
 
@@ -743,33 +688,25 @@ class SchemaValidator:
         required = table.get_required_columns()
         missing = [col for col in required if col not in entity]
         if missing:
-            result.add_error(
-                f"Missing required columns for table '{table_name}': {missing}"
-            )
+            result.add_error(f"Missing required columns for table '{table_name}': {missing}")
 
         # Check unknown columns
         valid_columns = set(table.columns.keys())
         provided_columns = set(entity.keys())
         unknown = provided_columns - valid_columns
         if unknown:
-            result.add_warning(
-                f"Unknown columns for table '{table_name}': {list(unknown)}"
-            )
+            result.add_warning(f"Unknown columns for table '{table_name}': {list(unknown)}")
 
         # Validate column types (basic)
         for col_name, value in entity.items():
             if col_name in table.columns:
                 col = table.columns[col_name]
                 if value is None and not col.nullable:
-                    result.add_error(
-                        f"Column '{col_name}' cannot be NULL in table '{table_name}'"
-                    )
+                    result.add_error(f"Column '{col_name}' cannot be NULL in table '{table_name}'")
 
         return result
 
-    def validate_operation(
-        self, operation: dict[str, Any]
-    ) -> ValidationResult:
+    def validate_operation(self, operation: dict[str, Any]) -> ValidationResult:
         """Validate operation against schema."""
         result = ValidationResult(valid=True)
 

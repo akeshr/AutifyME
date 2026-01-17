@@ -20,6 +20,7 @@ def get_llm(
     top_p: float | None = None,
     top_k: int | None = None,
     max_output_tokens: int | None = None,
+    seed: int | None = None,  # For reproducibility (best-effort, not guaranteed)
     # Thinking control (model-dependent)
     thinking_budget: int | None = None,  # Gemini 2.5: token count (0=disable, -1=dynamic)
     thinking_level: Literal["low", "medium", "high"] | None = None,  # Gemini 3+ (library 4.1.0+)
@@ -32,7 +33,8 @@ def get_llm(
     # Gemini 3 Image Generation parameters
     image_aspect_ratio: Literal[
         "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
-    ] | None = None,
+    ]
+    | None = None,
     image_size: Literal["1K", "2K", "4K"] | None = None,
     # Retry configuration for Gemini blank response handling
     max_retries: int = 5,
@@ -78,6 +80,9 @@ def get_llm(
         top_k: Top-k sampling parameter. Consider top_k most probable tokens. Must be positive.
         max_output_tokens: Maximum tokens in response. Must be > 0.
             Gemini 2.5: up to 65K. Gemini 3 Pro: up to 64K.
+        seed: Seed for reproducibility (Gemini only). Best-effort - deterministic output not guaranteed.
+            Use same seed + parameters for more consistent outputs across calls.
+            Useful for batch image generation where consistency is important.
 
         Thinking Control (mutually exclusive - use one based on model):
         thinking_budget: Token budget for Gemini 2.5 adaptive thinking.
@@ -235,9 +240,7 @@ def get_llm(
             temperature=effective_temp,
             timeout=timeout,  # type: ignore[call-arg]
             max_retries=max_retries,
-            model_kwargs={
-                "extra_headers": {"anthropic-beta": "prompt-caching-2024-07-31"}
-            },
+            model_kwargs={"extra_headers": {"anthropic-beta": "prompt-caching-2024-07-31"}},
         )
     elif provider == "google":
         # Google Gemini models with full parameter support
@@ -270,6 +273,7 @@ def get_llm(
             # Warn if user accidentally passed thinking_budget for Gemini 3
             if thinking_budget is not None:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     f"thinking_budget ignored for Gemini 3 model '{model}'. "
                     "Use thinking_level instead (Flash: minimal/low/medium/high, Pro: low/high)."
@@ -294,6 +298,8 @@ def get_llm(
             gemini_kwargs["top_k"] = top_k
         if max_output_tokens is not None:
             gemini_kwargs["max_output_tokens"] = max_output_tokens
+        if seed is not None:
+            gemini_kwargs["seed"] = seed
         if include_thoughts:
             gemini_kwargs["include_thoughts"] = include_thoughts
         if safety_settings is not None:
@@ -316,6 +322,7 @@ def get_llm(
             if is_gemini_3:
                 # Convert user-friendly strings to google.genai.types.MediaResolution enum
                 from google.genai.types import MediaResolution
+
                 resolution_map = {
                     "low": MediaResolution.MEDIA_RESOLUTION_LOW,
                     "medium": MediaResolution.MEDIA_RESOLUTION_MEDIUM,
@@ -324,6 +331,7 @@ def get_llm(
                 gemini_kwargs["media_resolution"] = resolution_map[media_resolution]
             else:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     f"media_resolution ignored for model '{model}'. "
                     "Only supported on Gemini 3+ models."

@@ -48,9 +48,7 @@ class UsagePattern(BaseModel):
     last_seen: datetime = Field(description="Most recent occurrence")
     avg_duration_seconds: float = Field(description="Average handling time")
     success_rate: float = Field(description="Success rate (0-1)")
-    is_edge_case: bool = Field(
-        default=False, description="Low frequency or high complexity"
-    )
+    is_edge_case: bool = Field(default=False, description="Low frequency or high complexity")
 
 
 class ScenarioDefinition(BaseModel):
@@ -76,9 +74,7 @@ class FailureCase(BaseModel):
     error_message: str = Field(description="Error details")
     thread_id: str = Field(description="LangGraph thread ID for debugging")
     occurred_at: datetime = Field(description="When failure occurred")
-    resolution_strategy: str | None = Field(
-        description="How it was resolved (if applicable)"
-    )
+    resolution_strategy: str | None = Field(description="How it was resolved (if applicable)")
 
 
 class ScenarioSynthesizer:
@@ -167,10 +163,7 @@ class ScenarioSynthesizer:
         """
         # Determine scenario name
         edge_marker = "[EDGE CASE] " if pattern.is_edge_case else ""
-        name = (
-            f"{edge_marker}Production Pattern: {pattern.intent} "
-            f"({pattern.occurrence_count}x)"
-        )
+        name = f"{edge_marker}Production Pattern: {pattern.intent} ({pattern.occurrence_count}x)"
 
         scenario = ScenarioDefinition(
             name=name,
@@ -244,9 +237,7 @@ class ScenarioSynthesizer:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate safe test function name
-        test_func_name = (
-            f"test_regression_{failure.failure_id.replace('-', '_')[:16]}"
-        )
+        test_func_name = f"test_regression_{failure.failure_id.replace('-', '_')[:16]}"
         test_file_name = f"{test_func_name}.py"
         test_file_path = output_dir / test_file_name
 
@@ -282,11 +273,7 @@ class ScenarioSynthesizer:
             Path to generated scenarios file
         """
         if output_path is None:
-            output_path = (
-                Path(__file__).parent.parent
-                / "cli"
-                / "synthesized_scenarios.py"
-            )
+            output_path = Path(__file__).parent.parent / "cli" / "synthesized_scenarios.py"
 
         # Generate scenarios dictionary
         scenarios_code = self._generate_scenarios_code(patterns)

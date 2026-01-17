@@ -4,6 +4,7 @@ Return types for:
 - PM interaction tool (chat_with_pm)
 - Trace analysis tools (get_trace_overview, get_run_details, etc.)
 """
+
 from datetime import datetime
 from typing import Any
 
@@ -54,9 +55,11 @@ class PMChatResult(BaseModel):
     error: str | None = None
     """Error message if something went wrong."""
 
+
 # ============================================================================
 # Execution Tool Models
 # ============================================================================
+
 
 class ExecutionResult(BaseModel):
     """Result of scenario execution via execute_scenario()."""
@@ -99,6 +102,7 @@ class ExecutionResult(BaseModel):
 # Trace Analysis Models
 # ============================================================================
 
+
 class RunNode(BaseModel):
     """Single run node in hierarchical trace tree.
 
@@ -129,7 +133,7 @@ class RunNode(BaseModel):
     error: str | None = None
     """High-level error message if failed (not full traceback)."""
 
-    children: list['RunNode'] = Field(default_factory=list)
+    children: list["RunNode"] = Field(default_factory=list)
     """Child runs (recursive tree structure)."""
 
 
@@ -312,6 +316,7 @@ class RunMessages(BaseModel):
 # Multi-Trace Workflow Story Models (for HITL workflows)
 # ============================================================================
 
+
 class HITLDecision(BaseModel):
     """User decision from HITL interrupt."""
 
@@ -392,6 +397,7 @@ class WorkflowStory(BaseModel):
 # Test History Models
 # ============================================================================
 
+
 class ExecutionRecord(BaseModel):
     """Single test execution record."""
 
@@ -430,6 +436,7 @@ class ExecutionHistory(BaseModel):
 # ============================================================================
 # LLM Trace Extraction Models (for prompt analysis)
 # ============================================================================
+
 
 class LLMCallNode(BaseModel):
     """Single LLM invocation with prompt and output.
@@ -477,7 +484,7 @@ class LLMCallNode(BaseModel):
     parent_agent: str | None = None
     """Parent agent name for context (who delegated to this agent)."""
 
-    children: list['LLMCallNode'] = Field(default_factory=list)
+    children: list["LLMCallNode"] = Field(default_factory=list)
     """Child LLM calls (recursive tree structure)."""
 
 

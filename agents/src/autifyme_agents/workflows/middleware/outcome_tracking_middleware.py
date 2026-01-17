@@ -156,9 +156,9 @@ class OutcomeTrackingMiddleware:
             True if tool message with "successfully cataloged" found
         """
         return any(
-            getattr(msg, "type", None) == "tool" and
-            isinstance(getattr(msg, "content", None), str) and
-            "successfully cataloged" in getattr(msg, "content", "").lower()
+            getattr(msg, "type", None) == "tool"
+            and isinstance(getattr(msg, "content", None), str)
+            and "successfully cataloged" in getattr(msg, "content", "").lower()
             for msg in messages
         )
 

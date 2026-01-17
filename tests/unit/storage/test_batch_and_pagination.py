@@ -22,7 +22,9 @@ from autifyme_agents.integrations.storage.supabase_client import SupabaseStorage
 @pytest.fixture
 def mock_supabase_client():
     """Mock Supabase async client for testing."""
-    with patch("autifyme_agents.integrations.storage.supabase_client.create_async_client") as mock_create:
+    with patch(
+        "autifyme_agents.integrations.storage.supabase_client.create_async_client"
+    ) as mock_create:
         # Create mock client
         mock_client = MagicMock()
 
@@ -81,8 +83,7 @@ class TestBatchReadBasicOperations:
         mock_response.data = [{"id": "id1", "name": "Product 1"}]
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         results = await storage.batch_read("products", ids=["id1"])
@@ -104,8 +105,7 @@ class TestBatchReadBasicOperations:
         ]
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         results = await storage.batch_read("products", ids=["id1", "id2", "id3"])
@@ -123,8 +123,7 @@ class TestBatchReadBasicOperations:
         mock_response.data = [{"id": id, "name": f"Product {id}"} for id in ids]
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         results = await storage.batch_read("products", ids=ids)
@@ -138,8 +137,7 @@ class TestBatchReadBasicOperations:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         results = await storage.batch_read("products", ids=[])
@@ -158,19 +156,16 @@ class TestBatchReadBasicOperations:
             {
                 "id": "id1",
                 "name": "Product 1",
-                "product_families": {"id": "fam1", "name": "Family 1"}
+                "product_families": {"id": "fam1", "name": "Family 1"},
             }
         ]
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         results = await storage.batch_read(
-            "products",
-            ids=["id1"],
-            relations=["product_families(*)"]
+            "products", ids=["id1"], relations=["product_families(*)"]
         )
 
         assert len(results) == 1
@@ -185,14 +180,11 @@ class TestBatchReadBasicOperations:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         await storage.batch_read(
-            "products",
-            ids=["id1"],
-            relations=["product_families(*)", "variants(*)"]
+            "products", ids=["id1"], relations=["product_families(*)", "variants(*)"]
         )
 
         # Should include all relations in select
@@ -221,8 +213,7 @@ class TestBatchReadOrderPreservation:
         ]
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         # Request in specific order
@@ -245,8 +236,7 @@ class TestBatchReadOrderPreservation:
         ]
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         results = await storage.batch_read("products", ids=["id1", "id2", "id3"])
@@ -266,8 +256,7 @@ class TestBatchReadOrderPreservation:
         mock_response.data = []
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         results = await storage.batch_read("products", ids=["nonexistent1", "nonexistent2"])
@@ -295,8 +284,7 @@ class TestBatchReadErrorHandling:
         mock_table.execute = mock_error
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         with pytest.raises(StorageError) as exc_info:
@@ -314,8 +302,7 @@ class TestBatchReadErrorHandling:
         mock_response.data = None
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         results = await storage.batch_read("products", ids=["id1"])
@@ -335,8 +322,7 @@ class TestBatchReadErrorHandling:
         ]
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         with patch("autifyme_agents.integrations.storage.supabase_client.logger") as mock_logger:
@@ -363,8 +349,7 @@ class TestPaginationOffsetMode:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         result = await storage.paginate_query("products", page=1, per_page=20)
@@ -382,8 +367,7 @@ class TestPaginationOffsetMode:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         await storage.paginate_query("products", page=2, per_page=20)
@@ -397,8 +381,7 @@ class TestPaginationOffsetMode:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         result = await storage.paginate_query("products", page=1, per_page=50)
@@ -412,8 +395,7 @@ class TestPaginationOffsetMode:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         # Should raise ValueError for per_page > 100
@@ -428,8 +410,7 @@ class TestPaginationOffsetMode:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         # Should raise ValueError for page < 1
@@ -447,8 +428,7 @@ class TestPaginationOffsetMode:
         mock_response.data = [{"id": f"id{i}"} for i in range(20)]
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         result = await storage.paginate_query("products", page=1, per_page=20)
@@ -464,8 +444,7 @@ class TestPaginationOffsetMode:
         mock_response.data = [{"id": f"id{i}"} for i in range(15)]
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         result = await storage.paginate_query("products", page=3, per_page=20)
@@ -478,8 +457,7 @@ class TestPaginationOffsetMode:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         await storage.paginate_query(
@@ -487,7 +465,7 @@ class TestPaginationOffsetMode:
             filters={"is_active": True, "category_id": "cat1"},
             search_patterns={"name": "%bottle%"},
             page=1,
-            per_page=20
+            per_page=20,
         )
 
         # Should apply filters
@@ -528,8 +506,7 @@ class TestPaginationCountAndMetadata:
         mock_table.execute = mock_multi_execute
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         result = await storage.paginate_query("products", page=1, per_page=20, include_count=True)
@@ -544,8 +521,7 @@ class TestPaginationCountAndMetadata:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         result = await storage.paginate_query("products", page=1, per_page=20)
@@ -580,8 +556,7 @@ class TestPaginationCountAndMetadata:
         mock_table.execute = mock_multi_execute
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         result = await storage.paginate_query(
@@ -590,7 +565,7 @@ class TestPaginationCountAndMetadata:
             search_patterns={"name": "%test%"},
             page=1,
             per_page=20,
-            include_count=True
+            include_count=True,
         )
 
         # Count should reflect filtered results
@@ -605,16 +580,10 @@ class TestPaginationCountAndMetadata:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
-        await storage.paginate_query(
-            "products",
-            order_by="created_at.desc",
-            page=1,
-            per_page=20
-        )
+        await storage.paginate_query("products", order_by="created_at.desc", page=1, per_page=20)
 
         # Should parse and apply ordering
         mock_table.order.assert_called_once_with("created_at", desc=True)
@@ -641,8 +610,7 @@ class TestPaginationCursorMode:
         cursor = base64.b64encode(json.dumps(cursor_data).encode("utf-8")).decode("utf-8")
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         result = await storage.paginate_query("products", cursor=cursor, per_page=20)
@@ -667,8 +635,7 @@ class TestPaginationCursorMode:
         cursor = base64.b64encode(json.dumps(cursor_data).encode("utf-8")).decode("utf-8")
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         result = await storage.paginate_query("products", cursor=cursor, per_page=20)
@@ -684,8 +651,7 @@ class TestPaginationCursorMode:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         # Invalid cursor should be handled gracefully
@@ -713,8 +679,7 @@ class TestPaginationEdgeCases:
         mock_response.data = []
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         result = await storage.paginate_query("products", page=1, per_page=20)
@@ -728,15 +693,11 @@ class TestPaginationEdgeCases:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         await storage.paginate_query(
-            "products",
-            relations=["product_families(*)"],
-            page=1,
-            per_page=20
+            "products", relations=["product_families(*)"], page=1, per_page=20
         )
 
         # Should include relations in select
@@ -755,8 +716,7 @@ class TestPaginationEdgeCases:
         mock_table.execute = mock_error
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         with pytest.raises(StorageError) as exc_info:
@@ -771,8 +731,7 @@ class TestPaginationEdgeCases:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         storage = SupabaseStorageClient(
-            supabase_url="https://test.supabase.co",
-            service_key="test-key"
+            supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
         await storage.paginate_query("products", page=1, per_page=20)

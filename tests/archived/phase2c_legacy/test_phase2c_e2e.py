@@ -18,7 +18,7 @@ import uuid
 import pytest
 
 # Windows-specific fix for psycopg async
-if sys.platform == 'win32':
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from autifyme_agents.schemas.operation_intent import (
@@ -46,12 +46,14 @@ from tests.fixtures.fake_storage import FakeStorage
 # Test Helpers
 # =============================================================================
 
+
 def get_table_count(table_counts: list[TableCount], table_name: str) -> int:
     """Helper to get count for a table from list[TableCount]."""
     for tc in table_counts:
         if tc.table == table_name:
             return tc.count
     return 0
+
 
 # =============================================================================
 # Fixtures - Test Database Setup
@@ -341,10 +343,16 @@ class TestDependencyResolution:
 
         operations = [
             Operation(
-                op_type="insert", table="test", new_entities=[], depends_on=[1]  # Depends on op 1
+                op_type="insert",
+                table="test",
+                new_entities=[],
+                depends_on=[1],  # Depends on op 1
             ),
             Operation(
-                op_type="insert", table="test", new_entities=[], depends_on=[0]  # Depends on op 0
+                op_type="insert",
+                table="test",
+                new_entities=[],
+                depends_on=[0],  # Depends on op 0
             ),
         ]
 
@@ -919,9 +927,11 @@ class TestBusinessRules:
 
         # Verify failure
         assert result.success is False
-        assert ("TST-EXISTING" in result.error_message or
-                "Duplicate" in result.error_message or
-                "unique" in result.error_message.lower())
+        assert (
+            "TST-EXISTING" in result.error_message
+            or "Duplicate" in result.error_message
+            or "unique" in result.error_message.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_sku_uniqueness_allows_unique_skus(self, operation_executor, test_storage):
@@ -1050,6 +1060,4 @@ class TestBusinessRules:
 
 def pytest_configure(config):
     """Register custom markers."""
-    config.addinivalue_line(
-        "markers", "phase2c_e2e: Phase 2C end-to-end integration tests"
-    )
+    config.addinivalue_line("markers", "phase2c_e2e: Phase 2C end-to-end integration tests")

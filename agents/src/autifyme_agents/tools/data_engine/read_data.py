@@ -25,8 +25,7 @@ class ReadDataInput(BaseModel):
     model_config = {"extra": "forbid"}
 
     table: str = Field(
-        ...,
-        description="Table name. Use inspect_schema to discover available tables."
+        ..., description="Table name. Use inspect_schema to discover available tables."
     )
     filters: dict[str, Any] | None = Field(
         None,
@@ -38,7 +37,7 @@ class ReadDataInput(BaseModel):
             "{'category_id': 'cat-123'}, "
             "{'status': ['draft', 'published']} (IN operator for lists). "
             "CRITICAL: Do NOT use '%' wildcards here. For text/name searching, use search_patterns."
-        )
+        ),
     )
     search_patterns: dict[str, str | list[str]] | None = Field(
         None,
@@ -56,11 +55,10 @@ class ReadDataInput(BaseModel):
             "CRITICAL: Only works on TEXT columns, NOT on array columns (text[]). "
             "For array columns, use filters with exact array values or query differently. "
             "Use inspect_schema to check column types before querying."
-        )
+        ),
     )
     columns: list[str] | None = Field(
-        None,
-        description="Columns to select (None = all columns). Example: ['id', 'name', 'price']"
+        None, description="Columns to select (None = all columns). Example: ['id', 'name', 'price']"
     )
     relations: list[str] | None = Field(
         None,
@@ -79,14 +77,14 @@ class ReadDataInput(BaseModel):
             "- Nested relations: wrap child inside parent parentheses, NOT dot notation\n"
             "- Table names MUST match exactly (check singular vs plural with inspect_schema)\n"
             "- Use inspect_schema with details=['relationships'] to verify FK targets"
-        )
+        ),
     )
     ids: list[str] | None = Field(
         None,
         description=(
             "Batch fetch by IDs. When provided, fetches only these IDs. "
             "Example: ['id1', 'id2', 'id3']"
-        )
+        ),
     )
     limit: int | None = Field(
         50,
@@ -95,16 +93,13 @@ class ReadDataInput(BaseModel):
             "Increase only when needed; prefer columns=[...] to keep payload small."
         ),
         gt=0,
-        le=1000
+        le=1000,
     )
     offset: int | None = Field(
-        None,
-        description="Skip N rows (pagination). Use with limit for pages",
-        ge=0
+        None, description="Skip N rows (pagination). Use with limit for pages", ge=0
     )
     count_only: bool = Field(
-        default=False,
-        description="Return only count, not actual records. Useful for analytics"
+        default=False, description="Return only count, not actual records. Useful for analytics"
     )
 
 
@@ -294,7 +289,7 @@ def create_read_data_tool(
             if allowed_tables is not None and table not in allowed_tables:
                 logger.warning(
                     f"Access denied to table: {table}",
-                    extra={"requested": table, "allowed": allowed_tables}
+                    extra={"requested": table, "allowed": allowed_tables},
                 )
                 return build_agent_error_response(
                     exception=PermissionError(f"Access denied to table: {table}"),
@@ -304,7 +299,7 @@ def create_read_data_tool(
                         f"You don't have access to table '{table}'. "
                         f"Available tables: {allowed_tables}. "
                         f"Request access from system administrator if needed."
-                    )
+                    ),
                 )
 
             logger.info(
@@ -315,48 +310,42 @@ def create_read_data_tool(
                     "has_search": search_patterns is not None,
                     "has_ids": ids is not None,
                     "count_only": count_only,
-                    "limit": limit
-                }
+                    "limit": limit,
+                },
             )
 
             # BATCH READ: Fetch by IDs
             if ids is not None:
-                results = await storage.batch_read(
-                    table=table,
-                    ids=ids,
-                    relations=relations
-                )
+                results = await storage.batch_read(table=table, ids=ids, relations=relations)
 
                 logger.info(
                     f"Batch read returned {len(results)} record(s)",
-                    extra={"table": table, "id_count": len(ids)}
+                    extra={"table": table, "id_count": len(ids)},
                 )
 
-                return build_success_response({
-                    "table": table,
-                    "operation": "batch_read",
-                    "results": results,
-                    "count": len(results),
-                    "requested_ids": len(ids),
-                })
+                return build_success_response(
+                    {
+                        "table": table,
+                        "operation": "batch_read",
+                        "results": results,
+                        "count": len(results),
+                        "requested_ids": len(ids),
+                    }
+                )
 
             # COUNT ONLY: Efficient counting
             if count_only:
-                count = await storage.count_entities(
-                    table=table,
-                    filters=filters
-                )
+                count = await storage.count_entities(table=table, filters=filters)
 
-                logger.info(
-                    f"Count query returned {count}",
-                    extra={"table": table}
-                )
+                logger.info(f"Count query returned {count}", extra={"table": table})
 
-                return build_success_response({
-                    "table": table,
-                    "operation": "count",
-                    "count": count,
-                })
+                return build_success_response(
+                    {
+                        "table": table,
+                        "operation": "count",
+                        "count": count,
+                    }
+                )
 
             # STANDARD QUERY: Filters, search, relations, pagination
             results = await storage.query_advanced(
@@ -366,7 +355,7 @@ def create_read_data_tool(
                 relations=relations,
                 search_patterns=search_patterns,
                 count_only=False,
-                limit=limit
+                limit=limit,
             )
 
             # Apply offset if specified (query_advanced doesn't support offset directly)
@@ -378,8 +367,8 @@ def create_read_data_tool(
                 extra={
                     "table": table,
                     "result_count": len(results),
-                    "has_pagination": limit is not None or offset is not None
-                }
+                    "has_pagination": limit is not None or offset is not None,
+                },
             )
 
             response_data: dict[str, Any] = {
@@ -394,7 +383,7 @@ def create_read_data_tool(
                 response_data["pagination"] = {
                     "limit": limit,
                     "offset": offset or 0,
-                    "has_more": len(results) == limit if limit else False
+                    "has_more": len(results) == limit if limit else False,
                 }
 
             return build_success_response(response_data)
@@ -407,7 +396,7 @@ def create_read_data_tool(
             logger.error(
                 f"Read operation failed for {table}",
                 exc_info=True,
-                extra={"table": table, "operation_type": "batch" if ids else "query"}
+                extra={"table": table, "operation_type": "batch" if ids else "query"},
             )
             return build_agent_error_response(
                 exception=e,
@@ -417,7 +406,7 @@ def create_read_data_tool(
                     f"Query failed for {table}. "
                     f"Verify table name, filters, and search patterns. "
                     f"Check available tables with inspect_schema tool."
-                )
+                ),
             )
 
     return StructuredTool.from_function(

@@ -27,9 +27,9 @@ def load_prompt(file_name: str) -> str:
     # Path(__file__).parent gives the directory of the current script (core/).
     # We navigate up to parent and then down to prompts/.
     base_path = Path(__file__).parent.parent  # Go up from core/ to autifyme_agents/
-    prompt_path = (base_path / 'prompts' / file_name).resolve()
+    prompt_path = (base_path / "prompts" / file_name).resolve()
 
     if not prompt_path.exists():
         raise FileNotFoundError(f"Prompt file not found at: {prompt_path}")
 
-    return prompt_path.read_text(encoding='utf-8')
+    return prompt_path.read_text(encoding="utf-8")

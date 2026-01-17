@@ -410,7 +410,7 @@ def store_baseline(
         )
 
         print(f"Stored baseline for {scenario_id}: trace={trace_id[:12]}..., score={score:.2f}")
-        print(f"  -> Update scenario YAML: baseline_trace_id: \"{trace_id}\"")
+        print(f'  -> Update scenario YAML: baseline_trace_id: "{trace_id}"')
         return True
 
     except Exception as e:
@@ -440,6 +440,7 @@ def get_baseline(scenario_id: str, baseline_trace_id: str | None = None) -> dict
     if baseline_trace_id is None:
         try:
             from tests.scenarios import load_scenario
+
             scenario = load_scenario(scenario_id)
             baseline_trace_id = scenario.baseline_trace_id
         except Exception:
@@ -577,9 +578,9 @@ def format_baseline_comparison(comparison: BaselineComparison) -> str:
         Formatted string for display
     """
     lines = [
-        f"\n{'='*60}",
+        f"\n{'=' * 60}",
         f"BASELINE COMPARISON: {comparison.scenario_id}",
-        f"{'='*60}",
+        f"{'=' * 60}",
         f"Verdict: {comparison.verdict}",
         "",
         "Scores:",
@@ -607,7 +608,7 @@ def format_baseline_comparison(comparison: BaselineComparison) -> str:
     if comparison.cost_delta != 0:
         lines.append(f"Cost delta: ${comparison.cost_delta:+.4f}")
 
-    lines.append(f"{'='*60}")
+    lines.append(f"{'=' * 60}")
 
     return "\n".join(lines)
 

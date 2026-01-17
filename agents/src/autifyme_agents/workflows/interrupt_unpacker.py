@@ -50,10 +50,14 @@ class InterruptUnpacker:
             return pending_interrupts_list
 
         for base_idx, interrupt_obj in enumerate(state_snapshot.interrupts):
-            interrupt_id = interrupt_obj.id if hasattr(interrupt_obj, 'id') else f"interrupt_{base_idx}"
-            interrupt_value = interrupt_obj.value if hasattr(interrupt_obj, 'value') else None
+            interrupt_id = (
+                interrupt_obj.id if hasattr(interrupt_obj, "id") else f"interrupt_{base_idx}"
+            )
+            interrupt_value = interrupt_obj.value if hasattr(interrupt_obj, "value") else None
 
-            logger.info(f"[UNPACK] Found interrupt with ID={interrupt_id}, value_type={type(interrupt_value).__name__}")
+            logger.info(
+                f"[UNPACK] Found interrupt with ID={interrupt_id}, value_type={type(interrupt_value).__name__}"
+            )
 
             # Case 1: List-valued interrupt (parallel tool calls)
             if isinstance(interrupt_value, list):
@@ -63,7 +67,7 @@ class InterruptUnpacker:
                         "thread_id": thread_id or "unknown",
                         "interrupt_id": interrupt_id,
                         "action_count": len(interrupt_value),
-                    }
+                    },
                 )
 
                 # Create one interrupt_info per action
@@ -87,11 +91,13 @@ class InterruptUnpacker:
                         description=description,
                     )
                     pending_interrupts_list.append(interrupt_info)
-                    logger.info(f"[RESUME ORDER] Interrupt {action_idx + 1}: {tool_args.get('name', 'unknown')}")
+                    logger.info(
+                        f"[RESUME ORDER] Interrupt {action_idx + 1}: {tool_args.get('name', 'unknown')}"
+                    )
 
             # Case 2a: DeepAgents batch HITL format (action_requests list)
-            elif isinstance(interrupt_value, dict) and 'action_requests' in interrupt_value:
-                action_requests = interrupt_value.get('action_requests', [])
+            elif isinstance(interrupt_value, dict) and "action_requests" in interrupt_value:
+                action_requests = interrupt_value.get("action_requests", [])
 
                 if isinstance(action_requests, list):
                     logger.debug(
@@ -100,15 +106,17 @@ class InterruptUnpacker:
                             "thread_id": thread_id or "unknown",
                             "interrupt_id": interrupt_id,
                             "action_count": len(action_requests),
-                        }
+                        },
                     )
 
                     # Create one interrupt_info per action_request
                     for action_idx, action_request in enumerate(action_requests):
                         if isinstance(action_request, dict):
-                            tool_name = action_request.get('name', 'unknown')
-                            tool_args = action_request.get('args', {})
-                            description = action_request.get('description', f"Action {action_idx + 1}")
+                            tool_name = action_request.get("name", "unknown")
+                            tool_args = action_request.get("args", {})
+                            description = action_request.get(
+                                "description", f"Action {action_idx + 1}"
+                            )
                         else:
                             tool_name = "unknown"
                             tool_args = {}
@@ -122,7 +130,9 @@ class InterruptUnpacker:
                             description=description,
                         )
                         pending_interrupts_list.append(interrupt_info)
-                        logger.info(f"[BATCH HITL] Action {action_idx + 1}: {tool_name} - {tool_args.get('name', 'unknown')}")
+                        logger.info(
+                            f"[BATCH HITL] Action {action_idx + 1}: {tool_name} - {tool_args.get('name', 'unknown')}"
+                        )
                 else:
                     # Fallback if action_requests is not a list
                     logger.warning(
@@ -131,7 +141,7 @@ class InterruptUnpacker:
                             "thread_id": thread_id or "unknown",
                             "interrupt_id": interrupt_id,
                             "action_requests_type": type(action_requests).__name__,
-                        }
+                        },
                     )
                     interrupt_info = InterruptInfo(
                         interrupt_id=interrupt_id,
@@ -161,14 +171,16 @@ class InterruptUnpacker:
                         "thread_id": thread_id or "unknown",
                         "interrupt_id": interrupt_id,
                         "value_type": type(interrupt_value).__name__,
-                    }
+                    },
                 )
                 interrupt_info = InterruptInfo(
                     interrupt_id=interrupt_id,
                     original_interrupt_id=interrupt_id,
                     tool_name="unknown",
                     tool_args={},
-                    description=str(interrupt_value)[:100] if interrupt_value else "Pending approval",
+                    description=str(interrupt_value)[:100]
+                    if interrupt_value
+                    else "Pending approval",
                 )
                 pending_interrupts_list.append(interrupt_info)
 
@@ -177,7 +189,7 @@ class InterruptUnpacker:
             extra={
                 "thread_id": thread_id or "unknown",
                 "total_interrupts": len(pending_interrupts_list),
-            }
+            },
         )
 
         return pending_interrupts_list

@@ -7,6 +7,7 @@ Implements 3-level hierarchical analysis for token efficiency:
 
 Token savings: 25x vs naive full dump approach.
 """
+
 import re
 from datetime import datetime, timedelta
 from typing import Any
@@ -498,6 +499,7 @@ def _count_saved_products(overview: TraceOverview) -> int:
 # LLM Trace Extraction (for prompt analysis)
 # ============================================================================
 
+
 def _classify_hierarchy_level(agent_name: str) -> str:
     """Classify agent hierarchy level from name.
 
@@ -510,9 +512,12 @@ def _classify_hierarchy_level(agent_name: str) -> str:
     name_lower = agent_name.lower()
 
     # Orchestrators (PM, project manager, LangGraph root)
-    if (name_lower == "pm" or
-        "project" in name_lower and "manager" in name_lower or
-        "langgraph" in name_lower):
+    if (
+        name_lower == "pm"
+        or "project" in name_lower
+        and "manager" in name_lower
+        or "langgraph" in name_lower
+    ):
         return "orchestrator"
 
     # Departments (ends with Dept or Department)
@@ -561,7 +566,8 @@ def _extract_system_prompt(messages: list) -> str:
                 elif isinstance(content, list):
                     # Handle multimodal content
                     text_parts = [
-                        part.get("text", "") for part in content
+                        part.get("text", "")
+                        for part in content
                         if isinstance(part, dict) and part.get("type") == "text"
                     ]
                     return "\n".join(text_parts)
@@ -675,10 +681,12 @@ def get_llm_trace_tree(trace_id: str) -> LLMTraceTree:
                                 # Extract simplified version with content
                                 kwargs = msg.get("kwargs", {})
                                 msg_type_str = msg_id[-1] if msg_id else "unknown"
-                                user_messages.append({
-                                    "type": msg_type_str,
-                                    "content": kwargs.get("content", ""),
-                                })
+                                user_messages.append(
+                                    {
+                                        "type": msg_type_str,
+                                        "content": kwargs.get("content", ""),
+                                    }
+                                )
                         else:
                             # Standard format: check for non-system messages
                             msg_type = msg.get("type") or msg.get("role")
@@ -1284,7 +1292,9 @@ def get_delegation_graph(
         description = tc.parsed_args.get("description", "")
         if description:
             # Truncate long descriptions
-            context_passed.append(description[:100] + "..." if len(description) > 100 else description)
+            context_passed.append(
+                description[:100] + "..." if len(description) > 100 else description
+            )
 
         if to_agent:
             to_agent = _normalize_agent_name(str(to_agent))
@@ -1385,15 +1395,10 @@ def get_file_io_trace(trace_id: str) -> FileIOTrace:
 
         if is_read:
             # read_data uses 'table' and 'search_patterns'
-            file_path = f"table:{args.get('table', 'unknown')}" if args.get('table') else ""
+            file_path = f"table:{args.get('table', 'unknown')}" if args.get("table") else ""
         else:
             # write_file uses 'file_path' (or 'path') and 'content'
-            file_path = (
-                args.get("file_path")
-                or args.get("path")
-                or args.get("filename")
-                or ""
-            )
+            file_path = args.get("file_path") or args.get("path") or args.get("filename") or ""
             content = args.get("content", args.get("data", ""))
             if isinstance(content, str):
                 content_preview = content[:200]
@@ -1888,7 +1893,9 @@ def get_scenario_history(
     )
 
 
-def get_baseline(scenario_id: str, dataset_name: str = "scenario-baselines") -> TraceBaseline | None:
+def get_baseline(
+    scenario_id: str, dataset_name: str = "scenario-baselines"
+) -> TraceBaseline | None:
     """Get known-good baseline for a scenario.
 
     Retrieves the reference trace from LangSmith dataset for comparison.
@@ -2083,11 +2090,13 @@ def compare_to_baseline(
     if current_delegation == baseline.expected_delegation_order:
         result["matches"].append("delegation_order")
     else:
-        result["deviations"].append({
-            "field": "delegation_order",
-            "expected": baseline.expected_delegation_order,
-            "actual": current_delegation,
-        })
+        result["deviations"].append(
+            {
+                "field": "delegation_order",
+                "expected": baseline.expected_delegation_order,
+                "actual": current_delegation,
+            }
+        )
 
     # Compare wave structure
     current_waves = {str(k): v for k, v in graph.waves.items()}
@@ -2095,36 +2104,44 @@ def compare_to_baseline(
     if current_waves == expected_waves:
         result["matches"].append("wave_structure")
     else:
-        result["deviations"].append({
-            "field": "wave_structure",
-            "expected": expected_waves,
-            "actual": current_waves,
-        })
+        result["deviations"].append(
+            {
+                "field": "wave_structure",
+                "expected": expected_waves,
+                "actual": current_waves,
+            }
+        )
 
     # Compare protocol loading
     if protocols.agent_protocols == baseline.expected_protocol_loads:
         result["matches"].append("protocol_loads")
     else:
-        result["deviations"].append({
-            "field": "protocol_loads",
-            "expected": baseline.expected_protocol_loads,
-            "actual": protocols.agent_protocols,
-        })
+        result["deviations"].append(
+            {
+                "field": "protocol_loads",
+                "expected": baseline.expected_protocol_loads,
+                "actual": protocols.agent_protocols,
+            }
+        )
 
     # Compare tool sequence (just count for now)
     current_tools = [tc.tool_name for tc in seq.tool_calls]
     if current_tools == baseline.expected_tool_sequence:
         result["matches"].append("tool_sequence")
     else:
-        result["deviations"].append({
-            "field": "tool_sequence",
-            "expected": baseline.expected_tool_sequence,
-            "actual": current_tools,
-        })
+        result["deviations"].append(
+            {
+                "field": "tool_sequence",
+                "expected": baseline.expected_tool_sequence,
+                "actual": current_tools,
+            }
+        )
 
     # Metrics comparison
     if baseline.baseline_duration_ms and overview.total_latency_ms:
-        result["metrics"]["duration_diff_ms"] = overview.total_latency_ms - baseline.baseline_duration_ms
+        result["metrics"]["duration_diff_ms"] = (
+            overview.total_latency_ms - baseline.baseline_duration_ms
+        )
 
     if baseline.baseline_cost and overview.total_cost:
         result["metrics"]["cost_diff"] = round(overview.total_cost - baseline.baseline_cost, 4)
@@ -2140,9 +2157,7 @@ def compare_to_baseline(
 # ============================================================================
 
 
-def get_thread_traces(
-    thread_id: str, enrich: bool = False, days: int = 7
-) -> "ThreadTraces":
+def get_thread_traces(thread_id: str, enrich: bool = False, days: int = 7) -> "ThreadTraces":
     """Get all traces in a conversation thread for multi-turn evaluation.
 
     Queries workflow_outcomes by thread_id. Optionally enriches with agent messages.
@@ -2174,9 +2189,7 @@ def get_thread_traces(
         from supabase import create_client
 
         url = os.environ.get("SUPABASE_URL")
-        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get(
-            "SUPABASE_ANON_KEY"
-        )
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
 
         if not url or not key:
             raise ValueError("Missing SUPABASE_URL or key env vars")
@@ -2437,11 +2450,13 @@ def list_test_assets(
         storage_path = f"{folder}/{name}"
         public_url = client.storage.from_("assets").get_public_url(storage_path)
 
-        assets.append({
-            "name": name,
-            "path": storage_path,
-            "public_url": public_url,
-        })
+        assets.append(
+            {
+                "name": name,
+                "path": storage_path,
+                "public_url": public_url,
+            }
+        )
 
         if len(assets) >= limit:
             break

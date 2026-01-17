@@ -84,9 +84,7 @@ class BatchApprovalResponse(BaseModel):
     responses: list[HumanInTheLoopResponse] = Field(
         description="List of responses matching pending interrupts by index"
     )
-    reasoning: str = Field(
-        description="Explanation of how user input was interpreted"
-    )
+    reasoning: str = Field(description="Explanation of how user input was interpreted")
 
     def validate_count(self, expected: int) -> None:
         """Validate that response count matches expected interrupt count.

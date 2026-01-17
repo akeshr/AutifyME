@@ -170,12 +170,27 @@ The specs guide priority:
 # =============================================================================
 
 
-def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatModel:
-    """Get Gemini 3 Pro Image LLM with proper configuration."""
+def _get_gemini3_image_llm(
+    output_spec: OutputSpec | None = None,
+    temperature: float | None = None,
+    seed: int | None = None,
+) -> BaseChatModel:
+    """Get Gemini 3 Pro Image LLM with proper configuration.
+
+    Args:
+        output_spec: Output specifications (aspect ratio, size)
+        temperature: Controls randomness. Default 0.7 for catalog consistency.
+            Lower (0.3-0.5) for batch variants. Higher (1.0+) for creative exploration.
+        seed: Seed for reproducibility (best-effort). Use same seed across batch.
+    """
     aspect_ratio = output_spec.aspect_ratio if output_spec else "1:1"
     if aspect_ratio == "original":
         aspect_ratio = "1:1"
     image_size = output_spec.size if output_spec else "1K"
+
+    # Default temperature 0.7 for catalog work - balanced consistency
+    # Override Gemini 3's default of 1.0 which causes high variance
+    effective_temperature = temperature if temperature is not None else 0.7
 
     return get_llm(
         provider="google",
@@ -183,6 +198,8 @@ def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatMod
         response_modalities=["TEXT", "IMAGE"],
         image_aspect_ratio=aspect_ratio,
         image_size=image_size,
+        temperature=effective_temperature,
+        seed=seed,
     )
 
 
@@ -201,6 +218,7 @@ def _load_and_encode_image(image_path: str) -> tuple[str, str]:
     img: Image.Image
     if image_path.startswith(("http://", "https://")):
         import httpx
+
         response = httpx.get(image_path, timeout=60)
         response.raise_for_status()
         img = Image.open(io.BytesIO(response.content))
@@ -268,7 +286,11 @@ def _save_base64_image(
     # Use explicit filename if provided, otherwise generate unique name
     if output_spec.filename:
         # Sanitize filename (remove extension if accidentally included)
-        base_name = output_spec.filename.rsplit(".", 1)[0] if "." in output_spec.filename else output_spec.filename
+        base_name = (
+            output_spec.filename.rsplit(".", 1)[0]
+            if "." in output_spec.filename
+            else output_spec.filename
+        )
         filename = f"{base_name}.{extension}"
     else:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -308,6 +330,7 @@ def _save_base64_image(
             try:
                 asyncio.get_running_loop()
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(
                         asyncio.run,
@@ -316,7 +339,7 @@ def _save_base64_image(
                             thread_id=thread_id,
                             filename=filename,
                             content_type=content_type,
-                        )
+                        ),
                     )
                     upload_result = future.result()
             except RuntimeError:
@@ -331,7 +354,10 @@ def _save_base64_image(
 
             internal_path = upload_result["storage_path"]
             storage_path = to_user_path(internal_path)  # LLM sees clean path
-            logger.info("Uploaded to pending", extra={"user_path": storage_path, "internal_path": internal_path})
+            logger.info(
+                "Uploaded to pending",
+                extra={"user_path": storage_path, "internal_path": internal_path},
+            )
 
             # Surface versioning info to agent if duplicate was detected
             if upload_result.get("duplicate_detected"):
@@ -390,8 +416,7 @@ def _build_prompt(input_spec: ImageStudioInput) -> str:
     # Images with labels
     if input_spec.images:
         spec_dict["images"] = [
-            {"label": img.label, "index": i}
-            for i, img in enumerate(input_spec.images)
+            {"label": img.label, "index": i} for i, img in enumerate(input_spec.images)
         ]
 
     # Add each spec if present (exclude_none removes empty fields)
@@ -408,7 +433,9 @@ def _build_prompt(input_spec: ImageStudioInput) -> str:
     if input_spec.composition:
         spec_dict["composition"] = input_spec.composition.model_dump(exclude_none=True)
     if input_spec.material_treatment:
-        spec_dict["material_treatment"] = input_spec.material_treatment.model_dump(exclude_none=True)
+        spec_dict["material_treatment"] = input_spec.material_treatment.model_dump(
+            exclude_none=True
+        )
     if input_spec.fidelity:
         spec_dict["fidelity"] = input_spec.fidelity.model_dump(exclude_none=True)
     if input_spec.focus:
@@ -465,7 +492,11 @@ def _process_images(input_spec: ImageStudioInput) -> ImageStudioOutput:
             )
 
         # Create LLM and prompt
-        llm = _get_gemini3_image_llm(output_spec=input_spec.output)
+        llm = _get_gemini3_image_llm(
+            output_spec=input_spec.output,
+            temperature=input_spec.temperature,
+            seed=input_spec.seed,
+        )
         prompt = _build_prompt(input_spec)
 
         # Build content: prompt first, then labeled images in order
@@ -492,9 +523,7 @@ def _process_images(input_spec: ImageStudioInput) -> ImageStudioOutput:
             )
 
         # Save result (thread_id obtained from execution context inside _save_base64_image)
-        file_path, metadata, storage_path = _save_base64_image(
-            image_data, input_spec.output
-        )
+        file_path, metadata, storage_path = _save_base64_image(image_data, input_spec.output)
 
         output_variant = OutputVariant(
             variant="master",
@@ -542,6 +571,8 @@ def _image_studio_impl(
     custom_spec: dict[str, Any] | CustomSpec | None = None,
     creative_direction: str | None = None,
     output: dict[str, Any] | OutputSpec | None = None,
+    temperature: float | None = None,
+    seed: int | None = None,
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Image Studio tool implementation.
 
@@ -560,6 +591,9 @@ def _image_studio_impl(
         custom_spec: Fully open-ended creative spec for OOTB ideas
         creative_direction: Additional creative notes
         output: Output specs (format, size, aspect_ratio)
+        temperature: Controls randomness (0.0-2.0). Default 0.7 for catalog consistency.
+            Lower (0.3-0.5) for batch variants. Higher (1.0+) for creative exploration.
+        seed: Seed for reproducibility (best-effort). Use same seed across batch variants.
     """
     # Get thread_id from execution context (invisible to LLM)
     thread_id = get_thread_id()
@@ -569,7 +603,7 @@ def _image_studio_impl(
         extra={
             "thread_id": thread_id,
             "storage_configured": _storage_client is not None,
-        }
+        },
     )
 
     try:
@@ -607,6 +641,8 @@ def _image_studio_impl(
             custom_spec=_to_spec(custom_spec, CustomSpec),
             creative_direction=creative_direction,
             output=_to_spec(output, OutputSpec) or OutputSpec(),
+            temperature=temperature,
+            seed=seed,
         )
 
         result = _process_images(input_spec)
@@ -619,7 +655,9 @@ def _image_studio_impl(
                 "success": True,
                 "storage_path": output_variant.storage_path,
                 "local_path": output_variant.path,
-                "metadata": output_variant.metadata.model_dump() if output_variant.metadata else None,
+                "metadata": output_variant.metadata.model_dump()
+                if output_variant.metadata
+                else None,
                 "warnings": result.warnings,
             }
 
@@ -640,7 +678,9 @@ def _image_studio_impl(
                             else:
                                 new_height = max_dim
                                 new_width = int(width * (max_dim / height))
-                            output_img = output_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                            output_img = output_img.resize(
+                                (new_width, new_height), Image.Resampling.LANCZOS
+                            )
 
                         # Convert to RGB if needed (for JPEG encoding)
                         if output_img.mode in ("RGBA", "LA", "P"):
@@ -652,21 +692,21 @@ def _image_studio_impl(
                             output_img = rgb_img
 
                         buffer = io.BytesIO()
-                        output_img.save(buffer, format="JPEG", quality=90)  # Higher quality for verification
+                        output_img.save(
+                            buffer, format="JPEG", quality=90
+                        )  # Higher quality for verification
                         encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
                         data_uri = f"data:image/jpeg;base64,{encoded}"
 
                     # Return multimodal: structured data + visual image
                     import json
+
                     return [
                         {
                             "type": "text",
-                            "text": f"Image generated successfully.\n{json.dumps(structured_data, indent=2)}"
+                            "text": f"Image generated successfully.\n{json.dumps(structured_data, indent=2)}",
                         },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": data_uri}
-                        },
+                        {"type": "image_url", "image_url": {"url": data_uri}},
                     ]
             except Exception as img_err:
                 logger.warning(f"Could not load generated image for preview: {img_err}")

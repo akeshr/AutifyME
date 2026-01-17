@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Windows-specific fix for psycopg async
-if sys.platform == 'win32':
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from tests.tools.intelligent_execution import intelligent_execute_scenario
@@ -60,7 +60,6 @@ PHASE2C_SCENARIOS = {
 - Database operations succeed
 - No architectural violations
 """,
-
     "add_variant_granular": """
 **Scenario:** ADD new variant value (granular operation)
 
@@ -88,7 +87,6 @@ PHASE2C_SCENARIOS = {
 - Existing products untouched
 - New SKUs follow family convention
 """,
-
     "update_field_targeted": """
 **Scenario:** UPDATE specific field (targeted operation)
 
@@ -115,7 +113,6 @@ PHASE2C_SCENARIOS = {
 - Single SQL UPDATE statement
 - Other fields unchanged
 """,
-
     "delete_with_cascade": """
 **Scenario:** DELETE with cascade impact analysis
 
@@ -146,7 +143,6 @@ PHASE2C_SCENARIOS = {
 - Cascade DELETE executes correctly
 - No orphaned records
 """,
-
     "ambiguous_request": """
 **Scenario:** Ambiguous request requiring clarification
 
@@ -172,7 +168,6 @@ PHASE2C_SCENARIOS = {
 - Specialist receives complete information
 - Workflow succeeds after clarification
 """,
-
     "business_rule_duplicate_sku": """
 **Scenario:** Business rule validation - duplicate SKU
 
@@ -202,7 +197,6 @@ PHASE2C_SCENARIOS = {
 - Database unchanged (no partial insert)
 - User can retry with corrected data
 """,
-
     "error_rollback": """
 **Scenario:** Error handling with rollback
 
@@ -231,7 +225,7 @@ PHASE2C_SCENARIOS = {
 - Steps 1 to N-1 rolled back
 - Database in consistent state
 - Clear error reporting
-"""
+""",
 }
 
 
@@ -251,9 +245,9 @@ async def run_scenario_test(scenario_name: str, scenario_desc: str):
     Returns:
         ExecutionResult with success/failure and trace info
     """
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"TEST: {scenario_name}")
-    print(f"{'='*80}\n")
+    print(f"{'=' * 80}\n")
 
     result = await intelligent_execute_scenario(
         scenario_id=scenario_desc,
@@ -266,7 +260,7 @@ async def run_scenario_test(scenario_name: str, scenario_desc: str):
         try:
             print(text)
         except UnicodeEncodeError:
-            print(text.encode('ascii', 'replace').decode('ascii'))
+            print(text.encode("ascii", "replace").decode("ascii"))
 
     # Print result summary
     safe_print(f"\n[RESULT]: {'SUCCESS' if result.success else 'FAILED'}")
@@ -293,7 +287,9 @@ async def run_scenario_test(scenario_name: str, scenario_desc: str):
                 if tree:
                     safe_print("\n   LLM Call Tree:")
                     for call in tree[:5]:  # Show first 5 calls
-                        safe_print(f"   - {call.get('name', 'Unknown')}: {call.get('status', 'N/A')}")
+                        safe_print(
+                            f"   - {call.get('name', 'Unknown')}: {call.get('status', 'N/A')}"
+                        )
 
             except Exception as e:
                 safe_print(f"   (Could not analyze trace: {e})")
@@ -308,16 +304,17 @@ async def run_all_phase2c_tests():
     Returns:
         Dict of scenario results
     """
+
     # Safe print helper
     def safe_print(text):
         try:
             print(text)
         except UnicodeEncodeError:
-            print(text.encode('ascii', 'replace').decode('ascii'))
+            print(text.encode("ascii", "replace").decode("ascii"))
 
-    safe_print("\n" + "="*80)
+    safe_print("\n" + "=" * 80)
     safe_print("PHASE 2C INTELLIGENT TESTING SUITE")
-    safe_print("="*80)
+    safe_print("=" * 80)
     safe_print("\nAI (gpt-4.1-nano) acts as real user, detecting architectural violations.\n")
 
     results = {}
@@ -344,9 +341,9 @@ async def run_all_phase2c_tests():
             }
 
     # Print summary
-    safe_print("\n" + "="*80)
+    safe_print("\n" + "=" * 80)
     safe_print("TEST SUITE SUMMARY")
-    safe_print("="*80 + "\n")
+    safe_print("=" * 80 + "\n")
 
     success_count = sum(1 for r in results.values() if r.get("success", False))
     total_count = len(results)
@@ -362,7 +359,7 @@ async def run_all_phase2c_tests():
         time_s = result.get("execution_time_seconds", "N/A")
         safe_print(f"{name:<35} {status:<10} {time_s!s:<12}")
 
-    safe_print("\n" + "="*80)
+    safe_print("\n" + "=" * 80)
 
     return results
 

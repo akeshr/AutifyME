@@ -48,17 +48,17 @@ CREATIVE_SPECIALIST_MODEL = "gemini-3-flash-preview"
 
 # Tables accessible by Creative Specialist
 CREATIVE_READ_TABLES = [
-    "assets",           # Read existing assets
-    "product_assets",   # Read product-asset links (product_id -> asset_id)
-    "products",         # Read products to resolve family_id -> product_ids
-    "product_families", # Read product families for context
+    "assets",  # Read existing assets
+    "product_assets",  # Read product-asset links (product_id -> asset_id)
+    "products",  # Read products to resolve family_id -> product_ids
+    "product_families",  # Read product families for context
     "campaign_assets",  # Read campaign creative assets
-    "campaigns",        # Read campaigns for asset context
+    "campaigns",  # Read campaigns for asset context
 ]
 
 CREATIVE_WRITE_TABLES = [
-    "assets",           # Create asset records for processed images
-    "product_assets",   # Link assets to products (junction table)
+    "assets",  # Create asset records for processed images
+    "product_assets",  # Link assets to products (junction table)
     "campaign_assets",  # Create campaign creative assets
 ]
 
@@ -112,13 +112,13 @@ def create_creative_specialist(
             create_read_data_tool,
             create_write_data_tool,
         )
+
         # Schema discovery for write_data - understand table structure before writing
         tools.append(create_inspect_schema_tool(storage, tables=CREATIVE_READ_TABLES))
         # Scoped read access to asset-related tables
         tools.append(create_read_data_tool(storage, tables=CREATIVE_READ_TABLES))
         # Scoped write access to assets table only
         tools.append(create_write_data_tool(storage, tables=CREATIVE_WRITE_TABLES))
-
 
     description = (
         "ROLE: Specialist (execution) - World-class visual artist\n"
@@ -145,11 +145,17 @@ def create_creative_specialist(
         "- No catalog CRUD; delegate to catalog_specialist for product records"
     )
     # Use provided model or default to Gemini 3 Flash (multimodal)
-    # Medium thinking: creative tasks are structured (HITL safety net), don't need deep reasoning
-    specialist_model = model if model is not None else get_llm(
-        provider="google",
-        model=CREATIVE_SPECIALIST_MODEL,
-        thinking_level="high",  # High: creative quality + speed (HITL provides safety)
+    # Temperature 0.7: Consistent spec decisions while allowing creative flexibility
+    # High thinking: Deep reasoning for complex creative decisions (12-spec palette, quality rubric)
+    specialist_model = (
+        model
+        if model is not None
+        else get_llm(
+            provider="google",
+            model=CREATIVE_SPECIALIST_MODEL,
+            temperature=0.7,
+            thinking_level="high",  # Deep reasoning for creative quality decisions
+        )
     )
 
     middleware = [

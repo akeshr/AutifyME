@@ -26,8 +26,7 @@ class InspectSchemaInput(BaseModel):
     model_config = {"extra": "forbid"}
 
     tables: list[str] = Field(
-        ...,
-        description="List of tables to inspect (e.g., ['entities', 'parent_entities'])"
+        ..., description="List of tables to inspect (e.g., ['entities', 'parent_entities'])"
     )
     details: list[Literal["structure", "relationships", "constraints", "stats", "samples"]] = Field(
         default=["structure"],
@@ -38,13 +37,10 @@ class InspectSchemaInput(BaseModel):
             "- constraints: Valid enum values, regex patterns, computed columns, JSONB schemas\n"
             "- stats: Row counts, index info\n"
             "- samples: Real data examples"
-        )
+        ),
     )
     sample_limit: int = Field(
-        default=3,
-        description="How many sample rows per table (default: 3, max: 10)",
-        ge=1,
-        le=10
+        default=3, description="How many sample rows per table (default: 3, max: 10)", ge=1, le=10
     )
 
 
@@ -52,16 +48,11 @@ class InspectSchemaToolConfig(BaseModel):
     """Configuration for inspect_schema tool with access control."""
 
     allowed_tables: list[str] | None = Field(
-        None,
-        description="Table restrictions (None = all tables accessible)"
+        None, description="Table restrictions (None = all tables accessible)"
     )
-    version: str = Field(
-        default="v2",
-        description="Schema version to use"
-    )
+    version: str = Field(default="v2", description="Schema version to use")
     domain: str = Field(
-        default="complete_database",
-        description="Domain name (for multi-domain support)"
+        default="complete_database", description="Domain name (for multi-domain support)"
     )
 
 
@@ -102,15 +93,12 @@ def create_inspect_schema_tool(
             tables=["records", "metadata"]
         )
     """
-    config = InspectSchemaToolConfig(
-        allowed_tables=tables,
-        version=version,
-        domain=domain
-    )
+    config = InspectSchemaToolConfig(allowed_tables=tables, version=version, domain=domain)
 
     async def _inspect_schema_impl(
         tables: list[str],
-        details: list[Literal["structure", "relationships", "constraints", "stats", "samples"]] | None = None,
+        details: list[Literal["structure", "relationships", "constraints", "stats", "samples"]]
+        | None = None,
         sample_limit: int = 3,
     ) -> dict[str, Any]:
         """
@@ -180,7 +168,7 @@ def create_inspect_schema_tool(
                 if unauthorized:
                     logger.warning(
                         f"Access denied to tables: {unauthorized}",
-                        extra={"requested": tables, "allowed": config.allowed_tables}
+                        extra={"requested": tables, "allowed": config.allowed_tables},
                     )
                     return build_agent_error_response(
                         exception=PermissionError(f"Access denied to tables: {unauthorized}"),
@@ -190,24 +178,23 @@ def create_inspect_schema_tool(
                             f"You don't have access to tables: {unauthorized}. "
                             f"Available tables: {config.allowed_tables}. "
                             f"Request access from system administrator if needed."
-                        )
+                        ),
                     )
 
             # Load schema from registry
             logger.info(
                 f"Loading schema for tables: {tables}",
-                extra={"tables": tables, "details": details, "version": config.version}
+                extra={"tables": tables, "details": details, "version": config.version},
             )
 
             schema_registry = SchemaRegistry.get_version(
-                version=config.version,
-                domain=config.domain
+                version=config.version, domain=config.domain
             )
 
             result: dict[str, Any] = {
                 "version": schema_registry.version,
                 "domain": schema_registry.domain,
-                "tables": {}
+                "tables": {},
             }
 
             # Process each table
@@ -224,7 +211,9 @@ def create_inspect_schema_tool(
                             "primary_key": table_schema.primary_key,
                             "columns": {
                                 name: {
-                                    "type": col.type.value if hasattr(col.type, 'value') else str(col.type),
+                                    "type": col.type.value
+                                    if hasattr(col.type, "value")
+                                    else str(col.type),
                                     "nullable": col.nullable,
                                     "unique": col.unique,
                                     "default": col.default,
@@ -232,10 +221,18 @@ def create_inspect_schema_tool(
                                     "references": col.references,
                                     "description": col.description,
                                     # Agent-critical fields (only if set)
-                                    **({"valid_values": col.valid_values} if col.valid_values else {}),
+                                    **(
+                                        {"valid_values": col.valid_values}
+                                        if col.valid_values
+                                        else {}
+                                    ),
                                     **({"pattern": col.pattern} if col.pattern else {}),
                                     **({"computed": col.computed} if col.computed else {}),
-                                    **({"element_type": col.element_type} if col.element_type else {}),
+                                    **(
+                                        {"element_type": col.element_type}
+                                        if col.element_type
+                                        else {}
+                                    ),
                                     **({"examples": col.examples} if col.examples else {}),
                                 }
                                 for name, col in table_schema.columns.items()
@@ -256,17 +253,23 @@ def create_inspect_schema_tool(
                             "enum_columns": {
                                 name: {
                                     "valid_values": values,
-                                    "descriptions": table_schema.columns[name].valid_values_descriptions
+                                    "descriptions": table_schema.columns[
+                                        name
+                                    ].valid_values_descriptions,
                                 }
                                 for name, values in enum_cols.items()
-                            } if enum_cols else {},
+                            }
+                            if enum_cols
+                            else {},
                             "pattern_columns": {
                                 name: {
                                     "pattern": pattern,
-                                    "examples": table_schema.columns[name].examples
+                                    "examples": table_schema.columns[name].examples,
                                 }
                                 for name, pattern in pattern_cols.items()
-                            } if pattern_cols else {},
+                            }
+                            if pattern_cols
+                            else {},
                             "computed_columns": computed_cols,
                             "jsonb_schemas": jsonb_schemas,
                         }
@@ -292,50 +295,39 @@ def create_inspect_schema_tool(
                             stats = await storage.get_table_stats(table_name)
                             table_data["stats"] = stats
                         except Exception as e:
-                            logger.warning(
-                                f"Could not fetch stats for {table_name}",
-                                exc_info=True
-                            )
+                            logger.warning(f"Could not fetch stats for {table_name}", exc_info=True)
                             table_data["stats"] = {"error": str(e)}
 
                     # Samples (real data examples)
                     if "samples" in details:
                         try:
                             samples = await storage.sample_data(
-                                table=table_name,
-                                limit=sample_limit
+                                table=table_name, limit=sample_limit
                             )
                             table_data["samples"] = samples
                         except Exception as e:
                             logger.warning(
-                                f"Could not fetch samples for {table_name}",
-                                exc_info=True
+                                f"Could not fetch samples for {table_name}", exc_info=True
                             )
                             table_data["samples"] = {"error": str(e)}
 
                     result["tables"][table_name] = table_data
 
                 except ValueError:
-                    logger.error(
-                        f"Table not found: {table_name}",
-                        exc_info=True
-                    )
+                    logger.error(f"Table not found: {table_name}", exc_info=True)
                     result["tables"][table_name] = {
                         "error": f"Table '{table_name}' not found in schema"
                     }
 
             logger.info(
                 f"Schema inspection complete for {len(tables)} tables",
-                extra={"tables": tables, "details": details}
+                extra={"tables": tables, "details": details},
             )
 
             return build_success_response(result)
 
         except FileNotFoundError as e:
-            logger.error(
-                f"Schema version not found: {config.version}",
-                exc_info=True
-            )
+            logger.error(f"Schema version not found: {config.version}", exc_info=True)
             return build_agent_error_response(
                 exception=e,
                 context={"version": config.version, "domain": config.domain},
@@ -343,14 +335,14 @@ def create_inspect_schema_tool(
                 fallback_action=(
                     f"Schema version '{config.version}' not found for domain '{config.domain}'. "
                     f"Contact system administrator."
-                )
+                ),
             )
 
         except Exception as e:
             logger.error(
                 "Schema inspection failed",
                 exc_info=True,
-                extra={"tables": tables, "error_type": type(e).__name__}
+                extra={"tables": tables, "error_type": type(e).__name__},
             )
             return build_agent_error_response(
                 exception=e,
@@ -359,7 +351,7 @@ def create_inspect_schema_tool(
                 fallback_action=(
                     "Schema registry issue. Verify table names and try again. "
                     "Contact system administrator if persistent."
-                )
+                ),
             )
 
     return StructuredTool.from_function(

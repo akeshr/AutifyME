@@ -10,19 +10,19 @@ class TestAssertBranded:
 
     def test_passes_with_company_name(self):
         """Passes when company name is in HTML."""
-        html = '<h1>Pavisha Packaging</h1><p>Welcome</p>'
+        html = "<h1>Pavisha Packaging</h1><p>Welcome</p>"
         # Should not raise
         RichOutputAssertions.assert_branded(html, "Pavisha Packaging")
 
     def test_fails_when_company_name_missing(self):
         """Fails when company name is not in HTML."""
-        html = '<h1>Welcome</h1><p>Content</p>'
+        html = "<h1>Welcome</h1><p>Content</p>"
         with pytest.raises(AssertionError, match="Company name"):
             RichOutputAssertions.assert_branded(html, "Pavisha Packaging")
 
     def test_fails_when_autifyme_present(self):
         """Fails when AutifyME is in HTML (platform branding leak)."""
-        html = '<h1>Pavisha Packaging</h1><footer>Powered by AutifyME</footer>'
+        html = "<h1>Pavisha Packaging</h1><footer>Powered by AutifyME</footer>"
         with pytest.raises(AssertionError, match="AutifyME"):
             RichOutputAssertions.assert_branded(html, "Pavisha Packaging")
 
@@ -32,28 +32,28 @@ class TestAssertDataRendered:
 
     def test_passes_with_keys_present(self):
         """Passes when all data keys are in HTML."""
-        html = '<div>name: Test</div><div>price: 100</div>'
+        html = "<div>name: Test</div><div>price: 100</div>"
         data = {"name": "Test", "price": 100}
         # Should not raise
         RichOutputAssertions.assert_data_rendered(html, data)
 
     def test_passes_with_readable_keys(self):
         """Passes when human-readable versions of keys are present."""
-        html = '<div>Product Name: Test</div><div>Unit Price: 100</div>'
+        html = "<div>Product Name: Test</div><div>Unit Price: 100</div>"
         data = {"product_name": "Test", "unit_price": 100}
         # Should not raise
         RichOutputAssertions.assert_data_rendered(html, data)
 
     def test_fails_when_key_missing(self):
         """Fails when a key is not rendered."""
-        html = '<div>name: Test</div>'
+        html = "<div>name: Test</div>"
         data = {"name": "Test", "price": 100}
         with pytest.raises(AssertionError, match="price"):
             RichOutputAssertions.assert_data_rendered(html, data)
 
     def test_handles_list_data(self):
         """Works with list of dicts (uses first item)."""
-        html = '<div>sku: ABC</div><div>status: active</div>'
+        html = "<div>sku: ABC</div><div>status: active</div>"
         data = [
             {"sku": "ABC", "status": "active"},
             {"sku": "DEF", "status": "draft"},
@@ -63,7 +63,7 @@ class TestAssertDataRendered:
 
     def test_handles_empty_list(self):
         """Handles empty list gracefully."""
-        html = '<p>No items</p>'
+        html = "<p>No items</p>"
         data = []
         # Should not raise
         RichOutputAssertions.assert_data_rendered(html, data)
@@ -96,13 +96,13 @@ class TestAssertNoScripts:
 
     def test_passes_with_clean_html(self):
         """Passes when no scripts or handlers are present."""
-        html = '<div><p>Safe content</p></div>'
+        html = "<div><p>Safe content</p></div>"
         # Should not raise
         RichOutputAssertions.assert_no_scripts(html)
 
     def test_fails_with_script_tag(self):
         """Fails when script tag is present."""
-        html = '<script>alert(1)</script>'
+        html = "<script>alert(1)</script>"
         with pytest.raises(AssertionError, match="Script"):
             RichOutputAssertions.assert_no_scripts(html)
 
@@ -136,20 +136,20 @@ class TestAssertValidStructure:
 
     def test_passes_with_valid_html(self):
         """Passes with valid HTML structure."""
-        html = '''<!DOCTYPE html>
-<html><head><title>Test</title></head><body></body></html>'''
+        html = """<!DOCTYPE html>
+<html><head><title>Test</title></head><body></body></html>"""
         # Should not raise
         RichOutputAssertions.assert_valid_structure(html)
 
     def test_fails_without_doctype(self):
         """Fails without DOCTYPE."""
-        html = '<html><head><title>Test</title></head><body></body></html>'
+        html = "<html><head><title>Test</title></head><body></body></html>"
         with pytest.raises(AssertionError, match="DOCTYPE"):
             RichOutputAssertions.assert_valid_structure(html)
 
     def test_fails_without_closing_html(self):
         """Fails without closing html tag."""
-        html = '<!DOCTYPE html><html><head><title>Test</title></head><body>'
+        html = "<!DOCTYPE html><html><head><title>Test</title></head><body>"
         with pytest.raises(AssertionError, match="</html>"):
             RichOutputAssertions.assert_valid_structure(html)
 
@@ -165,7 +165,7 @@ class TestAssertOgTags:
 
     def test_fails_without_og_title(self):
         """Fails when og:title is missing."""
-        html = '<title>Test Page</title>'
+        html = "<title>Test Page</title>"
         with pytest.raises(AssertionError, match="og:title"):
             RichOutputAssertions.assert_og_tags(html, "Test Page")
 
@@ -181,7 +181,7 @@ class TestAssertFieldHintsApplied:
 
     def test_passes_when_hints_applied(self):
         """Passes when field hint labels are in HTML."""
-        html = '<th>SKU</th><th>Price</th><th>Min Order Qty</th>'
+        html = "<th>SKU</th><th>Price</th><th>Min Order Qty</th>"
         hints = {
             "sku_code": {"label": "SKU"},
             "unit_price": {"label": "Price"},
@@ -192,7 +192,7 @@ class TestAssertFieldHintsApplied:
 
     def test_fails_when_hint_missing(self):
         """Fails when a hint label is not in HTML."""
-        html = '<th>SKU</th><th>unit_price</th>'
+        html = "<th>SKU</th><th>unit_price</th>"
         hints = {
             "sku_code": {"label": "SKU"},
             "unit_price": {"label": "Price"},

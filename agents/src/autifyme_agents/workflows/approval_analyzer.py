@@ -78,7 +78,7 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
     # This still returns BatchApprovalResponse Pydantic model
     structured_llm = llm.with_structured_output(
         BatchApprovalResponse,
-        method="function_calling"  # More flexible than strict JSON schema
+        method="function_calling",  # More flexible than strict JSON schema
     )
 
     # Load prompt template
@@ -86,9 +86,12 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
 
     # Build prompt template
     # Input variables: pending_interrupts, user_message, has_media, conversation_history
-    prompt_template = ChatPromptTemplate.from_messages([
-        ("system", prompt_text),
-        ("human", """**Conversation History:**
+    prompt_template = ChatPromptTemplate.from_messages(
+        [
+            ("system", prompt_text),
+            (
+                "human",
+                """**Conversation History:**
 {conversation_history_formatted}
 
 **Pending Interrupts:**
@@ -101,8 +104,10 @@ def create_approval_analyzer(llm: BaseChatModel | None = None) -> Any:
 
 Use the conversation history to understand context and resolve references (e.g., "the cheaper one", "same description", "make it 25").
 If has_media is True and user message contains product details (not explicit approval), treat as NEW INFORMATION (reject to pass to specialist).
-Analyze the user's response and return BatchApprovalResponse with exactly {interrupt_count} responses (one per interrupt)."""),
-    ])
+Analyze the user's response and return BatchApprovalResponse with exactly {interrupt_count} responses (one per interrupt).""",
+            ),
+        ]
+    )
 
     # Build chain with preprocessing
     def format_input(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -116,8 +121,8 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
         # Approval analyzer should see what user saw, not backend OperationIntent details
         interrupt_lines = []
         for idx, interrupt in enumerate(pending_interrupts, 1):
-            tool_name = interrupt.get('tool_name', 'unknown')
-            tool_args = interrupt.get('tool_args', {})
+            tool_name = interrupt.get("tool_name", "unknown")
+            tool_args = interrupt.get("tool_args", {})
 
             # Extract human-readable summary (what user actually saw in approval message)
             if tool_name == "execute_database_operation":
@@ -127,7 +132,7 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
                 interrupt_lines.append(f"{idx}. {intent_type}: {summary}")
             else:
                 # For other tools, show formatted tool name
-                formatted_name = tool_name.replace('_', ' ').title()
+                formatted_name = tool_name.replace("_", " ").title()
                 interrupt_lines.append(f"{idx}. {formatted_name}")
 
         # Result: "1. CREATE: Add 500ml PET jar" instead of "1. Tool: execute_database_operation, Args: {change_spec: {...}, entity_references: {...}}"
@@ -137,27 +142,28 @@ Analyze the user's response and return BatchApprovalResponse with exactly {inter
         history_lines = []
         if conversation_history:
             for msg in conversation_history[-5:]:  # Last 5 messages for context
-                msg_type = getattr(msg, 'type', None)
-                if not msg_type and hasattr(msg, '__class__'):
-                    msg_type = msg.__class__.__name__.replace('Message', '').lower()
+                msg_type = getattr(msg, "type", None)
+                if not msg_type and hasattr(msg, "__class__"):
+                    msg_type = msg.__class__.__name__.replace("Message", "").lower()
 
                 # Ensure msg_type is not None
                 if msg_type is None:
-                    msg_type = 'unknown'
+                    msg_type = "unknown"
 
                 # Extract text content (handles both OpenAI string and Gemini list formats)
-                raw_content = getattr(msg, 'content', None)
+                raw_content = getattr(msg, "content", None)
                 text_content = extract_text_content(raw_content) if raw_content else None
 
                 if text_content and len(text_content) > 0:
                     # Truncate long messages (500 chars to preserve context for references)
-                    preview = text_content[:500] + "..." if len(text_content) > 500 else text_content
+                    preview = (
+                        text_content[:500] + "..." if len(text_content) > 500 else text_content
+                    )
                     history_lines.append(f"[{msg_type.upper()}]: {preview}")
 
         formatted = {
             "conversation_history_formatted": (
-                "\n".join(history_lines) if history_lines
-                else "(No prior conversation)"
+                "\n".join(history_lines) if history_lines else "(No prior conversation)"
             ),
             "pending_interrupts_formatted": "\n".join(interrupt_lines),
             "has_media": "True" if has_media else "False",
@@ -208,6 +214,7 @@ def analyze_approval(
     config = {}
     if run_id:
         from uuid import UUID
+
         config["run_id"] = UUID(run_id) if isinstance(run_id, str) else run_id
 
     # Invoke analyzer with conversation history for context
@@ -228,7 +235,7 @@ def analyze_approval(
                 "error": str(e),
                 "interrupt_count": len(pending_interrupts),
                 "user_message": user_message[:100],
-            }
+            },
         )
         raise ValueError(
             f"Approval analyzer failed to return valid BatchApprovalResponse: {e}"
@@ -244,7 +251,7 @@ def analyze_approval(
                 "expected_count": len(pending_interrupts),
                 "actual_count": len(result.responses),
                 "reasoning": result.reasoning,
-            }
+            },
         )
         raise ValueError(
             f"Approval analyzer returned wrong number of responses: "
@@ -258,7 +265,7 @@ def analyze_approval(
             "response_count": len(result.responses),
             "has_conversation_history": len(conversation_history or []) > 0,
             "reasoning": result.reasoning,
-        }
+        },
     )
 
     return result

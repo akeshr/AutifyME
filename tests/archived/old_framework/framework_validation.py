@@ -3,6 +3,7 @@
 This script validates the 6-tool framework by running real scenarios
 and using hierarchical trace analysis to debug issues.
 """
+
 import sys
 from pathlib import Path
 
@@ -44,7 +45,7 @@ def test_basic_cataloging():
     print("\n[Step 1] Executing scenario...")
     result = execute_scenario(
         scenario_id="I want to catalog a product: Nike Air Max sneakers, white/blue colorway, sizes 8-12, price Rs 8500",
-        hitl_mode="auto_approve"
+        hitl_mode="auto_approve",
     )
 
     print(f"  Success: {result.success}")
@@ -78,6 +79,7 @@ def test_basic_cataloging():
 
     # Find failures
     failures = []
+
     def find_failures(node):
         if node.status == "error":
             failures.append(node)
@@ -102,6 +104,7 @@ def test_basic_cataloging():
 
     # Find LLM runs to check token usage
     llm_runs = []
+
     def find_llm_runs(node):
         if node.run_type == "llm":
             llm_runs.append(node)
@@ -134,8 +137,7 @@ def test_rejection_scenario():
 
     print("\n[Step 1] Executing scenario with auto-reject...")
     result = execute_scenario(
-        scenario_id="Catalog product: Adidas sneakers, Rs 5000",
-        hitl_mode="auto_reject"
+        scenario_id="Catalog product: Adidas sneakers, Rs 5000", hitl_mode="auto_reject"
     )
 
     print(f"  Success: {result.success}")

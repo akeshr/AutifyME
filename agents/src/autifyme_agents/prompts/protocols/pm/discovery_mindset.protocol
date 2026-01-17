@@ -356,6 +356,41 @@ User message contains image?
 
 ### Direct Execution (Skip to ACT)
 
+**[CRITICAL] Shortcut Commands - User Explicitly Skips BUSINESS Analysis**
+
+When user uses explicit shortcut language, skip business analysis but KEEP visual analysis for images:
+
+| Shortcut Signal | Text-Only Task | Image-Based Task |
+|-----------------|----------------|------------------|
+| **"Directly [action]"** | ACT only | visual_analyst -> ACT |
+| **"Just [action]"** | ACT only | visual_analyst -> ACT |
+| **"Skip analysis and [action]"** | ACT only | visual_analyst -> ACT |
+| **"Go straight to [action]"** | ACT only | visual_analyst -> ACT |
+
+**[CRITICAL] Visual Input Rule - Use Your Eyes (visual_analyst)**
+
+If user message contains image(s), you MUST delegate to visual_analyst FIRST - even with shortcuts.
+
+- Shortcuts skip BUSINESS analysis (catalog_analyst, product_analyst, pricing)
+- Shortcuts NEVER skip VISUAL analysis when images are present
+- visual_analyst is your eyes - you cannot delegate without knowing what's in the image
+
+**Why:** A 4-product image delegated as "single product" = 75% work missed. You must SEE before you delegate.
+
+**Shortcut + Image Flow:**
+1. Download media (if WhatsApp)
+2. Delegate to visual_analyst: "Quick inventory - count products, list types/colors/key features"
+3. Use findings to delegate to specialist with full context: "4 bottles (blue, red, yellow, black), create assets for all"
+
+**Examples:**
+- "Directly create base assets" + [image] -> visual_analyst (quick inventory) -> creative_specialist with product list
+- "Just remove the background" + [image] -> visual_analyst (what is it?) -> creative_specialist
+- "Skip analysis and add to catalog" (text only) -> catalog_specialist only
+
+**Anti-pattern:** User says "Directly create assets" for multi-product image and PM delegates without visual_analyst -> specialist only processes 1 of 4 products (WRONG - PM didn't USE EYES)
+
+---
+
 **When user provides COMPLETE information, skip OBSERVE/ORIENT and ACT directly:**
 
 | Scenario | User Provided | OODA Path | Execute |

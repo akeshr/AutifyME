@@ -157,6 +157,40 @@ Material-specific rendering instructions.
 - `rendering_notes`: How to treat the material (label sharpness, specular control, caustics, etc.)
 - `preserve_details`: Critical details to preserve (label legibility, cap details, texture)
 
+**[CRITICAL] Material Accuracy:**
+- Use the EXACT material from visual analysis (e.g., "glossy PET", "matte HDPE", "borosilicate glass")
+- Do NOT generalize to categories ("plastic", "glass", "metal")
+- Include finish: "glossy PET", "matte HDPE", "brushed aluminum", "frosted glass"
+- If analysis says "PET bottle", use "glossy PET" or "clear PET", not "clear_plastic"
+
+**[CRITICAL] Edge Artifact Prevention (Transparent/Glossy Materials):**
+
+For PET, glass, and glossy plastics, edges naturally show refraction. DO NOT add artificial rim highlights or edge reflections - they appear as shadow-like artifacts.
+
+| Anti-pattern | Correct |
+|--------------|---------|
+| `rendering_notes="Highlight reflections to show form"` | `rendering_notes="Natural edge refraction only. No artificial rim highlights. Clean silhouette."` |
+| No lighting.specials specified | `lighting={"specials": "no rim light - rely on natural edge refraction"}` |
+
+**For transparent materials, ALWAYS include:**
+```python
+material_treatment={
+    "primary_material": "glossy PET",  # or specific material
+    "rendering_notes": "Natural edge refraction only. No artificial rim highlights. Clean silhouette edges."
+},
+lighting={
+    "specials": "no rim light - rely on natural edge refraction for transparent materials"
+}
+```
+
+**Edge Artifact Self-Check (REQUIRED for transparent materials):**
+Before EVERY image_studio call with transparent/glossy material, verify:
+- [ ] `rendering_notes` does NOT contain: "highlight", "rim", "edge reflection", "show form"
+- [ ] `lighting.specials` explicitly prohibits rim light
+- [ ] No "edge glow" or "edge highlight" in any spec value
+
+**Why this matters:** Gemini interprets "highlight reflections" as adding white edge lines, which appear as shadow artifacts on transparent bottles.
+
 ### fidelity (CRITICAL for source images)
 FIX photography problems, PRESERVE product identity. **Always include when processing [source]/[product].**
 - `preserve_colors`: True product colors (fix color cast, don't generate)
@@ -280,6 +314,125 @@ image_studio(
 
 **Key principle:** Include ALL specs. Minimal calls produce garbage.
 
+---
+
+## GENERATION CONTROL (Batch Consistency)
+
+Gemini image generation is non-deterministic. Even identical prompts produce different outputs.
+
+**[CRITICAL] For batch scenarios (multiple items, regeneration, variants), consistency parameters are REQUIRED.**
+
+### Batch Scenario Detection
+
+You are in a batch scenario if:
+- Processing multiple products from same image (multi-item extraction)
+- Regenerating assets for multiple SKUs
+- Creating variants of the same product (sizes, colors)
+- User mentions: "all", "batch", "regenerate", "consistency", "family", "set"
+
+### Temperature (Default: 0.7)
+
+| Value | Use Case |
+|-------|----------|
+| 0.3-0.5 | **[REQUIRED for batch]** Maximum consistency |
+| 0.7 | Single catalog item - balanced (default) |
+| 1.0+ | Creative exploration - high variance |
+
+### Seed (REQUIRED for Batch Operations)
+
+**For batch scenarios, you MUST:**
+1. Generate a single seed at the START of batch processing
+2. Use the SAME seed for ALL image_studio calls in the batch
+
+```python
+# [REQUIRED] Batch of 4 variants - same seed for consistency
+BATCH_SEED = 42  # Pick once, use everywhere
+
+# Variant 1
+image_studio(images=[...], extraction={...}, temperature=0.4, seed=BATCH_SEED)
+
+# Variant 2
+image_studio(images=[...], extraction={...}, temperature=0.4, seed=BATCH_SEED)
+
+# Variant 3
+image_studio(images=[...], extraction={...}, temperature=0.4, seed=BATCH_SEED)
+```
+
+**Note:** Seed is "best-effort" - deterministic output not guaranteed, but significantly improves consistency.
+
+### Consistency Stack (REQUIRED for Catalog Batches)
+
+For batch operations, use ALL of:
+
+1. **Low temperature** (0.3-0.5) - REQUIRED
+2. **Same seed** across all variants - REQUIRED
+3. **Style-as-text** in custom_spec (from View-Then-Describe pattern)
+4. **Identical structured specs** (composition, lighting, enhancement)
+
+```python
+image_studio(
+    images=[{"path": "inbox/variant_2.jpg", "label": "source"}],
+    extraction={...},
+    composition={"camera_angle": "eye-level", "product_coverage": "80%"},
+    lighting={"type": "studio_3point", "direction": "front-left"},
+    custom_spec={"instruction": "Match anchor style: eye-level, 80% frame, soft shadow bottom-right"},
+    temperature=0.4,  # [REQUIRED] Low for batch
+    seed=42,          # [REQUIRED] Same across batch
+)
+```
+
+### Logo/Branding Position Consistency (REQUIRED for Variants)
+
+**Problem:** Logo position drift across color variants looks unprofessional.
+
+**Pattern: Anchor-Extract-Apply**
+
+1. **Extract position from anchor:**
+   After generating anchor image, use view_image to capture exact logo position:
+   ```
+   view_image: "Describe logo position precisely - distance from top edge, horizontal centering, size relative to bottle height"
+   ```
+   Result: "Logo centered horizontally, positioned 35% from top, occupies 20% of bottle height"
+
+2. **Apply position spec to all variants:**
+   ```python
+   fidelity={
+       "preserve_artwork": "logo must match anchor position: centered, 35% from top, 20% height",
+       "hero_features": "logo position and size consistency"
+   }
+   ```
+
+**Anti-pattern:** Generating variants without explicit position reference from anchor - Gemini will place logos inconsistently.
+
+### Color Variant Transparency Consistency
+
+**Problem:** Color variants (especially dark colors) may render with different opacity than anchor.
+
+**Pattern: Explicit Opacity Matching**
+
+For transparent products with color variants:
+
+```python
+material_treatment={
+    "primary_material": "glossy PET",
+    "rendering_notes": "Natural edge refraction only. No artificial rim highlights.",
+    "transparency_spec": "Match anchor opacity: 85% transparent, liquid visible through body"
+}
+```
+
+**[CRITICAL] For dark-colored variants (black, dark blue, etc.):**
+```python
+material_treatment={
+    "primary_material": "glossy PET - tinted [color]",
+    "rendering_notes": "MUST maintain same transparency as anchor. Dark tint, NOT opaque.",
+    "transparency_spec": "85% transparency - liquid visible through dark tint like sunglasses"
+}
+```
+
+**Why:** Without explicit transparency guidance, Gemini often renders dark variants as opaque plastic.
+
+---
+
 ### Pattern 6: Verification Grid (Batch Consistency Check)
 
 After generating multiple variants, create a visual grid for consistency verification:
@@ -395,6 +548,9 @@ Key field: `storage_path` - use this for creating asset records.
 | No output.filename | Unpredictable path | Always specify for predictable paths |
 | Single extraction for N items | 1 asset for 9 products | Extract each item separately |
 | Minimal specs for hero shots | Garbage quality | Use ALL specs (see Pattern 5) |
+| "Highlight reflections" in notes | Edge shadow artifacts | Use "natural refraction only" |
+| No logo position from anchor | Logo drift across variants | Extract position, include in fidelity |
+| Missing transparency_spec for dark | Black variant is opaque | Explicit "match anchor opacity" |
 
 ---
 

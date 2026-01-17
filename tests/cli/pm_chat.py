@@ -39,9 +39,9 @@ async def chat_with_pm(message: str, image_path: Path | None = None, thread_id: 
         image_path: Optional path to image file
         thread_id: Thread ID for conversation continuity
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("INVOKING PM...")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     # Setup
     storage: StorageInterface = get_storage()
@@ -81,20 +81,20 @@ async def chat_with_pm(message: str, image_path: Path | None = None, thread_id: 
             last_message = messages[-1]
             response = getattr(last_message, "content", str(last_message))
 
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
             print("PM RESPONSE:")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
             print(response)
-            print(f"{'='*60}\n")
+            print(f"{'=' * 60}\n")
         else:
             print("\n[No response from PM]\n")
 
     except Exception as e:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("ERROR:")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"{type(e).__name__}: {e}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
         raise
 
 

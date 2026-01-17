@@ -60,7 +60,9 @@ async def _is_connection_healthy(checkpointer: AsyncPostgresSaver) -> bool:
         return False
 
 
-async def get_async_checkpointer(setup: bool = False, force_reconnect: bool = False) -> AsyncPostgresSaver:
+async def get_async_checkpointer(
+    setup: bool = False, force_reconnect: bool = False
+) -> AsyncPostgresSaver:
     """Return AsyncPostgresSaver with connection health checks for serverless environments.
 
     In serverless environments (AWS Lambda), connections can be closed between invocations.

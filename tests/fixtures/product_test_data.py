@@ -3,6 +3,7 @@
 Provides structured test scenarios with images, descriptions, and expected attributes
 for comprehensive product cataloging workflow testing.
 """
+
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,7 +41,6 @@ TEST_PRODUCTS = {
         },
         price_hint="Rs 25 per piece",
     ),
-
     # Text-only test cases (no media)
     "nike_shoes_text": ProductTestCase(
         name="Nike Running Shoes",
@@ -57,7 +57,6 @@ TEST_PRODUCTS = {
         },
         price_hint="Rs 2500",
     ),
-
     "cotton_tshirt_text": ProductTestCase(
         name="Cotton T-Shirt",
         description="Plain cotton t-shirt, white color, size M, round neck, short sleeves",
@@ -82,10 +81,11 @@ BATCH_TEST_SCENARIOS = {
         ("Catalog Cotton t-shirt Rs 299", None),
         ("Catalog Denim jeans Rs 1999", None),
     ],
-
     "with_images": [
-        (f"Catalog this PET jar {TEST_PRODUCTS['pet_jar_500ml'].price_hint}",
-         TEST_PRODUCTS['pet_jar_500ml'].media_path),
+        (
+            f"Catalog this PET jar {TEST_PRODUCTS['pet_jar_500ml'].price_hint}",
+            TEST_PRODUCTS["pet_jar_500ml"].media_path,
+        ),
         ("Catalog Nike shoes Rs 2500", None),
         ("Catalog Cotton t-shirt Rs 299", None),
     ],
@@ -102,5 +102,7 @@ def get_test_case(name: str) -> ProductTestCase:
 def get_batch_scenario(name: str) -> list[tuple[str, str | None]]:
     """Get batch test scenario by name."""
     if name not in BATCH_TEST_SCENARIOS:
-        raise ValueError(f"Batch scenario '{name}' not found. Available: {list(BATCH_TEST_SCENARIOS.keys())}")
+        raise ValueError(
+            f"Batch scenario '{name}' not found. Available: {list(BATCH_TEST_SCENARIOS.keys())}"
+        )
     return BATCH_TEST_SCENARIOS[name]

@@ -248,7 +248,7 @@ def create_research_product_tool(settings: Settings) -> StructuredTool:
                     "query": query,
                     "max_results": max_results,
                     "include_answer": include_answer,
-                }
+                },
             )
 
             # Execute search (only query in invoke dict)
@@ -261,7 +261,7 @@ def create_research_product_tool(settings: Settings) -> StructuredTool:
                     extra={
                         "query": query,
                         "error": raw_results.get("error"),
-                    }
+                    },
                 )
                 return build_agent_error_response(
                     exception=ValueError(f"Tavily API error: {raw_results['error']}"),
@@ -289,7 +289,7 @@ def create_research_product_tool(settings: Settings) -> StructuredTool:
                     extra={
                         "query": query,
                         "response_type": type(raw_results).__name__,
-                    }
+                    },
                 )
                 return build_agent_error_response(
                     exception=ValueError(f"Unexpected Tavily response type: {type(raw_results)}"),
@@ -301,13 +301,15 @@ def create_research_product_tool(settings: Settings) -> StructuredTool:
             # Convert to structured schema
             sources = []
             for source in api_sources:
-                sources.append(ResearchSource(
-                    title=source.get("title", "Untitled"),
-                    url=source.get("url", ""),
-                    content=source.get("content", ""),
-                    relevance_score=source.get("score", 0.5),
-                    published_date=source.get("published_date"),
-                ))
+                sources.append(
+                    ResearchSource(
+                        title=source.get("title", "Untitled"),
+                        url=source.get("url", ""),
+                        content=source.get("content", ""),
+                        relevance_score=source.get("score", 0.5),
+                        published_date=source.get("published_date"),
+                    )
+                )
 
             # Calculate quality metrics
             confidence = _calculate_research_confidence(api_sources)
@@ -332,7 +334,7 @@ def create_research_product_tool(settings: Settings) -> StructuredTool:
                     "sources_found": len(sources),
                     "confidence": confidence,
                     "has_answer": api_answer is not None,
-                }
+                },
             )
 
             return build_success_response(result.model_dump())
@@ -353,7 +355,7 @@ def create_research_product_tool(settings: Settings) -> StructuredTool:
                 extra={
                     "query": query,
                     "error_type": type(exc).__name__,
-                }
+                },
             )
             return build_agent_error_response(
                 exception=exc,
@@ -506,7 +508,7 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
                 extra={
                     "url": url,
                     "format": format,
-                }
+                },
             )
 
             # Execute extraction (only urls in invoke dict)
@@ -522,7 +524,7 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
                     extra={
                         "url": url,
                         "error": raw_result,
-                    }
+                    },
                 )
                 return build_agent_error_response(
                     exception=ValueError(f"Tavily Extract error: {raw_result}"),
@@ -541,10 +543,12 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
                     extra={
                         "url": url,
                         "response_type": type(raw_result).__name__,
-                    }
+                    },
                 )
                 return build_agent_error_response(
-                    exception=ValueError(f"Unexpected Tavily Extract response type: {type(raw_result)}"),
+                    exception=ValueError(
+                        f"Unexpected Tavily Extract response type: {type(raw_result)}"
+                    ),
                     context={"url": url},
                     fallback_type="API_ERROR",
                     fallback_action="Content extraction returned unexpected format. Try alternative source.",
@@ -562,7 +566,7 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
                     extra={
                         "url": url,
                         "failed_results": failed_results,
-                    }
+                    },
                 )
                 return build_agent_error_response(
                     exception=ValueError(f"No content extracted from URL: {failure_reason}"),
@@ -612,7 +616,7 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
                     "url": url,
                     "word_count": word_count,
                     "has_structured_data": result.structured_data is not None,
-                }
+                },
             )
 
             return build_success_response(result.model_dump())
@@ -633,7 +637,7 @@ def create_extract_web_content_tool(settings: Settings) -> StructuredTool:
                 extra={
                     "url": url,
                     "error_type": type(exc).__name__,
-                }
+                },
             )
             return build_agent_error_response(
                 exception=exc,

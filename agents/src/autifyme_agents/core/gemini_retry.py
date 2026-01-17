@@ -224,7 +224,11 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
                 )
                 logger.warning(
                     f"Gemini blank response detected, attempt {attempt}/{self.max_retries}",
-                    extra={"attempt": attempt, "max_retries": self.max_retries, "model": self.model},
+                    extra={
+                        "attempt": attempt,
+                        "max_retries": self.max_retries,
+                        "model": self.model,
+                    },
                 )
 
             except GeminiTimeoutError as e:
@@ -246,7 +250,11 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
 
         logger.error(
             f"Gemini failed after {self.max_retries} attempts",
-            extra={"max_retries": self.max_retries, "model": self.model, "last_error": str(last_error)},
+            extra={
+                "max_retries": self.max_retries,
+                "model": self.model,
+                "last_error": str(last_error),
+            },
         )
         raise last_error  # type: ignore[misc]
 
@@ -319,7 +327,11 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
                 )
                 logger.warning(
                     f"Gemini blank response detected, attempt {attempt}/{self.max_retries}",
-                    extra={"attempt": attempt, "max_retries": self.max_retries, "model": self.model},
+                    extra={
+                        "attempt": attempt,
+                        "max_retries": self.max_retries,
+                        "model": self.model,
+                    },
                 )
 
             except GeminiTimeoutError as e:
@@ -341,6 +353,10 @@ class GeminiWithRetry(ChatGoogleGenerativeAI):
 
         logger.error(
             f"Gemini failed after {self.max_retries} attempts",
-            extra={"max_retries": self.max_retries, "model": self.model, "last_error": str(last_error)},
+            extra={
+                "max_retries": self.max_retries,
+                "model": self.model,
+                "last_error": str(last_error),
+            },
         )
         raise last_error  # type: ignore[misc]

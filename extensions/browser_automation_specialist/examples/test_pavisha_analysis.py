@@ -58,7 +58,7 @@ Return structured information with confidence assessment."""
         result = await specialist.execute_task(
             goal=goal,
             max_steps=50,  # Allow extensive exploration
-            initial_url="https://www.pavisha.com"
+            initial_url="https://www.pavisha.com",
         )
 
         print()
@@ -71,9 +71,9 @@ Return structured information with confidence assessment."""
         print(f"Page title: {result['final_title']}")
         print()
 
-        if result['success']:
+        if result["success"]:
             print("Actions executed:")
-            for i, action in enumerate(result['actions_summary'], 1):
+            for i, action in enumerate(result["actions_summary"], 1):
                 print(f"  {i}. {action}")
         else:
             print(f"Error: {result.get('error', 'Unknown error')}")
@@ -111,9 +111,7 @@ Confidence target: 90%+"""
         print("-" * 80)
 
         result = await specialist.execute_task(
-            goal=goal,
-            max_steps=40,
-            initial_url="https://www.pavisha.com"
+            goal=goal, max_steps=40, initial_url="https://www.pavisha.com"
         )
 
         print()
@@ -124,10 +122,10 @@ Confidence target: 90%+"""
         print(f"Steps: {result['steps_taken']}")
         print(f"Final URL: {result['final_url']}")
 
-        if result['actions_summary']:
+        if result["actions_summary"]:
             print()
             print("Key actions:")
-            for action in result['actions_summary'][:10]:  # Show first 10
+            for action in result["actions_summary"][:10]:  # Show first 10
                 print(f"  - {action}")
 
     finally:
@@ -161,9 +159,7 @@ DO NOT actually fill or submit the form - just analyze its structure."""
         print("-" * 80)
 
         result = await specialist.execute_task(
-            goal=goal,
-            max_steps=30,
-            initial_url="https://www.pavisha.com"
+            goal=goal, max_steps=30, initial_url="https://www.pavisha.com"
         )
 
         print()

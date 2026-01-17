@@ -61,9 +61,7 @@ class PendingMessageMixin(ABC):
         pass
 
     @abstractmethod
-    async def has_recent_activity(
-        self, sender_id: str, window_seconds: int | float = 5
-    ) -> bool:
+    async def has_recent_activity(self, sender_id: str, window_seconds: int | float = 5) -> bool:
         """Check if sender has recent activity within time window.
 
         Used for Smart Skip logic: text messages only debounce if
@@ -91,9 +89,7 @@ class PendingMessageMixin(ABC):
         pass
 
     @abstractmethod
-    async def get_orphaned_batches(
-        self, age_seconds: int = 33
-    ) -> list[dict[str, Any]]:
+    async def get_orphaned_batches(self, age_seconds: int = 33) -> list[dict[str, Any]]:
         """Get pending messages older than expected processing time.
 
         Used for server restart recovery - these messages were queued

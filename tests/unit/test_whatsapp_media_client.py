@@ -21,6 +21,7 @@ def media_client():
 @pytest.fixture
 def mock_httpx_response():
     """Factory for creating mock httpx responses."""
+
     def _create_response(status_code=200, json_data=None, content=b"", headers=None):
         response = Mock(spec=httpx.Response)
         response.status_code = status_code
@@ -31,13 +32,13 @@ def mock_httpx_response():
         def raise_for_status():
             if 400 <= status_code < 600:
                 raise httpx.HTTPStatusError(
-                    f"HTTP {status_code}",
-                    request=Mock(),
-                    response=response
+                    f"HTTP {status_code}", request=Mock(), response=response
                 )
+
         response.raise_for_status = raise_for_status
 
         return response
+
     return _create_response
 
 
@@ -53,7 +54,9 @@ class TestMediaClientInit:
 
     def test_init_from_settings(self):
         """Initialize with default settings."""
-        with patch('autifyme_agents.integrations.communication.whatsapp_media_client.settings') as mock_settings:
+        with patch(
+            "autifyme_agents.integrations.communication.whatsapp_media_client.settings"
+        ) as mock_settings:
             mock_settings.WHATSAPP_ACCESS_TOKEN = "settings_token"
             mock_settings.WHATSAPP_API_VERSION = "v18.0"
 
@@ -63,7 +66,9 @@ class TestMediaClientInit:
 
     def test_init_without_token_raises(self):
         """Initialize without token raises ValueError."""
-        with patch('autifyme_agents.integrations.communication.whatsapp_media_client.settings') as mock_settings:
+        with patch(
+            "autifyme_agents.integrations.communication.whatsapp_media_client.settings"
+        ) as mock_settings:
             mock_settings.WHATSAPP_ACCESS_TOKEN = None
 
             with pytest.raises(ValueError, match="WhatsApp access token not configured"):
@@ -81,10 +86,10 @@ class TestGetMediaURL:
                 "url": "https://lookaside.fbsbx.com/whatsapp_business/attachments/media123.jpg",
                 "mime_type": "image/jpeg",
                 "file_size": 12345,
-            }
+            },
         )
 
-        with patch('httpx.get', return_value=mock_response) as mock_get:
+        with patch("httpx.get", return_value=mock_response) as mock_get:
             media_url = media_client.get_media_url("media_abc123")
 
         assert media_url == "https://lookaside.fbsbx.com/whatsapp_business/attachments/media123.jpg"
@@ -98,24 +103,30 @@ class TestGetMediaURL:
         """HTTP 404 raises HTTPStatusError."""
         mock_response = mock_httpx_response(status_code=404)
 
-        with patch('httpx.get', return_value=mock_response), pytest.raises(httpx.HTTPStatusError):
+        with patch("httpx.get", return_value=mock_response), pytest.raises(httpx.HTTPStatusError):
             media_client.get_media_url("nonexistent_media")
 
     def test_get_media_url_http_403(self, media_client, mock_httpx_response):
         """HTTP 403 (permission denied) raises HTTPStatusError."""
         mock_response = mock_httpx_response(status_code=403)
 
-        with patch('httpx.get', return_value=mock_response), pytest.raises(httpx.HTTPStatusError):
+        with patch("httpx.get", return_value=mock_response), pytest.raises(httpx.HTTPStatusError):
             media_client.get_media_url("forbidden_media")
 
     def test_get_media_url_timeout(self, media_client):
         """Network timeout raises TimeoutException."""
-        with patch('httpx.get', side_effect=httpx.TimeoutException("Connection timeout")), pytest.raises(httpx.TimeoutException):
+        with (
+            patch("httpx.get", side_effect=httpx.TimeoutException("Connection timeout")),
+            pytest.raises(httpx.TimeoutException),
+        ):
             media_client.get_media_url("media_timeout")
 
     def test_get_media_url_network_error(self, media_client):
         """Network error raises ConnectError."""
-        with patch('httpx.get', side_effect=httpx.ConnectError("Connection failed")), pytest.raises(httpx.ConnectError):
+        with (
+            patch("httpx.get", side_effect=httpx.ConnectError("Connection failed")),
+            pytest.raises(httpx.ConnectError),
+        ):
             media_client.get_media_url("media_error")
 
 
@@ -131,12 +142,13 @@ class TestDownloadMedia:
         # Mock download response
         test_bytes = b"fake_image_data_12345"
         mock_response = mock_httpx_response(
-            status_code=200,
-            content=test_bytes,
-            headers={"Content-Type": "image/jpeg"}
+            status_code=200, content=test_bytes, headers={"Content-Type": "image/jpeg"}
         )
 
-        with patch('httpx.get', return_value=mock_response) as mock_get, patch('pathlib.Path.write_bytes'):
+        with (
+            patch("httpx.get", return_value=mock_response) as mock_get,
+            patch("pathlib.Path.write_bytes"),
+        ):
             path, content, mime_type = media_client.download_media("media_abc123")
 
         assert isinstance(path, Path)
@@ -158,14 +170,17 @@ class TestDownloadMedia:
 
         mock_response = mock_httpx_response(status_code=500)
 
-        with patch('httpx.get', return_value=mock_response), pytest.raises(httpx.HTTPStatusError):
+        with patch("httpx.get", return_value=mock_response), pytest.raises(httpx.HTTPStatusError):
             media_client.download_media("media_error")
 
     def test_download_media_timeout(self, media_client):
         """Timeout during download raises TimeoutException."""
         media_client.get_media_url = Mock(return_value="https://example.com/media.jpg")
 
-        with patch('httpx.get', side_effect=httpx.TimeoutException("Download timeout")), pytest.raises(httpx.TimeoutException):
+        with (
+            patch("httpx.get", side_effect=httpx.TimeoutException("Download timeout")),
+            pytest.raises(httpx.TimeoutException),
+        ):
             media_client.download_media("media_timeout")
 
     def test_download_media_write_failure(self, media_client, mock_httpx_response):
@@ -174,12 +189,13 @@ class TestDownloadMedia:
 
         test_bytes = b"image_data"
         mock_response = mock_httpx_response(
-            status_code=200,
-            content=test_bytes,
-            headers={"Content-Type": "image/png"}
+            status_code=200, content=test_bytes, headers={"Content-Type": "image/png"}
         )
 
-        with patch('httpx.get', return_value=mock_response), patch('pathlib.Path.write_bytes', side_effect=OSError("Read-only filesystem")):
+        with (
+            patch("httpx.get", return_value=mock_response),
+            patch("pathlib.Path.write_bytes", side_effect=OSError("Read-only filesystem")),
+        ):
             path, content, mime_type = media_client.download_media("media_abc123")
 
         # Should still return bytes even if write fails
@@ -193,12 +209,10 @@ class TestDownloadMedia:
         # Simulate 12MB file
         large_bytes = b"x" * (12 * 1024 * 1024)
         mock_response = mock_httpx_response(
-            status_code=200,
-            content=large_bytes,
-            headers={"Content-Type": "video/mp4"}
+            status_code=200, content=large_bytes, headers={"Content-Type": "video/mp4"}
         )
 
-        with patch('httpx.get', return_value=mock_response), patch('pathlib.Path.write_bytes'):
+        with patch("httpx.get", return_value=mock_response), patch("pathlib.Path.write_bytes"):
             path, content, mime_type = media_client.download_media("large_media")
 
         assert len(content) == 12 * 1024 * 1024
@@ -212,10 +226,10 @@ class TestDownloadMedia:
         mock_response = mock_httpx_response(
             status_code=200,
             content=b"unknown_data",
-            headers={}  # No Content-Type
+            headers={},  # No Content-Type
         )
 
-        with patch('httpx.get', return_value=mock_response), patch('pathlib.Path.write_bytes'):
+        with patch("httpx.get", return_value=mock_response), patch("pathlib.Path.write_bytes"):
             path, content, mime_type = media_client.download_media("unknown_media")
 
         assert mime_type == "application/octet-stream"
@@ -251,10 +265,20 @@ class TestMIMETypeMapping:
     def test_document_types(self):
         """Document MIME types map correctly."""
         assert WhatsAppMediaClient._derive_suffix("application/pdf") == ".pdf"
-        assert WhatsAppMediaClient._derive_suffix("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") == ".xlsx"
+        assert (
+            WhatsAppMediaClient._derive_suffix(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            == ".xlsx"
+        )
         assert WhatsAppMediaClient._derive_suffix("application/vnd.ms-excel") == ".xls"
         assert WhatsAppMediaClient._derive_suffix("text/csv") == ".csv"
-        assert WhatsAppMediaClient._derive_suffix("application/vnd.openxmlformats-officedocument.wordprocessingml.document") == ".docx"
+        assert (
+            WhatsAppMediaClient._derive_suffix(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+            == ".docx"
+        )
         assert WhatsAppMediaClient._derive_suffix("application/msword") == ".doc"
         assert WhatsAppMediaClient._derive_suffix("text/plain") == ".txt"
 
@@ -280,10 +304,10 @@ class TestEdgeCases:
         media_id = "media_123-abc_xyz"
         mock_response = mock_httpx_response(
             status_code=200,
-            json_data={"url": "https://example.com/media.jpg", "mime_type": "image/jpeg"}
+            json_data={"url": "https://example.com/media.jpg", "mime_type": "image/jpeg"},
         )
 
-        with patch('httpx.get', return_value=mock_response) as mock_get:
+        with patch("httpx.get", return_value=mock_response) as mock_get:
             media_client.get_media_url(media_id)
 
         # Verify URL contains the media_id
@@ -295,13 +319,11 @@ class TestEdgeCases:
         media_client.get_media_url = Mock(return_value="https://example.com/media.jpg")
 
         mock_response = mock_httpx_response(
-            status_code=200,
-            content=b"data",
-            headers={"Content-Type": "image/jpeg"}
+            status_code=200, content=b"data", headers={"Content-Type": "image/jpeg"}
         )
 
         paths = []
-        with patch('httpx.get', return_value=mock_response), patch('pathlib.Path.write_bytes'):
+        with patch("httpx.get", return_value=mock_response), patch("pathlib.Path.write_bytes"):
             for i in range(3):
                 path, _, _ = media_client.download_media(f"media_{i}")
                 paths.append(str(path))
@@ -315,12 +337,10 @@ class TestEdgeCases:
         media_client.get_media_url = Mock(return_value="https://example.com/media.jpg")
 
         mock_response = mock_httpx_response(
-            status_code=200,
-            content=b"data",
-            headers={"Content-Type": "image/jpeg; charset=utf-8"}
+            status_code=200, content=b"data", headers={"Content-Type": "image/jpeg; charset=utf-8"}
         )
 
-        with patch('httpx.get', return_value=mock_response), patch('pathlib.Path.write_bytes'):
+        with patch("httpx.get", return_value=mock_response), patch("pathlib.Path.write_bytes"):
             path, content, mime_type = media_client.download_media("media_unicode")
 
         # Should extract base MIME type (ignore charset)

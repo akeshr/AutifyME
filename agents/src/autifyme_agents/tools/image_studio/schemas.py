@@ -68,7 +68,7 @@ class BackgroundSpec(BaseModel):
             "'gradient from warm cream to pure white', 'soft blur of original', "
             "'remove completely', 'replace with marble texture', "
             "'generate modern kitchen scene', 'outdoor cafe setting at golden hour'"
-        )
+        ),
     )
     color: str | None = Field(
         default=None,
@@ -76,7 +76,7 @@ class BackgroundSpec(BaseModel):
             "Primary background color if applicable. "
             "Examples: '#FFFFFF', 'pure white', 'warm cream', 'soft gray', "
             "'charcoal', 'brand blue #1E3A8A', 'transparent'"
-        )
+        ),
     )
     scene_description: str | None = Field(
         default=None,
@@ -85,14 +85,14 @@ class BackgroundSpec(BaseModel):
             "Examples: 'modern minimalist kitchen with white marble counters', "
             "'cozy cafe corner with morning light streaming through window', "
             "'professional studio with gradient gray seamless backdrop'"
-        )
+        ),
     )
     custom: str | None = Field(
         default=None,
         description=(
             "Any additional background instructions not covered above. "
             "Use for creative OOTB ideas, special effects, unique treatments."
-        )
+        ),
     )
 
 
@@ -110,7 +110,7 @@ class LightingSpec(BaseModel):
             "Examples: 'soft studio', 'dramatic side light', 'natural window light', "
             "'hard directional', 'diffused overhead', 'rim lighting with fill', "
             "'split lighting', 'Rembrandt', 'butterfly/paramount', 'loop lighting'"
-        )
+        ),
     )
     direction: str = Field(
         default="45 degrees camera-left",
@@ -119,7 +119,7 @@ class LightingSpec(BaseModel):
             "Examples: '45 degrees camera-left', 'directly above', 'behind for rim', "
             "'soft frontal fill', 'side lighting from right', 'low angle dramatic', "
             "'window light from left at 10 oclock position'"
-        )
+        ),
     )
     quality: str = Field(
         default="soft",
@@ -127,7 +127,7 @@ class LightingSpec(BaseModel):
             "Light quality/character. "
             "Examples: 'soft diffused', 'hard specular', 'medium contrast', "
             "'wraparound soft', 'crisp with defined shadows', 'dreamy ethereal'"
-        )
+        ),
     )
     color_temperature: str = Field(
         default="neutral daylight",
@@ -135,7 +135,7 @@ class LightingSpec(BaseModel):
             "Color temperature/mood. "
             "Examples: 'neutral daylight 5500K', 'warm golden 3200K', 'cool blue', "
             "'warm tungsten', 'mixed warm key cool fill', 'sunset orange'"
-        )
+        ),
     )
     shadows: str = Field(
         default="soft natural",
@@ -144,7 +144,7 @@ class LightingSpec(BaseModel):
             "Examples: 'soft natural falloff', 'no shadows (flat lit)', "
             "'hard dramatic shadows', 'subtle contact shadow only', "
             "'deep shadows for mood', 'minimal fill to retain dimension'"
-        )
+        ),
     )
     special_requirements: str | None = Field(
         default=None,
@@ -154,14 +154,14 @@ class LightingSpec(BaseModel):
             "'controlled specular for metal surfaces', "
             "'soft gradient reflection for glossy packaging', "
             "'avoid hot spots on reflective label'"
-        )
+        ),
     )
     custom: str | None = Field(
         default=None,
         description=(
             "Any additional lighting instructions not covered above. "
             "Use for creative OOTB ideas, experimental setups, unique effects."
-        )
+        ),
     )
 
 
@@ -178,7 +178,7 @@ class CompositionSpec(BaseModel):
             "How much of the frame the product should occupy. "
             "Examples: '80% frame', '60% with breathing room', 'tight crop 90%', "
             "'small in scene 30%', 'hero dominant 85%', 'product fills frame edge-to-edge'"
-        )
+        ),
     )
     position: str = Field(
         default="centered",
@@ -187,7 +187,7 @@ class CompositionSpec(BaseModel):
             "Examples: 'centered', 'rule of thirds left', 'bottom third for hero angle', "
             "'offset right with negative space left', 'golden ratio placement', "
             "'anchored bottom center'"
-        )
+        ),
     )
     camera_angle: str = Field(
         default="eye level",
@@ -196,7 +196,7 @@ class CompositionSpec(BaseModel):
             "Examples: 'eye level straight on', '45 degree hero angle', "
             "'top-down flat lay', 'low angle looking up (powerful)', "
             "'slight 3/4 view', 'dramatic low angle', 'overhead at 30 degrees'"
-        )
+        ),
     )
     negative_space: str | None = Field(
         default=None,
@@ -205,7 +205,7 @@ class CompositionSpec(BaseModel):
             "Examples: 'generous top for text overlay', 'balanced all sides', "
             "'tight crop minimal negative space', 'right side clear for copy', "
             "'breathing room around product'"
-        )
+        ),
     )
     crop_instruction: str | None = Field(
         default=None,
@@ -214,14 +214,14 @@ class CompositionSpec(BaseModel):
             "Examples: 'crop to product bounds with 10% padding', "
             "'maintain original framing', 'crop tighter removing excess background', "
             "'square crop centered on label'"
-        )
+        ),
     )
     custom: str | None = Field(
         default=None,
         description=(
             "Any additional composition instructions not covered above. "
             "Use for creative OOTB ideas, unconventional framing, artistic choices."
-        )
+        ),
     )
 
 
@@ -238,7 +238,7 @@ class EnhancementSpec(BaseModel):
             "Examples: 'none', 'subtle', 'medium', 'high', "
             "'tack sharp on product soft on background', "
             "'crisp label details', 'natural without oversharpening'"
-        )
+        ),
     )
     contrast: str = Field(
         default="subtle",
@@ -246,7 +246,7 @@ class EnhancementSpec(BaseModel):
             "Contrast adjustment. "
             "Examples: 'none', 'subtle lift', 'medium punch', 'high dramatic', "
             "'flat for editing flexibility', 'S-curve for pop'"
-        )
+        ),
     )
     color_treatment: str = Field(
         default="accurate to source",
@@ -255,7 +255,7 @@ class EnhancementSpec(BaseModel):
             "Examples: 'accurate to source - no grading' (DEFAULT for products), "
             "'true-to-product color accuracy critical', 'preserve exact source colors'. "
             "Scene-only options (NOT for product colors): 'warm ambient', 'cool tones'"
-        )
+        ),
     )
     detail_enhancement: str | None = Field(
         default=None,
@@ -264,7 +264,7 @@ class EnhancementSpec(BaseModel):
             "Examples: 'enhance label text legibility', 'bring out texture detail', "
             "'recover shadow detail', 'denoise smooth areas', "
             "'upscale to 4K maintaining sharpness'"
-        )
+        ),
     )
     cleanup: str | None = Field(
         default=None,
@@ -272,14 +272,14 @@ class EnhancementSpec(BaseModel):
             "Cleanup/retouching needs. "
             "Examples: 'remove dust and scratches', 'clean up reflections', "
             "'remove blemishes on product surface', 'none - keep authentic'"
-        )
+        ),
     )
     custom: str | None = Field(
         default=None,
         description=(
             "Any additional enhancement instructions not covered above. "
             "Use for creative OOTB ideas, special filters, artistic treatments."
-        )
+        ),
     )
 
 
@@ -306,7 +306,7 @@ class SceneSpec(BaseModel):
             "Examples: 'modern minimalist', 'warm rustic', 'sleek contemporary', "
             "'cozy traditional', 'industrial chic', 'Scandinavian clean', "
             "'luxurious elegant', 'casual lifestyle', 'editorial magazine'"
-        )
+        ),
     )
     mood: str = Field(
         default="professional",
@@ -315,7 +315,7 @@ class SceneSpec(BaseModel):
             "Examples: 'professional and clean', 'warm and inviting', "
             "'fresh and energetic', 'calm and serene', 'luxurious and aspirational', "
             "'casual and approachable', 'dramatic and bold'"
-        )
+        ),
     )
     time_of_day: str = Field(
         default="natural daylight",
@@ -323,7 +323,7 @@ class SceneSpec(BaseModel):
             "Time and lighting context. "
             "Examples: 'bright morning light', 'soft afternoon', 'golden hour warmth', "
             "'moody evening', 'crisp midday', 'dawn freshness', 'twilight ambiance'"
-        )
+        ),
     )
     props_and_context: str | None = Field(
         default=None,
@@ -332,14 +332,14 @@ class SceneSpec(BaseModel):
             "Examples: 'fresh herbs and cutting board nearby', "
             "'coffee cup and open book', 'folded towels and candle', "
             "'laptop and notebook', 'none - product only'"
-        )
+        ),
     )
     custom: str | None = Field(
         default=None,
         description=(
             "Any additional scene instructions not covered above. "
             "Use for creative OOTB ideas, unique environments, fantasy settings."
-        )
+        ),
     )
 
 
@@ -356,7 +356,7 @@ class ProductPlacementSpec(BaseModel):
             "Examples: 'centered hero position', 'on countertop left third', "
             "'in hand being used', 'on shelf display', 'floating hero', "
             "'on table foreground', 'pedestal center stage'"
-        )
+        ),
     )
     scale: str = Field(
         default="dominant",
@@ -365,7 +365,7 @@ class ProductPlacementSpec(BaseModel):
             "Examples: 'dominant - clearly the hero', 'balanced with environment', "
             "'contextual - part of the scene', 'actual realistic size', "
             "'slightly larger than life for impact'"
-        )
+        ),
     )
     surface: str | None = Field(
         default=None,
@@ -374,7 +374,7 @@ class ProductPlacementSpec(BaseModel):
             "Examples: 'white marble countertop', 'rustic wood table', "
             "'floating/no surface', 'clean glass shelf', 'natural stone', "
             "'fabric draped surface', 'reflective surface for mirror effect'"
-        )
+        ),
     )
     interaction: str | None = Field(
         default=None,
@@ -383,14 +383,14 @@ class ProductPlacementSpec(BaseModel):
             "Examples: 'casting natural shadow', 'reflection on surface', "
             "'being held by hand', 'leaning against prop', "
             "'surrounded by ingredients', 'isolated on pedestal'"
-        )
+        ),
     )
     custom: str | None = Field(
         default=None,
         description=(
             "Any additional placement instructions not covered above. "
             "Use for creative OOTB ideas, unique positioning, artistic arrangements."
-        )
+        ),
     )
 
 
@@ -415,7 +415,7 @@ class FidelitySpec(BaseModel):
             "'actual amber honey color - source may have color cast', "
             "'real dusty rose - don't shift to vibrant pink', "
             "'correct white balance to show true product colors'"
-        )
+        ),
     )
     preserve_artwork: str | None = Field(
         default=None,
@@ -425,7 +425,7 @@ class FidelitySpec(BaseModel):
             "Examples: 'cartoon bee mascot - same pose, same expression, same details', "
             "'honeycomb geometric pattern - exact design even if source is blurry', "
             "'brand logo with text - sharpen but same design'"
-        )
+        ),
     )
     preserve_text: str | None = Field(
         default=None,
@@ -435,7 +435,7 @@ class FidelitySpec(BaseModel):
             "Examples: 'Wildflower Honey 500ml - sharpen but exact wording and font', "
             "'brand name typography - reveal clearly, same design', "
             "'nutritional info - legible and accurate to actual label'"
-        )
+        ),
     )
     preserve_texture: str | None = Field(
         default=None,
@@ -444,7 +444,7 @@ class FidelitySpec(BaseModel):
             "Enhance visibility, but same texture/pattern. "
             "Examples: 'honeycomb embossed pattern - sharpen, same design', "
             "'matte frosted finish - don't add gloss', 'brushed metal - same grain direction'"
-        )
+        ),
     )
     preserve_shape: str = Field(
         default="actual product shape (fix any camera distortion)",
@@ -453,7 +453,7 @@ class FidelitySpec(BaseModel):
             "Examples: 'true jar shape - fix wide-angle distortion', "
             "'actual proportions - correct any lens barrel distortion', "
             "'real bottle silhouette - this shape IS the brand'"
-        )
+        ),
     )
     hero_features: str | None = Field(
         default=None,
@@ -463,7 +463,7 @@ class FidelitySpec(BaseModel):
             "Examples: 'honeycomb texture pattern - this IS the brand differentiator', "
             "'wooden dipper and amber honey color - signature look', "
             "'brushed steel finish and minimalist logo - premium identity'"
-        )
+        ),
     )
     fidelity_notes: str | None = Field(
         default=None,
@@ -471,7 +471,7 @@ class FidelitySpec(BaseModel):
             "Additional fidelity requirements or concerns. "
             "Examples: 'customer complained about color drift in past - be extra careful', "
             "'label text is small - must remain legible', 'texture is subtle - preserve without enhancement'"
-        )
+        ),
     )
 
 
@@ -497,7 +497,7 @@ class ExtractionTarget(BaseModel):
             "Examples: [0, 0, 300, 300] for top-left item, "
             "[333, 333, 666, 666] for center item in 3x3 grid. "
             "When provided, model focuses on this region for extraction."
-        )
+        ),
     )
     target_image_label: str | None = Field(
         default=None,
@@ -505,7 +505,7 @@ class ExtractionTarget(BaseModel):
             "The label of the image in the `images` array that contains this target. "
             "Examples: 'source', 'product', 'group_photo'. "
             "Essential for multi-image inputs to know WHICH image to extract from."
-        )
+        ),
     )
 
 
@@ -556,7 +556,7 @@ class ExtractionSpec(BaseModel):
             "For single item extraction: array with 1 element. "
             "For multi-item extraction: array with N elements (one per item). "
             "Example: [{target_bbox: [0,0,300,300], target_image_label: 'source'}]"
-        )
+        ),
     )
 
     isolation: str = Field(
@@ -566,7 +566,7 @@ class ExtractionSpec(BaseModel):
             "Examples: 'complete isolation - remove everything else', "
             "'soft isolation with subtle shadow', 'keep reflection but remove background', "
             "'extract with context preserved'"
-        )
+        ),
     )
     edge_treatment: str = Field(
         default="clean professional",
@@ -575,14 +575,14 @@ class ExtractionSpec(BaseModel):
             "Examples: 'surgical clean edges', 'natural soft edges', "
             "'slight feathering for natural look', 'hard precise cutout', "
             "'preserve hair/fiber detail'"
-        )
+        ),
     )
     custom: str | None = Field(
         default=None,
         description=(
             "Any additional extraction instructions not covered above. "
             "Use for complex multi-product scenarios, special masking needs."
-        )
+        ),
     )
 
 
@@ -598,7 +598,7 @@ class FocusSpec(BaseModel):
             "Where to focus. "
             "Examples: 'product center', 'front label', 'closest edge to camera', "
             "'product logo', 'entire product sharp', 'cap/lid detail'"
-        )
+        ),
     )
     depth_of_field: str = Field(
         default="product sharp background soft",
@@ -607,7 +607,7 @@ class FocusSpec(BaseModel):
             "Examples: 'shallow - product sharp, background creamy bokeh', "
             "'deep - everything sharp', 'medium - product and immediate area sharp', "
             "'very shallow - only label sharp', 'natural falloff front to back'"
-        )
+        ),
     )
     falloff: str | None = Field(
         default=None,
@@ -615,14 +615,14 @@ class FocusSpec(BaseModel):
             "How sharpness falls off. "
             "Examples: 'gradual natural falloff', 'sharp subject soft everything else', "
             "'front edge sharp, back edge soft', 'no falloff - everything tack sharp'"
-        )
+        ),
     )
     custom: str | None = Field(
         default=None,
         description=(
             "Any additional focus instructions not covered above. "
             "Use for creative OOTB ideas, tilt-shift effects, selective focus."
-        )
+        ),
     )
 
 
@@ -657,14 +657,14 @@ class MaterialTreatmentSpec(BaseModel):
             "Specific details to preserve. "
             "Examples: 'label legibility critical', 'embossed logo must be visible', "
             "'color accuracy of product essential', 'texture detail on cap'"
-        )
+        ),
     )
     custom: str | None = Field(
         default=None,
         description=(
             "Any additional material treatment instructions not covered above. "
             "Use for unusual materials, mixed materials, creative interpretations."
-        )
+        ),
     )
 
 
@@ -691,35 +691,27 @@ class CustomSpec(BaseModel):
     """
 
     instruction: str | None = Field(
-        default=None,
-        description="Primary custom instruction - the main creative idea"
+        default=None, description="Primary custom instruction - the main creative idea"
     )
     style_reference: str | None = Field(
-        default=None,
-        description="Reference to a style, photographer, or aesthetic"
+        default=None, description="Reference to a style, photographer, or aesthetic"
     )
     color_palette: str | None = Field(
-        default=None,
-        description="Custom color treatment beyond standard specs"
+        default=None, description="Custom color treatment beyond standard specs"
     )
-    texture_overlay: str | None = Field(
-        default=None,
-        description="Texture or grain effects"
-    )
+    texture_overlay: str | None = Field(default=None, description="Texture or grain effects")
     special_effect: str | None = Field(
-        default=None,
-        description="Special visual effects or treatments"
+        default=None, description="Special visual effects or treatments"
     )
     artistic_intent: str | None = Field(
-        default=None,
-        description="The emotional or conceptual goal"
+        default=None, description="The emotional or conceptual goal"
     )
     extra: dict[str, str] | None = Field(
         default=None,
         description=(
             "Any additional key-value pairs for complete creative freedom. "
             "Use this for anything not covered by other fields."
-        )
+        ),
     )
 
 
@@ -738,7 +730,7 @@ class OutputSpec(BaseModel):
             "Output filename (without extension). RECOMMENDED for predictable paths. "
             "If not specified, UUID is auto-generated. "
             "Examples: 'mug_hero', 'tumbler_v2', 'product_lifestyle'."
-        )
+        ),
     )
 
 
@@ -857,7 +849,7 @@ class ImageStudioInput(BaseModel):
             "REQUIRED: Labeled images (1-15). Each image has a label "
             "you reference in your specs/instructions. "
             "Example: [ImageInput(path='inbox/photo.jpg', label='product')]"
-        )
+        ),
     )
 
     # ==========================================================================
@@ -865,48 +857,35 @@ class ImageStudioInput(BaseModel):
     # ==========================================================================
 
     background: BackgroundSpec | None = Field(
-        default=None,
-        description="Background treatment specification"
+        default=None, description="Background treatment specification"
     )
 
-    lighting: LightingSpec | None = Field(
-        default=None,
-        description="Lighting configuration"
-    )
+    lighting: LightingSpec | None = Field(default=None, description="Lighting configuration")
 
     composition: CompositionSpec | None = Field(
-        default=None,
-        description="Framing and composition settings"
+        default=None, description="Framing and composition settings"
     )
 
     enhancement: EnhancementSpec | None = Field(
-        default=None,
-        description="Image enhancement/retouching settings"
+        default=None, description="Image enhancement/retouching settings"
     )
 
     scene: SceneSpec | None = Field(
-        default=None,
-        description="Lifestyle scene settings (for generate)"
+        default=None, description="Lifestyle scene settings (for generate)"
     )
 
     placement: ProductPlacementSpec | None = Field(
-        default=None,
-        description="Product placement in scene (for generate)"
+        default=None, description="Product placement in scene (for generate)"
     )
 
     extraction: ExtractionSpec | None = Field(
-        default=None,
-        description="Product extraction settings (for multi-product images)"
+        default=None, description="Product extraction settings (for multi-product images)"
     )
 
-    focus: FocusSpec | None = Field(
-        default=None,
-        description="Focus and depth of field settings"
-    )
+    focus: FocusSpec | None = Field(default=None, description="Focus and depth of field settings")
 
     material_treatment: MaterialTreatmentSpec | None = Field(
-        default=None,
-        description="Material-specific rendering instructions"
+        default=None, description="Material-specific rendering instructions"
     )
 
     fidelity: FidelitySpec | None = Field(
@@ -916,12 +895,11 @@ class ImageStudioInput(BaseModel):
             "Use when working with source product images to ensure output "
             "preserves essential features (colors, artwork, text, texture, shape). "
             "Fidelity > Enhancement. Always include when extracting or processing products."
-        )
+        ),
     )
 
     custom_spec: CustomSpec | None = Field(
-        default=None,
-        description="Fully open-ended creative spec for OOTB ideas"
+        default=None, description="Fully open-ended creative spec for OOTB ideas"
     )
 
     # ==========================================================================
@@ -933,7 +911,7 @@ class ImageStudioInput(BaseModel):
         description=(
             "Overall vision, artistic intent, or specific requirements. "
             "Use for notes beyond structured parameters."
-        )
+        ),
     )
 
     # ==========================================================================
@@ -941,6 +919,32 @@ class ImageStudioInput(BaseModel):
     # ==========================================================================
 
     output: OutputSpec = Field(default_factory=OutputSpec)
+
+    # ==========================================================================
+    # Generation Control (for consistency across batch operations)
+    # ==========================================================================
+
+    temperature: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description=(
+            "Controls output randomness. Lower = more consistent. "
+            "Default: 0.7 for catalog work (balanced consistency). "
+            "Use 0.3-0.5 for batch variants requiring high consistency. "
+            "Use 1.0+ for creative exploration."
+        ),
+    )
+
+    seed: int | None = Field(
+        default=None,
+        description=(
+            "Seed for reproducibility (best-effort, not guaranteed). "
+            "Use SAME seed across batch variants for consistency. "
+            "Example: seed=42 for all variants in a product family. "
+            "Combined with low temperature maximizes batch consistency."
+        ),
+    )
 
 
 # =============================================================================
@@ -976,7 +980,7 @@ class OutputVariant(BaseModel):
     description: str | None = Field(default=None)
     storage_path: str | None = Field(
         default=None,
-        description="Storage path (e.g., 'pending/output.png'). Use in view_image, write_data."
+        description="Storage path (e.g., 'pending/output.png'). Use in view_image, write_data.",
     )
 
 
@@ -990,8 +994,7 @@ class ImageStudioOutput(BaseModel):
 
     # For asset creation (suggested data for WriteIntent)
     suggested_asset_data: str | None = Field(
-        default=None,
-        description="JSON string with pre-populated asset record for WriteIntent"
+        default=None, description="JSON string with pre-populated asset record for WriteIntent"
     )
 
     # Warnings, errors, and guidance
@@ -999,8 +1002,7 @@ class ImageStudioOutput(BaseModel):
     error: str | None = None
     error_code: str | None = None
     next_steps: list[str] = Field(
-        default_factory=list,
-        description="Suggested next operations based on results"
+        default_factory=list, description="Suggested next operations based on results"
     )
 
 

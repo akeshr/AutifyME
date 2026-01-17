@@ -144,20 +144,24 @@ class GraderSuiteResult:
 
         # Show trace error prominently if present
         if self.trace_error:
-            lines.extend([
-                "",
-                "### Trace Error",
-                "```",
-                f"{self.trace_error[:200]}{'...' if len(self.trace_error) > 200 else ''}",
-                "```",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "### Trace Error",
+                    "```",
+                    f"{self.trace_error[:200]}{'...' if len(self.trace_error) > 200 else ''}",
+                    "```",
+                ]
+            )
 
-        lines.extend([
-            "",
-            "### Behavioral Checks",
-            "| Grader | Result | Severity | Reason |",
-            "|--------|--------|----------|--------|",
-        ])
+        lines.extend(
+            [
+                "",
+                "### Behavioral Checks",
+                "| Grader | Result | Severity | Reason |",
+                "|--------|--------|----------|--------|",
+            ]
+        )
 
         for r in self.results:
             result_icon = "PASS" if r.passed else "FAIL"
@@ -165,20 +169,24 @@ class GraderSuiteResult:
             lines.append(f"| {r.name} | {result_icon} | {r.severity} | {reason_preview} |")
 
         if self.get_failures():
-            lines.extend([
-                "",
-                "### Failed Graders Detail",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "### Failed Graders Detail",
+                ]
+            )
             for r in self.get_failures():
                 lines.append(f"\n**{r.name}** ({r.severity})")
                 lines.append(f"- Reason: {r.reason}")
                 lines.append(f"- Evidence: {r.evidence}")
 
         if self.warnings:
-            lines.extend([
-                "",
-                "### Warnings",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "### Warnings",
+                ]
+            )
             for warning in self.warnings:
                 lines.append(f"- {warning}")
 
