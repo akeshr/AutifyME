@@ -406,28 +406,82 @@ Diagnose root cause and propose fix.
    - Show diff of proposed changes
    - Explain why this fixes the issue
 
-5. Await approval
+5. [CRITICAL] Check grader coverage (Framework Co-Evolution)
+   - Ask: "Would existing graders catch this issue?"
+   - If NO: propose new grader alongside system fix
+   - See "Framework Co-Evolution" section below
+
+6. Await approval
    - DO NOT implement without explicit approval
 
-6. Implement and validate
-   - Make changes
+7. Implement and validate
+   - Make changes (system + grader if needed)
    - Re-run test scenario
-   - Verify fix worked
+   - Verify fix worked AND grader catches old behavior
 
-7. Store pattern (if fix successful)
+8. Store pattern (if fix successful)
    - store_pattern_fix() with symptoms, fix location, description
    - Builds pattern library for future fixes
 ```
 
+### [CRITICAL] Framework Co-Evolution
+
+**Principle:** Every system fix should be accompanied by a grader improvement if needed.
+
+When you identify a system issue, ALWAYS ask:
+
+```
+1. "Would existing graders have caught this issue?"
+   - Run run_code_graders() on the failing trace
+   - Check if any grader flagged the root cause
+
+2. If NO grader caught it:
+   - Design a new grader that WOULD catch it
+   - Grader should detect the BAD behavior, not just the fix
+   - Add to appropriate registry (PM_GRADERS, SPECIALIST_GRADERS, etc.)
+
+3. Validate the grader:
+   - Run on the FAILING trace -> should FAIL
+   - Run on a PASSING trace -> should PASS
+   - The grader catches the issue we just fixed
+```
+
+**Why this matters:**
+- Fixes without graders = same bug can recur undetected
+- Graders without system fixes = detection without prevention
+- Both together = the issue is prevented AND detectable
+
+**Example from this session:**
+```
+Issue: PM skipped visual_analyst for image-based shortcuts
+System fix: Updated discovery_mindset.protocol with Visual Input Rule
+Grader fix: Added visual_analyst_for_images grader to pm_graders.py
+
+Result on failing trace:
+- Before: PASS (0.91) - graders missed the issue
+- After: PARTIAL (0.75) - visual_analyst_for_images: FAIL (correctly detected)
+```
+
+**Grader Design Checklist:**
+- [ ] Grader detects the BAD pattern (not just absence of good)
+- [ ] Evidence field explains WHY it failed
+- [ ] Severity reflects impact (HIGH for critical issues)
+- [ ] Grader is registered in orchestrator.py
+- [ ] Works on both positive and negative cases
+
 ### Pattern Matching
 
-| Symptom | Pattern | Fix Location |
-|---------|---------|--------------|
-| First call not load_protocol | PROTOCOL_NOT_LOADED | Agent prompt instructions section |
-| Child missing parent's context | CONTEXT_LOSS | PM delegation description |
-| No HITL before persist | HITL_SKIPPED | Specialist interrupt gate |
-| Wrong agent selected | WRONG_ROUTING | PM routing logic |
-| Incomplete research | PREMATURE_TERMINATION | Analyst thoroughness instructions |
+| Symptom | Pattern | Fix Location | Grader |
+|---------|---------|--------------|--------|
+| First call not load_protocol | PROTOCOL_NOT_LOADED | Agent prompt instructions | protocol_load_first |
+| Child missing parent's context | CONTEXT_LOSS | PM delegation description | pm_context_handoff (model) |
+| No HITL before persist | HITL_SKIPPED | Specialist interrupt gate | hitl_triggered |
+| Wrong agent selected | WRONG_ROUTING | PM routing logic | pm_routing_appropriate (model) |
+| Incomplete research | PREMATURE_TERMINATION | Analyst thoroughness instructions | analyst_observation_complete (model) |
+| Image task without visual_analyst | VISUAL_SKIPPED | PM discovery_mindset.protocol | visual_analyst_for_images |
+| Multi-product image as single | MULTI_ITEM_MISSED | creative specialist protocol | (model - view source vs output) |
+| Batch without seed/temperature | BATCH_INCONSISTENT | image_studio.protocol | image_studio_consistency_params |
+| Edge artifacts on transparent | EDGE_ARTIFACT | image_studio.protocol (rendering_notes) | (model - view generated images) |
 
 ### Output Template
 
