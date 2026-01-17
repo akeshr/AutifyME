@@ -163,6 +163,23 @@ Material-specific rendering instructions.
 - Include finish: "glossy PET", "matte HDPE", "brushed aluminum", "frosted glass"
 - If analysis says "PET bottle", use "glossy PET" or "clear PET", not "clear_plastic"
 
+**[CRITICAL] Edge Artifact Prevention (Transparent/Glossy Materials):**
+
+For PET, glass, and glossy plastics, edges naturally show refraction. DO NOT add artificial rim highlights or edge reflections - they appear as shadow-like artifacts.
+
+| Anti-pattern | Correct |
+|--------------|---------|
+| `rendering_notes="Highlight reflections to show form"` | `rendering_notes="Natural edge refraction only. No artificial rim highlights. Clean silhouette."` |
+| No lighting.specials specified | `lighting={"specials": "no rim light - rely on natural edge refraction"}` |
+
+**For transparent materials, ALWAYS include:**
+```python
+material_treatment={
+    "primary_material": "glossy PET",  # or specific material
+    "rendering_notes": "Natural edge refraction only. No artificial rim highlights. Clean silhouette edges."
+}
+```
+
 ### fidelity (CRITICAL for source images)
 FIX photography problems, PRESERVE product identity. **Always include when processing [source]/[product].**
 - `preserve_colors`: True product colors (fix color cast, don't generate)
