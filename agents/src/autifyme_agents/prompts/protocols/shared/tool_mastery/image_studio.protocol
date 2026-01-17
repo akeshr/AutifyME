@@ -545,6 +545,7 @@ Key field: `storage_path` - use this for creating asset records.
 | Missing transparency_spec for dark | Black variant is opaque | See multi_item.protocol |
 | "Caustics/sheen" for "realistic" | Creates artifacts, not realism | See hitl.protocol (creative) |
 | No optical_behavior for transparent | Flat/unrealistic first render | See catalog_visual.protocol |
+| No uniform tint spec | Dark bands at neck/base ("black accents") | Include "uniform tint throughout body" in rendering_notes |
 
 ---
 

@@ -69,8 +69,17 @@ Every call for PET/glass/clear plastic MUST include:
 2. **Optical behavior** - Natural refraction, contents visibility
 3. **Transparency depth** - In fidelity.hero_features
 4. **Soft lighting** - Allows transparency to show naturally
+5. **Uniform tint** - "Maintain consistent [color] tint throughout body - no dark bands at neck or base"
 
 See `image_studio.protocol` for exact parameter syntax.
+
+#### Common Transparent Material Issues
+
+| Issue | Cause | First-Render Prevention |
+|-------|-------|------------------------|
+| Dark bands at neck/base | Gemini exaggerates thickness variations | Include "uniform tint throughout body" in rendering_notes |
+| "Black accents" at top/bottom | Same as above | Include "no dark bands at neck or base" in fidelity |
+| Flat/unrealistic look | Missing optical_behavior | Include optical specs on FIRST call |
 
 #### The Transparent Material Test
 

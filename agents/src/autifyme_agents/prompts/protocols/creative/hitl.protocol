@@ -254,6 +254,44 @@ Proceeding with material-accurate rendering (no caustics, no sheen).
 
 ---
 
+## "BLACK ACCENTS" / "DARK BANDS" FEEDBACK - Uniform Tint Issue
+
+**When user says "black accents", "dark bands", or "dark areas at top/bottom" on transparent materials.**
+
+This is NOT an extraction artifact - it's Gemini exaggerating thickness variations at neck/base of bottles.
+
+### CORRECT Response
+
+```
+[HITL_FEEDBACK] "Why there is black accents in top and bottom"
+
+[HITL RESOLVED]
+
+**User Feedback:** "Why there is black accents in top and bottom"
+
+**Analysis:** Dark bands at neck/base are rendering artifacts from exaggerated thickness. Fix by specifying uniform tint.
+
+**Applied:**
+- Added "Maintain consistent [color] tint throughout body" to rendering_notes
+- Added "No dark bands at neck or base" to fidelity
+
+Proceeding with uniform-tint rendering.
+-> [image_studio with uniform tint specs]
+```
+
+### Key Specs to Add
+
+```python
+material_treatment={
+    "rendering_notes": "Maintain consistent [color] tint throughout body. No dark bands at neck or base."
+},
+fidelity={
+    "fidelity_notes": "Avoid dark accents. Uniform transparency throughout."
+}
+```
+
+---
+
 ## ANTI-PATTERNS
 
 **Wrong:** Responding without HITL marker
