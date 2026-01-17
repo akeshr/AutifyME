@@ -165,6 +165,7 @@ This is doctrine for how PM and Specialists should behave at runtime:
 - **Self-Review:** Critique outputs before returning; iterate when confidence is low
 - **Transparent Communication:** Flag limitations, assumptions, and data gaps clearly
 - **Learning Orientation:** System should improve from past executions
+- **[CRITICAL] OODA Orchestration:** PM follows Observe->Orient->Decide->Act pattern with knowledge checkpoints after each phase. READ analyst outputs, DECIDE next step. Serialize by default; parallelize only when both agents needed regardless of findings.
 
 ---
 

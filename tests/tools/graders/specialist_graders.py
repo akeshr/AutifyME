@@ -12,7 +12,6 @@ Universal graders (applicable to all agent types):
 from ..models import ToolCallSequence
 from .base import GraderCategory, GraderResult
 
-
 # =============================================================================
 # Universal Graders (applicable to all agents)
 # =============================================================================
