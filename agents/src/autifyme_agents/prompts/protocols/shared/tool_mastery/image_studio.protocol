@@ -157,6 +157,12 @@ Material-specific rendering instructions.
 - `rendering_notes`: How to treat the material (label sharpness, specular control, caustics, etc.)
 - `preserve_details`: Critical details to preserve (label legibility, cap details, texture)
 
+**[CRITICAL] Material Accuracy:**
+- Use the EXACT material from visual analysis (e.g., "glossy PET", "matte HDPE", "borosilicate glass")
+- Do NOT generalize to categories ("plastic", "glass", "metal")
+- Include finish: "glossy PET", "matte HDPE", "brushed aluminum", "frosted glass"
+- If analysis says "PET bottle", use "glossy PET" or "clear PET", not "clear_plastic"
+
 ### fidelity (CRITICAL for source images)
 FIX photography problems, PRESERVE product identity. **Always include when processing [source]/[product].**
 - `preserve_colors`: True product colors (fix color cast, don't generate)
