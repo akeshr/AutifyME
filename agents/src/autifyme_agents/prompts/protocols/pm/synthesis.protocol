@@ -205,13 +205,15 @@ Which approach fits your catalog strategy?"
 
 ## CONFLICT RESOLUTION AT SYNTHESIS
 
-**With wave-based execution (see discovery_mindset), most conflicts are prevented.**
+**With OODA-based execution (see discovery_mindset), most conflicts are prevented.**
 
-When PM delegates analysts in waves:
-- Wave 1: visual_analyst produces visual_analysis.md
-- Wave 2: product_analyst ‖ catalog_analyst (PM passes visual findings to both)
+When you orchestrate with OODA checkpoints:
+- OBSERVE: visual_analyst produces visual_analysis.md
+- ORIENT: catalog_analyst checks existing state (you READ and DECIDE)
+- [DECIDE checkpoint: Is product_analyst needed?]
+- ORIENT (conditional): product_analyst if novel category
 
-Both P and C analyze WITH visual context from the start. Cross-domain conflicts are rare.
+Each agent works WITH upstream context. Cross-domain conflicts are rare because you checkpoint between phases.
 
 ### Rare Edge Case: Post-Synthesis Refinement
 

@@ -69,7 +69,7 @@ BEFORE executing after approval -> load execution_flows FIRST
 
 | Protocol | You Get |
 |----------|---------|
-| `discovery_mindset` | Media acquisition flow, intent detection, prerequisite validation |
+| `discovery_mindset` | OODA orchestration, knowledge checkpoints, conditional parallelization, scenario matrix |
 | `synthesis` | Synthesis dimensions, conflict detection, presentation templates |
 | `execution_flows` | Catalog flows A-E, ID tracking, delegation templates |
 | `multi_image` | Components/variants/bulk workflows, composition patterns |
@@ -242,13 +242,13 @@ Product data expert. ANY catalog record operation.
 
 #### Agent Dependencies (When Needed)
 
-| Agent | REQUIRES | OUTPUTS |
-|-------|----------|---------|
-| visual_analyst | Image path | visual_analysis.md |
-| product_analyst | visual_analysis.md (if image) | product_research.md |
-| catalog_analyst | visual_analysis.md (+ product_research.md if exists) | catalog_analysis.md |
-| creative_specialist | Image + analysis files | asset_id |
-| catalog_specialist | Analysis files + asset_id (if linking) | product_id + junctions |
+| Agent | REQUIRES | OPTIONAL | OUTPUTS |
+|-------|----------|----------|---------|
+| visual_analyst | Image path | - | visual_analysis.md |
+| product_analyst | Product name/description | visual_analysis.md | product_research.md |
+| catalog_analyst | Product name/family context | visual_analysis.md | catalog_analysis.md |
+| creative_specialist | Image + material context | analysis files | asset_id |
+| catalog_specialist | Product/family data | asset_id (for linking) | product_id + junctions |
 
 #### The Reasoning Pattern
 
@@ -262,9 +262,10 @@ Product data expert. ANY catalog record operation.
 ```
 
 **The discovery_mindset protocol provides:**
-- Analysis chains (sequential vs parallel patterns)
-- Quick decision examples for common scenarios
-- Multi-image relationship detection
+- OODA orchestration (OBSERVE -> ORIENT -> DECIDE -> ACT)
+- Knowledge checkpoints after each phase
+- Conditional parallelization rules
+- Scenario matrix for common workflows
 - Verification pivot patterns
 
 #### When Verification Fails (Pivot Points)
