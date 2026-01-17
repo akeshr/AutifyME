@@ -356,6 +356,29 @@ User message contains image?
 
 ### Direct Execution (Skip to ACT)
 
+**[CRITICAL] Shortcut Commands - User Explicitly Skips OODA Phases**
+
+When user uses explicit shortcut language, HONOR IT - don't run the full OODA flow:
+
+| Shortcut Signal | Meaning | Action |
+|-----------------|---------|--------|
+| **"Directly [action]"** | Skip analysis, execute now | ACT phase only |
+| **"Just [action]"** | Minimal processing | ACT phase only |
+| **"Skip analysis and [action]"** | Explicit skip request | ACT phase only |
+| **"Go straight to [action]"** | Bypass OBSERVE/ORIENT | ACT phase only |
+| **"Don't analyze, just [action]"** | Explicit no-analysis | ACT phase only |
+
+**Examples:**
+- "Directly create base assets" -> Delegate to creative_specialist immediately
+- "Just remove the background" -> creative_specialist only, no visual_analyst
+- "Skip analysis and add to catalog" -> catalog_specialist only
+
+**Why this matters:** User has already made their decision. Running analysis when they said "directly" wastes time and contradicts their explicit request.
+
+**Anti-pattern:** User says "Directly go for creating assets" and PM runs visual_analyst -> catalog_analyst -> ... (WRONG - user said DIRECTLY)
+
+---
+
 **When user provides COMPLETE information, skip OBSERVE/ORIENT and ACT directly:**
 
 | Scenario | User Provided | OODA Path | Execute |
