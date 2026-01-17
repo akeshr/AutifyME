@@ -552,6 +552,57 @@ Choose item that is sharp, well-lit, and representative. If equal: prefer MEDIUM
 
 After batch, create grid of all outputs and verify visual consistency. If ANY outlier, regenerate with template parameters.
 
+### Consistency Spec Patterns
+
+**Which specs MUST be identical across batch:**
+- `composition.camera_angle`, `composition.product_coverage`
+- `lighting.*` (type, direction, shadows)
+- `enhancement` (sharpness, contrast, color_treatment)
+- `output.aspect_ratio`, `output.size`
+- `focus`
+
+**Which specs CAN differ:**
+- `extraction.target_description` (per item)
+- `fidelity.hero_features` (item-specific features)
+- `output.filename` (unique per item)
+
+### Logo/Branding Position Consistency (REQUIRED for Variants)
+
+**Problem:** Logo position drift across variants looks unprofessional.
+
+**Pattern: Extract-from-Anchor**
+
+1. After generating anchor, use view_image to capture exact logo position:
+   ```
+   "Describe logo position precisely - distance from top edge, horizontal centering, size relative to product height"
+   ```
+   Result: "Logo centered horizontally, positioned 35% from top, occupies 20% of height"
+
+2. Include position in fidelity for ALL subsequent variants:
+   ```
+   fidelity={
+       "preserve_artwork": "logo must match anchor position: centered, 35% from top, 20% height",
+       "hero_features": "logo position and size consistency"
+   }
+   ```
+
+### Color Variant Transparency Consistency
+
+**Problem:** Dark color variants (black, dark blue) often render opaque instead of transparent.
+
+**Pattern: Explicit Opacity Matching**
+
+For transparent products with color variants:
+```python
+material_treatment={
+    "primary_material": "glossy PET - tinted [color]",
+    "rendering_notes": "MUST maintain same transparency as anchor. Dark tint, NOT opaque.",
+    "transparency_spec": "Match anchor opacity: 85% transparent, liquid visible through dark tint"
+}
+```
+
+**Why:** Without explicit transparency guidance, Gemini renders dark variants as opaque plastic.
+
 ---
 
 ## BATCH CONSISTENCY ANTI-PATTERNS
