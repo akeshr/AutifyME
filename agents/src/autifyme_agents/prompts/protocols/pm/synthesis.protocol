@@ -171,11 +171,41 @@ Use this pattern when presenting to user after analysis phase:
 [If conflict exists:]
 **Note:** [Explain the conflict and options]
 
+[If OODA skipped unnecessary work:]
+**Analysis:** [Brief note on what was sufficient, e.g., "Catalog had complete data for this product type."]
+
 ---
 **What would you like to do next?**
 ```
 
 **CRITICAL:** Open-ended question. User decides WHAT and in WHAT ORDER. Do NOT present numbered options - they constrain the user.
+
+---
+
+## COMMUNICATING OODA DECISIONS (Transparency)
+
+When you skip work based on OODA checkpoints, be transparent:
+
+| What You Skipped | How to Communicate |
+|------------------|-------------------|
+| product_analyst (catalog had data) | "Our catalog has complete data for this category." |
+| product_analyst (existing match) | "This matches an existing product - no external research needed." |
+| Full analysis (user gave complete info) | "You provided all the details - proceeding directly." |
+
+**Example (skipped P):**
+```
+**Product:** Rose Gold Glass Bottle 500ml
+
+**Key Findings:**
+- Premium finish, matches Glass Premium family
+- Similar products priced Rs 150-200
+
+**Analysis:** Catalog has complete context for glass bottles - no external research needed.
+
+What would you like to do next?
+```
+
+**Why communicate:** User should understand PM's reasoning, not just results. This builds trust and allows correction if PM's DECIDE was wrong.
 
 ---
 

@@ -415,18 +415,28 @@ OODA Flow:
 Result: V -> C -> [DECIDE: need P] -> P -> Gate
 ```
 
-### Image + "research this iPhone 15" (Identity KNOWN + explicit request)
+### Image + "research this iPhone 15" (Identity KNOWN)
 ```
 User: [image] + "research this iPhone 15"
-User explicitly wants research AND catalog check.
-Both needed REGARDLESS of findings -> parallel OK.
+Identity KNOWN, but data completeness unknown.
 
-1. OBSERVE: visual_analyst (validates condition)
-2. ORIENT: product_analyst || catalog_analyst (both explicitly requested)
-   -> parallel because user wants BOTH regardless
+OODA Flow:
+1. OBSERVE: visual_analyst (validate condition, features)
+   -> "iPhone 15 Pro, good condition, 256GB"
 
-Result: V -> (P || C) -> Gate
+2. ORIENT: catalog_analyst (what do we have on this?)
+   -> READ catalog_analysis.md
+   -> CHECKPOINT: Complete data or gaps?
+
+3. DECIDE: Based on catalog findings
+   - Catalog has HSN, pricing, specs? -> Skip P, go to Gate
+   - Missing compliance/market data? -> Queue P
+
+4. Gate: Present with whatever data collected
+Result: V -> C -> [DECIDE: need P?] -> maybe P -> Gate
 ```
+
+**Key:** "Research X" means "ensure complete data" - not "ignore existing data."
 
 ### Pure image processing
 ```

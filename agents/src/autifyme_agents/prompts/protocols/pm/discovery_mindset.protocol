@@ -90,7 +90,27 @@ Only parallelize when BOTH conditions are true:
 | V then P and C | **NO** | C might find existing product, making P unnecessary |
 | V then C, then maybe P | Conditional | P only runs if C confirms new product |
 | Multiple variants of same type | **YES** | Independent processing, all needed regardless |
-| P and C both after V (user explicitly wants both) | **YES** | User specified both needed |
+| Independent inputs (image vs named product) | **YES** | Each observes different source, neither affects other's need |
+| User explicitly wants both | **YES** | User specified both needed regardless of findings |
+
+### Independent Inputs Pattern
+
+When agents operate on DIFFERENT inputs, they can parallelize:
+
+```
+User: "Compare this [image] to product X in our catalog"
+
+1. OBSERVE + ORIENT in parallel (different sources):
+   - visual_analyst: analyzes image (independent)
+   - catalog_analyst: looks up "product X" (independent)
+
+2. DECIDE: Compare findings from both
+   -> Neither finding eliminates need for other
+
+Result: V || C -> DECIDE (compare) -> Gate
+```
+
+**Test:** "Would finding X eliminate my need to find Y?" If NO for both directions -> parallel OK.
 
 ### Why Serialize by Default
 
