@@ -156,7 +156,60 @@ Why? You need to SEE what the input is before reasoning about it.
 | [image] + "process this" | YES | Pure OBSERVE -> ACT |
 | [image] + "compare to existing" | MAYBE | ORIENT first to know what to compare |
 
+### OBSERVE vs ORIENT Decision Tree
+
+```
+User message contains image?
+├── YES: Does user reference a KNOWN entity (product ID, SKU, family name)?
+│   ├── YES: ORIENT first (verify entity exists), then OBSERVE
+│   │   Examples: "update product X", "add to family Y", "is this SKU-123"
+│   └── NO: OBSERVE first (see what it is)
+│       Examples: "add this", "what is this", "process this"
+└── NO (text only): Is this a query or an action?
+    ├── QUERY: ORIENT only (catalog_analyst or product_analyst)
+    │   Examples: "how many in family X", "market price for jars"
+    └── ACTION: ORIENT -> ACT
+        Examples: "update price to X", "create graphic for Y"
+```
+
 **Default: Visual first (OBSERVE). Override when ORIENT must precede OBSERVE.**
+
+---
+
+## INTENT PATTERN DETECTION
+
+**Detect user intent to determine parallelization:**
+
+| Intent Signal | Primary Domain | Example | OODA Pattern |
+|---------------|----------------|---------|--------------|
+| "add", "catalog", "create entry" | Catalog (C) | "add this to catalog" | V -> C -> [P?] |
+| "research", "market", "competitors" | Product (P) | "research market price" | V -> P |
+| "X AND Y", "both", "also" | Both required | "add AND research market" | V -> (C ‖ P) |
+| "process", "edit", "background" | Creative only | "remove background" | Creative |
+| "update", "change", "modify" | Catalog (C) | "update price to X" | C -> CS |
+
+### Compound Directive Detection
+
+**Single directive** = OODA decides what's needed:
+- "add this" -> V -> C -> [DECIDE if P needed]
+- "research this" -> V -> C -> [DECIDE if complete]
+
+**Compound directive** = User wants both regardless:
+- "add this AND research market prices" -> V -> (C ‖ P)
+- "check catalog AND get competitor data" -> C ‖ P
+
+**Detection signals:**
+- Explicit "AND", "also", "as well as"
+- Two distinct domains mentioned: "catalog" + "market"
+- Action + research: "add" + "research"
+
+### Ambiguous Intent Handling
+
+| User Says | Ambiguity | Resolution |
+|-----------|-----------|------------|
+| "research this" | Catalog data or market data? | OODA: V -> C -> [DECIDE based on catalog completeness] |
+| "check prices" | Our prices or market prices? | Ask user: "Our catalog prices or competitor prices?" |
+| "add with details" | Catalog details or market details? | Default to catalog; P if C reports gaps |
 
 ---
 
@@ -257,6 +310,27 @@ Why? You need to SEE what the input is before reasoning about it.
    - **Familiar:** Glass jar -> catalog knows category -> proceed without P
    - **Novel:** Smart Bottle (glass + electronics) -> catalog unsure -> P required
 4. ACT only on what's needed
+
+### Novel vs. Familiar Classification (CRITICAL)
+
+**Familiar Category** (skip P):
+- Catalog has existing family for this product type
+- Similar products exist with HSN/pricing data
+- Single-material, standard form factor
+- catalog_analyst returns high confidence match
+
+**Novel Category** (require P):
+- No matching family exists in catalog
+- Multi-material or hybrid (glass + electronics)
+- Requires regulatory research (BIS, FSSAI, new HSN)
+- catalog_analyst returns "unknown category" or low confidence
+
+**Ambiguous/Hybrid** (when in doubt, run P):
+- "Glass jar with smart lid" - familiar base, novel component
+- First product in a category we've seen but not cataloged
+- Any compliance uncertainty
+
+**[CRITICAL] SAFEGUARD:** When classification is unclear, run P. Better to have extra data than compliance issues.
 
 **Examples:**
 
