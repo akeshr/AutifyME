@@ -28,6 +28,7 @@ from .specialist_graders import (
     analyst_protocol_first,
     error_recovery_attempted,
     hitl_triggered,
+    image_studio_consistency_params,
     image_studio_core_specs_included,
     image_studio_fidelity_included,
     image_studio_output_verified,
@@ -62,6 +63,7 @@ CREATIVE_SPECIALIST_GRADERS: list[tuple[str, GraderFn, dict]] = [
     ("image_studio_fidelity_included", image_studio_fidelity_included, {"agent": "creative_specialist"}),
     ("image_studio_core_specs_included", image_studio_core_specs_included, {"agent": "creative_specialist"}),
     ("image_studio_output_verified", image_studio_output_verified, {"agent": "creative_specialist"}),
+    ("image_studio_consistency_params", image_studio_consistency_params, {"agent": "creative_specialist"}),
 ]
 
 # Registry of analyst graders - these run against detected analysts
