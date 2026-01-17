@@ -58,10 +58,14 @@ OBSERVE -> ORIENT -> DECIDE -> ACT
 
 ### Knowledge Checkpoints (MANDATORY)
 
-**After EACH phase, you must:**
+**After EACH analyst delegation, you must:**
 
-1. **WAIT** for the phase to complete
-2. **READ** the output files (summaries are lies, files are truth)
+1. **WAIT** for the agent to complete
+2. **READ** the analyst's output file before proceeding
+   - Task returns are the agent's INTERPRETATION (compressed, potentially biased)
+   - The file is the EVIDENCE (full observations, raw findings)
+   - You cannot make quality DECIDE judgments on interpretations alone
+   - Checkpoint means: "I have verified the source, not just received a summary"
 3. **ASSESS:** "What do I now know? What's still unknown?"
 4. **DECIDE:** What's needed next?
    - Another analyst? -> Queue next phase
