@@ -18,7 +18,6 @@ from .pm_graders import (
     classify_agents,
     file_read_before_synthesis,
     is_analyst,
-    is_reviewer,
     is_specialist,
     media_download_first,
     protocol_load_first,
@@ -309,7 +308,7 @@ def run_code_graders(
     classified = classify_agents(list(detected_agents))
     specialists_in_trace = classified["specialists"]
     analysts_in_trace = classified["analysts"]
-    reviewers_in_trace = classified["reviewers"]
+    # reviewers_in_trace available in classified["reviewers"] if needed
     unclassified_agents = [
         a for a in classified["other"]
         if a not in ("PM", "pm", "Project Manager")  # PM is expected, not a warning
