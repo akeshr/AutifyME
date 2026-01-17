@@ -145,11 +145,13 @@ def create_creative_specialist(
         "- No catalog CRUD; delegate to catalog_specialist for product records"
     )
     # Use provided model or default to Gemini 3 Flash (multimodal)
-    # Medium thinking: creative tasks are structured (HITL safety net), don't need deep reasoning
+    # Temperature 0.7: Consistent spec decisions while allowing creative flexibility
+    # High thinking: creative quality + speed (HITL provides safety)
     specialist_model = model if model is not None else get_llm(
         provider="google",
         model=CREATIVE_SPECIALIST_MODEL,
-        thinking_level="high",  # High: creative quality + speed (HITL provides safety)
+        temperature=0.7,  # Consistent decisions about which specs to use
+        thinking_level="high",
     )
 
     middleware = [
