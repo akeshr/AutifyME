@@ -163,6 +163,35 @@ Material-specific rendering instructions.
 - Include finish: "glossy PET", "matte HDPE", "brushed aluminum", "frosted glass"
 - If analysis says "PET bottle", use "glossy PET" or "clear PET", not "clear_plastic"
 
+**[CRITICAL] Transparent Material Specs (Technical Reference):**
+
+For WHY these specs matter, see `catalog_visual.protocol` TRANSPARENT MATERIAL DOCTRINE.
+
+**Required Specs for PET/Glass/Clear Plastic:**
+
+```python
+# REQUIRED: Full optical behavior specs
+material_treatment={
+    "primary_material": "glossy PET",  # Exact material from analysis
+    "rendering_notes": "Natural transparency with accurate refraction. Liquid/contents visible through body.",
+    "optical_behavior": "Real PET optical properties - slight refraction at edges, contents visible, natural material depth"
+},
+fidelity={
+    "preserve_colors": "exact liquid color visible through transparent body",
+    "hero_features": "transparency depth, natural refraction, material authenticity"
+},
+lighting={
+    "quality": "soft diffused - allows natural transparency to show",
+    "specials": "no rim light - rely on natural edge refraction"
+}
+```
+
+**Transparent Material Checklist:**
+- [ ] `optical_behavior` describes natural refraction
+- [ ] `rendering_notes` mentions contents/liquid visibility
+- [ ] `fidelity.hero_features` includes "transparency depth"
+- [ ] Lighting allows transparency to show (soft, not harsh)
+
 **[CRITICAL] Edge Artifact Prevention (Transparent/Glossy Materials):**
 
 For PET, glass, and glossy plastics, edges naturally show refraction. DO NOT add artificial rim highlights or edge reflections - they appear as shadow-like artifacts.
@@ -190,6 +219,17 @@ Before EVERY image_studio call with transparent/glossy material, verify:
 - [ ] No "edge glow" or "edge highlight" in any spec value
 
 **Why this matters:** Gemini interprets "highlight reflections" as adding white edge lines, which appear as shadow artifacts on transparent bottles.
+
+**Terms to AVOID for Transparent Materials:**
+
+| AVOID | Causes |
+|-------|--------|
+| `internal caustics` | Bright spots, edge bleeding |
+| `glossy surface sheen` | Artificial rim highlights |
+| `detail_enhancement` | Over-sharpened edges = artifacts |
+| `enhanced lighting` | Specular artifacts |
+
+For handling "make it more realistic" feedback, see `hitl.protocol` (domain=creative).
 
 ### fidelity (CRITICAL for source images)
 FIX photography problems, PRESERVE product identity. **Always include when processing [source]/[product].**
@@ -381,55 +421,7 @@ image_studio(
 )
 ```
 
-### Logo/Branding Position Consistency (REQUIRED for Variants)
-
-**Problem:** Logo position drift across color variants looks unprofessional.
-
-**Pattern: Anchor-Extract-Apply**
-
-1. **Extract position from anchor:**
-   After generating anchor image, use view_image to capture exact logo position:
-   ```
-   view_image: "Describe logo position precisely - distance from top edge, horizontal centering, size relative to bottle height"
-   ```
-   Result: "Logo centered horizontally, positioned 35% from top, occupies 20% of bottle height"
-
-2. **Apply position spec to all variants:**
-   ```python
-   fidelity={
-       "preserve_artwork": "logo must match anchor position: centered, 35% from top, 20% height",
-       "hero_features": "logo position and size consistency"
-   }
-   ```
-
-**Anti-pattern:** Generating variants without explicit position reference from anchor - Gemini will place logos inconsistently.
-
-### Color Variant Transparency Consistency
-
-**Problem:** Color variants (especially dark colors) may render with different opacity than anchor.
-
-**Pattern: Explicit Opacity Matching**
-
-For transparent products with color variants:
-
-```python
-material_treatment={
-    "primary_material": "glossy PET",
-    "rendering_notes": "Natural edge refraction only. No artificial rim highlights.",
-    "transparency_spec": "Match anchor opacity: 85% transparent, liquid visible through body"
-}
-```
-
-**[CRITICAL] For dark-colored variants (black, dark blue, etc.):**
-```python
-material_treatment={
-    "primary_material": "glossy PET - tinted [color]",
-    "rendering_notes": "MUST maintain same transparency as anchor. Dark tint, NOT opaque.",
-    "transparency_spec": "85% transparency - liquid visible through dark tint like sunglasses"
-}
-```
-
-**Why:** Without explicit transparency guidance, Gemini often renders dark variants as opaque plastic.
+**For batch consistency patterns (logo position, color variant transparency), see `multi_item.protocol` (domain=creative).**
 
 ---
 
@@ -549,8 +541,11 @@ Key field: `storage_path` - use this for creating asset records.
 | Single extraction for N items | 1 asset for 9 products | Extract each item separately |
 | Minimal specs for hero shots | Garbage quality | Use ALL specs (see Pattern 5) |
 | "Highlight reflections" in notes | Edge shadow artifacts | Use "natural refraction only" |
-| No logo position from anchor | Logo drift across variants | Extract position, include in fidelity |
-| Missing transparency_spec for dark | Black variant is opaque | Explicit "match anchor opacity" |
+| No logo position from anchor | Logo drift across variants | See multi_item.protocol |
+| Missing transparency_spec for dark | Black variant is opaque | See multi_item.protocol |
+| "Caustics/sheen" for "realistic" | Creates artifacts, not realism | See hitl.protocol (creative) |
+| No optical_behavior for transparent | Flat/unrealistic first render | See catalog_visual.protocol |
+| No uniform tint spec | Dark bands at neck/base ("black accents") | Include "uniform tint throughout body" in rendering_notes |
 
 ---
 

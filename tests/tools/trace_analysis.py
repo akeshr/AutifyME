@@ -23,6 +23,7 @@ from .models import (
     FileIOTrace,
     FileOperation,
     HITLDecision,
+    ImagePair,
     LLMCallNode,
     LLMTraceTree,
     MediaPath,
@@ -41,6 +42,7 @@ from .models import (
     ToolCall,
     ToolCallSequence,
     TraceBaseline,
+    TraceImage,
     TraceOverview,
     WorkflowStory,
     WorkflowTrace,
@@ -2340,6 +2342,427 @@ def get_media_paths_from_trace(trace_id: str) -> list[MediaPath]:
             )
 
     return media_paths
+
+
+# ============================================================================
+# Trace Image Extraction (Unified Source + Generated)
+# ============================================================================
+
+TOOL_IMAGE_STUDIO = "image_studio"
+
+
+def get_trace_images(trace_id: str) -> list["TraceImage"]:
+    """Extract ALL images from a trace - sources and generated.
+
+    Unified extraction from:
+    - download_whatsapp_media outputs (user uploads)
+    - image_studio inputs (source images with labels)
+    - image_studio outputs (generated images)
+
+    Returns images in chronological order with roles.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        List of TraceImage with storage paths, roles, and context
+
+    Example:
+        >>> images = get_trace_images(trace_id)
+        >>> sources = [i for i in images if i.role == "source"]
+        >>> generated = [i for i in images if i.role == "generated"]
+        >>> print(f"Sources: {len(sources)}, Generated: {len(generated)}")
+    """
+    from tests.tools.models import TraceImage
+
+    client = _get_client()
+    runs = list(client.list_runs(trace_id=trace_id, run_type="tool"))
+
+    # Sort by start time for chronological order
+    runs.sort(key=lambda r: r.start_time or datetime.min)
+
+    images: list[TraceImage] = []
+    sequence = 0
+
+    for run in runs:
+        # Extract from download_whatsapp_media (user uploads)
+        if run.name == TOOL_DOWNLOAD_MEDIA:
+            storage_path = _extract_storage_path_from_output(run.outputs)
+            if storage_path:
+                images.append(
+                    TraceImage(
+                        storage_path=storage_path,
+                        role="source",
+                        tool_name=run.name,
+                        run_id=str(run.id),
+                        agent=_get_parent_agent_name(client, run),
+                        label="user_upload",
+                        sequence=sequence,
+                    )
+                )
+                sequence += 1
+
+        # Extract from image_studio (inputs and outputs)
+        elif run.name == TOOL_IMAGE_STUDIO:
+            # Extract input images (sources, style refs, etc.)
+            input_images = _extract_image_studio_inputs(run.inputs)
+            for img_input in input_images:
+                images.append(
+                    TraceImage(
+                        storage_path=img_input["path"],
+                        role=_label_to_role(img_input.get("label", "source")),
+                        tool_name=run.name,
+                        run_id=str(run.id),
+                        agent=_get_parent_agent_name(client, run),
+                        label=img_input.get("label"),
+                        sequence=sequence,
+                    )
+                )
+                sequence += 1
+
+            # Extract output image (generated)
+            output_image = _extract_image_studio_output(run.outputs)
+            if output_image:
+                images.append(
+                    TraceImage(
+                        storage_path=output_image["storage_path"],
+                        role="generated",
+                        tool_name=run.name,
+                        run_id=str(run.id),
+                        agent=_get_parent_agent_name(client, run),
+                        label="generated",
+                        sequence=sequence,
+                        metadata=output_image.get("metadata"),
+                    )
+                )
+                sequence += 1
+
+    return images
+
+
+def get_image_pairs(trace_id: str) -> list["ImagePair"]:
+    """Get source-to-generated image pairs from a trace.
+
+    Groups each image_studio call's inputs and outputs together,
+    making it easy to compare what went in vs what came out.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        List of ImagePair with source, generated, and specs
+
+    Example:
+        >>> pairs = get_image_pairs(trace_id)
+        >>> for p in pairs:
+        ...     print(f"Source: {p.source.storage_path if p.source else 'None'}")
+        ...     print(f"Generated: {p.generated.storage_path if p.generated else 'FAILED'}")
+        ...     if p.specs.get("fidelity"):
+        ...         print(f"Fidelity: {p.specs['fidelity']}")
+    """
+    from tests.tools.models import ImagePair, TraceImage
+
+    client = _get_client()
+    runs = list(client.list_runs(trace_id=trace_id, run_type="tool"))
+
+    # Filter to image_studio runs only
+    studio_runs = [r for r in runs if r.name == TOOL_IMAGE_STUDIO]
+    studio_runs.sort(key=lambda r: r.start_time or datetime.min)
+
+    pairs: list[ImagePair] = []
+
+    for run in studio_runs:
+        # Extract input images
+        input_images = _extract_image_studio_inputs(run.inputs)
+        source_img = None
+        style_ref_img = None
+
+        for img_input in input_images:
+            label = img_input.get("label", "source")
+            trace_img = TraceImage(
+                storage_path=img_input["path"],
+                role=_label_to_role(label),
+                tool_name=run.name,
+                run_id=str(run.id),
+                agent=_get_parent_agent_name(client, run),
+                label=label,
+            )
+            if label in ("source", "product"):
+                source_img = trace_img
+            elif label in ("style_ref", "mood_ref"):
+                style_ref_img = trace_img
+
+        # Extract output
+        output_image = _extract_image_studio_output(run.outputs)
+        generated_img = None
+        success = True
+        error = None
+
+        if output_image:
+            generated_img = TraceImage(
+                storage_path=output_image["storage_path"],
+                role="generated",
+                tool_name=run.name,
+                run_id=str(run.id),
+                agent=_get_parent_agent_name(client, run),
+                label="generated",
+                metadata=output_image.get("metadata"),
+            )
+        else:
+            success = False
+            error = _extract_error_from_output(run.outputs)
+
+        # Extract specs
+        specs = _extract_image_studio_specs(run.inputs)
+
+        pairs.append(
+            ImagePair(
+                source=source_img,
+                style_ref=style_ref_img,
+                generated=generated_img,
+                specs=specs,
+                run_id=str(run.id),
+                success=success,
+                error=error,
+            )
+        )
+
+    return pairs
+
+
+def view_trace_images(trace_id: str) -> str:
+    """Quick summary of all images in a trace.
+
+    Prints a formatted summary and returns storage paths for viewing.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        Formatted string summary of images
+
+    Example:
+        >>> print(view_trace_images(trace_id))
+        Images in trace:
+        [0] SOURCE: inbox/20260115_xxx.jpg (download_whatsapp_media)
+        [1] GENERATED: pending/20260115_xxx.png (image_studio)
+    """
+    images = get_trace_images(trace_id)
+
+    if not images:
+        return "No images found in trace."
+
+    lines = ["Images in trace:", ""]
+    for img in images:
+        role_display = img.role.upper()
+        lines.append(f"[{img.sequence}] {role_display}: {img.storage_path}")
+        lines.append(f"    Tool: {img.tool_name}, Agent: {img.agent or 'unknown'}")
+        if img.label and img.label != img.role:
+            lines.append(f"    Label: {img.label}")
+        lines.append("")
+
+    # Add quick reference
+    sources = [i for i in images if i.role == "source"]
+    generated = [i for i in images if i.role == "generated"]
+    lines.append(f"Summary: {len(sources)} source(s), {len(generated)} generated")
+
+    return "\n".join(lines)
+
+
+# Helper functions for image extraction
+
+
+def _label_to_role(label: str) -> str:
+    """Convert image_studio label to standard role."""
+    label_lower = label.lower()
+    if label_lower in ("source", "product"):
+        return "source"
+    elif label_lower in ("style_ref", "mood_ref"):
+        return "style_ref"
+    elif label_lower == "background":
+        return "background"
+    elif label_lower in ("variant", "product_2"):
+        return "variant"
+    return label_lower
+
+
+def _extract_storage_path_from_output(outputs: dict | None) -> str | None:
+    """Extract storage_path from tool output."""
+    if not outputs:
+        return None
+
+    output = outputs
+    # Handle nested structure: {'output': {'content': [{'type': 'text', 'text': '...'}]}}
+    if isinstance(output, dict):
+        inner = output.get("output") or output.get("result") or output
+        if isinstance(inner, dict) and "content" in inner:
+            for item in inner.get("content", []):
+                if isinstance(item, dict) and item.get("type") == "text":
+                    output = item.get("text", "")
+                    break
+            else:
+                output = str(inner)
+        elif isinstance(inner, str):
+            output = inner
+        else:
+            output = str(inner)
+
+    if not isinstance(output, str):
+        output = str(output)
+
+    # Look for "storage_path: xxx" pattern
+    path_match = re.search(r"storage_path:\s*(.+?)(?:\n|$)", output)
+    if path_match:
+        return path_match.group(1).strip()
+    return None
+
+
+def _extract_image_studio_inputs(inputs: dict | None) -> list[dict]:
+    """Extract image inputs from image_studio tool call."""
+    if not inputs:
+        return []
+
+    # Handle nested input structure
+    input_val = inputs.get("input", inputs)
+    parsed = _safe_parse_dict(input_val)
+    if not parsed:
+        return []
+
+    images = parsed.get("images", [])
+    if not images:
+        return []
+
+    result = []
+    for img in images:
+        if isinstance(img, dict) and "path" in img:
+            result.append({
+                "path": img["path"],
+                "label": img.get("label", "source"),
+            })
+    return result
+
+
+def _extract_image_studio_output(outputs: dict | None) -> dict | None:
+    """Extract generated image from image_studio output.
+
+    Handles multiple output formats:
+    1. Direct: outputs = {"success": true, "outputs": [...], ...}
+    2. Nested: outputs = {"output": {"success": true, ...}}
+    3. LangChain: outputs = {"output": {"content": [{"type": "text", "text": "...JSON..."}]}}
+    """
+    import json
+
+    if not outputs:
+        return None
+
+    # Handle nested output structure
+    output = outputs.get("output", outputs)
+
+    # Handle LangChain message format: {"content": [{"type": "text", "text": "..."}]}
+    if isinstance(output, dict) and "content" in output:
+        for item in output.get("content", []):
+            if isinstance(item, dict) and item.get("type") == "text":
+                text = item.get("text", "")
+                # Extract JSON from text (may have prefix like "Image generated successfully.")
+                json_start = text.find("{")
+                if json_start >= 0:
+                    try:
+                        output = json.loads(text[json_start:])
+                        break
+                    except json.JSONDecodeError:
+                        pass
+
+    if isinstance(output, str):
+        output = _safe_parse_dict(output)
+
+    if not isinstance(output, dict):
+        return None
+
+    # Check for success
+    if not output.get("success", False):
+        return None
+
+    # Try direct storage_path first (simplified output format)
+    if "storage_path" in output:
+        return {
+            "storage_path": output["storage_path"],
+            "metadata": output.get("metadata"),
+        }
+
+    # Extract from outputs array (structured format)
+    output_variants = output.get("outputs", [])
+    if not output_variants:
+        return None
+
+    first_variant = output_variants[0]
+    if not isinstance(first_variant, dict):
+        return None
+
+    storage_path = first_variant.get("storage_path")
+    if not storage_path:
+        # Fallback to path
+        storage_path = first_variant.get("path")
+
+    if not storage_path:
+        return None
+
+    return {
+        "storage_path": storage_path,
+        "metadata": first_variant.get("metadata"),
+    }
+
+
+def _extract_image_studio_specs(inputs: dict | None) -> dict:
+    """Extract specs from image_studio input (fidelity, material_treatment, etc.)."""
+    if not inputs:
+        return {}
+
+    input_val = inputs.get("input", inputs)
+    parsed = _safe_parse_dict(input_val)
+    if not parsed:
+        return {}
+
+    # Extract relevant spec fields
+    spec_keys = [
+        "fidelity", "material_treatment", "extraction", "background",
+        "lighting", "composition", "enhancement", "focus", "scene",
+        "placement", "custom_spec", "creative_direction", "output",
+    ]
+
+    specs = {}
+    for key in spec_keys:
+        if key in parsed and parsed[key]:
+            specs[key] = parsed[key]
+
+    return specs
+
+
+def _extract_error_from_output(outputs: dict | None) -> str | None:
+    """Extract error message from failed image_studio output."""
+    if not outputs:
+        return "No output"
+
+    output = outputs.get("output", outputs)
+    if isinstance(output, str):
+        output = _safe_parse_dict(output) or {}
+
+    if isinstance(output, dict):
+        return output.get("error")
+    return None
+
+
+def _get_parent_agent_name(client: Any, run: Any) -> str | None:
+    """Get the agent name that made this tool call."""
+    if not run.parent_run_id:
+        return None
+
+    try:
+        parent = client.read_run(run.parent_run_id)
+        if parent and parent.name:
+            return parent.name
+    except Exception:
+        pass
+    return None
 
 
 # ============================================================================

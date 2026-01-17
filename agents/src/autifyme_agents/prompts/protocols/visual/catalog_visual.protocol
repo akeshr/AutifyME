@@ -41,7 +41,53 @@ Light behaves differently on different materials. Honor the physics:
 
 Don't memorize lighting setups. Ask: "What does light DO to this material?" Then light it to reveal its nature.
 
-### 3. BACKGROUND FOR CONTRAST
+### 3. TRANSPARENT MATERIAL DOCTRINE (PET, Glass, Clear Plastic)
+
+**[CRITICAL] Realism for transparent materials comes from ACCURATE OPTICAL BEHAVIOR - not from post-processing effects.**
+
+#### The Realism Paradox
+
+When users ask for "more realistic" on transparent materials, the instinct is to ADD effects. This is WRONG. Effects cause artifacts.
+
+| User Says | WRONG Response | CORRECT Response |
+|-----------|----------------|------------------|
+| "Make it more realistic" | Add caustics, sheen, enhancement | Refine material accuracy |
+| "It looks flat" | Add rim highlights | Include optical_behavior in specs |
+| "Needs more depth" | Add texture detail | Specify transparency depth in fidelity |
+
+#### Why First Render Must Be Realistic
+
+If first render lacks realism, users request "make it realistic". You then ADD specs (caustics, sheen). Gemini interprets these as edge highlights = artifacts.
+
+**Break the cycle:** Include realism specs on FIRST render. User never needs to ask.
+
+#### First Render Requirements for Transparent Materials
+
+Every call for PET/glass/clear plastic MUST include:
+
+1. **Accurate material specification** - "glossy PET", not "clear_plastic"
+2. **Optical behavior** - Natural refraction, contents visibility
+3. **Transparency depth** - In fidelity.hero_features
+4. **Soft lighting** - Allows transparency to show naturally
+5. **Uniform tint** - "Maintain consistent [color] tint throughout body - no dark bands at neck or base"
+
+See `image_studio.protocol` for exact parameter syntax.
+
+#### Common Transparent Material Issues
+
+| Issue | Cause | First-Render Prevention |
+|-------|-------|------------------------|
+| Dark bands at neck/base | Gemini exaggerates thickness variations | Include "uniform tint throughout body" in rendering_notes |
+| "Black accents" at top/bottom | Same as above | Include "no dark bands at neck or base" in fidelity |
+| Flat/unrealistic look | Missing optical_behavior | Include optical specs on FIRST call |
+
+#### The Transparent Material Test
+
+Ask: "Would a photographer looking at a real PET bottle expect this level of optical depth?"
+
+If the render looks "clean but flat" - you missed the optical specs. Don't wait for user feedback.
+
+### 4. BACKGROUND FOR CONTRAST
 
 Background exists for ONE purpose: make the product pop.
 
@@ -53,7 +99,7 @@ Background exists for ONE purpose: make the product pop.
 
 **The Test:** Can you clearly see product edges against background? If edges blend, wrong background.
 
-### 4. PROFESSIONAL QUALITY BAR
+### 5. PROFESSIONAL QUALITY BAR
 
 Every output must pass:
 
@@ -220,151 +266,48 @@ Why? Color names tell the tool to GENERATE. You want to EXTRACT.
 
 ## MULTI-ITEM DOCTRINE
 
-When source contains multiple items:
+**For full multi-item workflow, load `multi_item.protocol` (domain=creative).**
 
-### Detection
+This section covers catalog-specific application.
 
-Visual analysis will include `## MULTI-ITEM ASSESSMENT` with:
-- Classification (VARIANTS, COLLECTION, COMPONENTS)
-- Extraction Targets (each item with position)
+### Catalog Default Strategy
 
-### Strategy Selection
+| PM Signal | Strategy | Catalog Reason |
+|-----------|----------|----------------|
+| "each", "per SKU", no signal | INDIVIDUAL | Each SKU needs its own asset |
+| "family", "together" | COMPOSITE | Family shot for marketing |
+| "only the X" | SELECTIVE | Filter, then INDIVIDUAL |
 
-| PM Signal | Strategy | Action |
-|-----------|----------|--------|
-| "each", "per SKU" | INDIVIDUAL | One image_studio per item |
-| "family", "together" | COMPOSITE | All items in one call |
-| "only the X" | SELECTIVE | Filter, then process |
-
-### Variant Identification (CRITICAL for targeting)
+### Variant Identification (Catalog-Specific Priority)
 
 **Use visual differentiators BEFORE position.** Position is ambiguous; visual characteristics are not.
 
-| Priority | Differentiator | Why Reliable |
-|----------|----------------|--------------|
-| 1 | **SIZE** | "the LARGEST jar" has ONE correct answer |
-| 2 | **VISUAL PATTERN** | Colors, prints, designs are intrinsic to product |
-| 3 | **TEXT/LABEL** | Explicit when readable |
-| 4 | **POSITION** | Last resort - only when visuals identical |
-
-**For size variants:** Lead with SIZE ("the LARGEST [product]", "the SMALLEST [product]")
-**For design variants:** Lead with VISUAL ("the [product] with [distinctive pattern]")
-**Combine for precision:** "the LARGEST jar with blue floral print"
+| Priority | Differentiator | Catalog Example |
+|----------|----------------|-----------------|
+| 1 | **SIZE** | "the LARGEST jar" - unambiguous |
+| 2 | **VISUAL PATTERN** | Colors, prints, lid colors |
+| 3 | **TEXT/LABEL** | Product name if readable |
+| 4 | **POSITION** | Last resort only |
 
 ### Key Rule
 
-**Never treat N items as 1.** If Extraction Targets has 9 rows and strategy is INDIVIDUAL, you output 9 assets.
+**Never treat N items as 1.** If Extraction Targets has 9 rows and strategy is INDIVIDUAL, you output 9 catalog assets.
 
-### Batch Consistency Doctrine (MANDATORY for variant sets)
+### Batch Consistency for Catalog
 
-When creating base assets for multiple variants, ALL outputs must appear from the SAME photoshoot.
+**Why it matters for catalog:** All variants display in a product grid. Inconsistent angles/framing = amateur appearance.
 
-**The Problem:**
-Each image_studio call is independent AND Gemini is non-deterministic. Without consistency enforcement:
-- Different camera angles across variants
-- Different lighting directions
-- Different framing/coverage
-- Result: Unusable as a cohesive set
+**Follow anchor-first pattern from `multi_item.protocol`:**
+1. Select anchor (sharp, well-lit, shows features)
+2. Generate with full specs, get HITL approval
+3. Extract style as TEXT (camera, lighting, framing)
+4. Apply identical specs to remaining variants
+5. Grid test for consistency
 
-**The Solution: View-Then-Describe**
-
-```
-1. IF REFERENCE PROVIDED - View it first, understand target style
-2. SELECT ANCHOR - Choose variant that is sharp, well-lit, shows full features
-   - If NO variant is suitable: ESCALATE (can't build batch on poor anchor)
-3. GENERATE ANCHOR - Process ONE variant with full specs
-4. VIEW ANCHOR - Use view_image to see the result
-5. EXTRACT STYLE AS TEXT - Describe what you see in precise terms
-6. ANCHOR HITL - Call write_data with asset_uploads (shows image to user)
-   - Include style specs in hitl_summary
-   - STOP AND WAIT for approval before proceeding
-7. BATCH REMAINING - Pass ONLY source images + TEXT style specs in custom_spec
-   - DO NOT pass anchor image to remaining calls
-8. GRID TEST - View all outputs, verify visual consistency
-```
-
-**[CRITICAL] Why TEXT, not anchor image?**
-Passing a generated image as reference causes Gemini to REPRODUCE that image instead of EXTRACTING from the new source. The anchor exists ONLY to establish style specs as TEXT. Once you've described it, the anchor's job is done - it should NOT appear in subsequent image_studio calls.
-
-### Step 4: Style Spec Extraction
-
-After viewing anchor, document:
-```
-ANCHOR STYLE SPECS:
-- Camera: [e.g., "eye-level, 0 degrees, perfectly upfront"]
-- Lighting: [e.g., "3-point studio, soft shadow bottom-right"]
-- Framing: [e.g., "80% frame, centered"]
-- Background: [e.g., "pure white, soft contact shadow"]
-- Enhancement: [e.g., "tack sharp, true colors"]
-```
-
-### Step 5: HITL Anchor Approval
-
-**Use write_data Pattern 8 (Asset Creation) from `write_data.protocol`:**
-- `asset_uploads`: Shows anchor image to user
-- `hitl_summary`: Include extracted style specs + "Approve this style for the entire batch?"
-- `operations`: Create anchor as first asset
-
-**[CRITICAL] STOP and WAIT for user response before batching.**
-
-**What user approves:**
-- Image quality (is this good enough?)
-- Style for batch (this angle/lighting/framing for ALL variants?)
-
-**If user REJECTS:** Adjust specs, regenerate anchor, re-present.
-**If user APPROVES:** Proceed to batch with locked style.
-
-### Step 6: Batch with Consistency
-
-**Images passed:** ONLY source/product images for the current variant
-**No anchor image:** The anchor is NOT passed - you extracted its style as text
-
-**custom_spec contains TEXT description of anchor style:**
-```
-custom_spec: {
-  instruction: "Match the anchor style EXACTLY:
-    Camera: eye-level, 0 degrees
-    Lighting: 3-point studio, shadow bottom-right
-    Framing: 80% frame, centered
-    This must look like the same photoshoot as the anchor."
-}
-```
-
-The style specs (camera angle, lighting direction, framing) come from your VIEW of the anchor, converted to TEXT. Gemini reads the text and applies that style to the NEW source.
-
-### Step 7: Grid Test (Visual Verification)
-
-After generating all variants, apply Grid Test from `multi_item.protocol` (domain=creative):
-- Create verification grid using image_studio (see pattern there)
-- View the grid, check: angle, framing, shadows, lighting consistency
-- **If ANY outlier:** REDO that variant with more explicit style specs
-
-### Anchor Selection
-
-| Criterion | Why | If Not Met |
-|-----------|-----|------------|
-| Sharp in source | Blur affects extraction | Try different variant |
-| Well-lit in source | Shadows affect quality | Try different variant |
-| Shows full features | Partial = incomplete | Try different variant |
-| **ALL fail** | No suitable anchor | **ESCALATE to PM** |
-
-**Heuristics when equal:**
+**Catalog-specific anchor selection:**
 - Size variants: Prefer MEDIUM
 - Design variants: Prefer hero/bestseller
-
-### Consistency Specs (IDENTICAL across batch)
-
-`composition.camera_angle`, `composition.product_coverage`, `lighting.*`, `enhancement`, `output.aspect_ratio`, `output.size`, `focus`
-
-**What CAN differ:** `extraction.target_description`, `fidelity.hero_features`, `output.filename`
-
-### Recovery (3 attempts max)
-
-| Attempt | Action |
-|---------|--------|
-| 1st | More explicit style specs (numeric values) |
-| 2nd | Different anchor variant |
-| 3rd | Escalate: "Variant X resists consistency due to [reason]" |
+- If none suitable: ESCALATE to PM
 
 ---
 
