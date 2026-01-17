@@ -667,6 +667,50 @@ class TraceLoader:
         # Context handoff analysis
 ```
 
+### ImageExtraction
+
+Extract and compare images from traces - sources (user uploads) and generated outputs.
+
+```python
+from tests.tools.trace_analysis import get_trace_images, get_image_pairs, view_trace_images
+from tests.tools.models import TraceImage, ImagePair
+
+# Get ALL images from a trace (unified view)
+images = get_trace_images(trace_id)
+sources = [i for i in images if i.role == "source"]
+generated = [i for i in images if i.role == "generated"]
+
+# Get source-to-generated pairs (for comparison)
+pairs = get_image_pairs(trace_id)
+for p in pairs:
+    print(f"Source: {p.source.storage_path if p.source else 'None'}")
+    print(f"Generated: {p.generated.storage_path if p.generated else 'FAILED'}")
+    print(f"Specs: {p.specs.get('fidelity', {})}")
+
+# Quick summary
+print(view_trace_images(trace_id))
+```
+
+**Models:**
+
+| Model | Purpose |
+|-------|---------|
+| `TraceImage` | Single image with role, tool, agent context |
+| `ImagePair` | Source + generated pair with specs used |
+
+**Roles:**
+- `source` - User upload or product image input
+- `generated` - Output from image_studio
+- `style_ref` - Style/mood reference image
+- `background` - Background reference
+- `variant` - Additional products for family shots
+
+**Use cases:**
+- Compare source vs generated for quality assessment
+- Track which specs were used for each generation
+- Debug failed generations (ImagePair.error)
+- Understand image flow through workflow
+
 ### Graders
 
 ```
