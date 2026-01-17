@@ -2,8 +2,15 @@
 
 ## PURPOSE
 
-Execution patterns for multi-image workflows.
-Load when: User sent multiple images AND Visual analyst identified relationship.
+Multi-image workflow patterns. **OODA still applies** - this protocol handles the specifics AFTER visual_analyst determines image relationship.
+
+Load when: User sent multiple images AND visual_analyst identified relationship.
+
+**OODA Context:**
+- OBSERVE: visual_analyst analyzes ALL images together, determines relationship
+- You READ visual_analysis.md, CHECKPOINT: "What relationship? What workflow?"
+- Then load this protocol for relationship-specific patterns
+- Continue OODA (ORIENT -> DECIDE -> ACT) per relationship type
 
 ---
 

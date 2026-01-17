@@ -5,7 +5,12 @@
 Data-driven creative execution: price posts, offer graphics, marketing content.
 Load when: User wants graphics that require catalog data (prices, variants, assets).
 
-**Key Insight:** PM delegates to catalog_analyst for data, then passes data to creative. Creative stays pure creative.
+**OODA Context:** This is a specialized workflow where:
+- ORIENT: catalog_analyst fetches data (no image to OBSERVE)
+- DECIDE: You have data, proceed to ACT
+- ACT: creative_specialist with data
+
+**Key Insight:** Delegate to catalog_analyst for data, then pass data to creative. Creative stays pure creative.
 
 ---
 
