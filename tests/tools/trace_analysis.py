@@ -2643,12 +2643,35 @@ def _extract_image_studio_inputs(inputs: dict | None) -> list[dict]:
 
 
 def _extract_image_studio_output(outputs: dict | None) -> dict | None:
-    """Extract generated image from image_studio output."""
+    """Extract generated image from image_studio output.
+
+    Handles multiple output formats:
+    1. Direct: outputs = {"success": true, "outputs": [...], ...}
+    2. Nested: outputs = {"output": {"success": true, ...}}
+    3. LangChain: outputs = {"output": {"content": [{"type": "text", "text": "...JSON..."}]}}
+    """
+    import json
+
     if not outputs:
         return None
 
     # Handle nested output structure
     output = outputs.get("output", outputs)
+
+    # Handle LangChain message format: {"content": [{"type": "text", "text": "..."}]}
+    if isinstance(output, dict) and "content" in output:
+        for item in output.get("content", []):
+            if isinstance(item, dict) and item.get("type") == "text":
+                text = item.get("text", "")
+                # Extract JSON from text (may have prefix like "Image generated successfully.")
+                json_start = text.find("{")
+                if json_start >= 0:
+                    try:
+                        output = json.loads(text[json_start:])
+                        break
+                    except json.JSONDecodeError:
+                        pass
+
     if isinstance(output, str):
         output = _safe_parse_dict(output)
 
@@ -2659,7 +2682,14 @@ def _extract_image_studio_output(outputs: dict | None) -> dict | None:
     if not output.get("success", False):
         return None
 
-    # Extract from outputs array
+    # Try direct storage_path first (simplified output format)
+    if "storage_path" in output:
+        return {
+            "storage_path": output["storage_path"],
+            "metadata": output.get("metadata"),
+        }
+
+    # Extract from outputs array (structured format)
     output_variants = output.get("outputs", [])
     if not output_variants:
         return None

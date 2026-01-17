@@ -1131,6 +1131,61 @@ next_id = next_trace(trace_id)
 prev_id = prev_trace(trace_id, session_gap_minutes=0)
 ```
 
+### Image Extraction
+
+Extract and compare images from traces - sources (user uploads) and generated outputs.
+
+```python
+from tests.tools.trace_analysis import get_trace_images, get_image_pairs, view_trace_images
+from tests.tools.models import TraceImage, ImagePair
+
+# Quick summary of all images in trace
+print(view_trace_images(trace_id))
+# Output:
+# Images in trace:
+# [0] SOURCE: inbox/20260115_xxx.jpg
+#     Tool: download_whatsapp_media, Agent: PM
+# [1] SOURCE: inbox/20260115_xxx.jpg
+#     Tool: image_studio, Agent: creative_specialist
+#     Label: source
+# [2] GENERATED: pending/20260115_xxx.png
+#     Tool: image_studio, Agent: creative_specialist
+# Summary: 2 source(s), 1 generated
+
+# Get ALL images with full context
+images = get_trace_images(trace_id)
+sources = [i for i in images if i.role == "source"]
+generated = [i for i in images if i.role == "generated"]
+
+# Get source-to-generated pairs (best for comparing what went in vs out)
+pairs = get_image_pairs(trace_id)
+for p in pairs:
+    print(f"Source: {p.source.storage_path if p.source else 'None'}")
+    print(f"Generated: {p.generated.storage_path if p.generated else 'FAILED'}")
+    print(f"Specs used: {list(p.specs.keys())}")  # fidelity, material_treatment, etc.
+    if not p.success:
+        print(f"Error: {p.error}")
+```
+
+**TraceImage fields:**
+- `storage_path` - Path in Supabase storage (use with view_image or download)
+- `role` - "source", "generated", "style_ref", "background", "variant"
+- `tool_name` - "download_whatsapp_media" or "image_studio"
+- `run_id` - For drilling down with show_node()
+- `agent` - Agent that made the call
+- `label` - Original label from image_studio input
+- `sequence` - Order in trace (0-indexed)
+- `metadata` - Image metadata if available (dimensions, etc.)
+
+**ImagePair fields:**
+- `source` - Primary source TraceImage (labeled "source" or "product")
+- `style_ref` - Style reference TraceImage if provided
+- `generated` - Output TraceImage (None if failed)
+- `specs` - Dict of specs used (fidelity, material_treatment, etc.)
+- `run_id` - image_studio run ID
+- `success` - Whether generation succeeded
+- `error` - Error message if failed
+
 ### Key Schemas
 
 **AgentDelegation** (from `get_delegation_graph().delegations`):
