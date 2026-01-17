@@ -170,12 +170,27 @@ The specs guide priority:
 # =============================================================================
 
 
-def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatModel:
-    """Get Gemini 3 Pro Image LLM with proper configuration."""
+def _get_gemini3_image_llm(
+    output_spec: OutputSpec | None = None,
+    temperature: float | None = None,
+    seed: int | None = None,
+) -> BaseChatModel:
+    """Get Gemini 3 Pro Image LLM with proper configuration.
+
+    Args:
+        output_spec: Output specifications (aspect ratio, size)
+        temperature: Controls randomness. Default 0.7 for catalog consistency.
+            Lower (0.3-0.5) for batch variants. Higher (1.0+) for creative exploration.
+        seed: Seed for reproducibility (best-effort). Use same seed across batch.
+    """
     aspect_ratio = output_spec.aspect_ratio if output_spec else "1:1"
     if aspect_ratio == "original":
         aspect_ratio = "1:1"
     image_size = output_spec.size if output_spec else "1K"
+
+    # Default temperature 0.7 for catalog work - balanced consistency
+    # Override Gemini 3's default of 1.0 which causes high variance
+    effective_temperature = temperature if temperature is not None else 0.7
 
     return get_llm(
         provider="google",
@@ -183,6 +198,8 @@ def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatMod
         response_modalities=["TEXT", "IMAGE"],
         image_aspect_ratio=aspect_ratio,
         image_size=image_size,
+        temperature=effective_temperature,
+        seed=seed,
     )
 
 
@@ -465,7 +482,11 @@ def _process_images(input_spec: ImageStudioInput) -> ImageStudioOutput:
             )
 
         # Create LLM and prompt
-        llm = _get_gemini3_image_llm(output_spec=input_spec.output)
+        llm = _get_gemini3_image_llm(
+            output_spec=input_spec.output,
+            temperature=input_spec.temperature,
+            seed=input_spec.seed,
+        )
         prompt = _build_prompt(input_spec)
 
         # Build content: prompt first, then labeled images in order
@@ -542,6 +563,8 @@ def _image_studio_impl(
     custom_spec: dict[str, Any] | CustomSpec | None = None,
     creative_direction: str | None = None,
     output: dict[str, Any] | OutputSpec | None = None,
+    temperature: float | None = None,
+    seed: int | None = None,
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Image Studio tool implementation.
 
@@ -560,6 +583,9 @@ def _image_studio_impl(
         custom_spec: Fully open-ended creative spec for OOTB ideas
         creative_direction: Additional creative notes
         output: Output specs (format, size, aspect_ratio)
+        temperature: Controls randomness (0.0-2.0). Default 0.7 for catalog consistency.
+            Lower (0.3-0.5) for batch variants. Higher (1.0+) for creative exploration.
+        seed: Seed for reproducibility (best-effort). Use same seed across batch variants.
     """
     # Get thread_id from execution context (invisible to LLM)
     thread_id = get_thread_id()
@@ -607,6 +633,8 @@ def _image_studio_impl(
             custom_spec=_to_spec(custom_spec, CustomSpec),
             creative_direction=creative_direction,
             output=_to_spec(output, OutputSpec) or OutputSpec(),
+            temperature=temperature,
+            seed=seed,
         )
 
         result = _process_images(input_spec)

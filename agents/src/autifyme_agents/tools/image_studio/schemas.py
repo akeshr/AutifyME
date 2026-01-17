@@ -942,6 +942,32 @@ class ImageStudioInput(BaseModel):
 
     output: OutputSpec = Field(default_factory=OutputSpec)
 
+    # ==========================================================================
+    # Generation Control (for consistency across batch operations)
+    # ==========================================================================
+
+    temperature: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description=(
+            "Controls output randomness. Lower = more consistent. "
+            "Default: 0.7 for catalog work (balanced consistency). "
+            "Use 0.3-0.5 for batch variants requiring high consistency. "
+            "Use 1.0+ for creative exploration."
+        )
+    )
+
+    seed: int | None = Field(
+        default=None,
+        description=(
+            "Seed for reproducibility (best-effort, not guaranteed). "
+            "Use SAME seed across batch variants for consistency. "
+            "Example: seed=42 for all variants in a product family. "
+            "Combined with low temperature maximizes batch consistency."
+        )
+    )
+
 
 # =============================================================================
 # Output Schemas

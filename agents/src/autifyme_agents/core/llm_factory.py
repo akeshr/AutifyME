@@ -20,6 +20,7 @@ def get_llm(
     top_p: float | None = None,
     top_k: int | None = None,
     max_output_tokens: int | None = None,
+    seed: int | None = None,  # For reproducibility (best-effort, not guaranteed)
     # Thinking control (model-dependent)
     thinking_budget: int | None = None,  # Gemini 2.5: token count (0=disable, -1=dynamic)
     thinking_level: Literal["low", "medium", "high"] | None = None,  # Gemini 3+ (library 4.1.0+)
@@ -78,6 +79,9 @@ def get_llm(
         top_k: Top-k sampling parameter. Consider top_k most probable tokens. Must be positive.
         max_output_tokens: Maximum tokens in response. Must be > 0.
             Gemini 2.5: up to 65K. Gemini 3 Pro: up to 64K.
+        seed: Seed for reproducibility (Gemini only). Best-effort - deterministic output not guaranteed.
+            Use same seed + parameters for more consistent outputs across calls.
+            Useful for batch image generation where consistency is important.
 
         Thinking Control (mutually exclusive - use one based on model):
         thinking_budget: Token budget for Gemini 2.5 adaptive thinking.
@@ -294,6 +298,8 @@ def get_llm(
             gemini_kwargs["top_k"] = top_k
         if max_output_tokens is not None:
             gemini_kwargs["max_output_tokens"] = max_output_tokens
+        if seed is not None:
+            gemini_kwargs["seed"] = seed
         if include_thoughts:
             gemini_kwargs["include_thoughts"] = include_thoughts
         if safety_settings is not None:

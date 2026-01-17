@@ -280,6 +280,63 @@ image_studio(
 
 **Key principle:** Include ALL specs. Minimal calls produce garbage.
 
+---
+
+## GENERATION CONTROL (Batch Consistency)
+
+Gemini image generation is non-deterministic. Even identical prompts produce different outputs. Use these controls for batch consistency:
+
+### Temperature (Default: 0.7)
+
+| Value | Use Case |
+|-------|----------|
+| 0.3-0.5 | Batch variants - maximum consistency |
+| 0.7 | Catalog work - balanced (default) |
+| 1.0+ | Creative exploration - high variance |
+
+### Seed (Best-Effort Reproducibility)
+
+Use SAME seed across all variants in a batch:
+
+```python
+# Batch of 4 variants - same seed for consistency
+BATCH_SEED = 42
+
+# Variant 1
+image_studio(images=[...], extraction={...}, temperature=0.4, seed=BATCH_SEED)
+
+# Variant 2
+image_studio(images=[...], extraction={...}, temperature=0.4, seed=BATCH_SEED)
+
+# Variant 3
+image_studio(images=[...], extraction={...}, temperature=0.4, seed=BATCH_SEED)
+```
+
+**Note:** Seed is "best-effort" - deterministic output not guaranteed, but significantly improves consistency.
+
+### Consistency Stack (Recommended for Catalog Batches)
+
+For maximum batch consistency, combine ALL of:
+
+1. **Low temperature** (0.3-0.5)
+2. **Same seed** across all variants
+3. **Style-as-text** in custom_spec (from View-Then-Describe pattern)
+4. **Identical structured specs** (composition, lighting, enhancement)
+
+```python
+image_studio(
+    images=[{"path": "inbox/variant_2.jpg", "label": "source"}],
+    extraction={...},
+    composition={"camera_angle": "eye-level", "product_coverage": "80%"},
+    lighting={"type": "studio_3point", "direction": "front-left"},
+    custom_spec={"instruction": "Match anchor style: eye-level, 80% frame, soft shadow bottom-right"},
+    temperature=0.4,
+    seed=42,
+)
+```
+
+---
+
 ### Pattern 6: Verification Grid (Batch Consistency Check)
 
 After generating multiple variants, create a visual grid for consistency verification:
