@@ -158,6 +158,32 @@ The specs guide priority:
 - Scene/lifestyle specs? Environment creativity matters more
 - Minimal specs? Professional judgment
 
+=== SOURCE: PRESERVE IDENTITY, FIX PHOTOGRAPHY ===
+Source images are often messy phone photos. Your job: PRESERVE product identity, FIX photography.
+
+PRESERVE (product identity - these are REAL properties of the product):
+- Material properties: transparency level, finish (matte/glossy), texture
+- True colors: actual product color (not color cast from bad lighting)
+- Artwork: exact labels, logos, patterns, text
+- Shape: true proportions (not lens distortion)
+
+FIX (photography problems - these are NOT product properties):
+- Bad lighting → Professional studio lighting
+- Cluttered background → Clean background
+- Color cast from environment → True product colors
+- Blur/softness → Tack sharp
+- Poor exposure → Proper exposure
+- Harsh shadows → Soft, natural shadows
+
+KEY DISTINCTION for transparent materials:
+- If product IS transparent (you can see through it in source), output MUST be equally transparent
+- The transparency is a PRODUCT PROPERTY to preserve, not a photography flaw
+- Don't make transparent materials look dense/opaque - that changes the product identity
+
+COMMON FAILURE: Treating transparency as something to "fix"
+- Source shows light, see-through bottle → Output looks like solid colored plastic
+- This is WRONG. Transparency is identity, not a flaw.
+
 === OUTPUT STANDARDS ===
 - Sharp at 200% zoom
 - Professional studio quality
