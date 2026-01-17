@@ -20,9 +20,9 @@ load_dotenv(project_root / ".env")
 
 def print_header(title: str) -> None:
     """Print test case header."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print(f"  {title}")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
 
 def verify_outcome_in_db(test_name: str, expected_sender: str = "local_test_user") -> dict | None:
@@ -51,7 +51,8 @@ def verify_outcome_in_db(test_name: str, expected_sender: str = "local_test_user
     try:
         with psycopg.connect(db_url, connect_timeout=5) as conn, conn.cursor() as cur:
             # Get latest outcome for this sender
-            cur.execute("""
+            cur.execute(
+                """
                     SELECT
                         tracking_id,
                         message_text,
@@ -63,7 +64,9 @@ def verify_outcome_in_db(test_name: str, expected_sender: str = "local_test_user
                     WHERE sender_id = %s
                     ORDER BY created_at DESC
                     LIMIT 1
-                """, (expected_sender,))
+                """,
+                (expected_sender,),
+            )
 
             result = cur.fetchone()
             if result:
@@ -95,6 +98,7 @@ def get_workflow_count() -> int:
     """Get total count of tracked workflows."""
     try:
         import psycopg
+
         db_url = os.getenv("DATABASE_URL")
         if not db_url:
             return -1
@@ -154,10 +158,10 @@ def run_test_case(case_number: int, description: str, command: str) -> bool:
 
 def main():
     """Run comprehensive test suite."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("  COMPREHENSIVE PHASE 1 TESTING")
     print("  All Permutation Combinations + Database Verification")
-    print("="*70)
+    print("=" * 70)
 
     results = []
 
@@ -165,7 +169,7 @@ def main():
     success = run_test_case(
         1,
         "Text Only (Auto-Approve)",
-        'cd agents && uv run python -m autifyme_agents.cli.simulate "Catalog a blue cotton t-shirt, price $29.99, sizes S-XL" --auto-approve'
+        'cd agents && uv run python -m autifyme_agents.cli.simulate "Catalog a blue cotton t-shirt, price $29.99, sizes S-XL" --auto-approve',
     )
     results.append(("Text Only (Auto-Approve)", success))
 
@@ -173,7 +177,7 @@ def main():
     success = run_test_case(
         2,
         "Image Only (Auto-Approve)",
-        'cd agents && uv run python -m autifyme_agents.cli.simulate "" --media test_images/WhatsApp.jpeg --auto-approve'
+        'cd agents && uv run python -m autifyme_agents.cli.simulate "" --media test_images/WhatsApp.jpeg --auto-approve',
     )
     results.append(("Image Only (Auto-Approve)", success))
 
@@ -181,7 +185,7 @@ def main():
     success = run_test_case(
         3,
         "Text + Image (Auto-Approve)",
-        'cd agents && uv run python -m autifyme_agents.cli.simulate "Catalog this product, price $79.99" --media test_images/WhatsApp.jpeg --auto-approve'
+        'cd agents && uv run python -m autifyme_agents.cli.simulate "Catalog this product, price $79.99" --media test_images/WhatsApp.jpeg --auto-approve',
     )
     results.append(("Text + Image (Auto-Approve)", success))
 
@@ -196,7 +200,9 @@ def main():
     print("\n[EXECUTING] Workflow with HITL (awaiting your approval)...\n")
 
     # Run without auto-approve
-    os.system('cd agents && uv run python -m autifyme_agents.cli.simulate "HITL Test: Catalog premium sneakers, price $149.99" --media test_images/WhatsApp.jpeg')
+    os.system(
+        'cd agents && uv run python -m autifyme_agents.cli.simulate "HITL Test: Catalog premium sneakers, price $149.99" --media test_images/WhatsApp.jpeg'
+    )
 
     time.sleep(2)
     count_after = get_workflow_count()
@@ -223,7 +229,9 @@ def main():
     print(f"\n[PRE-TEST] Workflow count: {count_before}")
     print("\n[EXECUTING] Workflow with HITL (awaiting your rejection)...\n")
 
-    os.system('cd agents && uv run python -m autifyme_agents.cli.simulate "HITL Rejection Test: Catalog rejected product" --media test_images/WhatsApp.jpeg')
+    os.system(
+        'cd agents && uv run python -m autifyme_agents.cli.simulate "HITL Rejection Test: Catalog rejected product" --media test_images/WhatsApp.jpeg'
+    )
 
     time.sleep(2)
     count_after = get_workflow_count()
@@ -241,9 +249,9 @@ def main():
     results.append(("HITL Rejection", hitl_rejection_success))
 
     # Summary
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("  TEST SUMMARY")
-    print("="*70)
+    print("=" * 70)
 
     passed = sum(1 for _, success in results if success)
     total = len(results)
@@ -251,19 +259,20 @@ def main():
     print(f"\nTotal Tests: {total}")
     print(f"Passed: {passed}")
     print(f"Failed: {total - passed}")
-    print(f"Success Rate: {(passed/total)*100:.1f}%\n")
+    print(f"Success Rate: {(passed / total) * 100:.1f}%\n")
 
     for test_name, success in results:
         status = "✓ PASSED" if success else "✗ FAILED"
         print(f"  {status}  {test_name}")
 
     # Final database verification
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("  FINAL DATABASE VERIFICATION")
-    print("="*70)
+    print("=" * 70)
 
     try:
         import psycopg
+
         db_url = os.getenv("DATABASE_URL")
         with psycopg.connect(db_url, connect_timeout=5) as conn, conn.cursor() as cur:
             # Total count
@@ -294,9 +303,9 @@ def main():
     except Exception as e:
         print(f"\n  ERROR: Database verification failed: {e}")
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("  COMPREHENSIVE TESTING COMPLETE")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     return all(success for _, success in results)
 

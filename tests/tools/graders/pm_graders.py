@@ -351,8 +351,7 @@ def file_read_before_synthesis(seq: ToolCallSequence) -> GraderResult:
     analyst_delegations = [
         tc
         for tc in pm_calls
-        if tc.tool_name == "task"
-        and is_analyst(tc.parsed_args.get("subagent_type", ""))
+        if tc.tool_name == "task" and is_analyst(tc.parsed_args.get("subagent_type", ""))
     ]
 
     # Case 1: No analyst delegations
@@ -419,15 +418,11 @@ def file_read_before_synthesis(seq: ToolCallSequence) -> GraderResult:
         )
 
     # Case 4 & 5: Analysts wrote files - now evaluate if PM read them
-    pm_read_calls = [
-        tc for tc in pm_calls if tc.tool_name in ("read_file", "read_data")
-    ]
+    pm_read_calls = [tc for tc in pm_calls if tc.tool_name in ("read_file", "read_data")]
 
     # Check reads came AFTER analyst delegations completed
     last_delegation_seq = max(tc.sequence for tc in successful_delegations)
-    reads_after_delegation = [
-        tc for tc in pm_read_calls if tc.sequence > last_delegation_seq
-    ]
+    reads_after_delegation = [tc for tc in pm_read_calls if tc.sequence > last_delegation_seq]
 
     passed = len(reads_after_delegation) > 0
 

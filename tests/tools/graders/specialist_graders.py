@@ -52,9 +52,9 @@ def error_recovery_attempted(seq: ToolCallSequence, agent: str) -> GraderResult:
     # Find error calls, EXCLUDING GraphInterrupt (HITL pause, not error)
     # GraphInterrupt is how HITL works - workflow intentionally pauses for approval
     error_calls = [
-        tc for tc in agent_calls
-        if (tc.status == "error" or tc.error)
-        and not (tc.error and "GraphInterrupt" in tc.error)
+        tc
+        for tc in agent_calls
+        if (tc.status == "error" or tc.error) and not (tc.error and "GraphInterrupt" in tc.error)
     ]
 
     # Case 1: No errors - nothing to recover from
@@ -102,7 +102,9 @@ def error_recovery_attempted(seq: ToolCallSequence, agent: str) -> GraderResult:
         )
     else:
         # Agent gave up after error
-        first_error = next(tc for tc in error_calls if tc.sequence == min(tc.sequence for tc in error_calls))
+        first_error = next(
+            tc for tc in error_calls if tc.sequence == min(tc.sequence for tc in error_calls)
+        )
         return GraderResult(
             name="error_recovery_attempted",
             passed=False,
@@ -113,7 +115,9 @@ def error_recovery_attempted(seq: ToolCallSequence, agent: str) -> GraderResult:
                 "error_calls": len(error_calls),
                 "first_error_seq": first_error.sequence,
                 "first_error_tool": first_error.tool_name,
-                "first_error_message": first_error.error[:200] if first_error.error else "Unknown error",
+                "first_error_message": first_error.error[:200]
+                if first_error.error
+                else "Unknown error",
                 "calls_after_error": 0,
             },
             reason=f"{agent} gave up after error in {first_error.tool_name} - no recovery attempted",
@@ -163,7 +167,8 @@ def hitl_triggered(seq: ToolCallSequence, agent: str = "catalog_specialist") -> 
     hitl_calls = [
         tc
         for tc in agent_calls
-        if tc.tool_name in hitl_names or any(h in tc.tool_name.lower() for h in ["interrupt", "approval"])
+        if tc.tool_name in hitl_names
+        or any(h in tc.tool_name.lower() for h in ["interrupt", "approval"])
     ]
 
     persist_calls = [tc for tc in agent_calls if tc.tool_name in persist_names]
@@ -210,7 +215,9 @@ def hitl_triggered(seq: ToolCallSequence, agent: str = "catalog_specialist") -> 
         evidence={
             "agent": agent,
             "first_hitl_seq": first_hitl_seq,
-            "first_hitl_tool": next(tc.tool_name for tc in hitl_calls if tc.sequence == first_hitl_seq),
+            "first_hitl_tool": next(
+                tc.tool_name for tc in hitl_calls if tc.sequence == first_hitl_seq
+            ),
             "first_persist_seq": first_persist_seq,
             "first_persist_tool": persist_calls[0].tool_name,
         },
@@ -264,9 +271,7 @@ def output_file_written(seq: ToolCallSequence, agent: str) -> GraderResult:
     }
 
     write_calls = [
-        tc
-        for tc in agent_calls
-        if tc.tool_name in write_names or "write" in tc.tool_name.lower()
+        tc for tc in agent_calls if tc.tool_name in write_names or "write" in tc.tool_name.lower()
     ]
 
     if not agent_calls:
@@ -418,9 +423,7 @@ def specialist_read_upstream(seq: ToolCallSequence, agent: str) -> GraderResult:
     # Find specialist read_file calls
     read_tools = {"read_file", "read_data", "load_file", "get_file"}
     specialist_reads = [
-        tc
-        for tc in agent_calls
-        if tc.tool_name in read_tools or "read" in tc.tool_name.lower()
+        tc for tc in agent_calls if tc.tool_name in read_tools or "read" in tc.tool_name.lower()
     ]
 
     # Find specialist action tools (non-read, non-protocol tools)
@@ -619,10 +622,12 @@ def image_studio_core_specs_included(
             missing.append("composition|output")
 
         if missing:
-            calls_missing_core_specs.append({
-                "sequence": tc.sequence,
-                "missing_specs": missing,
-            })
+            calls_missing_core_specs.append(
+                {
+                    "sequence": tc.sequence,
+                    "missing_specs": missing,
+                }
+            )
 
     if not calls_missing_core_specs:
         return GraderResult(
@@ -691,15 +696,15 @@ def image_studio_output_verified(
 
     for studio_call in image_studio_calls:
         # Find view_image calls after this studio call
-        subsequent_views = [
-            v for v in view_image_calls if v.sequence > studio_call.sequence
-        ]
+        subsequent_views = [v for v in view_image_calls if v.sequence > studio_call.sequence]
 
         if not subsequent_views:
-            unverified_outputs.append({
-                "image_studio_seq": studio_call.sequence,
-                "view_image_after": False,
-            })
+            unverified_outputs.append(
+                {
+                    "image_studio_seq": studio_call.sequence,
+                    "view_image_after": False,
+                }
+            )
 
     if not unverified_outputs:
         return GraderResult(
@@ -772,7 +777,16 @@ def image_studio_consistency_params(
         )
 
     # Detect batch scenario
-    batch_keywords = ["batch", "regenerate", "all", "consistency", "variant", "family", "set", "multiple"]
+    batch_keywords = [
+        "batch",
+        "regenerate",
+        "all",
+        "consistency",
+        "variant",
+        "family",
+        "set",
+        "multiple",
+    ]
     is_batch_by_keyword = any(kw in user_message.lower() for kw in batch_keywords)
     is_batch_by_count = len(image_studio_calls) > 1
 
@@ -808,17 +822,18 @@ def image_studio_consistency_params(
         if has_temperature:
             calls_with_temperature += 1
 
-        calls_analysis.append({
-            "sequence": tc.sequence,
-            "has_seed": has_seed,
-            "has_temperature": has_temperature,
-            "seed_value": args.get("seed"),
-            "temperature_value": args.get("temperature"),
-        })
+        calls_analysis.append(
+            {
+                "sequence": tc.sequence,
+                "has_seed": has_seed,
+                "has_temperature": has_temperature,
+                "seed_value": args.get("seed"),
+                "temperature_value": args.get("temperature"),
+            }
+        )
 
     # For batch consistency: ALL calls should have seed, and ideally same seed
     all_have_seed = calls_with_seed == len(image_studio_calls)
-    all_have_temperature = calls_with_temperature == len(image_studio_calls)
 
     # Check if same seed is used across calls (for true batch consistency)
     seed_values = [c["seed_value"] for c in calls_analysis if c["seed_value"] is not None]

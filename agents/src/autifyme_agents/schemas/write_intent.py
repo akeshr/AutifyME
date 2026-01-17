@@ -338,7 +338,5 @@ class WriteIntent(BaseModel):
     def validate_impact_structure(cls, v: dict[str, Any]) -> dict[str, Any]:
         """Validate impact has required keys."""
         if "creates" not in v and "updates" not in v and "deletes" not in v:
-            raise ValueError(
-                "impact must contain at least one of: creates, updates, deletes"
-            )
+            raise ValueError("impact must contain at least one of: creates, updates, deletes")
         return v

@@ -48,6 +48,7 @@ def _load_image_as_data_uri(image_path: str) -> tuple[str, dict[str, Any]]:
     img: Image.Image
     if image_path.startswith(("http://", "https://")):
         import httpx
+
         response = httpx.get(image_path, timeout=30)
         response.raise_for_status()
         img = Image.open(io.BytesIO(response.content))
@@ -112,12 +113,9 @@ def _view_image_impl(image_path: str) -> list[dict[str, Any]]:
         return [
             {
                 "type": "text",
-                "text": f"Image ({metadata['type']}): {metadata['original_size']}, {metadata['format']}"
+                "text": f"Image ({metadata['type']}): {metadata['original_size']}, {metadata['format']}",
             },
-            {
-                "type": "image_url",
-                "image_url": {"url": data_uri}
-            },
+            {"type": "image_url", "image_url": {"url": data_uri}},
         ]
 
     except Exception as e:

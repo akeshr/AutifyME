@@ -25,12 +25,7 @@ from autifyme_agents.schemas.registry import (
 
 def test_column_schema_basic():
     """Test basic column schema creation."""
-    col = ColumnSchema(
-        name="id",
-        type=ColumnType.UUID,
-        nullable=False,
-        primary_key=True
-    )
+    col = ColumnSchema(name="id", type=ColumnType.UUID, nullable=False, primary_key=True)
 
     assert col.name == "id"
     assert col.type == ColumnType.UUID
@@ -44,7 +39,7 @@ def test_column_schema_with_reference():
         name="product_family_id",
         type=ColumnType.UUID,
         nullable=False,
-        references="product_families.id"
+        references="product_families.id",
     )
 
     assert col.references == "product_families.id"
@@ -61,8 +56,8 @@ def test_column_schema_with_valid_values():
             "RAW_MATERIAL": "Purchased from suppliers",
             "COMPONENT": "Assembled from raw materials",
             "FINISHED_GOOD": "End product sold to customers",
-            "PACK": "Bundle of products"
-        }
+            "PACK": "Bundle of products",
+        },
     )
 
     assert col.valid_values == ["RAW_MATERIAL", "COMPONENT", "FINISHED_GOOD", "PACK"]
@@ -76,7 +71,7 @@ def test_column_schema_with_pattern():
         type=ColumnType.VARCHAR,
         nullable=True,
         pattern=r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$",
-        examples=["27AAPFU0939F1ZV", "09AAACH7409R1ZZ"]
+        examples=["27AAPFU0939F1ZV", "09AAACH7409R1ZZ"],
     )
 
     assert col.pattern is not None
@@ -90,7 +85,7 @@ def test_column_schema_computed():
         type=ColumnType.DECIMAL,
         nullable=False,
         computed=True,
-        description="Available to promise. Formula: quantity_on_hand - quantity_reserved"
+        description="Available to promise. Formula: quantity_on_hand - quantity_reserved",
     )
 
     assert col.computed is True
@@ -103,7 +98,7 @@ def test_column_schema_with_element_type():
         type=ColumnType.ARRAY,
         nullable=True,
         element_type="text",
-        description="Product tags for categorization"
+        description="Product tags for categorization",
     )
 
     assert col.element_type == "text"
@@ -118,8 +113,8 @@ def test_column_schema_with_jsonb_schema():
         jsonb_schema={
             "type": "object",
             "additionalProperties": True,
-            "description": "Flexible key-value pairs for custom attributes"
-        }
+            "description": "Flexible key-value pairs for custom attributes",
+        },
     )
 
     assert col.jsonb_schema is not None
@@ -128,11 +123,7 @@ def test_column_schema_with_jsonb_schema():
 
 def test_column_schema_defaults():
     """Test column schema defaults for new agent-critical fields."""
-    col = ColumnSchema(
-        name="simple_column",
-        type=ColumnType.VARCHAR,
-        nullable=True
-    )
+    col = ColumnSchema(name="simple_column", type=ColumnType.VARCHAR, nullable=True)
 
     assert col.valid_values is None
     assert col.valid_values_descriptions is None
@@ -154,7 +145,7 @@ def test_relationship_parent():
         type=RelationshipType.PARENT,
         target_table="product_families",
         foreign_key="product_family_id",
-        cascade_delete=True
+        cascade_delete=True,
     )
 
     assert rel.type == RelationshipType.PARENT
@@ -174,7 +165,7 @@ def test_business_rule_creation():
         rule_type="generate_sku",
         trigger=BusinessRuleTrigger.AFTER_INSERT,
         handler="generate_sku_explosion_for_new_axis",
-        parameters={"scope": "new_axis", "warn_threshold": 100}
+        parameters={"scope": "new_axis", "warn_threshold": 100},
     )
 
     assert rule.rule_type == "generate_sku"
@@ -194,20 +185,12 @@ def test_table_schema_basic():
     table = TableSchema(
         name="product_families",
         columns={
-            "id": ColumnSchema(
-                name="id",
-                type=ColumnType.UUID,
-                nullable=False,
-                primary_key=True
-            ),
+            "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False, primary_key=True),
             "name": ColumnSchema(
-                name="name",
-                type=ColumnType.VARCHAR,
-                max_length=255,
-                nullable=False
-            )
+                name="name", type=ColumnType.VARCHAR, max_length=255, nullable=False
+            ),
         },
-        primary_key="id"
+        primary_key="id",
     )
 
     assert table.name == "product_families"
@@ -221,8 +204,8 @@ def test_table_schema_get_column():
         name="test",
         columns={
             "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False),
-            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)
-        }
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False),
+        },
     )
 
     col = table.get_column("name")
@@ -242,9 +225,9 @@ def test_table_schema_get_foreign_keys():
             Relationship(
                 type=RelationshipType.PARENT,
                 target_table="product_families",
-                foreign_key="product_family_id"
+                foreign_key="product_family_id",
             )
-        ]
+        ],
     )
 
     fks = table.get_foreign_keys()
@@ -257,29 +240,13 @@ def test_table_schema_get_required_columns():
     table = TableSchema(
         name="test",
         columns={
-            "id": ColumnSchema(
-                name="id",
-                type=ColumnType.UUID,
-                nullable=False,
-                primary_key=True
-            ),
-            "name": ColumnSchema(
-                name="name",
-                type=ColumnType.VARCHAR,
-                nullable=False
-            ),
-            "description": ColumnSchema(
-                name="description",
-                type=ColumnType.TEXT,
-                nullable=True
-            ),
+            "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False, primary_key=True),
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False),
+            "description": ColumnSchema(name="description", type=ColumnType.TEXT, nullable=True),
             "created_at": ColumnSchema(
-                name="created_at",
-                type=ColumnType.TIMESTAMPTZ,
-                nullable=False,
-                default="now()"
-            )
-        }
+                name="created_at", type=ColumnType.TIMESTAMPTZ, nullable=False, default="now()"
+            ),
+        },
     )
 
     required = table.get_required_columns()
@@ -299,16 +266,16 @@ def test_table_schema_get_enum_columns():
                 name="product_type",
                 type=ColumnType.VARCHAR,
                 nullable=False,
-                valid_values=["RAW_MATERIAL", "COMPONENT", "FINISHED_GOOD"]
+                valid_values=["RAW_MATERIAL", "COMPONENT", "FINISHED_GOOD"],
             ),
             "status": ColumnSchema(
                 name="status",
                 type=ColumnType.VARCHAR,
                 nullable=False,
-                valid_values=["ACTIVE", "DRAFT", "DISCONTINUED"]
+                valid_values=["ACTIVE", "DRAFT", "DISCONTINUED"],
             ),
-            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)
-        }
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False),
+        },
     )
 
     enum_cols = table.get_enum_columns()
@@ -326,22 +293,15 @@ def test_table_schema_get_computed_columns():
         columns={
             "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False),
             "quantity_on_hand": ColumnSchema(
-                name="quantity_on_hand",
-                type=ColumnType.DECIMAL,
-                nullable=False
+                name="quantity_on_hand", type=ColumnType.DECIMAL, nullable=False
             ),
             "quantity_reserved": ColumnSchema(
-                name="quantity_reserved",
-                type=ColumnType.DECIMAL,
-                nullable=False
+                name="quantity_reserved", type=ColumnType.DECIMAL, nullable=False
             ),
             "quantity_available": ColumnSchema(
-                name="quantity_available",
-                type=ColumnType.DECIMAL,
-                nullable=False,
-                computed=True
-            )
-        }
+                name="quantity_available", type=ColumnType.DECIMAL, nullable=False, computed=True
+            ),
+        },
     )
 
     computed_cols = table.get_computed_columns()
@@ -361,15 +321,15 @@ def test_table_schema_get_pattern_columns():
                 name="gstin",
                 type=ColumnType.VARCHAR,
                 nullable=True,
-                pattern=r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
+                pattern=r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$",
             ),
             "pan": ColumnSchema(
                 name="pan",
                 type=ColumnType.VARCHAR,
                 nullable=True,
-                pattern=r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$"
-            )
-        }
+                pattern=r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$",
+            ),
+        },
     )
 
     pattern_cols = table.get_pattern_columns()
@@ -389,22 +349,16 @@ def test_table_schema_get_jsonb_schemas():
                 name="custom_attributes",
                 type=ColumnType.JSONB,
                 nullable=True,
-                jsonb_schema={
-                    "type": "object",
-                    "additionalProperties": True
-                }
+                jsonb_schema={"type": "object", "additionalProperties": True},
             ),
             "metadata": ColumnSchema(
                 name="metadata",
                 type=ColumnType.JSONB,
                 nullable=True,
-                jsonb_schema={
-                    "type": "object",
-                    "properties": {"source": {"type": "string"}}
-                }
+                jsonb_schema={"type": "object", "properties": {"source": {"type": "string"}}},
             ),
-            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)
-        }
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False),
+        },
     )
 
     jsonb_schemas = table.get_jsonb_schemas()
@@ -420,8 +374,8 @@ def test_table_schema_get_enum_columns_empty():
         name="simple",
         columns={
             "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False),
-            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)
-        }
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False),
+        },
     )
 
     enum_cols = table.get_enum_columns()
@@ -434,8 +388,8 @@ def test_table_schema_get_computed_columns_empty():
         name="simple",
         columns={
             "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False),
-            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)
-        }
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False),
+        },
     )
 
     computed_cols = table.get_computed_columns()
@@ -455,11 +409,9 @@ def test_schema_registry_basic():
         tables={
             "product_families": TableSchema(
                 name="product_families",
-                columns={
-                    "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False)
-                }
+                columns={"id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False)},
             )
-        }
+        },
     )
 
     assert registry.version == "v1"
@@ -472,9 +424,7 @@ def test_schema_registry_get_table():
     registry = SchemaRegistry(
         version="v1",
         domain="test",
-        tables={
-            "test_table": TableSchema(name="test_table", columns={})
-        }
+        tables={"test_table": TableSchema(name="test_table", columns={})},
     )
 
     table = registry.get_table("test_table")
@@ -491,8 +441,8 @@ def test_schema_registry_get_table_names():
         domain="test",
         tables={
             "table1": TableSchema(name="table1", columns={}),
-            "table2": TableSchema(name="table2", columns={})
-        }
+            "table2": TableSchema(name="table2", columns={}),
+        },
     )
 
     names = registry.get_table_names()
@@ -504,11 +454,7 @@ def test_schema_registry_get_table_names():
 def test_schema_registry_validate_table_exists():
     """Test table existence validation."""
     registry = SchemaRegistry(
-        version="v1",
-        domain="test",
-        tables={
-            "existing": TableSchema(name="existing", columns={})
-        }
+        version="v1", domain="test", tables={"existing": TableSchema(name="existing", columns={})}
     )
 
     assert registry.validate_table_exists("existing") is True
@@ -517,12 +463,7 @@ def test_schema_registry_validate_table_exists():
 
 def test_schema_registry_to_dict():
     """Test serialization to dictionary."""
-    registry = SchemaRegistry(
-        version="v1",
-        domain="test",
-        description="Test schema",
-        tables={}
-    )
+    registry = SchemaRegistry(version="v1", domain="test", description="Test schema", tables={})
 
     data = registry.to_dict()
     assert data["version"] == "v1"
@@ -533,11 +474,7 @@ def test_schema_registry_to_dict():
 
 def test_schema_registry_to_json():
     """Test serialization to JSON."""
-    registry = SchemaRegistry(
-        version="v1",
-        domain="test",
-        tables={}
-    )
+    registry = SchemaRegistry(version="v1", domain="test", tables={})
 
     json_str = registry.to_json()
     data = json.loads(json_str)
@@ -550,12 +487,7 @@ def test_schema_registry_from_dict():
     data = {
         "version": "v1",
         "domain": "test",
-        "tables": {
-            "test_table": {
-                "name": "test_table",
-                "columns": {}
-            }
-        }
+        "tables": {"test_table": {"name": "test_table", "columns": {}}},
     }
 
     registry = SchemaRegistry.from_dict(data)
@@ -589,11 +521,7 @@ def test_schema_registry_save_and_load(tmp_path):
     schema_file = tmp_path / "test_schema.json"
 
     # Create and save
-    registry = SchemaRegistry(
-        version="v1",
-        domain="test",
-        tables={}
-    )
+    registry = SchemaRegistry(version="v1", domain="test", tables={})
     registry.save_to_file(schema_file)
 
     # Load
@@ -605,11 +533,7 @@ def test_schema_registry_save_and_load(tmp_path):
 def test_schema_registry_evolve():
     """Test schema evolution."""
     v1 = SchemaRegistry(
-        version="v1",
-        domain="test",
-        tables={
-            "table1": TableSchema(name="table1", columns={})
-        }
+        version="v1", domain="test", tables={"table1": TableSchema(name="table1", columns={})}
     )
 
     # Evolve to v2 - add table, remove table, update table
@@ -617,7 +541,7 @@ def test_schema_registry_evolve():
         new_version="v2",
         add_tables=[TableSchema(name="table2", columns={})],
         remove_tables=["table1"],
-        description="Added table2, removed table1"
+        description="Added table2, removed table1",
     )
 
     assert v2.version == "v2"
@@ -662,11 +586,7 @@ def test_validation_result_add_warning():
 def test_schema_validator_validate_table_exists():
     """Test table existence validation."""
     registry = SchemaRegistry(
-        version="v1",
-        domain="test",
-        tables={
-            "existing": TableSchema(name="existing", columns={})
-        }
+        version="v1", domain="test", tables={"existing": TableSchema(name="existing", columns={})}
     )
 
     validator = SchemaValidator(registry)
@@ -684,25 +604,12 @@ def test_schema_validator_validate_entity_missing_required():
     table = TableSchema(
         name="test",
         columns={
-            "id": ColumnSchema(
-                name="id",
-                type=ColumnType.UUID,
-                nullable=False,
-                primary_key=True
-            ),
-            "name": ColumnSchema(
-                name="name",
-                type=ColumnType.VARCHAR,
-                nullable=False
-            )
-        }
+            "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False, primary_key=True),
+            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False),
+        },
     )
 
-    registry = SchemaRegistry(
-        version="v1",
-        domain="test",
-        tables={"test": table}
-    )
+    registry = SchemaRegistry(version="v1", domain="test", tables={"test": table})
 
     validator = SchemaValidator(registry)
 
@@ -718,17 +625,10 @@ def test_schema_validator_validate_entity_missing_required():
 def test_schema_validator_validate_entity_unknown_columns():
     """Test entity validation with unknown columns."""
     table = TableSchema(
-        name="test",
-        columns={
-            "id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False)
-        }
+        name="test", columns={"id": ColumnSchema(name="id", type=ColumnType.UUID, nullable=False)}
     )
 
-    registry = SchemaRegistry(
-        version="v1",
-        domain="test",
-        tables={"test": table}
-    )
+    registry = SchemaRegistry(version="v1", domain="test", tables={"test": table})
 
     validator = SchemaValidator(registry)
 
@@ -745,16 +645,10 @@ def test_schema_validator_validate_entity_null_violation():
     """Test entity validation with NULL constraint violation."""
     table = TableSchema(
         name="test",
-        columns={
-            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)
-        }
+        columns={"name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)},
     )
 
-    registry = SchemaRegistry(
-        version="v1",
-        domain="test",
-        tables={"test": table}
-    )
+    registry = SchemaRegistry(version="v1", domain="test", tables={"test": table})
 
     validator = SchemaValidator(registry)
 
@@ -770,25 +664,15 @@ def test_schema_validator_validate_operation():
     """Test operation validation."""
     table = TableSchema(
         name="test",
-        columns={
-            "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)
-        }
+        columns={"name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False)},
     )
 
-    registry = SchemaRegistry(
-        version="v1",
-        domain="test",
-        tables={"test": table}
-    )
+    registry = SchemaRegistry(version="v1", domain="test", tables={"test": table})
 
     validator = SchemaValidator(registry)
 
     # Valid operation
-    operation = {
-        "table": "test",
-        "op_type": "insert",
-        "new_entities": [{"name": "value"}]
-    }
+    operation = {"table": "test", "op_type": "insert", "new_entities": [{"name": "value"}]}
     result = validator.validate_operation(operation)
     assert result.valid is True
 
@@ -806,8 +690,10 @@ def test_schema_validator_validate_operation():
 def test_load_product_catalog_v1():
     """Test loading actual product catalog v1 schema."""
     # This tests the real schema file exists and is valid
-    schema_path = Path(__file__).parent.parent.parent.parent / \
-                  "agents/src/autifyme_agents/schemas/registry/versions/product_catalog/v1.json"
+    schema_path = (
+        Path(__file__).parent.parent.parent.parent
+        / "agents/src/autifyme_agents/schemas/registry/versions/product_catalog/v1.json"
+    )
 
     if not schema_path.exists():
         pytest.skip("Product catalog v1 schema not found")
@@ -827,7 +713,7 @@ def test_load_product_catalog_v1():
         "product_family_industries",
         "customer_segments",
         "product_images",
-        "marketing_content"
+        "marketing_content",
     ]
 
     for table_name in expected_tables:

@@ -232,7 +232,10 @@ def _get_trace_info(thread_id: str) -> tuple[str | None, str | None]:
         for run in runs:
             metadata = run.metadata or {}
             # Check both thread_id and langsmith.thread_id
-            if metadata.get("thread_id") == thread_id or metadata.get("langsmith.thread_id") == thread_id:
+            if (
+                metadata.get("thread_id") == thread_id
+                or metadata.get("langsmith.thread_id") == thread_id
+            ):
                 trace_id = str(run.trace_id)
                 trace_url = f"https://smith.langchain.com/public/{run.id}"
                 return trace_id, trace_url
@@ -298,9 +301,7 @@ def chat_with_pm(
     session["turn_count"] += 1
     turn = session["turn_count"]
 
-    logger.info(
-        f"chat_with_pm: turn={turn}, thread={actual_thread_id}, message={message[:50]}..."
-    )
+    logger.info(f"chat_with_pm: turn={turn}, thread={actual_thread_id}, message={message[:50]}...")
 
     try:
         # Combine media_path and media_paths into single list

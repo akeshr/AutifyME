@@ -144,10 +144,7 @@ def _extract_user_message_from_root(root_run) -> tuple[str, str, bool]:
     # - "[Image]" from multimodal parsing
     # - "[1 media attachment(s):" from WhatsApp integration
     # - "media attachment" general pattern
-    has_image = (
-        "[Image]" in preview
-        or "media attachment" in preview.lower()
-    )
+    has_image = "[Image]" in preview or "media attachment" in preview.lower()
 
     # Get full message if available
     full_message = ""
@@ -406,7 +403,7 @@ def format_trace_for_display(trace: TraceForEval) -> str:
         f"- **Status**: {trace.status}",
         f"- **Timestamp**: {trace.timestamp or 'Unknown'}",
         f"- **Session ID**: {trace.session_id or 'Unknown'}",
-        f"- **Latency**: {trace.latency_ms}ms ({trace.latency_ms/1000:.1f}s)",
+        f"- **Latency**: {trace.latency_ms}ms ({trace.latency_ms / 1000:.1f}s)",
         f"- **Cost**: ${trace.total_cost:.4f}",
         f"- **Total Runs**: {trace.total_runs}",
         f"- **LLM Calls**: {trace.llm_calls}",
@@ -417,9 +414,11 @@ def format_trace_for_display(trace: TraceForEval) -> str:
 
     # Auto-detected issues (prominent placement for evaluation)
     if trace.detected_issues:
-        lines.extend([
-            "## Detected Issues",
-        ])
+        lines.extend(
+            [
+                "## Detected Issues",
+            ]
+        )
         high_issues = [i for i in trace.detected_issues if i.severity == "HIGH"]
         medium_issues = [i for i in trace.detected_issues if i.severity == "MEDIUM"]
 
@@ -435,43 +434,53 @@ def format_trace_for_display(trace: TraceForEval) -> str:
 
         lines.append("")
     else:
-        lines.extend([
-            "## Detected Issues",
-            "- None detected",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Detected Issues",
+                "- None detected",
+                "",
+            ]
+        )
 
     if trace.error:
-        lines.extend([
-            "## Errors",
-            "```",
-            trace.error,
-            "```",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Errors",
+                "```",
+                trace.error,
+                "```",
+                "",
+            ]
+        )
 
     # User interaction (enhanced)
-    lines.extend([
-        "## User Input",
-        f"- **Message**: {trace.user_message}",
-        f"- **Has Image**: {trace.has_image}",
-        f"- **Media Paths**: {', '.join(trace.media_paths) if trace.media_paths else 'None'}",
-        "",
-    ])
+    lines.extend(
+        [
+            "## User Input",
+            f"- **Message**: {trace.user_message}",
+            f"- **Has Image**: {trace.has_image}",
+            f"- **Media Paths**: {', '.join(trace.media_paths) if trace.media_paths else 'None'}",
+            "",
+        ]
+    )
 
     # PM output preview
     if trace.pm_output_preview:
-        lines.extend([
-            "## PM Output (Preview)",
-            f"{trace.pm_output_preview}",
-            "",
-        ])
+        lines.extend(
+            [
+                "## PM Output (Preview)",
+                f"{trace.pm_output_preview}",
+                "",
+            ]
+        )
 
     # Delegations
-    lines.extend([
-        "## Delegation Graph",
-        f"- **Order**: {' -> '.join(trace.delegation_order) if trace.delegation_order else 'None'}",
-    ])
+    lines.extend(
+        [
+            "## Delegation Graph",
+            f"- **Order**: {' -> '.join(trace.delegation_order) if trace.delegation_order else 'None'}",
+        ]
+    )
 
     if trace.waves:
         for wave_num, agents in sorted(trace.waves.items()):
@@ -492,19 +501,23 @@ def format_trace_for_display(trace: TraceForEval) -> str:
 
     # Handoff issues
     if trace.handoff_issues:
-        lines.extend([
-            "### Handoff Issues",
-        ])
+        lines.extend(
+            [
+                "### Handoff Issues",
+            ]
+        )
         for hi in trace.handoff_issues:
             lines.append(f"- **{hi.to_agent}**: {'; '.join(hi.issues)}")
         lines.append("")
 
     # Tool calls
-    lines.extend([
-        "## Tool Calls",
-        f"- **Total**: {len(trace.tool_calls)}",
-        "",
-    ])
+    lines.extend(
+        [
+            "## Tool Calls",
+            f"- **Total**: {len(trace.tool_calls)}",
+            "",
+        ]
+    )
 
     if trace.tool_calls:
         lines.append("### Tool Call Sequence")
@@ -512,49 +525,59 @@ def format_trace_for_display(trace: TraceForEval) -> str:
         lines.append("|---|-------|------|--------|")
         for tc in trace.tool_calls[:20]:
             status_icon = "OK" if tc["status"] == "success" else "ERR"
-            lines.append(f"| {tc['sequence']} | {tc['agent']} | {tc['tool_name']} | {status_icon} |")
+            lines.append(
+                f"| {tc['sequence']} | {tc['agent']} | {tc['tool_name']} | {status_icon} |"
+            )
         if len(trace.tool_calls) > 20:
             lines.append(f"| ... | ... | ({len(trace.tool_calls) - 20} more) | ... |")
         lines.append("")
 
     # Protocols
     if trace.protocols_loaded:
-        lines.extend([
-            "## Protocols Loaded",
-            "| Agent | Protocol |",
-            "|-------|----------|",
-        ])
+        lines.extend(
+            [
+                "## Protocols Loaded",
+                "| Agent | Protocol |",
+                "|-------|----------|",
+            ]
+        )
         for agent, protocol in trace.protocols_loaded.items():
             lines.append(f"| {agent} | {protocol} |")
         lines.append("")
 
     # HITL Interrupts
     if trace.interrupts:
-        lines.extend([
-            "## HITL Interrupts",
-            "| Type | Agent | Sequence |",
-            "|------|-------|----------|",
-        ])
+        lines.extend(
+            [
+                "## HITL Interrupts",
+                "| Type | Agent | Sequence |",
+                "|------|-------|----------|",
+            ]
+        )
         for intr in trace.interrupts:
             lines.append(f"| {intr['type']} | {intr['agent']} | {intr['sequence']} |")
         lines.append("")
 
     # Final response
-    lines.extend([
-        "## Final Response",
-        f"- **Agent**: {trace.final_response_agent}",
-        f"- **Is Approval Request**: {trace.is_approval_request}",
-        f"- **Has Open Question**: {trace.has_open_question}",
-        f"- **Has Numbered Options**: {trace.has_numbered_options}",
-        f"- **Mentions Error**: {trace.mentions_error}",
-        f"- **Mentions Success**: {trace.mentions_success}",
-        "",
-        "### Response Text",
-        "```",
-        trace.final_response[:2000] if trace.final_response else "[No response]",
-        "```" if len(trace.final_response) <= 2000 else f"... (truncated, {len(trace.final_response)} chars total)\n```",
-        "",
-    ])
+    lines.extend(
+        [
+            "## Final Response",
+            f"- **Agent**: {trace.final_response_agent}",
+            f"- **Is Approval Request**: {trace.is_approval_request}",
+            f"- **Has Open Question**: {trace.has_open_question}",
+            f"- **Has Numbered Options**: {trace.has_numbered_options}",
+            f"- **Mentions Error**: {trace.mentions_error}",
+            f"- **Mentions Success**: {trace.mentions_success}",
+            "",
+            "### Response Text",
+            "```",
+            trace.final_response[:2000] if trace.final_response else "[No response]",
+            "```"
+            if len(trace.final_response) <= 2000
+            else f"... (truncated, {len(trace.final_response)} chars total)\n```",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 
@@ -585,7 +608,8 @@ def load_traces_for_comparison(
         "latency_diff_ms": trace_b.latency_ms - trace_a.latency_ms,
         "latency_pct_change": (
             ((trace_b.latency_ms - trace_a.latency_ms) / trace_a.latency_ms * 100)
-            if trace_a.latency_ms else 0
+            if trace_a.latency_ms
+            else 0
         ),
         "cost_diff": trace_b.total_cost - trace_a.total_cost,
         "token_diff": trace_b.total_tokens - trace_a.total_tokens,
@@ -712,7 +736,9 @@ if __name__ == "__main__":
         print(f"Recent traces ({hours}h, limit {limit}):")
         for i, tid in enumerate(traces, 1):
             summary = get_trace_quick_summary(tid)
-            print(f"  {i}. {tid[:12]} | {summary['status']:8} | {summary['latency_ms']/1000:.1f}s | {summary['user_input'][:50]}")
+            print(
+                f"  {i}. {tid[:12]} | {summary['status']:8} | {summary['latency_ms'] / 1000:.1f}s | {summary['user_input'][:50]}"
+            )
     elif len(sys.argv) >= 3:
         # Comparison mode
         trace_id_b = sys.argv[2]

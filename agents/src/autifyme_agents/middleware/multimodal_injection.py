@@ -53,26 +53,26 @@ logger = logging.getLogger(__name__)
 # - JSON strings: "path": "/tmp/file.jpg" or "path": "C:\\path\\file.png"
 # - With escaped backslashes in JSON: C:\\\\Users\\\\...
 IMAGE_PATH_PATTERN = re.compile(
-    r'(?:'
+    r"(?:"
     # Storage URLs (Supabase, S3, etc.)
     r'(https?://[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))'
-    r'|'
+    r"|"
     # Storage paths: inbox/..., pending/..., products/... (with optional leading slash)
     r'(/?(?:inbox|pending|products)/[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))'
-    r'|'
+    r"|"
     # Unix paths: /tmp/..., /var/...
     r'(/(?:tmp|var|home|Users)[/][^\s<>"\'\\]+\.(?:jpg|jpeg|png|gif|webp))'
-    r'|'
+    r"|"
     # Windows paths with normal slashes: C:/Users/...
     r'([A-Za-z]:/[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))'
-    r'|'
+    r"|"
     # Windows paths with single backslash: C:\Users\...
     r'([A-Za-z]:\\[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))'
-    r'|'
+    r"|"
     # Windows paths with escaped backslashes in JSON: C:\\Users\\...
     r'([A-Za-z]:\\\\[^\s<>"\']+\.(?:jpg|jpeg|png|gif|webp))'
-    r')',
-    re.IGNORECASE
+    r")",
+    re.IGNORECASE,
 )
 
 MAX_IMAGE_DIMENSION = 1024  # Larger for specialist (higher detail for image_studio)
@@ -155,7 +155,7 @@ def _load_and_encode_image(image_path: str) -> tuple[str, dict[str, Any]] | None
 
         logger.info(
             "Image loaded for multimodal injection",
-            extra={"source": image_path, "type": source_type, "size": original_size}
+            extra={"source": image_path, "type": source_type, "size": original_size},
         )
 
         return data_uri, metadata
@@ -256,25 +256,31 @@ def _transform_to_multimodal(
     content_blocks: list[dict[str, Any]] = []
 
     # Add original text (minus redundant path mentions if desired)
-    content_blocks.append({
-        "type": "text",
-        "text": original_content,
-    })
+    content_blocks.append(
+        {
+            "type": "text",
+            "text": original_content,
+        }
+    )
 
     # Add each image
     for path in image_paths:
         result = _load_and_encode_image(path)
         if result is not None:
             data_uri, metadata = result
-            content_blocks.append({
-                "type": "image_url",
-                "image_url": {"url": data_uri},
-            })
+            content_blocks.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": data_uri},
+                }
+            )
             # Add metadata as text for context
-            content_blocks.append({
-                "type": "text",
-                "text": f"[Above image: {metadata['source']} ({metadata['original_size']})]",
-            })
+            content_blocks.append(
+                {
+                    "type": "text",
+                    "text": f"[Above image: {metadata['source']} ({metadata['original_size']})]",
+                }
+            )
 
     return content_blocks
 
@@ -360,7 +366,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                     logger.info(
                         "Injecting %d image(s) into HumanMessage",
                         len(image_paths),
-                        extra={"paths": image_paths}
+                        extra={"paths": image_paths},
                     )
                     # Store paths for reference resolution (with None label - to be inferred)
                     for path in image_paths:
@@ -369,15 +375,13 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                     logger.info(
                         "Stored %d path(s) for reference resolution: %s",
                         len(self._injected_paths),
-                        [p for p, _ in self._injected_paths]
+                        [p for p, _ in self._injected_paths],
                     )
-                    multimodal_content = _transform_to_multimodal(
-                        msg.content, image_paths
-                    )
+                    multimodal_content = _transform_to_multimodal(msg.content, image_paths)
                     # Create new HumanMessage with multimodal content
-                    processed.append(HumanMessage(
-                        content=cast(list[str | dict[Any, Any]], multimodal_content)
-                    ))
+                    processed.append(
+                        HumanMessage(content=cast(list[str | dict[Any, Any]], multimodal_content))
+                    )
                 else:
                     processed.append(msg)
             elif isinstance(msg, ToolMessage) and isinstance(msg.content, str):
@@ -388,18 +392,18 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                         "Injecting %d image(s) into ToolMessage from %s",
                         len(image_paths),
                         msg.name or "unknown tool",
-                        extra={"paths": image_paths}
+                        extra={"paths": image_paths},
                     )
-                    multimodal_content = _transform_to_multimodal(
-                        msg.content, image_paths
-                    )
+                    multimodal_content = _transform_to_multimodal(msg.content, image_paths)
                     # Create new ToolMessage with multimodal content
                     # Preserve tool_call_id which is required for ToolMessage
-                    processed.append(ToolMessage(
-                        content=cast(list[str | dict[Any, Any]], multimodal_content),
-                        tool_call_id=msg.tool_call_id,
-                        name=msg.name,
-                    ))
+                    processed.append(
+                        ToolMessage(
+                            content=cast(list[str | dict[Any, Any]], multimodal_content),
+                            tool_call_id=msg.tool_call_id,
+                            name=msg.name,
+                        )
+                    )
                 else:
                     processed.append(msg)
             else:
@@ -476,7 +480,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         logger.debug(
             "[MULTIMODAL] _process_tool_result: content type=%s, content preview=%s",
             type(result.content).__name__,
-            str(result.content)[:200] if result.content else "None"
+            str(result.content)[:200] if result.content else "None",
         )
 
         # Skip if already multimodal (list with image_url blocks)
@@ -501,7 +505,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                     "Extracting %d image(s) from structured tool output: %s",
                     len(image_paths),
                     tool_name or "unknown",
-                    extra={"paths": image_paths}
+                    extra={"paths": image_paths},
                 )
                 # Convert dict to JSON string for multimodal transformation
                 text_content = json.dumps(content, indent=2)
@@ -518,14 +522,14 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             logger.debug(
                 "[MULTIMODAL] String extraction found %d path(s): %s",
                 len(image_paths),
-                image_paths[:3] if image_paths else "none"
+                image_paths[:3] if image_paths else "none",
             )
             if image_paths:
                 logger.info(
                     "Extracting %d image(s) from string tool output: %s",
                     len(image_paths),
                     tool_name or "unknown",
-                    extra={"paths": image_paths}
+                    extra={"paths": image_paths},
                 )
                 multimodal_content = _transform_to_multimodal(content, image_paths)
                 return ToolMessage(
@@ -535,8 +539,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
                 )
         elif not isinstance(content, list):  # Defensive: handles unexpected content types
             logger.debug(  # type: ignore[unreachable]
-                "[MULTIMODAL] Content is neither dict nor str nor list: %s",
-                type(content).__name__
+                "[MULTIMODAL] Content is neither dict nor str nor list: %s", type(content).__name__
             )
 
         logger.debug("[MULTIMODAL] No image paths found, returning original result")
@@ -565,15 +568,13 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             idx = int(ref)
             if 0 <= idx < len(self._injected_paths):
                 resolved = self._injected_paths[idx][0]
-                logger.info(
-                    "Resolved path reference @%d -> %s",
-                    idx, resolved
-                )
+                logger.info("Resolved path reference @%d -> %s", idx, resolved)
                 return resolved
             else:
                 logger.warning(
                     "Path reference @%d out of range (have %d paths)",
-                    idx, len(self._injected_paths)
+                    idx,
+                    len(self._injected_paths),
                 )
                 return path
 
@@ -581,16 +582,14 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         # Currently labels are None, but could be populated from image metadata
         for stored_path, label in self._injected_paths:
             if label and label.lower() == ref.lower():
-                logger.info(
-                    "Resolved path reference @%s -> %s",
-                    ref, stored_path
-                )
+                logger.info("Resolved path reference @%s -> %s", ref, stored_path)
                 return stored_path
 
         # No match - return original (will likely fail, but with clear error)
         logger.warning(
             "Could not resolve path reference @%s (available: %s)",
-            ref, [f"@{i}" for i in range(len(self._injected_paths))]
+            ref,
+            [f"@{i}" for i in range(len(self._injected_paths))],
         )
         return path
 
@@ -641,10 +640,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         # Get tool name for logging
         tool_name = request.tool.name if request.tool else None
 
-        logger.debug(
-            "[MULTIMODAL] wrap_tool_call INVOKED for tool: %s",
-            tool_name or "unknown"
-        )
+        logger.debug("[MULTIMODAL] wrap_tool_call INVOKED for tool: %s", tool_name or "unknown")
 
         # BEFORE execution: Resolve path references for image_studio
         if tool_name == "image_studio" and self._injected_paths:
@@ -652,9 +648,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             if isinstance(original_args, dict):
                 resolved_args = self._resolve_image_studio_args(original_args)
                 if resolved_args != original_args:
-                    logger.info(
-                        "[MULTIMODAL] Resolved path references in image_studio args"
-                    )
+                    logger.info("[MULTIMODAL] Resolved path references in image_studio args")
                     # Create new tool_call with resolved args
                     request.tool_call = {**request.tool_call, "args": resolved_args}
 
@@ -664,7 +658,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         logger.debug(
             "[MULTIMODAL] Tool result type: %s, content type: %s",
             type(result).__name__,
-            type(result.content).__name__ if hasattr(result, "content") else "N/A"
+            type(result.content).__name__ if hasattr(result, "content") else "N/A",
         )
 
         # AFTER execution: Process image_studio output for multimodal injection
@@ -673,7 +667,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             logger.debug(
                 "[MULTIMODAL] After processing - content type: %s, is_list: %s",
                 type(processed.content).__name__ if hasattr(processed, "content") else "N/A",
-                isinstance(processed.content, list) if hasattr(processed, "content") else False
+                isinstance(processed.content, list) if hasattr(processed, "content") else False,
             )
             return processed
 
@@ -699,10 +693,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         # Get tool name for logging
         tool_name = request.tool.name if request.tool else None
 
-        logger.debug(
-            "[MULTIMODAL] awrap_tool_call INVOKED for tool: %s",
-            tool_name or "unknown"
-        )
+        logger.debug("[MULTIMODAL] awrap_tool_call INVOKED for tool: %s", tool_name or "unknown")
 
         # BEFORE execution: Resolve path references for image_studio
         if tool_name == "image_studio" and self._injected_paths:
@@ -710,9 +701,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             if isinstance(original_args, dict):
                 resolved_args = self._resolve_image_studio_args(original_args)
                 if resolved_args != original_args:
-                    logger.info(
-                        "[MULTIMODAL] Resolved path references in image_studio args"
-                    )
+                    logger.info("[MULTIMODAL] Resolved path references in image_studio args")
                     # Create new tool_call with resolved args
                     request.tool_call = {**request.tool_call, "args": resolved_args}
 
@@ -722,7 +711,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
         logger.debug(
             "[MULTIMODAL] Tool result type: %s, content type: %s",
             type(result).__name__,
-            type(result.content).__name__ if hasattr(result, "content") else "N/A"
+            type(result.content).__name__ if hasattr(result, "content") else "N/A",
         )
 
         # AFTER execution: Process image_studio output for multimodal injection
@@ -731,7 +720,7 @@ class MultimodalInjectionMiddleware(AgentMiddleware):
             logger.debug(
                 "[MULTIMODAL] After processing - content type: %s, is_list: %s",
                 type(processed.content).__name__ if hasattr(processed, "content") else "N/A",
-                isinstance(processed.content, list) if hasattr(processed, "content") else False
+                isinstance(processed.content, list) if hasattr(processed, "content") else False,
             )
             return processed
 

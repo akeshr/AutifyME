@@ -33,7 +33,8 @@ def get_llm(
     # Gemini 3 Image Generation parameters
     image_aspect_ratio: Literal[
         "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
-    ] | None = None,
+    ]
+    | None = None,
     image_size: Literal["1K", "2K", "4K"] | None = None,
     # Retry configuration for Gemini blank response handling
     max_retries: int = 5,
@@ -239,9 +240,7 @@ def get_llm(
             temperature=effective_temp,
             timeout=timeout,  # type: ignore[call-arg]
             max_retries=max_retries,
-            model_kwargs={
-                "extra_headers": {"anthropic-beta": "prompt-caching-2024-07-31"}
-            },
+            model_kwargs={"extra_headers": {"anthropic-beta": "prompt-caching-2024-07-31"}},
         )
     elif provider == "google":
         # Google Gemini models with full parameter support
@@ -274,6 +273,7 @@ def get_llm(
             # Warn if user accidentally passed thinking_budget for Gemini 3
             if thinking_budget is not None:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     f"thinking_budget ignored for Gemini 3 model '{model}'. "
                     "Use thinking_level instead (Flash: minimal/low/medium/high, Pro: low/high)."
@@ -322,6 +322,7 @@ def get_llm(
             if is_gemini_3:
                 # Convert user-friendly strings to google.genai.types.MediaResolution enum
                 from google.genai.types import MediaResolution
+
                 resolution_map = {
                     "low": MediaResolution.MEDIA_RESOLUTION_LOW,
                     "medium": MediaResolution.MEDIA_RESOLUTION_MEDIUM,
@@ -330,6 +331,7 @@ def get_llm(
                 gemini_kwargs["media_resolution"] = resolution_map[media_resolution]
             else:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     f"media_resolution ignored for model '{model}'. "
                     "Only supported on Gemini 3+ models."

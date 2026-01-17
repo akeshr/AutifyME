@@ -90,9 +90,7 @@ class TestValidateEntityData:
         )
 
         result = await storage.validate_entity_data(
-            "products",
-            {"sku_code": "SKU-001", "name": "Product A"},
-            operation="insert"
+            "products", {"sku_code": "SKU-001", "name": "Product A"}, operation="insert"
         )
 
         assert result["valid"] is True
@@ -111,7 +109,7 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "products",
             {"sku_code": "SKU-001"},  # Missing 'name'
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is False
@@ -131,7 +129,7 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "products",
             {"sku_code": "", "name": "Product A"},  # Empty sku_code
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is False
@@ -147,9 +145,7 @@ class TestValidateEntityData:
         )
 
         result = await storage.validate_entity_data(
-            "products",
-            {"sku_code": None, "name": "Product A"},
-            operation="insert"
+            "products", {"sku_code": None, "name": "Product A"}, operation="insert"
         )
 
         assert result["valid"] is False
@@ -171,7 +167,7 @@ class TestValidateEntityData:
                 {"sku_code": "SKU-002", "name": "Product B"},
                 {"sku_code": "SKU-003", "name": "Product C"},
             ],
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is True
@@ -193,7 +189,7 @@ class TestValidateEntityData:
                 {"sku_code": "SKU-002"},  # Missing name
                 {"name": "Product C"},  # Missing sku_code
             ],
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is False
@@ -212,13 +208,12 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "products",
             {"sku_code": "SKU-001", "name": "Product A", "base_price": "invalid"},
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is False
         assert any(
-            e["field"] == "base_price" and "number" in e["error"].lower()
-            for e in result["errors"]
+            e["field"] == "base_price" and "number" in e["error"].lower() for e in result["errors"]
         )
 
     @pytest.mark.asyncio
@@ -233,7 +228,7 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "products",
             {"sku_code": "SKU-001", "name": "Product A", "base_price": -10.0},
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is True  # Warning, not error
@@ -255,7 +250,7 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "products",
             {"sku_code": "SKU-001", "name": "Product A", "description": long_description},
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is True
@@ -263,9 +258,7 @@ class TestValidateEntityData:
         assert "1500" in result["warnings"][0]["warning"]
 
     @pytest.mark.asyncio
-    async def test_validate_update_operation_no_required_fields(
-        self, mock_supabase_client
-    ):
+    async def test_validate_update_operation_no_required_fields(self, mock_supabase_client):
         """Test update operation doesn't require all fields."""
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
@@ -276,7 +269,7 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "products",
             {"base_price": 150.0},  # Only updating price, no sku/name required
-            operation="update"
+            operation="update",
         )
 
         assert result["valid"] is True
@@ -294,7 +287,7 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "products",
             {"base_price": 100.0},  # Partial data ok for upsert
-            operation="upsert"
+            operation="upsert",
         )
 
         assert result["valid"] is True
@@ -312,7 +305,7 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "product_families",
             {"name": "Family A"},  # Missing sku_prefix
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is False
@@ -330,7 +323,7 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "categories",
             {},  # Missing required 'name'
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is False
@@ -345,9 +338,7 @@ class TestValidateEntityData:
         )
 
         result = await storage.validate_entity_data(
-            "unknown_table",
-            {"any_field": "any_value"},
-            operation="insert"
+            "unknown_table", {"any_field": "any_value"}, operation="insert"
         )
 
         # Should pass as there are no specific validation rules
@@ -365,7 +356,7 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "products",
             {"sku_code": "SKU-001", "name": "Product A", "base_price": 0},
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is True
@@ -383,7 +374,7 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "products",
             {"sku_code": "SKU-001", "name": "Product A", "base_price": 99.99},
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is True
@@ -402,7 +393,7 @@ class TestValidateEntityData:
         result = await storage.validate_entity_data(
             "products",
             {"base_price": "not-a-number"},  # Missing sku_code, name, invalid price
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is False
@@ -424,7 +415,7 @@ class TestValidateEntityData:
                 {"sku_code": "SKU-002"},  # Error at index 1
                 {"sku_code": "SKU-003", "name": "Product C"},
             ],
-            operation="insert"
+            operation="insert",
         )
 
         assert result["valid"] is False
@@ -453,9 +444,7 @@ class TestCheckConstraintViolations:
         )
 
         result = await storage.check_constraint_violations(
-            "products",
-            {"sku_code": "SKU-NEW", "name": "New Product"},
-            operation="insert"
+            "products", {"sku_code": "SKU-NEW", "name": "New Product"}, operation="insert"
         )
 
         assert result["safe_to_proceed"] is True
@@ -474,9 +463,7 @@ class TestCheckConstraintViolations:
         )
 
         result = await storage.check_constraint_violations(
-            "products",
-            {"sku_code": "SKU-001", "name": "Product A"},
-            operation="insert"
+            "products", {"sku_code": "SKU-001", "name": "Product A"}, operation="insert"
         )
 
         assert result["safe_to_proceed"] is False
@@ -494,9 +481,7 @@ class TestCheckConstraintViolations:
         )
 
         result = await storage.check_constraint_violations(
-            "products",
-            {"sku_code": "SKU-001", "name": "Product A"},
-            operation="upsert"
+            "products", {"sku_code": "SKU-001", "name": "Product A"}, operation="upsert"
         )
 
         # Upsert handles conflicts, so should be safe
@@ -518,7 +503,7 @@ class TestCheckConstraintViolations:
             "products",
             {"sku_code": "SKU-001"},
             operation="update",
-            exclude_ids=["uuid-123"]  # Exclude self from check
+            exclude_ids=["uuid-123"],  # Exclude self from check
         )
 
         assert result["safe_to_proceed"] is True
@@ -541,7 +526,7 @@ class TestCheckConstraintViolations:
                 {"sku_code": "SKU-001", "name": "Product A"},  # Conflict
                 {"sku_code": "SKU-002", "name": "Product B"},  # OK
             ],
-            operation="insert"
+            operation="insert",
         )
 
         assert result["safe_to_proceed"] is False
@@ -565,7 +550,7 @@ class TestCheckConstraintViolations:
                 {"sku_code": "SKU-001", "name": "Product A Duplicate"},
                 {"sku_code": "SKU-002", "name": "Product B"},
             ],
-            operation="insert"
+            operation="insert",
         )
 
         assert result["safe_to_proceed"] is False
@@ -589,9 +574,7 @@ class TestCheckConstraintViolations:
         batch_data = [{"sku_code": f"SKU-{i:03d}", "name": f"Product {i}"} for i in range(150)]
 
         result = await storage.check_constraint_violations(
-            "products",
-            batch_data,
-            operation="insert"
+            "products", batch_data, operation="insert"
         )
 
         assert result["safe_to_proceed"] is True  # No violations
@@ -610,9 +593,7 @@ class TestCheckConstraintViolations:
         )
 
         result = await storage.check_constraint_violations(
-            "product_families",
-            {"sku_prefix": "PRE", "name": "Family A"},
-            operation="insert"
+            "product_families", {"sku_prefix": "PRE", "name": "Family A"}, operation="insert"
         )
 
         assert result["safe_to_proceed"] is False
@@ -630,9 +611,7 @@ class TestCheckConstraintViolations:
         )
 
         result = await storage.check_constraint_violations(
-            "categories",
-            {"slug": "bottles", "name": "Bottles"},
-            operation="insert"
+            "categories", {"slug": "bottles", "name": "Bottles"}, operation="insert"
         )
 
         assert result["safe_to_proceed"] is False
@@ -649,9 +628,7 @@ class TestCheckConstraintViolations:
         )
 
         result = await storage.check_constraint_violations(
-            "variant_axes",
-            {"axis_name": "size"},
-            operation="insert"
+            "variant_axes", {"axis_name": "size"}, operation="insert"
         )
 
         assert result["safe_to_proceed"] is False
@@ -666,9 +643,7 @@ class TestCheckConstraintViolations:
         )
 
         result = await storage.check_constraint_violations(
-            "unknown_table",
-            {"any_field": "any_value"},
-            operation="insert"
+            "unknown_table", {"any_field": "any_value"}, operation="insert"
         )
 
         # No constraints to check
@@ -687,9 +662,7 @@ class TestCheckConstraintViolations:
         )
 
         result = await storage.check_constraint_violations(
-            "products",
-            {"sku_code": None, "name": "Product"},
-            operation="insert"
+            "products", {"sku_code": None, "name": "Product"}, operation="insert"
         )
 
         # Null unique field not checked
@@ -708,9 +681,7 @@ class TestCheckConstraintViolations:
         )
 
         result = await storage.check_constraint_violations(
-            "products",
-            {"sku_code": "SKU-001", "name": "Product"},
-            operation="insert"
+            "products", {"sku_code": "SKU-001", "name": "Product"}, operation="insert"
         )
 
         assert result["safe_to_proceed"] is False
@@ -735,7 +706,7 @@ class TestCheckConstraintViolations:
                 {"sku_code": "SKU-002"},  # New
                 {"sku_code": "SKU-002"},  # Duplicate within batch
             ],
-            operation="insert"
+            operation="insert",
         )
 
         assert result["safe_to_proceed"] is False
@@ -756,9 +727,7 @@ class TestCheckConstraintViolations:
         )
 
         result = await storage.check_constraint_violations(
-            "products",
-            {"sku_code": "SKU-NEW"},
-            operation="insert"
+            "products", {"sku_code": "SKU-NEW"}, operation="insert"
         )
 
         assert len(result["checked_constraints"]) > 0
@@ -776,9 +745,7 @@ class TestCheckConstraintViolations:
         )
 
         result = await storage.check_constraint_violations(
-            "products",
-            {"sku_code": "SKU-EXISTING"},
-            operation="update"
+            "products", {"sku_code": "SKU-EXISTING"}, operation="update"
         )
 
         assert result["safe_to_proceed"] is False
@@ -827,9 +794,7 @@ class TestPreviewWriteImpact:
         )
 
         result = await storage.preview_write_impact(
-            "products",
-            filters={"is_active": False},
-            operation="update"
+            "products", filters={"is_active": False}, operation="update"
         )
 
         assert result["affected_count"] == 10
@@ -864,7 +829,7 @@ class TestPreviewWriteImpact:
         result = await storage.preview_write_impact(
             "products",
             filters=None,  # No filters!
-            operation="delete"
+            operation="delete",
         )
 
         assert result["safe_to_proceed"] is False
@@ -897,7 +862,7 @@ class TestPreviewWriteImpact:
         result = await storage.preview_write_impact(
             "products",
             filters={},  # Empty dict
-            operation="delete"
+            operation="delete",
         )
 
         assert result["safe_to_proceed"] is False
@@ -928,9 +893,7 @@ class TestPreviewWriteImpact:
         )
 
         result = await storage.preview_write_impact(
-            "products",
-            filters={"is_active": False},
-            operation="update"
+            "products", filters={"is_active": False}, operation="update"
         )
 
         assert any(w["type"] == "large_batch" for w in result["warnings"])
@@ -959,9 +922,7 @@ class TestPreviewWriteImpact:
         )
 
         result = await storage.preview_write_impact(
-            "products",
-            filters={"sku_code": "NON-EXISTENT"},
-            operation="delete"
+            "products", filters={"sku_code": "NON-EXISTENT"}, operation="delete"
         )
 
         assert result["affected_count"] == 0
@@ -996,9 +957,7 @@ class TestPreviewWriteImpact:
         )
 
         result = await storage.preview_write_impact(
-            "products",
-            filters={"is_active": False},
-            operation="delete"
+            "products", filters={"is_active": False}, operation="delete"
         )
 
         assert result["affected_count"] == 5
@@ -1032,10 +991,7 @@ class TestPreviewWriteImpact:
         )
 
         result = await storage.preview_write_impact(
-            "products",
-            filters={"category": "bottles"},
-            operation="update",
-            sample_size=10
+            "products", filters={"category": "bottles"}, operation="update", sample_size=10
         )
 
         assert len(result["sample_entities"]) == 10
@@ -1065,9 +1021,7 @@ class TestPreviewWriteImpact:
         )
 
         result = await storage.preview_write_impact(
-            "products",
-            filters={"is_active": True},
-            operation="update"
+            "products", filters={"is_active": True}, operation="update"
         )
 
         # 500 entities * 2ms = 1000ms
@@ -1098,9 +1052,7 @@ class TestPreviewWriteImpact:
         )
 
         result = await storage.preview_write_impact(
-            "products",
-            filters={"id": "specific-id"},
-            operation="update"
+            "products", filters={"id": "specific-id"}, operation="update"
         )
 
         # Minimum duration is 10ms
@@ -1131,9 +1083,7 @@ class TestPreviewWriteImpact:
         )
 
         result = await storage.preview_write_impact(
-            "products",
-            filters={"category": "test"},
-            operation="update"
+            "products", filters={"category": "test"}, operation="update"
         )
 
         assert result["safe_to_proceed"] is True
@@ -1169,10 +1119,7 @@ class TestPreviewWriteImpact:
         )
 
         result = await storage.preview_write_impact(
-            "products",
-            filters={"category": "test"},
-            operation="update",
-            sample_size=2
+            "products", filters={"category": "test"}, operation="update", sample_size=2
         )
 
         assert len(result["sample_entities"]) == 2
@@ -1206,7 +1153,7 @@ class TestPreviewWriteImpact:
         result = await storage.preview_write_impact(
             "products",
             filters={},  # Empty filters
-            operation="delete"
+            operation="delete",
         )
 
         # Should have both no_filters and large_batch warnings
@@ -1243,10 +1190,7 @@ class TestPreviewWriteImpact:
         )
 
         result = await storage.preview_write_impact(
-            "products",
-            filters={"category": "test"},
-            operation="update",
-            sample_size=3
+            "products", filters={"category": "test"}, operation="update", sample_size=3
         )
 
         assert len(result["sample_entities"]) == 3
@@ -1279,9 +1223,7 @@ class TestPreviewWriteImpact:
         )
 
         result = await storage.preview_write_impact(
-            "products",
-            filters={"category": "test"},
-            operation="update"
+            "products", filters={"category": "test"}, operation="update"
         )
 
         # Verify all expected fields present

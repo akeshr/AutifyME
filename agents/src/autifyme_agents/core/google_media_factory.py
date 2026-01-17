@@ -62,9 +62,7 @@ class VeoVideoGenerator:
         self.model = model
         self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
         if not self.api_key:
-            raise ValueError(
-                "GOOGLE_API_KEY environment variable or api_key parameter required"
-            )
+            raise ValueError("GOOGLE_API_KEY environment variable or api_key parameter required")
 
         # Configure client (type stubs lag behind actual SDK API)
         genai.configure(api_key=self.api_key)  # type: ignore[attr-defined]
@@ -122,18 +120,14 @@ class VeoVideoGenerator:
         elapsed = 0.0
         while not operation.done:
             if elapsed >= timeout:
-                raise TimeoutError(
-                    f"Video generation exceeded timeout of {timeout}s"
-                )
+                raise TimeoutError(f"Video generation exceeded timeout of {timeout}s")
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
             operation = await self.client.operations.get(operation.name)
 
         # Check for errors
         if operation.error:
-            raise ValueError(
-                f"Video generation failed: {operation.error.message}"
-            )
+            raise ValueError(f"Video generation failed: {operation.error.message}")
 
         # Extract video bytes from result
         video_data = operation.result.video
@@ -181,18 +175,14 @@ class VeoVideoGenerator:
         elapsed = 0.0
         while not operation.done:
             if elapsed >= timeout:
-                raise TimeoutError(
-                    f"Video extension exceeded timeout of {timeout}s"
-                )
+                raise TimeoutError(f"Video extension exceeded timeout of {timeout}s")
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
             operation = await self.client.operations.get(operation.name)
 
         # Check for errors
         if operation.error:
-            raise ValueError(
-                f"Video extension failed: {operation.error.message}"
-            )
+            raise ValueError(f"Video extension failed: {operation.error.message}")
 
         # Extract extended video bytes
         video_data = operation.result.video

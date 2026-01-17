@@ -179,8 +179,7 @@ Execute tasks thoughtfully, adapt dynamically, and communicate clearly."""
             "final_url": final_state.url if final_state else "unknown",
             "final_title": final_state.title if final_state else "unknown",
             "actions_summary": [
-                f"{action.action_type}: {action.reasoning[:100]}"
-                for action in actions
+                f"{action.action_type}: {action.reasoning[:100]}" for action in actions
             ],
             "error": result.get("error"),
         }

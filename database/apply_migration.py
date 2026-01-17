@@ -16,22 +16,23 @@ from dotenv import load_dotenv
 project_root = Path(__file__).parent.parent
 load_dotenv(project_root / ".env")
 
+
 def apply_migration(migration_file: Path) -> None:
     """Apply a SQL migration file to the database.
 
     Args:
         migration_file: Path to SQL migration file
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Applying Migration: {migration_file.name}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     # Read migration SQL
     if not migration_file.exists():
         print(f"ERROR: Migration file not found: {migration_file}")
         sys.exit(1)
 
-    sql = migration_file.read_text(encoding='utf-8')
+    sql = migration_file.read_text(encoding="utf-8")
     print(f"Migration size: {len(sql)} characters\n")
 
     # Connect to database
@@ -40,6 +41,7 @@ def apply_migration(migration_file: Path) -> None:
     except ImportError:
         print("ERROR: psycopg not installed. Installing...")
         import subprocess
+
         subprocess.run([sys.executable, "-m", "pip", "install", "psycopg[binary]"], check=True)
         import psycopg
 
@@ -123,9 +125,9 @@ def apply_migration(migration_file: Path) -> None:
                 if len(columns) > 10:
                     print(f"    ... and {len(columns) - 10} more columns")
 
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print("Migration applied successfully!")
-            print(f"{'='*60}\n")
+            print(f"{'=' * 60}\n")
 
     except psycopg.Error as e:
         print("\nERROR: Database error occurred:")
@@ -135,6 +137,7 @@ def apply_migration(migration_file: Path) -> None:
         print("\nERROR: Unexpected error:")
         print(f"  {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

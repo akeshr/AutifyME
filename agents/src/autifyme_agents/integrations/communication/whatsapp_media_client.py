@@ -62,7 +62,11 @@ class WhatsAppMediaClient:
         media_url: str = data["url"]
         logger.info(
             "Resolved media",
-            extra={"media_id": media_id, "media_url": media_url, "mime_type": data.get("mime_type")},
+            extra={
+                "media_id": media_id,
+                "media_url": media_url,
+                "mime_type": data.get("mime_type"),
+            },
         )
         return media_url
 
@@ -87,7 +91,11 @@ class WhatsAppMediaClient:
         except httpx.HTTPStatusError:  # noqa: BLE001
             logger.error(
                 "Failed to download media",
-                extra={"status": response.status_code, "media_id": media_id, "media_url": media_url},
+                extra={
+                    "status": response.status_code,
+                    "media_id": media_id,
+                    "media_url": media_url,
+                },
             )
             raise
 
@@ -161,7 +169,7 @@ class WhatsAppMediaClient:
         """
         logger.info(
             "Uploading media to WhatsApp",
-            extra={"file_name": filename, "mime_type": mime_type, "size_bytes": len(file_bytes)}
+            extra={"file_name": filename, "mime_type": mime_type, "size_bytes": len(file_bytes)},
         )
 
         # WhatsApp media upload endpoint
@@ -188,7 +196,11 @@ class WhatsAppMediaClient:
         except httpx.HTTPStatusError:
             logger.error(
                 "Failed to upload media to WhatsApp",
-                extra={"status": response.status_code, "file_name": filename, "response": response.text}
+                extra={
+                    "status": response.status_code,
+                    "file_name": filename,
+                    "response": response.text,
+                },
             )
             raise
 
@@ -196,8 +208,7 @@ class WhatsAppMediaClient:
         media_id: str = result["id"]
 
         logger.info(
-            "Media uploaded to WhatsApp",
-            extra={"file_name": filename, "media_id": media_id}
+            "Media uploaded to WhatsApp", extra={"file_name": filename, "media_id": media_id}
         )
 
         return media_id

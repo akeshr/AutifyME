@@ -203,5 +203,7 @@ def build_html_generator_prompt(
         company_industry=company_industry or "General",
         company_brand_voice=company_brand_voice,
         company_target_audience=company_target_audience,
-        company_style_preferences=", ".join(company_style_preferences) if company_style_preferences else "Modern, clean",
+        company_style_preferences=", ".join(company_style_preferences)
+        if company_style_preferences
+        else "Modern, clean",
     )

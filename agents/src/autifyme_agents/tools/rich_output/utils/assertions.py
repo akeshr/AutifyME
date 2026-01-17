@@ -24,7 +24,9 @@ class RichOutputAssertions:
             AssertionError: If branding is incorrect
         """
         assert company_name in html, f"Company name '{company_name}' not found in HTML"
-        assert "AutifyME" not in html, "Platform name 'AutifyME' should not appear in client-facing output"
+        assert "AutifyME" not in html, (
+            "Platform name 'AutifyME' should not appear in client-facing output"
+        )
 
     @staticmethod
     def assert_data_rendered(html: str, data: dict[str, Any] | list[dict[str, Any]]) -> None:
@@ -64,8 +66,8 @@ class RichOutputAssertions:
         Raises:
             AssertionError: If mobile optimization is missing
         """
-        assert 'viewport' in html.lower(), "Missing viewport meta tag"
-        assert 'width=device-width' in html.lower(), "Missing device-width in viewport"
+        assert "viewport" in html.lower(), "Missing viewport meta tag"
+        assert "width=device-width" in html.lower(), "Missing device-width in viewport"
 
     @staticmethod
     def assert_no_scripts(html: str) -> None:
@@ -80,11 +82,11 @@ class RichOutputAssertions:
             AssertionError: If executable code is found
         """
         html_lower = html.lower()
-        assert '<script' not in html_lower, "Script tags found in output"
-        assert 'javascript:' not in html_lower, "javascript: URLs found in output"
-        assert 'onclick=' not in html_lower, "onclick handler found in output"
-        assert 'onerror=' not in html_lower, "onerror handler found in output"
-        assert 'onload=' not in html_lower, "onload handler found in output"
+        assert "<script" not in html_lower, "Script tags found in output"
+        assert "javascript:" not in html_lower, "javascript: URLs found in output"
+        assert "onclick=" not in html_lower, "onclick handler found in output"
+        assert "onerror=" not in html_lower, "onerror handler found in output"
+        assert "onload=" not in html_lower, "onload handler found in output"
 
     @staticmethod
     def assert_valid_structure(html: str) -> None:
@@ -101,11 +103,11 @@ class RichOutputAssertions:
         html_stripped = html.strip()
         html_lower = html_stripped.lower()
 
-        assert html_lower.startswith('<!doctype html>'), "Missing DOCTYPE declaration"
-        assert html_lower.endswith('</html>'), "Missing closing </html> tag"
-        assert '<head>' in html_lower, "Missing <head> section"
-        assert '<body>' in html_lower, "Missing <body> section"
-        assert '<title>' in html_lower, "Missing <title> tag"
+        assert html_lower.startswith("<!doctype html>"), "Missing DOCTYPE declaration"
+        assert html_lower.endswith("</html>"), "Missing closing </html> tag"
+        assert "<head>" in html_lower, "Missing <head> section"
+        assert "<body>" in html_lower, "Missing <body> section"
+        assert "<title>" in html_lower, "Missing <title> tag"
 
     @staticmethod
     def assert_og_tags(html: str, title: str) -> None:
@@ -118,7 +120,7 @@ class RichOutputAssertions:
         Raises:
             AssertionError: If OG tags are missing
         """
-        assert 'og:title' in html, "Missing og:title meta tag"
+        assert "og:title" in html, "Missing og:title meta tag"
         assert title in html, f"Title '{title}' not found in HTML"
 
     @staticmethod

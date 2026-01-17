@@ -59,9 +59,7 @@ def mock_gemini_response_with_image():
     mock_response = MagicMock()
     # Gemini 3 returns images in content[0]["image_url"]["url"] as data URI
     fake_image_data = base64.b64encode(b"fake_image_data").decode()
-    mock_response.content = [
-        {"image_url": {"url": f"data:image/png;base64,{fake_image_data}"}}
-    ]
+    mock_response.content = [{"image_url": {"url": f"data:image/png;base64,{fake_image_data}"}}]
     return mock_response
 
 
@@ -113,7 +111,9 @@ class TestImageStudioSchemas:
             ],
             extraction=ExtractionSpec(
                 target_description="Extract [product] from background",
-                targets=[ExtractionTarget(target_bbox=[0, 0, 1000, 1000], target_image_label="product")],
+                targets=[
+                    ExtractionTarget(target_bbox=[0, 0, 1000, 1000], target_image_label="product")
+                ],
                 isolation="complete",
             ),
             background=BackgroundSpec(treatment="pure white"),
@@ -128,7 +128,9 @@ class TestImageStudioSchemas:
             images=[ImageInput(path="inbox/test/jar.jpg", label="product")],
             extraction=ExtractionSpec(
                 target_description="Glass jar [product]",
-                targets=[ExtractionTarget(target_bbox=[100, 100, 900, 900], target_image_label="product")]
+                targets=[
+                    ExtractionTarget(target_bbox=[100, 100, 900, 900], target_image_label="product")
+                ],
             ),
             background=BackgroundSpec(treatment="solid white", color="#FFFFFF"),
             lighting=LightingSpec(
@@ -213,10 +215,7 @@ class TestImageStudioSchemas:
 
     def test_extraction_target_structure(self):
         """Test ExtractionTarget model structure (bbox + image_label)."""
-        target = ExtractionTarget(
-            target_bbox=[0, 0, 500, 300],
-            target_image_label="source"
-        )
+        target = ExtractionTarget(target_bbox=[0, 0, 500, 300], target_image_label="source")
         assert target.target_bbox == [0, 0, 500, 300]
         assert target.target_image_label == "source"
 
@@ -231,13 +230,10 @@ class TestImageStudioSchemas:
         spec = ExtractionSpec(
             target_description="Extract the glass jar from [source]",
             targets=[
-                ExtractionTarget(
-                    target_bbox=[100, 100, 400, 400],
-                    target_image_label="source"
-                )
+                ExtractionTarget(target_bbox=[100, 100, 400, 400], target_image_label="source")
             ],
             isolation="complete isolation",
-            edge_treatment="surgical clean"
+            edge_treatment="surgical clean",
         )
         assert spec.target_description == "Extract the glass jar from [source]"
         assert len(spec.targets) == 1
@@ -249,21 +245,12 @@ class TestImageStudioSchemas:
         spec = ExtractionSpec(
             target_description="Extract all 3 jar variants from [source]",
             targets=[
-                ExtractionTarget(
-                    target_bbox=[0, 0, 300, 300],
-                    target_image_label="source"
-                ),
-                ExtractionTarget(
-                    target_bbox=[333, 333, 666, 666],
-                    target_image_label="source"
-                ),
-                ExtractionTarget(
-                    target_bbox=[700, 700, 1000, 1000],
-                    target_image_label="source"
-                ),
+                ExtractionTarget(target_bbox=[0, 0, 300, 300], target_image_label="source"),
+                ExtractionTarget(target_bbox=[333, 333, 666, 666], target_image_label="source"),
+                ExtractionTarget(target_bbox=[700, 700, 1000, 1000], target_image_label="source"),
             ],
             isolation="complete isolation",
-            edge_treatment="clean professional"
+            edge_treatment="clean professional",
         )
         assert len(spec.targets) == 3
         assert spec.targets[0].target_image_label == "source"
@@ -276,10 +263,11 @@ class TestImageStudioSchemas:
     def test_extraction_spec_targets_required(self):
         """Test that ExtractionSpec requires at least one target."""
         import pytest
+
         with pytest.raises(ValueError, match="at least 1"):
             ExtractionSpec(
                 target_description="Extract something",
-                targets=[]  # Empty array should fail
+                targets=[],  # Empty array should fail
             )
 
     def test_image_studio_input_with_multi_target_extraction(self):
@@ -291,17 +279,11 @@ class TestImageStudioSchemas:
             extraction=ExtractionSpec(
                 target_description="Extract jars from [source]",
                 targets=[
-                    ExtractionTarget(
-                        target_bbox=[0, 0, 333, 333],
-                        target_image_label="source"
-                    ),
-                    ExtractionTarget(
-                        target_bbox=[333, 333, 666, 666],
-                        target_image_label="source"
-                    ),
+                    ExtractionTarget(target_bbox=[0, 0, 333, 333], target_image_label="source"),
+                    ExtractionTarget(target_bbox=[333, 333, 666, 666], target_image_label="source"),
                 ],
                 isolation="complete",
-                edge_treatment="surgical"
+                edge_treatment="surgical",
             ),
             background=BackgroundSpec(treatment="transparent"),
         )
@@ -385,15 +367,17 @@ class TestImageProcessing:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        tool.invoke({
-            "images": [{"path": "/tmp/test.png", "label": "product"}],
-            "extraction": {
-                "target_description": "Extract [product]",
-                "targets": [{"target_bbox": [0,0,500,500], "target_image_label": "product"}],
-                "isolation": "complete"
-            },
-            "background": {"treatment": "pure white"},
-        })
+        tool.invoke(
+            {
+                "images": [{"path": "/tmp/test.png", "label": "product"}],
+                "extraction": {
+                    "target_description": "Extract [product]",
+                    "targets": [{"target_bbox": [0, 0, 500, 500], "target_image_label": "product"}],
+                    "isolation": "complete",
+                },
+                "background": {"treatment": "pure white"},
+            }
+        )
 
         # Should attempt to invoke the LLM
         mock_llm.invoke.assert_called_once()
@@ -412,14 +396,16 @@ class TestImageProcessing:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        tool.invoke({
-            "images": [
-                {"path": "/tmp/product.png", "label": "hero"},
-                {"path": "/tmp/style.png", "label": "mood_ref"},
-            ],
-            "lighting": {"type": "match [mood_ref] lighting"},
-            "creative_direction": "Place [hero] in warm scene",
-        })
+        tool.invoke(
+            {
+                "images": [
+                    {"path": "/tmp/product.png", "label": "hero"},
+                    {"path": "/tmp/style.png", "label": "mood_ref"},
+                ],
+                "lighting": {"type": "match [mood_ref] lighting"},
+                "creative_direction": "Place [hero] in warm scene",
+            }
+        )
 
         # Check the prompt sent to LLM contains labels
         call_args = mock_llm.invoke.call_args[0][0]
@@ -439,10 +425,12 @@ class TestImageProcessing:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
-            "images": [{"path": "/nonexistent/image.png", "label": "product"}],
-            "background": {"treatment": "white"},
-        })
+        result = tool.invoke(
+            {
+                "images": [{"path": "/nonexistent/image.png", "label": "product"}],
+                "background": {"treatment": "white"},
+            }
+        )
 
         # File not found returns specific error code
         assert result["success"] is False
@@ -461,11 +449,13 @@ class TestImageProcessing:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        tool.invoke({
-            "images": [{"path": "/tmp/test.png", "label": "source"}],
-            "creative_direction": "Enhance colors",
-            "output": {"size": "4K", "aspect_ratio": "16:9", "format": "JPEG"},
-        })
+        tool.invoke(
+            {
+                "images": [{"path": "/tmp/test.png", "label": "source"}],
+                "creative_direction": "Enhance colors",
+                "output": {"size": "4K", "aspect_ratio": "16:9", "format": "JPEG"},
+            }
+        )
 
         # Verify LLM factory was called with output specs
         mock_llm_factory.assert_called_once()
@@ -488,14 +478,16 @@ class TestImageProcessing:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        tool.invoke({
-            "images": [
-                {"path": "/tmp/img1.png", "label": "product"},
-                {"path": "/tmp/img2.png", "label": "source"},
-                {"path": "/tmp/img3.png", "label": "background"},
-            ],
-            "creative_direction": "Compose [product] from [source] on [background]",
-        })
+        tool.invoke(
+            {
+                "images": [
+                    {"path": "/tmp/img1.png", "label": "product"},
+                    {"path": "/tmp/img2.png", "label": "source"},
+                    {"path": "/tmp/img3.png", "label": "background"},
+                ],
+                "creative_direction": "Compose [product] from [source] on [background]",
+            }
+        )
 
         # Should load all 3 images
         assert mock_load.call_count == 3
@@ -513,10 +505,12 @@ class TestImageProcessing:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
-            "images": [{"path": "/tmp/test.png", "label": "source"}],
-            "background": {"treatment": "white"},
-        })
+        result = tool.invoke(
+            {
+                "images": [{"path": "/tmp/test.png", "label": "source"}],
+                "background": {"treatment": "white"},
+            }
+        )
 
         assert result["success"] is False
         assert "error" in result
@@ -540,8 +534,10 @@ class TestOutputSpecs:
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
         mock_save.return_value = (
             Path("/tmp/output.png"),
-            ImageMetadata(width=3840, height=2160, format="PNG", size_bytes=50000, aspect_ratio="16:9"),
-            "pending/test/output.png"
+            ImageMetadata(
+                width=3840, height=2160, format="PNG", size_bytes=50000, aspect_ratio="16:9"
+            ),
+            "pending/test/output.png",
         )
 
         mock_llm = MagicMock()
@@ -549,15 +545,17 @@ class TestOutputSpecs:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        tool.invoke({
-            "images": [{"path": "/tmp/source.png", "label": "product"}],
-            "creative_direction": "Studio shot with dramatic lighting",
-            "output": {
-                "size": "4K",
-                "aspect_ratio": "16:9",
-                "format": "PNG",
-            },
-        })
+        tool.invoke(
+            {
+                "images": [{"path": "/tmp/source.png", "label": "product"}],
+                "creative_direction": "Studio shot with dramatic lighting",
+                "output": {
+                    "size": "4K",
+                    "aspect_ratio": "16:9",
+                    "format": "PNG",
+                },
+            }
+        )
 
         mock_llm_factory.assert_called_once()
         call_kwargs = mock_llm_factory.call_args[1]
@@ -576,8 +574,10 @@ class TestOutputSpecs:
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
         mock_save.return_value = (
             Path("/tmp/output.png"),
-            ImageMetadata(width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"),
-            "pending/test/output.png"
+            ImageMetadata(
+                width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"
+            ),
+            "pending/test/output.png",
         )
 
         mock_llm = MagicMock()
@@ -585,10 +585,12 @@ class TestOutputSpecs:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
-            "images": [{"path": "/tmp/source.png", "label": "product"}],
-            "creative_direction": "Office desk scene",
-        })
+        result = tool.invoke(
+            {
+                "images": [{"path": "/tmp/source.png", "label": "product"}],
+                "creative_direction": "Office desk scene",
+            }
+        )
 
         assert result["success"] is True
         data = result.get("data", result)
@@ -604,10 +606,12 @@ class TestOutputSpecs:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
-            "images": [{"path": "/tmp/source.png", "label": "product"}],
-            "creative_direction": "Kitchen scene",
-        })
+        result = tool.invoke(
+            {
+                "images": [{"path": "/tmp/source.png", "label": "product"}],
+                "creative_direction": "Kitchen scene",
+            }
+        )
 
         assert result["success"] is False
         assert result["error_code"] == ImageStudioErrorCode.API_ERROR
@@ -638,10 +642,12 @@ class TestErrorHandling:
 
         try:
             tool = create_image_studio_tool()
-            result = tool.invoke({
-                "images": [{"path": corrupt_path, "label": "source"}],
-                "background": {"treatment": "white"},
-            })
+            result = tool.invoke(
+                {
+                    "images": [{"path": corrupt_path, "label": "source"}],
+                    "background": {"treatment": "white"},
+                }
+            )
 
             # Graceful degradation: corrupt image skipped with warning, LLM returns no image
             assert result["success"] is False
@@ -660,10 +666,12 @@ class TestErrorHandling:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
-            "images": [{"path": "/tmp/test.png", "label": "source"}],
-            "creative_direction": "Enhance image",
-        })
+        result = tool.invoke(
+            {
+                "images": [{"path": "/tmp/test.png", "label": "source"}],
+                "creative_direction": "Enhance image",
+            }
+        )
 
         assert result["success"] is False
         assert "error" in result
@@ -691,10 +699,12 @@ class TestErrorHandling:
         mock_llm_factory.return_value = mock_llm
 
         tool = create_image_studio_tool()
-        result = tool.invoke({
-            "images": [{"path": "/nonexistent/path.png", "label": "source"}],
-            "creative_direction": "Do something",
-        })
+        result = tool.invoke(
+            {
+                "images": [{"path": "/nonexistent/path.png", "label": "source"}],
+                "creative_direction": "Do something",
+            }
+        )
 
         assert result["success"] is False
         assert "error" in result
@@ -719,8 +729,10 @@ class TestThreadIdInjection:
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
         mock_save.return_value = (
             Path("/tmp/output.png"),
-            ImageMetadata(width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"),
-            "pending/test/output.png"
+            ImageMetadata(
+                width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"
+            ),
+            "pending/test/output.png",
         )
 
         mock_llm = MagicMock()
@@ -750,8 +762,10 @@ class TestThreadIdInjection:
         mock_load.return_value = ("data:image/png;base64,abc123", "image/png")
         mock_save.return_value = (
             Path("/tmp/output.png"),
-            ImageMetadata(width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"),
-            "pending/test/output.png"
+            ImageMetadata(
+                width=1024, height=1024, format="PNG", size_bytes=10000, aspect_ratio="1:1"
+            ),
+            "pending/test/output.png",
         )
 
         mock_llm = MagicMock()

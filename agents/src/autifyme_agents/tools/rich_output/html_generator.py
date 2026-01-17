@@ -71,8 +71,7 @@ def _build_user_prompt(
 
     if field_hints:
         prompt_data["field_hints"] = {
-            k: v.model_dump() if hasattr(v, "model_dump") else v
-            for k, v in field_hints.items()
+            k: v.model_dump() if hasattr(v, "model_dump") else v for k, v in field_hints.items()
         }
 
     if images:
@@ -169,7 +168,7 @@ async def generate_html(
                     "company": company_profile.name,
                     "data_type": type(data).__name__,
                     "item_count": len(data) if isinstance(data, list) else 1,
-                }
+                },
             )
 
             # Invoke LLM
@@ -200,20 +199,19 @@ async def generate_html(
                         "attempt": attempt + 1,
                         "error": error_msg,
                         "html_length": len(html_content),
-                    }
+                    },
                 )
                 last_error = error_msg
 
                 # Add feedback for retry
                 if attempt < max_retries:
-                    messages.append({
-                        "role": "assistant",
-                        "content": html_content
-                    })
-                    messages.append({
-                        "role": "user",
-                        "content": f"Invalid HTML: {error_msg}. Please regenerate with proper structure."
-                    })
+                    messages.append({"role": "assistant", "content": html_content})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": f"Invalid HTML: {error_msg}. Please regenerate with proper structure.",
+                        }
+                    )
                     continue
 
             # Generate summary
@@ -225,7 +223,7 @@ async def generate_html(
                     "attempt": attempt + 1,
                     "html_size_bytes": len(html_content.encode("utf-8")),
                     "summary": summary,
-                }
+                },
             )
 
             return html_content, summary
@@ -238,7 +236,7 @@ async def generate_html(
                     "error": str(e),
                     "error_type": type(e).__name__,
                 },
-                exc_info=True
+                exc_info=True,
             )
             last_error = str(e)
 

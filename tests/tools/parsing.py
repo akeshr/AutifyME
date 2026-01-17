@@ -90,11 +90,13 @@ def parse_lc_messages(messages: list) -> list[dict]:
             if has_image:
                 content = f"[IMAGE] {content}" if content else "[IMAGE]"
 
-        parsed.append({
-            "type": msg_type,
-            "content": content,
-            "tool_calls": tool_calls,
-        })
+        parsed.append(
+            {
+                "type": msg_type,
+                "content": content,
+                "tool_calls": tool_calls,
+            }
+        )
 
     return parsed
 
@@ -184,9 +186,7 @@ def extract_user_input(root_run) -> str:
             # Handle multimodal content (list of parts)
             if isinstance(content, list):
                 has_image = any(
-                    p.get("type") == "image_url"
-                    for p in content
-                    if isinstance(p, dict)
+                    p.get("type") == "image_url" for p in content if isinstance(p, dict)
                 )
                 text_parts = [
                     p.get("text", "")

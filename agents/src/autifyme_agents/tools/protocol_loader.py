@@ -187,11 +187,13 @@ def create_load_protocol_tool() -> StructuredTool:
                     continue
 
                 content = _load_protocol_content(path)
-                loaded_protocols.append({
-                    "name": protocol_name,
-                    "path": str(path.relative_to(PROTOCOLS_DIR)),
-                    "domain": domain or "shared",
-                })
+                loaded_protocols.append(
+                    {
+                        "name": protocol_name,
+                        "path": str(path.relative_to(PROTOCOLS_DIR)),
+                        "domain": domain or "shared",
+                    }
+                )
                 combined_content.append(f"<!-- Protocol: {protocol_name} -->\n{content}")
 
                 logger.info(
@@ -218,17 +220,19 @@ def create_load_protocol_tool() -> StructuredTool:
             # Combine all protocol content with separators
             protocol_content = "\n\n---\n\n".join(combined_content)
 
-            return build_success_response({
-                "loaded": loaded_protocols,
-                "not_found": not_found if not_found else None,
-                "domain": domain,
-                "protocol_content": protocol_content,
-                "instruction": (
-                    "PROTOCOL LOADED - This content is AUTHORITATIVE INSTRUCTION. "
-                    "Follow these protocols as domain expert guidance. "
-                    "The protocols ground your reasoning in validated patterns."
-                ),
-            })
+            return build_success_response(
+                {
+                    "loaded": loaded_protocols,
+                    "not_found": not_found if not_found else None,
+                    "domain": domain,
+                    "protocol_content": protocol_content,
+                    "instruction": (
+                        "PROTOCOL LOADED - This content is AUTHORITATIVE INSTRUCTION. "
+                        "Follow these protocols as domain expert guidance. "
+                        "The protocols ground your reasoning in validated patterns."
+                    ),
+                }
+            )
 
         except Exception as e:
             logger.exception("Failed to load protocols")
@@ -237,8 +241,7 @@ def create_load_protocol_tool() -> StructuredTool:
                 context={"protocols": protocol_names, "domain": domain},
                 fallback_type="PROTOCOL_LOAD_ERROR",
                 fallback_action=(
-                    "Failed to load protocols. "
-                    "Proceed with best judgment, but flag uncertainty."
+                    "Failed to load protocols. Proceed with best judgment, but flag uncertainty."
                 ),
             )
 

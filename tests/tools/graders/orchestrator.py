@@ -60,10 +60,26 @@ SPECIALIST_GRADERS: list[tuple[str, GraderFn, dict]] = [
 
 # Registry of creative specialist graders - these run only against creative_specialist
 CREATIVE_SPECIALIST_GRADERS: list[tuple[str, GraderFn, dict]] = [
-    ("image_studio_fidelity_included", image_studio_fidelity_included, {"agent": "creative_specialist"}),
-    ("image_studio_core_specs_included", image_studio_core_specs_included, {"agent": "creative_specialist"}),
-    ("image_studio_output_verified", image_studio_output_verified, {"agent": "creative_specialist"}),
-    ("image_studio_consistency_params", image_studio_consistency_params, {"agent": "creative_specialist"}),
+    (
+        "image_studio_fidelity_included",
+        image_studio_fidelity_included,
+        {"agent": "creative_specialist"},
+    ),
+    (
+        "image_studio_core_specs_included",
+        image_studio_core_specs_included,
+        {"agent": "creative_specialist"},
+    ),
+    (
+        "image_studio_output_verified",
+        image_studio_output_verified,
+        {"agent": "creative_specialist"},
+    ),
+    (
+        "image_studio_consistency_params",
+        image_studio_consistency_params,
+        {"agent": "creative_specialist"},
+    ),
 ]
 
 # Registry of analyst graders - these run against detected analysts
@@ -174,9 +190,7 @@ def run_specialist_graders(trace_id: str) -> GraderSuiteResult:
                 kwargs["seq"] = seq
 
             grader_name = f"{name}:{specialist}"
-            result = _run_grader_safely(
-                grader_name, grader_fn, GraderCategory.SPECIALIST, **kwargs
-            )
+            result = _run_grader_safely(grader_name, grader_fn, GraderCategory.SPECIALIST, **kwargs)
             results.append(result)
 
     passed = sum(1 for r in results if r.passed)
@@ -220,9 +234,7 @@ def run_analyst_graders(trace_id: str) -> GraderSuiteResult:
                 kwargs["seq"] = seq
 
             grader_name = f"{name}:{analyst}"
-            result = _run_grader_safely(
-                grader_name, grader_fn, GraderCategory.ANALYST, **kwargs
-            )
+            result = _run_grader_safely(grader_name, grader_fn, GraderCategory.ANALYST, **kwargs)
             results.append(result)
 
     passed = sum(1 for r in results if r.passed)
@@ -271,6 +283,7 @@ def run_code_graders(
 
     # Get trace status directly from root run (O(1) instead of loading full trace)
     from langsmith import Client
+
     client = Client()
     try:
         root_run = client.read_run(trace_id)
@@ -312,7 +325,8 @@ def run_code_graders(
     analysts_in_trace = classified["analysts"]
     # reviewers_in_trace available in classified["reviewers"] if needed
     unclassified_agents = [
-        a for a in classified["other"]
+        a
+        for a in classified["other"]
         if a not in ("PM", "pm", "Project Manager")  # PM is expected, not a warning
     ]
 
@@ -346,9 +360,7 @@ def run_code_graders(
                 if "seq" in grader_fn.__code__.co_varnames:
                     kwargs["seq"] = seq
 
-                result = _run_grader_safely(
-                    name, grader_fn, GraderCategory.SPECIALIST, **kwargs
-                )
+                result = _run_grader_safely(name, grader_fn, GraderCategory.SPECIALIST, **kwargs)
                 results.append(result)
 
     # Run analyst graders against each detected analyst
@@ -402,9 +414,7 @@ def run_code_graders(
     failed = len(results) - passed
 
     # Weighted score: HIGH severity failures count more
-    high_severity_failures = sum(
-        1 for r in results if not r.passed and r.severity == "HIGH"
-    )
+    high_severity_failures = sum(1 for r in results if not r.passed and r.severity == "HIGH")
     if high_severity_failures > 0:
         # Penalize HIGH severity failures more heavily
         overall_score = max(

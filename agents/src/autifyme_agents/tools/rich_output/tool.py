@@ -68,8 +68,7 @@ async def _upload_rich_output(
     """
     if _storage_client is None:
         raise RuntimeError(
-            "Storage client not configured. "
-            "Pass storage to create_rich_output_tool()."
+            "Storage client not configured. Pass storage to create_rich_output_tool()."
         )
 
     storage_path = f"outputs/{filename}"
@@ -106,7 +105,7 @@ async def _upload_rich_output(
             "storage_path": storage_path,
             "size_bytes": len(file_bytes),
             "expires_at": expires_at,
-        }
+        },
     )
 
     return {
@@ -175,7 +174,7 @@ async def _generate_rich_output_impl(
                     extra={
                         "total": len(images),
                         "valid": len(valid_images),
-                    }
+                    },
                 )
 
         # Generate HTML
@@ -217,16 +216,14 @@ async def _generate_rich_output_impl(
                 "company": company_profile.name,
                 "url": result.url,
                 "summary": summary,
-            }
+            },
         )
 
         return result.model_dump()
 
     except HTMLGenerationError as e:
         logger.error(
-            "HTML generation failed",
-            extra={"title": title, "error": str(e)},
-            exc_info=True
+            "HTML generation failed", extra={"title": title, "error": str(e)}, exc_info=True
         )
         return RichOutputResult(
             success=False,
@@ -241,8 +238,7 @@ async def _generate_rich_output_impl(
             context={"title": title, "data_type": type(data).__name__},
             fallback_type="RICH_OUTPUT_ERROR",
             fallback_action=(
-                "Rich output generation failed. "
-                "Consider presenting data as text summary instead."
+                "Rich output generation failed. Consider presenting data as text summary instead."
             ),
         )
 
@@ -275,17 +271,19 @@ def create_rich_output_tool(storage: Any = None) -> StructuredTool:
         ttl_days: int = 30,
     ) -> dict[str, Any]:
         """Sync wrapper for async rich output implementation."""
-        return asyncio.run(_generate_rich_output_impl(
-            title=title,
-            data=data,
-            context=context,
-            company_profile=company_profile,
-            field_hints=field_hints,
-            images=images,
-            layout_hint=layout_hint,
-            highlight_fields=highlight_fields,
-            ttl_days=ttl_days,
-        ))
+        return asyncio.run(
+            _generate_rich_output_impl(
+                title=title,
+                data=data,
+                context=context,
+                company_profile=company_profile,
+                field_hints=field_hints,
+                images=images,
+                layout_hint=layout_hint,
+                highlight_fields=highlight_fields,
+                ttl_days=ttl_days,
+            )
+        )
 
     return StructuredTool.from_function(
         func=_generate_rich_output_sync,

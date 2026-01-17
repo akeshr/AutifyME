@@ -39,32 +39,25 @@ class ListStorageInput(BaseModel):
             "- 'pending' - AI-generated images awaiting approval\n"
             "- 'products' - Approved permanent assets\n"
             "Can also be a custom path like 'approved/families'"
-        )
+        ),
     )
     limit: int = Field(
-        default=20,
-        description="Maximum files to return (default: 20, max: 100)",
-        gt=0,
-        le=100
+        default=20, description="Maximum files to return (default: 20, max: 100)", gt=0, le=100
     )
-    offset: int = Field(
-        default=0,
-        description="Skip N files for pagination (default: 0)",
-        ge=0
-    )
+    offset: int = Field(default=0, description="Skip N files for pagination (default: 0)", ge=0)
     extension_filter: list[str] | None = Field(
         default=None,
         description=(
             "Only include files with these extensions. "
             "Examples: ['jpg', 'png'], ['pdf'], ['.jpeg', '.webp']"
-        )
+        ),
     )
     prefix_filter: str | None = Field(
         default=None,
         description=(
             "Only include files starting with this prefix. "
             "Example: 'hero_' to find 'hero_shot.png', 'hero_v2.png'"
-        )
+        ),
     )
 
 
@@ -146,8 +139,7 @@ def create_list_storage_tool(
             # Validate thread_id for session-scoped folders
             if folder in ("inbox", "pending") and not current_thread_id:
                 logger.warning(
-                    f"No thread_id available for {folder}/ listing",
-                    extra={"folder": folder}
+                    f"No thread_id available for {folder}/ listing", extra={"folder": folder}
                 )
                 return build_agent_error_response(
                     exception=ValueError(f"Session context required for {folder}/"),
@@ -157,7 +149,7 @@ def create_list_storage_tool(
                         f"Cannot list {folder}/ without session context. "
                         f"This folder is thread-scoped. "
                         f"Use 'products' folder for non-session files."
-                    )
+                    ),
                 )
 
             logger.info(
@@ -168,7 +160,7 @@ def create_list_storage_tool(
                     "offset": offset,
                     "extension_filter": extension_filter,
                     "prefix_filter": prefix_filter,
-                }
+                },
             )
 
             result = await _storage_client.list_storage_files(
@@ -203,39 +195,36 @@ def create_list_storage_tool(
                     "count": len(files),
                     "total": result.get("total", 0),
                     "has_more": result.get("has_more", False),
-                }
+                },
             )
 
-            return build_success_response({
-                "folder": result.get("folder"),
-                "files": files,
-                "count": result.get("count", len(files)),
-                "total": result.get("total", 0),
-                "has_more": result.get("has_more", False),
-                "pagination": {
-                    "limit": limit,
-                    "offset": offset,
-                    "next_offset": offset + limit if result.get("has_more") else None,
+            return build_success_response(
+                {
+                    "folder": result.get("folder"),
+                    "files": files,
+                    "count": result.get("count", len(files)),
+                    "total": result.get("total", 0),
+                    "has_more": result.get("has_more", False),
+                    "pagination": {
+                        "limit": limit,
+                        "offset": offset,
+                        "next_offset": offset + limit if result.get("has_more") else None,
+                    },
                 }
-            })
+            )
 
         except ValueError as e:
-            logger.warning(
-                f"Validation error for list_storage: {e}",
-                extra={"folder": folder}
-            )
+            logger.warning(f"Validation error for list_storage: {e}", extra={"folder": folder})
             return build_agent_error_response(
                 exception=e,
                 context={"folder": folder},
                 fallback_type="VALIDATION_ERROR",
-                fallback_action=str(e)
+                fallback_action=str(e),
             )
 
         except Exception as e:
             logger.error(
-                f"Failed to list storage folder: {folder}",
-                exc_info=True,
-                extra={"folder": folder}
+                f"Failed to list storage folder: {folder}", exc_info=True, extra={"folder": folder}
             )
             return build_agent_error_response(
                 exception=e,
@@ -245,7 +234,7 @@ def create_list_storage_tool(
                     f"Failed to list {folder}/. "
                     f"Check folder name and try again. "
                     f"Common folders: inbox, pending, products."
-                )
+                ),
             )
 
     return StructuredTool.from_function(

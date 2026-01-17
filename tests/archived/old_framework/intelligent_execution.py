@@ -3,6 +3,7 @@
 Instead of pattern matching, AI (Google Gemini) reads PM messages and responds intelligently,
 detecting issues and debugging in real-time.
 """
+
 import asyncio
 import json
 import sys
@@ -19,7 +20,7 @@ from langsmith import Client
 load_dotenv()
 
 # Windows-specific fix: psycopg async requires SelectorEventLoop
-if sys.platform == 'win32':
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from autifyme_agents.core.ports import StorageInterface  # noqa: E402
@@ -42,11 +43,7 @@ class _IntelligentConsoleChannel(MessagingChannel):
 
     def send_text(self, recipient: str, message: str, *, metadata: dict | None = None) -> dict:
         """Capture PM text messages."""
-        self.messages_sent.append({
-            "type": "text",
-            "message": message,
-            "timestamp": time.time()
-        })
+        self.messages_sent.append({"type": "text", "message": message, "timestamp": time.time()})
         return {"status": "sent"}
 
     def send_approval_request(self, recipient: str, interrupt_value) -> dict:
@@ -54,7 +51,7 @@ class _IntelligentConsoleChannel(MessagingChannel):
         self.pending_interrupt = {
             "type": "approval_request",
             "value": interrupt_value,
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
         self.messages_sent.append(self.pending_interrupt.copy())
         # Return pending status - AI will decide
@@ -62,21 +59,23 @@ class _IntelligentConsoleChannel(MessagingChannel):
 
     def send_completion(self, recipient: str, result) -> dict:
         """Capture completion."""
-        self.messages_sent.append({
-            "type": "completion",
-            "result": result,
-            "timestamp": time.time()
-        })
+        self.messages_sent.append(
+            {"type": "completion", "result": result, "timestamp": time.time()}
+        )
         return {"status": "sent"}
 
-    def send_error(self, recipient: str, error_type: str, custom_message: str | None = None) -> dict:
+    def send_error(
+        self, recipient: str, error_type: str, custom_message: str | None = None
+    ) -> dict:
         """Capture errors."""
-        self.messages_sent.append({
-            "type": "error",
-            "error_type": error_type,
-            "message": custom_message,
-            "timestamp": time.time()
-        })
+        self.messages_sent.append(
+            {
+                "type": "error",
+                "error_type": error_type,
+                "message": custom_message,
+                "timestamp": time.time(),
+            }
+        )
         return {"status": "sent"}
 
     def download_media(self, media_id: str) -> Path:
@@ -104,18 +103,23 @@ def _ask_ai_how_to_respond(
     """
 
     # Build context for AI
-    messages_text = "\n\n".join([
-        f"[{msg['type'].upper()}] {msg.get('message', msg.get('error_type', str(msg)))}"
-        for msg in pm_messages
-    ])
+    messages_text = "\n\n".join(
+        [
+            f"[{msg['type'].upper()}] {msg.get('message', msg.get('error_type', str(msg)))}"
+            for msg in pm_messages
+        ]
+    )
 
-    history_text = "\n".join([
-        f"User: {turn['user']}\nPM: {turn['pm_response']}"
-        for turn in conversation_history
-    ]) if conversation_history else "No previous conversation"
+    history_text = (
+        "\n".join(
+            [f"User: {turn['user']}\nPM: {turn['pm_response']}" for turn in conversation_history]
+        )
+        if conversation_history
+        else "No previous conversation"
+    )
 
     # Extract initial request from conversation history to maintain consistency
-    initial_request = conversation_history[0]['user'] if conversation_history else "N/A"
+    initial_request = conversation_history[0]["user"] if conversation_history else "N/A"
 
     prompt = f"""You are roleplaying as a BUSINESS USER testing the AutifyME PM agent.
 
@@ -181,12 +185,15 @@ CRITICAL: Stay consistent with your initial request "{initial_request}". Never c
             model="gemini-2.5-flash-lite",
             temperature=0,
             max_output_tokens=500,
-            response_mime_type="application/json"
+            response_mime_type="application/json",
         )
 
         messages = [
-            {"role": "system", "content": "You are a test orchestration AI simulating a business user. Maintain character consistency. Return valid JSON only."},
-            {"role": "user", "content": prompt}
+            {
+                "role": "system",
+                "content": "You are a test orchestration AI simulating a business user. Maintain character consistency. Return valid JSON only.",
+            },
+            {"role": "user", "content": prompt},
         ]
 
         response = llm.invoke(messages)
@@ -201,7 +208,7 @@ CRITICAL: Stay consistent with your initial request "{initial_request}". Never c
             "action": "debug",
             "response_text": "",
             "reasoning": "Failed to parse AI response",
-            "debug_reason": f"AI returned invalid JSON: {response_text if 'response_text' in locals() else str(e)}"
+            "debug_reason": f"AI returned invalid JSON: {response_text if 'response_text' in locals() else str(e)}",
         }
     except Exception as e:
         # Any other error
@@ -209,7 +216,7 @@ CRITICAL: Stay consistent with your initial request "{initial_request}". Never c
             "action": "debug",
             "response_text": "",
             "reasoning": "AI call failed",
-            "debug_reason": f"Error calling AI model: {str(e)}"
+            "debug_reason": f"Error calling AI model: {str(e)}",
         }
 
     return decision
@@ -277,6 +284,7 @@ async def intelligent_execute_scenario(
 
     # Create workflow handler
     from autifyme_agents.workflows.handlers.cataloging_handler import CatalogingWorkflowHandler
+
     workflow_handler = CatalogingWorkflowHandler(channel=channel)
 
     runner = WorkflowRunner(
@@ -301,15 +309,15 @@ async def intelligent_execute_scenario(
         try:
             print(text)
         except UnicodeEncodeError:
-            print(text.encode('ascii', 'replace').decode('ascii'))
+            print(text.encode("ascii", "replace").decode("ascii"))
 
     try:
-        safe_print(f"\n{'='*80}")
+        safe_print(f"\n{'=' * 80}")
         safe_print("INTELLIGENT TESTING MODE - AI as Test User (Google Gemini 2.5 Flash)")
-        safe_print(f"{'='*80}")
+        safe_print(f"{'=' * 80}")
         safe_print(f"Scenario: {scenario_id[:80]}...")  # Show abbreviated scenario name
         safe_print(f"Thread: {thread_id}")
-        safe_print(f"{'='*80}\n")
+        safe_print(f"{'=' * 80}\n")
 
         # Send initial request to PM (not full scenario)
         safe_print(f"[USER -> PM] {initial_request}")
@@ -319,10 +327,7 @@ async def intelligent_execute_scenario(
             media_id=media_path if media_path else None,
         )
 
-        conversation_history.append({
-            "user": initial_request,
-            "pm_response": "pending..."
-        })
+        conversation_history.append({"user": initial_request, "pm_response": "pending..."})
 
         # INTELLIGENT CONVERSATION LOOP
         # AI reads PM messages and decides how to respond
@@ -389,9 +394,9 @@ async def intelligent_execute_scenario(
 
             # Act on AI's decision
             if decision["action"] == "debug":
-                safe_print(f"\n{'='*80}")
+                safe_print(f"\n{'=' * 80}")
                 safe_print("DEBUG MODE ACTIVATED")
-                safe_print(f"{'='*80}")
+                safe_print(f"{'=' * 80}")
                 safe_print(f"Reason: {decision['debug_reason']}")
                 safe_print("\nStopping test for manual debugging...")
                 errors.append(f"Debug triggered: {decision['debug_reason']}")
@@ -409,25 +414,20 @@ async def intelligent_execute_scenario(
                 )
 
                 # Update conversation history
-                pm_summary = "\n".join([
-                    msg.get("message", msg.get("error_type", ""))[:100]
-                    for msg in new_messages
-                    if msg.get("type") in ["text", "error"]
-                ])
-                conversation_history.append({
-                    "user": response_text,
-                    "pm_response": pm_summary
-                })
+                pm_summary = "\n".join(
+                    [
+                        msg.get("message", msg.get("error_type", ""))[:100]
+                        for msg in new_messages
+                        if msg.get("type") in ["text", "error"]
+                    ]
+                )
+                conversation_history.append({"user": response_text, "pm_response": pm_summary})
 
         # Get trace from LangSmith
         time.sleep(3.0)
         try:
             client = Client()
-            runs = list(client.list_runs(
-                project_name="autifyme-dev",
-                is_root=True,
-                limit=20
-            ))
+            runs = list(client.list_runs(project_name="autifyme-dev", is_root=True, limit=20))
 
             for run in runs:
                 if run.extra:
@@ -436,9 +436,15 @@ async def intelligent_execute_scenario(
                     if langsmith_thread_id == thread_id:
                         # Safely extract trace info with None checks
                         trace_id = str(run.trace_id) if run.trace_id else None
-                        session_id = run.session_id if hasattr(run, 'session_id') and run.session_id else None
+                        session_id = (
+                            run.session_id
+                            if hasattr(run, "session_id") and run.session_id
+                            else None
+                        )
                         if trace_id and session_id:
-                            trace_url = f"https://smith.langchain.com/public/{session_id}/r/{trace_id}"
+                            trace_url = (
+                                f"https://smith.langchain.com/public/{session_id}/r/{trace_id}"
+                            )
                         break
 
             if not trace_id:
@@ -457,7 +463,7 @@ async def intelligent_execute_scenario(
     # Count products created
     products_created = len([m for m in channel.messages_sent if m.get("type") == "completion"])
 
-    safe_print(f"\n{'='*80}")
+    safe_print(f"\n{'=' * 80}")
     safe_print(f"Result: {'SUCCESS' if success else 'FAILED'}")
     safe_print(f"Time: {execution_time:.2f}s")
     safe_print(f"HITL: {'Yes' if interrupt_occurred else 'No'}")
@@ -466,7 +472,7 @@ async def intelligent_execute_scenario(
         safe_print("\nErrors/Debug:")
         for err in errors:
             safe_print(f"  - {err}")
-    safe_print(f"{'='*80}\n")
+    safe_print(f"{'=' * 80}\n")
 
     return ExecutionResult(
         success=success,

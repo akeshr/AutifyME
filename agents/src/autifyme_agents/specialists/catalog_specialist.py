@@ -113,12 +113,18 @@ def create_catalog_specialist(
         currency_symbol=company_profile.currency_symbol,
         default_currency=company_profile.default_currency,
         price_positioning=company_profile.price_positioning,
-        business_models=", ".join(company_profile.business_models) if company_profile.business_models else "B2B",
-        target_markets=", ".join(company_profile.target_markets) if company_profile.target_markets else "India",
+        business_models=", ".join(company_profile.business_models)
+        if company_profile.business_models
+        else "B2B",
+        target_markets=", ".join(company_profile.target_markets)
+        if company_profile.target_markets
+        else "India",
         sku_prefix=sku_conv.prefix if sku_conv else "SKU",
         sku_separator=sku_conv.separator if sku_conv else "-",
         sku_uppercase=str(sku_conv.uppercase) if sku_conv else "True",
-        sku_examples=", ".join(sku_conv.examples[:3]) if sku_conv and sku_conv.examples else "SKU-001",
+        sku_examples=", ".join(sku_conv.examples[:3])
+        if sku_conv and sku_conv.examples
+        else "SKU-001",
         default_price_list_id=company_profile.default_price_list_id or "Query from price_lists",
     )
 

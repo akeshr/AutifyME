@@ -40,15 +40,13 @@ async def _get_executor(headless: bool = True):
 async def browser_automation_tool(
     goal: Annotated[
         str,
-        Field(description="Natural language description of browser automation task to accomplish")
+        Field(description="Natural language description of browser automation task to accomplish"),
     ],
     max_steps: Annotated[
-        int,
-        Field(description="Maximum number of UI actions to take (default 30)", default=30)
+        int, Field(description="Maximum number of UI actions to take (default 30)", default=30)
     ] = 30,
     initial_url: Annotated[
-        str | None,
-        Field(description="Starting URL to navigate to before task execution")
+        str | None, Field(description="Starting URL to navigate to before task execution")
     ] = None,
 ) -> dict:
     """Execute autonomous browser automation task using Google Computer Use model.
@@ -115,8 +113,7 @@ async def browser_automation_tool(
             "final_url": final_state.url if final_state else "unknown",
             "final_title": final_state.title if final_state else "unknown",
             "actions_summary": [
-                f"{action.action_type}: {action.reasoning[:80]}"
-                for action in actions
+                f"{action.action_type}: {action.reasoning[:80]}" for action in actions
             ],
             "error": result.get("error"),
         }

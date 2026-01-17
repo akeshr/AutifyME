@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Windows-specific fix for psycopg async
-if sys.platform == 'win32':
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from tests.tools.intelligent_execution import intelligent_execute_scenario
@@ -70,15 +70,16 @@ async def run_update_with_image_test():
     """
     Run intelligent test for updating variant with image.
     """
+
     def safe_print(text):
         try:
             print(text)
         except UnicodeEncodeError:
-            print(text.encode('ascii', 'replace').decode('ascii'))
+            print(text.encode("ascii", "replace").decode("ascii"))
 
-    safe_print("\n" + "="*80)
+    safe_print("\n" + "=" * 80)
     safe_print("INTELLIGENT TEST: Update 500ml to 1L with Image")
-    safe_print("="*80)
+    safe_print("=" * 80)
     safe_print("\nAI (Gemini 2.5 Flash) acts as real user with image attachment.\n")
 
     # Get image path
@@ -86,7 +87,9 @@ async def run_update_with_image_test():
 
     if not fixture_image.exists():
         safe_print(f"[ERROR] Image not found: {fixture_image}")
-        safe_print("Please ensure fixture image exists at tests/fixtures/images/PET_CAN_JAR_500ml.jpeg")
+        safe_print(
+            "Please ensure fixture image exists at tests/fixtures/images/PET_CAN_JAR_500ml.jpeg"
+        )
         return False
 
     safe_print(f"[IMAGE] Using fixture: {fixture_image.name}")
@@ -100,9 +103,9 @@ async def run_update_with_image_test():
     )
 
     # Print detailed result
-    safe_print(f"\n{'='*80}")
+    safe_print(f"\n{'=' * 80}")
     safe_print(f"RESULT: {'✓ SUCCESS' if result.success else '✗ FAILED'}")
-    safe_print(f"{'='*80}\n")
+    safe_print(f"{'=' * 80}\n")
 
     safe_print(f"Execution Time: {result.execution_time_seconds}s")
     safe_print(f"HITL Triggered: {'Yes' if result.hitl_triggered else 'No'}")
@@ -115,7 +118,7 @@ async def run_update_with_image_test():
         for error in result.errors:
             safe_print(f"  - {error}")
 
-    safe_print(f"\n{'='*80}\n")
+    safe_print(f"\n{'=' * 80}\n")
 
     return result.success
 

@@ -133,6 +133,7 @@ def _get_storage():
     """Get storage adapter."""
     load_dotenv()
     from autifyme_agents.integrations.storage.storage_factory import get_storage
+
     return get_storage()
 
 
@@ -143,6 +144,7 @@ def _run_async(coro):
         if loop.is_running():
             # If loop is running, create a new one
             import nest_asyncio
+
             nest_asyncio.apply()
             return loop.run_until_complete(coro)
         return loop.run_until_complete(coro)

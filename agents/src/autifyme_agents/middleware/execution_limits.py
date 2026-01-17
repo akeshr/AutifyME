@@ -68,17 +68,18 @@ class ToolCallLimitMiddleware(AgentMiddleware):
         new_count = count + len(msg.tool_calls)
 
         if new_count > self.limit:
-            error = json.dumps({
-                "success": False,
-                "error": f"LIMIT_EXCEEDED: Tool limit reached ({new_count}/{self.limit}). "
-                         "Synthesize findings and respond with what you have.",
-                "error_type": "LIMIT_EXCEEDED",
-            })
+            error = json.dumps(
+                {
+                    "success": False,
+                    "error": f"LIMIT_EXCEEDED: Tool limit reached ({new_count}/{self.limit}). "
+                    "Synthesize findings and respond with what you have.",
+                    "error_type": "LIMIT_EXCEEDED",
+                }
+            )
             # Error messages for blocked calls
-            blocked = msg.tool_calls[max(0, self.limit - count):]
+            blocked = msg.tool_calls[max(0, self.limit - count) :]
             error_msgs: list[ToolMessage | AIMessage] = [
-                ToolMessage(content=error, tool_call_id=tc["id"], status="error")
-                for tc in blocked
+                ToolMessage(content=error, tool_call_id=tc["id"], status="error") for tc in blocked
             ]
             error_msgs.append(AIMessage(content=error))
             return {

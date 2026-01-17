@@ -29,6 +29,7 @@ try:
 except (OSError, PermissionError):
     # Serverless environment - use /tmp and disable file logging
     import tempfile
+
     TMP_DIR = Path(tempfile.gettempdir()) / "autifyme"
     LOGS_DIR = TMP_DIR / "logs"
     MEDIA_DIR = TMP_DIR / "media"

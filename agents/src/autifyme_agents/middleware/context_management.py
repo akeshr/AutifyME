@@ -57,9 +57,7 @@ class TruncateToolResultsEdit:
 
         # Find all tool messages
         tool_messages = [
-            (idx, msg)
-            for idx, msg in enumerate(messages)
-            if isinstance(msg, ToolMessage)
+            (idx, msg) for idx, msg in enumerate(messages) if isinstance(msg, ToolMessage)
         ]
 
         # Exclude recent messages from truncation
@@ -72,17 +70,12 @@ class TruncateToolResultsEdit:
         excluded = set(self.exclude_tools)
         for _idx, msg in candidates:
             # Skip if already truncated or excluded
-            if (
-                msg.name in excluded
-                or self.truncation_marker in msg.content
-            ):
+            if msg.name in excluded or self.truncation_marker in msg.content:
                 continue
 
             # Truncate if over max length
             if isinstance(msg.content, str) and len(msg.content) > self.max_result_length:
-                msg.content = (
-                    msg.content[: self.max_result_length] + self.truncation_marker
-                )
+                msg.content = msg.content[: self.max_result_length] + self.truncation_marker
 
 
 @dataclass
@@ -136,9 +129,7 @@ class GraduatedTruncationEdit:
 
         # Find tool messages to truncate
         tool_messages = [
-            (idx, msg)
-            for idx, msg in enumerate(messages)
-            if isinstance(msg, ToolMessage)
+            (idx, msg) for idx, msg in enumerate(messages) if isinstance(msg, ToolMessage)
         ]
 
         if self.keep_recent >= len(tool_messages):
@@ -220,9 +211,7 @@ class HybridTruncateThenClearEdit:
     ) -> None:
         """Truncate old tool results."""
         tool_messages = [
-            (idx, msg)
-            for idx, msg in enumerate(messages)
-            if isinstance(msg, ToolMessage)
+            (idx, msg) for idx, msg in enumerate(messages) if isinstance(msg, ToolMessage)
         ]
 
         if self.keep_recent_truncate >= len(tool_messages):
@@ -252,9 +241,7 @@ class HybridTruncateThenClearEdit:
     ) -> None:
         """Clear oldest tool results completely."""
         tool_messages = [
-            (idx, msg)
-            for idx, msg in enumerate(messages)
-            if isinstance(msg, ToolMessage)
+            (idx, msg) for idx, msg in enumerate(messages) if isinstance(msg, ToolMessage)
         ]
 
         if self.keep_recent_clear >= len(tool_messages):

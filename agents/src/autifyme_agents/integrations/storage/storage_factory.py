@@ -47,7 +47,7 @@ def _cleanup_storage() -> None:
 
     if _storage_instance is not None:
         try:
-            if hasattr(_storage_instance, 'cleanup'):
+            if hasattr(_storage_instance, "cleanup"):
                 _storage_instance.cleanup()
                 logger.info("Storage singleton cleanup completed")
         except Exception as e:

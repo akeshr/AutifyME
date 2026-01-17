@@ -82,9 +82,7 @@ class GeminiLiveSession:
         self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
 
         if not self.api_key:
-            raise ValueError(
-                "GOOGLE_API_KEY environment variable or api_key parameter required"
-            )
+            raise ValueError("GOOGLE_API_KEY environment variable or api_key parameter required")
 
         # Configure client (type stubs lag behind actual SDK API)
         genai.configure(api_key=self.api_key)  # type: ignore[attr-defined]

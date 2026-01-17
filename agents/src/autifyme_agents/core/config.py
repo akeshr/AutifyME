@@ -3,16 +3,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
 
+
 class Settings(BaseSettings):
     """
     Manages application settings and secrets.
 
     This class automatically loads variables from the environment or a .env file.
     """
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"  # Allow and ignore extra environment variables
+        extra="ignore",  # Allow and ignore extra environment variables
     )
 
     SUPABASE_URL: str
@@ -40,7 +42,9 @@ class Settings(BaseSettings):
     ENABLE_GOOGLE_TAXONOMY_API: bool = False  # Taxonomy: Google Product Taxonomy integration
     ENABLE_LLM_INDUSTRY_CLASSIFICATION: bool = False  # Taxonomy: LLM-based NAICS classification
     ENABLE_COMPETITIVE_PRICING_API: bool = False  # Market Intelligence: Competitive pricing data
-    ENABLE_LLM_USE_CASE_GENERATION: bool = False  # Market Intelligence: Custom use cases per industry
+    ENABLE_LLM_USE_CASE_GENERATION: bool = (
+        False  # Market Intelligence: Custom use cases per industry
+    )
     ENABLE_LLM_BULLET_GENERATION: bool = False  # Content SEO: Brand-aligned bullet points
 
 

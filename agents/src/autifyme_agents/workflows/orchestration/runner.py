@@ -206,7 +206,9 @@ class WorkflowRunner:
         combined_text = " ".join(texts) if texts else ""
         if media_ids:
             media_summary = f"[{len(media_ids)} media attachment(s): {', '.join(media_ids)}]"
-            combined_text = f"{combined_text} {media_summary}".strip() if combined_text else media_summary
+            combined_text = (
+                f"{combined_text} {media_summary}".strip() if combined_text else media_summary
+            )
 
         # Get thread_id and execute workflow
         thread_id = self.channel.format_thread_id(sender)
@@ -279,7 +281,11 @@ class WorkflowRunner:
         with execution_context(thread_id=thread_id, company_id="default"):
             try:
                 # Execute with automatic outcome tracking via middleware
-                result, interrupt_value, tracking_id = await self.tracking_middleware.execute_with_tracking(
+                (
+                    result,
+                    interrupt_value,
+                    tracking_id,
+                ) = await self.tracking_middleware.execute_with_tracking(
                     thread_id=thread_id,
                     incoming_message=incoming_message,
                     pm_invoker=lambda tid: self._invoke_pm(thread_id, raw_payload, run_id=tid),
@@ -287,14 +293,19 @@ class WorkflowRunner:
 
                 # Handle user-facing logic (same as single message flow)
                 if interrupt_value:
-                    error_response = self.workflow_handler.handle_interrupt(sender, thread_id, interrupt_value)
+                    error_response = self.workflow_handler.handle_interrupt(
+                        sender, thread_id, interrupt_value
+                    )
 
                     # If validation failed, auto-reject with error so agent can retry
                     if error_response:
                         error_msg = error_response.get("error", str(error_response))
                         logger.warning(
                             "WriteIntent validation failed in batch - auto-rejecting",
-                            extra={"thread_id": thread_id, "error_type": error_response.get("error_type")},
+                            extra={
+                                "thread_id": thread_id,
+                                "error_type": error_response.get("error_type"),
+                            },
                         )
                         auto_reject: Command[Any] = Command(
                             resume={"decisions": [{"type": "reject", "message": error_msg}]}
@@ -334,7 +345,7 @@ class WorkflowRunner:
                             except Exception as img_err:
                                 logger.warning(
                                     "Failed to send image in batch",
-                                    extra={"path": img.path, "error": str(img_err)}
+                                    extra={"path": img.path, "error": str(img_err)},
                                 )
 
                     # Send text message
@@ -345,19 +356,23 @@ class WorkflowRunner:
                             extra={
                                 "thread_id": thread_id,
                                 "tracking_id": tracking_id,
-                                "image_count": len(structured_response.images) if structured_response.images else 0,
-                            }
+                                "image_count": len(structured_response.images)
+                                if structured_response.images
+                                else 0,
+                            },
                         )
                 else:
                     # Fallback to legacy extract_summary for non-structured responses
                     summary = self.workflow_handler.extract_summary(messages)
                     if summary:
                         self.channel.send_text(sender, summary)
-                        logger.info("Batch PM response sent (legacy)", extra={"thread_id": thread_id})
+                        logger.info(
+                            "Batch PM response sent (legacy)", extra={"thread_id": thread_id}
+                        )
                     else:
                         logger.warning(
                             "No response extracted from batch PM messages",
-                            extra={"thread_id": thread_id, "message_count": len(messages)}
+                            extra={"thread_id": thread_id, "message_count": len(messages)},
                         )
 
             except Exception:
@@ -394,7 +409,11 @@ class WorkflowRunner:
         """
         logger.debug(
             "Executing workflow",
-            extra={"thread_id": thread_id, "has_text": text is not None, "has_media": media_id is not None},
+            extra={
+                "thread_id": thread_id,
+                "has_text": text is not None,
+                "has_media": media_id is not None,
+            },
         )
 
         # Prepare structured incoming message
@@ -420,7 +439,11 @@ class WorkflowRunner:
         with execution_context(thread_id=thread_id, company_id="default"):
             try:
                 # Execute with automatic outcome tracking via middleware
-                result, interrupt_value, tracking_id = await self.tracking_middleware.execute_with_tracking(
+                (
+                    result,
+                    interrupt_value,
+                    tracking_id,
+                ) = await self.tracking_middleware.execute_with_tracking(
                     thread_id=thread_id,
                     incoming_message=incoming_message,
                     pm_invoker=lambda tid: self._invoke_pm(thread_id, raw_payload, run_id=tid),
@@ -428,14 +451,19 @@ class WorkflowRunner:
 
                 # Handle user-facing logic (middleware handles tracking)
                 if interrupt_value:
-                    error_response = self.workflow_handler.handle_interrupt(sender, thread_id, interrupt_value)
+                    error_response = self.workflow_handler.handle_interrupt(
+                        sender, thread_id, interrupt_value
+                    )
 
                     # If validation failed, auto-reject with error so agent can retry
                     if error_response:
                         error_msg = error_response.get("error", str(error_response))
                         logger.warning(
                             "WriteIntent validation failed - auto-rejecting",
-                            extra={"thread_id": thread_id, "error_type": error_response.get("error_type")}
+                            extra={
+                                "thread_id": thread_id,
+                                "error_type": error_response.get("error_type"),
+                            },
                         )
                         auto_reject: Command[Any] = Command(
                             resume={"decisions": [{"type": "reject", "message": error_msg}]}
@@ -448,7 +476,9 @@ class WorkflowRunner:
                 await self._cleanup_subagent_checkpoints(thread_id)
 
                 if not result:
-                    logger.warning("No result from PM - cannot send response", extra={"thread_id": thread_id})
+                    logger.warning(
+                        "No result from PM - cannot send response", extra={"thread_id": thread_id}
+                    )
                     return
 
                 # Extract messages from result
@@ -469,12 +499,15 @@ class WorkflowRunner:
                                 self.channel.send_image(sender, img.path, img.caption)
                                 logger.debug(
                                     "Image sent to user",
-                                    extra={"path": img.path, "has_caption": img.caption is not None}
+                                    extra={
+                                        "path": img.path,
+                                        "has_caption": img.caption is not None,
+                                    },
                                 )
                             except Exception as img_err:
                                 logger.warning(
                                     "Failed to send image",
-                                    extra={"path": img.path, "error": str(img_err)}
+                                    extra={"path": img.path, "error": str(img_err)},
                                 )
 
                     # Send text message
@@ -485,17 +518,16 @@ class WorkflowRunner:
                             extra={
                                 "thread_id": thread_id,
                                 "tracking_id": tracking_id,
-                                "image_count": len(structured_response.images) if structured_response.images else 0,
+                                "image_count": len(structured_response.images)
+                                if structured_response.images
+                                else 0,
                                 "await_feedback": structured_response.await_feedback,
-                            }
+                            },
                         )
 
                     # Handle await_feedback (interrupt for user response)
                     if structured_response.await_feedback:
-                        logger.info(
-                            "PM awaiting user feedback",
-                            extra={"thread_id": thread_id}
-                        )
+                        logger.info("PM awaiting user feedback", extra={"thread_id": thread_id})
                         # Note: Feedback loop is handled by next user message
                         # No explicit interrupt needed - PM state is preserved
                 else:
@@ -503,11 +535,14 @@ class WorkflowRunner:
                     summary = self.workflow_handler.extract_summary(messages)
                     if summary:
                         self.channel.send_text(sender, summary)
-                        logger.info("PM response sent (legacy)", extra={"thread_id": thread_id, "tracking_id": tracking_id})
+                        logger.info(
+                            "PM response sent (legacy)",
+                            extra={"thread_id": thread_id, "tracking_id": tracking_id},
+                        )
                     else:
                         logger.warning(
                             "No response extracted from PM messages",
-                            extra={"thread_id": thread_id, "message_count": len(messages)}
+                            extra={"thread_id": thread_id, "message_count": len(messages)},
                         )
 
             except BlankResponseError as exc:
@@ -518,7 +553,7 @@ class WorkflowRunner:
                 )
                 self.channel.send_text(
                     sender,
-                    "I apologize, but I encountered an error generating a response. Please try again."
+                    "I apologize, but I encountered an error generating a response. Please try again.",
                 )
 
             except GraphRecursionError as exc:
@@ -558,11 +593,13 @@ class WorkflowRunner:
             try:
                 logger.info(
                     "Downloading media attached to approval response",
-                    extra={"thread_id": thread_id, "media_id": media_id}
+                    extra={"thread_id": thread_id, "media_id": media_id},
                 )
                 # Use channel's download_media_with_bytes + storage upload (same as platform_tools)
-                if hasattr(self.channel, 'download_media_with_bytes'):
-                    local_path, media_bytes, mime_type = self.channel.download_media_with_bytes(media_id)
+                if hasattr(self.channel, "download_media_with_bytes"):
+                    local_path, media_bytes, mime_type = self.channel.download_media_with_bytes(
+                        media_id
+                    )
                     filename = Path(local_path).name
                     upload_result = await self.storage.upload_to_inbox(
                         file_bytes=media_bytes,
@@ -573,22 +610,25 @@ class WorkflowRunner:
                     media_path = upload_result["storage_path"]
                     logger.info(
                         "Media downloaded and stored for approval response",
-                        extra={"thread_id": thread_id, "media_path": media_path}
+                        extra={"thread_id": thread_id, "media_path": media_path},
                     )
             except Exception as e:
                 logger.warning(
                     "Failed to download media from approval response - continuing without it",
-                    extra={"thread_id": thread_id, "media_id": media_id, "error": str(e)}
+                    extra={"thread_id": thread_id, "media_id": media_id, "error": str(e)},
                 )
 
         # Extract conversation history
         conversation_history = []
         try:
             state_snapshot = await pm.aget_state(config)
-            if state_snapshot and hasattr(state_snapshot, 'values'):
+            if state_snapshot and hasattr(state_snapshot, "values"):
                 conversation_history = state_snapshot.values.get("messages", [])
         except Exception as e:
-            logger.debug("Could not extract conversation history", extra={"thread_id": thread_id, "error": str(e)})
+            logger.debug(
+                "Could not extract conversation history",
+                extra={"thread_id": thread_id, "error": str(e)},
+            )
 
         # Analyze approval and build command
         try:
@@ -604,7 +644,7 @@ class WorkflowRunner:
             logger.error(
                 "Approval analysis failed",
                 extra={"thread_id": thread_id, "error": str(e)},
-                exc_info=True
+                exc_info=True,
             )
             raise
 
@@ -619,8 +659,10 @@ class WorkflowRunner:
                 "interrupt_count": len(pending_interrupts_list),
                 "message_preview": user_message[:50],
                 "history_length": len(conversation_history),
-                "command_resume_keys": list(command_obj.resume.keys()) if command_obj and command_obj.resume else [],
-            }
+                "command_resume_keys": list(command_obj.resume.keys())
+                if command_obj and command_obj.resume
+                else [],
+            },
         )
 
         # Execute command and collect results
@@ -630,7 +672,7 @@ class WorkflowRunner:
         try:
             logger.info(
                 "Starting PM stream with Command",
-                extra={"thread_id": thread_id, "stream_mode": "values"}
+                extra={"thread_id": thread_id, "stream_mode": "values"},
             )
 
             event_count = 0
@@ -648,24 +690,31 @@ class WorkflowRunner:
                     "thread_id": thread_id,
                     "event_count": event_count,
                     "had_new_interrupt": interrupt_value is not None,
-                }
+                },
             )
 
             logger.debug(
                 "Command execution complete",
-                extra={"thread_id": thread_id, "had_new_interrupt": interrupt_value is not None}
+                extra={"thread_id": thread_id, "had_new_interrupt": interrupt_value is not None},
             )
             return last_event, interrupt_value
 
         except GraphInterrupt as interrupt_exc:
             interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
-            logger.debug("Interrupt via exception", extra={"thread_id": thread_id, "count": len(interrupts_list)})
+            logger.debug(
+                "Interrupt via exception",
+                extra={"thread_id": thread_id, "count": len(interrupts_list)},
+            )
             if interrupts_list:
                 return last_event, interrupts_list[0].value
             return last_event, None
 
         except Exception as e:
-            logger.error("Command execution failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
+            logger.error(
+                "Command execution failed",
+                extra={"thread_id": thread_id, "error": str(e)},
+                exc_info=True,
+            )
             raise
 
     async def _resume_with_command(
@@ -687,7 +736,7 @@ class WorkflowRunner:
 
             logger.info(
                 "Auto-resuming workflow with command",
-                extra={"thread_id": thread_id, "command_type": "auto_reject"}
+                extra={"thread_id": thread_id, "command_type": "auto_reject"},
             )
 
             # Stream and collect result
@@ -700,11 +749,16 @@ class WorkflowRunner:
                     if interrupts:
                         # New interrupt after auto-reject - send to user
                         interrupt_value = interrupts[0].value
-                        new_error = self.workflow_handler.handle_interrupt(sender, thread_id, interrupt_value)
+                        new_error = self.workflow_handler.handle_interrupt(
+                            sender, thread_id, interrupt_value
+                        )
                         if new_error:
                             logger.error(
                                 "Repeated validation failure after auto-reject",
-                                extra={"thread_id": thread_id, "error_type": new_error.get("error_type")}
+                                extra={
+                                    "thread_id": thread_id,
+                                    "error_type": new_error.get("error_type"),
+                                },
                             )
                         return
 
@@ -716,16 +770,16 @@ class WorkflowRunner:
                     self.channel.send_text(sender, summary)
                     logger.info(
                         "Auto-reject response sent to user",
-                        extra={"thread_id": thread_id, "summary_length": len(summary)}
+                        extra={"thread_id": thread_id, "summary_length": len(summary)},
                     )
 
         except Exception as e:
             logger.error(
-                "Auto-resume failed",
-                extra={"thread_id": thread_id, "error": str(e)},
-                exc_info=True
+                "Auto-resume failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True
             )
-            self.channel.send_error(sender, "processing", "I encountered an issue. Please try again.")
+            self.channel.send_error(
+                sender, "processing", "I encountered an issue. Please try again."
+            )
 
     async def _handle_new_message_flow(
         self,
@@ -789,30 +843,36 @@ class WorkflowRunner:
             # Put platform metadata in additional_kwargs (standard LangChain pattern)
             # PM receives clean user text with embedded media_id(s), metadata available if needed
             payload = {
-                "messages": [HumanMessage(
-                    content=user_text,
-                    additional_kwargs={
-                        "platform": raw_payload.get("platform"),
-                        "sender": raw_payload.get("sender"),
-                        "sender_name": raw_payload.get("sender_name"),
-                        "media_id": media_id,  # Backward compat
-                        "media_ids": media_ids,  # Batch support
-                        "message_count": raw_payload.get("message_count"),
-                        "timestamp": raw_payload.get("timestamp"),
-                    }
-                )]
+                "messages": [
+                    HumanMessage(
+                        content=user_text,
+                        additional_kwargs={
+                            "platform": raw_payload.get("platform"),
+                            "sender": raw_payload.get("sender"),
+                            "sender_name": raw_payload.get("sender_name"),
+                            "media_id": media_id,  # Backward compat
+                            "media_ids": media_ids,  # Batch support
+                            "message_count": raw_payload.get("message_count"),
+                            "timestamp": raw_payload.get("timestamp"),
+                        },
+                    )
+                ]
             }
         except Exception as e:
-            logger.error("Payload creation failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
+            logger.error(
+                "Payload creation failed",
+                extra={"thread_id": thread_id, "error": str(e)},
+                exc_info=True,
+            )
             raise
 
         logger.info(
             "New message flow: starting PM stream",
             extra={
                 "thread_id": thread_id,
-                "has_text": raw_payload.get('text') is not None,
-                "has_media": raw_payload.get('media_id') is not None,
-            }
+                "has_text": raw_payload.get("text") is not None,
+                "has_media": raw_payload.get("media_id") is not None,
+            },
         )
 
         # Stream PM and accumulate interrupts
@@ -847,19 +907,26 @@ class WorkflowRunner:
                     "thread_id": thread_id,
                     "interrupt_count": len(accumulated_interrupts),
                     "has_result": last_event is not None,
-                }
+                },
             )
             return last_event, interrupt_value
 
         except GraphInterrupt as interrupt_exc:
             interrupts_list = interrupt_exc.args[0] if interrupt_exc.args else []
-            logger.debug("Interrupt via exception", extra={"thread_id": thread_id, "count": len(interrupts_list)})
+            logger.debug(
+                "Interrupt via exception",
+                extra={"thread_id": thread_id, "count": len(interrupts_list)},
+            )
             if interrupts_list:
                 return last_event, interrupts_list[0].value
             return last_event, None
 
         except Exception as e:
-            logger.error("PM streaming failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
+            logger.error(
+                "PM streaming failed",
+                extra={"thread_id": thread_id, "error": str(e)},
+                exc_info=True,
+            )
             raise
 
     async def _invoke_pm(
@@ -894,13 +961,19 @@ class WorkflowRunner:
             pm = await self._create_project_manager()
             config = self._build_config(thread_id, run_id=run_id)
         except Exception as e:
-            logger.error("PM initialization failed", extra={"thread_id": thread_id, "error": str(e)}, exc_info=True)
+            logger.error(
+                "PM initialization failed",
+                extra={"thread_id": thread_id, "error": str(e)},
+                exc_info=True,
+            )
             raise
 
         # Check for pending interrupts
         try:
             state_snapshot = await pm.aget_state(config)
-            pending_interrupts_list = InterruptUnpacker.unpack_interrupts(state_snapshot, thread_id=thread_id)
+            pending_interrupts_list = InterruptUnpacker.unpack_interrupts(
+                state_snapshot, thread_id=thread_id
+            )
 
             flow_type = "resume" if pending_interrupts_list else "new_message"
             logger.info(
@@ -909,18 +982,20 @@ class WorkflowRunner:
                     "thread_id": thread_id,
                     "flow_type": flow_type,
                     "interrupt_count": len(pending_interrupts_list),
-                }
+                },
             )
         except Exception as e:
             logger.warning(
                 "Interrupt check failed, treating as new message",
-                extra={"thread_id": thread_id, "error": str(e)}
+                extra={"thread_id": thread_id, "error": str(e)},
             )
             pending_interrupts_list = []
 
         # Route to appropriate flow
         if pending_interrupts_list:
-            return await self._handle_resume_flow(pm, config, thread_id, raw_payload, pending_interrupts_list)
+            return await self._handle_resume_flow(
+                pm, config, thread_id, raw_payload, pending_interrupts_list
+            )
         else:
             return await self._handle_new_message_flow(pm, config, thread_id, raw_payload)
 
@@ -931,6 +1006,7 @@ class WorkflowRunner:
         from autifyme_agents.integrations.storage.postgres_saver_factory import (
             get_async_checkpointer,
         )
+
         return await get_async_checkpointer()
 
     async def _cleanup_subagent_checkpoints(self, thread_id: str) -> None:
@@ -1021,8 +1097,7 @@ class WorkflowRunner:
         # Add run_id if provided - this becomes the trace_id in LangSmith
         if run_id:
             from uuid import UUID
+
             config["run_id"] = UUID(run_id) if isinstance(run_id, str) else run_id
 
         return config
-
-

@@ -88,7 +88,7 @@ def build_storage_url(path: str, bucket: str = "assets") -> str:
 
     # Strip bucket prefix if accidentally included
     if path.startswith(f"{bucket}/"):
-        path = path[len(bucket) + 1:]
+        path = path[len(bucket) + 1 :]
 
     # Build URL
     base_url = os.getenv("SUPABASE_URL")

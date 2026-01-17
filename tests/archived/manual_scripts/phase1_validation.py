@@ -92,9 +92,7 @@ async def test_base_context_loading():
         f"Tokens: {token_count}/2000",
     )
 
-    print_result(
-        "Load time acceptable (<1000ms)", load_time < 1000, f"Time: {load_time:.0f}ms"
-    )
+    print_result("Load time acceptable (<1000ms)", load_time < 1000, f"Time: {load_time:.0f}ms")
 
     # Don't cleanup - other tests need storage
     return base_context
@@ -120,9 +118,7 @@ def test_query_tools():
         f"Found {first_result['total_matches']} matches for 'PET'",
     )
 
-    print_result(
-        "Query time acceptable (<500ms)", query_time < 500, f"Time: {query_time:.0f}ms"
-    )
+    print_result("Query time acceptable (<500ms)", query_time < 500, f"Time: {query_time:.0f}ms")
 
     # Test get_category_info
     category_tool = create_get_category_info_tool(storage)
@@ -137,9 +133,7 @@ def test_query_tools():
         f"Category: {result.name}, Subcategories: {result.subcategory_count}",
     )
 
-    print_result(
-        "Query time acceptable (<500ms)", query_time < 500, f"Time: {query_time:.0f}ms"
-    )
+    print_result("Query time acceptable (<500ms)", query_time < 500, f"Time: {query_time:.0f}ms")
 
     # Don't cleanup - other tests need storage
 
@@ -162,9 +156,7 @@ async def test_pm_initialization():
     )
     init_time = (time.time() - start_time) * 1000
 
-    print_result(
-        "PM creates successfully", pm is not None, f"Type: {type(pm).__name__}"
-    )
+    print_result("PM creates successfully", pm is not None, f"Type: {type(pm).__name__}")
 
     print_result(
         "Initialization time acceptable (<5000ms)",
@@ -202,9 +194,7 @@ def test_scenario_matrix():
 
     # Scenario 3: User question (would use base context)
     # This is validated by base context loading test
-    print_result(
-        "Scenario 3: User question", True, "Base context available for quick answers"
-    )
+    print_result("Scenario 3: User question", True, "Base context available for quick answers")
 
     # Scenario 4: Ambiguous match (multiple results)
     result = search_tool.invoke({"queries": ["PET"]})
@@ -239,7 +229,7 @@ async def test_performance_summary():
         company_profile=company_profile,
         checkpointer=pm_checkpointer,
         specialist_checkpointer=specialist_checkpointer,
-        storage=storage
+        storage=storage,
     )
 
     total_time = (time.time() - start_time) * 1000
