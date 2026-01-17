@@ -177,8 +177,19 @@ For PET, glass, and glossy plastics, edges naturally show refraction. DO NOT add
 material_treatment={
     "primary_material": "glossy PET",  # or specific material
     "rendering_notes": "Natural edge refraction only. No artificial rim highlights. Clean silhouette edges."
+},
+lighting={
+    "specials": "no rim light - rely on natural edge refraction for transparent materials"
 }
 ```
+
+**Edge Artifact Self-Check (REQUIRED for transparent materials):**
+Before EVERY image_studio call with transparent/glossy material, verify:
+- [ ] `rendering_notes` does NOT contain: "highlight", "rim", "edge reflection", "show form"
+- [ ] `lighting.specials` explicitly prohibits rim light
+- [ ] No "edge glow" or "edge highlight" in any spec value
+
+**Why this matters:** Gemini interprets "highlight reflections" as adding white edge lines, which appear as shadow artifacts on transparent bottles.
 
 ### fidelity (CRITICAL for source images)
 FIX photography problems, PRESERVE product identity. **Always include when processing [source]/[product].**
@@ -370,6 +381,56 @@ image_studio(
 )
 ```
 
+### Logo/Branding Position Consistency (REQUIRED for Variants)
+
+**Problem:** Logo position drift across color variants looks unprofessional.
+
+**Pattern: Anchor-Extract-Apply**
+
+1. **Extract position from anchor:**
+   After generating anchor image, use view_image to capture exact logo position:
+   ```
+   view_image: "Describe logo position precisely - distance from top edge, horizontal centering, size relative to bottle height"
+   ```
+   Result: "Logo centered horizontally, positioned 35% from top, occupies 20% of bottle height"
+
+2. **Apply position spec to all variants:**
+   ```python
+   fidelity={
+       "preserve_artwork": "logo must match anchor position: centered, 35% from top, 20% height",
+       "hero_features": "logo position and size consistency"
+   }
+   ```
+
+**Anti-pattern:** Generating variants without explicit position reference from anchor - Gemini will place logos inconsistently.
+
+### Color Variant Transparency Consistency
+
+**Problem:** Color variants (especially dark colors) may render with different opacity than anchor.
+
+**Pattern: Explicit Opacity Matching**
+
+For transparent products with color variants:
+
+```python
+material_treatment={
+    "primary_material": "glossy PET",
+    "rendering_notes": "Natural edge refraction only. No artificial rim highlights.",
+    "transparency_spec": "Match anchor opacity: 85% transparent, liquid visible through body"
+}
+```
+
+**[CRITICAL] For dark-colored variants (black, dark blue, etc.):**
+```python
+material_treatment={
+    "primary_material": "glossy PET - tinted [color]",
+    "rendering_notes": "MUST maintain same transparency as anchor. Dark tint, NOT opaque.",
+    "transparency_spec": "85% transparency - liquid visible through dark tint like sunglasses"
+}
+```
+
+**Why:** Without explicit transparency guidance, Gemini often renders dark variants as opaque plastic.
+
 ---
 
 ### Pattern 6: Verification Grid (Batch Consistency Check)
@@ -487,6 +548,9 @@ Key field: `storage_path` - use this for creating asset records.
 | No output.filename | Unpredictable path | Always specify for predictable paths |
 | Single extraction for N items | 1 asset for 9 products | Extract each item separately |
 | Minimal specs for hero shots | Garbage quality | Use ALL specs (see Pattern 5) |
+| "Highlight reflections" in notes | Edge shadow artifacts | Use "natural refraction only" |
+| No logo position from anchor | Logo drift across variants | Extract position, include in fidelity |
+| Missing transparency_spec for dark | Black variant is opaque | Explicit "match anchor opacity" |
 
 ---
 
