@@ -12,19 +12,15 @@ Load when: User sent multiple images AND visual_analyst identified relationship.
 - Then load this protocol for relationship-specific patterns
 - Continue OODA (ORIENT -> DECIDE -> ACT) per relationship type
 
+**For multi-image OODA orchestration patterns, see `discovery_mindset` protocol (Multi-Image Workflows section).**
+
 ---
 
 ## [CRITICAL] WORKFLOW DEPENDENCIES
 
-**Arrows (->) in workflows below indicate dependencies. Check what each agent REQUIRES before delegating.**
+**Arrows (->) in workflows below indicate dependencies.**
 
-| Agent | REQUIRES (hard) | Optional Context | Produces |
-|-------|-----------------|------------------|----------|
-| visual_analyst | Image paths | (none) | visual_analysis.md |
-| product_analyst | visual_analysis.md | (none) | product_research.md |
-| catalog_analyst | visual_analysis.md | product_research.md (CRITICAL for novel products, enriches for familiar - see discovery_mindset: Dependency Hardness) | catalog_analysis.md |
-| creative_specialist | visual_analysis.md + images | product_research.md | asset_ids |
-| catalog_specialist | visual_analysis.md + asset_ids | product_research.md | product records + junctions |
+For detailed agent dependency requirements, see `discovery_mindset` protocol (DEPENDENCY MAPPING section).
 
 **Before each delegation:** "Do I have what this agent REQUIRES? If not, run the producer first."
 

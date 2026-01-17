@@ -291,6 +291,8 @@ User message contains image?
 - If C finds existing product with all data, full analysis phase was unnecessary
 - OODA: Learn from ORIENT before committing to full analysis
 
+**Gate:** See `synthesis` protocol for gate synthesis and user presentation patterns.
+
 ---
 
 ## DEPENDENCY HARDNESS ASSESSMENT
@@ -389,6 +391,8 @@ User message contains image?
 | Analysts disagree | Product says Rs 50, Catalog says Rs 30 | Present both, explain discrepancy, recommend |
 | User contradicts themselves | First: "new product", Later: "update X" | Ask which they want |
 | Data validation fails | User price Rs 5 for premium item | Flag as unusual, confirm intent |
+
+**For detailed conflict resolution patterns, see `conflict_resolution` protocol (domain authority matrix, re-delegation patterns).**
 
 ### Workflow Interruptions
 

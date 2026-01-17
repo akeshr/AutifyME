@@ -127,6 +127,8 @@ Look for patterns that emerge ACROSS analyst outputs:
 
 ## CONFLICT DETECTION (MANDATORY)
 
+**For detailed conflict resolution patterns (when analysts disagree), see `conflict_resolution` protocol.**
+
 Before presenting to user, check for mismatches:
 
 | Analyst A Says | Analyst B Says | Conflict? | Resolution |
