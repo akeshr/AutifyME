@@ -438,6 +438,28 @@ Result: V -> C -> [DECIDE: need P?] -> maybe P -> Gate
 
 **Key:** "Research X" means "ensure complete data" - not "ignore existing data."
 
+### Image + "add this AND research market prices" (Compound Directive)
+```
+User: [image] + "add this to catalog and research market prices"
+User explicitly wants BOTH catalog check AND market research.
+
+OODA Flow:
+1. OBSERVE: visual_analyst
+   -> "Premium glass bottle, 500ml"
+
+2. ORIENT: catalog_analyst || product_analyst (PARALLEL)
+   -> User asked for BOTH regardless of findings
+   -> Neither eliminates need for other
+   -> C checks internal, P checks external (independent)
+
+3. DECIDE: Merge findings at gate
+
+4. Gate: Present combined insights
+Result: V -> (C || P) -> Gate
+```
+
+**Key:** Compound directive ("X AND Y") = user wants both regardless. Single directive ("add this") = OODA decides what's needed.
+
 ### Pure image processing
 ```
 User: [image] + "remove background"
