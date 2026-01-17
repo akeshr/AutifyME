@@ -81,9 +81,6 @@ def create_creative_specialist(
     Returns:
         SubAgent spec dict: {name, description, tools, system_prompt, model}
     """
-    if company_profile is None:
-        raise ValueError("company_profile is required for Creative Specialist (single-tenant)")
-
     # Load and format prompt with company context
     prompt_template = load_prompt("specialists/creative_specialist.prompt")
     vi = company_profile.visual_identity
@@ -153,7 +150,7 @@ def create_creative_specialist(
         else get_llm(
             provider="google",
             model=CREATIVE_SPECIALIST_MODEL,
-            temperature=0.7,
+            temperature=1.0,  # Balanced creativity and consistency
             thinking_level="high",  # Deep reasoning for creative quality decisions
         )
     )
