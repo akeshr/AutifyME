@@ -292,8 +292,6 @@ When user wants to abort or restart.
 | "[HITL FEEDBACK REQUIRES PM DIRECTION]" | Load hitl protocol, go to user |
 | Error or failure message | Inform user, offer options |
 
-**For complete HITL signal handling patterns, see `hitl` protocol.**
-
 **[CRITICAL] "Canceled per your request" = USER canceled during HITL, not PM.**
 - Specialist's "your" refers to the USER who interacted via HITL
 - PM did NOT request cancellation - USER did
