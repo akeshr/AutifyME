@@ -21,6 +21,7 @@ from .pm_graders import (
     is_specialist,
     media_download_first,
     protocol_load_first,
+    visual_analyst_for_images,
     wave_execution_correct,
 )
 from .specialist_graders import (
@@ -42,12 +43,19 @@ GraderFn = Callable[..., GraderResult]
 
 
 # Registry of PM graders - each tuple is (name, grader_function, kwargs)
+# Note: visual_analyst_for_images requires has_image, handled specially in run_code_graders
 PM_GRADERS: list[tuple[str, GraderFn, dict]] = [
     ("protocol_load_first", protocol_load_first, {"agent": "PM"}),
     ("media_download_first", media_download_first, {}),
     ("analyst_before_specialist", analyst_before_specialist, {}),
     ("wave_execution_correct", wave_execution_correct, {}),
     ("file_read_before_synthesis", file_read_before_synthesis, {}),
+    # visual_analyst_for_images added below with special has_image handling
+]
+
+# PM graders that require has_image from trace (handled specially)
+PM_GRADERS_WITH_IMAGE: list[tuple[str, GraderFn, dict]] = [
+    ("visual_analyst_for_images", visual_analyst_for_images, {}),
 ]
 
 # Registry of specialist graders - these run against detected specialists
@@ -281,14 +289,33 @@ def run_code_graders(
     seq = get_tool_call_sequence(trace_id)
     graph = get_delegation_graph(trace_id, seq=seq)  # Pass seq to avoid re-fetch
 
-    # Get trace status directly from root run (O(1) instead of loading full trace)
+    # Get trace status and check for images from root run (O(1) instead of loading full trace)
     from langsmith import Client
 
     client = Client()
+    has_image = False
     try:
         root_run = client.read_run(trace_id)
         trace_status = root_run.status or "unknown"
         trace_error = str(root_run.error) if root_run.error else None
+
+        # Check if trace has images in input
+        if root_run.inputs:
+            inputs_str = str(root_run.inputs)
+            # Check for common image indicators
+            has_image = any(
+                indicator in inputs_str.lower()
+                for indicator in [
+                    "media_id",
+                    "image_path",
+                    "image_url",
+                    ".jpg",
+                    ".jpeg",
+                    ".png",
+                    ".webp",
+                    "media attachment",
+                ]
+            )
     except Exception as e:
         trace_status = "unknown"
         trace_error = f"Failed to read trace: {e}"
@@ -306,6 +333,18 @@ def run_code_graders(
     if GraderCategory.PM in all_categories:
         for name, grader_fn, default_kwargs in PM_GRADERS:
             kwargs = dict(default_kwargs)
+            if "seq" in grader_fn.__code__.co_varnames:
+                kwargs["seq"] = seq
+            if "graph" in grader_fn.__code__.co_varnames:
+                kwargs["graph"] = graph
+
+            result = _run_grader_safely(name, grader_fn, GraderCategory.PM, **kwargs)
+            results.append(result)
+
+        # Run PM graders that require has_image
+        for name, grader_fn, default_kwargs in PM_GRADERS_WITH_IMAGE:
+            kwargs = dict(default_kwargs)
+            kwargs["has_image"] = has_image
             if "seq" in grader_fn.__code__.co_varnames:
                 kwargs["seq"] = seq
             if "graph" in grader_fn.__code__.co_varnames:

@@ -328,6 +328,116 @@ def wave_execution_correct(graph: DelegationGraph) -> GraderResult:
     )
 
 
+def visual_analyst_for_images(
+    seq: ToolCallSequence, graph: DelegationGraph, has_image: bool
+) -> GraderResult:
+    """Check if PM delegated to visual_analyst when trace has images.
+
+    The PM should use visual_analyst (its "eyes") to understand image content
+    BEFORE delegating to specialists. This applies even with shortcut commands.
+
+    Args:
+        seq: ToolCallSequence from get_tool_call_sequence()
+        graph: DelegationGraph from get_delegation_graph()
+        has_image: Whether the trace input contained images
+
+    Returns:
+        GraderResult with pass/fail and evidence
+    """
+    # If no images, grader not applicable
+    if not has_image:
+        return GraderResult(
+            name="visual_analyst_for_images",
+            passed=True,
+            score=1.0,
+            evidence={"has_image": False},
+            reason="No images in input - grader not applicable",
+            category=GraderCategory.PM,
+            severity="LOW",
+        )
+
+    # Check if visual_analyst was delegated to
+    visual_analyst_delegated = "visual_analyst" in graph.delegation_order
+
+    # Check if any specialist was delegated to
+    specialists_in_order = [
+        agent for agent in graph.delegation_order if is_specialist(agent)
+    ]
+
+    # If no specialists delegated, grader not fully applicable
+    # (PM might have just done analysis)
+    if not specialists_in_order:
+        return GraderResult(
+            name="visual_analyst_for_images",
+            passed=True,
+            score=1.0,
+            evidence={
+                "has_image": True,
+                "visual_analyst_delegated": visual_analyst_delegated,
+                "specialists_delegated": [],
+            },
+            reason="No specialists delegated - visual analysis may not be required",
+            category=GraderCategory.PM,
+            severity="LOW",
+        )
+
+    # If specialist delegated but visual_analyst was NOT - this is the failure case
+    if not visual_analyst_delegated:
+        return GraderResult(
+            name="visual_analyst_for_images",
+            passed=False,
+            score=0.0,
+            evidence={
+                "has_image": True,
+                "visual_analyst_delegated": False,
+                "specialists_delegated": specialists_in_order,
+                "delegation_order": graph.delegation_order,
+            },
+            reason=f"Image present but PM skipped visual_analyst - delegated directly to {specialists_in_order} without understanding image content",
+            category=GraderCategory.PM,
+            severity="HIGH",
+        )
+
+    # Check that visual_analyst came BEFORE any specialist
+    visual_idx = graph.delegation_order.index("visual_analyst")
+    first_specialist_idx = min(
+        graph.delegation_order.index(s) for s in specialists_in_order
+    )
+
+    if visual_idx >= first_specialist_idx:
+        return GraderResult(
+            name="visual_analyst_for_images",
+            passed=False,
+            score=0.5,
+            evidence={
+                "has_image": True,
+                "visual_analyst_delegated": True,
+                "visual_analyst_index": visual_idx,
+                "first_specialist_index": first_specialist_idx,
+                "delegation_order": graph.delegation_order,
+            },
+            reason=f"visual_analyst delegated at index {visual_idx} but specialist at {first_specialist_idx} - should analyze image BEFORE delegating to specialist",
+            category=GraderCategory.PM,
+            severity="MEDIUM",
+        )
+
+    return GraderResult(
+        name="visual_analyst_for_images",
+        passed=True,
+        score=1.0,
+        evidence={
+            "has_image": True,
+            "visual_analyst_delegated": True,
+            "visual_analyst_index": visual_idx,
+            "first_specialist_index": first_specialist_idx,
+            "specialists_delegated": specialists_in_order,
+        },
+        reason="Image present, visual_analyst used before specialist (CORRECT - PM used eyes)",
+        category=GraderCategory.PM,
+        severity="HIGH",
+    )
+
+
 def file_read_before_synthesis(seq: ToolCallSequence) -> GraderResult:
     """Check if PM read analysis files before synthesizing response.
 
