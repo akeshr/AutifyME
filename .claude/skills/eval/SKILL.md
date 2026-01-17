@@ -426,48 +426,102 @@ Diagnose root cause and propose fix.
 
 ### [CRITICAL] Framework Co-Evolution
 
-**Principle:** Every system fix should be accompanied by a grader improvement if needed.
+**Principle:** Every system fix should be accompanied by evaluation framework improvements.
 
-When you identify a system issue, ALWAYS ask:
+When you identify a system issue, check ALL framework components:
 
 ```
-1. "Would existing graders have caught this issue?"
-   - Run run_code_graders() on the failing trace
-   - Check if any grader flagged the root cause
+1. GRADERS (tests/tools/graders/)
+   "Would existing code graders have caught this?"
+   - Run run_code_graders() on failing trace
+   - If NO: design new grader for the BAD pattern
+   - Add to PM_GRADERS, SPECIALIST_GRADERS, ANALYST_GRADERS, or UNIVERSAL_GRADERS
 
-2. If NO grader caught it:
-   - Design a new grader that WOULD catch it
-   - Grader should detect the BAD behavior, not just the fix
-   - Add to appropriate registry (PM_GRADERS, SPECIALIST_GRADERS, etc.)
+2. MODEL RUBRICS (SKILL.md rubric sections)
+   "Does this need LLM evaluation?"
+   - Code graders: deterministic checks (tool sequences, parameters)
+   - Model rubrics: quality/judgment (image quality, context completeness)
+   - If issue requires "viewing" or "judging": add/update model rubric
 
-3. Validate the grader:
-   - Run on the FAILING trace -> should FAIL
-   - Run on a PASSING trace -> should PASS
-   - The grader catches the issue we just fixed
+3. TRACE ANALYSIS TOOLS (tests/tools/trace_analysis.py)
+   "Was investigation harder than it should be?"
+   - Add helper if you repeatedly extracted same data pattern
+   - Add to get_* functions for common queries
+   - Update show_* helpers for better debugging
+
+4. SCENARIOS (tests/scenarios/)
+   "Should this become a regression test?"
+   - If issue is reproducible: create scenario YAML
+   - Include baseline_trace_id for comparison
+   - Add to scenario catalog for /eval test
+
+5. PATTERNS (Pattern Matching table)
+   "Is this a recurring pattern?"
+   - Add symptom -> pattern -> fix location -> grader mapping
+   - Enables faster diagnosis for similar issues
+
+6. HELPERS (tests/tools/evaluation/helpers.py)
+   "Would a new helper speed up future investigation?"
+   - show_* functions for visualization
+   - get_* functions for data extraction
+   - detect_* functions for auto-detection
 ```
+
+**Framework Component Checklist:**
+
+| Component | Question | Location |
+|-----------|----------|----------|
+| Code Grader | Can code detect the BAD pattern? | `tests/tools/graders/*.py` |
+| Model Rubric | Does it need LLM judgment? | `SKILL.md` rubric sections |
+| Trace Helper | Was data extraction manual/repetitive? | `tests/tools/trace_analysis.py` |
+| Eval Helper | Would a show_*/detect_* help? | `tests/tools/evaluation/helpers.py` |
+| Scenario | Should this be a regression test? | `tests/scenarios/*.yaml` |
+| Pattern | Is this a recurring issue type? | Pattern Matching table below |
 
 **Why this matters:**
-- Fixes without graders = same bug can recur undetected
-- Graders without system fixes = detection without prevention
-- Both together = the issue is prevented AND detectable
+- System fix alone = issue can recur undetected
+- Framework improvement alone = detection without prevention
+- Both together = prevented AND detectable AND faster to diagnose next time
 
 **Example from this session:**
+
 ```
 Issue: PM skipped visual_analyst for image-based shortcuts
-System fix: Updated discovery_mindset.protocol with Visual Input Rule
-Grader fix: Added visual_analyst_for_images grader to pm_graders.py
+       (4-product image processed as single product)
 
-Result on failing trace:
-- Before: PASS (0.91) - graders missed the issue
-- After: PARTIAL (0.75) - visual_analyst_for_images: FAIL (correctly detected)
+System fixes:
+1. discovery_mindset.protocol - Visual Input Rule
+2. image_studio.protocol - batch consistency, logo position, transparency
+
+Framework improvements:
+1. NEW GRADER: visual_analyst_for_images (pm_graders.py)
+2. NEW GRADER: image_studio_consistency_params (specialist_graders.py)
+3. UPDATED PATTERN TABLE: VISUAL_SKIPPED, BATCH_INCONSISTENT patterns
+4. No new model rubric needed (graders sufficient for this case)
+
+Validation:
+- Failing trace before: PASS (0.91) - missed the issue
+- Failing trace after: PARTIAL (0.75) - correctly detected
 ```
 
 **Grader Design Checklist:**
-- [ ] Grader detects the BAD pattern (not just absence of good)
+- [ ] Detects the BAD pattern (not just absence of good)
 - [ ] Evidence field explains WHY it failed
 - [ ] Severity reflects impact (HIGH for critical issues)
-- [ ] Grader is registered in orchestrator.py
+- [ ] Registered in orchestrator.py
 - [ ] Works on both positive and negative cases
+
+**Model Rubric Design Checklist:**
+- [ ] Clear data to pull (what to examine)
+- [ ] Explicit pass/fail criteria
+- [ ] Evidence requirements specified
+- [ ] Cannot be replaced by deterministic code check
+
+**Scenario Design Checklist:**
+- [ ] Reproducible input (message + media paths)
+- [ ] Expected behavior documented
+- [ ] Success criteria defined
+- [ ] Baseline trace ID for comparison
 
 ### Pattern Matching
 
