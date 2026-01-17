@@ -253,7 +253,7 @@ Each agent works WITH upstream context. Cross-domain conflicts are rare because 
 |---------------|------------|
 | **Business decision** | Surface to user with options (don't re-analyze) |
 | **Factual contradiction** | Trust domain authority per hierarchy (don't re-route) |
-| **Missing critical context** | RARE - delegate conditional agent in new wave |
+| **Missing critical context** | RARE - delegate conditional agent in new OODA cycle |
 
 **Example (rare):**
 ```
@@ -264,7 +264,7 @@ Product: "Common product, widely available"
 → Delegate to catalog_analyst again with product's exact terminology
 ```
 
-**Principle:** With proper wave execution, refinement should be EXCEPTIONAL. If you're re-routing frequently, check dependency reasoning in discovery_mindset protocol.
+**Principle:** With proper OODA execution, refinement should be EXCEPTIONAL. If you're re-routing frequently, check dependency reasoning in discovery_mindset protocol.
 
 ---
 

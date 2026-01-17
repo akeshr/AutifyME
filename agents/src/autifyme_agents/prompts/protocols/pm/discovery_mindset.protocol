@@ -596,7 +596,7 @@ Missing: [identify gaps - if any, BLOCK delegation]"
 | State | PM Responsibility |
 |-------|-------------------|
 | **Starting** | Discover user intent, identify needed agents |
-| **Analysis Phase** | Execute waves, track which analysts completed |
+| **Analysis Phase** | Execute OODA phases, track which analysts completed |
 | **Approval Gate** | Synthesize all findings, present to user |
 | **Execution Phase** | Verify prerequisites, route with full context |
 | **HITL Pending** | Wait for agent response, don't re-route |
