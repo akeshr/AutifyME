@@ -101,40 +101,59 @@ INPUT: You receive JSON specs + labeled images. Read ALL specs and apply them.
 === LABELED IMAGES ===
 Each image has a label indicating its ROLE:
 
-[source], [product] = THE ACTUAL PRODUCT
-  - This IS your source material - work FROM this image
-  - Study it: shape, colors, textures, patterns, labels, artwork
-  - Output must be THIS SPECIFIC PRODUCT with improved presentation
-
-[style_ref], [mood_ref] = ATMOSPHERE REFERENCE
-  - Match its lighting, color temperature, mood
-  - Copy the STYLE, not the specific products shown
-
+[source], [product] = THE ACTUAL PRODUCT - study it carefully before generating
+[style_ref], [mood_ref] = ATMOSPHERE REFERENCE - copy style, not products shown
 [background] = Scene/environment reference
 [variant], [product_2] = Additional products for family shots
 
-KEY DISTINCTION:
-- Source provided? Output must be BASED ON that specific product
-- No source? Generate from description in specs
+No source provided? Generate from description in specs.
+
+=== SOURCE HANDLING: PRESERVE IDENTITY, FIX PHOTOGRAPHY ===
+Source images are often messy phone photos. Your job: PRESERVE product identity, FIX photography.
+
+PRESERVE (product identity - REAL properties of the product):
+- Material properties: transparency level, finish (matte/glossy), texture, surface quality
+- True colors: actual product color (not color cast from bad lighting)
+- Artwork: exact labels, logos, patterns, text (position, size, content)
+- Shape: true proportions, silhouette (not lens distortion)
+- Features: caps, lids, handles, spouts - all distinguishing elements
+
+FIX (photography problems - NOT product properties):
+- Bad lighting -> Professional studio lighting
+- Cluttered background -> Clean background
+- Color cast from environment -> True product colors
+- Blur/softness -> Tack sharp
+- Poor exposure -> Proper exposure
+- Harsh shadows -> Soft, natural shadows
+
+THE CRITICAL TEST: Would the product owner recognize THIS EXACT PRODUCT?
+- Same material feel (transparent stays transparent, matte stays matte)
+- Same colors (not "similar" - SAME)
+- Same artwork (exact labels, not "readable but different")
+- Same shape (exact silhouette, not "close enough")
+
+COMMON FAILURES (treating identity as photography problem):
+- Transparent material -> rendered dense/opaque (transparency IS identity)
+- Glossy finish -> rendered matte (finish IS identity)
+- Specific label artwork -> generic similar text (artwork IS identity)
+- Product proportions -> subtly distorted (shape IS identity)
 
 === SPEC TYPES (apply what's provided) ===
 
 "extraction" = EXTRACT FROM SOURCE IMAGE
   - target_description: Overall description of the task
   - targets: Array of items to extract, each with specific bbox
-    * target_bbox: Precise coordinate targeting
-    * target_image_label: Label of the image containing this target
-  - Isolate the described item(s) from the provided source
-  - Source may be messy - your job is to isolate cleanly
   - PRIORITY: Use bbox for targeting when available
 
 "fidelity" = PRODUCT IDENTITY PRESERVATION
   - preserve_colors, preserve_artwork, preserve_shape, hero_features
-  - Balance: Preserve identity while improving presentation
+  - Reinforces which identity aspects matter most
 
 "material_treatment" = MATERIAL-SPECIFIC RENDERING
   - primary_material: Glass, metal, plastic, fabric, etc.
-  - Different materials need different light/reflection handling
+  - Apply PRESERVE principle: material properties are identity
+  - Transparent? Output must be equally transparent
+  - Matte? Output must be matte, not glossy
 
 "scene" = LIFESTYLE ENVIRONMENT - Generate scene, place product
 "background" = BACKGROUND TREATMENT - solid, transparent, gradient
@@ -148,7 +167,7 @@ KEY DISTINCTION:
 
 === QUALITY DIMENSIONS (balance appropriately) ===
 
-- IDENTITY: Product recognizable (when source provided)
+- IDENTITY: Product recognizable as THE SAME PRODUCT from source
 - SHARPNESS: Crisp details, text/logos legible, edges precise
 - PHOTOREALISM: Contact shadows, grounding, believable light physics
 - CREATIVITY: Professional composition, optimal presentation
@@ -158,37 +177,10 @@ The specs guide priority:
 - Scene/lifestyle specs? Environment creativity matters more
 - Minimal specs? Professional judgment
 
-=== SOURCE: PRESERVE IDENTITY, FIX PHOTOGRAPHY ===
-Source images are often messy phone photos. Your job: PRESERVE product identity, FIX photography.
-
-PRESERVE (product identity - these are REAL properties of the product):
-- Material properties: transparency level, finish (matte/glossy), texture
-- True colors: actual product color (not color cast from bad lighting)
-- Artwork: exact labels, logos, patterns, text
-- Shape: true proportions (not lens distortion)
-
-FIX (photography problems - these are NOT product properties):
-- Bad lighting → Professional studio lighting
-- Cluttered background → Clean background
-- Color cast from environment → True product colors
-- Blur/softness → Tack sharp
-- Poor exposure → Proper exposure
-- Harsh shadows → Soft, natural shadows
-
-KEY DISTINCTION for transparent materials:
-- If product IS transparent (you can see through it in source), output MUST be equally transparent
-- The transparency is a PRODUCT PROPERTY to preserve, not a photography flaw
-- Don't make transparent materials look dense/opaque - that changes the product identity
-
-COMMON FAILURE: Treating transparency as something to "fix"
-- Source shows light, see-through bottle → Output looks like solid colored plastic
-- This is WRONG. Transparency is identity, not a flaw.
-
 === OUTPUT STANDARDS ===
 - Sharp at 200% zoom
 - Professional studio quality
-- Products sit ON surfaces (contact shadows, not floating)
-- Source provided? Owner recognizes their exact product"""
+- Products sit ON surfaces (contact shadows, not floating)"""
 
 
 # =============================================================================
