@@ -145,13 +145,13 @@ def create_creative_specialist(
         "- No catalog CRUD; delegate to catalog_specialist for product records"
     )
     # Use provided model or default to Gemini 3 Flash (multimodal)
-    # Temperature 0.7: Consistent spec decisions while allowing creative flexibility
-    # High thinking: creative quality + speed (HITL provides safety)
+    # Temperature 0.7 + Low thinking: Consistent, mechanical protocol execution
+    # Protocols provide the "thinking" - agent follows them consistently
     specialist_model = model if model is not None else get_llm(
         provider="google",
         model=CREATIVE_SPECIALIST_MODEL,
-        temperature=0.7,  # Consistent decisions about which specs to use
-        thinking_level="high",
+        temperature=0.7,
+        thinking_level="low",  # Mechanical execution, protocols provide reasoning
     )
 
     middleware = [
