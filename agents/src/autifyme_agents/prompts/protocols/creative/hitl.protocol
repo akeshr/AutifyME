@@ -200,6 +200,60 @@ Proceeding with corrected extraction.
 
 ---
 
+## "REALISTIC" FEEDBACK - Material Refinement, Not Effects
+
+**Special handling for transparent materials (PET, glass, clear plastic).**
+
+When user says "more realistic" on transparent materials, the instinct is to ADD visual effects. This is WRONG - effects cause edge artifacts.
+
+### WRONG Response
+
+```
+[HITL_FEEDBACK] "Make it more realistic"
+
+[HITL RESOLVED]
+
+**User Feedback:** "Make it more realistic"
+
+**Applied:** Added internal caustics, glossy surface sheen, detail enhancement
+
+Proceeding with enhanced rendering.
+-> [image_studio with caustics, sheen, detail_enhancement]  # CREATES ARTIFACTS
+```
+
+### CORRECT Response
+
+```
+[HITL_FEEDBACK] "Make it more realistic"
+
+[HITL RESOLVED]
+
+**User Feedback:** "Make it more realistic"
+
+**Analysis:** Current render lacks optical depth. For transparent materials, realism = accurate transparency + natural refraction, NOT added effects.
+
+**Applied:**
+- Refined material_treatment with accurate optical_behavior
+- Added transparency depth to fidelity.hero_features
+- Soft lighting to show natural transparency
+
+Proceeding with material-accurate rendering (no caustics, no sheen).
+-> [image_studio with refined material specs, NOT effects]
+```
+
+### Terms to AVOID in "Realistic" Corrections
+
+| AVOID | Causes |
+|-------|--------|
+| `internal caustics` | Bright spots, edge bleeding |
+| `glossy surface sheen` | Artificial rim highlights |
+| `detail_enhancement` | Over-sharpened edges = artifacts |
+| `clean up reflections` | Often adds reflections instead |
+
+**The Fix:** Refine material accuracy (optical_behavior, transparency depth, soft lighting). See `catalog_visual.protocol` TRANSPARENT MATERIAL DOCTRINE.
+
+---
+
 ## ANTI-PATTERNS
 
 **Wrong:** Responding without HITL marker

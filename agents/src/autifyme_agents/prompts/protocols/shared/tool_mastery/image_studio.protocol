@@ -163,15 +163,17 @@ Material-specific rendering instructions.
 - Include finish: "glossy PET", "matte HDPE", "brushed aluminum", "frosted glass"
 - If analysis says "PET bottle", use "glossy PET" or "clear PET", not "clear_plastic"
 
-**[CRITICAL] Transparent Material Realism (REQUIRED on First Render):**
+**[CRITICAL] Transparent Material Specs (Technical Reference):**
 
-For PET, glass, and clear plastics, realism comes from accurate optical behavior - NOT from adding effects later. Include these specs on EVERY first render to avoid users asking "make it more realistic":
+For WHY these specs matter, see `catalog_visual.protocol` TRANSPARENT MATERIAL DOCTRINE.
+
+**Required Specs for PET/Glass/Clear Plastic:**
 
 ```python
-# REQUIRED for transparent materials on FIRST render
+# REQUIRED: Full optical behavior specs
 material_treatment={
     "primary_material": "glossy PET",  # Exact material from analysis
-    "rendering_notes": "Natural transparency with accurate refraction. Liquid/contents visible through body. Subtle depth from material thickness.",
+    "rendering_notes": "Natural transparency with accurate refraction. Liquid/contents visible through body.",
     "optical_behavior": "Real PET optical properties - slight refraction at edges, contents visible, natural material depth"
 },
 fidelity={
@@ -184,9 +186,7 @@ lighting={
 }
 ```
 
-**Why this matters:** Without these specs, Gemini produces "flat clean" output - technically correct but lacking the optical depth that makes transparent materials look real. Users then ask for "realistic", leading to overcompensation and artifacts.
-
-**First Render Checklist for Transparent Materials:**
+**Transparent Material Checklist:**
 - [ ] `optical_behavior` describes natural refraction
 - [ ] `rendering_notes` mentions contents/liquid visibility
 - [ ] `fidelity.hero_features` includes "transparency depth"
@@ -220,46 +220,16 @@ Before EVERY image_studio call with transparent/glossy material, verify:
 
 **Why this matters:** Gemini interprets "highlight reflections" as adding white edge lines, which appear as shadow artifacts on transparent bottles.
 
-**[CRITICAL] Handling "Make It More Realistic" Requests (Transparent Materials):**
+**Terms to AVOID for Transparent Materials:**
 
-When user asks for "more realistic" on transparent materials (PET, glass, clear plastic):
+| AVOID | Causes |
+|-------|--------|
+| `internal caustics` | Bright spots, edge bleeding |
+| `glossy surface sheen` | Artificial rim highlights |
+| `detail_enhancement` | Over-sharpened edges = artifacts |
+| `enhanced lighting` | Specular artifacts |
 
-**The Paradox:** "Realistic" for transparent materials comes from ACCURATE transparency and NATURAL refraction - NOT from adding visual effects. Adding specs for "realism" often triggers the exact edge artifacts we're avoiding.
-
-**Terms to AVOID when user asks for "realistic":**
-
-| AVOID These | Why They Break |
-|-------------|----------------|
-| `internal caustics` | Creates bright spots, edge bleeding |
-| `glossy surface sheen` | Adds artificial rim highlights |
-| `detail_enhancement` | Gemini over-sharpens edges into artifacts |
-| `clean up reflections` | Often adds reflections instead |
-| `enhanced lighting` | Adds specular artifacts |
-| `texture detail` | Creates visual noise on smooth surfaces |
-
-**CORRECT Response to "Make It More Realistic":**
-
-```python
-# User says: "Make it more realistic"
-# WRONG: Add more visual effects
-enhancement={"detail_enhancement": "texture detail", "cleanup": "clean reflections"}
-
-# CORRECT: Refine material accuracy and natural behavior
-material_treatment={
-    "primary_material": "glossy PET",  # Be MORE specific about material
-    "rendering_notes": "Natural transparency and refraction. Accurate liquid color visible through body. No artificial effects."
-},
-fidelity={
-    "preserve_colors": "exact match to source - this IS realistic",
-    "hero_features": "natural material behavior, accurate reflections from environment only"
-}
-```
-
-**Key Insight:** Realism = fidelity to source + natural physics. If the first render looked "unrealistic", the fix is usually:
-1. More accurate material specification
-2. Better source image fidelity
-3. Environment-appropriate lighting
-NOT: Adding caustics, sheen, or detail enhancement.
+For handling "make it more realistic" feedback, see `hitl.protocol` (domain=creative).
 
 ### fidelity (CRITICAL for source images)
 FIX photography problems, PRESERVE product identity. **Always include when processing [source]/[product].**
@@ -621,8 +591,8 @@ Key field: `storage_path` - use this for creating asset records.
 | "Highlight reflections" in notes | Edge shadow artifacts | Use "natural refraction only" |
 | No logo position from anchor | Logo drift across variants | Extract position, include in fidelity |
 | Missing transparency_spec for dark | Black variant is opaque | Explicit "match anchor opacity" |
-| "Caustics/sheen" for "realistic" | Creates artifacts, not realism | Refine material accuracy instead |
-| No optical_behavior for transparent | Flat/unrealistic first render | Include realism specs from start |
+| "Caustics/sheen" for "realistic" | Creates artifacts, not realism | See hitl.protocol (creative) |
+| No optical_behavior for transparent | Flat/unrealistic first render | See catalog_visual.protocol |
 
 ---
 

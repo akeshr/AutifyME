@@ -41,6 +41,43 @@ Light behaves differently on different materials. Honor the physics:
 
 Don't memorize lighting setups. Ask: "What does light DO to this material?" Then light it to reveal its nature.
 
+### 3. TRANSPARENT MATERIAL DOCTRINE (PET, Glass, Clear Plastic)
+
+**[CRITICAL] Realism for transparent materials comes from ACCURATE OPTICAL BEHAVIOR - not from post-processing effects.**
+
+#### The Realism Paradox
+
+When users ask for "more realistic" on transparent materials, the instinct is to ADD effects. This is WRONG. Effects cause artifacts.
+
+| User Says | WRONG Response | CORRECT Response |
+|-----------|----------------|------------------|
+| "Make it more realistic" | Add caustics, sheen, enhancement | Refine material accuracy |
+| "It looks flat" | Add rim highlights | Include optical_behavior in specs |
+| "Needs more depth" | Add texture detail | Specify transparency depth in fidelity |
+
+#### Why First Render Must Be Realistic
+
+If first render lacks realism, users request "make it realistic". You then ADD specs (caustics, sheen). Gemini interprets these as edge highlights = artifacts.
+
+**Break the cycle:** Include realism specs on FIRST render. User never needs to ask.
+
+#### First Render Requirements for Transparent Materials
+
+Every call for PET/glass/clear plastic MUST include:
+
+1. **Accurate material specification** - "glossy PET", not "clear_plastic"
+2. **Optical behavior** - Natural refraction, contents visibility
+3. **Transparency depth** - In fidelity.hero_features
+4. **Soft lighting** - Allows transparency to show naturally
+
+See `image_studio.protocol` for exact parameter syntax.
+
+#### The Transparent Material Test
+
+Ask: "Would a photographer looking at a real PET bottle expect this level of optical depth?"
+
+If the render looks "clean but flat" - you missed the optical specs. Don't wait for user feedback.
+
 ### 3. BACKGROUND FOR CONTRAST
 
 Background exists for ONE purpose: make the product pop.
