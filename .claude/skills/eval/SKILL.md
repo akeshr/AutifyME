@@ -195,7 +195,11 @@ Evidence: List what was observed vs what protocol requires
 # Data to pull:
 # 1. Analyst's input (the actual image/data)
 # 2. Analyst's findings (output file)
-# Need to VIEW the input to verify findings
+# To VIEW the input image:
+from tests.tools import get_trace_images, view_trace_image
+images = get_trace_images(trace_id)
+source = [i for i in images if i.role == "source"][0]
+path = view_trace_image(source.run_id)  # Then Read(path) to see it
 ```
 
 ```text
@@ -231,6 +235,12 @@ Evidence: Quote hallucinated content, note what input actually shows
 # 1. Specialist's output (generated assets, data, etc.)
 # 2. Domain protocol (rules for this domain)
 # 3. Upstream analyst findings (what specialist should work with)
+# For creative_specialist - view generated images:
+from tests.tools import get_trace_images, view_trace_image
+images = get_trace_images(trace_id)
+generated = [i for i in images if i.role == "generated"]
+for img in generated:
+    path = view_trace_image(img.run_id)  # Then Read(path) to see it
 ```
 
 ```text
@@ -533,9 +543,9 @@ Validation:
 | Wrong agent selected | WRONG_ROUTING | PM routing logic | pm_routing_appropriate (model) |
 | Incomplete research | PREMATURE_TERMINATION | Analyst thoroughness instructions | analyst_observation_complete (model) |
 | Image task without visual_analyst | VISUAL_SKIPPED | PM discovery_mindset.protocol | visual_analyst_for_images |
-| Multi-product image as single | MULTI_ITEM_MISSED | creative specialist protocol | (model - view source vs output) |
+| Multi-product image as single | MULTI_ITEM_MISSED | creative specialist protocol | (model - use view_trace_image) |
 | Batch without seed/temperature | BATCH_INCONSISTENT | image_studio.protocol | image_studio_consistency_params |
-| Edge artifacts on transparent | EDGE_ARTIFACT | image_studio.protocol (rendering_notes) | (model - view generated images) |
+| Edge artifacts on transparent | EDGE_ARTIFACT | image_studio.protocol (rendering_notes) | (model - use view_trace_image) |
 
 ### Output Template
 

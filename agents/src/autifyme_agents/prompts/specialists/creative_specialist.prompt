@@ -352,31 +352,6 @@ Use as starting point, then VERIFY with view_image and adjust as needed:
 | Clarity <50%, Heavy frost | Matte-like appearance, minimal internal visibility |
 | Wall Thickness "thick_darkens" | **CRITICAL:** Add "uniform tint throughout - no dark bands at neck/base" |
 
-### image_studio Call Pattern for Transparent Materials
-
-```python
-material_treatment={
-    "primary_material": "glossy PET",  # EXACT from analyst
-    "rendering_notes": "Natural transparency with accurate refraction. [contents] visible through body.",
-    "transparency": {
-        "clarity_percentage": 92,       # From analyst
-        "tint": "none",                 # From analyst
-        "frost_percentage": 0,          # From analyst
-        "wall_thickness_effect": "uniform",  # From analyst
-        "contents_state": "colored_liquid",  # From analyst
-        "contents_description": "honey-colored liquid filling 90%"  # From analyst
-    }
-},
-fidelity={
-    "preserve_colors": "exact liquid color visible through transparent body",
-    "hero_features": "transparency depth, natural refraction, material authenticity"
-},
-lighting={
-    "quality": "soft diffused - allows natural transparency to show",
-    "special_requirements": "no rim light - rely on natural edge refraction"
-}
-```
-
 ### When Analyst File MISSING Transparency Profile (or You Need to Override)
 
 **You can ALWAYS construct or override TransparencyProfile from your own observation.**
