@@ -60,7 +60,8 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     return get_llm(
         provider="google",
         model="gemini-3-flash-preview",
-        thinking_level="low",  # Fast orchestration
+        thinking_level="high",  # Fast orchestration
+        temperature=1.2,  # Gemini 3 default (below 1.0 may cause looping)
         max_retries=5,  # Increase resilience against blank responses
     )
 
