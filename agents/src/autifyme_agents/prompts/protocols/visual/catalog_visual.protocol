@@ -157,6 +157,50 @@ Ask: "Does this render match the TransparencyProfile?"
 
 If the render doesn't match profile specifications - iterate with corrected specs.
 
+#### Transparent Material Syntax Pattern (for image_studio calls)
+
+**Checklist (all required):**
+
+| Spec | Required Content |
+|------|------------------|
+| `focus` | `{"depth_of_field": "deep - everything sharp"}` |
+| `fidelity.hero_features` | "transparency depth at [X]% clarity, natural refraction only - no artificial rim highlights, clean simple render - no simulated refraction patterns, no artificial light streaks" |
+| `fidelity.preserve_colors` | "[color] tint visible THROUGH transparent body" |
+| `primary_material` | "glossy PET - tinted [color]" |
+| `rendering_notes` | "Photograph-like simplicity. No internal distortion patterns. No vertical highlight streaks." |
+| `transparency.*` | All fields from analyst profile |
+| `lighting.specials` | "no rim light - rely on natural edge refraction" |
+
+**Example Call:**
+```python
+image_studio(
+    images=[{"path": "inbox/source.jpg", "label": "source"}],
+    extraction={"target_description": "blue PET bottle in [source]", "targets": [...]},
+    focus={"depth_of_field": "deep - everything sharp"},
+    fidelity={
+        "hero_features": "transparency depth at 90% clarity, natural refraction only - "
+                         "no artificial rim highlights, clean simple render - "
+                         "no simulated refraction patterns, no artificial light streaks, arrow branding",
+        "preserve_colors": "exact blue tint visible THROUGH transparent body"
+    },
+    material_treatment={
+        "primary_material": "glossy PET - tinted blue",
+        "rendering_notes": "Crystal clear transparency - can see THROUGH to background. "
+                           "Natural edge refraction only. No artificial rim highlights. "
+                           "Photograph-like simplicity. No internal distortion patterns. "
+                           "No vertical highlight streaks.",
+        "transparency": {
+            "clarity_percentage": 90, "tint": "blue", "frost_percentage": 0,
+            "wall_thickness_effect": "uniform", "contents_state": "empty",
+            "contents_description": "empty bottle"
+        }
+    },
+    lighting={"specials": "no rim light - rely on natural edge refraction"},
+    background={"treatment": "solid_color", "color": "white"},
+    output={"format": "PNG", "aspect_ratio": "1:1", "filename": "product_hero"}
+)
+```
+
 ### 4. BACKGROUND FOR CONTRAST
 
 Background exists for ONE purpose: make the product pop.

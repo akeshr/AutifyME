@@ -202,26 +202,11 @@ Proceeding with corrected extraction.
 
 ## "REALISTIC" FEEDBACK - Material Refinement, Not Effects
 
-**Special handling for transparent materials (PET, glass, clear plastic).**
+**For transparent materials (PET, glass, clear plastic):** "More realistic" means better material accuracy, NOT added effects.
 
-When user says "more realistic" on transparent materials, the instinct is to ADD visual effects. This is WRONG - effects cause edge artifacts.
+**See `catalog_visual.protocol` - "The Realism Paradox" and "Anti-Simulation Principle" for full doctrine.**
 
-### WRONG Response
-
-```
-[HITL_FEEDBACK] "Make it more realistic"
-
-[HITL RESOLVED]
-
-**User Feedback:** "Make it more realistic"
-
-**Applied:** Added internal caustics, glossy surface sheen, detail enhancement
-
-Proceeding with enhanced rendering.
--> [image_studio with caustics, sheen, detail_enhancement]  # CREATES ARTIFACTS
-```
-
-### CORRECT Response
+### Response Pattern
 
 ```
 [HITL_FEEDBACK] "Make it more realistic"
@@ -230,37 +215,25 @@ Proceeding with enhanced rendering.
 
 **User Feedback:** "Make it more realistic"
 
-**Analysis:** Current render lacks optical depth. For transparent materials, realism = accurate transparency + natural refraction, NOT added effects.
+**Analysis:** For transparent materials, realism = accurate transparency specs, NOT added effects.
 
-**Applied:**
-- Refined material_treatment with accurate optical_behavior
-- Added transparency depth to fidelity.hero_features
-- Soft lighting to show natural transparency
+**Applied:** Refined material_treatment with TransparencyProfile from catalog_visual doctrine.
 
-Proceeding with material-accurate rendering (no caustics, no sheen).
--> [image_studio with refined material specs, NOT effects]
+Proceeding with material-accurate rendering.
+-> [image_studio with refined specs per catalog_visual.protocol]
 ```
 
-### Terms to AVOID in "Realistic" Corrections
-
-| AVOID | Causes |
-|-------|--------|
-| `internal caustics` | Bright spots, edge bleeding |
-| `glossy surface sheen` | Artificial rim highlights |
-| `detail_enhancement` | Over-sharpened edges = artifacts |
-| `clean up reflections` | Often adds reflections instead |
-
-**The Fix:** Refine material accuracy (optical_behavior, transparency depth, soft lighting). See `catalog_visual.protocol` TRANSPARENT MATERIAL DOCTRINE.
+**Key:** Use TransparencyProfile specs and anti-simulation language. See `catalog_visual.protocol` for syntax pattern. Never add caustics, sheen, or enhancement.
 
 ---
 
 ## "BLACK ACCENTS" / "DARK BANDS" FEEDBACK - Uniform Tint Issue
 
-**When user says "black accents", "dark bands", or "dark areas at top/bottom" on transparent materials.**
+**When user says "black accents", "dark bands", or "dark areas at top/bottom":** This is Gemini exaggerating wall thickness variations.
 
-This is NOT an extraction artifact - it's Gemini exaggerating thickness variations at neck/base of bottles.
+**See `catalog_visual.protocol` - "Common Transparent Material Issues" table for full explanation.**
 
-### CORRECT Response
+### Response Pattern
 
 ```
 [HITL_FEEDBACK] "Why there is black accents in top and bottom"
@@ -269,26 +242,15 @@ This is NOT an extraction artifact - it's Gemini exaggerating thickness variatio
 
 **User Feedback:** "Why there is black accents in top and bottom"
 
-**Analysis:** Dark bands at neck/base are rendering artifacts from exaggerated thickness. Fix by specifying uniform tint.
+**Analysis:** Dark bands from exaggerated thickness. Fix with uniform tint spec.
 
-**Applied:**
-- Added "Maintain consistent [color] tint throughout body" to rendering_notes
-- Added "No dark bands at neck or base" to fidelity
+**Applied:** Added "uniform tint throughout body - no dark bands" to rendering_notes per catalog_visual doctrine.
 
 Proceeding with uniform-tint rendering.
 -> [image_studio with uniform tint specs]
 ```
 
-### Key Specs to Add
-
-```python
-material_treatment={
-    "rendering_notes": "Maintain consistent [color] tint throughout body. No dark bands at neck or base."
-},
-fidelity={
-    "fidelity_notes": "Avoid dark accents. Uniform transparency throughout."
-}
-```
+**Key spec:** `rendering_notes`: "Maintain consistent [color] tint throughout body. No dark bands at neck or base."
 
 ---
 
