@@ -305,6 +305,85 @@ When PM delegates hero shot / base asset / catalog image:
 
 **No shortcuts.** Minimal specs = garbage output. See protocols for details.
 
+**[CRITICAL] Required Specs for ALL Catalog Hero Shots:**
+
+| Spec | Requirement |
+|------|-------------|
+| **focus** | ALWAYS include: `focus={"depth_of_field": "deep - everything sharp"}` |
+| **fidelity** | ALWAYS include preserve_colors, preserve_artwork, hero_features |
+| **material_treatment** | ALWAYS include primary_material + rendering_notes |
+
+**[CRITICAL] Transparent Material Hero Shots (PET, Glass, Clear Plastic):**
+
+Transparent materials require ADDITIONAL specs beyond standard hero shots. Without these, renders look flat/opaque instead of see-through.
+
+**Complete Transparent Hero Shot Pattern (COPY THIS):**
+
+```python
+image_studio(
+    images=[{"path": "[source_path]", "label": "source"}],
+    extraction={
+        "target_description": "[color] tinted PET bottle in [source]",
+        "targets": [{"target_bbox": [y_min, x_min, y_max, x_max], "target_image_label": "source"}],
+        "edge_treatment": "surgical clean",
+        "isolation": "complete"
+    },
+    # [CRITICAL] Focus - REQUIRED for all catalog
+    focus={"depth_of_field": "deep - everything sharp"},
+    # [CRITICAL] Fidelity - hero_features MUST mention transparency depth
+    fidelity={
+        "preserve_colors": "exact [color] tint visible THROUGH transparent body",
+        "preserve_artwork": "[branding details]",
+        "hero_features": "transparency depth at [X]% clarity, natural refraction, [key features]"
+    },
+    # [CRITICAL] Material - primary_material MUST include tint
+    material_treatment={
+        "primary_material": "glossy PET - tinted [color]",
+        "rendering_notes": "Crystal clear transparency - can see THROUGH to background. "
+                          "Natural refraction at edges. No artificial rim highlights. "
+                          "[color] tint is IN the material, not ON it.",
+        "transparency": {
+            "clarity_percentage": [from analyst],
+            "tint": "[color]",
+            "frost_percentage": 0,
+            "wall_thickness_effect": "[from analyst]",
+            "contents_state": "[from analyst]",
+            "contents_description": "[from analyst]"
+        }
+    },
+    composition={"product_coverage": "80%", "camera_angle": "[angle]"},
+    background={"treatment": "solid_color", "color": "white"},
+    lighting={
+        "type": "studio_3point",
+        "quality": "soft diffused - allows natural transparency to show",
+        "specials": "no rim light - rely on natural edge refraction"
+    },
+    enhancement={"sharpness": "tack sharp on branding", "color_treatment": "accurate to source"},
+    output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1", "filename": "[name]"},
+    temperature=0.4,
+    seed=42
+)
+```
+
+**Why Each Spec Matters:**
+
+| Spec | What Happens If Missing |
+|------|------------------------|
+| `focus` | Random DOF - some areas blurry |
+| `fidelity.hero_features` with "transparency depth" | Gemini renders solid color, not see-through |
+| `primary_material` with "- tinted [color]" | Model treats tint as surface color, not material property |
+| `preserve_colors` with "THROUGH transparent body" | Model renders opaque colored plastic |
+| `rendering_notes` with "can see THROUGH" | No emphasis on transparency behavior |
+
+**Transparent Material Checklist (verify BEFORE calling image_studio):**
+- [ ] `focus` included with "deep - everything sharp"
+- [ ] `fidelity.hero_features` mentions "transparency depth at X% clarity"
+- [ ] `fidelity.preserve_colors` mentions "THROUGH transparent body"
+- [ ] `material_treatment.primary_material` includes "- tinted [color]"
+- [ ] `material_treatment.rendering_notes` mentions "can see THROUGH"
+- [ ] `material_treatment.transparency` has all 6 fields from analyst
+- [ ] `lighting.specials` says "no rim light"
+
 </hero_shot_discipline>
 
 <upstream_integration>
