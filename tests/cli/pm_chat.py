@@ -175,6 +175,11 @@ def main():
     else:
         print("Warning: .env file not found")
 
+    # Configure DeepAgents before creating any agents
+    from autifyme_agents.core.config import configure_deepagents
+
+    configure_deepagents()
+
     # Parse arguments
     if len(sys.argv) > 1:
         if sys.argv[1] in ["--help", "-h"]:

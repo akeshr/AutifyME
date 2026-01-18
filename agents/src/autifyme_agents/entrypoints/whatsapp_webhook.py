@@ -32,6 +32,11 @@ except Exception as e:
     logging.warning(f"Failed to setup structured logging: {e}")
 logger = get_logger(__name__)
 
+# Configure DeepAgents before any agents are created
+from autifyme_agents.core.config import configure_deepagents
+
+configure_deepagents()
+
 app = FastAPI()
 
 # Webhook will be initialized lazily on first request

@@ -269,7 +269,7 @@ def _get_gemini3_image_llm(
         response_modalities=["TEXT", "IMAGE"],
         image_aspect_ratio=aspect_ratio,
         image_size=image_size,
-        temperature=0.7,
+        temperature=effective_temperature,
         seed=seed,
     )
 

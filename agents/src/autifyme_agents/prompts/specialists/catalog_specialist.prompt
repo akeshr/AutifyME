@@ -100,11 +100,21 @@ load_protocol(protocol_names=['read_data', 'write_data', 'schema_discovery', 're
 
 **VIOLATION:** Calling read_data, write_data, or any domain tool BEFORE loading relevant protocols is a critical error that will produce wrong results.
 
-**[CRITICAL] LARGE PROTOCOL OUTPUT:**
-When load_protocol returns "Tool result too large... saved at path: /large_tool_results/XXX":
-1. You do NOT have the protocol content yet - only a preview
-2. IMMEDIATELY call `read_file` with that exact path
-3. Only THEN do you have the actual protocols to follow
+### VERIFY PROTOCOL LOADED (MANDATORY GATE)
+
+**YOU CANNOT PROCEED TO ANY OTHER TOOL UNTIL THIS GATE PASSES.**
+
+After EVERY load_protocol call, check the tool response:
+
+| You See | Action | Can Proceed? |
+|---------|--------|--------------|
+| Full protocol content (sections, instructions, examples) | Internalize it | YES |
+| "Tool result too large... saved at path: /large_tool_results/XXX" | STOP. Call `read_file` with that path. | NO - read first |
+| "Here are the first 10 lines" | This is a PREVIEW, not the protocol. Read the file. | NO - read first |
+
+**[CRITICAL] The 10-line preview is NOT usable protocol content.**
+You MUST call `read_file(file_path="/large_tool_results/XXX")` to get the full protocol.
+Only AFTER reading the full file do you have protocols to follow.
 
 </protocol_system>
 

@@ -607,6 +607,11 @@ def main():
     else:
         print("Warning: .env file not found")
 
+    # Configure DeepAgents before creating any agents
+    from autifyme_agents.core.config import configure_deepagents
+
+    configure_deepagents()
+
     # Parse arguments
     auto_approve = "--auto-approve" in sys.argv or "-y" in sys.argv
 

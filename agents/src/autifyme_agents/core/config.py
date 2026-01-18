@@ -51,3 +51,53 @@ class Settings(BaseSettings):
 # Create a single, globally accessible instance of the settings.
 # Other parts of our application will import this `settings` object.
 settings = Settings()
+
+
+# =============================================================================
+# DeepAgents Configuration
+# =============================================================================
+
+_deepagents_configured = False
+
+
+def configure_deepagents() -> None:
+    """Configure DeepAgents middleware settings.
+
+    Disables large output eviction to files. By default, DeepAgents writes
+    tool outputs > 20k tokens to files and returns a 10-line preview. This
+    breaks:
+    - view_image: Multimodal content can't be reconstructed from file
+    - load_protocol: Protocols must be in context for agent reasoning
+
+    Call this early in your application startup, before creating any agents.
+    Safe to call multiple times (idempotent).
+    """
+    global _deepagents_configured
+    if _deepagents_configured:
+        return
+
+    from deepagents.middleware import filesystem
+
+    # Store original __init__
+    original_init = filesystem.FilesystemMiddleware.__init__
+
+    def patched_init(
+        self,
+        *,
+        backend=None,
+        system_prompt=None,
+        custom_tool_descriptions=None,
+        tool_token_limit_before_evict=None,  # Changed default: None = disabled
+    ):
+        original_init(
+            self,
+            backend=backend,
+            system_prompt=system_prompt,
+            custom_tool_descriptions=custom_tool_descriptions,
+            tool_token_limit_before_evict=tool_token_limit_before_evict,
+        )
+
+    # Apply patch
+    filesystem.FilesystemMiddleware.__init__ = patched_init
+
+    _deepagents_configured = True
