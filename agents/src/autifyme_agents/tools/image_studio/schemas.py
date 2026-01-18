@@ -626,6 +626,72 @@ class FocusSpec(BaseModel):
     )
 
 
+class TransparencyProfile(BaseModel):
+    """Characterizes transparent/translucent material optical properties.
+
+    CRITICAL for realistic rendering of PET bottles, glass jars, and clear plastics.
+    Binary "transparent" vs "translucent" is insufficient - rendering quality depends
+    on the DEGREE and NATURE of transparency.
+
+    Use this spec when Visual Analyst identifies any transparent/translucent material.
+    """
+
+    clarity_percentage: int = Field(
+        ge=0,
+        le=100,
+        description=(
+            "Overall optical clarity. 0=fully opaque, 100=crystal clear. "
+            "Examples: PET bottle 90-95%, frosted glass 20-40%, "
+            "translucent HDPE 15-25%, light frost 60-70%"
+        ),
+    )
+    tint: str | None = Field(
+        default=None,
+        description=(
+            "Color tint affecting light passage. None for water-clear. "
+            "Examples: 'amber' (UV protection), 'blue' (cosmetics), "
+            "'green' (traditional glass), 'smoke' (premium), 'none'"
+        ),
+    )
+    frost_percentage: int = Field(
+        ge=0,
+        le=100,
+        default=0,
+        description=(
+            "Surface diffusion from frosting/texturing. 0=smooth/glossy, 100=fully frosted. "
+            "Examples: clear PET 0%, light decorative frost 20%, "
+            "privacy frost 70%, heavy frost 90%"
+        ),
+    )
+    wall_thickness_effect: str = Field(
+        default="uniform",
+        description=(
+            "How wall thickness affects appearance. "
+            "'uniform' - consistent transparency throughout, "
+            "'thick_darkens' - thick sections (neck, base) concentrate color/reduce clarity, "
+            "'variable' - noticeable variation (e.g., ribbed/embossed areas)"
+        ),
+    )
+    contents_state: str = Field(
+        default="empty",
+        description=(
+            "What's inside and how it affects appearance. "
+            "'empty' - air only, 'clear_liquid' - water/oil visible, "
+            "'colored_liquid' - tinted liquid shows through, "
+            "'opaque' - contents block view, 'partial' - partially filled"
+        ),
+    )
+    contents_description: str | None = Field(
+        default=None,
+        description=(
+            "Detailed description of visible contents. "
+            "Examples: 'honey-colored liquid filling 90%', "
+            "'blue gel visible through body', 'empty - internal structure visible', "
+            "'white cream partially visible at bottom'"
+        ),
+    )
+
+
 class MaterialTreatmentSpec(BaseModel):
     """Material-specific rendering instructions.
 
@@ -664,6 +730,14 @@ class MaterialTreatmentSpec(BaseModel):
         description=(
             "Any additional material treatment instructions not covered above. "
             "Use for unusual materials, mixed materials, creative interpretations."
+        ),
+    )
+    transparency: TransparencyProfile | None = Field(
+        default=None,
+        description=(
+            "REQUIRED for transparent/translucent materials (PET, glass, clear plastic). "
+            "Captures clarity level, tint, frost, wall thickness effect, and contents state. "
+            "Enables photorealistic rendering by specifying DEGREE of transparency, not just binary."
         ),
     )
 

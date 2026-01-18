@@ -1133,45 +1133,64 @@ prev_id = prev_trace(trace_id, session_gap_minutes=0)
 
 ### Image Extraction
 
-Extract and compare images from traces - sources (user uploads) and generated outputs.
+Extract and view images from traces - sources (user uploads) and generated outputs.
+
+#### Mental Model - When to Use What
+
+| Function                        | Purpose                        | Data Source                |
+|---------------------------------|--------------------------------|----------------------------|
+| `view_trace_images(trace_id)`   | Quick text inventory           | Metadata only              |
+| `get_trace_images(trace_id)`    | Programmatic metadata access   | Metadata only              |
+| `view_trace_image(run_id)`      | **Actually view an image**     | Extracts from trace output |
+| `get_image_pairs(trace_id)`     | Compare source vs generated    | Metadata + specs           |
+
+**Key Insight:** Tool outputs (download_whatsapp_media, view_image, image_studio) embed images as base64 data URIs. `view_trace_image()` extracts these directly from the trace - **no Supabase fetch required**.
 
 ```python
-from tests.tools.trace_analysis import get_trace_images, get_image_pairs, view_trace_images
-from tests.tools.models import TraceImage, ImagePair
+from tests.tools import (
+    get_trace_images, get_image_pairs, view_trace_images, view_trace_image,
+    TraceImage, ImagePair
+)
 
-# Quick summary of all images in trace
+# Step 1: Quick inventory (text only)
 print(view_trace_images(trace_id))
 # Output:
 # Images in trace:
 # [0] SOURCE: inbox/20260115_xxx.jpg
 #     Tool: download_whatsapp_media, Agent: PM
-# [1] SOURCE: inbox/20260115_xxx.jpg
+# [1] GENERATED: pending/20260115_xxx.png
 #     Tool: image_studio, Agent: creative_specialist
-#     Label: source
-# [2] GENERATED: pending/20260115_xxx.png
-#     Tool: image_studio, Agent: creative_specialist
-# Summary: 2 source(s), 1 generated
+# Summary: 1 source(s), 1 generated
 
-# Get ALL images with full context
+# Step 2: Get metadata for filtering
 images = get_trace_images(trace_id)
 sources = [i for i in images if i.role == "source"]
 generated = [i for i in images if i.role == "generated"]
 
-# Get source-to-generated pairs (best for comparing what went in vs out)
+# Step 3: ACTUALLY VIEW an image (extracts to temp file)
+if generated:
+    path = view_trace_image(generated[0].run_id)
+    # Returns: "C:/Users/.../temp/trace_images/trace_abc123.jpg"
+    # Now use Read tool on this path to see the actual image
+
+# Alternative: Get source-to-generated pairs for comparison
 pairs = get_image_pairs(trace_id)
 for p in pairs:
     print(f"Source: {p.source.storage_path if p.source else 'None'}")
     print(f"Generated: {p.generated.storage_path if p.generated else 'FAILED'}")
-    print(f"Specs used: {list(p.specs.keys())}")  # fidelity, material_treatment, etc.
-    if not p.success:
-        print(f"Error: {p.error}")
+    print(f"Specs: {list(p.specs.keys())}")  # fidelity, material_treatment, etc.
+
+    # View the generated image
+    if p.generated:
+        path = view_trace_image(p.generated.run_id)
+        # Use Read tool on path to see it
 ```
 
 **TraceImage fields:**
-- `storage_path` - Path in Supabase storage (use with view_image or download)
+- `storage_path` - Reference path (e.g., "pending/output.png")
 - `role` - "source", "generated", "style_ref", "background", "variant"
-- `tool_name` - "download_whatsapp_media" or "image_studio"
-- `run_id` - For drilling down with show_node()
+- `tool_name` - "download_whatsapp_media", "view_image", or "image_studio"
+- `run_id` - **Use with view_trace_image() to extract actual image**
 - `agent` - Agent that made the call
 - `label` - Original label from image_studio input
 - `sequence` - Order in trace (0-indexed)
@@ -1185,6 +1204,15 @@ for p in pairs:
 - `run_id` - image_studio run ID
 - `success` - Whether generation succeeded
 - `error` - Error message if failed
+
+#### Trace Inspection vs Replay Scenarios
+
+| Use Case                       | Function                       | Why                                                        |
+|--------------------------------|--------------------------------|------------------------------------------------------------|
+| **View images during eval**    | `view_trace_image(run_id)`     | Extracts from trace output (no Supabase)                   |
+| **Replay production scenario** | `get_media_for_outcome()`      | Downloads original source files from Supabase storage      |
+
+Replay scenarios need the original source images (what user uploaded) to pass to `chat_with_pm()`. These live in Supabase storage, not in trace outputs. Use `create_scenario_from_outcome()` which handles media download automatically.
 
 ### Key Schemas
 

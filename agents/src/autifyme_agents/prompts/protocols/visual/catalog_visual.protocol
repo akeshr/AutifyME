@@ -45,47 +45,99 @@ Don't memorize lighting setups. Ask: "What does light DO to this material?" Then
 
 **[CRITICAL] Realism for transparent materials comes from ACCURATE OPTICAL BEHAVIOR - not from post-processing effects.**
 
+#### The TransparencyProfile Revolution
+
+**Binary "transparent" vs "opaque" is INSUFFICIENT.** Visual Analyst now provides TRANSPARENCY PROFILE with quantified properties:
+
+| Property | What It Controls | Impact on Rendering |
+|----------|------------------|---------------------|
+| **Clarity %** | How much you see through | 95% = sharp refraction, 60% = soft diffusion |
+| **Tint** | Color in the material | Affects internal glow color |
+| **Frost %** | Surface diffusion | 0% = glossy sharp, 50% = soft edges |
+| **Wall Thickness** | How thick areas behave | "thick_darkens" = dark band risk |
+| **Contents State** | What's inside | colored_liquid = different rendering than empty |
+
 #### The Realism Paradox
 
 When users ask for "more realistic" on transparent materials, the instinct is to ADD effects. This is WRONG. Effects cause artifacts.
 
 | User Says | WRONG Response | CORRECT Response |
 |-----------|----------------|------------------|
-| "Make it more realistic" | Add caustics, sheen, enhancement | Refine material accuracy |
-| "It looks flat" | Add rim highlights | Include optical_behavior in specs |
-| "Needs more depth" | Add texture detail | Specify transparency depth in fidelity |
+| "Make it more realistic" | Add caustics, sheen, enhancement | Use TransparencyProfile with correct clarity % |
+| "It looks flat" | Add rim highlights | Include transparency.clarity_percentage at 90%+ |
+| "Needs more depth" | Add texture detail | Specify contents_state and contents_description |
 
 #### Why First Render Must Be Realistic
 
 If first render lacks realism, users request "make it realistic". You then ADD specs (caustics, sheen). Gemini interprets these as edge highlights = artifacts.
 
-**Break the cycle:** Include realism specs on FIRST render. User never needs to ask.
+**Break the cycle:** Use TransparencyProfile on FIRST render. User never needs to ask.
 
 #### First Render Requirements for Transparent Materials
 
 Every call for PET/glass/clear plastic MUST include:
 
-1. **Accurate material specification** - "glossy PET", not "clear_plastic"
-2. **Optical behavior** - Natural refraction, contents visibility
-3. **Transparency depth** - In fidelity.hero_features
+1. **TransparencyProfile** - All 6 fields from analyst or your observation
+2. **Accurate material specification** - "glossy PET", not "clear_plastic"
+3. **Clarity-appropriate rendering** - Match rendering to clarity %
 4. **Soft lighting** - Allows transparency to show naturally
-5. **Uniform tint** - "Maintain consistent [color] tint throughout body - no dark bands at neck or base"
+5. **Uniform tint** - If wall_thickness_effect = "thick_darkens", add "no dark bands"
 
-See `image_studio.protocol` for exact parameter syntax.
+See `image_studio.protocol` for exact parameter syntax and TransparencyProfile schema.
+
+#### TransparencyProfile Examples
+
+**Example 1: Crystal Clear PET Bottle with Honey**
+```
+TRANSPARENCY PROFILE:
+- Clarity: 92% - Can see honey liquid clearly through body
+- Tint: None - Material is water-clear
+- Frost: 0% - Glossy smooth surface
+- Wall Thickness: thick_darkens - Neck and base appear slightly darker
+- Contents: colored_liquid
+  - Description: Golden honey filling 85%, visible meniscus
+```
+
+**Example 2: Frosted Glass Jar (Empty)**
+```
+TRANSPARENCY PROFILE:
+- Clarity: 35% - Can barely see internal structure
+- Tint: None - No color in glass
+- Frost: 70% - Heavy acid-etched frosting
+- Wall Thickness: uniform - Consistent appearance
+- Contents: empty
+  - Description: Interior structure barely visible
+```
+
+**Example 3: Amber PET Medicine Bottle**
+```
+TRANSPARENCY PROFILE:
+- Clarity: 75% - Can see through but with amber tint
+- Tint: Amber - UV-protective brown coloring
+- Frost: 0% - Glossy smooth surface
+- Wall Thickness: thick_darkens - Heavier amber at thick sections
+- Contents: opaque
+  - Description: White tablets/powder not visible through amber
+```
 
 #### Common Transparent Material Issues
 
 | Issue | Cause | First-Render Prevention |
 |-------|-------|------------------------|
-| Dark bands at neck/base | Gemini exaggerates thickness variations | Include "uniform tint throughout body" in rendering_notes |
-| "Black accents" at top/bottom | Same as above | Include "no dark bands at neck or base" in fidelity |
-| Flat/unrealistic look | Missing optical_behavior | Include optical specs on FIRST call |
+| Dark bands at neck/base | wall_thickness_effect not handled | If "thick_darkens", include "uniform tint" in rendering_notes |
+| "Black accents" at top/bottom | Same as above | Check TransparencyProfile for wall_thickness_effect |
+| Flat/unrealistic look | clarity_percentage too low or missing | Set clarity at observed level (90%+ for clear PET) |
+| Contents not visible | contents_state/description missing | Include full contents specification |
+| Over-frosted look | frost_percentage too high | Match actual frost level from analyst |
 
 #### The Transparent Material Test
 
-Ask: "Would a photographer looking at a real PET bottle expect this level of optical depth?"
+Ask: "Does this render match the TransparencyProfile?"
+- Clarity 92% should show clear refraction
+- Frost 0% should show glossy surface
+- Contents "honey filling 85%" should show honey at that level
 
-If the render looks "clean but flat" - you missed the optical specs. Don't wait for user feedback.
+If the render doesn't match profile specifications - iterate with corrected specs.
 
 ### 4. BACKGROUND FOR CONTRAST
 

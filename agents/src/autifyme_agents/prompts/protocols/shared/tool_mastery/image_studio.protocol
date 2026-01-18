@@ -167,30 +167,89 @@ Material-specific rendering instructions.
 
 For WHY these specs matter, see `catalog_visual.protocol` TRANSPARENT MATERIAL DOCTRINE.
 
-**Required Specs for PET/Glass/Clear Plastic:**
+**TransparencyProfile Schema (NEW - Use for all transparent/translucent materials):**
+
+Visual Analyst provides TRANSPARENCY PROFILE section with structured data. Map directly to `material_treatment.transparency`:
 
 ```python
-# REQUIRED: Full optical behavior specs
 material_treatment={
     "primary_material": "glossy PET",  # Exact material from analysis
     "rendering_notes": "Natural transparency with accurate refraction. Liquid/contents visible through body.",
-    "optical_behavior": "Real PET optical properties - slight refraction at edges, contents visible, natural material depth"
+    "transparency": {
+        "clarity_percentage": 92,           # From analyst: 0-100, higher = clearer
+        "tint": "none",                     # From analyst: none/amber/blue/green/smoke
+        "frost_percentage": 0,              # From analyst: 0-100, higher = more diffused
+        "wall_thickness_effect": "uniform", # From analyst: uniform/thick_darkens/variable
+        "contents_state": "colored_liquid", # From analyst: empty/clear_liquid/colored_liquid/opaque/partial
+        "contents_description": "honey-colored liquid filling 90%"  # From analyst
+    }
+}
+```
+
+**Clarity-to-Rendering Mapping:**
+
+| Clarity % | Rendering Behavior |
+|-----------|-------------------|
+| 90-100% | Crystal clear - maximum refraction, internal structure visible, sharp edge definition |
+| 70-89% | High transparency - natural refraction, contents clearly visible, slight softening |
+| 50-69% | Medium transparency - reduced refraction, soft diffusion, contents partially visible |
+| 20-49% | Low transparency - significant diffusion, minimal internal visibility |
+| 0-19% | Near opaque - treat as translucent/matte, no refraction effects |
+
+**Wall Thickness Handling (CRITICAL for dark band prevention):**
+
+| wall_thickness_effect | Rendering Action |
+|-----------------------|------------------|
+| "uniform" | Standard transparency throughout |
+| "thick_darkens" | **MUST include:** "uniform tint throughout body - no dark bands at neck or base" in rendering_notes |
+| "variable" | Acknowledge variation but maintain overall clarity |
+
+**Contents State Rendering:**
+
+| contents_state | Rendering Focus |
+|----------------|-----------------|
+| "empty" | Internal structure, air refraction |
+| "clear_liquid" | Liquid refraction, subtle caustics |
+| "colored_liquid" | Liquid color dominates, visible through body |
+| "opaque" | Contents block interior, focus on material surface |
+| "partial" | Show fill level, meniscus at liquid surface |
+
+**Full Transparent Material Call Pattern:**
+
+```python
+material_treatment={
+    "primary_material": "glossy PET",  # Exact from visual analysis
+    "rendering_notes": "Natural transparency with accurate refraction. "
+                       "Honey-colored liquid visible through body. "
+                       "Uniform tint throughout - no dark bands at neck or base.",
+    "transparency": {
+        "clarity_percentage": 92,
+        "tint": "none",
+        "frost_percentage": 0,
+        "wall_thickness_effect": "thick_darkens",  # Triggers uniform tint requirement
+        "contents_state": "colored_liquid",
+        "contents_description": "honey-colored liquid filling 90%"
+    }
 },
 fidelity={
-    "preserve_colors": "exact liquid color visible through transparent body",
-    "hero_features": "transparency depth, natural refraction, material authenticity"
+    "preserve_colors": "exact honey liquid color visible through transparent body",
+    "hero_features": "transparency depth at 92% clarity, natural refraction, liquid visibility"
 },
 lighting={
     "quality": "soft diffused - allows natural transparency to show",
-    "specials": "no rim light - rely on natural edge refraction"
+    "special_requirements": "no rim light - rely on natural edge refraction"
 }
 ```
 
 **Transparent Material Checklist:**
-- [ ] `optical_behavior` describes natural refraction
-- [ ] `rendering_notes` mentions contents/liquid visibility
-- [ ] `fidelity.hero_features` includes "transparency depth"
-- [ ] Lighting allows transparency to show (soft, not harsh)
+- [ ] `transparency.clarity_percentage` set from analyst profile
+- [ ] `transparency.tint` specified (or "none")
+- [ ] `transparency.frost_percentage` specified (0 for glossy)
+- [ ] `transparency.wall_thickness_effect` set - if "thick_darkens", uniform tint in notes
+- [ ] `transparency.contents_state` matches analyst observation
+- [ ] `rendering_notes` mentions contents visibility and uniform tint
+- [ ] `fidelity.hero_features` includes transparency depth
+- [ ] Lighting soft, no rim light specified
 
 **[CRITICAL] Edge Artifact Prevention (Transparent/Glossy Materials):**
 

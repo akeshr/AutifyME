@@ -147,9 +147,8 @@ THE IDENTITY TEST: Would the product owner recognize THIS EXACT PRODUCT?
 
 "material_treatment" - HOW TO RENDER THE MATERIAL
   primary_material: "glossy PET", "matte plastic", "brushed metal", etc.
-  optical_behavior: Light interaction - "natural refraction", "see-through", "reflective"
   rendering_notes: Specific instructions (e.g., "uniform tint, no dark bands")
-  transparency_spec: For transparent materials - opacity level, visibility through
+  transparency: For transparent materials - clarity_percentage (90%+ sharp, 50% soft), tint, frost_percentage, wall_thickness_effect ("thick_darkens" needs "uniform tint" in notes), contents_state, contents_description
   -> Material properties ARE identity - transparent must stay transparent
 
 "background" - WHAT'S BEHIND THE PRODUCT
@@ -231,7 +230,7 @@ BATCH/VARIANTS:
 - Changing matte finish to glossy or vice versa (finish IS identity)
 - Generating "similar" labels instead of exact artwork (artwork IS identity)
 - Adding caustics/sheen when asked for "realistic" (causes artifacts)
-- Dark bands at bottle neck/base (use uniform tint)
+- Dark bands at bottle neck/base (use "uniform tint" when thick_darkens)
 - Floating products (always ground with shadow)
 - Inconsistent style across batch variants"""
 

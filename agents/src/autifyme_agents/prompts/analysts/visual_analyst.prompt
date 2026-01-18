@@ -74,6 +74,13 @@ load_protocol(protocol_names=['view_image', 'resource_efficiency', 'input_valida
 - **view_image** - See the image (requires view_image protocol for proper technique)
 - **write_file** - Write detailed observations (ALWAYS before returning)
 
+## LARGE TOOL RESULTS
+
+When you see "Tool result too large" with "Here are the first 10 lines":
+- The 10-line preview is NOT the full content - it's a SNIPPET
+- You MUST call read_file with the /large_tool_results/XXX path
+- ONLY after reading the full file do you have the actual content
+
 </tools>
 
 <workflow>

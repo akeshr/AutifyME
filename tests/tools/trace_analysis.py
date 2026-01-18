@@ -2569,6 +2569,109 @@ def view_trace_images(trace_id: str) -> str:
     return "\n".join(lines)
 
 
+def view_trace_image(run_id: str) -> str | None:
+    """Extract image from a tool run and save to temp file for viewing.
+
+    Extracts the embedded data URI from tool output (no Supabase fetch),
+    decodes to bytes, and saves to a temp file. Returns the absolute path
+    for use with the Read tool.
+
+    Works with any tool that returns multimodal content:
+    - download_whatsapp_media
+    - view_image
+    - image_studio
+
+    Args:
+        run_id: Tool run ID (from TraceImage.run_id)
+
+    Returns:
+        Absolute path to temp image file, or None if no image found.
+        Use Read tool on the returned path to view the image.
+
+    Example:
+        >>> images = get_trace_images(trace_id)
+        >>> generated = [i for i in images if i.role == "generated"][0]
+        >>> path = view_trace_image(generated.run_id)
+        >>> # Now use Read tool on 'path' to view the image
+    """
+    import base64
+    import platform
+    import tempfile
+    from pathlib import Path
+
+    # Setup temp directory (same pattern as production tools)
+    if platform.system() == "Windows":
+        media_dir = Path(tempfile.gettempdir()) / "trace_images"
+    else:
+        media_dir = Path("/tmp/trace_images")
+    media_dir.mkdir(parents=True, exist_ok=True)
+
+    # Fetch the run
+    client = _get_client()
+    try:
+        run = client.read_run(run_id)
+    except Exception:
+        return None
+
+    # Extract data URI from output
+    data_uri = _extract_data_uri_from_output(run.outputs)
+    if not data_uri:
+        return None
+
+    # Parse data URI: data:image/jpeg;base64,{data}
+    try:
+        header, b64_data = data_uri.split(",", 1)
+        # Extract mime type and determine extension
+        mime_part = header.split(";")[0].replace("data:", "")
+        ext_map = {
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/gif": ".gif",
+            "image/webp": ".webp",
+        }
+        ext = ext_map.get(mime_part, ".jpg")
+
+        # Decode base64 to bytes
+        image_bytes = base64.b64decode(b64_data)
+    except Exception:
+        return None
+
+    # Save to temp file with unique name
+    filename = f"trace_{run_id[:8]}{ext}"
+    file_path = media_dir / filename
+    file_path.write_bytes(image_bytes)
+
+    return str(file_path.absolute())
+
+
+def _extract_data_uri_from_output(outputs: dict | None) -> str | None:
+    """Extract data URI from tool output's multimodal content.
+
+    Handles the standard tool output format:
+    outputs = {"output": {"content": [{"type": "image_url", "image_url": {"url": "data:..."}}]}}
+    """
+    if not outputs:
+        return None
+
+    # Navigate to content list
+    output = outputs.get("output", outputs)
+    if not isinstance(output, dict):
+        return None
+
+    content = output.get("content", [])
+    if not isinstance(content, list):
+        return None
+
+    # Find image_url item
+    for item in content:
+        if isinstance(item, dict) and item.get("type") == "image_url":
+            url = item.get("image_url", {}).get("url", "")
+            if url.startswith("data:"):
+                return url
+
+    return None
+
+
 # Helper functions for image extraction
 
 

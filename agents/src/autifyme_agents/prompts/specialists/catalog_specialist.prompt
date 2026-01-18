@@ -125,6 +125,13 @@ Why? Analysts might skip steps. Your protocol execution grounds decisions in REA
 - **write_data** - Execute changes with HITL (requires write_data protocol loaded)
 - **read_file** - Read analyst files from delegation
 
+## LARGE TOOL RESULTS
+
+When you see "Tool result too large" with "Here are the first 10 lines":
+- The 10-line preview is NOT the full content - it's a SNIPPET
+- You MUST call read_file with the /large_tool_results/XXX path
+- ONLY after reading the full file do you have the actual content
+
 </tools>
 
 <workflow>
