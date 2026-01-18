@@ -233,7 +233,7 @@ material_treatment={
 },
 fidelity={
     "preserve_colors": "exact honey liquid color visible through transparent body",
-    "hero_features": "transparency depth at 92% clarity, natural refraction, liquid visibility"
+    "hero_features": "transparency depth at 92% clarity, natural refraction only - no artificial rim highlights, liquid visibility"
 },
 lighting={
     "quality": "soft diffused - allows natural transparency to show",
@@ -246,7 +246,7 @@ lighting={
 | Category | Requirement | Why |
 |----------|-------------|-----|
 | **focus** | Include `focus={"depth_of_field": "deep - everything sharp"}` for catalog | Missing = random DOF |
-| **fidelity.hero_features** | Must contain "transparency depth at X% clarity, natural refraction" | Missing = Gemini renders solid, not see-through |
+| **fidelity.hero_features** | Must contain "transparency depth at X% clarity, natural refraction only - no artificial rim highlights" | Missing = Gemini renders solid OR adds edge artifacts |
 | **fidelity.preserve_colors** | Must contain "THROUGH transparent body" | Missing = tint rendered as surface color |
 | **primary_material** | Must include tint: "glossy PET - tinted [color]" | Missing = model doesn't know tint is IN material |
 | **rendering_notes** | Must contain "can see THROUGH" or "crystal clear transparency" | Missing = no emphasis on see-through behavior |
@@ -272,7 +272,7 @@ For PET, glass, and glossy plastics, edges naturally show refraction. DO NOT add
 ```python
 focus={"depth_of_field": "deep - everything sharp"},  # REQUIRED for catalog
 fidelity={
-    "hero_features": "transparency depth at [X]% clarity, natural refraction, [key features]",
+    "hero_features": "transparency depth at [X]% clarity, natural refraction only - no artificial rim highlights, [key features]",
     "preserve_colors": "exact [color] tint visible THROUGH transparent body"
 },
 material_treatment={
@@ -295,6 +295,7 @@ lighting={
 
 **Edge Artifact Self-Check (REQUIRED for transparent materials):**
 Before EVERY image_studio call with transparent/glossy material, verify:
+- [ ] `fidelity.hero_features` contains "natural refraction only - no artificial rim highlights"
 - [ ] `rendering_notes` does NOT contain: "highlight", "rim", "edge reflection", "show form"
 - [ ] `lighting.specials` explicitly prohibits rim light
 - [ ] No "edge glow" or "edge highlight" in any spec value
