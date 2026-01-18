@@ -329,29 +329,6 @@ You have view_image - USE IT. The analyst's transparency profile is a starting p
 
 **You are the artist. Analyst is the researcher. Final creative decision is YOURS.**
 
-### When Analyst File Contains TRANSPARENCY PROFILE
-
-Use as starting point, then VERIFY with view_image and adjust as needed:
-
-| Analyst Field | Maps To | Example Mapping |
-|---------------|---------|-----------------|
-| Clarity % | material_treatment.transparency.clarity_percentage | 92% -> sharp refraction |
-| Tint | material_treatment.transparency.tint | "amber" -> warm internal glow |
-| Frost % | material_treatment.transparency.frost_percentage | 20% -> soft diffused edges |
-| Wall Thickness | material_treatment.transparency.wall_thickness_effect | "thick_darkens" -> uniform tint spec |
-| Contents State | material_treatment.transparency.contents_state | "colored_liquid" -> liquid visibility |
-
-### Transparency-to-Rendering Translation
-
-| Transparency Profile | Rendering Approach |
-|---------------------|-------------------|
-| Clarity 90%+, No frost, Empty | Maximum refraction, edge definition, internal structure visible |
-| Clarity 90%+, No frost, Colored liquid | Liquid color dominates, refraction shows liquid depth |
-| Clarity 70-90%, Light tint, Empty | Subtle tint throughout, natural refraction |
-| Clarity 50-70%, Light frost, Any | Soft diffused look, reduced refraction, no sharp edges |
-| Clarity <50%, Heavy frost | Matte-like appearance, minimal internal visibility |
-| Wall Thickness "thick_darkens" | **CRITICAL:** Add "uniform tint throughout - no dark bands at neck/base" |
-
 ### When Analyst File MISSING Transparency Profile (or You Need to Override)
 
 **You can ALWAYS construct or override TransparencyProfile from your own observation.**
