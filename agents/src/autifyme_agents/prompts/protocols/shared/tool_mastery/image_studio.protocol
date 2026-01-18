@@ -243,45 +243,35 @@ lighting={
 
 **Transparent Material Checklist (MANDATORY - verify ALL before calling image_studio):**
 
-| Category | Requirement | Why |
-|----------|-------------|-----|
-| **focus** | Include `focus={"depth_of_field": "deep - everything sharp"}` for catalog | Missing = random DOF |
-| **fidelity.hero_features** | Must contain "transparency depth at X% clarity, natural refraction only - no artificial rim highlights, clean simple render - no simulated refraction patterns, no artificial light streaks" | Missing = Gemini renders solid, adds edge artifacts, OR adds synthetic "realism" effects |
-| **fidelity.preserve_colors** | Must contain "THROUGH transparent body" | Missing = tint rendered as surface color |
-| **primary_material** | Must include tint: "glossy PET - tinted [color]" | Missing = model doesn't know tint is IN material |
-| **rendering_notes** | Must contain anti-simulation language: "Photograph-like simplicity. No internal distortion patterns. No vertical highlight streaks." | Missing = model adds wavy distortions and light streaks |
-| **transparency.clarity_percentage** | Set from analyst profile (90%+ for clear PET) | Missing = flat/unrealistic |
-| **transparency.tint** | Specified (or "none") | Missing = wrong color rendering |
-| **transparency.frost_percentage** | Specified (0 for glossy) | Missing = may add unwanted diffusion |
-| **transparency.wall_thickness_effect** | Set - if "thick_darkens", add "uniform tint" to notes | Missing = dark bands at neck/base |
-| **transparency.contents_state** | Matches analyst observation | Missing = wrong interior rendering |
-| **lighting.specials** | "no rim light - rely on natural edge refraction" | Missing = edge artifacts |
+| Category | Required Value |
+|----------|----------------|
+| **focus** | `{"depth_of_field": "deep - everything sharp"}` |
+| **fidelity.hero_features** | "transparency depth at [X]% clarity, natural refraction only - no artificial rim highlights, clean simple render - no simulated refraction patterns, no artificial light streaks, [key features]" |
+| **fidelity.preserve_colors** | "[color] tint visible THROUGH transparent body" |
+| **primary_material** | "glossy PET - tinted [color]" (include tint in material name) |
+| **rendering_notes** | Include: "Photograph-like simplicity. No internal distortion patterns. No vertical highlight streaks." |
+| **transparency.clarity_percentage** | From analyst (90%+ for clear PET) |
+| **transparency.tint** | Specified or "none" |
+| **transparency.frost_percentage** | Specified (0 for glossy) |
+| **transparency.wall_thickness_effect** | From analyst - if "thick_darkens", add "uniform tint" to notes |
+| **transparency.contents_state** | From analyst |
+| **lighting.specials** | "no rim light - rely on natural edge refraction" |
 
-**If ANY item is missing, the render will likely fail for transparent materials.**
+**For creative doctrine on WHY these specs matter, see `catalog_visual.protocol` - "Transparent Material Doctrine" and "Anti-Simulation Principle" sections.**
 
-**[CRITICAL] Edge Artifact Prevention (Transparent/Glossy Materials):**
-
-For PET, glass, and glossy plastics, edges naturally show refraction. DO NOT add artificial rim highlights or edge reflections - they appear as shadow-like artifacts.
-
-| Anti-pattern | Correct |
-|--------------|---------|
-| `rendering_notes="Highlight reflections to show form"` | `rendering_notes="Natural edge refraction only. No artificial rim highlights. Clean silhouette."` |
-| No lighting.specials specified | `lighting={"specials": "no rim light - rely on natural edge refraction"}` |
-
-**For transparent materials, ALWAYS include:**
+**Syntax Pattern:**
 ```python
-focus={"depth_of_field": "deep - everything sharp"},  # REQUIRED for catalog
+focus={"depth_of_field": "deep - everything sharp"},
 fidelity={
     "hero_features": "transparency depth at [X]% clarity, natural refraction only - no artificial rim highlights, "
                      "clean simple render - no simulated refraction patterns, no artificial light streaks, [key features]",
     "preserve_colors": "exact [color] tint visible THROUGH transparent body"
 },
 material_treatment={
-    "primary_material": "glossy PET - tinted [color]",  # Include tint in material name
+    "primary_material": "glossy PET - tinted [color]",
     "rendering_notes": "Crystal clear transparency - can see THROUGH to background. "
                        "Natural edge refraction only. No artificial rim highlights. "
-                       "Photograph-like simplicity. No internal distortion patterns. "
-                       "No vertical highlight streaks. Material shows naturally without added demonstration effects.",
+                       "Photograph-like simplicity. No internal distortion patterns. No vertical highlight streaks.",
     "transparency": {
         "clarity_percentage": [from analyst],
         "tint": "[color]",
@@ -291,48 +281,26 @@ material_treatment={
         "contents_description": "[from analyst]"
     }
 },
-lighting={
-    "specials": "no rim light - rely on natural edge refraction for transparent materials"
-}
+lighting={"specials": "no rim light - rely on natural edge refraction"}
 ```
 
-**Edge Artifact Self-Check (REQUIRED for transparent materials):**
-Before EVERY image_studio call with transparent/glossy material, verify:
-- [ ] `fidelity.hero_features` contains "natural refraction only - no artificial rim highlights"
-- [ ] `fidelity.hero_features` contains "clean simple render - no simulated refraction patterns, no artificial light streaks"
-- [ ] `rendering_notes` contains "Photograph-like simplicity. No internal distortion patterns. No vertical highlight streaks."
-- [ ] `rendering_notes` does NOT contain: "highlight", "rim", "edge reflection", "show form", "demonstrate", "refraction pattern"
-- [ ] `lighting.specials` explicitly prohibits rim light
-- [ ] No "edge glow", "edge highlight", "light rays", or "wavy" in any spec value
+**Self-Check (before calling):**
+- [ ] All checklist items included?
+- [ ] No prohibited terms in any spec? (see "Terms to AVOID" below)
 
-**Why this matters:** Gemini interprets "highlight reflections" as adding white edge lines. It also adds synthetic "realism" effects (wavy distortion, vertical streaks) to "demonstrate" transparency - these look CGI, not photographic.
+**Terms to AVOID for Transparent Materials (cause artifacts):**
 
-**Terms to AVOID for Transparent Materials:**
-
-| AVOID | Causes |
-|-------|--------|
+| AVOID | Artifact Caused |
+|-------|-----------------|
 | `internal caustics` | Bright spots, edge bleeding |
 | `glossy surface sheen` | Artificial rim highlights |
-| `detail_enhancement` | Over-sharpened edges = artifacts |
+| `detail_enhancement` | Over-sharpened edges |
 | `enhanced lighting` | Specular artifacts |
-| `refraction patterns` | Wavy internal distortion that looks CGI |
+| `refraction patterns` | Wavy internal distortion |
 | `light rays` / `light beams` | Artificial streak effects |
-| `demonstrate transparency` | Model adds "proof" effects that look fake |
+| `demonstrate transparency` | Synthetic "proof" effects |
 
-**[CRITICAL] Anti-Simulation Principle:**
-
-Real product photography shows materials as they naturally appear - it does NOT add effects to "demonstrate" material properties. Gemini tends to add synthetic "realism" that looks CGI:
-
-| Synthetic Effect | What Model Adds | Correct Approach |
-|------------------|-----------------|------------------|
-| Wavy internal distortion | Fake refraction waves inside bottle | Empty bottles show clean interior, no waves |
-| Vertical light streaks | Sharp stripes to show "cylindrical form" | Real cylinders have soft curved gradients |
-| Exaggerated base darkening | Dark ring at bottom for "thickness" | Real effect is subtle gradient, not distinct band |
-| Perfect uniform tint | CGI-perfect even coloring | Real tint has subtle angle/thickness variation |
-
-**In hero_features, ALWAYS include:** "clean simple render - no simulated refraction patterns, no artificial light streaks"
-
-**In rendering_notes, ALWAYS include:** "Photograph-like simplicity. No internal distortion patterns. No vertical highlight streaks. Material shows naturally without added demonstration effects."
+**For creative doctrine on WHY these artifacts occur and how to think about transparent materials, see `catalog_visual.protocol` (domain=visual) - "Anti-Simulation Principle" section.**
 
 For handling "make it more realistic" feedback, see `hitl.protocol` (domain=creative).
 

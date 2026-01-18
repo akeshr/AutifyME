@@ -307,20 +307,20 @@ When PM delegates hero shot / base asset / catalog image:
 
 **[CRITICAL] Transparent Material Gate (PET, Glass, Clear Plastic):**
 
-Transparent materials FAIL if specs are incomplete. Before calling image_studio:
+Transparent materials require BOTH creative understanding AND technical completeness.
 
-1. **Verify you loaded `image_studio` protocol** - contains the mandatory checklist
-2. **Find "Transparent Material Checklist" section** in the protocol
-3. **Verify ALL 11 items are satisfied** in your call - if ANY missing, render will be flat/opaque
-4. **Use the "For transparent materials, ALWAYS include" pattern** from the protocol
+**Before calling image_studio for transparent materials:**
 
-**Common failures (all cause opaque-looking renders):**
-- Missing `focus` spec entirely
-- `fidelity.hero_features` without "transparency depth at X% clarity"
-- `primary_material` without "- tinted [color]"
-- `preserve_colors` without "THROUGH transparent body"
+1. **Understand the creative doctrine** - `catalog_visual.protocol` (domain=visual):
+   - "Transparent Material Doctrine" - WHY transparency is hard
+   - "Anti-Simulation Principle" - what makes renders look CGI vs photographic
 
-The protocol has the complete checklist and pattern. Follow it exactly.
+2. **Follow the technical checklist** - `image_studio.protocol`:
+   - "Transparent Material Checklist" - WHAT to include
+   - "Syntax Pattern" - HOW to write the call
+   - "Terms to AVOID" - what causes artifacts
+
+**The pattern:** Creative protocol tells you HOW TO THINK. Tool protocol tells you WHAT TO WRITE.
 
 </hero_shot_discipline>
 

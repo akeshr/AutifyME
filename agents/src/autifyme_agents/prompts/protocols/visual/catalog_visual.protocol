@@ -67,6 +67,24 @@ When users ask for "more realistic" on transparent materials, the instinct is to
 | "It looks flat" | Add rim highlights | Include transparency.clarity_percentage at 90%+ |
 | "Needs more depth" | Add texture detail | Specify contents_state and contents_description |
 
+#### The Anti-Simulation Principle
+
+**Real product photography shows materials as they naturally appear - it does NOT add effects to "demonstrate" material properties.**
+
+Gemini tends to add synthetic "realism" that looks CGI, not photographic:
+
+| Synthetic Effect | What Model Adds | Why It Looks Fake | Correct Approach |
+|------------------|-----------------|-------------------|------------------|
+| Wavy internal distortion | Fake refraction waves inside bottle | Real empty bottles show clean interior | Specify "no internal distortion patterns" |
+| Vertical light streaks | Sharp stripes to show "cylindrical form" | Real cylinders have soft curved gradients | Specify "no artificial light streaks" |
+| Exaggerated base darkening | Dark ring at bottom for "thickness" | Real effect is subtle gradient, not distinct band | Use "uniform tint" if thick_darkens |
+| Perfect uniform tint | CGI-perfect even coloring | Real tint has subtle angle/thickness variation | Let natural variation show |
+| Artificial rim highlights | White edge lines to "show form" | Real PET has natural refraction, not highlights | Specify "natural refraction only" |
+
+**The Photography Test:** Would a professional product photographer add this effect? If not, neither should Gemini.
+
+**In specs, always include:** "Photograph-like simplicity. No simulated refraction patterns. No artificial light streaks. Material shows naturally without added demonstration effects."
+
 #### Why First Render Must Be Realistic
 
 If first render lacks realism, users request "make it realistic". You then ADD specs (caustics, sheen). Gemini interprets these as edge highlights = artifacts.
