@@ -1,3 +1,5 @@
+from typing import Any
+
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -82,13 +84,13 @@ def configure_deepagents() -> None:
     original_init = filesystem.FilesystemMiddleware.__init__
 
     def patched_init(
-        self,
+        self: Any,
         *,
-        backend=None,
-        system_prompt=None,
-        custom_tool_descriptions=None,
-        tool_token_limit_before_evict=None,  # Changed default: None = disabled
-    ):
+        backend: Any = None,
+        system_prompt: str | None = None,
+        custom_tool_descriptions: dict[str, str] | None = None,
+        tool_token_limit_before_evict: int | None = None,  # Changed default: None = disabled
+    ) -> None:
         original_init(
             self,
             backend=backend,
