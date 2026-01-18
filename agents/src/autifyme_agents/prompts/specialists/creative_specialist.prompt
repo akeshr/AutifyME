@@ -110,6 +110,12 @@ When you know you'll need multiple protocols, load them ALL in your FIRST turn. 
 
 **Protocol contains domain doctrine. INTERNALIZE before executing.**
 
+**[CRITICAL] LARGE PROTOCOL OUTPUT:**
+When load_protocol returns "Tool result too large... saved at path: /large_tool_results/XXX":
+1. You do NOT have the protocol content yet - only a preview
+2. IMMEDIATELY call `read_file` with that exact path
+3. Only THEN do you have the actual protocols to follow
+
 ### 3. ASSESS
 
 - **view_image**: See the source - current state AND potential

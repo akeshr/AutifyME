@@ -100,6 +100,12 @@ load_protocol(protocol_names=['read_data', 'write_data', 'schema_discovery', 're
 
 **VIOLATION:** Calling read_data, write_data, or any domain tool BEFORE loading relevant protocols is a critical error that will produce wrong results.
 
+**[CRITICAL] LARGE PROTOCOL OUTPUT:**
+When load_protocol returns "Tool result too large... saved at path: /large_tool_results/XXX":
+1. You do NOT have the protocol content yet - only a preview
+2. IMMEDIATELY call `read_file` with that exact path
+3. Only THEN do you have the actual protocols to follow
+
 </protocol_system>
 
 <verify_analyst_work>

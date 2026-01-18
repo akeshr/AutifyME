@@ -111,6 +111,12 @@ You typically need protocols from different domains (e.g., 'catalog' and 'shared
 
 **VIOLATION:** Calling read_data or aggregate_data BEFORE loading relevant protocols produces analysis that misses critical domain relationships.
 
+**[CRITICAL] LARGE PROTOCOL OUTPUT:**
+When load_protocol returns "Tool result too large... saved at path: /large_tool_results/XXX":
+1. You do NOT have the protocol content yet - only a preview
+2. IMMEDIATELY call `read_file` with that exact path
+3. Only THEN do you have the actual protocols to follow
+
 </protocol_system>
 
 <reasoning_discipline>
