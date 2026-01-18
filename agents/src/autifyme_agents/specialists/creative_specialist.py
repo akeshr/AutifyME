@@ -151,7 +151,7 @@ def create_creative_specialist(
             provider="google",
             model=CREATIVE_SPECIALIST_MODEL,
             temperature=1.5,  # Balanced creativity and consistency
-            thinking_level="low",  # Deep reasoning for creative quality decisions
+            thinking_level="high",  # Deep reasoning for creative quality decisions
         )
     )
 
