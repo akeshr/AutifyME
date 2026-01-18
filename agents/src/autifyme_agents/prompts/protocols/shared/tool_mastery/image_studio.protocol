@@ -241,15 +241,23 @@ lighting={
 }
 ```
 
-**Transparent Material Checklist:**
-- [ ] `transparency.clarity_percentage` set from analyst profile
-- [ ] `transparency.tint` specified (or "none")
-- [ ] `transparency.frost_percentage` specified (0 for glossy)
-- [ ] `transparency.wall_thickness_effect` set - if "thick_darkens", uniform tint in notes
-- [ ] `transparency.contents_state` matches analyst observation
-- [ ] `rendering_notes` mentions contents visibility and uniform tint
-- [ ] `fidelity.hero_features` includes transparency depth
-- [ ] Lighting soft, no rim light specified
+**Transparent Material Checklist (MANDATORY - verify ALL before calling image_studio):**
+
+| Category | Requirement | Why |
+|----------|-------------|-----|
+| **focus** | Include `focus={"depth_of_field": "deep - everything sharp"}` for catalog | Missing = random DOF |
+| **fidelity.hero_features** | Must contain "transparency depth at X% clarity, natural refraction" | Missing = Gemini renders solid, not see-through |
+| **fidelity.preserve_colors** | Must contain "THROUGH transparent body" | Missing = tint rendered as surface color |
+| **primary_material** | Must include tint: "glossy PET - tinted [color]" | Missing = model doesn't know tint is IN material |
+| **rendering_notes** | Must contain "can see THROUGH" or "crystal clear transparency" | Missing = no emphasis on see-through behavior |
+| **transparency.clarity_percentage** | Set from analyst profile (90%+ for clear PET) | Missing = flat/unrealistic |
+| **transparency.tint** | Specified (or "none") | Missing = wrong color rendering |
+| **transparency.frost_percentage** | Specified (0 for glossy) | Missing = may add unwanted diffusion |
+| **transparency.wall_thickness_effect** | Set - if "thick_darkens", add "uniform tint" to notes | Missing = dark bands at neck/base |
+| **transparency.contents_state** | Matches analyst observation | Missing = wrong interior rendering |
+| **lighting.specials** | "no rim light - rely on natural edge refraction" | Missing = edge artifacts |
+
+**If ANY item is missing, the render will likely fail for transparent materials.**
 
 **[CRITICAL] Edge Artifact Prevention (Transparent/Glossy Materials):**
 
@@ -262,9 +270,23 @@ For PET, glass, and glossy plastics, edges naturally show refraction. DO NOT add
 
 **For transparent materials, ALWAYS include:**
 ```python
+focus={"depth_of_field": "deep - everything sharp"},  # REQUIRED for catalog
+fidelity={
+    "hero_features": "transparency depth at [X]% clarity, natural refraction, [key features]",
+    "preserve_colors": "exact [color] tint visible THROUGH transparent body"
+},
 material_treatment={
-    "primary_material": "glossy PET",  # or specific material
-    "rendering_notes": "Natural edge refraction only. No artificial rim highlights. Clean silhouette edges."
+    "primary_material": "glossy PET - tinted [color]",  # Include tint in material name
+    "rendering_notes": "Crystal clear transparency - can see THROUGH to background. "
+                      "Natural edge refraction only. No artificial rim highlights.",
+    "transparency": {
+        "clarity_percentage": [from analyst],
+        "tint": "[color]",
+        "frost_percentage": 0,
+        "wall_thickness_effect": "[from analyst]",
+        "contents_state": "[from analyst]",
+        "contents_description": "[from analyst]"
+    }
 },
 lighting={
     "specials": "no rim light - rely on natural edge refraction for transparent materials"
