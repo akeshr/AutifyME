@@ -67,6 +67,24 @@ When users ask for "more realistic" on transparent materials, the instinct is to
 | "It looks flat" | Add rim highlights | Include transparency.clarity_percentage at 90%+ |
 | "Needs more depth" | Add texture detail | Specify contents_state and contents_description |
 
+#### The Anti-Simulation Principle
+
+**Real product photography shows materials as they naturally appear - it does NOT add effects to "demonstrate" material properties.**
+
+Gemini tends to add synthetic "realism" that looks CGI, not photographic:
+
+| Synthetic Effect | What Model Adds | Why It Looks Fake | Correct Approach |
+|------------------|-----------------|-------------------|------------------|
+| Wavy internal distortion | Fake refraction waves inside bottle | Real empty bottles show clean interior | Specify "no internal distortion patterns" |
+| Vertical light streaks | Sharp stripes to show "cylindrical form" | Real cylinders have soft curved gradients | Specify "no artificial light streaks" |
+| Exaggerated base darkening | Dark ring at bottom for "thickness" | Real effect is subtle gradient, not distinct band | Use "uniform tint" if thick_darkens |
+| Perfect uniform tint | CGI-perfect even coloring | Real tint has subtle angle/thickness variation | Let natural variation show |
+| Artificial rim highlights | White edge lines to "show form" | Real PET has natural refraction, not highlights | Specify "natural refraction only" |
+
+**The Photography Test:** Would a professional product photographer add this effect? If not, neither should Gemini.
+
+**In specs, always include:** "Photograph-like simplicity. No simulated refraction patterns. No artificial light streaks. Material shows naturally without added demonstration effects."
+
 #### Why First Render Must Be Realistic
 
 If first render lacks realism, users request "make it realistic". You then ADD specs (caustics, sheen). Gemini interprets these as edge highlights = artifacts.
@@ -138,6 +156,50 @@ Ask: "Does this render match the TransparencyProfile?"
 - Contents "honey filling 85%" should show honey at that level
 
 If the render doesn't match profile specifications - iterate with corrected specs.
+
+#### Transparent Material Syntax Pattern (for image_studio calls)
+
+**Checklist (all required):**
+
+| Spec | Required Content |
+|------|------------------|
+| `focus` | `{"depth_of_field": "deep - everything sharp"}` |
+| `fidelity.hero_features` | "transparency depth at [X]% clarity, natural refraction only - no artificial rim highlights, clean simple render - no simulated refraction patterns, no artificial light streaks" |
+| `fidelity.preserve_colors` | "[color] tint visible THROUGH transparent body" |
+| `primary_material` | "glossy PET - tinted [color]" |
+| `rendering_notes` | "Photograph-like simplicity. No internal distortion patterns. No vertical highlight streaks." |
+| `transparency.*` | All fields from analyst profile |
+| `lighting.specials` | "no rim light - rely on natural edge refraction" |
+
+**Example Call:**
+```python
+image_studio(
+    images=[{"path": "inbox/source.jpg", "label": "source"}],
+    extraction={"target_description": "blue PET bottle in [source]", "targets": [...]},
+    focus={"depth_of_field": "deep - everything sharp"},
+    fidelity={
+        "hero_features": "transparency depth at 90% clarity, natural refraction only - "
+                         "no artificial rim highlights, clean simple render - "
+                         "no simulated refraction patterns, no artificial light streaks, arrow branding",
+        "preserve_colors": "exact blue tint visible THROUGH transparent body"
+    },
+    material_treatment={
+        "primary_material": "glossy PET - tinted blue",
+        "rendering_notes": "Crystal clear transparency - can see THROUGH to background. "
+                           "Natural edge refraction only. No artificial rim highlights. "
+                           "Photograph-like simplicity. No internal distortion patterns. "
+                           "No vertical highlight streaks.",
+        "transparency": {
+            "clarity_percentage": 90, "tint": "blue", "frost_percentage": 0,
+            "wall_thickness_effect": "uniform", "contents_state": "empty",
+            "contents_description": "empty bottle"
+        }
+    },
+    lighting={"specials": "no rim light - rely on natural edge refraction"},
+    background={"treatment": "solid_color", "color": "white"},
+    output={"format": "PNG", "aspect_ratio": "1:1", "filename": "product_hero"}
+)
+```
 
 ### 4. BACKGROUND FOR CONTRAST
 

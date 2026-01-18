@@ -158,137 +158,41 @@ Material-specific rendering instructions.
 - `preserve_details`: Critical details to preserve (label legibility, cap details, texture)
 
 **[CRITICAL] Material Accuracy:**
-- Use the EXACT material from visual analysis (e.g., "glossy PET", "matte HDPE", "borosilicate glass")
-- Do NOT generalize to categories ("plastic", "glass", "metal")
-- Include finish: "glossy PET", "matte HDPE", "brushed aluminum", "frosted glass"
-- If analysis says "PET bottle", use "glossy PET" or "clear PET", not "clear_plastic"
+- Use EXACT material from visual analysis: "glossy PET", "matte HDPE", "borosilicate glass"
+- Include finish in material name: "glossy PET - tinted blue", "brushed aluminum"
 
-**[CRITICAL] Transparent Material Specs (Technical Reference):**
+**[CRITICAL] Transparent Material Rendering:**
 
-For WHY these specs matter, see `catalog_visual.protocol` TRANSPARENT MATERIAL DOCTRINE.
+**For creative doctrine (WHY), see `catalog_visual.protocol` - "Transparent Material Doctrine" section.**
 
-**TransparencyProfile Schema (NEW - Use for all transparent/translucent materials):**
-
-Visual Analyst provides TRANSPARENCY PROFILE section with structured data. Map directly to `material_treatment.transparency`:
-
+**TransparencyProfile Schema:**
 ```python
 material_treatment={
-    "primary_material": "glossy PET",  # Exact material from analysis
-    "rendering_notes": "Natural transparency with accurate refraction. Liquid/contents visible through body.",
+    "primary_material": "glossy PET - tinted [color]",
+    "rendering_notes": "[see catalog_visual for required language]",
     "transparency": {
-        "clarity_percentage": 92,           # From analyst: 0-100, higher = clearer
-        "tint": "none",                     # From analyst: none/amber/blue/green/smoke
-        "frost_percentage": 0,              # From analyst: 0-100, higher = more diffused
-        "wall_thickness_effect": "uniform", # From analyst: uniform/thick_darkens/variable
-        "contents_state": "colored_liquid", # From analyst: empty/clear_liquid/colored_liquid/opaque/partial
-        "contents_description": "honey-colored liquid filling 90%"  # From analyst
+        "clarity_percentage": [0-100],      # From analyst
+        "tint": "[color or none]",          # From analyst
+        "frost_percentage": [0-100],        # From analyst
+        "wall_thickness_effect": "[uniform|thick_darkens|variable]",
+        "contents_state": "[empty|clear_liquid|colored_liquid|opaque|partial]",
+        "contents_description": "[from analyst]"
     }
 }
 ```
 
-**Clarity-to-Rendering Mapping:**
+**Required Specs (all mandatory for transparent materials):**
+- `focus`: `{"depth_of_field": "deep - everything sharp"}`
+- `fidelity.hero_features`: Must include "transparency depth at X% clarity"
+- `fidelity.preserve_colors`: Must include "THROUGH transparent body"
+- `lighting.specials`: "no rim light - rely on natural edge refraction"
+- All `transparency` sub-fields populated from analyst
 
-| Clarity % | Rendering Behavior |
-|-----------|-------------------|
-| 90-100% | Crystal clear - maximum refraction, internal structure visible, sharp edge definition |
-| 70-89% | High transparency - natural refraction, contents clearly visible, slight softening |
-| 50-69% | Medium transparency - reduced refraction, soft diffusion, contents partially visible |
-| 20-49% | Low transparency - significant diffusion, minimal internal visibility |
-| 0-19% | Near opaque - treat as translucent/matte, no refraction effects |
+**Terms to AVOID (cause artifacts):**
+`internal caustics`, `glossy surface sheen`, `detail_enhancement`, `enhanced lighting`, `refraction patterns`, `light rays`, `demonstrate transparency`
 
-**Wall Thickness Handling (CRITICAL for dark band prevention):**
-
-| wall_thickness_effect | Rendering Action |
-|-----------------------|------------------|
-| "uniform" | Standard transparency throughout |
-| "thick_darkens" | **MUST include:** "uniform tint throughout body - no dark bands at neck or base" in rendering_notes |
-| "variable" | Acknowledge variation but maintain overall clarity |
-
-**Contents State Rendering:**
-
-| contents_state | Rendering Focus |
-|----------------|-----------------|
-| "empty" | Internal structure, air refraction |
-| "clear_liquid" | Liquid refraction, subtle caustics |
-| "colored_liquid" | Liquid color dominates, visible through body |
-| "opaque" | Contents block interior, focus on material surface |
-| "partial" | Show fill level, meniscus at liquid surface |
-
-**Full Transparent Material Call Pattern:**
-
-```python
-material_treatment={
-    "primary_material": "glossy PET",  # Exact from visual analysis
-    "rendering_notes": "Natural transparency with accurate refraction. "
-                       "Honey-colored liquid visible through body. "
-                       "Uniform tint throughout - no dark bands at neck or base.",
-    "transparency": {
-        "clarity_percentage": 92,
-        "tint": "none",
-        "frost_percentage": 0,
-        "wall_thickness_effect": "thick_darkens",  # Triggers uniform tint requirement
-        "contents_state": "colored_liquid",
-        "contents_description": "honey-colored liquid filling 90%"
-    }
-},
-fidelity={
-    "preserve_colors": "exact honey liquid color visible through transparent body",
-    "hero_features": "transparency depth at 92% clarity, natural refraction, liquid visibility"
-},
-lighting={
-    "quality": "soft diffused - allows natural transparency to show",
-    "special_requirements": "no rim light - rely on natural edge refraction"
-}
-```
-
-**Transparent Material Checklist:**
-- [ ] `transparency.clarity_percentage` set from analyst profile
-- [ ] `transparency.tint` specified (or "none")
-- [ ] `transparency.frost_percentage` specified (0 for glossy)
-- [ ] `transparency.wall_thickness_effect` set - if "thick_darkens", uniform tint in notes
-- [ ] `transparency.contents_state` matches analyst observation
-- [ ] `rendering_notes` mentions contents visibility and uniform tint
-- [ ] `fidelity.hero_features` includes transparency depth
-- [ ] Lighting soft, no rim light specified
-
-**[CRITICAL] Edge Artifact Prevention (Transparent/Glossy Materials):**
-
-For PET, glass, and glossy plastics, edges naturally show refraction. DO NOT add artificial rim highlights or edge reflections - they appear as shadow-like artifacts.
-
-| Anti-pattern | Correct |
-|--------------|---------|
-| `rendering_notes="Highlight reflections to show form"` | `rendering_notes="Natural edge refraction only. No artificial rim highlights. Clean silhouette."` |
-| No lighting.specials specified | `lighting={"specials": "no rim light - rely on natural edge refraction"}` |
-
-**For transparent materials, ALWAYS include:**
-```python
-material_treatment={
-    "primary_material": "glossy PET",  # or specific material
-    "rendering_notes": "Natural edge refraction only. No artificial rim highlights. Clean silhouette edges."
-},
-lighting={
-    "specials": "no rim light - rely on natural edge refraction for transparent materials"
-}
-```
-
-**Edge Artifact Self-Check (REQUIRED for transparent materials):**
-Before EVERY image_studio call with transparent/glossy material, verify:
-- [ ] `rendering_notes` does NOT contain: "highlight", "rim", "edge reflection", "show form"
-- [ ] `lighting.specials` explicitly prohibits rim light
-- [ ] No "edge glow" or "edge highlight" in any spec value
-
-**Why this matters:** Gemini interprets "highlight reflections" as adding white edge lines, which appear as shadow artifacts on transparent bottles.
-
-**Terms to AVOID for Transparent Materials:**
-
-| AVOID | Causes |
-|-------|--------|
-| `internal caustics` | Bright spots, edge bleeding |
-| `glossy surface sheen` | Artificial rim highlights |
-| `detail_enhancement` | Over-sharpened edges = artifacts |
-| `enhanced lighting` | Specular artifacts |
-
-For handling "make it more realistic" feedback, see `hitl.protocol` (domain=creative).
+**For complete checklist, syntax patterns, and creative doctrine: see `catalog_visual.protocol` (domain=visual).**
+**For handling "make it more realistic" feedback: see `hitl.protocol` (domain=creative).**
 
 ### fidelity (CRITICAL for source images)
 FIX photography problems, PRESERVE product identity. **Always include when processing [source]/[product].**
