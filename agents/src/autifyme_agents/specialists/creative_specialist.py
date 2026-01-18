@@ -150,7 +150,7 @@ def create_creative_specialist(
         else get_llm(
             provider="google",
             model=CREATIVE_SPECIALIST_MODEL,
-            temperature=1.2,  # Balanced creativity and consistency
+            temperature=1.1,  # Balanced creativity and consistency
             thinking_level="high",  # Deep reasoning for creative quality decisions
         )
     )
