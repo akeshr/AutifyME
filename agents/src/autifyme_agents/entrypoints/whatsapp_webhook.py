@@ -12,7 +12,7 @@ from typing import Any, cast
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse
 
-from autifyme_agents.core.config import settings
+from autifyme_agents.core.config import configure_deepagents, settings
 from autifyme_agents.core.logging_config import get_logger, setup_logging
 from autifyme_agents.core.message_batcher import MessageBatcher
 from autifyme_agents.core.ports import StorageInterface
@@ -33,8 +33,6 @@ except Exception as e:
 logger = get_logger(__name__)
 
 # Configure DeepAgents before any agents are created
-from autifyme_agents.core.config import configure_deepagents
-
 configure_deepagents()
 
 app = FastAPI()
