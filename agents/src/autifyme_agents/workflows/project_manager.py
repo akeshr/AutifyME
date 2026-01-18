@@ -61,7 +61,7 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
         provider="google",
         model="gemini-3-flash-preview",
         thinking_level="high",  # Fast orchestration
-        temperature=1.2,  # Gemini 3 default (below 1.0 may cause looping)
+        temperature=1.5,  # Gemini 3 default (below 1.0 may cause looping)
         max_retries=5,  # Increase resilience against blank responses
     )
 
