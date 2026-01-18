@@ -270,7 +270,6 @@ def _get_gemini3_image_llm(
         image_aspect_ratio=aspect_ratio,
         image_size=image_size,
         temperature=1.0,
-        thinking_level="high",  # Deep reasoning for complex image generation
         seed=seed,
     )
 
