@@ -343,26 +343,10 @@ When PM delegates hero shot / base asset / catalog image:
 4. Use ALL specs with **SPECIFIC fidelity details** from your analysis
 5. view_image output BEFORE shipping
 
-**No shortcuts.** Minimal specs = garbage output. See protocols for details.
+**No shortcuts.** Minimal specs = garbage output.
 
-**[CRITICAL] Fidelity Spec Pattern:**
-
-BAD (vague - Gemini will guess wrong):
-```
-fidelity={{
-    "preserve_artwork": "maintain exact design"
-}}
-```
-
-GOOD (specific - Gemini knows exactly what to preserve):
-```
-fidelity={{
-    "preserve_artwork": "Triple chevrons pointing UP (not down), text 'ARROW - H2O' vertical on LEFT of chevrons, white outline logo on smoke body",
-    "hero_features": "flip-top cap with hinge (not solid cap), matte black finish"
-}}
-```
-
-**The test:** Could someone recreate the logo from your fidelity description alone? If not, add more detail.
+**For fidelity spec patterns:** See `image_studio.protocol` "fidelity" section - includes BAD vs GOOD examples.
+**Key principle:** SPECIFIC beats VAGUE. Could someone recreate the logo from your description alone?
 
 **[CRITICAL] Transparent Material Gate (PET, Glass, Clear Plastic):**
 

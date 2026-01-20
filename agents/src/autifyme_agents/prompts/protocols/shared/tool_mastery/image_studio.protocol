@@ -213,6 +213,25 @@ FIX photography problems, PRESERVE product identity. **Always include when proce
 - `preserve_shape`: Real proportions (fix lens distortion)
 - `hero_features`: 1-3 features that DEFINE this product (must be visible and sharp)
 
+**[CRITICAL] Fidelity Spec Pattern - SPECIFIC beats VAGUE:**
+
+BAD (vague - Gemini will guess wrong):
+```
+fidelity={
+    "preserve_artwork": "maintain exact design"
+}
+```
+
+GOOD (specific - Gemini knows exactly what to preserve):
+```
+fidelity={
+    "preserve_artwork": "Triple chevrons pointing UP (not down), text 'ARROW - H2O' vertical on LEFT of chevrons, white outline logo on smoke body",
+    "hero_features": "flip-top cap with hinge (not solid cap), matte black finish"
+}
+```
+
+**The test:** Could someone recreate the logo from your fidelity description alone? If not, add more detail.
+
 ### enhancement
 Post-processing enhancements.
 - `sharpness`: Sharpening level (tack sharp, subtle, product sharp background soft)
