@@ -160,16 +160,45 @@ Apply domain doctrine via image_studio.
 Protocol tells you which specs matter for this domain.
 Your job: translate vision into the right spec combination.
 
+**[CRITICAL] ANTI-SIMULATION PRINCIPLE:**
+
+Gemini's default behavior adds synthetic effects that look CGI, not photographic.
+ALWAYS include in your specs:
+
+1. **In `material_treatment.rendering_notes`** (MANDATORY for all materials):
+   ```
+   "Photograph-like simplicity. No artificial effects. Natural appearance only."
+   ```
+
+2. **For transparent materials, add:**
+   ```
+   "No internal distortion patterns. No artificial rim highlights. No vertical light streaks. Clean, simple render."
+   ```
+
+3. **In `fidelity.hero_features`** (when transparent):
+   ```
+   "natural refraction only - no artificial rim highlights"
+   ```
+
+**The rule:** REALISM = NATURAL APPEARANCE, NOT ADDED EFFECTS
+
 ### 5. CRITIQUE
 
 **view_image on EVERY output before shipping.**
 
-Ask:
-- Does output show THE SAME product, just better photographed?
-- Would a professional photographer believe this came from a real shoot?
-- Would you stake your reputation on this?
+**CRITIQUE CHECKLIST:**
 
-If any answer is "no" -> iterate.
+| Check | Question | If NO |
+|-------|----------|-------|
+| **IDENTITY** | Is this THE SAME product, just better photographed? | Iterate - fidelity specs too vague |
+| **REALISM** | Does it look like a real photo, not a CGI render? | Iterate - add anti-simulation language |
+| **CGI ARTIFACTS** | Any wavy distortion, rim highlights, light streaks? | Iterate - specify "no artificial effects" |
+| **TRANSPARENCY** | Does transparent material look natural (not "enhanced")? | Iterate - add "photograph-like simplicity" |
+| **LIGHTING** | Soft and professional, not dramatic or artificial? | Iterate - soften lighting specs |
+
+**The Test:** Would a professional photographer believe this came from a real photoshoot?
+
+If any answer is "no" -> iterate with more specific anti-simulation language.
 
 ### 6. SHIP or ITERATE
 
@@ -392,13 +421,44 @@ PM's delegation OVERRIDES file contents (reflects user feedback).
 
 **All transparent material doctrine lives in `catalog_visual.protocol` (domain=visual).**
 
-**Your role:**
-1. **view_image** the source - validate analyst's TransparencyProfile against what YOU see
-2. **Adjust values** that don't match your observation (you are the artist, analyst is researcher)
-3. **Load protocol** and follow the checklist/syntax pattern
-4. **view_image** output and verify against "The Transparent Material Test" in the protocol
+**[CRITICAL] Transparency = ABSENCE of opacity, NOT presence of effects.**
 
-**If render fails:** Check protocol's "Common Transparent Material Issues" table for diagnosis.
+Real transparent bottles under studio lighting show:
+- Clean, simple interior (no wavy patterns)
+- Soft natural gradients (no vertical streaks)
+- Natural edge refraction (no artificial rim highlights)
+- Subtle thickness variation (no exaggerated dark bands)
+
+**MANDATORY SPECS for transparent materials:**
+
+```python
+material_treatment={
+    "primary_material": "glossy PET - tinted [color]",  # or "clear glass", etc.
+    "rendering_notes": "Photograph-like simplicity. No internal distortion patterns. "
+                       "No artificial rim highlights. No vertical light streaks. "
+                       "Clean, simple render. Natural appearance only.",
+    "transparency": {
+        "clarity_percentage": [from analyst or your observation],
+        "tint": "[color or none]",
+        "frost_percentage": [0-100],
+        "wall_thickness_effect": "uniform",  # prevents dark bands
+        "contents_state": "[empty/liquid/etc]",
+        "contents_description": "[what you see]"
+    }
+},
+fidelity={
+    "hero_features": "[product features], natural refraction only - no artificial rim highlights",
+    "preserve_colors": "[color] tint visible THROUGH transparent body"
+}
+```
+
+**Your role:**
+1. **view_image** the source - note ACTUAL clarity, tint, contents
+2. **Include ALL mandatory specs** - especially anti-simulation language
+3. **view_image** output - check for CGI artifacts (wavy patterns, rim highlights, streaks)
+4. If artifacts present -> iterate with stronger anti-simulation language
+
+**If render looks CGI:** Add more explicit prohibitions in rendering_notes.
 
 </transparency_handling>
 
