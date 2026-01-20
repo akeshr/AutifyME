@@ -190,6 +190,15 @@ Once loaded, hitl protocol stays in context for subsequent feedback iterations.
 
 Load `multi_item` (domain=creative) protocol for full doctrine. The core principle: user drives iteration pace, not you.
 
+**[CRITICAL] Generation Control for Consistency:**
+
+Image generation is non-deterministic. For batch/multi-item work:
+- Use `temperature=0.4` (lower = more consistent)
+- Pick one `seed` value (e.g., 42) and use it for ALL items in the batch
+- Without these, Gemini generates wildly different interpretations
+
+See `multi_item` protocol for full consistency stack.
+
 </anchor_workflow>
 
 <tools>

@@ -258,10 +258,12 @@ def _get_gemini3_image_llm(
         aspect_ratio = "1:1"
     image_size = output_spec.size if output_spec else "1K"
 
-    # Default temperature 0.7 for catalog work - balanced consistency
-    # Override Gemini 3's default of 1.0 which causes high variance
+    # Default temperature for catalog consistency
+    # Lower = more consistent, Higher = more creative variance
+    # 0.4 default balances quality with reasonable consistency
+    # Use 0.3-0.5 for batch operations requiring high consistency
     effective_temperature = temperature if temperature is not None else 0.4
-    print(f"Using Gemini 3 Pro Image temperature: {effective_temperature}")
+    logger.info(f"Gemini 3 Pro Image: temperature={effective_temperature}, seed={seed}")
 
     return get_llm(
         provider="google",
@@ -269,7 +271,7 @@ def _get_gemini3_image_llm(
         response_modalities=["TEXT", "IMAGE"],
         image_aspect_ratio=aspect_ratio,
         image_size=image_size,
-        temperature=1.2,
+        temperature=effective_temperature,
         seed=seed,
     )
 

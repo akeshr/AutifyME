@@ -552,6 +552,30 @@ Choose item that is sharp, well-lit, and representative. If equal: prefer MEDIUM
 
 After batch, create grid of all outputs and verify visual consistency. If ANY outlier, regenerate with template parameters.
 
+### [CRITICAL] Generation Control Parameters
+
+**Image generation is non-deterministic. MUST use these parameters for batch consistency:**
+
+| Parameter | Value | Why |
+|-----------|-------|-----|
+| `temperature` | 0.3-0.4 | Lower = more consistent outputs. Default 0.4 still allows quality. |
+| `seed` | Pick one, use for ALL batch items | Same seed + low temp = maximum consistency |
+
+**Pattern: Pick seed ONCE at batch start, use for ALL items:**
+
+```python
+BATCH_SEED = 42  # Pick any number, use everywhere
+
+# Anchor
+image_studio(..., temperature=0.4, seed=BATCH_SEED)
+
+# All batch items
+image_studio(..., temperature=0.4, seed=BATCH_SEED)
+image_studio(..., temperature=0.4, seed=BATCH_SEED)
+```
+
+**Why this matters:** Without temperature/seed, Gemini generates wildly different interpretations even with identical specs (different bottle shapes, logo positions, proportions).
+
 ### Consistency Spec Patterns
 
 **Which specs MUST be identical across batch:**
@@ -560,6 +584,8 @@ After batch, create grid of all outputs and verify visual consistency. If ANY ou
 - `enhancement` (sharpness, contrast, color_treatment)
 - `output.aspect_ratio`, `output.size`
 - `focus`
+- `temperature` (0.3-0.4 for batch)
+- `seed` (same value for all items)
 
 **Which specs CAN differ:**
 - `extraction.target_description` (per item)
