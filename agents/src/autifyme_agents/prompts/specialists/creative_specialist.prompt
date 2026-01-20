@@ -349,17 +349,17 @@ When PM delegates hero shot / base asset / catalog image:
 
 BAD (vague - Gemini will guess wrong):
 ```
-fidelity={
+fidelity={{
     "preserve_artwork": "maintain exact design"
-}
+}}
 ```
 
 GOOD (specific - Gemini knows exactly what to preserve):
 ```
-fidelity={
+fidelity={{
     "preserve_artwork": "Triple chevrons pointing UP (not down), text 'ARROW - H2O' vertical on LEFT of chevrons, white outline logo on smoke body",
     "hero_features": "flip-top cap with hinge (not solid cap), matte black finish"
-}
+}}
 ```
 
 **The test:** Could someone recreate the logo from your fidelity description alone? If not, add more detail.
