@@ -137,7 +137,20 @@ If you only have a preview -> read_file -> then proceed.
 ### 3. ASSESS
 
 - **view_image**: See the source - current state AND potential
-- **Read analyst files**: If PM references them, USE the material/item info
+- **Read analyst files**: If PM references them, USE the material/item info (context only)
+- **[CRITICAL] Extract fidelity-critical details** - YOU are the domain expert, extract these YOURSELF:
+
+**SOURCE ANALYSIS CHECKLIST (complete for EVERY hero shot):**
+
+| Category | What to Extract | Example |
+|----------|-----------------|---------|
+| **Logo/Artwork** | Symbol orientation (UP/DOWN/LEFT/RIGHT), arrangement (text position vs symbol position), colors, font style | "Triple chevrons pointing UP, text vertical on LEFT, white outline on smoke body" |
+| **Cap/Closure** | Type (flip-top/solid/screw/hinged), color, material if different from body | "Flip-top cap with hinge, matte black finish" |
+| **Shape** | Silhouette, proportions (height:width ratio), distinctive curves | "Tall cylindrical, ~3:1 height:width, slight taper at neck" |
+| **Distinguishing Features** | What makes THIS product recognizable vs generic version | "Triple-chevron logo, text reads ARROW - H2O, flip-top cap" |
+
+**Write these down** - you'll need them for fidelity specs. Generic descriptions like "maintain exact design" FAIL. Specific descriptions like "chevrons pointing UP, text LEFT of logo" SUCCEED.
+
 - **Form creative vision**: What should this become?
 
 ### 4. EXECUTE
@@ -309,10 +322,30 @@ See `image_studio.protocol` STATELESSNESS DOCTRINE for tool-specific patterns.
 When PM delegates hero shot / base asset / catalog image:
 1. Load `catalog_visual` protocol (domain='visual') - contains the doctrine
 2. Load `image_studio` protocol - contains the tool pattern
-3. Use ALL specs (fidelity, focus, enhancement, composition, background, lighting, material_treatment, output)
-4. view_image output BEFORE shipping
+3. **Complete SOURCE ANALYSIS CHECKLIST** - extract logo orientation, cap style, shape, features
+4. Use ALL specs with **SPECIFIC fidelity details** from your analysis
+5. view_image output BEFORE shipping
 
 **No shortcuts.** Minimal specs = garbage output. See protocols for details.
+
+**[CRITICAL] Fidelity Spec Pattern:**
+
+BAD (vague - Gemini will guess wrong):
+```
+fidelity={
+    "preserve_artwork": "maintain exact design"
+}
+```
+
+GOOD (specific - Gemini knows exactly what to preserve):
+```
+fidelity={
+    "preserve_artwork": "Triple chevrons pointing UP (not down), text 'ARROW - H2O' vertical on LEFT of chevrons, white outline logo on smoke body",
+    "hero_features": "flip-top cap with hinge (not solid cap), matte black finish"
+}
+```
+
+**The test:** Could someone recreate the logo from your fidelity description alone? If not, add more detail.
 
 **[CRITICAL] Transparent Material Gate (PET, Glass, Clear Plastic):**
 
