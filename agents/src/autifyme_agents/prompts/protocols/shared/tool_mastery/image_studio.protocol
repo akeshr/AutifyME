@@ -161,6 +161,13 @@ Material-specific rendering instructions.
 - Use EXACT material from visual analysis: "glossy PET", "matte HDPE", "borosilicate glass"
 - Include finish in material name: "glossy PET - tinted blue", "brushed aluminum"
 
+**[CRITICAL] Anti-Simulation Language (MANDATORY for ALL materials):**
+
+Gemini adds synthetic effects that look CGI. Always include in `rendering_notes`:
+```
+"Photograph-like simplicity. No artificial effects. Natural appearance only."
+```
+
 **[CRITICAL] Transparent Material Rendering:**
 
 **For creative doctrine (WHY), see `catalog_visual.protocol` - "Transparent Material Doctrine" section.**
@@ -169,7 +176,9 @@ Material-specific rendering instructions.
 ```python
 material_treatment={
     "primary_material": "glossy PET - tinted [color]",
-    "rendering_notes": "[see catalog_visual for required language]",
+    "rendering_notes": "Photograph-like simplicity. No internal distortion patterns. "
+                       "No artificial rim highlights. No vertical light streaks. "
+                       "Clean, simple render. Natural appearance only.",
     "transparency": {
         "clarity_percentage": [0-100],      # From analyst
         "tint": "[color or none]",          # From analyst
@@ -183,15 +192,16 @@ material_treatment={
 
 **Required Specs (all mandatory for transparent materials):**
 - `focus`: `{"depth_of_field": "deep - everything sharp"}`
-- `fidelity.hero_features`: Must include "transparency depth at X% clarity"
+- `fidelity.hero_features`: Must include "transparency depth at X% clarity, natural refraction only"
 - `fidelity.preserve_colors`: Must include "THROUGH transparent body"
 - `lighting.specials`: "no rim light - rely on natural edge refraction"
+- `rendering_notes`: Must include anti-simulation language (see above)
 - All `transparency` sub-fields populated from analyst
 
 **Terms to AVOID (cause artifacts):**
-`internal caustics`, `glossy surface sheen`, `detail_enhancement`, `enhanced lighting`, `refraction patterns`, `light rays`, `demonstrate transparency`
+`internal caustics`, `glossy surface sheen`, `detail_enhancement`, `enhanced lighting`, `refraction patterns`, `light rays`, `demonstrate transparency`, `rim highlights`, `show transparency`
 
-**For complete checklist, syntax patterns, and creative doctrine: see `catalog_visual.protocol` (domain=visual).**
+**For complete doctrine and TransparencyProfile examples: see `catalog_visual.protocol` (domain=visual).**
 **For handling "make it more realistic" feedback: see `hitl.protocol` (domain=creative).**
 
 ### fidelity (CRITICAL for source images)

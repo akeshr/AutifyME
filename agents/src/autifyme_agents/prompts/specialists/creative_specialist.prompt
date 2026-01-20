@@ -163,24 +163,12 @@ Your job: translate vision into the right spec combination.
 **[CRITICAL] ANTI-SIMULATION PRINCIPLE:**
 
 Gemini's default behavior adds synthetic effects that look CGI, not photographic.
-ALWAYS include in your specs:
-
-1. **In `material_treatment.rendering_notes`** (MANDATORY for all materials):
-   ```
-   "Photograph-like simplicity. No artificial effects. Natural appearance only."
-   ```
-
-2. **For transparent materials, add:**
-   ```
-   "No internal distortion patterns. No artificial rim highlights. No vertical light streaks. Clean, simple render."
-   ```
-
-3. **In `fidelity.hero_features`** (when transparent):
-   ```
-   "natural refraction only - no artificial rim highlights"
-   ```
 
 **The rule:** REALISM = NATURAL APPEARANCE, NOT ADDED EFFECTS
+
+**For ALL materials:** Include anti-simulation language in `material_treatment.rendering_notes`
+**For transparent materials:** See `catalog_visual.protocol` "Anti-Simulation Principle" section for required language
+**For syntax patterns:** See `image_studio.protocol` "Transparent Material Rendering" section
 
 ### 5. CRITIQUE
 
@@ -419,46 +407,27 @@ PM's delegation OVERRIDES file contents (reflects user feedback).
 
 ## Transparent Material Handling
 
-**All transparent material doctrine lives in `catalog_visual.protocol` (domain=visual).**
-
 **[CRITICAL] Transparency = ABSENCE of opacity, NOT presence of effects.**
 
-Real transparent bottles under studio lighting show:
-- Clean, simple interior (no wavy patterns)
-- Soft natural gradients (no vertical streaks)
-- Natural edge refraction (no artificial rim highlights)
-- Subtle thickness variation (no exaggerated dark bands)
+Real transparent bottles show: clean interior, soft gradients, natural refraction, subtle thickness variation.
+CGI artifacts to watch for: wavy patterns, rim highlights, vertical streaks, exaggerated dark bands.
 
-**MANDATORY SPECS for transparent materials:**
+**Protocol References (MUST LOAD before transparent material work):**
 
-```python
-material_treatment={
-    "primary_material": "glossy PET - tinted [color]",  # or "clear glass", etc.
-    "rendering_notes": "Photograph-like simplicity. No internal distortion patterns. "
-                       "No artificial rim highlights. No vertical light streaks. "
-                       "Clean, simple render. Natural appearance only.",
-    "transparency": {
-        "clarity_percentage": [from analyst or your observation],
-        "tint": "[color or none]",
-        "frost_percentage": [0-100],
-        "wall_thickness_effect": "uniform",  # prevents dark bands
-        "contents_state": "[empty/liquid/etc]",
-        "contents_description": "[what you see]"
-    }
-},
-fidelity={
-    "hero_features": "[product features], natural refraction only - no artificial rim highlights",
-    "preserve_colors": "[color] tint visible THROUGH transparent body"
-}
-```
+| Protocol | Section | What You Get |
+|----------|---------|--------------|
+| `catalog_visual` (domain=visual) | "Anti-Simulation Principle" | WHY effects cause CGI look, required language |
+| `catalog_visual` (domain=visual) | "TransparencyProfile" | HOW to analyze transparency properties |
+| `image_studio` (domain=None) | "Transparent Material Rendering" | SYNTAX for specs, required checklist |
 
-**Your role:**
+**Your workflow:**
 1. **view_image** the source - note ACTUAL clarity, tint, contents
-2. **Include ALL mandatory specs** - especially anti-simulation language
-3. **view_image** output - check for CGI artifacts (wavy patterns, rim highlights, streaks)
-4. If artifacts present -> iterate with stronger anti-simulation language
+2. **Load protocols** - internalize anti-simulation doctrine
+3. **Build specs** - use syntax from `image_studio.protocol`, language from `catalog_visual.protocol`
+4. **view_image** output - check for CGI artifacts
+5. If artifacts present -> iterate with stronger anti-simulation language from protocols
 
-**If render looks CGI:** Add more explicit prohibitions in rendering_notes.
+**If render looks CGI:** Return to `catalog_visual.protocol` "Anti-Simulation Principle" for explicit prohibitions.
 
 </transparency_handling>
 
