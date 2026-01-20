@@ -15,7 +15,13 @@ logger = logging.getLogger(__name__)
 class WhatsAppClient:
     """Thin wrapper around the WhatsApp Business Cloud send API."""
 
-    def __init__(self, *, access_token: str | None = None, phone_number_id: str | None = None, api_version: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        access_token: str | None = None,
+        phone_number_id: str | None = None,
+        api_version: str | None = None,
+    ) -> None:
         self.access_token = access_token or settings.WHATSAPP_ACCESS_TOKEN
         self.phone_number_id = phone_number_id or settings.WHATSAPP_PHONE_NUMBER_ID
         self.api_version = api_version or settings.WHATSAPP_API_VERSION
@@ -23,7 +29,9 @@ class WhatsAppClient:
         if not self.access_token or not self.phone_number_id:
             raise ValueError("WhatsApp credentials are not configured")
 
-        self._base_url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/messages"
+        self._base_url = (
+            f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/messages"
+        )
 
     def send_typing_indicator(self, message_id: str) -> dict[str, Any]:
         """Mark message as read and show typing indicator.
@@ -57,9 +65,7 @@ class WhatsAppClient:
             "messaging_product": "whatsapp",
             "status": "read",
             "message_id": message_id,
-            "typing_indicator": {
-                "type": "text"
-            }
+            "typing_indicator": {"type": "text"},
         }
 
         headers = {
@@ -76,7 +82,9 @@ class WhatsAppClient:
         )
         return data
 
-    def send_text(self, recipient: str, message: str, *, preview_url: bool = False) -> dict[str, Any]:
+    def send_text(
+        self, recipient: str, message: str, *, preview_url: bool = False
+    ) -> dict[str, Any]:
         payload = {
             "messaging_product": "whatsapp",
             "to": recipient,
@@ -101,7 +109,9 @@ class WhatsAppClient:
         )
         return data
 
-    def send_image(self, recipient: str, media_id: str, *, caption: str | None = None) -> dict[str, Any]:
+    def send_image(
+        self, recipient: str, media_id: str, *, caption: str | None = None
+    ) -> dict[str, Any]:
         """Send image message using WhatsApp media_id.
 
         Media must be uploaded first via WhatsAppMediaClient.upload_media().

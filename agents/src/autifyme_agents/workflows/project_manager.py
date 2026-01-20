@@ -60,7 +60,8 @@ def _resolve_model(model: BaseChatModel | None = None) -> BaseChatModel:
     return get_llm(
         provider="google",
         model="gemini-3-flash-preview",
-        thinking_level="low",  # Fast orchestration
+        thinking_level="high",  # Fast orchestration
+        temperature=1.5,  # Gemini 3 default (below 1.0 may cause looping)
         max_retries=5,  # Increase resilience against blank responses
     )
 
@@ -81,15 +82,15 @@ def _load_prompt(
 **Your Catalog Summary (Loaded at Startup):**
 - Total Product Families: {base_context.catalog_summary.total_families}
 - Total SKUs: {base_context.catalog_summary.total_skus}
-- Family Names: {', '.join(base_context.catalog_summary.family_names)}
-- Top Categories: {', '.join(base_context.catalog_summary.top_categories)}
+- Family Names: {", ".join(base_context.catalog_summary.family_names)}
+- Top Categories: {", ".join(base_context.catalog_summary.top_categories)}
 """
 
     root_categories = [cat.name for cat in base_context.taxonomy_tree.root_categories]
     taxonomy_text = f"""
 **Your Taxonomy Tree (Loaded at Startup):**
 - Total Categories: {base_context.taxonomy_tree.total_categories}
-- Root Categories: {', '.join(root_categories)}
+- Root Categories: {", ".join(root_categories)}
 """
 
     # Company patterns for cold-start handling
@@ -99,16 +100,24 @@ def _load_prompt(
 **Company Patterns (For Cold-Start Handling):**
 - Primary Workflow: {patterns.primary_workflow}
 - Price Range: Rs {price_min:.0f} - Rs {price_max:.0f}
-- Common Product Types: {', '.join(patterns.common_product_types) if patterns.common_product_types else 'N/A'}
-- SKU Pattern: {patterns.naming_conventions.get('sku_pattern', 'FAMILY-SIZE-VARIANT')}
+- Common Product Types: {", ".join(patterns.common_product_types) if patterns.common_product_types else "N/A"}
+- SKU Pattern: {patterns.naming_conventions.get("sku_pattern", "FAMILY-SIZE-VARIANT")}
 """
 
-    return prompt_template.format(
-        company_name=company_profile.name,
-        brand_voice=company_profile.brand_voice,
-        target_audience=company_profile.target_audience,
-        platform=platform_name,
-    ) + "\n\n" + catalog_summary_text + "\n" + taxonomy_text + "\n" + patterns_text
+    return (
+        prompt_template.format(
+            company_name=company_profile.name,
+            brand_voice=company_profile.brand_voice,
+            target_audience=company_profile.target_audience,
+            platform=platform_name,
+        )
+        + "\n\n"
+        + catalog_summary_text
+        + "\n"
+        + taxonomy_text
+        + "\n"
+        + patterns_text
+    )
 
 
 async def create_project_manager(
@@ -148,7 +157,7 @@ async def create_project_manager(
         extra={
             "catalog_families": base_context.catalog_summary.total_families,
             "taxonomy_categories": base_context.taxonomy_tree.total_categories,
-        }
+        },
     )
 
     instructions = _load_prompt(company_profile, base_context, channel)
@@ -160,17 +169,20 @@ async def create_project_manager(
     # load_protocol for PM to load coordination protocols (domain_awareness, coordination_patterns)
     # PM uses this for: understanding domain boundaries, conflict resolution, multi-domain coordination
     from autifyme_agents.tools.protocol_loader import create_load_protocol_tool
+
     pm_tools.append(create_load_protocol_tool())
 
     # view_image for PM to see user images and understand conversational context
     # PM uses this for: initial understanding, conversational references ("the blue one")
     # PM does NOT use this for: detailed analysis (that's visual_analyst's job)
     from autifyme_agents.tools.view_image import create_view_image_tool
+
     pm_tools.append(create_view_image_tool())
 
     # Platform media download (with storage for inbox persistence)
     if channel is not None:
         from autifyme_agents.tools.platform_tools import create_platform_media_tools
+
         pm_tools.extend(create_platform_media_tools(channel, storage=storage))
 
     # Specialist LLM configuration

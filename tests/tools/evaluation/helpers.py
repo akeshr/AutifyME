@@ -119,7 +119,9 @@ def show_tree(trace_id: str) -> dict[str, str]:
 
     # Header
     print(f"\nTRACE: {trace_id}")
-    print(f"Status: {root.status} | Cost: ${total_cost:.4f} | Time: {total_ms/1000:.1f}s | Tokens: {total_tokens:,}")
+    print(
+        f"Status: {root.status} | Cost: ${total_cost:.4f} | Time: {total_ms / 1000:.1f}s | Tokens: {total_tokens:,}"
+    )
     print(f"LLM calls: {llm_count} | Tool calls: {tool_count} | Total nodes: {len(runs)}")
     print("")
     print(f"USER: {user_input_preview}")
@@ -192,7 +194,7 @@ def show_tree(trace_id: str) -> dict[str, str]:
         duration = ""
         if run.end_time and run.start_time:
             ms = int((run.end_time - run.start_time).total_seconds() * 1000)
-            duration = f"{ms/1000:.1f}s"
+            duration = f"{ms / 1000:.1f}s"
 
         # Status marker
         status = ""
@@ -427,7 +429,7 @@ def show_context_flow(trace_id: str, target_agent: str) -> None:
     for i, run in enumerate(path):
         full_run = client.read_run(run.id)
 
-        print(f"\n[{i+1}] {run.name}")
+        print(f"\n[{i + 1}] {run.name}")
 
         if full_run.inputs:
             # Summarize inputs
@@ -497,7 +499,9 @@ def compare_traces(trace_id_before: str, trace_id_after: str) -> None:
 
     latency_delta = after["latency_ms"] - before["latency_ms"]
     latency_pct = (latency_delta / before["latency_ms"] * 100) if before["latency_ms"] else 0
-    print(f"{'Latency':20} {before['latency_ms']/1000:>11.1f}s {after['latency_ms']/1000:>11.1f}s {latency_pct:>+11.0f}%")
+    print(
+        f"{'Latency':20} {before['latency_ms'] / 1000:>11.1f}s {after['latency_ms'] / 1000:>11.1f}s {latency_pct:>+11.0f}%"
+    )
 
     cost_delta = after["cost"] - before["cost"]
     cost_pct = (cost_delta / before["cost"] * 100) if before["cost"] else 0
@@ -537,13 +541,15 @@ def list_failures(hours: int = 24, limit: int = 10) -> None:
 
     start_time = datetime.now() - timedelta(hours=hours)
 
-    runs = list(client.list_runs(
-        project_name="autifyme-dev",
-        is_root=True,
-        error=True,
-        start_time=start_time,
-        limit=limit,
-    ))
+    runs = list(
+        client.list_runs(
+            project_name="autifyme-dev",
+            is_root=True,
+            error=True,
+            start_time=start_time,
+            limit=limit,
+        )
+    )
 
     if not runs:
         print(f"No failures in last {hours} hours")
@@ -585,12 +591,14 @@ def list_recent(hours: int = 24, limit: int = 10) -> list[str]:
 
     start_time = datetime.now() - timedelta(hours=hours)
 
-    runs = list(client.list_runs(
-        project_name="autifyme-dev",
-        is_root=True,
-        start_time=start_time,
-        limit=limit,
-    ))
+    runs = list(
+        client.list_runs(
+            project_name="autifyme-dev",
+            is_root=True,
+            start_time=start_time,
+            limit=limit,
+        )
+    )
 
     if not runs:
         print(f"No traces in last {hours} hours")
@@ -638,11 +646,11 @@ def show_node(run_id: str) -> dict:
     client = _get_client()
     run = client.read_run(run_id)
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"NODE: [{str(run.id)[:8]}] {run.name}")
     print(f"Full ID: {run.id}")
     print(f"Type: {run.run_type} | Status: {run.status} | Tokens: {run.total_tokens or 0:,}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     result = {
         "id": str(run.id),
@@ -665,7 +673,9 @@ def show_node(run_id: str) -> dict:
 
             print(f"Messages: {len(messages)}")
             for i, msg in enumerate(messages):
-                content_preview = msg["content"][:100] + "..." if len(msg["content"]) > 100 else msg["content"]
+                content_preview = (
+                    msg["content"][:100] + "..." if len(msg["content"]) > 100 else msg["content"]
+                )
                 _safe_print(f"  [{i}] {msg['type']}: {content_preview}")
 
                 # Show tool calls in AIMessage
@@ -740,7 +750,7 @@ def show_node(run_id: str) -> dict:
                         subagent = args.get("subagent_type", args.get("specialist", "unknown"))
                         print(f"     [HANDOFF CHECK REQUIRED -> {subagent}]")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
 
     return result
 
@@ -766,12 +776,12 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
     parent = client.read_run(parent_run_id)
     child = client.read_run(child_run_id)
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("CONTEXT HANDOFF ANALYSIS")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Parent: [{str(parent.id)[:8]}] {parent.name}")
     print(f"Child:  [{str(child.id)[:8]}] {child.name}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     result = {
         "parent_id": str(parent.id),
@@ -953,8 +963,7 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
             for v in child_received.values()
         )
         passed_has_file = any(
-            "inbox/" in str(v) or "/tmp/" in str(v)
-            for v in passed_context.values()
+            "inbox/" in str(v) or "/tmp/" in str(v) for v in passed_context.values()
         )
 
         if not passed_has_file:
@@ -978,7 +987,7 @@ def show_handoff(parent_run_id: str, child_run_id: str) -> dict:
         print("No obvious issues detected")
         print("\nHANDOFF QUALITY: OK (verify manually)")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
 
     return result
 
@@ -1015,16 +1024,21 @@ def show_orchestrator_flow(trace_id: str) -> list[dict]:
     for r in runs:
         if r.run_type == "llm" and r.parent_run_id:
             parent = by_id.get(str(r.parent_run_id))
-            if parent and parent.name == "model" and parent.parent_run_id and str(parent.parent_run_id) == str(root.id):
+            if (
+                parent
+                and parent.name == "model"
+                and parent.parent_run_id
+                and str(parent.parent_run_id) == str(root.id)
+            ):
                 # Grandparent is root - this is an orchestrator LLM call
                 orchestrator_llm_calls.append(r)
 
     orchestrator_llm_calls.sort(key=lambda x: x.start_time or datetime.min)
 
-    _safe_print(f"\n{'='*70}")
+    _safe_print(f"\n{'=' * 70}")
     _safe_print("ORCHESTRATOR DECISION FLOW")
     _safe_print(f"Trace: {trace_id}")
-    _safe_print(f"{'='*70}")
+    _safe_print(f"{'=' * 70}")
 
     decisions = []
 
@@ -1067,7 +1081,7 @@ def show_orchestrator_flow(trace_id: str) -> list[dict]:
 
         decisions.append(decision)
 
-    _safe_print(f"\n{'='*70}")
+    _safe_print(f"\n{'=' * 70}")
     _safe_print(f"Total orchestrator decisions: {len(decisions)}")
 
     return decisions
@@ -1100,10 +1114,10 @@ def scan_all_handoffs(trace_id: str) -> list[dict]:
     # Find all task tool calls
     task_runs = [r for r in runs if r.run_type == "tool" and r.name == "task"]
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"HANDOFF SCAN: {trace_id}")
     print(f"Found {len(task_runs)} task delegations")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     issues = []
 
@@ -1127,6 +1141,7 @@ def scan_all_handoffs(trace_id: str) -> list[dict]:
                     # Try 3: Parse string input (Python repr or JSON)
                     import ast
                     import json
+
                     try:
                         # Try Python literal first (single quotes from LangSmith)
                         parsed = ast.literal_eval(task_input)
@@ -1145,7 +1160,9 @@ def scan_all_handoffs(trace_id: str) -> list[dict]:
 
             # Try 4: Check prompt/description directly (some tools store differently)
             if subagent == "unknown":
-                subagent = task_run.inputs.get("specialist", task_run.inputs.get("agent", "unknown"))
+                subagent = task_run.inputs.get(
+                    "specialist", task_run.inputs.get("agent", "unknown")
+                )
             if not task_description:
                 task_description = task_run.inputs.get("prompt", task_run.inputs.get("task", ""))
 
@@ -1170,10 +1187,17 @@ def scan_all_handoffs(trace_id: str) -> list[dict]:
                         content = msg.get("content", "")
                         if isinstance(content, str):
                             child_output_text = content
-                            if any(kw in content.lower() for kw in [
-                                "provide the", "need the", "please provide",
-                                "storage_path", "image path", "file path"
-                            ]):
+                            if any(
+                                kw in content.lower()
+                                for kw in [
+                                    "provide the",
+                                    "need the",
+                                    "please provide",
+                                    "storage_path",
+                                    "image path",
+                                    "file path",
+                                ]
+                            ):
                                 child_asked_for_context = True
 
         # Determine issue
@@ -1192,22 +1216,24 @@ def scan_all_handoffs(trace_id: str) -> list[dict]:
         _safe_print(f"    Description: {task_description}")
         if issue_found:
             print(f"    ISSUE: {issue_found}")
-            issues.append({
-                "child_id": str(task_run.id),
-                "subagent": subagent,
-                "issue": issue_found,
-                "severity": severity,
-                "description": task_description,
-            })
+            issues.append(
+                {
+                    "child_id": str(task_run.id),
+                    "subagent": subagent,
+                    "issue": issue_found,
+                    "severity": severity,
+                    "description": task_description,
+                }
+            )
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     if issues:
         print(f"FOUND {len(issues)} HANDOFF ISSUE(S)")
         for i in issues:
             print(f"  - [{i['severity']}] {i['subagent']}: {i['issue']}")
     else:
         print("No handoff issues detected")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     return issues
 
@@ -1280,12 +1306,14 @@ def get_workflow_window(
     end_iso = window_end.isoformat()
 
     # Query with time bounds - O(window) instead of O(entire session)
-    session_runs = list(client.list_runs(
-        project_name="autifyme-dev",
-        is_root=True,
-        filter=f'and(eq(session_id, "{run.session_id}"), gte(start_time, "{start_iso}"), lte(start_time, "{end_iso}"))',
-        limit=max_traces,
-    ))
+    session_runs = list(
+        client.list_runs(
+            project_name="autifyme-dev",
+            is_root=True,
+            filter=f'and(eq(session_id, "{run.session_id}"), gte(start_time, "{start_iso}"), lte(start_time, "{end_iso}"))',
+            limit=max_traces,
+        )
+    )
 
     if not session_runs:
         return []
@@ -1308,15 +1336,17 @@ def get_workflow_window(
             if gap > gap_threshold:
                 session_break = True
 
-        result.append({
-            "trace_id": str(r.id),
-            "start_time": r.start_time,
-            "end_time": r.end_time,
-            "is_starting_trace": is_starting,
-            "session_break_before": session_break,
-            "status": r.status,
-            "error": r.error if r.error else None,
-        })
+        result.append(
+            {
+                "trace_id": str(r.id),
+                "start_time": r.start_time,
+                "end_time": r.end_time,
+                "is_starting_trace": is_starting,
+                "session_break_before": session_break,
+                "status": r.status,
+                "error": r.error if r.error else None,
+            }
+        )
 
         prev_time = r.end_time or r.start_time
 
@@ -1368,12 +1398,14 @@ def prev_trace(trace_id: str, session_gap_minutes: int = 60) -> str | None:
     current_iso = run.start_time.isoformat()
 
     # Get traces before current time, limit to small batch
-    prev_runs = list(client.list_runs(
-        project_name="autifyme-dev",
-        is_root=True,
-        filter=f'and(eq(session_id, "{run.session_id}"), gte(start_time, "{start_iso}"), lt(start_time, "{current_iso}"))',
-        limit=10,
-    ))
+    prev_runs = list(
+        client.list_runs(
+            project_name="autifyme-dev",
+            is_root=True,
+            filter=f'and(eq(session_id, "{run.session_id}"), gte(start_time, "{start_iso}"), lt(start_time, "{current_iso}"))',
+            limit=10,
+        )
+    )
 
     if not prev_runs:
         print("This is the first trace in the session (within 24h window)")
@@ -1387,7 +1419,9 @@ def prev_trace(trace_id: str, session_gap_minutes: int = 60) -> str | None:
     if prev_run.end_time and run.start_time:
         gap = run.start_time - (prev_run.end_time or prev_run.start_time)
         if gap > timedelta(minutes=session_gap_minutes):
-            print(f"Session boundary detected (gap: {gap}). Previous trace is from different session.")
+            print(
+                f"Session boundary detected (gap: {gap}). Previous trace is from different session."
+            )
             print(f"  Use prev_trace('{trace_id}', session_gap_minutes=0) to ignore boundaries.")
             return None
 
@@ -1433,12 +1467,14 @@ def next_trace(trace_id: str, session_gap_minutes: int = 60) -> str | None:
     end_iso = window_end.isoformat()
 
     # Get traces after current time, limit to small batch
-    next_runs = list(client.list_runs(
-        project_name="autifyme-dev",
-        is_root=True,
-        filter=f'and(eq(session_id, "{run.session_id}"), gt(start_time, "{current_iso}"), lte(start_time, "{end_iso}"))',
-        limit=10,
-    ))
+    next_runs = list(
+        client.list_runs(
+            project_name="autifyme-dev",
+            is_root=True,
+            filter=f'and(eq(session_id, "{run.session_id}"), gt(start_time, "{current_iso}"), lte(start_time, "{end_iso}"))',
+            limit=10,
+        )
+    )
 
     if not next_runs:
         print("This is the last trace in the session (within 24h window)")
@@ -1486,34 +1522,38 @@ def detect_issues(trace_id: str) -> list[dict]:
     client = _get_client()
     runs = list(client.list_runs(trace_id=trace_id))
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"ISSUE DETECTION: {trace_id}")
     print(f"Scanning {len(runs)} nodes...")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     issues = []
 
     # 1. Check for failed/errored runs
     failed_runs = [r for r in runs if r.status == "error" or r.error]
     for r in failed_runs:
-        issues.append({
-            "type": "ERROR",
-            "severity": "HIGH",
-            "node_id": str(r.id),
-            "node_name": r.name,
-            "description": f"Run failed: {r.error or 'unknown error'}",
-        })
+        issues.append(
+            {
+                "type": "ERROR",
+                "severity": "HIGH",
+                "node_id": str(r.id),
+                "node_name": r.name,
+                "description": f"Run failed: {r.error or 'unknown error'}",
+            }
+        )
 
     # 2. Check for high token usage
     high_token_runs = [r for r in runs if r.run_type == "llm" and (r.total_tokens or 0) > 50000]
     for r in high_token_runs:
-        issues.append({
-            "type": "HIGH_TOKENS",
-            "severity": "MEDIUM",
-            "node_id": str(r.id),
-            "node_name": r.name,
-            "description": f"High token usage: {r.total_tokens:,} tokens",
-        })
+        issues.append(
+            {
+                "type": "HIGH_TOKENS",
+                "severity": "MEDIUM",
+                "node_id": str(r.id),
+                "node_name": r.name,
+                "description": f"High token usage: {r.total_tokens:,} tokens",
+            }
+        )
 
     # 3. Check for tool loops (same tool called 3+ times by same agent)
     # Group runs by parent
@@ -1531,13 +1571,15 @@ def detect_issues(trace_id: str) -> list[dict]:
             tool_counts[tr.name] = tool_counts.get(tr.name, 0) + 1
         for tool_name, count in tool_counts.items():
             if count >= 3 and tool_name not in ("write_todos", "SummarizationMiddleware"):
-                issues.append({
-                    "type": "TOOL_LOOP",
-                    "severity": "MEDIUM",
-                    "node_id": parent_id,
-                    "node_name": tool_name,
-                    "description": f"Tool '{tool_name}' called {count} times - possible loop",
-                })
+                issues.append(
+                    {
+                        "type": "TOOL_LOOP",
+                        "severity": "MEDIUM",
+                        "node_id": parent_id,
+                        "node_name": tool_name,
+                        "description": f"Tool '{tool_name}' called {count} times - possible loop",
+                    }
+                )
 
     # 4. Scan handoffs (reuse scan_all_handoffs logic but quieter)
     task_runs = [r for r in runs if r.run_type == "tool" and r.name == "task"]
@@ -1551,10 +1593,17 @@ def detect_issues(trace_id: str) -> list[dict]:
                 for msg in messages:
                     if isinstance(msg, dict):
                         content = msg.get("content", "")
-                        if isinstance(content, str) and any(kw in content.lower() for kw in [
-                            "provide the", "need the", "please provide",
-                            "storage_path", "image path", "file path"
-                        ]):
+                        if isinstance(content, str) and any(
+                            kw in content.lower()
+                            for kw in [
+                                "provide the",
+                                "need the",
+                                "please provide",
+                                "storage_path",
+                                "image path",
+                                "file path",
+                            ]
+                        ):
                             subagent = "unknown"
                             if task_run.inputs:
                                 # Try direct key first, then nested
@@ -1564,13 +1613,15 @@ def detect_issues(trace_id: str) -> list[dict]:
                                     if isinstance(task_input, dict):
                                         subagent = task_input.get("subagent_type", "unknown")
 
-                            issues.append({
-                                "type": "MISSING_CONTEXT",
-                                "severity": "HIGH",
-                                "node_id": str(task_run.id),
-                                "node_name": f"task({subagent})",
-                                "description": f"Child asked for missing context: {content}",
-                            })
+                            issues.append(
+                                {
+                                    "type": "MISSING_CONTEXT",
+                                    "severity": "HIGH",
+                                    "node_id": str(task_run.id),
+                                    "node_name": f"task({subagent})",
+                                    "description": f"Child asked for missing context: {content}",
+                                }
+                            )
                             break
 
     # Print summary
@@ -1593,6 +1644,6 @@ def detect_issues(trace_id: str) -> list[dict]:
             for i in medium:
                 print(f"  [{i['type']}] {i['node_name']}: {i['description']}")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
 
     return issues

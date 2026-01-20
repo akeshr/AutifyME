@@ -94,75 +94,145 @@ JPEG_QUALITY = 85
 GEMINI_3_IMAGE_MODEL = "gemini-3-pro-image-preview"
 
 # Tool system prompt - focused on execution, domain doctrine lives in protocols
-TOOL_SYSTEM_PROMPT = """Execute the creative direction with master-level precision.
+TOOL_SYSTEM_PROMPT = """You are a master product photographer and retoucher. Execute creative direction with precision.
 
-INPUT: You receive JSON specs + labeled images. Read ALL specs and apply them.
+INPUT: JSON specs + labeled images. Read ALL specs carefully before generating.
 
 === LABELED IMAGES ===
-Each image has a label indicating its ROLE:
+[source], [product] = THE ACTUAL PRODUCT - study carefully, this is your reference
+[style_ref], [mood_ref] = ATMOSPHERE REFERENCE - match lighting/mood, not the products shown
+[background] = Scene/environment to place product in
+[variant], [product_2] = Additional products for family/group shots
 
-[source], [product] = THE ACTUAL PRODUCT
-  - This IS your source material - work FROM this image
-  - Study it: shape, colors, textures, patterns, labels, artwork
-  - Output must be THIS SPECIFIC PRODUCT with improved presentation
+No source? Generate from specs description.
 
-[style_ref], [mood_ref] = ATMOSPHERE REFERENCE
-  - Match its lighting, color temperature, mood
-  - Copy the STYLE, not the specific products shown
+=== CORE PRINCIPLE: PRESERVE IDENTITY, FIX PHOTOGRAPHY ===
+Source images are often messy phone photos. Your job: PRESERVE product identity, FIX photography problems.
 
-[background] = Scene/environment reference
-[variant], [product_2] = Additional products for family shots
+PRESERVE (real product properties - these define what the product IS):
+- Material: transparency level, finish (matte/glossy/satin), texture, surface quality
+- Colors: actual product colors (ignore color cast from bad lighting)
+- Artwork: exact labels, logos, patterns, text - position, size, AND content
+- Shape: true proportions and silhouette (ignore lens distortion)
+- Features: caps, lids, handles, spouts, closures - all distinguishing elements
 
-KEY DISTINCTION:
-- Source provided? Output must be BASED ON that specific product
-- No source? Generate from description in specs
+FIX (photography problems - these are NOT product properties):
+- Bad lighting -> Professional studio lighting
+- Cluttered background -> Clean background per specs
+- Color cast -> True product colors
+- Blur/softness -> Tack sharp
+- Poor exposure -> Proper exposure
+- Harsh shadows -> Soft, natural shadows
 
-=== SPEC TYPES (apply what's provided) ===
+THE IDENTITY TEST: Would the product owner recognize THIS EXACT PRODUCT?
+- Same material feel (transparent stays transparent, matte stays matte)
+- Same colors (not "similar" - SAME)
+- Same artwork (exact labels, not "readable but different")
+- Same shape (exact silhouette, not "close enough")
 
-"extraction" = EXTRACT FROM SOURCE IMAGE
-  - target_description: Overall description of the task
-  - targets: Array of items to extract, each with specific bbox
-    * target_bbox: Precise coordinate targeting
-    * target_image_label: Label of the image containing this target
-  - Isolate the described item(s) from the provided source
-  - Source may be messy - your job is to isolate cleanly
-  - PRIORITY: Use bbox for targeting when available
+=== SPEC REFERENCE ===
 
-"fidelity" = PRODUCT IDENTITY PRESERVATION
-  - preserve_colors, preserve_artwork, preserve_shape, hero_features
-  - Balance: Preserve identity while improving presentation
+"extraction" - WHAT TO EXTRACT FROM SOURCE
+  target_description: Overall task description
+  targets[]: Array with target_bbox (coordinates) and target_image_label
+  -> Use bbox coordinates when provided for precise targeting
 
-"material_treatment" = MATERIAL-SPECIFIC RENDERING
-  - primary_material: Glass, metal, plastic, fabric, etc.
-  - Different materials need different light/reflection handling
+"fidelity" - IDENTITY PRESERVATION PRIORITIES
+  preserve_colors: Match source colors exactly (True) or specific instructions
+  preserve_artwork: Match labels/logos exactly - includes position and content
+  preserve_shape: Maintain exact proportions and silhouette
+  hero_features[]: Key features to emphasize (e.g., "blue cap", "transparency depth")
+  fidelity_notes: Additional identity requirements (e.g., "uniform transparency")
+  -> When fidelity is heavy, identity trumps all other considerations
 
-"scene" = LIFESTYLE ENVIRONMENT - Generate scene, place product
-"background" = BACKGROUND TREATMENT - solid, transparent, gradient
-"lighting" = LIGHT SETUP - type, direction, quality, shadows
-"composition" = FRAMING - coverage, position, camera_angle
-"enhancement" = POST-PROCESSING - sharpness, contrast, cleanup
-"placement" = PRODUCT POSITION in generated scene
-"focus" = DEPTH OF FIELD control
-"custom_spec" = CREATIVE ideas beyond standard specs
-"creative_direction" = FREE-FORM notes
+"material_treatment" - HOW TO RENDER THE MATERIAL
+  primary_material: "glossy PET", "matte plastic", "brushed metal", etc.
+  rendering_notes: Specific instructions (e.g., "uniform tint, no dark bands")
+  transparency: For transparent materials - clarity_percentage (90%+ sharp, 50% soft), tint, frost_percentage, wall_thickness_effect ("thick_darkens" needs "uniform tint" in notes), contents_state, contents_description
+  -> Material properties ARE identity - transparent must stay transparent
 
-=== QUALITY DIMENSIONS (balance appropriately) ===
+"background" - WHAT'S BEHIND THE PRODUCT
+  treatment: "solid_color", "transparent", "gradient", "scene"
+  color: Background color when solid
+  -> Choose contrast: dark product = light background, light product = gray (not white)
 
-- IDENTITY: Product recognizable (when source provided)
-- SHARPNESS: Crisp details, text/logos legible, edges precise
-- PHOTOREALISM: Contact shadows, grounding, believable light physics
-- CREATIVITY: Professional composition, optimal presentation
+"lighting" - HOW TO LIGHT THE SCENE
+  type: "studio_3point", "natural", "dramatic", "soft", "rim"
+  direction: Where key light comes from
+  quality: "soft" (diffused), "hard" (defined shadows)
+  shadows: Shadow treatment instructions
+  -> Lighting FIXES photography, doesn't change product identity
 
-The specs guide priority:
-- Heavy fidelity spec? Identity matters most
-- Scene/lifestyle specs? Environment creativity matters more
-- Minimal specs? Professional judgment
+"composition" - HOW TO FRAME THE SHOT
+  camera_angle: "eye-level", "slight_top", "overhead", "three-quarter"
+  product_coverage: Percentage of frame product fills (e.g., "80%")
+  position: Where in frame ("center", "left-third", "bottom-weighted")
+  -> For catalog: consistent angle across variants is critical
 
-=== OUTPUT STANDARDS ===
-- Sharp at 200% zoom
+"enhancement" - POST-PROCESSING
+  sharpness: "high", "moderate", "subtle"
+  contrast: Level of contrast adjustment
+  color_treatment: Any color grading
+  -> Enhancement FIXES photography quality, never changes product identity
+
+"focus" - DEPTH OF FIELD
+  type: "deep" (everything sharp), "shallow" (selective focus)
+  subject: What to keep sharp
+  -> Catalog = deep (all sharp), Lifestyle = can be shallow
+
+"scene" - LIFESTYLE ENVIRONMENT (when generating scenes)
+  environment: Scene description
+  mood: Atmosphere/feeling
+  -> Product identity preserved, scene is creative
+
+"placement" - WHERE PRODUCT GOES IN SCENE
+  position: Location in generated scene
+  -> Product must look naturally placed, grounded
+
+"output" - TECHNICAL SPECIFICATIONS
+  filename: Output path
+  aspect_ratio: "1:1", "4:5", "16:9", etc.
+  size: "1K", "2K"
+
+"custom_spec" / "creative_direction" - FREE-FORM NOTES
+  instruction: Any additional creative direction
+  -> Read carefully, may contain critical requirements
+
+=== WORK TYPE GUIDANCE ===
+
+CATALOG/HERO SHOTS (fidelity-heavy):
+- Identity is PARAMOUNT - owner must recognize exact product
+- All features sharp and legible at 200% zoom
+- Clean background, professional lighting
+- Contact shadow for grounding
+- Consistent style across variants
+
+LIFESTYLE/SCENE (scene-heavy):
+- Product identity still preserved
+- Creative freedom in environment
+- Product naturally integrated, not floating
+- Mood/atmosphere from style reference
+
+BATCH/VARIANTS:
+- Consistency across all outputs is critical
+- Same angle, framing, lighting direction
+- Same treatment of equivalent features
+
+=== QUALITY STANDARDS ===
+- Sharp at 200% zoom - labels fully legible
 - Professional studio quality
-- Products sit ON surfaces (contact shadows, not floating)
-- Source provided? Owner recognizes their exact product"""
+- Products grounded with contact shadows (not floating)
+- Clean edges, no artifacts or halos
+- Photorealistic - would a photographer believe this came from a real shoot?
+
+=== PITFALLS TO AVOID ===
+- Making transparent materials opaque (transparency IS identity)
+- Changing matte finish to glossy or vice versa (finish IS identity)
+- Generating "similar" labels instead of exact artwork (artwork IS identity)
+- Adding caustics/sheen when asked for "realistic" (causes artifacts)
+- Dark bands at bottle neck/base (use "uniform tint" when thick_darkens)
+- Floating products (always ground with shadow)
+- Inconsistent style across batch variants"""
 
 
 # =============================================================================
@@ -170,12 +240,28 @@ The specs guide priority:
 # =============================================================================
 
 
-def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatModel:
-    """Get Gemini 3 Pro Image LLM with proper configuration."""
+def _get_gemini3_image_llm(
+    output_spec: OutputSpec | None = None,
+    temperature: float | None = None,
+    seed: int | None = None,
+) -> BaseChatModel:
+    """Get Gemini 3 Pro Image LLM with proper configuration.
+
+    Args:
+        output_spec: Output specifications (aspect ratio, size)
+        temperature: Controls randomness. Default 0.7 for catalog consistency.
+            Lower (0.3-0.5) for batch variants. Higher (1.0+) for creative exploration.
+        seed: Seed for reproducibility (best-effort). Use same seed across batch.
+    """
     aspect_ratio = output_spec.aspect_ratio if output_spec else "1:1"
     if aspect_ratio == "original":
         aspect_ratio = "1:1"
     image_size = output_spec.size if output_spec else "1K"
+
+    # Default temperature 0.7 for catalog work - balanced consistency
+    # Override Gemini 3's default of 1.0 which causes high variance
+    effective_temperature = temperature if temperature is not None else 0.4
+    print(f"Using Gemini 3 Pro Image temperature: {effective_temperature}")
 
     return get_llm(
         provider="google",
@@ -183,6 +269,8 @@ def _get_gemini3_image_llm(output_spec: OutputSpec | None = None) -> BaseChatMod
         response_modalities=["TEXT", "IMAGE"],
         image_aspect_ratio=aspect_ratio,
         image_size=image_size,
+        temperature=1.2,
+        seed=seed,
     )
 
 
@@ -201,6 +289,7 @@ def _load_and_encode_image(image_path: str) -> tuple[str, str]:
     img: Image.Image
     if image_path.startswith(("http://", "https://")):
         import httpx
+
         response = httpx.get(image_path, timeout=60)
         response.raise_for_status()
         img = Image.open(io.BytesIO(response.content))
@@ -268,7 +357,11 @@ def _save_base64_image(
     # Use explicit filename if provided, otherwise generate unique name
     if output_spec.filename:
         # Sanitize filename (remove extension if accidentally included)
-        base_name = output_spec.filename.rsplit(".", 1)[0] if "." in output_spec.filename else output_spec.filename
+        base_name = (
+            output_spec.filename.rsplit(".", 1)[0]
+            if "." in output_spec.filename
+            else output_spec.filename
+        )
         filename = f"{base_name}.{extension}"
     else:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -308,6 +401,7 @@ def _save_base64_image(
             try:
                 asyncio.get_running_loop()
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(
                         asyncio.run,
@@ -316,7 +410,7 @@ def _save_base64_image(
                             thread_id=thread_id,
                             filename=filename,
                             content_type=content_type,
-                        )
+                        ),
                     )
                     upload_result = future.result()
             except RuntimeError:
@@ -331,7 +425,10 @@ def _save_base64_image(
 
             internal_path = upload_result["storage_path"]
             storage_path = to_user_path(internal_path)  # LLM sees clean path
-            logger.info("Uploaded to pending", extra={"user_path": storage_path, "internal_path": internal_path})
+            logger.info(
+                "Uploaded to pending",
+                extra={"user_path": storage_path, "internal_path": internal_path},
+            )
 
             # Surface versioning info to agent if duplicate was detected
             if upload_result.get("duplicate_detected"):
@@ -390,8 +487,7 @@ def _build_prompt(input_spec: ImageStudioInput) -> str:
     # Images with labels
     if input_spec.images:
         spec_dict["images"] = [
-            {"label": img.label, "index": i}
-            for i, img in enumerate(input_spec.images)
+            {"label": img.label, "index": i} for i, img in enumerate(input_spec.images)
         ]
 
     # Add each spec if present (exclude_none removes empty fields)
@@ -408,7 +504,9 @@ def _build_prompt(input_spec: ImageStudioInput) -> str:
     if input_spec.composition:
         spec_dict["composition"] = input_spec.composition.model_dump(exclude_none=True)
     if input_spec.material_treatment:
-        spec_dict["material_treatment"] = input_spec.material_treatment.model_dump(exclude_none=True)
+        spec_dict["material_treatment"] = input_spec.material_treatment.model_dump(
+            exclude_none=True
+        )
     if input_spec.fidelity:
         spec_dict["fidelity"] = input_spec.fidelity.model_dump(exclude_none=True)
     if input_spec.focus:
@@ -465,7 +563,11 @@ def _process_images(input_spec: ImageStudioInput) -> ImageStudioOutput:
             )
 
         # Create LLM and prompt
-        llm = _get_gemini3_image_llm(output_spec=input_spec.output)
+        llm = _get_gemini3_image_llm(
+            output_spec=input_spec.output,
+            temperature=input_spec.temperature,
+            seed=input_spec.seed,
+        )
         prompt = _build_prompt(input_spec)
 
         # Build content: prompt first, then labeled images in order
@@ -492,9 +594,7 @@ def _process_images(input_spec: ImageStudioInput) -> ImageStudioOutput:
             )
 
         # Save result (thread_id obtained from execution context inside _save_base64_image)
-        file_path, metadata, storage_path = _save_base64_image(
-            image_data, input_spec.output
-        )
+        file_path, metadata, storage_path = _save_base64_image(image_data, input_spec.output)
 
         output_variant = OutputVariant(
             variant="master",
@@ -542,6 +642,8 @@ def _image_studio_impl(
     custom_spec: dict[str, Any] | CustomSpec | None = None,
     creative_direction: str | None = None,
     output: dict[str, Any] | OutputSpec | None = None,
+    temperature: float | None = None,
+    seed: int | None = None,
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Image Studio tool implementation.
 
@@ -560,6 +662,9 @@ def _image_studio_impl(
         custom_spec: Fully open-ended creative spec for OOTB ideas
         creative_direction: Additional creative notes
         output: Output specs (format, size, aspect_ratio)
+        temperature: Controls randomness (0.0-2.0). Default 0.7 for catalog consistency.
+            Lower (0.3-0.5) for batch variants. Higher (1.0+) for creative exploration.
+        seed: Seed for reproducibility (best-effort). Use same seed across batch variants.
     """
     # Get thread_id from execution context (invisible to LLM)
     thread_id = get_thread_id()
@@ -569,7 +674,7 @@ def _image_studio_impl(
         extra={
             "thread_id": thread_id,
             "storage_configured": _storage_client is not None,
-        }
+        },
     )
 
     try:
@@ -607,6 +712,8 @@ def _image_studio_impl(
             custom_spec=_to_spec(custom_spec, CustomSpec),
             creative_direction=creative_direction,
             output=_to_spec(output, OutputSpec) or OutputSpec(),
+            temperature=temperature,
+            seed=seed,
         )
 
         result = _process_images(input_spec)
@@ -619,7 +726,9 @@ def _image_studio_impl(
                 "success": True,
                 "storage_path": output_variant.storage_path,
                 "local_path": output_variant.path,
-                "metadata": output_variant.metadata.model_dump() if output_variant.metadata else None,
+                "metadata": output_variant.metadata.model_dump()
+                if output_variant.metadata
+                else None,
                 "warnings": result.warnings,
             }
 
@@ -640,7 +749,9 @@ def _image_studio_impl(
                             else:
                                 new_height = max_dim
                                 new_width = int(width * (max_dim / height))
-                            output_img = output_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                            output_img = output_img.resize(
+                                (new_width, new_height), Image.Resampling.LANCZOS
+                            )
 
                         # Convert to RGB if needed (for JPEG encoding)
                         if output_img.mode in ("RGBA", "LA", "P"):
@@ -652,21 +763,21 @@ def _image_studio_impl(
                             output_img = rgb_img
 
                         buffer = io.BytesIO()
-                        output_img.save(buffer, format="JPEG", quality=90)  # Higher quality for verification
+                        output_img.save(
+                            buffer, format="JPEG", quality=90
+                        )  # Higher quality for verification
                         encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
                         data_uri = f"data:image/jpeg;base64,{encoded}"
 
                     # Return multimodal: structured data + visual image
                     import json
+
                     return [
                         {
                             "type": "text",
-                            "text": f"Image generated successfully.\n{json.dumps(structured_data, indent=2)}"
+                            "text": f"Image generated successfully.\n{json.dumps(structured_data, indent=2)}",
                         },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": data_uri}
-                        },
+                        {"type": "image_url", "image_url": {"url": data_uri}},
                     ]
             except Exception as img_err:
                 logger.warning(f"Could not load generated image for preview: {img_err}")

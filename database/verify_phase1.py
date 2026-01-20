@@ -14,11 +14,12 @@ from dotenv import load_dotenv
 project_root = Path(__file__).parent.parent
 load_dotenv(project_root / ".env")
 
+
 def verify_phase1():
     """Verify Phase 1 integration is working."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Phase 1 Integration Verification")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     try:
         import psycopg
@@ -49,13 +50,13 @@ def verify_phase1():
                 """)
                 tables = [row[0] for row in cur.fetchall()]
 
-                if 'workflow_outcomes' in tables:
+                if "workflow_outcomes" in tables:
                     print("   [OK] workflow_outcomes table exists")
                 else:
                     print("   [FAIL] workflow_outcomes table missing!")
                     return False
 
-                if 'routing_history' in tables:
+                if "routing_history" in tables:
                     print("   [OK] routing_history table exists")
                 else:
                     print("   [FAIL] routing_history table missing!")
@@ -73,7 +74,7 @@ def verify_phase1():
                 """)
                 views = [row[0] for row in cur.fetchall()]
 
-                expected_views = ['v_success_rates', 'v_recent_failures', 'v_edge_cases']
+                expected_views = ["v_success_rates", "v_recent_failures", "v_edge_cases"]
                 for view in expected_views:
                     if view in views:
                         print(f"   [OK] {view} view exists")
@@ -93,9 +94,15 @@ def verify_phase1():
                 columns = [row[0] for row in cur.fetchall()]
 
                 required_columns = [
-                    'id', 'tracking_id', 'thread_id', 'sender_id',
-                    'message_text', 'message_hash', 'success',
-                    'duration_seconds', 'created_at'
+                    "id",
+                    "tracking_id",
+                    "thread_id",
+                    "sender_id",
+                    "message_text",
+                    "message_hash",
+                    "success",
+                    "duration_seconds",
+                    "created_at",
                 ]
 
                 for col in required_columns:
@@ -130,9 +137,9 @@ def verify_phase1():
                 else:
                     print("   [INFO] No workflows tracked yet (run a test to generate data)")
 
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("Phase 1 Integration: VERIFIED")
-            print("="*60 + "\n")
+            print("=" * 60 + "\n")
             return True
 
     except psycopg.OperationalError as e:
@@ -143,6 +150,7 @@ def verify_phase1():
         print("\nERROR: Verification failed:")
         print(f"  {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

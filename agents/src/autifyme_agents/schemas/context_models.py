@@ -15,21 +15,13 @@ class CategoryNode(BaseModel):
     Used in PM base context for taxonomy awareness without loading full catalog.
     """
 
-    id: UUID = Field(
-        ...,
-        description="Unique identifier for this category"
-    )
-    name: str = Field(
-        ...,
-        description="Category name (e.g., 'Food & Beverage', 'Personal Care')"
-    )
+    id: UUID = Field(..., description="Unique identifier for this category")
+    name: str = Field(..., description="Category name (e.g., 'Food & Beverage', 'Personal Care')")
     parent_id: UUID | None = Field(
-        None,
-        description="Parent category ID (None for root categories)"
+        None, description="Parent category ID (None for root categories)"
     )
     children: list["CategoryNode"] = Field(
-        default_factory=list,
-        description="Child categories (empty for leaf nodes)"
+        default_factory=list, description="Child categories (empty for leaf nodes)"
     )
 
     model_config = ConfigDict(from_attributes=True)
@@ -43,17 +35,12 @@ class TaxonomyTree(BaseModel):
     """
 
     root_categories: list[CategoryNode] = Field(
-        ...,
-        description="Top-level categories (e.g., Food & Beverage, Personal Care)"
+        ..., description="Top-level categories (e.g., Food & Beverage, Personal Care)"
     )
     total_categories: int = Field(
-        ...,
-        description="Total number of categories in tree (for context)"
+        ..., description="Total number of categories in tree (for context)"
     )
-    last_updated: datetime = Field(
-        ...,
-        description="When taxonomy tree was last loaded from DB"
-    )
+    last_updated: datetime = Field(..., description="When taxonomy tree was last loaded from DB")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -70,25 +57,16 @@ class CatalogSummary(BaseModel):
     Token cost: ~500-1000 tokens for 100 product families
     """
 
-    total_families: int = Field(
-        ...,
-        description="Total number of product families in catalog"
-    )
-    total_skus: int = Field(
-        ...,
-        description="Total number of individual product SKUs"
-    )
+    total_families: int = Field(..., description="Total number of product families in catalog")
+    total_skus: int = Field(..., description="Total number of individual product SKUs")
     family_names: list[str] = Field(
-        ...,
-        description="List of product family names (just names, not full data)"
+        ..., description="List of product family names (just names, not full data)"
     )
     top_categories: list[str] = Field(
-        default_factory=list,
-        description="Most common product categories in catalog"
+        default_factory=list, description="Most common product categories in catalog"
     )
     last_updated: datetime = Field(
-        ...,
-        description="When catalog summary was last refreshed from DB"
+        ..., description="When catalog summary was last refreshed from DB"
     )
 
     model_config = ConfigDict(from_attributes=True)
@@ -103,27 +81,26 @@ class CompanyPatterns(BaseModel):
 
     primary_workflow: str = Field(
         default="catalog",
-        description="Most common workflow type: 'catalog', 'marketing', 'operations'"
+        description="Most common workflow type: 'catalog', 'marketing', 'operations'",
     )
     typical_price_range: tuple[float, float] = Field(
         default=(0.0, 1000.0),
-        description="Common price range (min, max) for products in this company"
+        description="Common price range (min, max) for products in this company",
     )
     common_product_types: list[str] = Field(
         default_factory=list,
-        description="Most common product types: ['FINISHED_GOOD', 'RAW_MATERIAL', etc.]"
+        description="Most common product types: ['FINISHED_GOOD', 'RAW_MATERIAL', etc.]",
     )
     naming_conventions: dict[str, str] = Field(
         default_factory=dict,
-        description="Observed naming patterns, e.g., {'sku_pattern': 'FAMILY-SIZE-VARIANT'}"
+        description="Observed naming patterns, e.g., {'sku_pattern': 'FAMILY-SIZE-VARIANT'}",
     )
     recent_actions: list[str] = Field(
-        default_factory=list,
-        description="Recent user actions for pattern inference (last 10)"
+        default_factory=list, description="Recent user actions for pattern inference (last 10)"
     )
     last_analyzed: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        description="When patterns were last analyzed from catalog"
+        description="When patterns were last analyzed from catalog",
     )
 
     model_config = ConfigDict(from_attributes=True)
@@ -151,28 +128,23 @@ class PMBaseContext(BaseModel):
     """
 
     company_profile: CompanyProfile = Field(
-        ...,
-        description="Company profile with brand voice, target audience, capabilities"
+        ..., description="Company profile with brand voice, target audience, capabilities"
     )
     catalog_summary: CatalogSummary = Field(
-        ...,
-        description="Lightweight catalog statistics and family names"
+        ..., description="Lightweight catalog statistics and family names"
     )
-    taxonomy_tree: TaxonomyTree = Field(
-        ...,
-        description="Hierarchical category structure"
-    )
+    taxonomy_tree: TaxonomyTree = Field(..., description="Hierarchical category structure")
     company_patterns: CompanyPatterns = Field(
         default_factory=CompanyPatterns,
-        description="Common patterns for cold-start handling and intent inference"
+        description="Common patterns for cold-start handling and intent inference",
     )
     recent_activity: list[str] = Field(
         default_factory=list,
-        description="Recent user activities for context (FUTURE - not implemented yet)"
+        description="Recent user activities for context (FUTURE - not implemented yet)",
     )
     loaded_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        description="When this context object was created"
+        description="When this context object was created",
     )
 
     model_config = ConfigDict(from_attributes=True)

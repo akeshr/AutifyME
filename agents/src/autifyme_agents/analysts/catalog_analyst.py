@@ -104,8 +104,12 @@ def create_catalog_analyst(
         currency_symbol=company_profile.currency_symbol,
         default_currency=company_profile.default_currency,
         price_positioning=company_profile.price_positioning,
-        business_models=", ".join(company_profile.business_models) if company_profile.business_models else "B2B",
-        target_markets=", ".join(company_profile.target_markets) if company_profile.target_markets else "India",
+        business_models=", ".join(company_profile.business_models)
+        if company_profile.business_models
+        else "B2B",
+        target_markets=", ".join(company_profile.target_markets)
+        if company_profile.target_markets
+        else "India",
     )
 
     description = (

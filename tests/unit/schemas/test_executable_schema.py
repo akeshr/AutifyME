@@ -110,9 +110,7 @@ class TestValidateBeforeInsert:
         assert len(result.errors) == 0
         assert len(result.warnings) == 0
 
-    async def test_unique_constraint_passes_with_new_values(
-        self, simple_table, fake_storage
-    ):
+    async def test_unique_constraint_passes_with_new_values(self, simple_table, fake_storage):
         """New unique values should pass validation."""
         entities = [
             {"email": "user1@test.com", "username": "user1", "name": "User 1"},
@@ -124,9 +122,7 @@ class TestValidateBeforeInsert:
         assert result.valid
         assert len(result.errors) == 0
 
-    async def test_unique_constraint_fails_with_duplicate_in_db(
-        self, simple_table, fake_storage
-    ):
+    async def test_unique_constraint_fails_with_duplicate_in_db(self, simple_table, fake_storage):
         """Duplicate values already in DB should fail validation."""
         # Seed database with existing record
         fake_storage.tables["test_table"] = [
@@ -139,9 +135,7 @@ class TestValidateBeforeInsert:
         ]
 
         # Try to insert duplicate email
-        entities = [
-            {"email": "existing@test.com", "username": "new_user", "name": "New User"}
-        ]
+        entities = [{"email": "existing@test.com", "username": "new_user", "name": "New User"}]
 
         result = await simple_table.validate_before_insert(entities, fake_storage)
 
@@ -149,9 +143,7 @@ class TestValidateBeforeInsert:
         assert len(result.errors) > 0
         assert "existing@test.com" in str(result.errors)
 
-    async def test_multiple_unique_columns_all_validated(
-        self, simple_table, fake_storage
-    ):
+    async def test_multiple_unique_columns_all_validated(self, simple_table, fake_storage):
         """All unique columns should be validated."""
         # Seed with existing data
         fake_storage.tables["test_table"] = [
@@ -173,9 +165,7 @@ class TestValidateBeforeInsert:
         result = await simple_table.validate_before_insert(entities, fake_storage)
         assert not result.valid
 
-    async def test_entities_with_null_unique_values_are_skipped(
-        self, simple_table, fake_storage
-    ):
+    async def test_entities_with_null_unique_values_are_skipped(self, simple_table, fake_storage):
         """Entities with null values for unique columns should be skipped."""
         entities = [
             {"email": "user1@test.com", "username": None, "name": "User 1"},
@@ -203,10 +193,9 @@ class TestValidateBeforeInsert:
         assert result.valid
         assert len(result.errors) == 0
 
-    async def test_storage_error_returns_warning_not_failure(
-        self, simple_table, fake_storage
-    ):
+    async def test_storage_error_returns_warning_not_failure(self, simple_table, fake_storage):
         """Storage errors should return warnings, not fail validation."""
+
         # Force storage error by making check_existing_values raise
         class FailingStorage(FakeStorage):
             async def check_existing_values(self, table, column, values):
@@ -293,9 +282,7 @@ class TestValidateBeforeUpdate:
 
         assert result.valid
 
-    async def test_update_unique_field_to_existing_value_fails(
-        self, simple_table, fake_storage
-    ):
+    async def test_update_unique_field_to_existing_value_fails(self, simple_table, fake_storage):
         """Updating unique field to existing value should fail."""
         # Seed with existing data
         fake_storage.tables["test_table"] = [
@@ -317,9 +304,7 @@ class TestValidateBeforeUpdate:
         assert not result.valid
         assert "existing@test.com" in str(result.errors)
 
-    async def test_update_unique_field_to_new_value_passes(
-        self, simple_table, fake_storage
-    ):
+    async def test_update_unique_field_to_new_value_passes(self, simple_table, fake_storage):
         """Updating unique field to new value should pass."""
         result = await simple_table.validate_before_update(
             filters={"id": str(uuid.uuid4())},
@@ -329,9 +314,7 @@ class TestValidateBeforeUpdate:
 
         assert result.valid
 
-    async def test_update_with_null_unique_value_skipped(
-        self, simple_table, fake_storage
-    ):
+    async def test_update_with_null_unique_value_skipped(self, simple_table, fake_storage):
         """Updating unique field to null should be skipped."""
         result = await simple_table.validate_before_update(
             filters={"id": str(uuid.uuid4())},
@@ -341,9 +324,7 @@ class TestValidateBeforeUpdate:
 
         assert result.valid
 
-    async def test_idempotent_update_to_same_value_passes(
-        self, simple_table, fake_storage
-    ):
+    async def test_idempotent_update_to_same_value_passes(self, simple_table, fake_storage):
         """Idempotent update: updating record to same unique value it already has should pass.
 
         This tests the critical fix for Issue #2 - exclude_ids prevents self-collision.
@@ -380,9 +361,7 @@ class TestValidateBeforeUpdate:
 class TestCalculateCascadeImpact:
     """Test suite for TableSchema.calculate_cascade_impact()."""
 
-    async def test_cascade_impact_with_no_children(
-        self, schema_registry, fake_storage
-    ):
+    async def test_cascade_impact_with_no_children(self, schema_registry, fake_storage):
         """Deleting record with no children should show single table impact."""
         product_families = schema_registry.get_table("product_families")
         family_id = str(uuid.uuid4())
@@ -493,11 +472,7 @@ class TestCalculateCascadeImpact:
 class TestPropertyBased:
     """Property-based tests using Hypothesis for validation invariants."""
 
-    @given(
-        emails=st.lists(
-            st.emails(), min_size=1, max_size=20, unique=True
-        )
-    )
+    @given(emails=st.lists(st.emails(), min_size=1, max_size=20, unique=True))
     @settings(max_examples=50, deadline=5000)
     async def test_property_unique_emails_always_pass(self, emails):
         """Property: Unique emails should always pass validation."""
@@ -505,9 +480,15 @@ class TestPropertyBased:
         table = TableSchema(
             name="test_table",
             columns={
-                "id": ColumnSchema(name="id", type=ColumnType.UUID, primary_key=True, nullable=False),
-                "email": ColumnSchema(name="email", type=ColumnType.VARCHAR, unique=True, nullable=False),
-                "username": ColumnSchema(name="username", type=ColumnType.VARCHAR, unique=True, nullable=False),
+                "id": ColumnSchema(
+                    name="id", type=ColumnType.UUID, primary_key=True, nullable=False
+                ),
+                "email": ColumnSchema(
+                    name="email", type=ColumnType.VARCHAR, unique=True, nullable=False
+                ),
+                "username": ColumnSchema(
+                    name="username", type=ColumnType.VARCHAR, unique=True, nullable=False
+                ),
                 "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False),
             },
             primary_key="id",
@@ -532,9 +513,15 @@ class TestPropertyBased:
         table = TableSchema(
             name="test_table",
             columns={
-                "id": ColumnSchema(name="id", type=ColumnType.UUID, primary_key=True, nullable=False),
-                "email": ColumnSchema(name="email", type=ColumnType.VARCHAR, unique=True, nullable=False),
-                "username": ColumnSchema(name="username", type=ColumnType.VARCHAR, unique=True, nullable=False),
+                "id": ColumnSchema(
+                    name="id", type=ColumnType.UUID, primary_key=True, nullable=False
+                ),
+                "email": ColumnSchema(
+                    name="email", type=ColumnType.VARCHAR, unique=True, nullable=False
+                ),
+                "username": ColumnSchema(
+                    name="username", type=ColumnType.VARCHAR, unique=True, nullable=False
+                ),
                 "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False),
             },
             primary_key="id",
@@ -569,9 +556,15 @@ class TestPropertyBased:
         table = TableSchema(
             name="test_table",
             columns={
-                "id": ColumnSchema(name="id", type=ColumnType.UUID, primary_key=True, nullable=False),
-                "email": ColumnSchema(name="email", type=ColumnType.VARCHAR, unique=True, nullable=False),
-                "username": ColumnSchema(name="username", type=ColumnType.VARCHAR, unique=True, nullable=False),
+                "id": ColumnSchema(
+                    name="id", type=ColumnType.UUID, primary_key=True, nullable=False
+                ),
+                "email": ColumnSchema(
+                    name="email", type=ColumnType.VARCHAR, unique=True, nullable=False
+                ),
+                "username": ColumnSchema(
+                    name="username", type=ColumnType.VARCHAR, unique=True, nullable=False
+                ),
                 "name": ColumnSchema(name="name", type=ColumnType.VARCHAR, nullable=False),
             },
             primary_key="id",
@@ -604,9 +597,7 @@ class TestPropertyBased:
 class TestEdgeCases:
     """Edge case coverage for production robustness."""
 
-    async def test_validation_with_missing_table_in_storage(
-        self, simple_table, fake_storage
-    ):
+    async def test_validation_with_missing_table_in_storage(self, simple_table, fake_storage):
         """Missing table in storage should return warning."""
         # Don't create test_table in fake_storage
         entities = [{"email": "test@test.com", "username": "test", "name": "Test"}]
@@ -616,9 +607,7 @@ class TestEdgeCases:
         # Should gracefully handle (empty table = no duplicates)
         assert result.valid
 
-    async def test_validation_with_special_characters_in_values(
-        self, simple_table, fake_storage
-    ):
+    async def test_validation_with_special_characters_in_values(self, simple_table, fake_storage):
         """Special characters in values should be handled correctly."""
         entities = [
             {
@@ -646,9 +635,7 @@ class TestEdgeCases:
 
         assert result.valid
 
-    async def test_validation_with_unicode_characters(
-        self, simple_table, fake_storage
-    ):
+    async def test_validation_with_unicode_characters(self, simple_table, fake_storage):
         """Unicode characters should be handled correctly."""
         entities = [
             {
@@ -670,9 +657,7 @@ class TestEdgeCases:
                 "id": ColumnSchema(
                     name="id", type=ColumnType.UUID, primary_key=True, nullable=False
                 ),
-                "value": ColumnSchema(
-                    name="value", type=ColumnType.VARCHAR, nullable=False
-                ),
+                "value": ColumnSchema(name="value", type=ColumnType.VARCHAR, nullable=False),
             },
             primary_key="id",
         )
@@ -695,9 +680,7 @@ class TestOldVsNewComparison:
     These tests ensure behavior parity before removing old handlers.
     """
 
-    async def test_schema_validation_detects_duplicate_sku(
-        self, products_table, fake_storage
-    ):
+    async def test_schema_validation_detects_duplicate_sku(self, products_table, fake_storage):
         """Verify schema validation detects duplicate SKU (core requirement)."""
         family_id = str(uuid.uuid4())
 
@@ -738,9 +721,7 @@ class TestOldVsNewComparison:
         ]
 
         # Test new schema method detects duplicate
-        schema_result = await products_table.validate_before_insert(
-            entities, fake_storage
-        )
+        schema_result = await products_table.validate_before_insert(entities, fake_storage)
 
         # Should fail for duplicate SKU
         assert not schema_result.valid
@@ -755,9 +736,7 @@ class TestOldVsNewComparison:
 class TestPerformance:
     """Performance benchmarks to ensure no regressions."""
 
-    async def test_validation_performance_100_entities(
-        self, simple_table, fake_storage
-    ):
+    async def test_validation_performance_100_entities(self, simple_table, fake_storage):
         """Validate 100 entities should complete in <100ms."""
         import time
 
@@ -777,9 +756,7 @@ class TestPerformance:
         assert result.valid
         assert duration < 100, f"Validation took {duration}ms, expected <100ms"
 
-    async def test_validation_performance_50_entities(
-        self, products_table, fake_storage
-    ):
+    async def test_validation_performance_50_entities(self, products_table, fake_storage):
         """Validate 50 entities should complete in <50ms."""
         import time
 

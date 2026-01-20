@@ -1,6 +1,5 @@
 """Unit tests for Rich Output validation utilities."""
 
-
 from autifyme_agents.tools.rich_output.utils.validation import (
     validate_html_structure,
     validate_image_url,
@@ -12,7 +11,7 @@ class TestHtmlStructureValidation:
 
     def test_valid_html_passes(self):
         """Valid HTML structure passes validation."""
-        html = '''<!DOCTYPE html>
+        html = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <title>Test</title>
@@ -20,7 +19,7 @@ class TestHtmlStructureValidation:
 <body>
     <p>Content</p>
 </body>
-</html>'''
+</html>"""
         is_valid, error = validate_html_structure(html)
 
         assert is_valid is True
@@ -28,7 +27,7 @@ class TestHtmlStructureValidation:
 
     def test_missing_doctype_fails(self):
         """Missing DOCTYPE fails validation."""
-        html = '<html><head><title>Test</title></head><body></body></html>'
+        html = "<html><head><title>Test</title></head><body></body></html>"
         is_valid, error = validate_html_structure(html)
 
         assert is_valid is False
@@ -36,7 +35,7 @@ class TestHtmlStructureValidation:
 
     def test_missing_closing_html_fails(self):
         """Missing closing </html> fails validation."""
-        html = '<!DOCTYPE html><html><head><title>Test</title></head><body>'
+        html = "<!DOCTYPE html><html><head><title>Test</title></head><body>"
         is_valid, error = validate_html_structure(html)
 
         assert is_valid is False
@@ -44,7 +43,7 @@ class TestHtmlStructureValidation:
 
     def test_missing_head_fails(self):
         """Missing <head> fails validation."""
-        html = '<!DOCTYPE html><html><title>Test</title><body></body></html>'
+        html = "<!DOCTYPE html><html><title>Test</title><body></body></html>"
         is_valid, error = validate_html_structure(html)
 
         assert is_valid is False
@@ -52,7 +51,7 @@ class TestHtmlStructureValidation:
 
     def test_missing_body_fails(self):
         """Missing <body> fails validation."""
-        html = '<!DOCTYPE html><html><head><title>Test</title></head></html>'
+        html = "<!DOCTYPE html><html><head><title>Test</title></head></html>"
         is_valid, error = validate_html_structure(html)
 
         assert is_valid is False
@@ -60,7 +59,7 @@ class TestHtmlStructureValidation:
 
     def test_missing_title_fails(self):
         """Missing <title> fails validation."""
-        html = '<!DOCTYPE html><html><head></head><body></body></html>'
+        html = "<!DOCTYPE html><html><head></head><body></body></html>"
         is_valid, error = validate_html_structure(html)
 
         assert is_valid is False
@@ -68,15 +67,15 @@ class TestHtmlStructureValidation:
 
     def test_handles_whitespace(self):
         """Leading/trailing whitespace is handled."""
-        html = '''   <!DOCTYPE html>
-<html><head><title>Test</title></head><body></body></html>   '''
+        html = """   <!DOCTYPE html>
+<html><head><title>Test</title></head><body></body></html>   """
         is_valid, error = validate_html_structure(html)
 
         assert is_valid is True
 
     def test_case_insensitive(self):
         """Validation is case-insensitive."""
-        html = '<!doctype HTML><HTML><HEAD><TITLE>Test</TITLE></HEAD><BODY></BODY></HTML>'
+        html = "<!doctype HTML><HTML><HEAD><TITLE>Test</TITLE></HEAD><BODY></BODY></HTML>"
         is_valid, error = validate_html_structure(html)
 
         assert is_valid is True

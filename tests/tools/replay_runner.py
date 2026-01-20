@@ -323,9 +323,9 @@ def format_batch_summary(results: list[ReplayResult]) -> str:
     total_cost = sum(r.cost for r in results)
 
     lines = [
-        f"\n{'='*60}",
+        f"\n{'=' * 60}",
         "REPLAY BATCH SUMMARY",
-        f"{'='*60}",
+        f"{'=' * 60}",
         "",
         f"Execution: {successful}/{total} successful",
         "",
@@ -340,7 +340,7 @@ def format_batch_summary(results: list[ReplayResult]) -> str:
         f"  Improvements: {improvements}",
         "",
         "Performance:",
-        f"  Avg Latency: {avg_latency/1000:.1f}s",
+        f"  Avg Latency: {avg_latency / 1000:.1f}s",
         f"  Total Cost:  ${total_cost:.4f}",
     ]
 
@@ -352,7 +352,7 @@ def format_batch_summary(results: list[ReplayResult]) -> str:
             if r.is_regression:
                 lines.append(f"  - {r.scenario_id}: {r.graders_failed}")
 
-    lines.append(f"{'='*60}")
+    lines.append(f"{'=' * 60}")
 
     return "\n".join(lines)
 

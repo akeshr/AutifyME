@@ -22,9 +22,9 @@ class Product(BaseModel):
 
     The `id` field is None for drafts and populated by the database on INSERT.
     """
+
     id: UUID | None = Field(
-        default=None,
-        description="The unique identifier for the product (database-generated)."
+        default=None, description="The unique identifier for the product (database-generated)."
     )
     name: str | None = Field(None, description="The name of the product.")
     description: str | None = Field(None, description="A detailed description of the product.")
@@ -33,7 +33,7 @@ class Product(BaseModel):
     colors: list[str] | None = Field(default_factory=list, description="Available colors.")
     image_urls: list[str] | None = Field(default_factory=list, description="Product image URLs.")
 
-    @field_validator('id', mode='before')
+    @field_validator("id", mode="before")
     @classmethod
     def validate_id(cls, v: Any) -> UUID | None:
         """
@@ -65,25 +65,16 @@ class SKUNamingConvention(BaseModel):
 
     Maps to: companies.brand_attributes.sku_naming in database.
     """
-    prefix: str = Field(
-        ...,
-        description="SKU prefix (e.g., 'PAV' for Pavisha)"
-    )
+
+    prefix: str = Field(..., description="SKU prefix (e.g., 'PAV' for Pavisha)")
     pattern: str = Field(
-        ...,
-        description="SKU pattern template (e.g., 'PREFIX-CATEGORY-SIZE-VARIANT')"
+        ..., description="SKU pattern template (e.g., 'PREFIX-CATEGORY-SIZE-VARIANT')"
     )
-    separator: str = Field(
-        default="-",
-        description="Character used to separate SKU components"
-    )
-    uppercase: bool = Field(
-        default=True,
-        description="Whether SKUs should be uppercase"
-    )
+    separator: str = Field(default="-", description="Character used to separate SKU components")
+    uppercase: bool = Field(default=True, description="Whether SKUs should be uppercase")
     examples: list[str] = Field(
         default_factory=list,
-        description="Example SKUs following this convention (e.g., ['PAV-BTL-500ML-CLR', 'PAV-JAR-1L-AMB'])"
+        description="Example SKUs following this convention (e.g., ['PAV-BTL-500ML-CLR', 'PAV-JAR-1L-AMB'])",
     )
 
     model_config = ConfigDict(from_attributes=True)
@@ -96,6 +87,7 @@ class WorkflowOutcome(BaseModel):
     Schema matches database: database/migrations/001_workflow_outcomes.sql
     Used by outcome tracking middleware to record workflow execution results.
     """
+
     # Required identifiers (NOT NULL in DB)
     tracking_id: str = Field(..., description="Unique identifier for this outcome")
     thread_id: str = Field(..., description="LangGraph thread ID")
@@ -144,24 +136,15 @@ class VisualIdentity(BaseModel):
     """Brand visual identity for consistent creative output."""
 
     primary_color: str = Field(
-        default="#d32f2f",
-        description="Primary brand color in hex (e.g., '#d32f2f')"
+        default="#d32f2f", description="Primary brand color in hex (e.g., '#d32f2f')"
     )
-    secondary_color: str = Field(
-        default="#000000",
-        description="Secondary brand color in hex"
-    )
-    accent_color: str | None = Field(
-        default=None,
-        description="Accent color for highlights"
-    )
+    secondary_color: str = Field(default="#000000", description="Secondary brand color in hex")
+    accent_color: str | None = Field(default=None, description="Accent color for highlights")
     font_family: str = Field(
-        default="sans-serif",
-        description="Primary font family (e.g., 'Inter', 'sans-serif')"
+        default="sans-serif", description="Primary font family (e.g., 'Inter', 'sans-serif')"
     )
     logo_asset_path: str | None = Field(
-        default=None,
-        description="Storage path to company logo (e.g., 'brands/logo.png')"
+        default=None, description="Storage path to company logo (e.g., 'brands/logo.png')"
     )
 
     model_config = ConfigDict(from_attributes=True)
@@ -177,6 +160,7 @@ class CompanyProfile(BaseModel):
     Loaded from: companies + company_intelligence tables
     Injected into: PM (full), Specialists (formatted prompts), Analysts (minimal)
     """
+
     # Core identification
     id: str = Field(..., description="Unique identifier for the company.")
     name: str = Field(..., description="The company's business name.")
@@ -187,43 +171,31 @@ class CompanyProfile(BaseModel):
 
     # Business context (from company_intelligence)
     business_models: list[str] = Field(
-        default_factory=list,
-        description="Business models: B2B, B2C, D2C"
+        default_factory=list, description="Business models: B2B, B2C, D2C"
     )
     target_markets: list[str] = Field(
-        default_factory=list,
-        description="Target markets: India, South Asia, etc."
+        default_factory=list, description="Target markets: India, South Asia, etc."
     )
     price_positioning: str = Field(
-        default="mid-range",
-        description="Price positioning: budget, mid-range, premium"
+        default="mid-range", description="Price positioning: budget, mid-range, premium"
     )
 
     # SKU Naming Conventions (for Catalog Specialist)
     sku_naming_convention: SKUNamingConvention | None = Field(
-        None,
-        description="Company-specific SKU naming rules for autonomous pattern generation"
+        None, description="Company-specific SKU naming rules for autonomous pattern generation"
     )
 
     # Visual Identity (for Creative Specialist)
     visual_identity: VisualIdentity = Field(
-        default_factory=VisualIdentity,
-        description="Brand visual identity for creative output"
+        default_factory=VisualIdentity, description="Brand visual identity for creative output"
     )
 
     # Pricing defaults (for Catalog Specialist)
-    default_currency: str = Field(
-        default="INR",
-        description="Default currency (ISO 4217)"
-    )
+    default_currency: str = Field(default="INR", description="Default currency (ISO 4217)")
     currency_symbol: str = Field(
-        default="₹",
-        description="Currency symbol for display (e.g., ₹, $)"
+        default="₹", description="Currency symbol for display (e.g., ₹, $)"
     )
-    default_price_list_id: str | None = Field(
-        None,
-        description="Default retail price list UUID"
-    )
+    default_price_list_id: str | None = Field(None, description="Default retail price list UUID")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -242,8 +214,12 @@ class CatalogingResult(BaseModel):
     stage: Literal["draft", "awaiting_approval", "saved", "failed"] = Field(
         ..., description="Current lifecycle stage for the cataloging workflow."
     )
-    success: bool = Field(..., description="Whether the cataloging operation succeeded for this stage.")
-    product_id: UUID | None = Field(None, description="The UUID of the cataloged product if available.")
+    success: bool = Field(
+        ..., description="Whether the cataloging operation succeeded for this stage."
+    )
+    product_id: UUID | None = Field(
+        None, description="The UUID of the cataloged product if available."
+    )
     product_name: str | None = Field(None, description="The name of the cataloged product.")
     message: str = Field(..., description="Human-readable summary of what happened.")
     data: dict[str, Any] | None = Field(
@@ -269,27 +245,21 @@ class ProductFamily(BaseModel):
     Maps to: product_families table in database.
     """
 
-    id: UUID | None = Field(
-        default=None,
-        description="The unique identifier (database-generated)."
-    )
+    id: UUID | None = Field(default=None, description="The unique identifier (database-generated).")
     company_id: str | None = Field(
         default=None,
-        description="Company identifier (optional for single-tenant, required in database)."
+        description="Company identifier (optional for single-tenant, required in database).",
     )
     category_id: UUID | None = Field(
-        default=None,
-        description="Category this product family belongs to."
+        default=None, description="Category this product family belongs to."
     )
 
     # Core identifiers
     product_group_id: str = Field(
-        ...,
-        description="Unique identifier for schema.org ProductGroup (e.g., 'PAV-BTL-500')."
+        ..., description="Unique identifier for schema.org ProductGroup (e.g., 'PAV-BTL-500')."
     )
     sku_prefix: str = Field(
-        ...,
-        description="Prefix for variant SKUs (e.g., 'PAV-BTL' generates 'PAV-BTL-500ML-CLR')."
+        ..., description="Prefix for variant SKUs (e.g., 'PAV-BTL' generates 'PAV-BTL-500ML-CLR')."
     )
 
     # Basic info
@@ -300,65 +270,54 @@ class ProductFamily(BaseModel):
     # Tags and categorization
     tags: list[str] = Field(
         default_factory=list,
-        description="Search tags for discovery (e.g., ['food-grade', 'BPA-free'])."
+        description="Search tags for discovery (e.g., ['food-grade', 'BPA-free']).",
     )
     google_product_category: str | None = Field(
-        default=None,
-        description="Google Product Category taxonomy ID for Google Shopping feeds."
+        default=None, description="Google Product Category taxonomy ID for Google Shopping feeds."
     )
 
     # Pricing (base price for all variants, can be overridden per variant)
     base_price: Decimal = Field(
-        ...,
-        description="Base price in price_currency (variants may add price_adjustment)."
+        ..., description="Base price in price_currency (variants may add price_adjustment)."
     )
     price_currency: str = Field(
-        default="INR",
-        description="ISO 4217 currency code (e.g., 'INR', 'USD')."
+        default="INR", description="ISO 4217 currency code (e.g., 'INR', 'USD')."
     )
 
     # Shared attributes across all variants
     material: str | None = Field(
-        default=None,
-        description="Primary material (e.g., 'Virgin PET Resin', 'Cotton')."
+        default=None, description="Primary material (e.g., 'Virgin PET Resin', 'Cotton')."
     )
     condition: Literal["new", "refurbished", "used"] = Field(
-        default="new",
-        description="Product condition."
+        default="new", description="Product condition."
     )
 
     # Extensible attributes (JSONB in database)
     custom_attributes: dict[str, Any] = Field(
         default_factory=dict,
-        description="Extensible key-value attributes (e.g., {'weight_g': 22, 'certifications': ['IS:12252', 'FSSAI']})."
+        description="Extensible key-value attributes (e.g., {'weight_g': 22, 'certifications': ['IS:12252', 'FSSAI']}).",
     )
 
     # Lifecycle management
     lifecycle_stage: Literal["new_arrival", "regular", "clearance", "discontinued"] = Field(
-        default="regular",
-        description="Product lifecycle stage for marketing and inventory."
+        default="regular", description="Product lifecycle stage for marketing and inventory."
     )
 
     # Metadata
     is_active: bool = Field(
-        default=True,
-        description="Whether this product family is active and available."
+        default=True, description="Whether this product family is active and available."
     )
     created_at: datetime | None = Field(
-        default=None,
-        description="Creation timestamp (database-generated)."
+        default=None, description="Creation timestamp (database-generated)."
     )
     updated_at: datetime | None = Field(
-        default=None,
-        description="Last update timestamp (database-generated)."
+        default=None, description="Last update timestamp (database-generated)."
     )
     created_by: str | None = Field(
-        default=None,
-        description="User who created this record (for audit trail)."
+        default=None, description="User who created this record (for audit trail)."
     )
     updated_by: str | None = Field(
-        default=None,
-        description="User who last updated this record (for audit trail)."
+        default=None, description="User who last updated this record (for audit trail)."
     )
 
     model_config = ConfigDict(from_attributes=True)
@@ -377,32 +336,23 @@ class VariantAxis(BaseModel):
     Maps to: variant_axes table in database.
     """
 
-    id: UUID | None = Field(
-        default=None,
-        description="The unique identifier (database-generated)."
-    )
-    product_family_id: UUID = Field(
-        ...,
-        description="The product family this axis belongs to."
-    )
+    id: UUID | None = Field(default=None, description="The unique identifier (database-generated).")
+    product_family_id: UUID = Field(..., description="The product family this axis belongs to.")
 
     name: str = Field(
         ...,
-        description="Internal axis name (lowercase, underscores: 'size', 'color', 'neck_finish')."
+        description="Internal axis name (lowercase, underscores: 'size', 'color', 'neck_finish').",
     )
     display_label: str = Field(
-        ...,
-        description="Human-readable label for UI (e.g., 'Size', 'Color', 'Neck Finish')."
+        ..., description="Human-readable label for UI (e.g., 'Size', 'Color', 'Neck Finish')."
     )
     sort_order: int = Field(
-        default=0,
-        description="Display order in UI (lower numbers appear first)."
+        default=0, description="Display order in UI (lower numbers appear first)."
     )
 
     # Schema.org mapping (optional)
     schema_property: str | None = Field(
-        default=None,
-        description="Schema.org property URL (e.g., 'https://schema.org/color')."
+        default=None, description="Schema.org property URL (e.g., 'https://schema.org/color')."
     )
 
     model_config = ConfigDict(from_attributes=True)
@@ -419,57 +369,39 @@ class VariantValue(BaseModel):
     Maps to: variant_values table in database.
     """
 
-    id: UUID | None = Field(
-        default=None,
-        description="The unique identifier (database-generated)."
-    )
-    variant_axis_id: UUID = Field(
-        ...,
-        description="The variant axis this value belongs to."
-    )
+    id: UUID | None = Field(default=None, description="The unique identifier (database-generated).")
+    variant_axis_id: UUID = Field(..., description="The variant axis this value belongs to.")
 
-    value: str = Field(
-        ...,
-        description="Internal value (e.g., 'S', 'Red', '500ml', '99%')."
-    )
+    value: str = Field(..., description="Internal value (e.g., 'S', 'Red', '500ml', '99%').")
     display_label: str | None = Field(
-        default=None,
-        description="Optional pretty label for UI (e.g., 'Small', 'Extra Large')."
+        default=None, description="Optional pretty label for UI (e.g., 'Small', 'Extra Large')."
     )
 
     # SKU generation
     sku_code: str = Field(
         ...,
-        description="Code used in SKU generation (uppercase, alphanumeric, hyphens: 'S', 'RED', '500ML')."
+        description="Code used in SKU generation (uppercase, alphanumeric, hyphens: 'S', 'RED', '500ML').",
     )
 
     # Visual representation (for color/pattern swatches)
     color_hex: str | None = Field(
-        default=None,
-        description="Hex color code for color swatches (e.g., '#FF0000')."
+        default=None, description="Hex color code for color swatches (e.g., '#FF0000')."
     )
-    image_url: str | None = Field(
-        default=None,
-        description="URL to swatch or pattern image."
-    )
+    image_url: str | None = Field(default=None, description="URL to swatch or pattern image.")
 
     # Pricing modifier (optional)
     price_adjustment: Decimal = Field(
         default=Decimal("0"),
-        description="Price adjustment vs base_price (+/- amount, e.g., Decimal('5.00') adds ₹5)."
+        description="Price adjustment vs base_price (+/- amount, e.g., Decimal('5.00') adds ₹5).",
     )
 
     # Display order
     sort_order: int = Field(
-        default=0,
-        description="Display order within axis (lower numbers appear first)."
+        default=0, description="Display order within axis (lower numbers appear first)."
     )
 
     # Metadata
-    is_active: bool = Field(
-        default=True,
-        description="Whether this value is active and available."
-    )
+    is_active: bool = Field(default=True, description="Whether this value is active and available.")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -489,97 +421,74 @@ class ProductVariant(BaseModel):
     Maps to: products table in database.
     """
 
-    id: UUID | None = Field(
-        default=None,
-        description="The unique identifier (database-generated)."
-    )
+    id: UUID | None = Field(default=None, description="The unique identifier (database-generated).")
     company_id: str | None = Field(
         default=None,
-        description="Company identifier (optional for single-tenant, required in database)."
+        description="Company identifier (optional for single-tenant, required in database).",
     )
-    product_family_id: UUID = Field(
-        ...,
-        description="The product family this variant belongs to."
-    )
+    product_family_id: UUID = Field(..., description="The product family this variant belongs to.")
 
     # SKU (unique identifier)
     sku: str = Field(
         ...,
-        description="Unique SKU code (e.g., 'PAV-BTL-500ML-28PCO-CLR' from family + variant values)."
+        description="Unique SKU code (e.g., 'PAV-BTL-500ML-28PCO-CLR' from family + variant values).",
     )
 
     # Name (optional - can be auto-generated from family + variants)
     name: str | None = Field(
         default=None,
-        description="Variant name (e.g., '500ml PET Bottle - Clear - 28mm PCO'). NULL = auto-generate."
+        description="Variant name (e.g., '500ml PET Bottle - Clear - 28mm PCO'). NULL = auto-generate.",
     )
 
     # Pricing (overrides base_price if set)
     price: Decimal | None = Field(
         default=None,
-        description="Variant-specific price (overrides product_family.base_price if set)."
+        description="Variant-specific price (overrides product_family.base_price if set).",
     )
     sale_price: Decimal | None = Field(
-        default=None,
-        description="Sale price (must be < price if set)."
+        default=None, description="Sale price (must be < price if set)."
     )
-    sale_price_start: date | None = Field(
-        default=None,
-        description="Sale period start date."
-    )
-    sale_price_end: date | None = Field(
-        default=None,
-        description="Sale period end date."
-    )
+    sale_price_start: date | None = Field(default=None, description="Sale period start date.")
+    sale_price_end: date | None = Field(default=None, description="Sale period end date.")
 
     # Inventory
-    availability: Literal["in_stock", "out_of_stock", "preorder", "available_for_order", "discontinued"] = Field(
-        default="in_stock",
-        description="Stock availability status."
-    )
+    availability: Literal[
+        "in_stock", "out_of_stock", "preorder", "available_for_order", "discontinued"
+    ] = Field(default="in_stock", description="Stock availability status.")
     stock_quantity: int | None = Field(
-        default=None,
-        description="Current stock quantity (NULL = not tracked)."
+        default=None, description="Current stock quantity (NULL = not tracked)."
     )
-    low_stock_threshold: int = Field(
-        default=5,
-        description="Alert threshold for low stock."
-    )
+    low_stock_threshold: int = Field(default=5, description="Alert threshold for low stock.")
 
     # Preorder
     preorder_date: date | None = Field(
-        default=None,
-        description="Expected shipping date for preorder items."
+        default=None, description="Expected shipping date for preorder items."
     )
 
     # Product page URL
     link: str | None = Field(
         default=None,
-        description="URL to product page (e.g., 'https://pavisha.com/products/bottle-500ml-clear')."
+        description="URL to product page (e.g., 'https://pavisha.com/products/bottle-500ml-clear').",
     )
 
     # Extensible attributes (variant-specific overrides)
     custom_attributes: dict[str, Any] = Field(
         default_factory=dict,
-        description="Variant-specific attributes (overrides product_family.custom_attributes)."
+        description="Variant-specific attributes (overrides product_family.custom_attributes).",
     )
 
     # Metadata
     is_primary_variant: bool = Field(
-        default=False,
-        description="Whether this is the featured/default variant for the family."
+        default=False, description="Whether this is the featured/default variant for the family."
     )
     is_active: bool = Field(
-        default=True,
-        description="Whether this variant is active and available."
+        default=True, description="Whether this variant is active and available."
     )
     created_at: datetime | None = Field(
-        default=None,
-        description="Creation timestamp (database-generated)."
+        default=None, description="Creation timestamp (database-generated)."
     )
     updated_at: datetime | None = Field(
-        default=None,
-        description="Last update timestamp (database-generated)."
+        default=None, description="Last update timestamp (database-generated)."
     )
 
     model_config = ConfigDict(from_attributes=True)
@@ -597,14 +506,8 @@ class ProductVariantValue(BaseModel):
     Maps to: product_variant_values table in database.
     """
 
-    product_id: UUID = Field(
-        ...,
-        description="The product variant ID."
-    )
-    variant_value_id: UUID = Field(
-        ...,
-        description="The variant value ID."
-    )
+    product_id: UUID = Field(..., description="The product variant ID.")
+    variant_value_id: UUID = Field(..., description="The variant value ID.")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -620,63 +523,51 @@ class CustomerSegment(BaseModel):
     Maps to: customer_segments table in database.
     """
 
-    id: UUID | None = Field(
-        default=None,
-        description="The unique identifier (database-generated)."
-    )
+    id: UUID | None = Field(default=None, description="The unique identifier (database-generated).")
     company_id: str | None = Field(
         default=None,
-        description="Company identifier (optional for single-tenant, required in database)."
+        description="Company identifier (optional for single-tenant, required in database).",
     )
-    product_family_id: UUID = Field(
-        ...,
-        description="The product family this segment applies to."
-    )
+    product_family_id: UUID = Field(..., description="The product family this segment applies to.")
 
     # Segment definition
-    segment_type: Literal["B2B", "B2C", "D2C"] = Field(
-        ...,
-        description="Type of customer segment."
-    )
+    segment_type: Literal["B2B", "B2C", "D2C"] = Field(..., description="Type of customer segment.")
 
     # Audience definition
     target_audience: str = Field(
         ...,
-        description="Description of target audience (e.g., 'Food processing manufacturers', 'Health-conscious families')."
+        description="Description of target audience (e.g., 'Food processing manufacturers', 'Health-conscious families').",
     )
     use_cases: list[str] = Field(
         default_factory=list,
-        description="Primary use cases for this segment (e.g., ['Beverage bottling', 'Bulk packaging'])."
+        description="Primary use cases for this segment (e.g., ['Beverage bottling', 'Bulk packaging']).",
     )
 
     # Messaging strategy
     benefits_focus: list[str] = Field(
         default_factory=list,
-        description="Key benefits to emphasize (e.g., ['Cost efficiency', 'Bulk discounts', 'Reliable supply'])."
+        description="Key benefits to emphasize (e.g., ['Cost efficiency', 'Bulk discounts', 'Reliable supply']).",
     )
     content_tone: Literal["professional", "casual", "luxury", "playful", "traditional"] = Field(
-        ...,
-        description="Content tone for marketing materials."
+        ..., description="Content tone for marketing materials."
     )
     marketing_channels: list[str] = Field(
         default_factory=list,
-        description="Preferred marketing channels (e.g., ['LinkedIn', 'Trade shows', 'Email'])."
+        description="Preferred marketing channels (e.g., ['LinkedIn', 'Trade shows', 'Email']).",
     )
 
     # Pricing strategy (text description, not actual prices)
     pricing_strategy: str | None = Field(
         default=None,
-        description="Pricing approach description (e.g., 'Bulk discounts with MOQ 1000 units')."
+        description="Pricing approach description (e.g., 'Bulk discounts with MOQ 1000 units').",
     )
 
     # Metadata
     created_at: datetime | None = Field(
-        default=None,
-        description="Creation timestamp (database-generated)."
+        default=None, description="Creation timestamp (database-generated)."
     )
     updated_at: datetime | None = Field(
-        default=None,
-        description="Last update timestamp (database-generated)."
+        default=None, description="Last update timestamp (database-generated)."
     )
 
     model_config = ConfigDict(from_attributes=True)
@@ -693,42 +584,33 @@ class ProductFamilyIndustry(BaseModel):
     Maps to: product_family_industries table in database.
     """
 
-    id: UUID | None = Field(
-        default=None,
-        description="The unique identifier (database-generated)."
-    )
+    id: UUID | None = Field(default=None, description="The unique identifier (database-generated).")
     company_id: str | None = Field(
         default=None,
-        description="Company identifier (optional for single-tenant, required in database)."
+        description="Company identifier (optional for single-tenant, required in database).",
     )
     product_family_id: UUID = Field(
-        ...,
-        description="The product family this industry link applies to."
+        ..., description="The product family this industry link applies to."
     )
-    naics_code: str = Field(
-        ...,
-        description="NAICS 2022 industry code (e.g., '311', '3121')."
-    )
+    naics_code: str = Field(..., description="NAICS 2022 industry code (e.g., '311', '3121').")
 
     # Industry-specific messaging
     use_cases: list[str] = Field(
         default_factory=list,
-        description="Industry-specific use cases (e.g., ['Juice bottling', 'Beverage packaging'])."
+        description="Industry-specific use cases (e.g., ['Juice bottling', 'Beverage packaging']).",
     )
     messaging_angle: str | None = Field(
         default=None,
-        description="Industry-specific messaging angle (e.g., 'Food-grade certification for regulatory compliance')."
+        description="Industry-specific messaging angle (e.g., 'Food-grade certification for regulatory compliance').",
     )
 
     # Priority
     is_primary: bool = Field(
-        default=False,
-        description="Whether this is the primary industry for the product family."
+        default=False, description="Whether this is the primary industry for the product family."
     )
 
     created_at: datetime | None = Field(
-        default=None,
-        description="Creation timestamp (database-generated)."
+        default=None, description="Creation timestamp (database-generated)."
     )
 
     model_config = ConfigDict(from_attributes=True)

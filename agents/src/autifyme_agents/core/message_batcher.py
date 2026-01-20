@@ -71,9 +71,7 @@ class MessageBatcher:
             else settings.MESSAGE_BATCH_RECENT_WINDOW_SECONDS
         )
         self._max_batch_size = (
-            max_batch_size
-            if max_batch_size is not None
-            else settings.MESSAGE_BATCH_MAX_SIZE
+            max_batch_size if max_batch_size is not None else settings.MESSAGE_BATCH_MAX_SIZE
         )
 
         logger.info(
@@ -118,7 +116,11 @@ class MessageBatcher:
             )
             logger.info(
                 "BATCHER: Checked recent activity",
-                extra={"sender_id": sender_id, "has_recent": has_recent, "window_seconds": self._recent_window_seconds},
+                extra={
+                    "sender_id": sender_id,
+                    "has_recent": has_recent,
+                    "window_seconds": self._recent_window_seconds,
+                },
             )
             if has_recent:
                 logger.info(
@@ -236,21 +238,27 @@ class MessageBatcher:
             await asyncio.sleep(self._debounce_seconds)
 
             # Check if new messages arrived during our sleep
-            has_recent = await self._storage.has_recent_activity(
-                sender_id, self._debounce_seconds
-            )
+            has_recent = await self._storage.has_recent_activity(sender_id, self._debounce_seconds)
 
             if has_recent and iteration < max_extensions:
                 logger.info(
                     "BATCHER: New activity during debounce, extending wait",
-                    extra={"sender_id": sender_id, "iteration": iteration + 1, "max_extensions": max_extensions},
+                    extra={
+                        "sender_id": sender_id,
+                        "iteration": iteration + 1,
+                        "max_extensions": max_extensions,
+                    },
                 )
                 continue
 
             # No new activity or max extensions reached
             logger.info(
                 "BATCHER: Debounce wait complete",
-                extra={"sender_id": sender_id, "iterations": iteration + 1, "has_recent": has_recent},
+                extra={
+                    "sender_id": sender_id,
+                    "iterations": iteration + 1,
+                    "has_recent": has_recent,
+                },
             )
             break
 

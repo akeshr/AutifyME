@@ -326,7 +326,7 @@ class WhatsAppChannel:
         except FileNotFoundError as exc:
             logger.error(
                 "Image file not found for WhatsApp send",
-                extra={"recipient": recipient, "image_source": image_source}
+                extra={"recipient": recipient, "image_source": image_source},
             )
             raise ChannelError(
                 f"Image file not found: {image_source}",
@@ -338,7 +338,11 @@ class WhatsAppChannel:
         except httpx.HTTPStatusError as exc:
             logger.error(
                 "Failed to fetch image from URL",
-                extra={"recipient": recipient, "url": image_source, "status": exc.response.status_code}
+                extra={
+                    "recipient": recipient,
+                    "url": image_source,
+                    "status": exc.response.status_code,
+                },
             )
             raise ChannelError(
                 f"Failed to fetch image from URL: {exc.response.status_code}",
@@ -390,12 +394,10 @@ class WhatsAppChannel:
                 "Please try resending it or check your connection."
             ),
             "processing": (
-                "❌ I hit a processing error. "
-                "Please try resending the details or wait for support."
+                "❌ I hit a processing error. Please try resending the details or wait for support."
             ),
             "recursion": (
-                "❌ I'm having trouble finishing this task. "
-                "A specialist will review and follow up."
+                "❌ I'm having trouble finishing this task. A specialist will review and follow up."
             ),
         }
         return messages.get(error_type, "❌ Something went wrong. Please try again.")

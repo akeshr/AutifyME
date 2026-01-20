@@ -33,43 +33,20 @@ def sanitize_llm_html_output(html_content: str) -> str:
     """
     # Remove <script> tags and content
     html_content = re.sub(
-        r'<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>',
-        '',
-        html_content,
-        flags=re.IGNORECASE
+        r"<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>", "", html_content, flags=re.IGNORECASE
     )
 
     # Remove on* event handlers (onclick, onerror, onload, etc.)
     # Matches: onclick="...", onclick='...', onclick=...
-    html_content = re.sub(
-        r'\bon\w+\s*=\s*["\'][^"\']*["\']',
-        '',
-        html_content,
-        flags=re.IGNORECASE
-    )
+    html_content = re.sub(r'\bon\w+\s*=\s*["\'][^"\']*["\']', "", html_content, flags=re.IGNORECASE)
 
     # Also handle unquoted event handlers
-    html_content = re.sub(
-        r'\bon\w+\s*=\s*[^\s>]+',
-        '',
-        html_content,
-        flags=re.IGNORECASE
-    )
+    html_content = re.sub(r"\bon\w+\s*=\s*[^\s>]+", "", html_content, flags=re.IGNORECASE)
 
     # Remove javascript: URLs
-    html_content = re.sub(
-        r'javascript\s*:',
-        '',
-        html_content,
-        flags=re.IGNORECASE
-    )
+    html_content = re.sub(r"javascript\s*:", "", html_content, flags=re.IGNORECASE)
 
     # Remove data: URLs that could contain HTML (XSS vector)
-    html_content = re.sub(
-        r'data\s*:\s*text/html',
-        '',
-        html_content,
-        flags=re.IGNORECASE
-    )
+    html_content = re.sub(r"data\s*:\s*text/html", "", html_content, flags=re.IGNORECASE)
 
     return html_content

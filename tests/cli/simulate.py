@@ -100,7 +100,7 @@ def safe_print(text: str) -> None:
         print(text)
     except UnicodeEncodeError:
         # Fallback: encode to ASCII, replacing unencodable chars
-        print(text.encode('ascii', errors='replace').decode('ascii'))
+        print(text.encode("ascii", errors="replace").decode("ascii"))
 
 
 class ConsoleChannel(MessagingChannel):
@@ -128,22 +128,27 @@ class ConsoleChannel(MessagingChannel):
     def format_thread_id(self, sender: str) -> str:
         return f"console:{sender}"
 
-    def send_text(self, recipient: str, message: str, *, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
-        print(f"\n{'='*60}")
+    def send_text(
+        self, recipient: str, message: str, *, metadata: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        print(f"\n{'=' * 60}")
         safe_print(f"📤 MESSAGE TO {recipient}:")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(message)
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Check if this is a batch approval message
         if "**Batch Approval Request**" in message:
             # Parse product count from message: "**Batch Approval Request** (3 products)"
             import re
-            match = re.search(r'\((\d+) products?\)', message)
+
+            match = re.search(r"\((\d+) products?\)", message)
             if match:
                 product_count = int(match.group(1))
                 self.approval_count = product_count  # Set counter for mixed mode
-                print(f"\n[BATCH APPROVAL DETECTED: {product_count} products, counter set to {self.approval_count}]\n")
+                print(
+                    f"\n[BATCH APPROVAL DETECTED: {product_count} products, counter set to {self.approval_count}]\n"
+                )
             else:
                 print(f"\n[BATCH MESSAGE FOUND BUT NO MATCH: {message[:100]}]\n")
         else:
@@ -156,12 +161,12 @@ class ConsoleChannel(MessagingChannel):
         """Generic HITL request handler - works for ANY interrupt type."""
         self.approval_count += 1  # Increment counter
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         safe_print(f"⏸️  HITL REQUEST TO {recipient}:")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # Handle different interrupt value types
-        if hasattr(interrupt_value, 'model_dump'):
+        if hasattr(interrupt_value, "model_dump"):
             # Pydantic model (Product, etc.)
             draft_dict = interrupt_value.model_dump()
         elif isinstance(interrupt_value, dict):
@@ -171,12 +176,12 @@ class ConsoleChannel(MessagingChannel):
 
         # Custom JSON encoder to handle UUID objects
         def json_encoder(obj):
-            if hasattr(obj, '__str__'):
+            if hasattr(obj, "__str__"):
                 return str(obj)
             raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
         print(json.dumps(draft_dict, indent=2, ensure_ascii=False, default=json_encoder))
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # Handle different HITL modes
         if self.hitl_mode == "auto_approve":
@@ -192,7 +197,7 @@ class ConsoleChannel(MessagingChannel):
         elif self.hitl_mode == "auto_edit":
             print("\n[AUTO-EDIT MODE: Approving with edits]\n")
             # Apply predefined edits
-            if self.predefined_edits and hasattr(interrupt_value, '__dict__'):
+            if self.predefined_edits and hasattr(interrupt_value, "__dict__"):
                 for field, value in self.predefined_edits.items():
                     if hasattr(interrupt_value, field):
                         setattr(interrupt_value, field, value)
@@ -273,23 +278,25 @@ class ConsoleChannel(MessagingChannel):
                 print("Invalid option. Try again.")
 
     def send_completion(self, recipient: str, result: CatalogingResult) -> dict[str, Any]:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         safe_print(f"✅ COMPLETION MESSAGE TO {recipient}:")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(json.dumps(result, indent=2, ensure_ascii=False))
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         self.messages_sent.append({"type": "completion", "result": result})
         return {"status": "sent"}
 
-    def send_error(self, recipient: str, error_type: str, custom_message: str | None = None) -> dict:
-        print(f"\n{'='*60}")
+    def send_error(
+        self, recipient: str, error_type: str, custom_message: str | None = None
+    ) -> dict:
+        print(f"\n{'=' * 60}")
         safe_print(f"❌ ERROR MESSAGE TO {recipient}:")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Error Type: {error_type}")
         if custom_message:
             print(f"Message: {custom_message}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         self.messages_sent.append({"type": "error", "error_type": error_type})
         return {"status": "sent"}
@@ -319,9 +326,9 @@ def run_scenario(
         predefined_edits: Edits to apply in auto_edit mode
         media_type: Type of media (image/video/audio/voice/document)
     """
-    print(f"\n{'#'*60}")
+    print(f"\n{'#' * 60}")
     safe_print(f"🎬 SCENARIO: {name}")
-    print(f"{'#'*60}\n")
+    print(f"{'#' * 60}\n")
 
     start_time = time.time()
 
@@ -355,6 +362,7 @@ def run_scenario(
 
     # Run scenario with unique sender to avoid checkpoint pollution
     import uuid
+
     unique_sender = f"local_test_{uuid.uuid4().hex[:8]}"
 
     try:
@@ -368,9 +376,11 @@ def run_scenario(
         # This simulates user responding to HITL interrupt
         if hitl_mode in ["auto_approve", "auto_reject", "auto_edit", "mixed"]:
             time.sleep(0.5)  # Brief pause to simulate user thinking
-            print(f"\n{'='*60}")
-            safe_print(f"📨 AUTO-MODE: Sending follow-up {'approval' if hitl_mode != 'auto_reject' else 'rejection'} message")
-            print(f"{'='*60}\n")
+            print(f"\n{'=' * 60}")
+            safe_print(
+                f"📨 AUTO-MODE: Sending follow-up {'approval' if hitl_mode != 'auto_reject' else 'rejection'} message"
+            )
+            print(f"{'=' * 60}\n")
 
             # Send appropriate follow-up message
             if hitl_mode == "auto_approve":
@@ -406,18 +416,18 @@ def run_scenario(
             )
 
         elapsed = time.time() - start_time
-        print(f"\n{'#'*60}")
+        print(f"\n{'#' * 60}")
         safe_print(f"✅ SCENARIO COMPLETE: {name}")
         safe_print(f"⏱️  Elapsed time: {elapsed:.2f}s")
-        print(f"{'#'*60}\n")
+        print(f"{'#' * 60}\n")
 
     except Exception as e:
         elapsed = time.time() - start_time
-        print(f"\n{'#'*60}")
+        print(f"\n{'#' * 60}")
         safe_print(f"❌ SCENARIO FAILED: {name}")
         safe_print(f"⏱️  Elapsed time: {elapsed:.2f}s")
         print(f"Error: {type(e).__name__}: {e}")
-        print(f"{'#'*60}\n")
+        print(f"{'#' * 60}\n")
         raise
 
 
@@ -443,7 +453,6 @@ def get_predefined_scenarios():
             "image": None,
             "media_type": None,
         },
-
         # === PART 2: Image + Caption Permutations ===
         "image_with_clear_caption": {
             "name": "Image + Clear Caption",
@@ -469,7 +478,6 @@ def get_predefined_scenarios():
             "image": "agents/test_images/sneaker.jpg",
             "media_type": "image",
         },
-
         # === PART 3: Video + Caption Permutations ===
         "video_with_caption": {
             "name": "Video + Caption",
@@ -483,7 +491,6 @@ def get_predefined_scenarios():
             "image": "test_media/product_demo.mp4",
             "media_type": "video",
         },
-
         # === PART 4: Document + Caption Permutations ===
         "document_with_caption": {
             "name": "Document + Caption",
@@ -497,7 +504,6 @@ def get_predefined_scenarios():
             "image": "test_media/product_specs.pdf",
             "media_type": "document",
         },
-
         # === PART 5: Audio/Voice Messages (no captions) ===
         "voice_message": {
             "name": "Voice Message",
@@ -505,7 +511,6 @@ def get_predefined_scenarios():
             "image": "test_media/voice_note.ogg",
             "media_type": "voice",
         },
-
         # === PART 6: Conversational & Inquiry ===
         "conversational_greeting": {
             "name": "Conversational - Greeting",
@@ -519,7 +524,6 @@ def get_predefined_scenarios():
             "image": None,
             "media_type": None,
         },
-
         # === Legacy scenarios for backward compatibility ===
         "cataloging_with_image": {
             "name": "Legacy - Cataloging with Text + Image",
@@ -540,9 +544,9 @@ def run_all_scenarios(auto_approve: bool = False, hitl_mode: str = "interactive"
     """Run all predefined scenarios."""
     scenarios = get_predefined_scenarios()
 
-    print(f"\n{'*'*60}")
+    print(f"\n{'*' * 60}")
     safe_print(f"🚀 RUNNING ALL SCENARIOS ({len(scenarios)} total)")
-    print(f"{'*'*60}\n")
+    print(f"{'*' * 60}\n")
 
     results = []
 
@@ -561,19 +565,21 @@ def run_all_scenarios(auto_approve: bool = False, hitl_mode: str = "interactive"
             results.append({"scenario": scenario["name"], "status": "PASSED"})
 
         except Exception as e:
-            results.append({
-                "scenario": scenario["name"],
-                "status": "FAILED",
-                "error": str(e),
-            })
+            results.append(
+                {
+                    "scenario": scenario["name"],
+                    "status": "FAILED",
+                    "error": str(e),
+                }
+            )
 
         if hitl_mode == "interactive":
             input("\nPress Enter to continue to next scenario...")
 
     # Summary
-    print(f"\n{'*'*60}")
+    print(f"\n{'*' * 60}")
     safe_print("📊 SUMMARY:")
-    print(f"{'*'*60}")
+    print(f"{'*' * 60}")
     passed = sum(1 for r in results if r["status"] == "PASSED")
     failed = sum(1 for r in results if r["status"] == "FAILED")
     safe_print(f"✅ Passed: {passed}")
@@ -584,7 +590,7 @@ def run_all_scenarios(auto_approve: bool = False, hitl_mode: str = "interactive"
         safe_print(f"{status_icon} {result['scenario']}: {result['status']}")
         if "error" in result:
             print(f"   Error: {result['error']}")
-    print(f"{'*'*60}\n")
+    print(f"{'*' * 60}\n")
 
     return results
 
@@ -600,6 +606,11 @@ def main():
         load_dotenv(env_path)
     else:
         print("Warning: .env file not found")
+
+    # Configure DeepAgents before creating any agents
+    from autifyme_agents.core.config import configure_deepagents
+
+    configure_deepagents()
 
     # Parse arguments
     auto_approve = "--auto-approve" in sys.argv or "-y" in sys.argv
@@ -668,7 +679,12 @@ def main():
             print("Use --help for usage information")
             sys.exit(1)
 
-        message = " ".join(arg for arg in sys.argv[1:] if not arg.startswith("-") and arg not in ["interactive", "auto_approve", "auto_reject", "auto_edit", "question"])
+        message = " ".join(
+            arg
+            for arg in sys.argv[1:]
+            if not arg.startswith("-")
+            and arg not in ["interactive", "auto_approve", "auto_reject", "auto_edit", "question"]
+        )
         if message:
             run_scenario("Custom", message, auto_approve=auto_approve, hitl_mode=hitl_mode)
     else:

@@ -34,8 +34,7 @@ try:
     from google.genai import types
 except ImportError:
     raise ImportError(
-        "google-genai package required for Computer Use. "
-        "Install with: uv pip install google-genai"
+        "google-genai package required for Computer Use. Install with: uv pip install google-genai"
     ) from None
 
 
@@ -203,9 +202,7 @@ class ComputerUseAgent:
         self.confirmation_callback = confirmation_callback
 
         if not self.api_key:
-            raise ValueError(
-                "GOOGLE_API_KEY environment variable or api_key parameter required"
-            )
+            raise ValueError("GOOGLE_API_KEY environment variable or api_key parameter required")
 
         # Create Gemini client with API key
         self.client = genai.Client(api_key=self.api_key)
@@ -366,7 +363,10 @@ class ComputerUseAgent:
                         )
 
                         # Check safety decision
-                        if hasattr(fc, "safety_decision") and fc.safety_decision.get("decision") == "require_confirmation":
+                        if (
+                            hasattr(fc, "safety_decision")
+                            and fc.safety_decision.get("decision") == "require_confirmation"
+                        ):
                             action.requires_confirmation = True
 
                         # Handle confirmation

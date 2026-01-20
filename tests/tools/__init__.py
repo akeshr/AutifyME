@@ -36,6 +36,12 @@ LangSmith Feedback Integration:
 Test Asset Management (Supabase Storage):
 - list_test_assets: List available images in Supabase storage
 - download_test_asset: Download image from Supabase to local for testing
+
+Trace Image Extraction (No Supabase):
+- get_trace_images: Extract image metadata from trace (lightweight)
+- get_image_pairs: Get source-to-generated pairs for comparison
+- view_trace_images: Quick text summary of all images
+- view_trace_image: Extract image to temp file for viewing with Read tool
 """
 
 # PM Interaction
@@ -50,6 +56,7 @@ from .models import (
     FileIOTrace,
     FileOperation,
     HITLDecision,
+    ImagePair,
     LLMCallNode,
     LLMTraceTree,
     MediaPath,
@@ -70,6 +77,7 @@ from .models import (
     ToolCallSequence,
     ToolResult,
     TraceBaseline,
+    TraceImage,
     TraceOverview,
     WorkflowStory,
     WorkflowTrace,
@@ -92,6 +100,7 @@ from .trace_analysis import (
     get_delegation_graph,
     get_evaluation_queue_url,
     get_file_io_trace,
+    get_image_pairs,
     get_llm_trace_tree,
     get_media_paths_from_trace,
     get_protocol_loads,
@@ -100,11 +109,14 @@ from .trace_analysis import (
     get_scenario_history,
     get_thread_traces,
     get_tool_call_sequence,
+    get_trace_images,
     get_trace_overview,
     get_workflow_story,
     list_test_assets,
     record_evaluation,
     store_baseline,
+    view_trace_image,
+    view_trace_images,
 )
 
 __all__ = [
@@ -144,6 +156,13 @@ __all__ = [
     "list_test_assets",
     "download_test_asset",
     "download_media_from_trace",
+    # Trace Image Extraction (no Supabase)
+    "get_trace_images",
+    "get_image_pairs",
+    "view_trace_images",
+    "view_trace_image",
+    "TraceImage",
+    "ImagePair",
     # Models - Core
     "TraceOverview",
     "RunNode",

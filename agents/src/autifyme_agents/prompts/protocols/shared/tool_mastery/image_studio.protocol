@@ -157,6 +157,43 @@ Material-specific rendering instructions.
 - `rendering_notes`: How to treat the material (label sharpness, specular control, caustics, etc.)
 - `preserve_details`: Critical details to preserve (label legibility, cap details, texture)
 
+**[CRITICAL] Material Accuracy:**
+- Use EXACT material from visual analysis: "glossy PET", "matte HDPE", "borosilicate glass"
+- Include finish in material name: "glossy PET - tinted blue", "brushed aluminum"
+
+**[CRITICAL] Transparent Material Rendering:**
+
+**For creative doctrine (WHY), see `catalog_visual.protocol` - "Transparent Material Doctrine" section.**
+
+**TransparencyProfile Schema:**
+```python
+material_treatment={
+    "primary_material": "glossy PET - tinted [color]",
+    "rendering_notes": "[see catalog_visual for required language]",
+    "transparency": {
+        "clarity_percentage": [0-100],      # From analyst
+        "tint": "[color or none]",          # From analyst
+        "frost_percentage": [0-100],        # From analyst
+        "wall_thickness_effect": "[uniform|thick_darkens|variable]",
+        "contents_state": "[empty|clear_liquid|colored_liquid|opaque|partial]",
+        "contents_description": "[from analyst]"
+    }
+}
+```
+
+**Required Specs (all mandatory for transparent materials):**
+- `focus`: `{"depth_of_field": "deep - everything sharp"}`
+- `fidelity.hero_features`: Must include "transparency depth at X% clarity"
+- `fidelity.preserve_colors`: Must include "THROUGH transparent body"
+- `lighting.specials`: "no rim light - rely on natural edge refraction"
+- All `transparency` sub-fields populated from analyst
+
+**Terms to AVOID (cause artifacts):**
+`internal caustics`, `glossy surface sheen`, `detail_enhancement`, `enhanced lighting`, `refraction patterns`, `light rays`, `demonstrate transparency`
+
+**For complete checklist, syntax patterns, and creative doctrine: see `catalog_visual.protocol` (domain=visual).**
+**For handling "make it more realistic" feedback: see `hitl.protocol` (domain=creative).**
+
 ### fidelity (CRITICAL for source images)
 FIX photography problems, PRESERVE product identity. **Always include when processing [source]/[product].**
 - `preserve_colors`: True product colors (fix color cast, don't generate)
@@ -280,6 +317,77 @@ image_studio(
 
 **Key principle:** Include ALL specs. Minimal calls produce garbage.
 
+---
+
+## GENERATION CONTROL (Batch Consistency)
+
+Gemini image generation is non-deterministic. Even identical prompts produce different outputs.
+
+**[CRITICAL] For batch scenarios (multiple items, regeneration, variants), consistency parameters are REQUIRED.**
+
+### Batch Scenario Detection
+
+You are in a batch scenario if:
+- Processing multiple products from same image (multi-item extraction)
+- Regenerating assets for multiple SKUs
+- Creating variants of the same product (sizes, colors)
+- User mentions: "all", "batch", "regenerate", "consistency", "family", "set"
+
+### Temperature (Default: 0.7)
+
+| Value | Use Case |
+|-------|----------|
+| 0.3-0.5 | **[REQUIRED for batch]** Maximum consistency |
+| 0.7 | Single catalog item - balanced (default) |
+| 1.0+ | Creative exploration - high variance |
+
+### Seed (REQUIRED for Batch Operations)
+
+**For batch scenarios, you MUST:**
+1. Generate a single seed at the START of batch processing
+2. Use the SAME seed for ALL image_studio calls in the batch
+
+```python
+# [REQUIRED] Batch of 4 variants - same seed for consistency
+BATCH_SEED = 42  # Pick once, use everywhere
+
+# Variant 1
+image_studio(images=[...], extraction={...}, temperature=0.4, seed=BATCH_SEED)
+
+# Variant 2
+image_studio(images=[...], extraction={...}, temperature=0.4, seed=BATCH_SEED)
+
+# Variant 3
+image_studio(images=[...], extraction={...}, temperature=0.4, seed=BATCH_SEED)
+```
+
+**Note:** Seed is "best-effort" - deterministic output not guaranteed, but significantly improves consistency.
+
+### Consistency Stack (REQUIRED for Catalog Batches)
+
+For batch operations, use ALL of:
+
+1. **Low temperature** (0.3-0.5) - REQUIRED
+2. **Same seed** across all variants - REQUIRED
+3. **Style-as-text** in custom_spec (from View-Then-Describe pattern)
+4. **Identical structured specs** (composition, lighting, enhancement)
+
+```python
+image_studio(
+    images=[{"path": "inbox/variant_2.jpg", "label": "source"}],
+    extraction={...},
+    composition={"camera_angle": "eye-level", "product_coverage": "80%"},
+    lighting={"type": "studio_3point", "direction": "front-left"},
+    custom_spec={"instruction": "Match anchor style: eye-level, 80% frame, soft shadow bottom-right"},
+    temperature=0.4,  # [REQUIRED] Low for batch
+    seed=42,          # [REQUIRED] Same across batch
+)
+```
+
+**For batch consistency patterns (logo position, color variant transparency), see `multi_item.protocol` (domain=creative).**
+
+---
+
 ### Pattern 6: Verification Grid (Batch Consistency Check)
 
 After generating multiple variants, create a visual grid for consistency verification:
@@ -395,6 +503,12 @@ Key field: `storage_path` - use this for creating asset records.
 | No output.filename | Unpredictable path | Always specify for predictable paths |
 | Single extraction for N items | 1 asset for 9 products | Extract each item separately |
 | Minimal specs for hero shots | Garbage quality | Use ALL specs (see Pattern 5) |
+| "Highlight reflections" in notes | Edge shadow artifacts | Use "natural refraction only" |
+| No logo position from anchor | Logo drift across variants | See multi_item.protocol |
+| Missing transparency_spec for dark | Black variant is opaque | See multi_item.protocol |
+| "Caustics/sheen" for "realistic" | Creates artifacts, not realism | See hitl.protocol (creative) |
+| No optical_behavior for transparent | Flat/unrealistic first render | See catalog_visual.protocol |
+| No uniform tint spec | Dark bands at neck/base ("black accents") | Include "uniform tint throughout body" in rendering_notes |
 
 ---
 

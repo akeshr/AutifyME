@@ -77,11 +77,11 @@ def create_platform_media_tools(
         try:
             logger.info(
                 f"Downloading media from {platform_name}",
-                extra={"media_id": media_id, "thread_id": thread_id}
+                extra={"media_id": media_id, "thread_id": thread_id},
             )
 
             # Download with bytes for storage upload
-            if hasattr(channel, 'download_media_with_bytes'):
+            if hasattr(channel, "download_media_with_bytes"):
                 media_path, media_bytes, mime_type = channel.download_media_with_bytes(media_id)
             else:
                 downloaded_path = channel.download_media(media_id)
@@ -104,6 +104,7 @@ def create_platform_media_tools(
             try:
                 asyncio.get_running_loop()
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(
                         asyncio.run,
@@ -112,7 +113,7 @@ def create_platform_media_tools(
                             thread_id=thread_id,
                             filename=filename,
                             content_type=mime_type,
-                        )
+                        ),
                     )
                     upload_result = future.result()
             except RuntimeError:
@@ -131,7 +132,7 @@ def create_platform_media_tools(
 
             logger.info(
                 "Media persisted to inbox",
-                extra={"user_path": user_path, "internal_path": storage_path}
+                extra={"user_path": user_path, "internal_path": storage_path},
             )
 
             # Return multimodal content if image, otherwise dict

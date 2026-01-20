@@ -2,8 +2,13 @@
 
 ## PURPOSE
 
-Execution patterns after user approval. ID tracking, junction rules, delegation templates.
+**This is the ACT phase of OODA.** Execution patterns after user approval.
 Load when: User approved execution, ready to delegate to specialists.
+
+You've completed OBSERVE -> ORIENT -> DECIDE. User approved. Now ACT.
+- ID tracking between specialists
+- Junction creation rules
+- Delegation templates for specialists
 
 ---
 
@@ -12,8 +17,8 @@ Load when: User approved execution, ready to delegate to specialists.
 **For dependency-based routing of analysts, see `discovery_mindset` protocol.**
 
 The discovery_mindset protocol provides:
-- Dependency reasoning framework (identify needed agents → map dependencies → execute in waves)
-- Wave-based execution (parallel within wave, sequential across waves)
+- OODA orchestration (OBSERVE -> ORIENT -> DECIDE -> ACT with checkpoints)
+- Conditional parallelization rules (parallel only when BOTH needed regardless of findings)
 - 25+ scenario patterns (image workflows, text queries, multi-image, mixed context)
 - Direct execution patterns (when user provides complete info)
 - Edge case handling

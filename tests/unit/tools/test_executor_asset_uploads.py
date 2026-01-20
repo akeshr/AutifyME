@@ -148,9 +148,7 @@ class TestAssetUploadSchema:
 class TestExecutorAssetUploads:
     """Test executor handling of asset uploads."""
 
-    async def test_upload_asset_before_operations(
-        self, executor, storage, temp_image_file
-    ):
+    async def test_upload_asset_before_operations(self, executor, storage, temp_image_file):
         """Test assets are uploaded before database operations."""
         intent = WriteIntent(
             goal="Create product with image",
@@ -190,9 +188,7 @@ class TestExecutorAssetUploads:
         assert len(products) == 1
         assert products[0]["image_url"].startswith("https://")
 
-    async def test_reference_resolution_public_url(
-        self, executor, storage, temp_image_file
-    ):
+    async def test_reference_resolution_public_url(self, executor, storage, temp_image_file):
         """Test @name.public_url reference resolution."""
         intent = WriteIntent(
             goal="Create asset record with URL",
@@ -228,9 +224,7 @@ class TestExecutorAssetUploads:
         assert images[0]["url"].startswith("https://")
         assert "products/" in images[0]["storage_path"]
 
-    async def test_multiple_asset_uploads(
-        self, executor, storage, temp_image_file, temp_jpeg_file
-    ):
+    async def test_multiple_asset_uploads(self, executor, storage, temp_image_file, temp_jpeg_file):
         """Test multiple asset uploads in single intent."""
         intent = WriteIntent(
             goal="Create product with multiple images",
@@ -275,9 +269,7 @@ class TestExecutorAssetUploads:
         assert "products/" in products[0]["main_image_url"]
         assert "thumbnails/" in products[0]["thumbnail_url"]
 
-    async def test_asset_upload_to_custom_bucket(
-        self, executor, storage, temp_image_file
-    ):
+    async def test_asset_upload_to_custom_bucket(self, executor, storage, temp_image_file):
         """Test asset upload to custom bucket."""
         intent = WriteIntent(
             goal="Upload to marketing bucket",
@@ -319,14 +311,10 @@ class TestExecutorAssetUploads:
 class TestAssetRollbackOnError:
     """Test asset rollback on database operation failure."""
 
-    async def test_rollback_assets_on_db_error(
-        self, executor, storage, temp_image_file
-    ):
+    async def test_rollback_assets_on_db_error(self, executor, storage, temp_image_file):
         """Test uploaded assets are deleted on database error."""
         # Pre-populate to cause constraint violation
-        await storage.insert_entity(
-            "products", {"name": "Existing", "sku_code": "DUP-001"}
-        )
+        await storage.insert_entity("products", {"name": "Existing", "sku_code": "DUP-001"})
 
         # Note: FakeStorage doesn't enforce unique constraints,
         # so we document this test as a placeholder for production testing.
@@ -442,9 +430,7 @@ class TestAssetReferenceResolution:
             goal="Create asset with size",
             reasoning="Test size resolution",
             hitl_summary=TEST_HITL_SUMMARY,
-            asset_uploads=[
-                AssetUpload(temp_path=temp_image_file, returns="uploaded_file")
-            ],
+            asset_uploads=[AssetUpload(temp_path=temp_image_file, returns="uploaded_file")],
             operations=[
                 Operation(
                     action="create",
@@ -472,9 +458,7 @@ class TestAssetReferenceResolution:
             goal="Create asset with content type",
             reasoning="Test content type resolution",
             hitl_summary=TEST_HITL_SUMMARY,
-            asset_uploads=[
-                AssetUpload(temp_path=temp_image_file, returns="uploaded_file")
-            ],
+            asset_uploads=[AssetUpload(temp_path=temp_image_file, returns="uploaded_file")],
             operations=[
                 Operation(
                     action="create",
@@ -573,9 +557,7 @@ class TestAssetUploadValidation:
             goal="Dry run with asset",
             reasoning="Test dry run",
             hitl_summary=TEST_HITL_SUMMARY,
-            asset_uploads=[
-                AssetUpload(temp_path=temp_image_file, returns="image")
-            ],
+            asset_uploads=[AssetUpload(temp_path=temp_image_file, returns="image")],
             operations=[
                 Operation(
                     action="create",
@@ -625,9 +607,7 @@ class TestExecutionResultWithAssets:
         result = ExecutionResult(
             success=True,
             created_entities={"products": [{"id": "1"}]},
-            uploaded_assets=[
-                {"storage_path": "products/123.png", "bucket": "assets"}
-            ],
+            uploaded_assets=[{"storage_path": "products/123.png", "bucket": "assets"}],
         )
 
         result_dict = result.to_dict()

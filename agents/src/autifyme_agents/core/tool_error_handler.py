@@ -28,7 +28,6 @@ ERROR_PATTERNS = {
         "type": "ACCESS_DENIED",
         "action": "Permission denied. Verify you have required access rights.",
     },
-
     # Database/Storage errors
     "table": {
         "type": "TABLE_ERROR",
@@ -54,7 +53,6 @@ ERROR_PATTERNS = {
         "type": "INVALID_SYNTAX",
         "action": "Check query syntax. Verify filter format, search patterns, and relations.",
     },
-
     # Network/API errors
     "timeout": {
         "type": "CONNECTION_ERROR",
@@ -72,7 +70,6 @@ ERROR_PATTERNS = {
         "type": "RATE_LIMIT_ERROR",
         "action": "Too many requests. Wait and retry. Implement backoff strategy.",
     },
-
     # Permission/Access errors (general access errors, distinct from table-level ACCESS_DENIED)
     "access": {
         "type": "ACCESS_ERROR",
@@ -82,7 +79,6 @@ ERROR_PATTERNS = {
         "type": "ACCESS_ERROR",
         "action": "Authentication failed. Check API credentials or refresh token.",
     },
-
     # File/Image errors
     "not found": {
         "type": "NOT_FOUND",
@@ -100,7 +96,6 @@ ERROR_PATTERNS = {
         "type": "INVALID_FILE",
         "action": "File corrupted or unsupported. Request file again. Verify file integrity.",
     },
-
     # API-specific errors
     "openai": {
         "type": "API_ERROR",
@@ -165,10 +160,7 @@ def build_agent_error_response(
             break
 
     # Build actionable error message
-    actionable_msg = (
-        f"{error_type}: {str(exception)}\n\n"
-        f"Agent Action: {agent_action}"
-    )
+    actionable_msg = f"{error_type}: {str(exception)}\n\nAgent Action: {agent_action}"
 
     # Return structured response
     return {

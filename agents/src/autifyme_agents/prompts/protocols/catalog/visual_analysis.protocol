@@ -26,6 +26,36 @@ When viewing product images for catalog purposes, systematically analyze:
 - Is the surface glossy or matte?
 - Does it appear rigid or flexible?
 
+### 1b. TRANSPARENCY PROFILE (REQUIRED for Transparent/Translucent Materials)
+
+**[CRITICAL] When material is transparent or translucent, you MUST provide detailed transparency characterization. Binary "transparent" is insufficient for realistic rendering.**
+
+| Property | What to Assess | How to Describe |
+|----------|---------------|-----------------|
+| **Clarity %** | How much can you see through? | 0-100% (crystal clear PET ~95%, light frost ~60%, heavy frost ~25%) |
+| **Tint** | Any color in the material itself? | None/Amber/Blue/Green/Smoke + intensity |
+| **Frost %** | Surface diffusion/texture? | 0-100% (glossy 0%, decorative frost 20%, privacy frost 70%) |
+| **Wall Thickness** | Do thick areas look different? | uniform/thick_darkens/variable |
+| **Contents State** | What's inside? | empty/clear_liquid/colored_liquid/opaque/partial |
+
+**Transparency Assessment Checklist:**
+1. Look THROUGH the product - what can you see? Background? Internal structure? Contents?
+2. Check edges and thick sections (neck, base) - darker/more opaque than body?
+3. Identify any tint - hold against mental white reference
+4. Look for frost/texture - smooth and glossy or diffused?
+5. If contents present - what color? How full? Visible through body?
+
+**Reference Clarity Levels:**
+| Material State | Typical Clarity % |
+|----------------|-------------------|
+| Crystal clear PET/glass | 90-98% |
+| Standard clear PET | 85-92% |
+| Light amber/blue tint | 80-90% |
+| Light decorative frost | 55-70% |
+| Translucent PP/HDPE | 15-30% |
+| Heavy frost | 10-25% |
+| Opaque | 0-5% |
+
 ### 2. Form Factor Classification
 
 | Shape | Typical Products |
@@ -81,6 +111,14 @@ When analyzing a product image, structure your observations:
 MATERIAL:
 - Type: [PET/Glass/HDPE/PP/etc.]
 - Evidence: [Transparency, finish, appearance]
+
+TRANSPARENCY PROFILE (Required for transparent/translucent materials):
+- Clarity: [X]% - [Evidence: what you can see through it]
+- Tint: [None/Amber/Blue/Green/Custom] - [describe intensity if present]
+- Frost: [X]% - [where: entire surface/decorative band/base only]
+- Wall Thickness: [uniform/thick_darkens/variable] - [note thick sections if relevant]
+- Contents: [empty/clear_liquid/colored_liquid/opaque/partial]
+  - Description: [what's visible inside, fill level, color]
 
 FORM FACTOR:
 - Shape: [Jar/Bottle/Container/etc.]

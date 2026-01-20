@@ -205,9 +205,7 @@ class PlaywrightExecutor(ActionExecutor):
                 return True
 
             elif action_type == ActionType.DRAG_AND_DROP:
-                from_x, from_y = self.normalize_coordinates(
-                    args["from_x"], args["from_y"]
-                )
+                from_x, from_y = self.normalize_coordinates(args["from_x"], args["from_y"])
                 to_x, to_y = self.normalize_coordinates(args["to_x"], args["to_y"])
 
                 # Perform drag and drop

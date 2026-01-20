@@ -195,7 +195,11 @@ Evidence: List what was observed vs what protocol requires
 # Data to pull:
 # 1. Analyst's input (the actual image/data)
 # 2. Analyst's findings (output file)
-# Need to VIEW the input to verify findings
+# To VIEW the input image:
+from tests.tools import get_trace_images, view_trace_image
+images = get_trace_images(trace_id)
+source = [i for i in images if i.role == "source"][0]
+path = view_trace_image(source.run_id)  # Then Read(path) to see it
 ```
 
 ```text
@@ -231,6 +235,12 @@ Evidence: Quote hallucinated content, note what input actually shows
 # 1. Specialist's output (generated assets, data, etc.)
 # 2. Domain protocol (rules for this domain)
 # 3. Upstream analyst findings (what specialist should work with)
+# For creative_specialist - view generated images:
+from tests.tools import get_trace_images, view_trace_image
+images = get_trace_images(trace_id)
+generated = [i for i in images if i.role == "generated"]
+for img in generated:
+    path = view_trace_image(img.run_id)  # Then Read(path) to see it
 ```
 
 ```text
@@ -406,28 +416,136 @@ Diagnose root cause and propose fix.
    - Show diff of proposed changes
    - Explain why this fixes the issue
 
-5. Await approval
+5. [CRITICAL] Check grader coverage (Framework Co-Evolution)
+   - Ask: "Would existing graders catch this issue?"
+   - If NO: propose new grader alongside system fix
+   - See "Framework Co-Evolution" section below
+
+6. Await approval
    - DO NOT implement without explicit approval
 
-6. Implement and validate
-   - Make changes
+7. Implement and validate
+   - Make changes (system + grader if needed)
    - Re-run test scenario
-   - Verify fix worked
+   - Verify fix worked AND grader catches old behavior
 
-7. Store pattern (if fix successful)
+8. Store pattern (if fix successful)
    - store_pattern_fix() with symptoms, fix location, description
    - Builds pattern library for future fixes
 ```
 
+### [CRITICAL] Framework Co-Evolution
+
+**Principle:** Every system fix should be accompanied by evaluation framework improvements.
+
+When you identify a system issue, check ALL framework components:
+
+```
+1. GRADERS (tests/tools/graders/)
+   "Would existing code graders have caught this?"
+   - Run run_code_graders() on failing trace
+   - If NO: design new grader for the BAD pattern
+   - Add to PM_GRADERS, SPECIALIST_GRADERS, ANALYST_GRADERS, or UNIVERSAL_GRADERS
+
+2. MODEL RUBRICS (SKILL.md rubric sections)
+   "Does this need LLM evaluation?"
+   - Code graders: deterministic checks (tool sequences, parameters)
+   - Model rubrics: quality/judgment (image quality, context completeness)
+   - If issue requires "viewing" or "judging": add/update model rubric
+
+3. TRACE ANALYSIS TOOLS (tests/tools/trace_analysis.py)
+   "Was investigation harder than it should be?"
+   - Add helper if you repeatedly extracted same data pattern
+   - Add to get_* functions for common queries
+   - Update show_* helpers for better debugging
+
+4. SCENARIOS (tests/scenarios/)
+   "Should this become a regression test?"
+   - If issue is reproducible: create scenario YAML
+   - Include baseline_trace_id for comparison
+   - Add to scenario catalog for /eval test
+
+5. PATTERNS (Pattern Matching table)
+   "Is this a recurring pattern?"
+   - Add symptom -> pattern -> fix location -> grader mapping
+   - Enables faster diagnosis for similar issues
+
+6. HELPERS (tests/tools/evaluation/helpers.py)
+   "Would a new helper speed up future investigation?"
+   - show_* functions for visualization
+   - get_* functions for data extraction
+   - detect_* functions for auto-detection
+```
+
+**Framework Component Checklist:**
+
+| Component | Question | Location |
+|-----------|----------|----------|
+| Code Grader | Can code detect the BAD pattern? | `tests/tools/graders/*.py` |
+| Model Rubric | Does it need LLM judgment? | `SKILL.md` rubric sections |
+| Trace Helper | Was data extraction manual/repetitive? | `tests/tools/trace_analysis.py` |
+| Eval Helper | Would a show_*/detect_* help? | `tests/tools/evaluation/helpers.py` |
+| Scenario | Should this be a regression test? | `tests/scenarios/*.yaml` |
+| Pattern | Is this a recurring issue type? | Pattern Matching table below |
+
+**Why this matters:**
+- System fix alone = issue can recur undetected
+- Framework improvement alone = detection without prevention
+- Both together = prevented AND detectable AND faster to diagnose next time
+
+**Example from this session:**
+
+```
+Issue: PM skipped visual_analyst for image-based shortcuts
+       (4-product image processed as single product)
+
+System fixes:
+1. discovery_mindset.protocol - Visual Input Rule
+2. image_studio.protocol - batch consistency, logo position, transparency
+
+Framework improvements:
+1. NEW GRADER: visual_analyst_for_images (pm_graders.py)
+2. NEW GRADER: image_studio_consistency_params (specialist_graders.py)
+3. UPDATED PATTERN TABLE: VISUAL_SKIPPED, BATCH_INCONSISTENT patterns
+4. No new model rubric needed (graders sufficient for this case)
+
+Validation:
+- Failing trace before: PASS (0.91) - missed the issue
+- Failing trace after: PARTIAL (0.75) - correctly detected
+```
+
+**Grader Design Checklist:**
+- [ ] Detects the BAD pattern (not just absence of good)
+- [ ] Evidence field explains WHY it failed
+- [ ] Severity reflects impact (HIGH for critical issues)
+- [ ] Registered in orchestrator.py
+- [ ] Works on both positive and negative cases
+
+**Model Rubric Design Checklist:**
+- [ ] Clear data to pull (what to examine)
+- [ ] Explicit pass/fail criteria
+- [ ] Evidence requirements specified
+- [ ] Cannot be replaced by deterministic code check
+
+**Scenario Design Checklist:**
+- [ ] Reproducible input (message + media paths)
+- [ ] Expected behavior documented
+- [ ] Success criteria defined
+- [ ] Baseline trace ID for comparison
+
 ### Pattern Matching
 
-| Symptom | Pattern | Fix Location |
-|---------|---------|--------------|
-| First call not load_protocol | PROTOCOL_NOT_LOADED | Agent prompt instructions section |
-| Child missing parent's context | CONTEXT_LOSS | PM delegation description |
-| No HITL before persist | HITL_SKIPPED | Specialist interrupt gate |
-| Wrong agent selected | WRONG_ROUTING | PM routing logic |
-| Incomplete research | PREMATURE_TERMINATION | Analyst thoroughness instructions |
+| Symptom | Pattern | Fix Location | Grader |
+|---------|---------|--------------|--------|
+| First call not load_protocol | PROTOCOL_NOT_LOADED | Agent prompt instructions | protocol_load_first |
+| Child missing parent's context | CONTEXT_LOSS | PM delegation description | pm_context_handoff (model) |
+| No HITL before persist | HITL_SKIPPED | Specialist interrupt gate | hitl_triggered |
+| Wrong agent selected | WRONG_ROUTING | PM routing logic | pm_routing_appropriate (model) |
+| Incomplete research | PREMATURE_TERMINATION | Analyst thoroughness instructions | analyst_observation_complete (model) |
+| Image task without visual_analyst | VISUAL_SKIPPED | PM discovery_mindset.protocol | visual_analyst_for_images |
+| Multi-product image as single | MULTI_ITEM_MISSED | creative specialist protocol | (model - use view_trace_image) |
+| Batch without seed/temperature | BATCH_INCONSISTENT | image_studio.protocol | image_studio_consistency_params |
+| Edge artifacts on transparent | EDGE_ARTIFACT | image_studio.protocol (rendering_notes) | (model - use view_trace_image) |
 
 ### Output Template
 
@@ -1022,6 +1140,89 @@ next_id = next_trace(trace_id)
 # Ignore boundaries if needed
 prev_id = prev_trace(trace_id, session_gap_minutes=0)
 ```
+
+### Image Extraction
+
+Extract and view images from traces - sources (user uploads) and generated outputs.
+
+#### Mental Model - When to Use What
+
+| Function                        | Purpose                        | Data Source                |
+|---------------------------------|--------------------------------|----------------------------|
+| `view_trace_images(trace_id)`   | Quick text inventory           | Metadata only              |
+| `get_trace_images(trace_id)`    | Programmatic metadata access   | Metadata only              |
+| `view_trace_image(run_id)`      | **Actually view an image**     | Extracts from trace output |
+| `get_image_pairs(trace_id)`     | Compare source vs generated    | Metadata + specs           |
+
+**Key Insight:** Tool outputs (download_whatsapp_media, view_image, image_studio) embed images as base64 data URIs. `view_trace_image()` extracts these directly from the trace - **no Supabase fetch required**.
+
+```python
+from tests.tools import (
+    get_trace_images, get_image_pairs, view_trace_images, view_trace_image,
+    TraceImage, ImagePair
+)
+
+# Step 1: Quick inventory (text only)
+print(view_trace_images(trace_id))
+# Output:
+# Images in trace:
+# [0] SOURCE: inbox/20260115_xxx.jpg
+#     Tool: download_whatsapp_media, Agent: PM
+# [1] GENERATED: pending/20260115_xxx.png
+#     Tool: image_studio, Agent: creative_specialist
+# Summary: 1 source(s), 1 generated
+
+# Step 2: Get metadata for filtering
+images = get_trace_images(trace_id)
+sources = [i for i in images if i.role == "source"]
+generated = [i for i in images if i.role == "generated"]
+
+# Step 3: ACTUALLY VIEW an image (extracts to temp file)
+if generated:
+    path = view_trace_image(generated[0].run_id)
+    # Returns: "C:/Users/.../temp/trace_images/trace_abc123.jpg"
+    # Now use Read tool on this path to see the actual image
+
+# Alternative: Get source-to-generated pairs for comparison
+pairs = get_image_pairs(trace_id)
+for p in pairs:
+    print(f"Source: {p.source.storage_path if p.source else 'None'}")
+    print(f"Generated: {p.generated.storage_path if p.generated else 'FAILED'}")
+    print(f"Specs: {list(p.specs.keys())}")  # fidelity, material_treatment, etc.
+
+    # View the generated image
+    if p.generated:
+        path = view_trace_image(p.generated.run_id)
+        # Use Read tool on path to see it
+```
+
+**TraceImage fields:**
+- `storage_path` - Reference path (e.g., "pending/output.png")
+- `role` - "source", "generated", "style_ref", "background", "variant"
+- `tool_name` - "download_whatsapp_media", "view_image", or "image_studio"
+- `run_id` - **Use with view_trace_image() to extract actual image**
+- `agent` - Agent that made the call
+- `label` - Original label from image_studio input
+- `sequence` - Order in trace (0-indexed)
+- `metadata` - Image metadata if available (dimensions, etc.)
+
+**ImagePair fields:**
+- `source` - Primary source TraceImage (labeled "source" or "product")
+- `style_ref` - Style reference TraceImage if provided
+- `generated` - Output TraceImage (None if failed)
+- `specs` - Dict of specs used (fidelity, material_treatment, etc.)
+- `run_id` - image_studio run ID
+- `success` - Whether generation succeeded
+- `error` - Error message if failed
+
+#### Trace Inspection vs Replay Scenarios
+
+| Use Case                       | Function                       | Why                                                        |
+|--------------------------------|--------------------------------|------------------------------------------------------------|
+| **View images during eval**    | `view_trace_image(run_id)`     | Extracts from trace output (no Supabase)                   |
+| **Replay production scenario** | `get_media_for_outcome()`      | Downloads original source files from Supabase storage      |
+
+Replay scenarios need the original source images (what user uploaded) to pass to `chat_with_pm()`. These live in Supabase storage, not in trace outputs. Use `create_scenario_from_outcome()` which handles media download automatically.
 
 ### Key Schemas
 

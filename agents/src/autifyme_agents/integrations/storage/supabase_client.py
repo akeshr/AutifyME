@@ -26,7 +26,9 @@ from autifyme_agents.schemas.models import (
 logger = logging.getLogger(__name__)
 
 
-def _normalize_numeric_types(data: dict[str, Any] | list[dict[str, Any]]) -> dict[str, Any] | list[dict[str, Any]]:
+def _normalize_numeric_types(
+    data: dict[str, Any] | list[dict[str, Any]],
+) -> dict[str, Any] | list[dict[str, Any]]:
     """
     Normalize whole-number floats to integers for PostgreSQL compatibility.
 
@@ -43,6 +45,7 @@ def _normalize_numeric_types(data: dict[str, Any] | list[dict[str, Any]]) -> dic
     Returns:
         Normalized data with whole-number floats converted to ints
     """
+
     def normalize_value(value: Any) -> Any:
         """Recursively normalize a single value."""
         if isinstance(value, float) and value.is_integer():
@@ -86,7 +89,9 @@ class SupabaseStorageClient(StorageInterface):
         """Configure the adapter with explicit or settings-derived credentials."""
 
         self._supabase_url = supabase_url or settings.SUPABASE_URL
-        derived_key = service_key or settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_ANON_KEY
+        derived_key = (
+            service_key or settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_ANON_KEY
+        )
         if settings.SUPABASE_SERVICE_ROLE_KEY is None and service_key is None:
             logger.warning(
                 "SUPABASE_SERVICE_ROLE_KEY not set; falling back to anon key which has restricted write access."
@@ -94,7 +99,9 @@ class SupabaseStorageClient(StorageInterface):
         self._service_key = derived_key
         self._client: Client | None = client
         self._async_client: AsyncClient | None = None  # Async client for non-blocking ops
-        self._async_client_loop: asyncio.AbstractEventLoop | None = None  # Track which loop owns client
+        self._async_client_loop: asyncio.AbstractEventLoop | None = (
+            None  # Track which loop owns client
+        )
         self._current_transaction: SupabaseTransaction | None = None  # Track active transaction
 
     def __enter__(self) -> SupabaseStorageClient:
@@ -106,7 +113,9 @@ class SupabaseStorageClient(StorageInterface):
         self._ensure_client()
         return self
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any) -> None:
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
+    ) -> None:
         """Exit context manager - performs automatic cleanup.
 
         Args:
@@ -131,8 +140,9 @@ class SupabaseStorageClient(StorageInterface):
             True if value matches UUID format (8-4-4-4-12 hex pattern)
         """
         import re
+
         # UUID pattern: 8-4-4-4-12 hex digits
-        uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         return bool(re.match(uuid_pattern, value.lower()))
 
     def _ensure_client(self) -> Client:
@@ -153,14 +163,14 @@ class SupabaseStorageClient(StorageInterface):
             if not self._supabase_url:
                 raise ConfigurationError(
                     "SUPABASE_URL not configured. Set environment variable or pass to constructor.",
-                    config_key="SUPABASE_URL"
+                    config_key="SUPABASE_URL",
                 )
 
             if not self._service_key:
                 raise ConfigurationError(
                     "Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY configured. "
                     "Set at least one environment variable.",
-                    config_key="SUPABASE_SERVICE_ROLE_KEY"
+                    config_key="SUPABASE_SERVICE_ROLE_KEY",
                 )
 
             try:
@@ -193,7 +203,7 @@ class SupabaseStorageClient(StorageInterface):
                         "url": self._supabase_url[:30] + "...",  # Log partial URL for security
                         "has_service_key": bool(self._service_key),
                         "http_version": "HTTP/1.1",  # Log protocol version
-                    }
+                    },
                 )
 
             except Exception as e:
@@ -204,11 +214,11 @@ class SupabaseStorageClient(StorageInterface):
                         "url": self._supabase_url[:30] + "..." if self._supabase_url else None,
                         "error_type": type(e).__name__,
                         "error_msg": str(e),
-                    }
+                    },
                 )
                 raise ConfigurationError(
                     f"Cannot connect to Supabase or validate credentials: {str(e)}",
-                    config_key="SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY"
+                    config_key="SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY",
                 ) from e
 
         return self._client
@@ -249,9 +259,11 @@ class SupabaseStorageClient(StorageInterface):
                 logger.debug(
                     "Event loop changed - cleaning up old async client",
                     extra={
-                        "old_loop": id(self._async_client_loop) if self._async_client_loop else None,
-                        "new_loop": id(current_loop) if current_loop else None
-                    }
+                        "old_loop": id(self._async_client_loop)
+                        if self._async_client_loop
+                        else None,
+                        "new_loop": id(current_loop) if current_loop else None,
+                    },
                 )
                 # Safe cleanup: just nullify, let GC handle httpx connections
                 # (avoid calling aclose() on closed loop)
@@ -261,14 +273,14 @@ class SupabaseStorageClient(StorageInterface):
             if not self._supabase_url:
                 raise ConfigurationError(
                     "SUPABASE_URL not configured. Set environment variable or pass to constructor.",
-                    config_key="SUPABASE_URL"
+                    config_key="SUPABASE_URL",
                 )
 
             if not self._service_key:
                 raise ConfigurationError(
                     "Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY configured. "
                     "Set at least one environment variable.",
-                    config_key="SUPABASE_SERVICE_ROLE_KEY"
+                    config_key="SUPABASE_SERVICE_ROLE_KEY",
                 )
 
             try:
@@ -304,7 +316,7 @@ class SupabaseStorageClient(StorageInterface):
                         "has_service_key": bool(self._service_key),
                         "http_version": "HTTP/1.1",
                         "event_loop_id": id(current_loop) if current_loop else None,
-                    }
+                    },
                 )
 
             except Exception as e:
@@ -315,11 +327,11 @@ class SupabaseStorageClient(StorageInterface):
                         "url": self._supabase_url[:30] + "..." if self._supabase_url else None,
                         "error_type": type(e).__name__,
                         "error_msg": str(e),
-                    }
+                    },
                 )
                 raise ConfigurationError(
                     f"Cannot connect to Supabase async client or validate credentials: {str(e)}",
-                    config_key="SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY"
+                    config_key="SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY",
                 ) from e
 
         # Type guaranteed: if client was None, we initialized it above or raised exception
@@ -360,9 +372,14 @@ class SupabaseStorageClient(StorageInterface):
             # Resolve logo_asset_id to storage path
             if vi.get("logo_asset_id"):
                 try:
-                    asset_response = client.table("assets").select("storage_url").eq(
-                        "id", vi["logo_asset_id"]
-                    ).limit(1).single().execute()
+                    asset_response = (
+                        client.table("assets")
+                        .select("storage_url")
+                        .eq("id", vi["logo_asset_id"])
+                        .limit(1)
+                        .single()
+                        .execute()
+                    )
                     if asset_response.data and asset_response.data.get("storage_url"):
                         # Extract relative path from full URL
                         # URL: https://...supabase.co/storage/v1/object/public/assets/brands/file.jpg
@@ -441,7 +458,9 @@ class SupabaseStorageClient(StorageInterface):
             response = client.table("products").upsert(product_payload).execute()
 
         if not response.data:
-            raise RuntimeError("Storage adapter failed to persist product; inspect Supabase response for details.")
+            raise RuntimeError(
+                "Storage adapter failed to persist product; inspect Supabase response for details."
+            )
 
         return Product.model_validate(response.data[0])
 
@@ -481,12 +500,15 @@ class SupabaseStorageClient(StorageInterface):
         """
         try:
             client = self._ensure_client()
-            result = client.rpc("check_and_mark_processed", {
-                "p_message_id": message_id,
-                "p_sender_id": sender_id,
-                "p_thread_id": thread_id,
-                "p_received_at": received_at.isoformat(),
-            }).execute()
+            result = client.rpc(
+                "check_and_mark_processed",
+                {
+                    "p_message_id": message_id,
+                    "p_sender_id": sender_id,
+                    "p_thread_id": thread_id,
+                    "p_received_at": received_at.isoformat(),
+                },
+            ).execute()
 
             result_data: dict[str, Any] = result.data
             is_duplicate: bool = result_data.get("is_duplicate", False)
@@ -638,8 +660,7 @@ class SupabaseStorageClient(StorageInterface):
         try:
             client = await self._ensure_async_client()
             result = await client.rpc(
-                "fetch_and_clear_pending_batch",
-                {"p_batch_key": batch_key}
+                "fetch_and_clear_pending_batch", {"p_batch_key": batch_key}
             ).execute()
 
             batch = result.data if result.data else []
@@ -667,9 +688,7 @@ class SupabaseStorageClient(StorageInterface):
                 original_error=exc,
             ) from exc
 
-    async def has_recent_activity(
-        self, sender_id: str, window_seconds: int | float = 5
-    ) -> bool:
+    async def has_recent_activity(self, sender_id: str, window_seconds: int | float = 5) -> bool:
         """Check if sender has recent activity within time window.
 
         Used for Smart Skip logic: text messages only debounce if
@@ -686,7 +705,7 @@ class SupabaseStorageClient(StorageInterface):
             client = await self._ensure_async_client()
             result = await client.rpc(
                 "has_recent_sender_activity",
-                {"p_sender_id": sender_id, "p_window_seconds": int(window_seconds)}
+                {"p_sender_id": sender_id, "p_window_seconds": int(window_seconds)},
             ).execute()
 
             has_activity = bool(result.data)
@@ -721,10 +740,7 @@ class SupabaseStorageClient(StorageInterface):
         """
         try:
             client = await self._ensure_async_client()
-            result = await client.rpc(
-                "has_pending_messages",
-                {"p_sender_id": sender_id}
-            ).execute()
+            result = await client.rpc("has_pending_messages", {"p_sender_id": sender_id}).execute()
 
             has_pending = bool(result.data)
             logger.debug(
@@ -745,9 +761,7 @@ class SupabaseStorageClient(StorageInterface):
             )
             return False
 
-    async def get_orphaned_batches(
-        self, age_seconds: int = 33
-    ) -> list[dict[str, Any]]:
+    async def get_orphaned_batches(self, age_seconds: int = 33) -> list[dict[str, Any]]:
         """Get pending messages older than expected processing time.
 
         Used for server restart recovery - these messages were queued
@@ -762,8 +776,7 @@ class SupabaseStorageClient(StorageInterface):
         try:
             client = await self._ensure_async_client()
             result = await client.rpc(
-                "get_orphaned_pending_messages",
-                {"p_age_seconds": age_seconds}
+                "get_orphaned_pending_messages", {"p_age_seconds": age_seconds}
             ).execute()
 
             orphaned = result.data if result.data else []
@@ -810,18 +823,32 @@ class SupabaseStorageClient(StorageInterface):
 
         # Validate required fields before attempting insert
         # Must match NOT NULL columns in workflow_outcomes table
-        required_fields = ["tracking_id", "thread_id", "sender_id", "message_hash", "success", "received_at", "started_at"]
-        missing_fields = [field for field in required_fields if field not in outcome_dict or outcome_dict[field] is None]
+        required_fields = [
+            "tracking_id",
+            "thread_id",
+            "sender_id",
+            "message_hash",
+            "success",
+            "received_at",
+            "started_at",
+        ]
+        missing_fields = [
+            field
+            for field in required_fields
+            if field not in outcome_dict or outcome_dict[field] is None
+        ]
 
         if missing_fields:
-            error_msg = f"Cannot persist workflow outcome - missing required fields: {missing_fields}"
+            error_msg = (
+                f"Cannot persist workflow outcome - missing required fields: {missing_fields}"
+            )
             logger.error(
                 error_msg,
                 extra={
                     "missing_fields": missing_fields,
                     "tracking_id": outcome_dict.get("tracking_id"),
                     "thread_id": outcome_dict.get("thread_id"),
-                }
+                },
             )
             raise ValueError(error_msg)
 
@@ -872,7 +899,7 @@ class SupabaseStorageClient(StorageInterface):
                     "error_msg": str(e),
                     "payload_keys": list(payload.keys()),
                 },
-                exc_info=True
+                exc_info=True,
             )
             raise
 
@@ -949,11 +976,7 @@ class SupabaseStorageClient(StorageInterface):
         # Note: View filters by 7 days by default; we'll use the view as-is for Phase 1
         # TODO: Make view parameterizable in Phase 2
 
-        response = (
-            client.table("v_success_rates")
-            .select("*")
-            .execute()
-        )
+        response = client.table("v_success_rates").select("*").execute()
 
         return response.data if response.data else []
 
@@ -970,12 +993,7 @@ class SupabaseStorageClient(StorageInterface):
         # Note: View uses 30-day window and occurrence_count <= 3 by default
         # TODO: Make view parameterizable in Phase 2
 
-        response = (
-            client.table("v_edge_cases")
-            .select("*")
-            .limit(limit)
-            .execute()
-        )
+        response = client.table("v_edge_cases").select("*").limit(limit).execute()
 
         return response.data if response.data else []
 
@@ -1018,7 +1036,7 @@ class SupabaseStorageClient(StorageInterface):
             relations=relations,
             search_patterns=search_patterns,
             count_only=False,  # Always return rows
-            limit=limit
+            limit=limit,
         )
         # Type guaranteed by @overload: count_only=False → list
         assert isinstance(result, list)  # Runtime assertion for type safety
@@ -1104,7 +1122,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Failed to check existing values in {table}.{column}",
                 exc_info=True,
-                extra={"table": table, "column": column, "value_count": len(values)}
+                extra={"table": table, "column": column, "value_count": len(values)},
             )
             raise StorageError(
                 message=f"Existence check failed for {table}.{column}: {str(e)}",
@@ -1181,10 +1199,7 @@ class SupabaseStorageClient(StorageInterface):
             else:
                 select_clause = "*"
 
-            query = client.table(table).select(
-                select_clause,
-                count="exact" if count_only else None
-            )
+            query = client.table(table).select(select_clause, count="exact" if count_only else None)
 
             # Apply filters with case-insensitive matching for text fields
             if filters:
@@ -1232,7 +1247,7 @@ class SupabaseStorageClient(StorageInterface):
                     "table": table,
                     "filters": filters,
                     "search_patterns": search_patterns,
-                }
+                },
             )
             raise StorageError(
                 message=f"Advanced query failed for {table}: {str(e)}",
@@ -1287,9 +1302,7 @@ class SupabaseStorageClient(StorageInterface):
                     or "pgrst202" in error_msg  # PostgREST function not found code
                 )
                 if rpc_not_found:
-                    logger.info(
-                        "dynamic_aggregate RPC not found - will raise error"
-                    )
+                    logger.info("dynamic_aggregate RPC not found - will raise error")
                 else:
                     # RPC exists but failed - re-raise
                     raise
@@ -1297,7 +1310,7 @@ class SupabaseStorageClient(StorageInterface):
             # RPC not available - fail with actionable error
             raise StorageError(
                 message=f"Aggregate queries require dynamic_aggregate RPC function for table '{table}'. "
-                        "Run migration 006_dynamic_aggregate_rpc.sql to enable.",
+                "Run migration 006_dynamic_aggregate_rpc.sql to enable.",
                 operation="query_aggregate",
             )
 
@@ -1309,7 +1322,7 @@ class SupabaseStorageClient(StorageInterface):
                     "table": table,
                     "aggregates": aggregates,
                     "group_by": group_by,
-                }
+                },
             )
             raise StorageError(
                 message=f"Aggregate query failed for {table}: {str(e)}",
@@ -1348,7 +1361,7 @@ class SupabaseStorageClient(StorageInterface):
                 "p_filters": combined_filters if combined_filters else {},
                 "p_group_by": group_by,
                 "p_having": having,
-            }
+            },
         ).execute()
 
         results = response.data if response.data else []
@@ -1414,7 +1427,7 @@ class SupabaseStorageClient(StorageInterface):
                     "requested": len(ids),
                     "found": len(ordered_results),
                     "missing": len(ids) - len(ordered_results),
-                }
+                },
             )
 
             return ordered_results
@@ -1423,7 +1436,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Batch read failed for {table}",
                 exc_info=True,
-                extra={"table": table, "id_count": len(ids)}
+                extra={"table": table, "id_count": len(ids)},
             )
             raise StorageError(
                 message=f"Batch read failed for {table}: {str(e)}",
@@ -1531,7 +1544,9 @@ class SupabaseStorageClient(StorageInterface):
                         # Continue from last ID (requires order by id)
                         query = query.gt("id", last_id)
                 except Exception:
-                    logger.warning(f"Invalid cursor format: {cursor}, falling back to offset pagination")
+                    logger.warning(
+                        f"Invalid cursor format: {cursor}, falling back to offset pagination"
+                    )
 
             else:
                 # Offset-based: Calculate offset from page
@@ -1574,9 +1589,12 @@ class SupabaseStorageClient(StorageInterface):
             if cursor and results and has_next:
                 import base64
                 import json
+
                 last_entity = results[-1]
                 cursor_data = {"last_id": last_entity.get("id")}
-                next_cursor = base64.b64encode(json.dumps(cursor_data).encode("utf-8")).decode("utf-8")
+                next_cursor = base64.b64encode(json.dumps(cursor_data).encode("utf-8")).decode(
+                    "utf-8"
+                )
 
             # Build response
             result = {
@@ -1600,7 +1618,7 @@ class SupabaseStorageClient(StorageInterface):
                     "per_page": per_page,
                     "cursor": bool(cursor),
                     "has_next": has_next,
-                }
+                },
             )
 
             return result
@@ -1612,7 +1630,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Paginated query failed for {table}",
                 exc_info=True,
-                extra={"table": table, "page": page, "per_page": per_page}
+                extra={"table": table, "page": page, "per_page": per_page},
             )
             raise StorageError(
                 message=f"Paginated query failed for {table}: {str(e)}",
@@ -1653,11 +1671,13 @@ class SupabaseStorageClient(StorageInterface):
 
             # Track operation for transaction rollback
             if self._current_transaction is not None:
-                self._current_transaction.operations.append({
-                    "type": "insert",
-                    "table": table,
-                    "ids": [inserted.get("id")],
-                })
+                self._current_transaction.operations.append(
+                    {
+                        "type": "insert",
+                        "table": table,
+                        "ids": [inserted.get("id")],
+                    }
+                )
 
             return inserted
 
@@ -1665,7 +1685,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Failed to insert into {table}",
                 exc_info=True,
-                extra={"table": table, "data_keys": list(data.keys())}
+                extra={"table": table, "data_keys": list(data.keys())},
             )
             raise StorageError(
                 message=f"Insert failed for {table}: {str(e)}",
@@ -1711,11 +1731,13 @@ class SupabaseStorageClient(StorageInterface):
             if self._current_transaction is not None:
                 entity_ids = [entity.get("id") for entity in inserted if entity.get("id")]
                 if entity_ids:
-                    self._current_transaction.operations.append({
-                        "type": "insert",
-                        "table": table,
-                        "ids": entity_ids,
-                    })
+                    self._current_transaction.operations.append(
+                        {
+                            "type": "insert",
+                            "table": table,
+                            "ids": entity_ids,
+                        }
+                    )
 
             return inserted
 
@@ -1723,7 +1745,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Failed to batch insert into {table}",
                 exc_info=True,
-                extra={"table": table, "entity_count": len(data)}
+                extra={"table": table, "entity_count": len(data)},
             )
             raise StorageError(
                 message=f"Batch insert failed for {table}: {str(e)}",
@@ -1789,12 +1811,14 @@ class SupabaseStorageClient(StorageInterface):
 
             # Track operation for transaction (limited rollback capability)
             if self._current_transaction is not None:
-                self._current_transaction.operations.append({
-                    "type": "update",
-                    "table": table,
-                    "filters": filters,
-                    "count": count,
-                })
+                self._current_transaction.operations.append(
+                    {
+                        "type": "update",
+                        "table": table,
+                        "filters": filters,
+                        "count": count,
+                    }
+                )
 
             return count
 
@@ -1802,7 +1826,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Failed to update {table}",
                 exc_info=True,
-                extra={"table": table, "filters": filters, "updates": updates}
+                extra={"table": table, "filters": filters, "updates": updates},
             )
             raise StorageError(
                 message=f"Update failed for {table}: {str(e)}",
@@ -1837,6 +1861,7 @@ class SupabaseStorageClient(StorageInterface):
             if soft_delete:
                 # Soft delete: UPDATE is_active=False and deleted_at=now()
                 from datetime import UTC, datetime
+
                 updates = {
                     "is_active": False,
                     "deleted_at": datetime.now(UTC).isoformat(),
@@ -1844,20 +1869,18 @@ class SupabaseStorageClient(StorageInterface):
                 }
 
                 # Use update_entities for soft delete
-                count = await self.update_entities(
-                    table=table,
-                    filters=filters,
-                    updates=updates
-                )
+                count = await self.update_entities(table=table, filters=filters, updates=updates)
 
                 # Track operation for transaction
                 if self._current_transaction is not None:
-                    self._current_transaction.operations.append({
-                        "type": "soft_delete",
-                        "table": table,
-                        "filters": filters,
-                        "count": count,
-                    })
+                    self._current_transaction.operations.append(
+                        {
+                            "type": "soft_delete",
+                            "table": table,
+                            "filters": filters,
+                            "count": count,
+                        }
+                    )
 
                 return count
             else:
@@ -1897,12 +1920,14 @@ class SupabaseStorageClient(StorageInterface):
 
                 # Track operation for transaction (no rollback capability for hard deletes)
                 if self._current_transaction is not None:
-                    self._current_transaction.operations.append({
-                        "type": "delete",
-                        "table": table,
-                        "filters": filters,
-                        "count": count,
-                    })
+                    self._current_transaction.operations.append(
+                        {
+                            "type": "delete",
+                            "table": table,
+                            "filters": filters,
+                            "count": count,
+                        }
+                    )
 
             return count
 
@@ -1910,7 +1935,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Failed to delete from {table}",
                 exc_info=True,
-                extra={"table": table, "filters": filters}
+                extra={"table": table, "filters": filters},
             )
             raise StorageError(
                 message=f"Delete failed for {table}: {str(e)}",
@@ -1952,12 +1977,16 @@ class SupabaseStorageClient(StorageInterface):
             on_conflict = ",".join(conflict_fields) if conflict_fields else "id"
 
             # Execute upsert: INSERT with ON CONFLICT DO UPDATE
-            response = await client.table(table).upsert(
-                normalized_data,
-                on_conflict=on_conflict,
-                ignore_duplicates=False,  # DO UPDATE on conflict
-                returning="representation",
-            ).execute()
+            response = (
+                await client.table(table)
+                .upsert(
+                    normalized_data,
+                    on_conflict=on_conflict,
+                    ignore_duplicates=False,  # DO UPDATE on conflict
+                    returning="representation",
+                )
+                .execute()
+            )
 
             if not response.data or len(response.data) == 0:
                 raise StorageError(
@@ -1969,12 +1998,14 @@ class SupabaseStorageClient(StorageInterface):
 
             # Track operation for transaction
             if self._current_transaction is not None:
-                self._current_transaction.operations.append({
-                    "type": "upsert",
-                    "table": table,
-                    "ids": [upserted.get("id")],
-                    "conflict_fields": conflict_fields or ["id"],
-                })
+                self._current_transaction.operations.append(
+                    {
+                        "type": "upsert",
+                        "table": table,
+                        "ids": [upserted.get("id")],
+                        "conflict_fields": conflict_fields or ["id"],
+                    }
+                )
 
             return upserted
 
@@ -1982,7 +2013,11 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Failed to upsert into {table}",
                 exc_info=True,
-                extra={"table": table, "conflict_fields": conflict_fields, "data_keys": list(data.keys())}
+                extra={
+                    "table": table,
+                    "conflict_fields": conflict_fields,
+                    "data_keys": list(data.keys()),
+                },
             )
             raise StorageError(
                 message=f"Upsert failed for {table}: {str(e)}",
@@ -2024,13 +2059,17 @@ class SupabaseStorageClient(StorageInterface):
             on_conflict = ",".join(conflict_fields) if conflict_fields else "id"
 
             # Execute bulk upsert
-            response = await client.table(table).upsert(
-                normalized_data,
-                on_conflict=on_conflict,
-                ignore_duplicates=False,  # DO UPDATE on conflict
-                returning="representation",
-                default_to_null=True,  # Missing fields default to NULL on INSERT
-            ).execute()
+            response = (
+                await client.table(table)
+                .upsert(
+                    normalized_data,
+                    on_conflict=on_conflict,
+                    ignore_duplicates=False,  # DO UPDATE on conflict
+                    returning="representation",
+                    default_to_null=True,  # Missing fields default to NULL on INSERT
+                )
+                .execute()
+            )
 
             if not response.data:
                 raise StorageError(
@@ -2043,13 +2082,15 @@ class SupabaseStorageClient(StorageInterface):
 
             # Track operation for transaction
             if self._current_transaction is not None:
-                self._current_transaction.operations.append({
-                    "type": "bulk_upsert",
-                    "table": table,
-                    "ids": entity_ids,
-                    "conflict_fields": conflict_fields or ["id"],
-                    "count": len(upserted),
-                })
+                self._current_transaction.operations.append(
+                    {
+                        "type": "bulk_upsert",
+                        "table": table,
+                        "ids": entity_ids,
+                        "conflict_fields": conflict_fields or ["id"],
+                        "count": len(upserted),
+                    }
+                )
 
             return upserted
 
@@ -2060,7 +2101,11 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Failed to bulk upsert into {table}",
                 exc_info=True,
-                extra={"table": table, "conflict_fields": conflict_fields, "entity_count": len(data)}
+                extra={
+                    "table": table,
+                    "conflict_fields": conflict_fields,
+                    "entity_count": len(data),
+                },
             )
             raise StorageError(
                 message=f"Bulk upsert failed for {table}: {str(e)}",
@@ -2105,12 +2150,14 @@ class SupabaseStorageClient(StorageInterface):
 
             # Track operation for transaction
             if self._current_transaction is not None:
-                self._current_transaction.operations.append({
-                    "type": "patch",
-                    "table": table,
-                    "ids": [id],
-                    "updates": updates,
-                })
+                self._current_transaction.operations.append(
+                    {
+                        "type": "patch",
+                        "table": table,
+                        "ids": [id],
+                        "updates": updates,
+                    }
+                )
 
             return patched
 
@@ -2121,7 +2168,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Failed to patch entity in {table}",
                 exc_info=True,
-                extra={"table": table, "id": id, "updates": updates}
+                extra={"table": table, "id": id, "updates": updates},
             )
             raise StorageError(
                 message=f"Patch failed for {table}: {str(e)}",
@@ -2177,39 +2224,47 @@ class SupabaseStorageClient(StorageInterface):
                 # Check required fields
                 for field in required_fields:
                     if field not in entity or entity[field] is None or entity[field] == "":
-                        errors.append({
-                            "entity_index": idx,
-                            "field": field,
-                            "error": f"Field '{field}' is required but missing or empty",
-                            "severity": "error"
-                        })
+                        errors.append(
+                            {
+                                "entity_index": idx,
+                                "field": field,
+                                "error": f"Field '{field}' is required but missing or empty",
+                                "severity": "error",
+                            }
+                        )
 
                 # Type validation for common fields
                 if "base_price" in entity and entity["base_price"] is not None:
                     if not isinstance(entity["base_price"], (int, float)):
-                        errors.append({
-                            "entity_index": idx,
-                            "field": "base_price",
-                            "error": "Field 'base_price' must be a number",
-                            "severity": "error"
-                        })
+                        errors.append(
+                            {
+                                "entity_index": idx,
+                                "field": "base_price",
+                                "error": "Field 'base_price' must be a number",
+                                "severity": "error",
+                            }
+                        )
                     elif entity["base_price"] < 0:
-                        warnings.append({
-                            "entity_index": idx,
-                            "field": "base_price",
-                            "warning": "Negative price detected",
-                            "severity": "warning"
-                        })
+                        warnings.append(
+                            {
+                                "entity_index": idx,
+                                "field": "base_price",
+                                "warning": "Negative price detected",
+                                "severity": "warning",
+                            }
+                        )
 
                 # Check for unusually long strings (potential data issues)
                 for key, value in entity.items():
                     if isinstance(value, str) and len(value) > 1000:
-                        warnings.append({
-                            "entity_index": idx,
-                            "field": key,
-                            "warning": f"String value exceeds 1000 characters ({len(value)} chars)",
-                            "severity": "warning"
-                        })
+                        warnings.append(
+                            {
+                                "entity_index": idx,
+                                "field": key,
+                                "warning": f"String value exceeds 1000 characters ({len(value)} chars)",
+                                "severity": "warning",
+                            }
+                        )
 
             return {
                 "valid": len(errors) == 0,
@@ -2222,7 +2277,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Validation failed for {table}",
                 exc_info=True,
-                extra={"table": table, "operation": operation}
+                extra={"table": table, "operation": operation},
             )
             raise StorageError(
                 message=f"Validation failed for {table}: {str(e)}",
@@ -2289,21 +2344,25 @@ class SupabaseStorageClient(StorageInterface):
 
                         # Report violations for existing values
                         for value in existing_values:
-                            violations.append({
-                                "type": "uniqueness",
-                                "field": field,
-                                "value": value,
-                                "message": f"{field} '{value}' already exists",
-                            })
+                            violations.append(
+                                {
+                                    "type": "uniqueness",
+                                    "field": field,
+                                    "value": value,
+                                    "message": f"{field} '{value}' already exists",
+                                }
+                            )
 
                         checked_constraints.append(f"{field}_unique")
 
             # Check for large batches (performance warning)
             if len(entities) > 100:
-                warnings.append({
-                    "type": "performance",
-                    "message": f"Large batch ({len(entities)} entities) may be slow"
-                })
+                warnings.append(
+                    {
+                        "type": "performance",
+                        "message": f"Large batch ({len(entities)} entities) may be slow",
+                    }
+                )
 
             # Check for duplicate values within the batch itself
             for field in unique_fields:
@@ -2316,12 +2375,14 @@ class SupabaseStorageClient(StorageInterface):
                 duplicates = {v for v in field_values if field_values.count(v) > 1}
 
                 for dup_value in duplicates:
-                    violations.append({
-                        "type": "duplicate_in_batch",
-                        "field": field,
-                        "value": dup_value,
-                        "message": f"Duplicate {field} '{dup_value}' within batch"
-                    })
+                    violations.append(
+                        {
+                            "type": "duplicate_in_batch",
+                            "field": field,
+                            "value": dup_value,
+                            "message": f"Duplicate {field} '{dup_value}' within batch",
+                        }
+                    )
 
             return {
                 "safe_to_proceed": len(violations) == 0,
@@ -2334,7 +2395,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Constraint check failed for {table}",
                 exc_info=True,
-                extra={"table": table, "operation": operation}
+                extra={"table": table, "operation": operation},
             )
             raise StorageError(
                 message=f"Constraint check failed for {table}: {str(e)}",
@@ -2371,9 +2432,7 @@ class SupabaseStorageClient(StorageInterface):
             sample_entities: list[dict[str, Any]] = []
             if affected_count > 0:
                 sample_entities = await self.query_entities(
-                    table,
-                    filters=filters,
-                    limit=sample_size
+                    table, filters=filters, limit=sample_size
                 )
 
             # Calculate estimated duration (heuristic: ~2ms per entity)
@@ -2384,23 +2443,23 @@ class SupabaseStorageClient(StorageInterface):
             safe_to_proceed = True
 
             if filters is None or len(filters) == 0:
-                warnings.append({
-                    "type": "no_filters",
-                    "message": "Operation affects ALL entities in table"
-                })
+                warnings.append(
+                    {"type": "no_filters", "message": "Operation affects ALL entities in table"}
+                )
                 safe_to_proceed = False  # Dangerous operation
 
             if affected_count > 100:
-                warnings.append({
-                    "type": "large_batch",
-                    "message": f"Operation affects {affected_count} entities"
-                })
+                warnings.append(
+                    {
+                        "type": "large_batch",
+                        "message": f"Operation affects {affected_count} entities",
+                    }
+                )
 
             if affected_count == 0:
-                warnings.append({
-                    "type": "no_effect",
-                    "message": "No entities match the filter criteria"
-                })
+                warnings.append(
+                    {"type": "no_effect", "message": "No entities match the filter criteria"}
+                )
 
             return {
                 "affected_count": affected_count,
@@ -2414,7 +2473,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Preview failed for {table}",
                 exc_info=True,
-                extra={"table": table, "operation": operation, "filters": filters}
+                extra={"table": table, "operation": operation, "filters": filters},
             )
             raise StorageError(
                 message=f"Preview failed for {table}: {str(e)}",
@@ -2466,18 +2525,13 @@ class SupabaseStorageClient(StorageInterface):
             }
 
             logger.debug(
-                f"Fetched stats for {table}",
-                extra={"table": table, "row_count": row_count}
+                f"Fetched stats for {table}", extra={"table": table, "row_count": row_count}
             )
 
             return stats
 
         except Exception as e:
-            logger.error(
-                f"Failed to get stats for {table}",
-                exc_info=True,
-                extra={"table": table}
-            )
+            logger.error(f"Failed to get stats for {table}", exc_info=True, extra={"table": table})
             raise StorageError(
                 message=f"Failed to get table stats for {table}: {str(e)}",
                 operation="get_table_stats",
@@ -2526,7 +2580,7 @@ class SupabaseStorageClient(StorageInterface):
 
             logger.debug(
                 f"Fetched {len(samples)} samples from {table}",
-                extra={"table": table, "filters": filters, "limit": safe_limit}
+                extra={"table": table, "filters": filters, "limit": safe_limit},
             )
 
             return samples
@@ -2535,7 +2589,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Failed to sample data from {table}",
                 exc_info=True,
-                extra={"table": table, "filters": filters}
+                extra={"table": table, "filters": filters},
             )
             raise StorageError(
                 message=f"Failed to sample data from {table}: {str(e)}",
@@ -2643,7 +2697,7 @@ class SupabaseStorageClient(StorageInterface):
                 {
                     "p_operations": operations,
                     "p_context": context or {},
-                }
+                },
             ).execute()
 
             # RPC returns the result directly in data
@@ -2663,7 +2717,7 @@ class SupabaseStorageClient(StorageInterface):
                     extra={
                         "operations_executed": rpc_result.get("operations_executed", 0),
                         "results_count": len(rpc_result.get("results", [])),
-                    }
+                    },
                 )
             else:
                 logger.warning(
@@ -2672,7 +2726,7 @@ class SupabaseStorageClient(StorageInterface):
                         "error": rpc_result.get("error"),
                         "error_code": rpc_result.get("error_code"),
                         "failed_operation_index": rpc_result.get("failed_operation_index"),
-                    }
+                    },
                 )
 
             return rpc_result
@@ -2681,7 +2735,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 "WriteIntent RPC call failed",
                 exc_info=True,
-                extra={"operation_count": len(operations)}
+                extra={"operation_count": len(operations)},
             )
             raise StorageError(
                 message=f"WriteIntent RPC failed: {str(e)}",
@@ -2761,7 +2815,7 @@ class SupabaseStorageClient(StorageInterface):
                     "storage_path": storage_path,
                     "size_bytes": len(file_content),
                     "content_type": content_type,
-                }
+                },
             )
 
             return {
@@ -2779,7 +2833,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Failed to upload asset to {bucket}/{folder}",
                 exc_info=True,
-                extra={"file_path": file_path, "bucket": bucket, "folder": folder}
+                extra={"file_path": file_path, "bucket": bucket, "folder": folder},
             )
             raise StorageError(
                 message=f"Asset upload failed: {str(e)}",
@@ -2812,7 +2866,7 @@ class SupabaseStorageClient(StorageInterface):
 
             logger.info(
                 f"Deleted asset from {bucket}/{storage_path}",
-                extra={"bucket": bucket, "storage_path": storage_path}
+                extra={"bucket": bucket, "storage_path": storage_path},
             )
 
             return True
@@ -2821,7 +2875,7 @@ class SupabaseStorageClient(StorageInterface):
             logger.error(
                 f"Failed to delete asset from {bucket}/{storage_path}",
                 exc_info=True,
-                extra={"storage_path": storage_path, "bucket": bucket}
+                extra={"storage_path": storage_path, "bucket": bucket},
             )
             raise StorageError(
                 message=f"Asset delete failed: {str(e)}",
@@ -2966,6 +3020,7 @@ class SupabaseStorageClient(StorageInterface):
 
         # Fallback to timestamp if too many versions
         import time
+
         return f"{base}-{int(time.time())}{ext}"
 
     async def _upload_to_zone(
@@ -3024,7 +3079,11 @@ class SupabaseStorageClient(StorageInterface):
             except Exception as upload_error:
                 # Check if it's a duplicate error (409)
                 error_str = str(upload_error)
-                if "409" in error_str or "Duplicate" in error_str or "already exists" in error_str.lower():
+                if (
+                    "409" in error_str
+                    or "Duplicate" in error_str
+                    or "already exists" in error_str.lower()
+                ):
                     duplicate_detected = True
 
                     # Find next available version
@@ -3046,7 +3105,7 @@ class SupabaseStorageClient(StorageInterface):
                             "original_filename": original_filename,
                             "versioned_filename": actual_filename,
                             "folder_path": folder_path,
-                        }
+                        },
                     )
                 else:
                     raise  # Re-raise if it's not a duplicate error
@@ -3064,7 +3123,7 @@ class SupabaseStorageClient(StorageInterface):
                     "size_bytes": len(file_bytes),
                     "content_type": content_type,
                     "duplicate_detected": duplicate_detected,
-                }
+                },
             )
 
             result: dict[str, Any] = {
@@ -3096,7 +3155,7 @@ class SupabaseStorageClient(StorageInterface):
                     "thread_id": thread_id,
                     "file_name": filename,  # Renamed: 'filename' conflicts with LogRecord
                     "bucket": bucket,
-                }
+                },
             )
             raise StorageError(
                 message=f"Upload to {zone} failed: {str(e)}",
@@ -3142,7 +3201,9 @@ class SupabaseStorageClient(StorageInterface):
                 file_bytes = client.storage.from_(bucket).download(source_path)
             except Exception as download_error:
                 if "not found" in str(download_error).lower():
-                    raise FileNotFoundError(f"Source file not found: {source_path}") from download_error
+                    raise FileNotFoundError(
+                        f"Source file not found: {source_path}"
+                    ) from download_error
                 raise
 
             # Generate new filename in target folder
@@ -3177,7 +3238,7 @@ class SupabaseStorageClient(StorageInterface):
                     "target_path": target_path,
                     "bucket": bucket,
                     "size_bytes": len(file_bytes),
-                }
+                },
             )
 
             return {
@@ -3200,7 +3261,7 @@ class SupabaseStorageClient(StorageInterface):
                     "source_path": source_path,
                     "target_folder": target_folder,
                     "bucket": bucket,
-                }
+                },
             )
             raise StorageError(
                 message=f"Asset move failed: {str(e)}",
@@ -3249,9 +3310,7 @@ class SupabaseStorageClient(StorageInterface):
             # Build folder path - thread-scoped for inbox/pending
             if folder in ("inbox", "pending"):
                 if not thread_id:
-                    raise ValueError(
-                        f"thread_id is required for {folder}/ folder (session-scoped)"
-                    )
+                    raise ValueError(f"thread_id is required for {folder}/ folder (session-scoped)")
                 sanitized_thread_id = sanitize_for_path(thread_id)
                 folder_path = f"{folder}/{sanitized_thread_id}"
             else:
@@ -3263,7 +3322,7 @@ class SupabaseStorageClient(StorageInterface):
             try:
                 response = client.storage.from_(bucket).list(
                     folder_path,
-                    {"limit": limit + offset, "offset": 0}  # Fetch enough for offset
+                    {"limit": limit + offset, "offset": 0},  # Fetch enough for offset
                 )
             except Exception as list_error:
                 # Handle empty folder or non-existent path
@@ -3291,7 +3350,8 @@ class SupabaseStorageClient(StorageInterface):
 
             # Filter out folder entries (only files)
             all_files = [
-                item for item in response
+                item
+                for item in response
                 if item.get("id") is not None  # Files have IDs, folders don't
             ]
 
@@ -3299,25 +3359,20 @@ class SupabaseStorageClient(StorageInterface):
             if extension_filter:
                 normalized_exts = [ext.lower().lstrip(".") for ext in extension_filter]
                 all_files = [
-                    f for f in all_files
-                    if any(
-                        f.get("name", "").lower().endswith(f".{ext}")
-                        for ext in normalized_exts
-                    )
+                    f
+                    for f in all_files
+                    if any(f.get("name", "").lower().endswith(f".{ext}") for ext in normalized_exts)
                 ]
 
             # Apply prefix filter
             if prefix_filter:
-                all_files = [
-                    f for f in all_files
-                    if f.get("name", "").startswith(prefix_filter)
-                ]
+                all_files = [f for f in all_files if f.get("name", "").startswith(prefix_filter)]
 
             # Calculate total before pagination
             total_count = len(all_files)
 
             # Apply offset and limit
-            paginated_files = all_files[offset:offset + limit]
+            paginated_files = all_files[offset : offset + limit]
 
             # Build enriched file list with public URLs
             files: list[dict[str, Any]] = []
@@ -3358,7 +3413,7 @@ class SupabaseStorageClient(StorageInterface):
                     "count": len(files),
                     "total": total_count,
                     "has_more": has_more,
-                }
+                },
             )
 
             return {
@@ -3380,7 +3435,7 @@ class SupabaseStorageClient(StorageInterface):
                     "bucket": bucket,
                     "folder": folder,
                     "thread_id": thread_id,
-                }
+                },
             )
             raise StorageError(
                 message=f"Storage listing failed: {str(e)}",
@@ -3405,7 +3460,7 @@ class SupabaseStorageClient(StorageInterface):
         if self._client is not None:
             try:
                 # Close PostgREST client (database operations)
-                if hasattr(self._client.postgrest, 'session'):
+                if hasattr(self._client.postgrest, "session"):
                     self._client.postgrest.session.close()
                     logger.debug("Closed sync PostgREST HTTP client")
             except Exception as e:
@@ -3413,7 +3468,7 @@ class SupabaseStorageClient(StorageInterface):
 
             try:
                 # Close Storage client (file operations)
-                if hasattr(self._client.storage, '_client'):
+                if hasattr(self._client.storage, "_client"):
                     self._client.storage._client.close()
                     logger.debug("Closed sync Storage HTTP client")
             except Exception as e:
@@ -3421,7 +3476,7 @@ class SupabaseStorageClient(StorageInterface):
 
             try:
                 # Close Functions client (edge function operations)
-                if hasattr(self._client.functions, '_client'):
+                if hasattr(self._client.functions, "_client"):
                     self._client.functions._client.close()
                     logger.debug("Closed sync Functions HTTP client")
             except Exception as e:
@@ -3430,9 +3485,7 @@ class SupabaseStorageClient(StorageInterface):
         # Cleanup async client - safe nullification (GC handles httpx connections)
         # Explicit cleanup via _cleanup_async() is better but not required
         if self._async_client is not None:
-            logger.debug(
-                "Async client cleanup - nullifying references for GC"
-            )
+            logger.debug("Async client cleanup - nullifying references for GC")
             self._async_client = None
             self._async_client_loop = None
 
@@ -3447,7 +3500,7 @@ class SupabaseStorageClient(StorageInterface):
         if self._async_client is not None:
             try:
                 # Close async PostgREST client
-                if hasattr(self._async_client.postgrest, 'session'):
+                if hasattr(self._async_client.postgrest, "session"):
                     await self._async_client.postgrest.session.aclose()
                     logger.debug("Closed async PostgREST HTTP client")
             except Exception as e:
@@ -3455,7 +3508,7 @@ class SupabaseStorageClient(StorageInterface):
 
             try:
                 # Close async Storage client
-                if hasattr(self._async_client.storage, '_client'):
+                if hasattr(self._async_client.storage, "_client"):
                     await self._async_client.storage._client.aclose()
                     logger.debug("Closed async Storage HTTP client")
             except Exception as e:
@@ -3463,7 +3516,7 @@ class SupabaseStorageClient(StorageInterface):
 
             try:
                 # Close async Functions client
-                if hasattr(self._async_client.functions, '_client'):
+                if hasattr(self._async_client.functions, "_client"):
                     await self._async_client.functions._client.aclose()
                     logger.debug("Closed async Functions HTTP client")
             except Exception as e:
@@ -3497,8 +3550,7 @@ class SupabaseStorageClient(StorageInterface):
         try:
             client = await self._ensure_async_client()
             result = await client.rpc(
-                "cleanup_thread_subagent_checkpoints",
-                {"p_thread_id": thread_id}
+                "cleanup_thread_subagent_checkpoints", {"p_thread_id": thread_id}
             ).execute()
 
             if result.data and len(result.data) > 0:
@@ -3601,11 +3653,15 @@ class SupabaseTransaction:
 
                     elif op_type == "update":
                         # Cannot reliably rollback updates without storing previous values
-                        logger.warning(f"Cannot rollback update to {operation['table']} (no snapshot)")
+                        logger.warning(
+                            f"Cannot rollback update to {operation['table']} (no snapshot)"
+                        )
 
                     elif op_type == "delete":
                         # Cannot rollback deletes (data lost)
-                        logger.warning(f"Cannot rollback delete from {operation['table']} (data lost)")
+                        logger.warning(
+                            f"Cannot rollback delete from {operation['table']} (data lost)"
+                        )
 
                 except Exception as e:
                     logger.error(f"Rollback operation failed: {e}", exc_info=True)

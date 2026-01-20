@@ -24,10 +24,7 @@ class AggregateDataInput(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    table: str = Field(
-        ...,
-        description="Table name to aggregate (e.g., 'table_a', 'table_b')"
-    )
+    table: str = Field(..., description="Table name to aggregate (e.g., 'table_a', 'table_b')")
     aggregates: dict[str, str] = Field(
         ...,
         description=(
@@ -37,7 +34,7 @@ class AggregateDataInput(BaseModel):
             "{'avg_val': 'avg(amount)'} - average price, "
             "{'min_price': 'min(amount)', 'max_price': 'max(amount)'} - min/max. "
             "Supported functions: count, sum, avg, min, max"
-        )
+        ),
     )
     filters: dict[str, Any] = Field(
         default_factory=dict,
@@ -46,7 +43,7 @@ class AggregateDataInput(BaseModel):
             "Use for: IDs, booleans, enums, status codes.\n"
             "Examples: {'is_active': True}, {'parent_id': 'uuid-123'}, {'status': ['active','draft']}.\n"
             "CRITICAL: For text/name filtering, use search_patterns instead (fuzzy match)."
-        )
+        ),
     )
     search_patterns: dict[str, str | list[str]] = Field(
         default_factory=dict,
@@ -56,11 +53,10 @@ class AggregateDataInput(BaseModel):
             "Single pattern (AND): {'name': '%keyword%'} (contains), {'code': 'PREFIX-%'} (starts with).\n"
             "Multiple patterns (OR): {'name': ['%jar%', '%bottle%']} (matches any).\n"
             "Use for: name searches, code patterns, description matching."
-        )
+        ),
     )
     group_by: list[str] | None = Field(
-        default=None,
-        description="Columns to group by (e.g., ['category_id', 'brand'])"
+        default=None, description="Columns to group by (e.g., ['category_id', 'brand'])"
     )
     having: dict[str, Any] | None = Field(
         default=None,
@@ -70,7 +66,7 @@ class AggregateDataInput(BaseModel):
             "{'total': {'gt': 10}} - groups with total > 10, "
             "{'avg_val': {'gte': 100, 'lte': 500}} - average price between 100-500. "
             "Operators: gt, gte, lt, lte, eq, neq"
-        )
+        ),
     )
 
 
@@ -149,7 +145,7 @@ def create_aggregate_data_tool(
             if allowed_tables is not None and table not in allowed_tables:
                 logger.warning(
                     f"Access denied to table: {table}",
-                    extra={"requested": table, "allowed": allowed_tables}
+                    extra={"requested": table, "allowed": allowed_tables},
                 )
                 return build_agent_error_response(
                     exception=PermissionError(f"Access denied to table: {table}"),
@@ -159,16 +155,12 @@ def create_aggregate_data_tool(
                         f"You don't have access to table '{table}'. "
                         f"Available tables: {allowed_tables}. "
                         f"Request access from system administrator if needed."
-                    )
+                    ),
                 )
 
             logger.info(
                 f"Aggregating data from {table}",
-                extra={
-                    "table": table,
-                    "aggregates": list(aggregates.keys()),
-                    "group_by": group_by
-                }
+                extra={"table": table, "aggregates": list(aggregates.keys()), "group_by": group_by},
             )
 
             # Execute aggregation query
@@ -183,16 +175,18 @@ def create_aggregate_data_tool(
 
             logger.info(
                 f"Aggregation returned {len(results)} result(s)",
-                extra={"table": table, "result_count": len(results)}
+                extra={"table": table, "result_count": len(results)},
             )
 
-            return build_success_response({
-                "table": table,
-                "aggregates": list(aggregates.keys()),
-                "group_by": group_by or [],
-                "results": results,
-                "count": len(results),
-            })
+            return build_success_response(
+                {
+                    "table": table,
+                    "aggregates": list(aggregates.keys()),
+                    "group_by": group_by or [],
+                    "results": results,
+                    "count": len(results),
+                }
+            )
 
         except PermissionError:
             # Re-raise to avoid double-wrapping
@@ -202,7 +196,7 @@ def create_aggregate_data_tool(
             logger.error(
                 f"Aggregation failed for {table}",
                 exc_info=True,
-                extra={"table": table, "aggregates": aggregates}
+                extra={"table": table, "aggregates": aggregates},
             )
             return build_agent_error_response(
                 exception=e,
@@ -212,7 +206,7 @@ def create_aggregate_data_tool(
                     f"Aggregation query failed for {table}. "
                     f"Verify aggregate syntax and try again. "
                     f"Supported functions: count, sum, avg, min, max."
-                )
+                ),
             )
 
     return StructuredTool.from_function(

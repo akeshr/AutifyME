@@ -12,7 +12,6 @@ Universal graders (applicable to all agent types):
 from ..models import ToolCallSequence
 from .base import GraderCategory, GraderResult
 
-
 # =============================================================================
 # Universal Graders (applicable to all agents)
 # =============================================================================
@@ -28,6 +27,7 @@ def error_recovery_attempted(seq: ToolCallSequence, agent: str) -> GraderResult:
     - If no errors occurred: PASS (nothing to recover from)
     - If error occurred AND agent continued with subsequent calls: PASS
     - If error occurred AND agent stopped: FAIL (gave up without trying)
+    - GraphInterrupt errors are EXCLUDED (HITL pause, not actual error)
 
     Args:
         seq: ToolCallSequence from get_tool_call_sequence()
@@ -49,8 +49,13 @@ def error_recovery_attempted(seq: ToolCallSequence, agent: str) -> GraderResult:
             severity="LOW",
         )
 
-    # Find error calls
-    error_calls = [tc for tc in agent_calls if tc.status == "error" or tc.error]
+    # Find error calls, EXCLUDING GraphInterrupt (HITL pause, not error)
+    # GraphInterrupt is how HITL works - workflow intentionally pauses for approval
+    error_calls = [
+        tc
+        for tc in agent_calls
+        if (tc.status == "error" or tc.error) and not (tc.error and "GraphInterrupt" in tc.error)
+    ]
 
     # Case 1: No errors - nothing to recover from
     if not error_calls:
@@ -97,7 +102,9 @@ def error_recovery_attempted(seq: ToolCallSequence, agent: str) -> GraderResult:
         )
     else:
         # Agent gave up after error
-        first_error = next(tc for tc in error_calls if tc.sequence == min(tc.sequence for tc in error_calls))
+        first_error = next(
+            tc for tc in error_calls if tc.sequence == min(tc.sequence for tc in error_calls)
+        )
         return GraderResult(
             name="error_recovery_attempted",
             passed=False,
@@ -108,7 +115,9 @@ def error_recovery_attempted(seq: ToolCallSequence, agent: str) -> GraderResult:
                 "error_calls": len(error_calls),
                 "first_error_seq": first_error.sequence,
                 "first_error_tool": first_error.tool_name,
-                "first_error_message": first_error.error[:200] if first_error.error else "Unknown error",
+                "first_error_message": first_error.error[:200]
+                if first_error.error
+                else "Unknown error",
                 "calls_after_error": 0,
             },
             reason=f"{agent} gave up after error in {first_error.tool_name} - no recovery attempted",
@@ -158,7 +167,8 @@ def hitl_triggered(seq: ToolCallSequence, agent: str = "catalog_specialist") -> 
     hitl_calls = [
         tc
         for tc in agent_calls
-        if tc.tool_name in hitl_names or any(h in tc.tool_name.lower() for h in ["interrupt", "approval"])
+        if tc.tool_name in hitl_names
+        or any(h in tc.tool_name.lower() for h in ["interrupt", "approval"])
     ]
 
     persist_calls = [tc for tc in agent_calls if tc.tool_name in persist_names]
@@ -205,7 +215,9 @@ def hitl_triggered(seq: ToolCallSequence, agent: str = "catalog_specialist") -> 
         evidence={
             "agent": agent,
             "first_hitl_seq": first_hitl_seq,
-            "first_hitl_tool": next(tc.tool_name for tc in hitl_calls if tc.sequence == first_hitl_seq),
+            "first_hitl_tool": next(
+                tc.tool_name for tc in hitl_calls if tc.sequence == first_hitl_seq
+            ),
             "first_persist_seq": first_persist_seq,
             "first_persist_tool": persist_calls[0].tool_name,
         },
@@ -259,9 +271,7 @@ def output_file_written(seq: ToolCallSequence, agent: str) -> GraderResult:
     }
 
     write_calls = [
-        tc
-        for tc in agent_calls
-        if tc.tool_name in write_names or "write" in tc.tool_name.lower()
+        tc for tc in agent_calls if tc.tool_name in write_names or "write" in tc.tool_name.lower()
     ]
 
     if not agent_calls:
@@ -413,9 +423,7 @@ def specialist_read_upstream(seq: ToolCallSequence, agent: str) -> GraderResult:
     # Find specialist read_file calls
     read_tools = {"read_file", "read_data", "load_file", "get_file"}
     specialist_reads = [
-        tc
-        for tc in agent_calls
-        if tc.tool_name in read_tools or "read" in tc.tool_name.lower()
+        tc for tc in agent_calls if tc.tool_name in read_tools or "read" in tc.tool_name.lower()
     ]
 
     # Find specialist action tools (non-read, non-protocol tools)
@@ -614,10 +622,12 @@ def image_studio_core_specs_included(
             missing.append("composition|output")
 
         if missing:
-            calls_missing_core_specs.append({
-                "sequence": tc.sequence,
-                "missing_specs": missing,
-            })
+            calls_missing_core_specs.append(
+                {
+                    "sequence": tc.sequence,
+                    "missing_specs": missing,
+                }
+            )
 
     if not calls_missing_core_specs:
         return GraderResult(
@@ -686,15 +696,15 @@ def image_studio_output_verified(
 
     for studio_call in image_studio_calls:
         # Find view_image calls after this studio call
-        subsequent_views = [
-            v for v in view_image_calls if v.sequence > studio_call.sequence
-        ]
+        subsequent_views = [v for v in view_image_calls if v.sequence > studio_call.sequence]
 
         if not subsequent_views:
-            unverified_outputs.append({
-                "image_studio_seq": studio_call.sequence,
-                "view_image_after": False,
-            })
+            unverified_outputs.append(
+                {
+                    "image_studio_seq": studio_call.sequence,
+                    "view_image_after": False,
+                }
+            )
 
     if not unverified_outputs:
         return GraderResult(
@@ -727,6 +737,151 @@ def image_studio_output_verified(
             category=GraderCategory.SPECIALIST,
             severity="MEDIUM",
         )
+
+
+def image_studio_consistency_params(
+    seq: ToolCallSequence,
+    agent: str = "creative_specialist",
+    user_message: str = "",
+) -> GraderResult:
+    """Check if batch image_studio calls include consistency parameters (seed, temperature).
+
+    For batch operations (multiple items, regeneration, variants), consistency parameters
+    are critical to ensure uniform visual output across the set.
+
+    Detection:
+    - Multiple image_studio calls in trace = batch scenario
+    - User message contains batch keywords = batch scenario
+    - Single call without batch context = grader not applicable
+
+    Args:
+        seq: ToolCallSequence from get_tool_call_sequence()
+        agent: Agent to check (default: creative_specialist)
+        user_message: Original user message (for batch keyword detection)
+
+    Returns:
+        GraderResult with pass/fail and evidence
+    """
+    agent_calls = [tc for tc in seq.tool_calls if tc.agent == agent]
+    image_studio_calls = [tc for tc in agent_calls if tc.tool_name == "image_studio"]
+
+    if not image_studio_calls:
+        return GraderResult(
+            name="image_studio_consistency_params",
+            passed=True,
+            score=1.0,
+            evidence={"agent": agent, "image_studio_calls": 0},
+            reason=f"No image_studio calls found for {agent} - grader not applicable",
+            category=GraderCategory.SPECIALIST,
+            severity="LOW",
+        )
+
+    # Detect batch scenario
+    batch_keywords = [
+        "batch",
+        "regenerate",
+        "all",
+        "consistency",
+        "variant",
+        "family",
+        "set",
+        "multiple",
+    ]
+    is_batch_by_keyword = any(kw in user_message.lower() for kw in batch_keywords)
+    is_batch_by_count = len(image_studio_calls) > 1
+
+    is_batch_scenario = is_batch_by_keyword or is_batch_by_count
+
+    if not is_batch_scenario:
+        return GraderResult(
+            name="image_studio_consistency_params",
+            passed=True,
+            score=1.0,
+            evidence={
+                "agent": agent,
+                "image_studio_calls": len(image_studio_calls),
+                "is_batch_scenario": False,
+            },
+            reason="Single image_studio call without batch context - consistency params not required",
+            category=GraderCategory.SPECIALIST,
+            severity="LOW",
+        )
+
+    # Batch scenario detected - check for consistency params
+    calls_analysis: list[dict] = []
+    calls_with_seed = 0
+    calls_with_temperature = 0
+
+    for tc in image_studio_calls:
+        args = tc.parsed_args or {}
+        has_seed = args.get("seed") is not None
+        has_temperature = args.get("temperature") is not None
+
+        if has_seed:
+            calls_with_seed += 1
+        if has_temperature:
+            calls_with_temperature += 1
+
+        calls_analysis.append(
+            {
+                "sequence": tc.sequence,
+                "has_seed": has_seed,
+                "has_temperature": has_temperature,
+                "seed_value": args.get("seed"),
+                "temperature_value": args.get("temperature"),
+            }
+        )
+
+    # For batch consistency: ALL calls should have seed, and ideally same seed
+    all_have_seed = calls_with_seed == len(image_studio_calls)
+
+    # Check if same seed is used across calls (for true batch consistency)
+    seed_values = [c["seed_value"] for c in calls_analysis if c["seed_value"] is not None]
+    same_seed_used = len(set(seed_values)) == 1 if seed_values else False
+
+    # Scoring:
+    # - All have seed + same seed = 1.0 (perfect batch consistency)
+    # - All have seed + different seeds = 0.7 (seed used but not for consistency)
+    # - Some have seed = 0.4 (partial adoption)
+    # - None have seed = 0.0 (no consistency controls for batch)
+    if all_have_seed and same_seed_used:
+        score = 1.0
+        passed = True
+        reason = f"All {len(image_studio_calls)} batch calls use same seed ({seed_values[0]}) - maximum consistency"
+    elif all_have_seed:
+        score = 0.7
+        passed = True
+        reason = f"All {len(image_studio_calls)} batch calls have seed but values differ - partial consistency"
+    elif calls_with_seed > 0:
+        score = 0.4
+        passed = False
+        reason = f"Only {calls_with_seed}/{len(image_studio_calls)} batch calls have seed - inconsistent adoption"
+    else:
+        score = 0.0
+        passed = False
+        reason = f"Batch scenario ({len(image_studio_calls)} calls) with NO seed parameters - consistency at risk"
+
+    return GraderResult(
+        name="image_studio_consistency_params",
+        passed=passed,
+        score=score,
+        evidence={
+            "agent": agent,
+            "image_studio_calls": len(image_studio_calls),
+            "is_batch_scenario": True,
+            "batch_detection": {
+                "by_keyword": is_batch_by_keyword,
+                "by_count": is_batch_by_count,
+            },
+            "calls_with_seed": calls_with_seed,
+            "calls_with_temperature": calls_with_temperature,
+            "same_seed_used": same_seed_used,
+            "calls_analysis": calls_analysis,
+        },
+        reason=reason,
+        category=GraderCategory.SPECIALIST,
+        severity="MEDIUM",
+    )
 
 
 def specialist_hitl_respected(

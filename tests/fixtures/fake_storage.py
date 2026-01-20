@@ -125,7 +125,9 @@ class FakeStorage(StorageInterface):
             "media_id": media_id,
             "caption": caption,
             "sender_name": sender_name,
-            "received_at": received_at.isoformat() if isinstance(received_at, datetime) else received_at,
+            "received_at": received_at.isoformat()
+            if isinstance(received_at, datetime)
+            else received_at,
             "created_at": datetime.now(UTC).isoformat(),
         }
         self.tables["pending_messages"].append(message)
@@ -138,13 +140,15 @@ class FakeStorage(StorageInterface):
 
         # Find all messages for this batch_key
         batch = [
-            msg for msg in self.tables["pending_messages"]
+            msg
+            for msg in self.tables["pending_messages"]
             if msg.get("batch_key") == batch_key or msg.get("sender_id") == batch_key
         ]
 
         # Remove from table
         self.tables["pending_messages"] = [
-            msg for msg in self.tables["pending_messages"]
+            msg
+            for msg in self.tables["pending_messages"]
             if msg.get("batch_key") != batch_key and msg.get("sender_id") != batch_key
         ]
 
@@ -152,9 +156,7 @@ class FakeStorage(StorageInterface):
         batch.sort(key=lambda x: x.get("created_at", ""))
         return batch
 
-    async def has_recent_activity(
-        self, sender_id: str, window_seconds: int = 5
-    ) -> bool:
+    async def has_recent_activity(self, sender_id: str, window_seconds: int = 5) -> bool:
         """Check if sender has recent activity within time window."""
         if "pending_messages" not in self.tables:
             return False
@@ -176,14 +178,9 @@ class FakeStorage(StorageInterface):
         if "pending_messages" not in self.tables:
             return False
 
-        return any(
-            msg.get("sender_id") == sender_id
-            for msg in self.tables["pending_messages"]
-        )
+        return any(msg.get("sender_id") == sender_id for msg in self.tables["pending_messages"])
 
-    async def get_orphaned_batches(
-        self, age_seconds: int = 33
-    ) -> list[dict[str, Any]]:
+    async def get_orphaned_batches(self, age_seconds: int = 33) -> list[dict[str, Any]]:
         """Get pending messages older than expected processing time."""
         if "pending_messages" not in self.tables:
             return []
@@ -566,7 +563,9 @@ class FakeStorage(StorageInterface):
                     result[alias] = sum(float(row.get(col, 0)) for row in filtered_data)
                 elif "avg" in func:
                     col = func.split("(")[1].split(")")[0]
-                    values = [float(row.get(col, 0)) for row in filtered_data if row.get(col) is not None]
+                    values = [
+                        float(row.get(col, 0)) for row in filtered_data if row.get(col) is not None
+                    ]
                     result[alias] = sum(values) / len(values) if values else 0
                 elif "min" in func:
                     col = func.split("(")[1].split(")")[0]
@@ -580,6 +579,7 @@ class FakeStorage(StorageInterface):
 
         # Group by (simplified)
         from collections import defaultdict
+
         groups = defaultdict(list)
         for row in filtered_data:
             key = tuple(row.get(col) for col in group_by)
@@ -596,7 +596,9 @@ class FakeStorage(StorageInterface):
                     result[alias] = sum(float(row.get(col, 0)) for row in group_rows)
                 elif "avg" in func:
                     col = func.split("(")[1].split(")")[0]
-                    values = [float(row.get(col, 0)) for row in group_rows if row.get(col) is not None]
+                    values = [
+                        float(row.get(col, 0)) for row in group_rows if row.get(col) is not None
+                    ]
                     result[alias] = sum(values) / len(values) if values else 0
             results.append(result)
 
@@ -644,10 +646,7 @@ class FakeStorage(StorageInterface):
                 col = order_spec.get("column")
                 direction = order_spec.get("direction", "asc")
                 if col:
-                    filtered_data.sort(
-                        key=lambda x: x.get(col, ""),
-                        reverse=(direction == "desc")
-                    )
+                    filtered_data.sort(key=lambda x: x.get(col, ""), reverse=(direction == "desc"))
 
         # Calculate pagination
         total_count = len(filtered_data) if include_total_count else None
@@ -768,19 +767,19 @@ class FakeStorage(StorageInterface):
             for i, entity in enumerate(entities):
                 sku = entity.get("sku_code")
                 if sku:
-                    existing = await self.query_entities(
-                        table, filters={"sku_code": sku}
-                    )
+                    existing = await self.query_entities(table, filters={"sku_code": sku})
                     # Filter out excluded IDs
                     if exclude_ids:
                         existing = [e for e in existing if e.get("id") not in exclude_ids]
                     if existing:
-                        violations.append({
-                            "entity_index": i,
-                            "constraint": "unique_sku_code",
-                            "field": "sku_code",
-                            "value": sku,
-                        })
+                        violations.append(
+                            {
+                                "entity_index": i,
+                                "constraint": "unique_sku_code",
+                                "field": "sku_code",
+                                "value": sku,
+                            }
+                        )
 
         return violations
 
@@ -1093,7 +1092,7 @@ class FakeStorage(StorageInterface):
         for key, data in self._file_storage.items():
             if key.startswith(bucket_prefix):
                 # Extract filename from full path
-                relative_path = key[len(f"{bucket}/"):]
+                relative_path = key[len(f"{bucket}/") :]
                 filename = relative_path.split("/")[-1]
 
                 file_info = {
@@ -1109,7 +1108,8 @@ class FakeStorage(StorageInterface):
         if extension_filter:
             normalized_exts = [ext.lower().lstrip(".") for ext in extension_filter]
             all_files = [
-                f for f in all_files
+                f
+                for f in all_files
                 if any(f["name"].lower().endswith(f".{ext}") for ext in normalized_exts)
             ]
 
@@ -1121,7 +1121,7 @@ class FakeStorage(StorageInterface):
         total_count = len(all_files)
 
         # Apply offset and limit
-        paginated_files = all_files[offset:offset + limit]
+        paginated_files = all_files[offset : offset + limit]
 
         # Add user_path for convenience
         for file_info in paginated_files:
@@ -1160,8 +1160,7 @@ class FakeStorage(StorageInterface):
 
         # Create snapshot for rollback
         snapshot = {
-            table_name: copy.deepcopy(table_data)
-            for table_name, table_data in self.tables.items()
+            table_name: copy.deepcopy(table_data) for table_name, table_data in self.tables.items()
         }
 
         # Initialize context for @references
@@ -1198,7 +1197,12 @@ class FakeStorage(StorageInterface):
                     # Handle both single entity and batch inserts
                     if isinstance(data, list):
                         entities = await self.insert_entities(table, data)
-                        result = {"action": action, "table": table, "data": entities, "count": len(entities)}
+                        result = {
+                            "action": action,
+                            "table": table,
+                            "data": entities,
+                            "count": len(entities),
+                        }
                         results.append(result)
                         if returns:
                             ctx[returns] = entities

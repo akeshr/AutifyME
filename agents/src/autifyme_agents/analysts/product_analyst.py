@@ -68,7 +68,9 @@ def create_product_analyst(
     system_prompt = prompt_template.format(
         company_name=company_profile.name,
         industry=company_profile.industry or "Product Manufacturing",
-        target_markets=", ".join(company_profile.target_markets) if company_profile.target_markets else "India",
+        target_markets=", ".join(company_profile.target_markets)
+        if company_profile.target_markets
+        else "India",
     )
 
     description = (

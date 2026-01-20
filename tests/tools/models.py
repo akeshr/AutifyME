@@ -4,6 +4,7 @@ Return types for:
 - PM interaction tool (chat_with_pm)
 - Trace analysis tools (get_trace_overview, get_run_details, etc.)
 """
+
 from datetime import datetime
 from typing import Any
 
@@ -54,9 +55,11 @@ class PMChatResult(BaseModel):
     error: str | None = None
     """Error message if something went wrong."""
 
+
 # ============================================================================
 # Execution Tool Models
 # ============================================================================
+
 
 class ExecutionResult(BaseModel):
     """Result of scenario execution via execute_scenario()."""
@@ -99,6 +102,7 @@ class ExecutionResult(BaseModel):
 # Trace Analysis Models
 # ============================================================================
 
+
 class RunNode(BaseModel):
     """Single run node in hierarchical trace tree.
 
@@ -129,7 +133,7 @@ class RunNode(BaseModel):
     error: str | None = None
     """High-level error message if failed (not full traceback)."""
 
-    children: list['RunNode'] = Field(default_factory=list)
+    children: list["RunNode"] = Field(default_factory=list)
     """Child runs (recursive tree structure)."""
 
 
@@ -213,6 +217,81 @@ class MediaPath(BaseModel):
 
     media_id: str | None = None
     """Original WhatsApp media ID from tool input."""
+
+
+class TraceImage(BaseModel):
+    """Image extracted from a trace with full context.
+
+    Unified model for ALL images in a trace - user uploads (source) and
+    generated outputs. Makes it easy to track image flow through workflows.
+
+    Example:
+        >>> images = get_trace_images(trace_id)
+        >>> sources = [i for i in images if i.role == "source"]
+        >>> generated = [i for i in images if i.role == "generated"]
+        >>> for img in images:
+        ...     print(f"{img.role}: {img.storage_path} ({img.tool_name})")
+    """
+
+    storage_path: str
+    """Storage path (e.g., 'inbox/xxx.jpg' or 'pending/xxx.png')."""
+
+    role: str
+    """Role in workflow: 'source', 'generated', 'style_ref', 'background', 'variant'."""
+
+    tool_name: str
+    """Tool that produced/consumed this image (e.g., 'download_whatsapp_media', 'image_studio')."""
+
+    run_id: str
+    """Run ID for drilling down with get_run_details()."""
+
+    agent: str | None = None
+    """Agent that made the tool call (e.g., 'creative_specialist')."""
+
+    label: str | None = None
+    """Image label from image_studio input (e.g., 'source', 'style_ref')."""
+
+    sequence: int = 0
+    """Order in trace (0-indexed). Useful for tracking workflow progression."""
+
+    metadata: dict[str, Any] | None = None
+    """Image metadata if available (dimensions, format, etc.)."""
+
+
+class ImagePair(BaseModel):
+    """Source-to-generated image pair for comparison.
+
+    Groups an image_studio call's inputs and outputs together,
+    making it easy to compare what went in vs what came out.
+
+    Example:
+        >>> pairs = get_image_pairs(trace_id)
+        >>> for p in pairs:
+        ...     print(f"Source: {p.source.storage_path}")
+        ...     print(f"Generated: {p.generated.storage_path if p.generated else 'FAILED'}")
+        ...     print(f"Specs: {p.specs.get('fidelity', {})}")
+    """
+
+    source: TraceImage | None = None
+    """Primary source image input (labeled 'source' or 'product')."""
+
+    style_ref: TraceImage | None = None
+    """Style reference image if provided."""
+
+    generated: TraceImage | None = None
+    """Generated output image (None if generation failed)."""
+
+    specs: dict[str, Any] = Field(default_factory=dict)
+    """Specs passed to image_studio (fidelity, material_treatment, etc.)."""
+
+    run_id: str
+    """image_studio run ID for drilling down."""
+
+    success: bool = True
+    """Whether image generation succeeded."""
+
+    error: str | None = None
+    """Error message if generation failed."""
 
 
 class RunMetadata(BaseModel):
@@ -312,6 +391,7 @@ class RunMessages(BaseModel):
 # Multi-Trace Workflow Story Models (for HITL workflows)
 # ============================================================================
 
+
 class HITLDecision(BaseModel):
     """User decision from HITL interrupt."""
 
@@ -392,6 +472,7 @@ class WorkflowStory(BaseModel):
 # Test History Models
 # ============================================================================
 
+
 class ExecutionRecord(BaseModel):
     """Single test execution record."""
 
@@ -430,6 +511,7 @@ class ExecutionHistory(BaseModel):
 # ============================================================================
 # LLM Trace Extraction Models (for prompt analysis)
 # ============================================================================
+
 
 class LLMCallNode(BaseModel):
     """Single LLM invocation with prompt and output.
@@ -477,7 +559,7 @@ class LLMCallNode(BaseModel):
     parent_agent: str | None = None
     """Parent agent name for context (who delegated to this agent)."""
 
-    children: list['LLMCallNode'] = Field(default_factory=list)
+    children: list["LLMCallNode"] = Field(default_factory=list)
     """Child LLM calls (recursive tree structure)."""
 
 

@@ -182,9 +182,7 @@ class TestDeleteAsset:
 
     async def test_delete_nonexistent_asset_is_idempotent(self, storage):
         """Test deleting nonexistent asset returns True (idempotent)."""
-        result = await storage.delete_asset(
-            storage_path="nonexistent/path.png", bucket="assets"
-        )
+        result = await storage.delete_asset(storage_path="nonexistent/path.png", bucket="assets")
 
         # Should return True (idempotent behavior)
         assert result is True
@@ -241,9 +239,7 @@ class TestGetAssetPublicUrl:
 
     def test_get_public_url_custom_bucket(self, storage):
         """Test public URL with custom bucket."""
-        url = storage.get_asset_public_url(
-            storage_path="campaigns/banner.jpg", bucket="marketing"
-        )
+        url = storage.get_asset_public_url(storage_path="campaigns/banner.jpg", bucket="marketing")
 
         assert "marketing" in url
         assert "campaigns/banner.jpg" in url
@@ -326,17 +322,13 @@ class TestFileStorageIntegration:
         )
 
         # Delete from assets bucket only
-        await storage.delete_asset(
-            storage_path=result1["storage_path"], bucket="assets"
-        )
+        await storage.delete_asset(storage_path=result1["storage_path"], bucket="assets")
 
         # Verify assets file deleted, marketing file still exists
         assert f"assets/{result1['storage_path']}" not in storage._file_storage
         assert f"marketing/{result2['storage_path']}" in storage._file_storage
 
-    async def test_transaction_does_not_affect_file_storage(
-        self, storage, temp_image_file
-    ):
+    async def test_transaction_does_not_affect_file_storage(self, storage, temp_image_file):
         """Test that file uploads are outside transaction scope."""
         # Upload file
         upload_result = await storage.upload_asset(
@@ -345,9 +337,7 @@ class TestFileStorageIntegration:
 
         # Start transaction and create data
         async with storage.transaction():
-            await storage.insert_entity(
-                "products", {"name": "Test Product", "sku": "TEST-001"}
-            )
+            await storage.insert_entity("products", {"name": "Test Product", "sku": "TEST-001"})
 
         # File should still exist (not affected by transaction)
         bucket_key = f"assets/{upload_result['storage_path']}"

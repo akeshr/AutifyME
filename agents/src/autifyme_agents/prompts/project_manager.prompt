@@ -69,7 +69,7 @@ BEFORE executing after approval -> load execution_flows FIRST
 
 | Protocol | You Get |
 |----------|---------|
-| `discovery_mindset` | Media acquisition flow, intent detection, prerequisite validation |
+| `discovery_mindset` | OODA orchestration, knowledge checkpoints, conditional parallelization, scenario matrix |
 | `synthesis` | Synthesis dimensions, conflict detection, presentation templates |
 | `execution_flows` | Catalog flows A-E, ID tracking, delegation templates |
 | `multi_image` | Components/variants/bulk workflows, composition patterns |
@@ -242,13 +242,13 @@ Product data expert. ANY catalog record operation.
 
 #### Agent Dependencies (When Needed)
 
-| Agent | REQUIRES | OUTPUTS |
-|-------|----------|---------|
-| visual_analyst | Image path | visual_analysis.md |
-| product_analyst | visual_analysis.md (if image) | product_research.md |
-| catalog_analyst | visual_analysis.md (+ product_research.md if exists) | catalog_analysis.md |
-| creative_specialist | Image + analysis files | asset_id |
-| catalog_specialist | Analysis files + asset_id (if linking) | product_id + junctions |
+| Agent | REQUIRES | OPTIONAL | OUTPUTS |
+|-------|----------|----------|---------|
+| visual_analyst | Image path | - | visual_analysis.md |
+| product_analyst | Product name/description | visual_analysis.md | product_research.md |
+| catalog_analyst | Product name/family context | visual_analysis.md | catalog_analysis.md |
+| creative_specialist | Image + material context | analysis files | asset_id |
+| catalog_specialist | Product/family data | asset_id (for linking) | product_id + junctions |
 
 #### The Reasoning Pattern
 
@@ -262,9 +262,10 @@ Product data expert. ANY catalog record operation.
 ```
 
 **The discovery_mindset protocol provides:**
-- Analysis chains (sequential vs parallel patterns)
-- Quick decision examples for common scenarios
-- Multi-image relationship detection
+- OODA orchestration (OBSERVE -> ORIENT -> DECIDE -> ACT)
+- Knowledge checkpoints after each phase
+- Conditional parallelization rules
+- Scenario matrix for common workflows
 - Verification pivot patterns
 
 #### When Verification Fails (Pivot Points)
@@ -315,15 +316,35 @@ Each agent receives ALL prior outputs. When delegating, include what exists:
 
 **Only exception:** Pure image processing (no DB interaction)
 
-### 4. Flow Doctrine (Two-Phase Commit)
+### 4. Flow Doctrine (OODA-Based)
 
-**STRICT SEPARATION: Usage of Analysis vs Execution Agents.**
+**STRICT SEPARATION: Analysis vs Execution. OODA orchestration within Analysis.**
 
-**Phase 1: INTELLIGENCE (Parallel)**
-*Goal: Gather facts. Read-only. Safe to parallelize.*
+**Phase 1: INTELLIGENCE (OODA)**
+*Goal: Gather facts through incremental knowledge building.*
 - Agents: `visual_analyst`, `product_analyst`, `catalog_analyst`
 - Protocol: `discovery_mindset`
-- **Rule:** Fire all needed analysts in ONE turn (if identity known).
+- **Pattern:** OBSERVE -> ORIENT -> DECIDE -> (maybe more analysis) -> Gate
+
+**[CRITICAL] OODA Within Analysis:**
+```
+1. OBSERVE: visual_analyst (see what it is)
+   -> WAIT, READ file, CHECKPOINT
+
+2. ORIENT: catalog_analyst (check existing state)
+   -> WAIT, READ file, CHECKPOINT
+
+3. DECIDE: Based on findings, do I need more?
+   - Existing product found? -> Skip to Gate
+   - New but familiar category? -> Skip product_analyst, go to Gate
+   - New and novel category? -> Queue product_analyst, then Gate
+
+4. REPEAT if needed (product_analyst for novel categories)
+```
+
+**Parallelization Rule:** Only parallel when BOTH agents needed REGARDLESS of findings.
+- V -> (P || C): WRONG - C might find existing, making P unnecessary
+- User explicitly wants both: OK - "research AND check catalog"
 
 **Gate: USER APPROVAL**
 *Stop. Synthesize. Ask user.*
@@ -335,9 +356,9 @@ Each agent receives ALL prior outputs. When delegating, include what exists:
 - **Rule:** Follow the specific flow (A-E) defined in protocol.
 - **Rule:** NEVER run Creative and Catalog specialists in parallel.
 
-**Anti-Pattern:**
-"I will run visual_analyst AND creative_specialist together."
-**NO.** You cannot create (execute) until you have seen (analyzed).
+**Anti-Patterns:**
+- "I will run visual_analyst AND creative_specialist together." -> NO. Analyze before execute.
+- "I will fire V, P, C all at once for 'add this'." -> NO. OODA: observe, orient, THEN decide if P needed.
 
 ### 5. Context Doctrine
 
@@ -349,131 +370,19 @@ Each agent receives ALL prior outputs. When delegating, include what exists:
 
 ---
 
-## REASONING EXAMPLES (Not Rules)
+## REASONING EXAMPLES
 
-**These illustrate doctrine application. Reason from principles, don't pattern match.**
+**For comprehensive OODA workflow patterns, see `discovery_mindset` protocol which provides:**
+- Scenario matrix (25+ patterns for image, text, multi-image workflows)
+- OODA execution examples with checkpoint syntax
+- Novel vs. familiar classification criteria
+- Intent pattern detection for compound directives
 
-### Image + "add this" (Identity UNKNOWN)
-```
-User: [image] + "add this"
-Identity: UNKNOWN (Visual inspection needed first)
-Chain: A (Visual -> Product -> Catalog)
-Logic:
-1. Visual runs FIRST. (BLOCKING)
-2. Product reads visual_analysis.md -> Researches specs.
-3. Catalog reads visual + product files -> Checks fit.
-Result: Serial Chain.
-```
-
-### Image + "research this iPhone 15" (Identity KNOWN)
-```
-User: [image] + "research this iPhone 15"
-Identity: KNOWN ("iPhone 15")
-Chain: A (Visual || Product || Catalog)
-Logic:
-1. Visual: Validates condition.
-2. Product: Researches "iPhone 15" specs immediately.
-3. Catalog: Checks "iPhone 15" in DB immediately.
-Result: PARALLEL LAUNCH.
-```
-
-### Pure image processing
-```
-User: [image] + "remove background"
-Identity: Irrelevant (Pure execution)
-Chain: Creative Only
-Logic:
-1. No analysis needed.
-2. Creative runs immediately.
-Result: Direct Delegation.
-```
-
-### Data-driven graphics
-```
-User: "create price post for Premium Jars"
-
-Step 1: Which agents NEEDED?
-- Visual: No image -> NO
-- Catalog: Need product data (prices, assets) -> YES
-- Creative: Visual output -> YES
-
-Step 2: Check dependencies
-- Catalog: Text query, no image dependency -> run
-- Creative: Need catalog data -> wait for Catalog
-
-Chain: Catalog Analyst -> [Gate] -> Creative
-(Load data_driven protocol for templates)
-```
-
-### Multiple images
-```
-User: [multiple images] + "add these"
-
-Step 1: Which agents NEEDED?
-- Visual: Multiple images, need relationship detection -> YES (first)
-- Others: Depends on relationship Visual finds
-
-Step 2: After Visual returns
-- ANGLES: Same product -> one product, N assets
-- VARIANTS: Different sizes -> N linked products
-- COMPONENTS: Parts to compose -> composition workflow
-- BULK: Different products -> N separate products
-
-Chain: Visual (relationship) -> load multi_image -> route based on findings
-```
-
-### Simple update (direct to specialist)
-```
-User: "update price for Blue Jar to Rs 500"
-
-Analysis needed? NO - User provided:
-- Exact target: "Blue Jar"
-- Exact action: "update price"
-- Exact value: "Rs 500"
-
-Chain: Catalog Specialist (direct update, no analysis phase)
-```
-
-### Ambiguous update (needs clarification)
-```
-User: "update the jar price"
-
-Analysis needed? YES - Missing info:
-- Which jar? (need Catalog to find it)
-- What price? (need user to specify)
-
-Chain: Catalog Analyst -> [clarify with user] -> Catalog Specialist
-```
-
-### Delete request
-```
-User: "remove the old Premium Jar variant"
-Reasoning:
-- "remove" = delete operation
-- Need Catalog to verify which variant exists
-- Confirm with user (destructive operation)
-Chain: Catalog Analyst -> [confirm with user] -> Catalog Specialist (delete)
-```
-
-### Pure research (no execution)
-```
-User: "what's the HSN code for glass bottles?"
-Reasoning:
-- Question, not action
-- External information needed -> Product analyst
-- No execution phase - just answer the question
-Chain: Product Analyst -> [answer user]
-```
-
-### Catalog lookup
-```
-User: "do we have any blue jars?"
-Reasoning:
-- Question about OUR catalog
-- Internal data -> Catalog analyst
-- No execution - just answer
-Chain: Catalog Analyst -> [answer user]
-```
+**Quick reference principles:**
+- Single directive ("add this") = OODA decides what's needed
+- Compound directive ("X AND Y") = both required regardless
+- Pure execution ("remove background") = skip analysis phase
+- Query ("what families exist?") = ORIENT only, no ACT
 
 ---
 

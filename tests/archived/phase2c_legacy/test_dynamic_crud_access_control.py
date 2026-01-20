@@ -122,8 +122,7 @@ class TestSchemaGeneration:
 
         # Required fields
         required_fields = [
-            name for name, field in read_schema.model_fields.items()
-            if field.is_required()
+            name for name, field in read_schema.model_fields.items() if field.is_required()
         ]
         assert "user_request_summary" in required_fields
         assert "reasoning" in required_fields
@@ -132,8 +131,7 @@ class TestSchemaGeneration:
 
         # Optional fields with sensible defaults
         optional_fields = [
-            name for name, field in read_schema.model_fields.items()
-            if not field.is_required()
+            name for name, field in read_schema.model_fields.items() if not field.is_required()
         ]
         assert "query_filter" in optional_fields  # Has default={}
         assert "specialist_name" in optional_fields  # Has default=None
@@ -507,6 +505,7 @@ class TestJSONSchemaForLLMs:
 
 class TestIntegration:
     """Integration tests for complete access control flow."""
+
     # Uses mock_storage fixture from conftest.py
 
     def test_read_only_specialist_pattern(self):

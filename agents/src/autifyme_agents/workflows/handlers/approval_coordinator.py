@@ -76,7 +76,7 @@ class ApprovalCoordinator:
                 "interrupt_count": len(pending_interrupts),
                 "user_message": user_message[:50],
                 "has_history": len(conversation_history) > 0,
-            }
+            },
         )
 
         # Generate unique run_id for approval analyzer trace
@@ -89,7 +89,9 @@ class ApprovalCoordinator:
             text=f"[Approval Analysis] {user_message}",
             platform="internal",
         )
-        approval_tracking_id = self.outcome_tracker.track_workflow_start(thread_id, approval_message)
+        approval_tracking_id = self.outcome_tracker.track_workflow_start(
+            thread_id, approval_message
+        )
         self.outcome_tracker.set_trace_id(approval_tracking_id, approval_run_id)
 
         try:
@@ -111,7 +113,7 @@ class ApprovalCoordinator:
                     "interrupt_count": len(pending_interrupts),
                     "response_count": len(approval_response.responses),
                     "reasoning": approval_response.reasoning,
-                }
+                },
             )
 
             logger.info(
@@ -120,7 +122,7 @@ class ApprovalCoordinator:
                     "thread_id": thread_id,
                     "response_count": len(approval_response.responses),
                     "reasoning": approval_response.reasoning,
-                }
+                },
             )
 
             # Build Command from structured approval response
@@ -134,17 +136,17 @@ class ApprovalCoordinator:
             # Validation error (malformed approval response)
             logger.error(
                 "Approval analysis validation failed",
-                extra={"thread_id": thread_id, "error": str(e)}
+                extra={"thread_id": thread_id, "error": str(e)},
             )
             self.outcome_tracker.track_workflow_end(
                 tracking_id=approval_tracking_id,
                 success=False,
                 error=e,
-                resolution_strategy="user_notified"
+                resolution_strategy="user_notified",
             )
             self.channel.send_text(
                 raw_payload.get("sender", ""),
-                "I had trouble processing your response. Please try: 'approve' or 'reject'"
+                "I had trouble processing your response. Please try: 'approve' or 'reject'",
             )
             return None, None
 
@@ -152,17 +154,17 @@ class ApprovalCoordinator:
             # Generic error
             logger.exception(
                 "Approval analysis failed",
-                extra={"thread_id": thread_id, "error_type": type(e).__name__}
+                extra={"thread_id": thread_id, "error_type": type(e).__name__},
             )
             self.outcome_tracker.track_workflow_end(
                 tracking_id=approval_tracking_id,
                 success=False,
                 error=e,
-                resolution_strategy="user_notified"
+                resolution_strategy="user_notified",
             )
             self.channel.send_text(
                 raw_payload.get("sender", ""),
-                "I encountered an error processing your response. Please try again."
+                "I encountered an error processing your response. Please try again.",
             )
             return None, None
 
@@ -193,7 +195,7 @@ class ApprovalCoordinator:
             extra={
                 "interrupt_count": len(pending_interrupts),
                 "response_count": len(approval_response.responses),
-            }
+            },
         )
 
         # Build flat list of decisions in order of pending_interrupts
@@ -207,7 +209,7 @@ class ApprovalCoordinator:
                     "idx": idx,
                     "interrupt_id": interrupt_info.interrupt_id,
                     "tool_name": interrupt_info.tool_name,
-                }
+                },
             )
 
             response = approval_response.responses[idx]
@@ -219,26 +221,23 @@ class ApprovalCoordinator:
                 decision = {"type": "approve"}
                 logger.debug(
                     f"Built approve decision for interrupt {idx}",
-                    extra={"interrupt_id": interrupt_info.interrupt_id}
+                    extra={"interrupt_id": interrupt_info.interrupt_id},
                 )
             elif response.type == "reject":
                 # User rejected or wants changes - send user's actual response to PM
                 # Simple marker format so PM recognizes this as HITL feedback (not hallucination)
-                feedback_text = response.user_message or 'User rejected'
+                feedback_text = response.user_message or "User rejected"
                 # Include media_path if user sent image with their feedback
                 if media_path:
                     feedback_text = f"{feedback_text}\n[ATTACHED_IMAGE] {media_path}"
-                decision = {
-                    "type": "reject",
-                    "message": f"[HITL_FEEDBACK] {feedback_text}"
-                }
+                decision = {"type": "reject", "message": f"[HITL_FEEDBACK] {feedback_text}"}
                 logger.debug(
                     f"Built reject decision for interrupt {idx}",
                     extra={
                         "interrupt_id": interrupt_info.interrupt_id,
                         "user_feedback": response.user_message,
                         "media_path": media_path,
-                    }
+                    },
                 )
 
             all_decisions.append(decision)
@@ -249,7 +248,7 @@ class ApprovalCoordinator:
                 "total_decisions": len(all_decisions),
                 "approve_count": sum(1 for d in all_decisions if d["type"] == "approve"),
                 "reject_count": sum(1 for d in all_decisions if d["type"] == "reject"),
-            }
+            },
         )
 
         # Build HITLResponse: {"decisions": [all_decisions_in_order]}

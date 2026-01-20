@@ -265,7 +265,7 @@ def create_write_data_tool(
                     if op.table not in allowed_tables:
                         logger.warning(
                             f"Access denied to table: {op.table}",
-                            extra={"requested": op.table, "allowed": allowed_tables}
+                            extra={"requested": op.table, "allowed": allowed_tables},
                         )
                         return build_agent_error_response(
                             exception=PermissionError(f"Access denied to table: {op.table}"),
@@ -275,15 +275,13 @@ def create_write_data_tool(
                                 f"You don't have access to table '{op.table}'. "
                                 f"Available tables: {allowed_tables}. "
                                 f"Request access from system administrator if needed."
-                            )
+                            ),
                         )
 
             # Execute with MultiOperationExecutor
             executor = MultiOperationExecutor(storage)
             result = await executor.execute_intent(
-                intent=write_intent,
-                dry_run=dry_run,
-                validate_only=validate_only
+                intent=write_intent, dry_run=dry_run, validate_only=validate_only
             )
 
             # Return result
@@ -298,14 +296,12 @@ def create_write_data_tool(
                         "rollback_performed": result.rollback_performed,
                     },
                     fallback_type="EXECUTION_ERROR",
-                    fallback_action=result.error_message or "Review operation structure and retry."
+                    fallback_action=result.error_message or "Review operation structure and retry.",
                 )
 
         except Exception as e:
             logger.error(
-                f"WriteIntent execution error: {goal}",
-                exc_info=True,
-                extra={"goal": goal}
+                f"WriteIntent execution error: {goal}", exc_info=True, extra={"goal": goal}
             )
             return build_agent_error_response(
                 exception=e,
@@ -314,7 +310,7 @@ def create_write_data_tool(
                 fallback_action=(
                     f"WriteIntent execution failed: {str(e)}. "
                     f"Review operations, dependencies, and data format."
-                )
+                ),
             )
 
     return StructuredTool.from_function(

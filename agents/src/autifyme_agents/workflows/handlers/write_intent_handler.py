@@ -57,8 +57,7 @@ class WriteIntentHandler:
                 return text
 
         logger.warning(
-            "No AI message with text content found",
-            extra={"message_count": len(messages)}
+            "No AI message with text content found", extra={"message_count": len(messages)}
         )
         return None
 
@@ -77,7 +76,7 @@ class WriteIntentHandler:
             extra={
                 "thread_id": thread_id,
                 "interrupt_type": type(interrupt_value).__name__,
-            }
+            },
         )
 
         try:
@@ -86,7 +85,7 @@ class WriteIntentHandler:
                 action_requests = interrupt_value.get("action_requests", [])
                 logger.info(
                     "Processing DeepAgents interrupt",
-                    extra={"thread_id": thread_id, "action_count": len(action_requests)}
+                    extra={"thread_id": thread_id, "action_count": len(action_requests)},
                 )
 
                 for action_req in action_requests:
@@ -99,7 +98,9 @@ class WriteIntentHandler:
                     if isinstance(action, dict) and "action_request" in action:
                         action_request = action.get("action_request", {})
                         if action_request.get("action") == "write_data":
-                            return self._send_write_intent_approval(sender, action_request.get("args", {}))
+                            return self._send_write_intent_approval(
+                                sender, action_request.get("args", {})
+                            )
                 return None
 
             return None
@@ -114,7 +115,14 @@ class WriteIntentHandler:
             )
 
     # Fields that belong to WriteIntent domain model (excludes tool-layer fields like dry_run)
-    _WRITE_INTENT_FIELDS = {"goal", "reasoning", "hitl_summary", "asset_uploads", "operations", "impact"}
+    _WRITE_INTENT_FIELDS = {
+        "goal",
+        "reasoning",
+        "hitl_summary",
+        "asset_uploads",
+        "operations",
+        "impact",
+    }
 
     def _send_write_intent_approval(
         self, sender: str, write_intent_dict: dict[str, Any]
@@ -125,8 +133,7 @@ class WriteIntentHandler:
         """
         # Filter to WriteIntent fields only
         filtered_dict = {
-            k: v for k, v in write_intent_dict.items()
-            if k in self._WRITE_INTENT_FIELDS
+            k: v for k, v in write_intent_dict.items() if k in self._WRITE_INTENT_FIELDS
         }
 
         # Validate first - don't send HITL if invalid
@@ -148,7 +155,7 @@ class WriteIntentHandler:
                 "goal": write_intent.goal[:50],
                 "asset_count": len(write_intent.asset_uploads),
                 "operation_count": len(write_intent.operations),
-            }
+            },
         )
 
         # Send each asset image
@@ -172,7 +179,6 @@ class WriteIntentHandler:
         self.channel.send_text(sender, summary)
 
         logger.info(
-            "WriteIntent approval sent",
-            extra={"sender": sender, "images_sent": images_sent}
+            "WriteIntent approval sent", extra={"sender": sender, "images_sent": images_sent}
         )
         return None

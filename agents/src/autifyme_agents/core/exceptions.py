@@ -21,12 +21,14 @@ class AutifyMEError(Exception):
     All custom exceptions in the system inherit from this, making it easy
     to catch AutifyME errors specifically while letting system errors propagate.
     """
+
     pass
 
 
 # ============================================================================
 # Tool & Integration Errors
 # ============================================================================
+
 
 class ToolExecutionError(AutifyMEError):
     """
@@ -110,7 +112,7 @@ class ExternalAPIError(ToolExecutionError):
         api_name: str,
         status_code: int | None = None,
         is_retryable: bool = True,
-        original_error: Exception | None = None
+        original_error: Exception | None = None,
     ):
         """
         Initialize with external API error context.
@@ -137,6 +139,7 @@ class ExternalAPIError(ToolExecutionError):
 # ============================================================================
 # Validation & Data Errors
 # ============================================================================
+
 
 class ValidationError(AutifyMEError):
     """
@@ -186,6 +189,7 @@ class DataNotFoundError(AutifyMEError):
 # Configuration & System Errors
 # ============================================================================
 
+
 class ConfigurationError(AutifyMEError):
     """
     Raised when configuration is missing or invalid.
@@ -210,6 +214,7 @@ class ConfigurationError(AutifyMEError):
 # ============================================================================
 # Agent & Workflow Errors
 # ============================================================================
+
 
 class AgentExecutionError(AutifyMEError):
     """
@@ -256,6 +261,7 @@ class WorkflowInterruptedError(AutifyMEError):
 # ============================================================================
 # Error Classification Utilities
 # ============================================================================
+
 
 def classify_api_error(
     error: Exception,
@@ -314,4 +320,3 @@ def classify_api_error(
         tool_name=tool_name,
         original_error=error,
     )
-

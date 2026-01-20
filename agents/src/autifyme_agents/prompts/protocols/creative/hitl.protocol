@@ -200,6 +200,60 @@ Proceeding with corrected extraction.
 
 ---
 
+## "REALISTIC" FEEDBACK - Material Refinement, Not Effects
+
+**For transparent materials (PET, glass, clear plastic):** "More realistic" means better material accuracy, NOT added effects.
+
+**See `catalog_visual.protocol` - "The Realism Paradox" and "Anti-Simulation Principle" for full doctrine.**
+
+### Response Pattern
+
+```
+[HITL_FEEDBACK] "Make it more realistic"
+
+[HITL RESOLVED]
+
+**User Feedback:** "Make it more realistic"
+
+**Analysis:** For transparent materials, realism = accurate transparency specs, NOT added effects.
+
+**Applied:** Refined material_treatment with TransparencyProfile from catalog_visual doctrine.
+
+Proceeding with material-accurate rendering.
+-> [image_studio with refined specs per catalog_visual.protocol]
+```
+
+**Key:** Use TransparencyProfile specs and anti-simulation language. See `catalog_visual.protocol` for syntax pattern. Never add caustics, sheen, or enhancement.
+
+---
+
+## "BLACK ACCENTS" / "DARK BANDS" FEEDBACK - Uniform Tint Issue
+
+**When user says "black accents", "dark bands", or "dark areas at top/bottom":** This is Gemini exaggerating wall thickness variations.
+
+**See `catalog_visual.protocol` - "Common Transparent Material Issues" table for full explanation.**
+
+### Response Pattern
+
+```
+[HITL_FEEDBACK] "Why there is black accents in top and bottom"
+
+[HITL RESOLVED]
+
+**User Feedback:** "Why there is black accents in top and bottom"
+
+**Analysis:** Dark bands from exaggerated thickness. Fix with uniform tint spec.
+
+**Applied:** Added "uniform tint throughout body - no dark bands" to rendering_notes per catalog_visual doctrine.
+
+Proceeding with uniform-tint rendering.
+-> [image_studio with uniform tint specs]
+```
+
+**Key spec:** `rendering_notes`: "Maintain consistent [color] tint throughout body. No dark bands at neck or base."
+
+---
+
 ## ANTI-PATTERNS
 
 **Wrong:** Responding without HITL marker

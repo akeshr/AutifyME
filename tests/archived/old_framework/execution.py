@@ -2,6 +2,7 @@
 
 Provides execute_scenario() to run workflow tests programmatically.
 """
+
 import time
 import uuid
 from pathlib import Path
@@ -44,7 +45,8 @@ class _SilentConsoleChannel(MessagingChannel):
         # Detect batch approval messages and track product count (for mixed mode)
         if "**Batch Approval Request**" in message:
             import re
-            match = re.search(r'\((\d+) products?\)', message)
+
+            match = re.search(r"\((\d+) products?\)", message)
             if match:
                 self.approval_count = int(match.group(1))
 
@@ -69,7 +71,9 @@ class _SilentConsoleChannel(MessagingChannel):
         self.messages_sent.append({"type": "completion", "result": result})
         return {"status": "sent"}
 
-    def send_error(self, recipient: str, error_type: str, custom_message: str | None = None) -> dict:
+    def send_error(
+        self, recipient: str, error_type: str, custom_message: str | None = None
+    ) -> dict:
         self.messages_sent.append({"type": "error", "error_type": error_type})
         return {"status": "sent"}
 
@@ -122,6 +126,7 @@ def execute_scenario(
 
     # Create cataloging workflow handler
     from autifyme_agents.workflows.handlers.cataloging_handler import CatalogingWorkflowHandler
+
     workflow_handler = CatalogingWorkflowHandler(channel=channel)
 
     runner = WorkflowRunner(
@@ -188,8 +193,11 @@ def execute_scenario(
 
                     # Detect if PM is asking for approval
                     is_approval_request = (
-                        ("approve" in message_text.lower() or "review" in message_text.lower()) and
-                        ("product" in message_text.lower() or "campaign" in message_text.lower() or "family" in message_text.lower())
+                        "approve" in message_text.lower() or "review" in message_text.lower()
+                    ) and (
+                        "product" in message_text.lower()
+                        or "campaign" in message_text.lower()
+                        or "family" in message_text.lower()
                     )
 
                     # Detect if PM is asking a question
@@ -247,7 +255,9 @@ def execute_scenario(
             # Check if workflow completed successfully anyway (maybe didn't need approval)
             has_completion = any(m.get("type") == "completion" for m in channel.messages_sent)
             if not has_completion:
-                errors.append("Workflow completed without HITL interrupt or completion message. PM may have failed or gotten stuck.")
+                errors.append(
+                    "Workflow completed without HITL interrupt or completion message. PM may have failed or gotten stuck."
+                )
 
         # Query LangSmith for trace by thread_id AFTER workflow completes
         # (get_current_run_tree() doesn't work outside traced context)
@@ -257,11 +267,7 @@ def execute_scenario(
         try:
             client = Client()
             # Query recent root runs
-            runs = list(client.list_runs(
-                project_name="autifyme-dev",
-                is_root=True,
-                limit=20
-            ))
+            runs = list(client.list_runs(project_name="autifyme-dev", is_root=True, limit=20))
 
             # Find run matching our thread_id
             for run in runs:
@@ -272,7 +278,9 @@ def execute_scenario(
                         trace_id = str(run.trace_id)
                         # Build LangSmith trace URL
                         # Format: https://smith.langchain.com/public/SESSION_ID/r/TRACE_ID
-                        trace_url = f"https://smith.langchain.com/public/{run.session_id}/r/{trace_id}"
+                        trace_url = (
+                            f"https://smith.langchain.com/public/{run.session_id}/r/{trace_id}"
+                        )
                         break
 
             if not trace_id:
@@ -282,7 +290,9 @@ def execute_scenario(
                     for run in runs
                     if run.extra and run.extra.get("metadata")
                 ]
-                errors.append(f"Trace not found for thread {thread_id}. Found threads: {found_threads[:5]}")
+                errors.append(
+                    f"Trace not found for thread {thread_id}. Found threads: {found_threads[:5]}"
+                )
         except Exception as e:
             # If trace capture fails, continue but note the error
             errors.append(f"Failed to capture trace: {str(e)}")

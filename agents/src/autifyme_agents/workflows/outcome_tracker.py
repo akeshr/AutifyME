@@ -38,7 +38,8 @@ class IncomingMessage(BaseModel):
 
     sender_id: str = Field(description="User/sender identifier")
     sender_name: str | None = Field(
-        default=None, description="User display name for personalization (e.g., WhatsApp profile name)"
+        default=None,
+        description="User display name for personalization (e.g., WhatsApp profile name)",
     )
     text: str | None = Field(default=None, description="Message text content")
     media_id: str | None = Field(default=None, description="Media attachment ID")
@@ -75,9 +76,7 @@ class WorkflowResult(BaseModel):
         default=None, description="Structured result if successful"
     )
     error_type: str | None = Field(default=None, description="Error class if failed")
-    error_message: str | None = Field(
-        default=None, description="Error details if failed"
-    )
+    error_message: str | None = Field(default=None, description="Error details if failed")
     resolution_strategy: str | None = Field(
         default=None, description="How error was resolved (auto/manual/escalated)"
     )
@@ -87,9 +86,7 @@ class WorkflowResult(BaseModel):
 class TrackedWorkflow(BaseModel):
     """Complete workflow tracking record."""
 
-    tracking_id: str = Field(
-        default_factory=lambda: str(uuid4()), description="Unique tracking ID"
-    )
+    tracking_id: str = Field(default_factory=lambda: str(uuid4()), description="Unique tracking ID")
     thread_id: str = Field(description="LangGraph thread ID")
     trace_id: str | None = Field(
         default=None, description="LangSmith trace ID for observability correlation"
@@ -265,9 +262,7 @@ class OutcomeTracker:
                 return
 
             workflow.ended_at = datetime.now()
-            workflow.duration_seconds = (
-                workflow.ended_at - workflow.started_at
-            ).total_seconds()
+            workflow.duration_seconds = (workflow.ended_at - workflow.started_at).total_seconds()
 
             workflow.result = WorkflowResult(
                 success=success,
@@ -421,14 +416,12 @@ class OutcomeTracker:
         # Handle dataclasses
         if hasattr(data, "__dataclass_fields__"):
             from dataclasses import asdict
+
             return asdict(data)
 
         # Handle dicts
         if isinstance(data, dict):
-            return {
-                key: self._make_json_serializable(value)
-                for key, value in data.items()
-            }
+            return {key: self._make_json_serializable(value) for key, value in data.items()}
 
         # Handle lists/tuples
         if isinstance(data, (list, tuple)):

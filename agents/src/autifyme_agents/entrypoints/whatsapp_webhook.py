@@ -12,7 +12,7 @@ from typing import Any, cast
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse
 
-from autifyme_agents.core.config import settings
+from autifyme_agents.core.config import configure_deepagents, settings
 from autifyme_agents.core.logging_config import get_logger, setup_logging
 from autifyme_agents.core.message_batcher import MessageBatcher
 from autifyme_agents.core.ports import StorageInterface
@@ -27,9 +27,13 @@ try:
 except Exception as e:
     # Fallback to basic logging if setup fails
     import logging
+
     logging.basicConfig(level=logging.INFO)
     logging.warning(f"Failed to setup structured logging: {e}")
 logger = get_logger(__name__)
+
+# Configure DeepAgents before any agents are created
+configure_deepagents()
 
 app = FastAPI()
 
@@ -201,6 +205,7 @@ async def favicon() -> RedirectResponse:
     """Redirects to the static vercel.svg in the public directory."""
     return RedirectResponse("/vercel.svg", status_code=307)
 
+
 _EVENT_DUMP_DIR = Path("/tmp/whatsapp_events")
 
 
@@ -251,7 +256,7 @@ async def _process_message_async(
                 "sender": sender,
                 "has_media": media_id is not None,
                 "has_text": text is not None,
-            }
+            },
         )
 
         # Send typing indicator (Phase 1: single call, lasts 25s or until message sent)
@@ -262,14 +267,14 @@ async def _process_message_async(
             whatsapp_channel.client.send_typing_indicator(message_id)
             logger.debug(
                 "Typing indicator sent (message marked as read)",
-                extra={"message_id": message_id, "sender": sender}
+                extra={"message_id": message_id, "sender": sender},
             )
         except Exception as typing_exc:
             # Non-critical: continue processing even if typing indicator fails
             logger.warning(
                 "Failed to send typing indicator (continuing with workflow)",
                 exc_info=typing_exc,
-                extra={"message_id": message_id, "sender": sender}
+                extra={"message_id": message_id, "sender": sender},
             )
 
         # Process workflow (may take >5 seconds for complex catalogs)
@@ -278,14 +283,14 @@ async def _process_message_async(
 
         logger.info(
             "Background workflow processing completed",
-            extra={"message_id": message_id, "sender": sender}
+            extra={"message_id": message_id, "sender": sender},
         )
 
     except GeneratorExit:
         # GeneratorExit occurs when workflow streaming times out
         logger.warning(
             "Workflow streaming timed out (GeneratorExit) in background task",
-            extra={"message_id": message_id, "sender": sender, "event_path": str(event_path)}
+            extra={"message_id": message_id, "sender": sender, "event_path": str(event_path)},
         )
 
     except Exception as workflow_exc:
@@ -297,7 +302,7 @@ async def _process_message_async(
                 "sender": sender,
                 "error_type": type(workflow_exc).__name__,
                 "event_path": str(event_path),
-            }
+            },
         )
         # Don't raise - background task failures are logged but don't affect webhook response
 
@@ -413,12 +418,12 @@ async def receive(
                     sender_name = profile.get("name")
                     logger.debug(
                         "Extracted sender profile name",
-                        extra={"sender_name": sender_name, "event_path": str(event_path)}
+                        extra={"sender_name": sender_name, "event_path": str(event_path)},
                     )
                 else:
                     logger.warning(
                         "No contacts array in WhatsApp payload - personalization unavailable",
-                        extra={"value_keys": list(value.keys()), "event_path": str(event_path)}
+                        extra={"value_keys": list(value.keys()), "event_path": str(event_path)},
                     )
 
                 # Process each message (usually just one, but iterate for safety)
@@ -450,14 +455,25 @@ async def receive(
                     if not message_id or not sender:
                         logger.warning(
                             f"TRACE[{trace_id}] SKIP: Missing id or sender",
-                            extra={"trace_id": trace_id, "whatsapp_message": message, "event_path": str(event_path)},
+                            extra={
+                                "trace_id": trace_id,
+                                "whatsapp_message": message,
+                                "event_path": str(event_path),
+                            },
                         )
                         continue
 
                     # Validate message type is supported
                     # WhatsApp sends "unsupported" for message types not enabled on the account
                     # (stickers, locations, contacts, reactions, etc.)
-                    supported_message_types = {"text", "image", "video", "document", "audio", "voice"}
+                    supported_message_types = {
+                        "text",
+                        "image",
+                        "video",
+                        "document",
+                        "audio",
+                        "voice",
+                    }
                     if msg_type not in supported_message_types:
                         logger.warning(
                             f"TRACE[{trace_id}] SKIP: Unsupported message type '{msg_type}'",
@@ -480,7 +496,12 @@ async def receive(
                     thread_id = runner.channel.format_thread_id(sender)
                     logger.info(
                         f"TRACE[{trace_id}] IDEMPOTENCY_CHECK: Checking duplicate for message_id",
-                        extra={"trace_id": trace_id, "message_id": message_id, "thread_id": thread_id, "sender": sender},
+                        extra={
+                            "trace_id": trace_id,
+                            "message_id": message_id,
+                            "thread_id": thread_id,
+                            "sender": sender,
+                        },
                     )
                     if storage.check_and_mark_message_processed(
                         message_id=message_id,
@@ -490,7 +511,12 @@ async def receive(
                     ):
                         logger.info(
                             f"TRACE[{trace_id}] SKIP: Duplicate message (already processed)",
-                            extra={"trace_id": trace_id, "message_id": message_id, "sender": sender, "event_path": str(event_path)},
+                            extra={
+                                "trace_id": trace_id,
+                                "message_id": message_id,
+                                "sender": sender,
+                                "event_path": str(event_path),
+                            },
                         )
                         continue
                     logger.info(
@@ -570,10 +596,19 @@ async def receive(
                     # Check if message should be debounced
                     logger.info(
                         f"TRACE[{trace_id}] DEBOUNCE_CHECK: Evaluating batch vs immediate",
-                        extra={"trace_id": trace_id, "message_id": message_id, "msg_type": msg_type, "sender": sender},
+                        extra={
+                            "trace_id": trace_id,
+                            "message_id": message_id,
+                            "msg_type": msg_type,
+                            "sender": sender,
+                        },
                     )
                     should_batch = await batcher.should_debounce(sender, msg_type or "text")
-                    debounce_reason = "media" if msg_type in ("image", "video", "document", "audio", "voice") else "recent_activity_or_pending"
+                    debounce_reason = (
+                        "media"
+                        if msg_type in ("image", "video", "document", "audio", "voice")
+                        else "recent_activity_or_pending"
+                    )
 
                     logger.info(
                         f"TRACE[{trace_id}] DEBOUNCE_DECISION: {'BATCH' if should_batch else 'IMMEDIATE'}",
@@ -581,7 +616,9 @@ async def receive(
                             "trace_id": trace_id,
                             "message_id": message_id,
                             "should_batch": should_batch,
-                            "debounce_reason": debounce_reason if should_batch else "no_recent_activity",
+                            "debounce_reason": debounce_reason
+                            if should_batch
+                            else "no_recent_activity",
                             "msg_type": msg_type,
                             "sender": sender,
                         },
@@ -596,7 +633,9 @@ async def receive(
                             message_type=msg_type or "text",
                             text_content=text,
                             media_id=media_id,
-                            caption=text if media_id else None,  # Caption is text when media present
+                            caption=text
+                            if media_id
+                            else None,  # Caption is text when media present
                             sender_name=sender_name,
                             received_at=received_at,
                             runner=runner,
@@ -609,7 +648,7 @@ async def receive(
                                 "sender": sender,
                                 "message_type": msg_type,
                                 "thread_id": thread_id,
-                            }
+                            },
                         )
 
                         # Each message starts a delayed processing task
@@ -617,7 +656,11 @@ async def receive(
                         # Multiple concurrent tasks are safe - atomic fetch_and_clear ensures only one processes
                         logger.info(
                             f"TRACE[{trace_id}] BATCH_TASK_STARTED: Background task for delayed processing",
-                            extra={"trace_id": trace_id, "message_id": message_id, "sender": sender},
+                            extra={
+                                "trace_id": trace_id,
+                                "message_id": message_id,
+                                "sender": sender,
+                            },
                         )
                         background_tasks.add_task(
                             _process_batch_after_delay,
@@ -629,7 +672,11 @@ async def receive(
                         # Process immediately (text-only, no recent activity)
                         logger.info(
                             f"TRACE[{trace_id}] IMMEDIATE_TASK_STARTED: Background task for workflow",
-                            extra={"trace_id": trace_id, "message_id": message_id, "sender": sender},
+                            extra={
+                                "trace_id": trace_id,
+                                "message_id": message_id,
+                                "sender": sender,
+                            },
                         )
                         background_tasks.add_task(
                             _process_message_async,

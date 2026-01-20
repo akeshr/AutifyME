@@ -216,25 +216,19 @@ class MultiOperationExecutor:
         for i, op in enumerate(intent.operations):
             if op.action in ("create", "upsert") and op.data is None:
                 errors.append(
-                    f"Operation {i} ({op.action} on {op.table}): "
-                    f"data is required for {op.action}"
+                    f"Operation {i} ({op.action} on {op.table}): data is required for {op.action}"
                 )
 
             if op.action == "update":
                 if op.filters is None:
-                    errors.append(
-                        f"Operation {i} (update on {op.table}): filters required"
-                    )
+                    errors.append(f"Operation {i} (update on {op.table}): filters required")
                 if op.updates is None and op.data is None:
                     errors.append(
-                        f"Operation {i} (update on {op.table}): "
-                        f"either updates or data required"
+                        f"Operation {i} (update on {op.table}): either updates or data required"
                     )
 
             if op.action == "delete" and op.filters is None:
-                errors.append(
-                    f"Operation {i} (delete on {op.table}): filters required"
-                )
+                errors.append(f"Operation {i} (delete on {op.table}): filters required")
 
         # Check for circular dependencies
         try:
@@ -263,8 +257,7 @@ class MultiOperationExecutor:
             for dep in op.dependencies:
                 if dep not in returns_names:
                     errors.append(
-                        f"Operation {i} ({op.table}): "
-                        f"dependency '{dep}' not found in returns names"
+                        f"Operation {i} ({op.table}): dependency '{dep}' not found in returns names"
                     )
 
         return errors
@@ -374,7 +367,10 @@ class MultiOperationExecutor:
 
                         logger.info(
                             f"Asset moved: {move_result['public_url']}",
-                            extra={"returns": asset_upload.returns, "public_url": move_result["public_url"]},
+                            extra={
+                                "returns": asset_upload.returns,
+                                "public_url": move_result["public_url"],
+                            },
                         )
 
                     elif asset_upload.temp_path is not None:
@@ -407,7 +403,10 @@ class MultiOperationExecutor:
 
                         logger.info(
                             f"Asset uploaded: {upload_result['public_url']}",
-                            extra={"returns": asset_upload.returns, "public_url": upload_result["public_url"]},
+                            extra={
+                                "returns": asset_upload.returns,
+                                "public_url": upload_result["public_url"],
+                            },
                         )
                     else:
                         # Validation should have caught this, but defensive
@@ -720,9 +719,7 @@ class MultiOperationExecutor:
                 resolved[key] = self._resolve_references(value, context)
             elif isinstance(value, list):
                 resolved[key] = [
-                    self._resolve_references(item, context)
-                    if isinstance(item, dict)
-                    else item
+                    self._resolve_references(item, context) if isinstance(item, dict) else item
                     for item in value
                 ]
             else:
@@ -757,17 +754,14 @@ class MultiOperationExecutor:
 
         if ref_name not in context:
             raise ToolException(
-                f"Reference '{ref_name}' not found in context. "
-                f"Available: {list(context.keys())}"
+                f"Reference '{ref_name}' not found in context. Available: {list(context.keys())}"
             )
 
         # Navigate nested field path (e.g., "id" or "nested.field")
         value = context[ref_name]
         for field in field_path.split("."):
             if not isinstance(value, dict) or field not in value:
-                raise ToolException(
-                    f"Field '{field_path}' not found in '{ref_name}' context"
-                )
+                raise ToolException(f"Field '{field_path}' not found in '{ref_name}' context")
             value = value[field]
 
         return value
@@ -802,9 +796,7 @@ class MultiOperationExecutor:
         updates: dict[str, Any],
     ) -> int:
         """Execute update operation."""
-        return await self.storage.update_entities(
-            table=table, filters=filters, updates=updates
-        )
+        return await self.storage.update_entities(table=table, filters=filters, updates=updates)
 
     async def _execute_delete(
         self,

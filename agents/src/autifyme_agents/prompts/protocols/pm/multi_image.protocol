@@ -2,22 +2,21 @@
 
 ## PURPOSE
 
-Execution patterns for multi-image workflows.
-Load when: User sent multiple images AND Visual analyst identified relationship.
+Multi-image workflow patterns. **OODA still applies** - this protocol handles the specifics AFTER visual_analyst determines image relationship.
+
+Load when: User sent multiple images AND visual_analyst identified relationship.
+
+**OODA Context:**
+- OBSERVE: visual_analyst analyzes ALL images together, determines relationship
+- You READ visual_analysis.md, CHECKPOINT: "What relationship? What workflow?"
+- Then load this protocol for relationship-specific patterns
+- Continue OODA (ORIENT -> DECIDE -> ACT) per relationship type
 
 ---
 
 ## [CRITICAL] WORKFLOW DEPENDENCIES
 
-**Arrows (->) in workflows below indicate dependencies. Check what each agent REQUIRES before delegating.**
-
-| Agent | REQUIRES (hard) | Optional Context | Produces |
-|-------|-----------------|------------------|----------|
-| visual_analyst | Image paths | (none) | visual_analysis.md |
-| product_analyst | visual_analysis.md | (none) | product_research.md |
-| catalog_analyst | visual_analysis.md | product_research.md (CRITICAL for novel products, enriches for familiar - see discovery_mindset: Dependency Hardness) | catalog_analysis.md |
-| creative_specialist | visual_analysis.md + images | product_research.md | asset_ids |
-| catalog_specialist | visual_analysis.md + asset_ids | product_research.md | product records + junctions |
+**Arrows (->) in workflows below indicate dependencies.**
 
 **Before each delegation:** "Do I have what this agent REQUIRES? If not, run the producer first."
 

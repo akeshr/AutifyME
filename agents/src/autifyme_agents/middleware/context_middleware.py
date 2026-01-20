@@ -44,8 +44,7 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
     try:
         # Query 1: Total families (include category_id for top categories)
         families = await storage.query_entities(
-            table="product_families",
-            columns=["id", "name", "category_id"]
+            table="product_families", columns=["id", "name", "category_id"]
         )
         total_families = len(families)
         family_names = [f["name"] for f in families]
@@ -65,7 +64,9 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
                 category_counts[cat_id] += 1
 
             # Get top 5 category names
-            top_cat_ids = sorted(category_counts.keys(), key=lambda x: category_counts[x], reverse=True)[:5]
+            top_cat_ids = sorted(
+                category_counts.keys(), key=lambda x: category_counts[x], reverse=True
+            )[:5]
 
             if top_cat_ids:
                 # Query categories for top IDs
@@ -73,7 +74,7 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
                 categories = await storage.query_entities(
                     table="categories",
                     filters={"id": [str(c) for c in top_cat_ids]},
-                    columns=["id", "name"]
+                    columns=["id", "name"],
                 )
                 top_categories = [c["name"] for c in categories]
 
@@ -83,7 +84,7 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
                 "total_families": total_families,
                 "total_skus": total_skus,
                 "top_categories_count": len(top_categories),
-            }
+            },
         )
 
         return CatalogSummary(
@@ -98,7 +99,7 @@ async def load_catalog_summary(storage: StorageInterface) -> CatalogSummary:
         logger.error(
             "Failed to load catalog summary from database",
             exc_info=True,
-            extra={"error_type": type(e).__name__, "error_msg": str(e)}
+            extra={"error_type": type(e).__name__, "error_msg": str(e)},
         )
         # Re-raise for caller to handle graceful degradation
         raise
@@ -122,8 +123,7 @@ async def load_taxonomy_tree(storage: StorageInterface) -> TaxonomyTree:
     try:
         # Query all categories with parent_id
         categories_data = await storage.query_entities(
-            table="categories",
-            columns=["id", "name", "parent_id"]
+            table="categories", columns=["id", "name", "parent_id"]
         )
 
         if not categories_data:
@@ -162,7 +162,7 @@ async def load_taxonomy_tree(storage: StorageInterface) -> TaxonomyTree:
             extra={
                 "total_categories": len(categories_data),
                 "root_categories": len(root_categories),
-            }
+            },
         )
 
         return TaxonomyTree(
@@ -175,7 +175,7 @@ async def load_taxonomy_tree(storage: StorageInterface) -> TaxonomyTree:
         logger.error(
             "Failed to load taxonomy tree from database",
             exc_info=True,
-            extra={"error_type": type(e).__name__, "error_msg": str(e)}
+            extra={"error_type": type(e).__name__, "error_msg": str(e)},
         )
         # Re-raise for caller to handle graceful degradation
         raise
@@ -202,8 +202,7 @@ async def load_company_patterns(storage: StorageInterface) -> CompanyPatterns:
     try:
         # Query 1: Product type distribution
         products = await storage.query_entities(
-            table="products",
-            columns=["product_type", "sku", "status"]
+            table="products", columns=["product_type", "sku", "status"]
         )
 
         # Count product types
@@ -214,9 +213,7 @@ async def load_company_patterns(storage: StorageInterface) -> CompanyPatterns:
 
         # Sort by count and get top types
         common_product_types = sorted(
-            type_counts.keys(),
-            key=lambda x: type_counts[x],
-            reverse=True
+            type_counts.keys(), key=lambda x: type_counts[x], reverse=True
         )[:5]
 
         # Determine primary workflow based on product mix
@@ -226,10 +223,7 @@ async def load_company_patterns(storage: StorageInterface) -> CompanyPatterns:
             primary_workflow = "operations"
 
         # Query 2: Price range
-        prices = await storage.query_entities(
-            table="product_prices",
-            columns=["unit_price"]
-        )
+        prices = await storage.query_entities(table="product_prices", columns=["unit_price"])
 
         if prices:
             price_values = [float(p["unit_price"]) for p in prices if p.get("unit_price")]
@@ -260,7 +254,7 @@ async def load_company_patterns(storage: StorageInterface) -> CompanyPatterns:
                 "primary_workflow": primary_workflow,
                 "price_range": typical_price_range,
                 "common_types_count": len(common_product_types),
-            }
+            },
         )
 
         return CompanyPatterns(
@@ -276,7 +270,7 @@ async def load_company_patterns(storage: StorageInterface) -> CompanyPatterns:
         logger.error(
             "Failed to load company patterns from database",
             exc_info=True,
-            extra={"error_type": type(e).__name__, "error_msg": str(e)}
+            extra={"error_type": type(e).__name__, "error_msg": str(e)},
         )
         # Re-raise for caller to handle graceful degradation
         raise
@@ -322,7 +316,7 @@ async def load_base_context(
                 "catalog_families": catalog_summary.total_families,
                 "taxonomy_categories": taxonomy_tree.total_categories,
                 "primary_workflow": company_patterns.primary_workflow,
-            }
+            },
         )
 
         return PMBaseContext(
@@ -342,7 +336,7 @@ async def load_base_context(
                 "error_type": type(e).__name__,
                 "error_msg": str(e),
                 "company_id": company_profile.id,
-            }
+            },
         )
 
         # Graceful degradation: Return empty summaries instead of crashing

@@ -82,9 +82,7 @@ class TestUpsertEntityBasicOperations:
         """Test upsert inserts new entity when no conflict."""
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
-        mock_response.data = [
-            {"id": "new-id", "sku_code": "SKU-001", "name": "Product A"}
-        ]
+        mock_response.data = [{"id": "new-id", "sku_code": "SKU-001", "name": "Product A"}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
@@ -113,9 +111,7 @@ class TestUpsertEntityBasicOperations:
         """Test upsert updates existing entity when ID conflicts."""
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
-        mock_response.data = [
-            {"id": "existing-id", "name": "Updated Product", "price": 200}
-        ]
+        mock_response.data = [{"id": "existing-id", "name": "Updated Product", "price": 200}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
@@ -200,9 +196,7 @@ class TestUpsertEntityBasicOperations:
         """Test upsert is idempotent (same call twice = same result)."""
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
-        mock_response.data = [
-            {"id": "product-1", "sku_code": "SKU-001", "name": "Product A"}
-        ]
+        mock_response.data = [{"id": "product-1", "sku_code": "SKU-001", "name": "Product A"}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
@@ -227,9 +221,7 @@ class TestUpsertEntityBasicOperations:
         assert result1["sku_code"] == result2["sku_code"]
 
     @pytest.mark.asyncio
-    async def test_upsert_no_conflict_fields_defaults_to_id(
-        self, mock_supabase_client
-    ):
+    async def test_upsert_no_conflict_fields_defaults_to_id(self, mock_supabase_client):
         """Test upsert without conflict_fields defaults to 'id'."""
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
@@ -249,9 +241,7 @@ class TestUpsertEntityBasicOperations:
         """Test upsert normalizes whole-number floats to ints."""
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
-        mock_response.data = [
-            {"id": "id1", "name": "Product", "sort_order": 1, "price": 99.99}
-        ]
+        mock_response.data = [{"id": "id1", "name": "Product", "sort_order": 1, "price": 99.99}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
@@ -405,9 +395,7 @@ class TestUpsertEntityBasicOperations:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         large_metadata = {"attributes": {f"field_{i}": f"value_{i}" for i in range(100)}}
-        mock_response.data = [
-            {"id": "id1", "name": "Product", "metadata": large_metadata}
-        ]
+        mock_response.data = [{"id": "id1", "name": "Product", "metadata": large_metadata}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
@@ -567,12 +555,8 @@ class TestBulkUpsertBatchOperations:
             supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
-        batch_data = [
-            {"sku_code": f"SKU-{i:03d}", "name": f"Product {i}"} for i in range(1, 101)
-        ]
-        results = await storage.bulk_upsert(
-            "products", batch_data, conflict_fields=["sku_code"]
-        )
+        batch_data = [{"sku_code": f"SKU-{i:03d}", "name": f"Product {i}"} for i in range(1, 101)]
+        results = await storage.bulk_upsert("products", batch_data, conflict_fields=["sku_code"])
 
         assert len(results) == 100
         assert results[0]["sku_code"] == "SKU-001"
@@ -734,9 +718,7 @@ class TestBulkUpsertBatchOperations:
             assert "updated_at" in result
 
     @pytest.mark.asyncio
-    async def test_bulk_upsert_partial_fields_different_per_entity(
-        self, mock_supabase_client
-    ):
+    async def test_bulk_upsert_partial_fields_different_per_entity(self, mock_supabase_client):
         """Test bulk upsert with different fields per entity."""
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
@@ -810,14 +792,10 @@ class TestBulkUpsertBatchOperations:
         ]
 
         # First upsert
-        results1 = await storage.bulk_upsert(
-            "products", batch_data, conflict_fields=["sku_code"]
-        )
+        results1 = await storage.bulk_upsert("products", batch_data, conflict_fields=["sku_code"])
 
         # Second upsert with identical data
-        results2 = await storage.bulk_upsert(
-            "products", batch_data, conflict_fields=["sku_code"]
-        )
+        results2 = await storage.bulk_upsert("products", batch_data, conflict_fields=["sku_code"])
 
         # Both should return same entities
         assert len(results1) == len(results2)
@@ -841,9 +819,7 @@ class TestBulkUpsertBatchOperations:
 
         storage._current_transaction = SupabaseTransaction(storage)
 
-        await storage.bulk_upsert(
-            "products", [{"name": "Product A"}, {"name": "Product B"}]
-        )
+        await storage.bulk_upsert("products", [{"name": "Product A"}, {"name": "Product B"}])
 
         # Verify transaction tracked the operation
         assert len(storage._current_transaction.operations) == 1
@@ -1012,9 +988,7 @@ class TestPatchEntityPartialUpdates:
             supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
-        await storage.patch_entity(
-            "products", "product-1", {"sort_order": 1.0, "price": 99.99}
-        )
+        await storage.patch_entity("products", "product-1", {"sort_order": 1.0, "price": 99.99})
 
         # Verify normalization
         call_args = mock_table.update.call_args
@@ -1027,17 +1001,13 @@ class TestPatchEntityPartialUpdates:
         """Test patch can set field to NULL."""
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
-        mock_response.data = [
-            {"id": "product-1", "name": "Product", "description": None}
-        ]
+        mock_response.data = [{"id": "product-1", "name": "Product", "description": None}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
-        result = await storage.patch_entity(
-            "products", "product-1", {"description": None}
-        )
+        result = await storage.patch_entity("products", "product-1", {"description": None})
 
         assert result["description"] is None
 
@@ -1212,17 +1182,13 @@ class TestPatchEntityPartialUpdates:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         large_metadata = {"attributes": {f"field_{i}": f"value_{i}" for i in range(100)}}
-        mock_response.data = [
-            {"id": "product-1", "name": "Product", "metadata": large_metadata}
-        ]
+        mock_response.data = [{"id": "product-1", "name": "Product", "metadata": large_metadata}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
-        result = await storage.patch_entity(
-            "products", "product-1", {"metadata": large_metadata}
-        )
+        result = await storage.patch_entity("products", "product-1", {"metadata": large_metadata})
 
         assert len(result["metadata"]["attributes"]) == 100
 
@@ -1256,9 +1222,7 @@ class TestConflictResolution:
         """Test conflict resolution with single field (sku_code)."""
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
-        mock_response.data = [
-            {"id": "product-1", "sku_code": "SKU-001", "name": "Updated Product"}
-        ]
+        mock_response.data = [{"id": "product-1", "sku_code": "SKU-001", "name": "Updated Product"}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
@@ -1343,9 +1307,7 @@ class TestConflictResolution:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         # First call: INSERT
-        mock_response.data = [
-            {"id": "product-1", "sku_code": "SKU-001", "name": "Original"}
-        ]
+        mock_response.data = [{"id": "product-1", "sku_code": "SKU-001", "name": "Original"}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
@@ -1358,9 +1320,7 @@ class TestConflictResolution:
         )
 
         # Second call: UPDATE (conflict on sku_code)
-        mock_response.data = [
-            {"id": "product-1", "sku_code": "SKU-001", "name": "Updated"}
-        ]
+        mock_response.data = [{"id": "product-1", "sku_code": "SKU-001", "name": "Updated"}]
 
         result2 = await storage.upsert_entity(
             "products",
@@ -1556,9 +1516,7 @@ class TestTransactionTracking:
 
         storage._current_transaction = SupabaseTransaction(storage)
 
-        await storage.bulk_upsert(
-            "products", [{"name": "Product A"}, {"name": "Product B"}]
-        )
+        await storage.bulk_upsert("products", [{"name": "Product A"}, {"name": "Product B"}])
 
         assert len(storage._current_transaction.operations) == 1
         op = storage._current_transaction.operations[0]
@@ -1656,9 +1614,7 @@ class TestEdgeCasesAndErrorHandling:
             supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
-        result = await storage.upsert_entity(
-            "products", {"name": "", "description": ""}
-        )
+        result = await storage.upsert_entity("products", {"name": "", "description": ""})
 
         assert result["name"] == ""
         assert result["description"] == ""
@@ -1685,17 +1641,13 @@ class TestEdgeCasesAndErrorHandling:
         """Test patch handles zero values (not confused with NULL)."""
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
-        mock_response.data = [
-            {"id": "product-1", "name": "Product", "price": 0, "stock": 0}
-        ]
+        mock_response.data = [{"id": "product-1", "name": "Product", "price": 0, "stock": 0}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
         )
 
-        result = await storage.patch_entity(
-            "products", "product-1", {"price": 0, "stock": 0}
-        )
+        result = await storage.patch_entity("products", "product-1", {"price": 0, "stock": 0})
 
         assert result["price"] == 0
         assert result["stock"] == 0
@@ -1706,9 +1658,7 @@ class TestEdgeCasesAndErrorHandling:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         long_description = "A" * 10000  # 10K characters
-        mock_response.data = [
-            {"id": "id1", "name": "Product", "description": long_description}
-        ]
+        mock_response.data = [{"id": "id1", "name": "Product", "description": long_description}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
@@ -1772,15 +1722,9 @@ class TestEdgeCasesAndErrorHandling:
         mock_client, mock_create, mock_table, mock_response = mock_supabase_client
 
         nested_data = {
-            "level1": {
-                "level2": {
-                    "level3": {"level4": {"level5": {"value": "deep value"}}}
-                }
-            }
+            "level1": {"level2": {"level3": {"level4": {"level5": {"value": "deep value"}}}}}
         }
-        mock_response.data = [
-            {"id": "id1", "name": "Product", "metadata": nested_data}
-        ]
+        mock_response.data = [{"id": "id1", "name": "Product", "metadata": nested_data}]
 
         storage = SupabaseStorageClient(
             supabase_url="https://test.supabase.co", service_key="test-key"
@@ -1791,9 +1735,7 @@ class TestEdgeCasesAndErrorHandling:
         )
 
         assert (
-            result["metadata"]["level1"]["level2"]["level3"]["level4"]["level5"][
-                "value"
-            ]
+            result["metadata"]["level1"]["level2"]["level3"]["level4"]["level5"]["value"]
             == "deep value"
         )
 

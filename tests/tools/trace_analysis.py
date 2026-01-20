@@ -7,6 +7,7 @@ Implements 3-level hierarchical analysis for token efficiency:
 
 Token savings: 25x vs naive full dump approach.
 """
+
 import re
 from datetime import datetime, timedelta
 from typing import Any
@@ -22,6 +23,7 @@ from .models import (
     FileIOTrace,
     FileOperation,
     HITLDecision,
+    ImagePair,
     LLMCallNode,
     LLMTraceTree,
     MediaPath,
@@ -40,6 +42,7 @@ from .models import (
     ToolCall,
     ToolCallSequence,
     TraceBaseline,
+    TraceImage,
     TraceOverview,
     WorkflowStory,
     WorkflowTrace,
@@ -498,6 +501,7 @@ def _count_saved_products(overview: TraceOverview) -> int:
 # LLM Trace Extraction (for prompt analysis)
 # ============================================================================
 
+
 def _classify_hierarchy_level(agent_name: str) -> str:
     """Classify agent hierarchy level from name.
 
@@ -510,9 +514,12 @@ def _classify_hierarchy_level(agent_name: str) -> str:
     name_lower = agent_name.lower()
 
     # Orchestrators (PM, project manager, LangGraph root)
-    if (name_lower == "pm" or
-        "project" in name_lower and "manager" in name_lower or
-        "langgraph" in name_lower):
+    if (
+        name_lower == "pm"
+        or "project" in name_lower
+        and "manager" in name_lower
+        or "langgraph" in name_lower
+    ):
         return "orchestrator"
 
     # Departments (ends with Dept or Department)
@@ -561,7 +568,8 @@ def _extract_system_prompt(messages: list) -> str:
                 elif isinstance(content, list):
                     # Handle multimodal content
                     text_parts = [
-                        part.get("text", "") for part in content
+                        part.get("text", "")
+                        for part in content
                         if isinstance(part, dict) and part.get("type") == "text"
                     ]
                     return "\n".join(text_parts)
@@ -675,10 +683,12 @@ def get_llm_trace_tree(trace_id: str) -> LLMTraceTree:
                                 # Extract simplified version with content
                                 kwargs = msg.get("kwargs", {})
                                 msg_type_str = msg_id[-1] if msg_id else "unknown"
-                                user_messages.append({
-                                    "type": msg_type_str,
-                                    "content": kwargs.get("content", ""),
-                                })
+                                user_messages.append(
+                                    {
+                                        "type": msg_type_str,
+                                        "content": kwargs.get("content", ""),
+                                    }
+                                )
                         else:
                             # Standard format: check for non-system messages
                             msg_type = msg.get("type") or msg.get("role")
@@ -1284,7 +1294,9 @@ def get_delegation_graph(
         description = tc.parsed_args.get("description", "")
         if description:
             # Truncate long descriptions
-            context_passed.append(description[:100] + "..." if len(description) > 100 else description)
+            context_passed.append(
+                description[:100] + "..." if len(description) > 100 else description
+            )
 
         if to_agent:
             to_agent = _normalize_agent_name(str(to_agent))
@@ -1385,15 +1397,10 @@ def get_file_io_trace(trace_id: str) -> FileIOTrace:
 
         if is_read:
             # read_data uses 'table' and 'search_patterns'
-            file_path = f"table:{args.get('table', 'unknown')}" if args.get('table') else ""
+            file_path = f"table:{args.get('table', 'unknown')}" if args.get("table") else ""
         else:
             # write_file uses 'file_path' (or 'path') and 'content'
-            file_path = (
-                args.get("file_path")
-                or args.get("path")
-                or args.get("filename")
-                or ""
-            )
+            file_path = args.get("file_path") or args.get("path") or args.get("filename") or ""
             content = args.get("content", args.get("data", ""))
             if isinstance(content, str):
                 content_preview = content[:200]
@@ -1888,7 +1895,9 @@ def get_scenario_history(
     )
 
 
-def get_baseline(scenario_id: str, dataset_name: str = "scenario-baselines") -> TraceBaseline | None:
+def get_baseline(
+    scenario_id: str, dataset_name: str = "scenario-baselines"
+) -> TraceBaseline | None:
     """Get known-good baseline for a scenario.
 
     Retrieves the reference trace from LangSmith dataset for comparison.
@@ -2083,11 +2092,13 @@ def compare_to_baseline(
     if current_delegation == baseline.expected_delegation_order:
         result["matches"].append("delegation_order")
     else:
-        result["deviations"].append({
-            "field": "delegation_order",
-            "expected": baseline.expected_delegation_order,
-            "actual": current_delegation,
-        })
+        result["deviations"].append(
+            {
+                "field": "delegation_order",
+                "expected": baseline.expected_delegation_order,
+                "actual": current_delegation,
+            }
+        )
 
     # Compare wave structure
     current_waves = {str(k): v for k, v in graph.waves.items()}
@@ -2095,36 +2106,44 @@ def compare_to_baseline(
     if current_waves == expected_waves:
         result["matches"].append("wave_structure")
     else:
-        result["deviations"].append({
-            "field": "wave_structure",
-            "expected": expected_waves,
-            "actual": current_waves,
-        })
+        result["deviations"].append(
+            {
+                "field": "wave_structure",
+                "expected": expected_waves,
+                "actual": current_waves,
+            }
+        )
 
     # Compare protocol loading
     if protocols.agent_protocols == baseline.expected_protocol_loads:
         result["matches"].append("protocol_loads")
     else:
-        result["deviations"].append({
-            "field": "protocol_loads",
-            "expected": baseline.expected_protocol_loads,
-            "actual": protocols.agent_protocols,
-        })
+        result["deviations"].append(
+            {
+                "field": "protocol_loads",
+                "expected": baseline.expected_protocol_loads,
+                "actual": protocols.agent_protocols,
+            }
+        )
 
     # Compare tool sequence (just count for now)
     current_tools = [tc.tool_name for tc in seq.tool_calls]
     if current_tools == baseline.expected_tool_sequence:
         result["matches"].append("tool_sequence")
     else:
-        result["deviations"].append({
-            "field": "tool_sequence",
-            "expected": baseline.expected_tool_sequence,
-            "actual": current_tools,
-        })
+        result["deviations"].append(
+            {
+                "field": "tool_sequence",
+                "expected": baseline.expected_tool_sequence,
+                "actual": current_tools,
+            }
+        )
 
     # Metrics comparison
     if baseline.baseline_duration_ms and overview.total_latency_ms:
-        result["metrics"]["duration_diff_ms"] = overview.total_latency_ms - baseline.baseline_duration_ms
+        result["metrics"]["duration_diff_ms"] = (
+            overview.total_latency_ms - baseline.baseline_duration_ms
+        )
 
     if baseline.baseline_cost and overview.total_cost:
         result["metrics"]["cost_diff"] = round(overview.total_cost - baseline.baseline_cost, 4)
@@ -2140,9 +2159,7 @@ def compare_to_baseline(
 # ============================================================================
 
 
-def get_thread_traces(
-    thread_id: str, enrich: bool = False, days: int = 7
-) -> "ThreadTraces":
+def get_thread_traces(thread_id: str, enrich: bool = False, days: int = 7) -> "ThreadTraces":
     """Get all traces in a conversation thread for multi-turn evaluation.
 
     Queries workflow_outcomes by thread_id. Optionally enriches with agent messages.
@@ -2174,9 +2191,7 @@ def get_thread_traces(
         from supabase import create_client
 
         url = os.environ.get("SUPABASE_URL")
-        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get(
-            "SUPABASE_ANON_KEY"
-        )
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
 
         if not url or not key:
             raise ValueError("Missing SUPABASE_URL or key env vars")
@@ -2330,6 +2345,530 @@ def get_media_paths_from_trace(trace_id: str) -> list[MediaPath]:
 
 
 # ============================================================================
+# Trace Image Extraction (Unified Source + Generated)
+# ============================================================================
+
+TOOL_IMAGE_STUDIO = "image_studio"
+
+
+def get_trace_images(trace_id: str) -> list["TraceImage"]:
+    """Extract ALL images from a trace - sources and generated.
+
+    Unified extraction from:
+    - download_whatsapp_media outputs (user uploads)
+    - image_studio inputs (source images with labels)
+    - image_studio outputs (generated images)
+
+    Returns images in chronological order with roles.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        List of TraceImage with storage paths, roles, and context
+
+    Example:
+        >>> images = get_trace_images(trace_id)
+        >>> sources = [i for i in images if i.role == "source"]
+        >>> generated = [i for i in images if i.role == "generated"]
+        >>> print(f"Sources: {len(sources)}, Generated: {len(generated)}")
+    """
+    from tests.tools.models import TraceImage
+
+    client = _get_client()
+    runs = list(client.list_runs(trace_id=trace_id, run_type="tool"))
+
+    # Sort by start time for chronological order
+    runs.sort(key=lambda r: r.start_time or datetime.min)
+
+    images: list[TraceImage] = []
+    sequence = 0
+
+    for run in runs:
+        # Extract from download_whatsapp_media (user uploads)
+        if run.name == TOOL_DOWNLOAD_MEDIA:
+            storage_path = _extract_storage_path_from_output(run.outputs)
+            if storage_path:
+                images.append(
+                    TraceImage(
+                        storage_path=storage_path,
+                        role="source",
+                        tool_name=run.name,
+                        run_id=str(run.id),
+                        agent=_get_parent_agent_name(client, run),
+                        label="user_upload",
+                        sequence=sequence,
+                    )
+                )
+                sequence += 1
+
+        # Extract from image_studio (inputs and outputs)
+        elif run.name == TOOL_IMAGE_STUDIO:
+            # Extract input images (sources, style refs, etc.)
+            input_images = _extract_image_studio_inputs(run.inputs)
+            for img_input in input_images:
+                images.append(
+                    TraceImage(
+                        storage_path=img_input["path"],
+                        role=_label_to_role(img_input.get("label", "source")),
+                        tool_name=run.name,
+                        run_id=str(run.id),
+                        agent=_get_parent_agent_name(client, run),
+                        label=img_input.get("label"),
+                        sequence=sequence,
+                    )
+                )
+                sequence += 1
+
+            # Extract output image (generated)
+            output_image = _extract_image_studio_output(run.outputs)
+            if output_image:
+                images.append(
+                    TraceImage(
+                        storage_path=output_image["storage_path"],
+                        role="generated",
+                        tool_name=run.name,
+                        run_id=str(run.id),
+                        agent=_get_parent_agent_name(client, run),
+                        label="generated",
+                        sequence=sequence,
+                        metadata=output_image.get("metadata"),
+                    )
+                )
+                sequence += 1
+
+    return images
+
+
+def get_image_pairs(trace_id: str) -> list["ImagePair"]:
+    """Get source-to-generated image pairs from a trace.
+
+    Groups each image_studio call's inputs and outputs together,
+    making it easy to compare what went in vs what came out.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        List of ImagePair with source, generated, and specs
+
+    Example:
+        >>> pairs = get_image_pairs(trace_id)
+        >>> for p in pairs:
+        ...     print(f"Source: {p.source.storage_path if p.source else 'None'}")
+        ...     print(f"Generated: {p.generated.storage_path if p.generated else 'FAILED'}")
+        ...     if p.specs.get("fidelity"):
+        ...         print(f"Fidelity: {p.specs['fidelity']}")
+    """
+    from tests.tools.models import ImagePair, TraceImage
+
+    client = _get_client()
+    runs = list(client.list_runs(trace_id=trace_id, run_type="tool"))
+
+    # Filter to image_studio runs only
+    studio_runs = [r for r in runs if r.name == TOOL_IMAGE_STUDIO]
+    studio_runs.sort(key=lambda r: r.start_time or datetime.min)
+
+    pairs: list[ImagePair] = []
+
+    for run in studio_runs:
+        # Extract input images
+        input_images = _extract_image_studio_inputs(run.inputs)
+        source_img = None
+        style_ref_img = None
+
+        for img_input in input_images:
+            label = img_input.get("label", "source")
+            trace_img = TraceImage(
+                storage_path=img_input["path"],
+                role=_label_to_role(label),
+                tool_name=run.name,
+                run_id=str(run.id),
+                agent=_get_parent_agent_name(client, run),
+                label=label,
+            )
+            if label in ("source", "product"):
+                source_img = trace_img
+            elif label in ("style_ref", "mood_ref"):
+                style_ref_img = trace_img
+
+        # Extract output
+        output_image = _extract_image_studio_output(run.outputs)
+        generated_img = None
+        success = True
+        error = None
+
+        if output_image:
+            generated_img = TraceImage(
+                storage_path=output_image["storage_path"],
+                role="generated",
+                tool_name=run.name,
+                run_id=str(run.id),
+                agent=_get_parent_agent_name(client, run),
+                label="generated",
+                metadata=output_image.get("metadata"),
+            )
+        else:
+            success = False
+            error = _extract_error_from_output(run.outputs)
+
+        # Extract specs
+        specs = _extract_image_studio_specs(run.inputs)
+
+        pairs.append(
+            ImagePair(
+                source=source_img,
+                style_ref=style_ref_img,
+                generated=generated_img,
+                specs=specs,
+                run_id=str(run.id),
+                success=success,
+                error=error,
+            )
+        )
+
+    return pairs
+
+
+def view_trace_images(trace_id: str) -> str:
+    """Quick summary of all images in a trace.
+
+    Prints a formatted summary and returns storage paths for viewing.
+
+    Args:
+        trace_id: LangSmith trace ID
+
+    Returns:
+        Formatted string summary of images
+
+    Example:
+        >>> print(view_trace_images(trace_id))
+        Images in trace:
+        [0] SOURCE: inbox/20260115_xxx.jpg (download_whatsapp_media)
+        [1] GENERATED: pending/20260115_xxx.png (image_studio)
+    """
+    images = get_trace_images(trace_id)
+
+    if not images:
+        return "No images found in trace."
+
+    lines = ["Images in trace:", ""]
+    for img in images:
+        role_display = img.role.upper()
+        lines.append(f"[{img.sequence}] {role_display}: {img.storage_path}")
+        lines.append(f"    Tool: {img.tool_name}, Agent: {img.agent or 'unknown'}")
+        if img.label and img.label != img.role:
+            lines.append(f"    Label: {img.label}")
+        lines.append("")
+
+    # Add quick reference
+    sources = [i for i in images if i.role == "source"]
+    generated = [i for i in images if i.role == "generated"]
+    lines.append(f"Summary: {len(sources)} source(s), {len(generated)} generated")
+
+    return "\n".join(lines)
+
+
+def view_trace_image(run_id: str) -> str | None:
+    """Extract image from a tool run and save to temp file for viewing.
+
+    Extracts the embedded data URI from tool output (no Supabase fetch),
+    decodes to bytes, and saves to a temp file. Returns the absolute path
+    for use with the Read tool.
+
+    Works with any tool that returns multimodal content:
+    - download_whatsapp_media
+    - view_image
+    - image_studio
+
+    Args:
+        run_id: Tool run ID (from TraceImage.run_id)
+
+    Returns:
+        Absolute path to temp image file, or None if no image found.
+        Use Read tool on the returned path to view the image.
+
+    Example:
+        >>> images = get_trace_images(trace_id)
+        >>> generated = [i for i in images if i.role == "generated"][0]
+        >>> path = view_trace_image(generated.run_id)
+        >>> # Now use Read tool on 'path' to view the image
+    """
+    import base64
+    import platform
+    import tempfile
+    from pathlib import Path
+
+    # Setup temp directory (same pattern as production tools)
+    if platform.system() == "Windows":
+        media_dir = Path(tempfile.gettempdir()) / "trace_images"
+    else:
+        media_dir = Path("/tmp/trace_images")
+    media_dir.mkdir(parents=True, exist_ok=True)
+
+    # Fetch the run
+    client = _get_client()
+    try:
+        run = client.read_run(run_id)
+    except Exception:
+        return None
+
+    # Extract data URI from output
+    data_uri = _extract_data_uri_from_output(run.outputs)
+    if not data_uri:
+        return None
+
+    # Parse data URI: data:image/jpeg;base64,{data}
+    try:
+        header, b64_data = data_uri.split(",", 1)
+        # Extract mime type and determine extension
+        mime_part = header.split(";")[0].replace("data:", "")
+        ext_map = {
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/gif": ".gif",
+            "image/webp": ".webp",
+        }
+        ext = ext_map.get(mime_part, ".jpg")
+
+        # Decode base64 to bytes
+        image_bytes = base64.b64decode(b64_data)
+    except Exception:
+        return None
+
+    # Save to temp file with unique name
+    filename = f"trace_{run_id[:8]}{ext}"
+    file_path = media_dir / filename
+    file_path.write_bytes(image_bytes)
+
+    return str(file_path.absolute())
+
+
+def _extract_data_uri_from_output(outputs: dict | None) -> str | None:
+    """Extract data URI from tool output's multimodal content.
+
+    Handles the standard tool output format:
+    outputs = {"output": {"content": [{"type": "image_url", "image_url": {"url": "data:..."}}]}}
+    """
+    if not outputs:
+        return None
+
+    # Navigate to content list
+    output = outputs.get("output", outputs)
+    if not isinstance(output, dict):
+        return None
+
+    content = output.get("content", [])
+    if not isinstance(content, list):
+        return None
+
+    # Find image_url item
+    for item in content:
+        if isinstance(item, dict) and item.get("type") == "image_url":
+            url = item.get("image_url", {}).get("url", "")
+            if url.startswith("data:"):
+                return url
+
+    return None
+
+
+# Helper functions for image extraction
+
+
+def _label_to_role(label: str) -> str:
+    """Convert image_studio label to standard role."""
+    label_lower = label.lower()
+    if label_lower in ("source", "product"):
+        return "source"
+    elif label_lower in ("style_ref", "mood_ref"):
+        return "style_ref"
+    elif label_lower == "background":
+        return "background"
+    elif label_lower in ("variant", "product_2"):
+        return "variant"
+    return label_lower
+
+
+def _extract_storage_path_from_output(outputs: dict | None) -> str | None:
+    """Extract storage_path from tool output."""
+    if not outputs:
+        return None
+
+    output = outputs
+    # Handle nested structure: {'output': {'content': [{'type': 'text', 'text': '...'}]}}
+    if isinstance(output, dict):
+        inner = output.get("output") or output.get("result") or output
+        if isinstance(inner, dict) and "content" in inner:
+            for item in inner.get("content", []):
+                if isinstance(item, dict) and item.get("type") == "text":
+                    output = item.get("text", "")
+                    break
+            else:
+                output = str(inner)
+        elif isinstance(inner, str):
+            output = inner
+        else:
+            output = str(inner)
+
+    if not isinstance(output, str):
+        output = str(output)
+
+    # Look for "storage_path: xxx" pattern
+    path_match = re.search(r"storage_path:\s*(.+?)(?:\n|$)", output)
+    if path_match:
+        return path_match.group(1).strip()
+    return None
+
+
+def _extract_image_studio_inputs(inputs: dict | None) -> list[dict]:
+    """Extract image inputs from image_studio tool call."""
+    if not inputs:
+        return []
+
+    # Handle nested input structure
+    input_val = inputs.get("input", inputs)
+    parsed = _safe_parse_dict(input_val)
+    if not parsed:
+        return []
+
+    images = parsed.get("images", [])
+    if not images:
+        return []
+
+    result = []
+    for img in images:
+        if isinstance(img, dict) and "path" in img:
+            result.append({
+                "path": img["path"],
+                "label": img.get("label", "source"),
+            })
+    return result
+
+
+def _extract_image_studio_output(outputs: dict | None) -> dict | None:
+    """Extract generated image from image_studio output.
+
+    Handles multiple output formats:
+    1. Direct: outputs = {"success": true, "outputs": [...], ...}
+    2. Nested: outputs = {"output": {"success": true, ...}}
+    3. LangChain: outputs = {"output": {"content": [{"type": "text", "text": "...JSON..."}]}}
+    """
+    import json
+
+    if not outputs:
+        return None
+
+    # Handle nested output structure
+    output = outputs.get("output", outputs)
+
+    # Handle LangChain message format: {"content": [{"type": "text", "text": "..."}]}
+    if isinstance(output, dict) and "content" in output:
+        for item in output.get("content", []):
+            if isinstance(item, dict) and item.get("type") == "text":
+                text = item.get("text", "")
+                # Extract JSON from text (may have prefix like "Image generated successfully.")
+                json_start = text.find("{")
+                if json_start >= 0:
+                    try:
+                        output = json.loads(text[json_start:])
+                        break
+                    except json.JSONDecodeError:
+                        pass
+
+    if isinstance(output, str):
+        output = _safe_parse_dict(output)
+
+    if not isinstance(output, dict):
+        return None
+
+    # Check for success
+    if not output.get("success", False):
+        return None
+
+    # Try direct storage_path first (simplified output format)
+    if "storage_path" in output:
+        return {
+            "storage_path": output["storage_path"],
+            "metadata": output.get("metadata"),
+        }
+
+    # Extract from outputs array (structured format)
+    output_variants = output.get("outputs", [])
+    if not output_variants:
+        return None
+
+    first_variant = output_variants[0]
+    if not isinstance(first_variant, dict):
+        return None
+
+    storage_path = first_variant.get("storage_path")
+    if not storage_path:
+        # Fallback to path
+        storage_path = first_variant.get("path")
+
+    if not storage_path:
+        return None
+
+    return {
+        "storage_path": storage_path,
+        "metadata": first_variant.get("metadata"),
+    }
+
+
+def _extract_image_studio_specs(inputs: dict | None) -> dict:
+    """Extract specs from image_studio input (fidelity, material_treatment, etc.)."""
+    if not inputs:
+        return {}
+
+    input_val = inputs.get("input", inputs)
+    parsed = _safe_parse_dict(input_val)
+    if not parsed:
+        return {}
+
+    # Extract relevant spec fields
+    spec_keys = [
+        "fidelity", "material_treatment", "extraction", "background",
+        "lighting", "composition", "enhancement", "focus", "scene",
+        "placement", "custom_spec", "creative_direction", "output",
+    ]
+
+    specs = {}
+    for key in spec_keys:
+        if key in parsed and parsed[key]:
+            specs[key] = parsed[key]
+
+    return specs
+
+
+def _extract_error_from_output(outputs: dict | None) -> str | None:
+    """Extract error message from failed image_studio output."""
+    if not outputs:
+        return "No output"
+
+    output = outputs.get("output", outputs)
+    if isinstance(output, str):
+        output = _safe_parse_dict(output) or {}
+
+    if isinstance(output, dict):
+        return output.get("error")
+    return None
+
+
+def _get_parent_agent_name(client: Any, run: Any) -> str | None:
+    """Get the agent name that made this tool call."""
+    if not run.parent_run_id:
+        return None
+
+    try:
+        parent = client.read_run(run.parent_run_id)
+        if parent and parent.name:
+            return parent.name
+    except Exception:
+        pass
+    return None
+
+
+# ============================================================================
 # LangSmith Annotation Queue Integration
 # ============================================================================
 
@@ -2437,11 +2976,13 @@ def list_test_assets(
         storage_path = f"{folder}/{name}"
         public_url = client.storage.from_("assets").get_public_url(storage_path)
 
-        assets.append({
-            "name": name,
-            "path": storage_path,
-            "public_url": public_url,
-        })
+        assets.append(
+            {
+                "name": name,
+                "path": storage_path,
+                "public_url": public_url,
+            }
+        )
 
         if len(assets) >= limit:
             break
