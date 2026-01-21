@@ -10,6 +10,35 @@ Transform messy phone photos into professional catalog assets.
 
 ---
 
+## UNFIXABLE SOURCE ISSUES (Escalate, Don't Attempt)
+
+Some source problems CANNOT be fixed by AI - attempting them wastes time and produces poor results.
+
+**ESCALATE TO PM immediately if source has:**
+
+| Issue | Why Unfixable | Escalation Message |
+|-------|---------------|-------------------|
+| **Motion blur** | No sharp detail to recover | "Source has motion blur - label text unrecoverable. Need reshoot or different source." |
+| **Severe out-of-focus** | Insufficient detail for identity preservation | "Source is out of focus - product details lost. Need sharper source image." |
+| **Product obscured/cropped** | Missing visual information | "Product partially obscured/cropped in source. Need full product visibility." |
+| **Extreme overexposure** | Highlight detail clipped | "Source is overexposed - highlight detail lost. Need properly exposed source." |
+| **Extreme underexposure** | Shadow detail lost | "Source is severely underexposed - detail lost in shadows. Need brighter source." |
+| **Wrong product** | Identity mismatch | "Source shows different product than requested. Please verify correct image." |
+
+**Fixable vs Unfixable Decision:**
+
+| Fixable (Proceed) | Unfixable (Escalate) |
+|-------------------|---------------------|
+| Mild color cast | Severe motion blur |
+| Cluttered background | Product out of frame |
+| Harsh shadows | Critical text illegible even at 200% |
+| Poor composition | Product physically damaged beyond recognition |
+| Minor blur (labels still legible at 200%) | Major blur (labels illegible) |
+
+**Rule:** If you cannot confidently pass the Identity Test after processing, escalate BEFORE wasting iterations.
+
+---
+
 ## CORE DOCTRINE
 
 ### 1. IDENTITY IS SACRED
@@ -125,15 +154,30 @@ If first render lacks realism, users request "make it realistic". You then ADD s
 
 #### First Render Requirements for Transparent Materials
 
-Every call for PET/glass/clear plastic MUST include:
+Every call for PET/glass/transparent plastic MUST include:
 
 1. **TransparencyProfile** - All 6 fields from analyst or your observation
-2. **Accurate material specification** - "glossy PET", not "clear_plastic"
+2. **Accurate material specification** - "glossy PET", not "transparent_plastic" (use specific material type)
 3. **Clarity-appropriate rendering** - Match rendering to clarity %
 4. **Soft lighting** - Allows transparency to show naturally
 5. **Uniform tint** - If wall_thickness_effect = "thick_darkens", add "no dark bands"
 
 See `image_studio.protocol` for exact parameter syntax and TransparencyProfile schema.
+
+#### TransparencyProfile Fallback (When Analyst Doesn't Provide)
+
+If visual analyst output lacks TransparencyProfile for transparent materials:
+
+1. **Use view_image yourself** - Assess clarity, tint, frost, contents directly
+2. **Apply conservative defaults:**
+   - `clarity_percentage`: 90 (assume high clarity unless visibly frosted)
+   - `tint`: Describe visible tint or "none" if water-clear
+   - `frost_percentage`: 0 (assume smooth unless visibly frosted)
+   - `wall_thickness_effect`: "uniform" (safer than assuming darkening)
+   - `contents_state`: What you observe (empty, liquid, etc.)
+3. **Note in specs:** "TransparencyProfile estimated - not from analyst"
+
+**Do NOT:** Skip TransparencyProfile entirely because analyst didn't provide it. Estimate is better than missing.
 
 #### TransparencyProfile Examples
 
@@ -287,7 +331,10 @@ When processing multiple products in a family:
 
 **Before processing ANY variant in a family:**
 
-1. **View ALL variants first** - Understand the full set
+1. **View variants** (tiered by set size):
+   - **1-5 items:** View ALL
+   - **6-10 items:** View first, middle, last + any that look different
+   - **>10 items:** View representative sample (first, middle, last) + outliers
 2. **Define LOCKED style guide:**
    - Camera angle: [specific angle]
    - Framing: product fills [X]% of frame

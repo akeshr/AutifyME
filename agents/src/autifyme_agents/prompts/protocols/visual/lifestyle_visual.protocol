@@ -275,7 +275,10 @@ For campaigns or sequences with multiple lifestyle images:
 
 Before processing ANY image in a set:
 
-1. View ALL references/sources first
+1. View references/sources (tiered by count):
+   - **1-5 items:** View ALL
+   - **6-10 items:** View first, middle, last + any that look different
+   - **>10 items:** View representative sample + outliers
 2. Define LOCKED style guide:
    - Lighting direction and quality
    - Color temperature

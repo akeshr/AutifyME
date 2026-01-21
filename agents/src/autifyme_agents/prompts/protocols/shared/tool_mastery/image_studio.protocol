@@ -79,6 +79,11 @@ Common labels:
 | `style_ref` | Mood/lighting reference - match its atmosphere |
 | `background` | Background/scene reference |
 | `product_variant` | Additional product for family shots |
+| `main` / `hero` | Primary product in multi-product composition |
+| `variant` | Secondary variant in family shots |
+| `v1`, `v2`, `v3`... | Multiple variants when processing many |
+| `bodies` / `lids` | Component parts for COMPOSITE assembly |
+| `anchor` | Reference image for batch consistency |
 
 **Use descriptive labels that match your intent.** PM provides paths, you decide appropriate labels based on what each image IS.
 
@@ -98,12 +103,15 @@ Reference labels using `[label]` syntax in specs:
 
 ---
 
-## STRUCTURED SPECS (All Optional)
+## STRUCTURED SPECS (All Optional - Use What Applies)
 
-Use what applies to your use case. Describe YOUR situation - don't copy examples.
+Each spec block is OPTIONAL - use only what applies to your use case.
+Within each block, some fields may be REQUIRED if you use that block.
 
-### extraction
+### extraction (OPTIONAL block - use for product isolation)
 Extract product from messy background or multi-product image.
+
+**If you use extraction, these are REQUIRED within it:**
 - `target_description`: **REQUIRED** - what to extract, reference [source] label
 - `targets`: **REQUIRED** - array of `{target_bbox, target_image_label}` pairs (min 1)
   - `target_bbox`: `[y_min, x_min, y_max, x_max]` normalized 0-1000 scale
@@ -153,7 +161,7 @@ Position product in scene.
 
 ### material_treatment
 Material-specific rendering instructions.
-- `primary_material`: Main material type (clear_plastic, opaque_plastic, glass, metal, fabric)
+- `primary_material`: Main material type (transparent_plastic, opaque_plastic, glass, metal, fabric, wood, ceramic, leather)
 - `rendering_notes`: How to treat the material (label sharpness, specular control, caustics, etc.)
 - `preserve_details`: Critical details to preserve (label legibility, cap details, texture)
 
@@ -200,7 +208,7 @@ material_treatment={
 - `focus`: `{"depth_of_field": "deep - everything sharp"}`
 - `fidelity.hero_features`: Must include "transparency depth at X% clarity"
 - `fidelity.preserve_colors`: Must include "THROUGH transparent body"
-- `lighting.specials`: "no rim light - rely on natural edge refraction"
+- `lighting.special_requirements`: "no rim light - rely on natural edge refraction"
 - All `transparency` sub-fields populated from analyst
 
 **Terms to AVOID (cause artifacts):**
@@ -333,7 +341,7 @@ image_studio(
     composition={"product_coverage": "75-85%", "camera_angle": "slight top (15-20 deg)"},
     background={"treatment": "gradient", "color": "white to light gray - subtle vertical gradient for depth"},
     lighting={"type": "studio_3point", "shadows": "soft contact shadow"},
-    material_treatment={"primary_material": "[clear_plastic|opaque_plastic|glass|metal]"},
+    material_treatment={"primary_material": "[transparent_plastic|opaque_plastic|glass|metal|fabric|wood|ceramic|leather]"},
     output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1"}
 )
 ```
@@ -371,7 +379,7 @@ image_studio(
     lighting={
         "type": "studio_3point",
         "shadows": "soft contact shadow",
-        "specials": "no rim light - rely on natural edge refraction"
+        "special_requirements": "no rim light - rely on natural edge refraction"
     },
     material_treatment={
         "primary_material": "glossy PET - tinted [color]",
@@ -618,20 +626,20 @@ When source image contains multiple items, use precise targeting.
 | Field | Purpose | Single | Multi-source (list) |
 |-------|---------|--------|---------------------|
 | `target_description` | WHAT to extract | Visual attributes | Describes final composite |
-| `target_image` | WHICH image(s) | `"[source]"` | `["[bodies]", "[lids]"]` |
+| `target_image_label` | WHICH image(s) | `"[source]"` | `["[bodies]", "[lids]"]` |
 | `target_bbox` | WHERE | `[y,x,y,x]` | `[[...], [...]]` |
 
 **Single source (default):**
 ```
 target_description: "tall jar with floral print"
-target_image: "[source]"
+target_image_label: "[source]"
 target_bbox: [50, 20, 600, 350]
 ```
 
 **Multi-source composition (COMPONENTS):**
 ```
 target_description: "glass jar with blue lid"  # Describes final result
-target_image: ["[bodies]", "[lids]"]           # Extract from each
+target_image_label: ["[bodies]", "[lids]"]           # Extract from each
 target_bbox: [[100, 50, 800, 600], [200, 100, 400, 300]]  # Corresponding regions
 ```
 

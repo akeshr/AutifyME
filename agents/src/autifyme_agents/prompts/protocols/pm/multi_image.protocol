@@ -352,7 +352,10 @@ FAILURES (user rejected):
 - [full_storage_path_4]
 
 MISSION:
-1. View ALL images using view_image
+1. View images (tiered by count):
+   - **1-5 images:** View ALL using view_image
+   - **6-10 images:** View first, middle, last + any that look different
+   - **>10 images:** View representative sample + outliers
 2. Identify specific differences between SUCCESS and FAILURES:
    - Lighting quality
    - Edge/cutout quality

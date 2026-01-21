@@ -202,7 +202,7 @@ Proceeding with corrected extraction.
 
 ## "REALISTIC" FEEDBACK - Material Refinement, Not Effects
 
-**For transparent materials (PET, glass, clear plastic):** "More realistic" means better material accuracy, NOT added effects.
+**For transparent materials (PET, glass, transparent plastic):** "More realistic" means better material accuracy, NOT added effects.
 
 **See `catalog_visual.protocol` - "The Realism Paradox" and "Anti-Simulation Principle" for full doctrine.**
 
@@ -279,5 +279,20 @@ Proceeding with: [parameters]  # TEXT, not tool call!
 Proceeding with corrected action.
 -> [view_image to re-analyze, then image_studio with YOUR coordinates]
 ```
+
+**Wrong:** Approving without viewing the generated image
+```
+[User approves]
+-> [write_data to persist]  # But did YOU verify quality first?
+```
+
+**Correct:**
+```
+[User approves]
+-> [view_image on generated output]  # Verify it meets quality bar
+-> [write_data to persist]  # THEN persist
+```
+
+**Why it matters:** User approval != quality verified. User may approve based on description alone. YOU must verify the actual output meets professional standards before persisting.
 
 </protocol>

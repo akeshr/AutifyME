@@ -305,6 +305,35 @@ for each group in manifest.group_by(axis):
     output: one asset per group
 ```
 
+**Concrete example - Group by Size:**
+
+Given manifest with 9 jars: 3 Small, 3 Medium, 3 Large (different designs each)
+
+```python
+# Group by size axis - produces 3 outputs (one per size)
+# STEP 1: Process Small group
+image_studio(
+    images=[{"path": "inbox/jars.jpg", "label": "source"}],
+    extraction=ExtractionSpec(
+        target_description="all SMALL jars in [source]",
+        targets=[
+            ExtractionTarget(target_bbox=[y1, x1, y2, x2], target_image_label="source"),  # Small #1
+            ExtractionTarget(target_bbox=[y1, x1, y2, x2], target_image_label="source"),  # Small #2
+            ExtractionTarget(target_bbox=[y1, x1, y2, x2], target_image_label="source"),  # Small #3
+        ]
+    ),
+    composition={"arrangement": "horizontal row, equal spacing"},
+    output={"filename": "small_jars_group"}
+)
+# -> Output: small_jars_group.png (3 small jars in a row)
+
+# STEP 2: Process Medium group (same pattern)
+# STEP 3: Process Large group (same pattern)
+# -> Total: 3 outputs instead of 9
+```
+
+**Key difference from INDIVIDUAL:** Items stay together in group composition, not isolated separately.
+
 ### COMPOSITE
 
 Keep all items together in arrangement, producing 1 output.
@@ -339,7 +368,6 @@ image_studio(
     )
 )
 output: one composed asset
-```
 ```
 
 ### SELECTIVE
@@ -560,6 +588,8 @@ After batch, create grid of all outputs and verify visual consistency. If ANY ou
 - `enhancement` (sharpness, contrast, color_treatment)
 - `output.aspect_ratio`, `output.size`
 - `focus`
+- `temperature` (0.3-0.5 for high consistency)
+- `seed` (same seed across all batch items)
 
 **Which specs CAN differ:**
 - `extraction.target_description` (per item)
@@ -590,6 +620,8 @@ After batch, create grid of all outputs and verify visual consistency. If ANY ou
 
 **Problem:** Dark color variants (black, dark blue) often render opaque instead of transparent.
 
+**See `catalog_visual.protocol` - "Clarity-Over-Color Pattern" for full doctrine.**
+
 **Pattern: Explicit Opacity Matching**
 
 For transparent products with color variants:
@@ -610,7 +642,7 @@ material_treatment={
 If you find yourself doing any of these, the core principle is being violated:
 
 - **Rapid self-iteration** - Generating v1, v2, v3... without HITL between each. Each anchor attempt requires presenting via write_data and WAITING for user feedback before generating again. User drives iteration pace.
-- **Text workarounds** - Writing "match anchor" or "same style as anchor" in custom_spec means parameters aren't actually identical
+- **Vague text workarounds** - Writing "match anchor" or "same style as anchor" in custom_spec means parameters aren't actually identical. NOTE: Specific quantitative values ("35% from top", "20% height") in fidelity ARE correct - they're reproducible. Vague references ("match anchor") are anti-patterns because they require viewing prior output.
 - **Dropped source context** - Batch calls missing shared reference images that anchor used
 - **HITL bypass** - Skipping `write_data` after anchor generation (user must approve style before batch)
 - **Modified parameters** - Changing lighting, composition, background, etc. between anchor and batch

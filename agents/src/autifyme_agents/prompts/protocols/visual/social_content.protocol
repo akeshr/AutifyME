@@ -43,6 +43,9 @@ Content that looks like it was made for Instagram but posted to WhatsApp feels w
 | **Facebook** | Social, shareable | Relatable, informational, community |
 | **WhatsApp Status** | Personal, direct | Quick, authentic, mobile-first |
 | **Pinterest** | Inspirational, saved | Vertical, text welcome, aspirational |
+| **TikTok** | Authentic, trendy | Raw, fast-paced, text-heavy, native feel |
+| **YouTube Shorts** | Entertainment, educational | High production, engaging hooks, vertical |
+| **LinkedIn** | Professional, informative | Clean, business context, data-driven |
 
 ### Platform Specs (Reference)
 
@@ -62,6 +65,19 @@ Content that looks like it was made for Instagram but posted to WhatsApp feels w
 **Pinterest:**
 - Standard: 2:3 (1000x1500)
 - Long: 1:2.1 (1000x2100)
+
+**TikTok:**
+- Videos/Covers: 9:16 (1080x1920)
+- Profile image: 1:1 (200x200)
+
+**YouTube Shorts:**
+- Video: 9:16 (1080x1920)
+- Thumbnail: 9:16 (1080x1920)
+
+**LinkedIn:**
+- Feed: 1.91:1 (1200x627) or 1:1 (1080x1080)
+- Stories: 9:16 (1080x1920)
+- Carousel: 1:1 (1080x1080)
 
 ---
 
@@ -150,6 +166,9 @@ Text must feel DESIGNED, not pasted.
 | Facebook | Top or bottom 25% |
 | Pinterest | Top third or bottom banner |
 | WhatsApp Status | Bottom 20%, simple |
+| TikTok | Center-bottom 30% (avoid top bar, comments area) |
+| YouTube Shorts | Center-bottom 25% (avoid title, like/subscribe buttons) |
+| LinkedIn | Top or bottom 20%, professional placement |
 
 ---
 
@@ -169,6 +188,23 @@ Every number, every spec MUST be correct. Verify before shipping.
 | Sale | Strike-through original, highlight new |
 | Premium | Elegant, restrained |
 | Value focus | Bold, attention-grabbing |
+
+### Currency & Decimal Handling
+
+**Currency symbol placement:** Match locale conventions
+- US/UK: $99.99, £49.99 (symbol before)
+- EU: 99,99 EUR or 99,99 € (symbol after, comma decimal)
+- India: ₹999 (symbol before, no decimals for round numbers)
+
+**Decimal display rules:**
+| Price Type | Show Decimals? | Example |
+|------------|----------------|---------|
+| Round number | No | $100, not $100.00 |
+| Cents matter | Yes | $9.99 |
+| Premium positioning | No | $1,200 (clean, elegant) |
+| Value positioning | Yes | $19.95 (precision implies deal) |
+
+**If PM doesn't specify currency:** Default to $ with US format, but ASK if targeting non-US market.
 
 ### Variant Display Reasoning
 
@@ -234,13 +270,18 @@ Would this pass as professional photography in a professional feed?
 For social content, specs depend on sub-type:
 
 **Product-focused social:**
-- Use catalog_visual specs (fidelity, extraction, background, material_treatment)
+- Use `catalog_visual.protocol` specs:
+  - fidelity (see "Identity Is Sacred" section)
+  - extraction, background, material_treatment
+  - For transparent products: see "Transparent Material Doctrine" section
 - Add composition for platform dimensions (product_coverage, position)
 - Add enhancement (sharpness, contrast for scroll-stopping)
 - output with platform-specific aspect_ratio (1:1 feed, 9:16 stories)
 
 **Lifestyle social:**
-- Use lifestyle_visual specs (scene, placement, lighting)
+- Use `lifestyle_visual.protocol` specs:
+  - scene, placement, lighting (see "Scene Doctrine" section)
+  - mood keywords (see "Mood Vocabulary" section)
 - Add focus (shallow DOF for lifestyle feel)
 - Add enhancement (color_treatment for mood)
 - output with platform-specific aspect_ratio
@@ -262,7 +303,10 @@ For social content, specs depend on sub-type:
 
 Before processing ANY image in a campaign:
 
-1. View ALL references/sources
+1. View references/sources (tiered by count):
+   - **1-5 items:** View ALL
+   - **6-10 items:** View first, middle, last + any that look different
+   - **>10 items:** View representative sample + outliers
 2. Define LOCKED style guide
 3. Apply IDENTICAL treatment
 

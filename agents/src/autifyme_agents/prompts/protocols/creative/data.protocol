@@ -146,7 +146,54 @@ Reference in operations: @[ref_name].public_url, @[ref_name].caption
 
 ### Pattern: Single Asset (All Domains)
 
-Structure (adapt field names from schema):
+**Concrete Python Example:**
+
+```python
+# After image_studio produces: pending/honey_jar_hero.png
+write_data(
+    goal="Create PRIMARY asset for Honey Jar product",
+    reasoning="Quality verified: labels sharp at 200%, colors match source, clean edges, professional shadow",
+    hitl_summary="Hero shot for Honey Jar ready. Pure white background, 80% product coverage, labels clearly visible. Approve to save as PRIMARY asset?",
+    asset_uploads=[{
+        "storage_path": "pending/honey_jar_hero.png",
+        "returns": "hero_asset",
+        "caption": "Professional hero shot - Honey Jar 500ml",
+        "target_folder": "products"
+    }],
+    operations=[
+        {
+            "action": "create",
+            "table": "assets",
+            "data": {
+                "name": "Honey Jar 500ml - Hero Shot",
+                "storage_url": "@hero_asset.public_url",
+                "storage_provider": "supabase",
+                "file_name": "honey_jar_hero.png",
+                "mime_type": "image/png",
+                "asset_type": "IMAGE",
+                "status": "ACTIVE",
+                "purpose": "PRODUCT",
+                "is_ai_generated": True,
+                "generation_prompt": "Hero shot extraction with gradient background, 3-point lighting"
+            },
+            "returns": "asset"
+        },
+        {
+            "action": "create",
+            "table": "product_assets",
+            "data": {
+                "product_id": "[product-uuid]",
+                "asset_id": "@asset.id",
+                "role": "PRIMARY"
+            },
+            "dependencies": ["asset"]
+        }
+    ],
+    impact={"creates": {"assets": 1, "product_assets": 1}}
+)
+```
+
+**Structure template (adapt field names from schema):**
 
 ```
 WriteIntent:
