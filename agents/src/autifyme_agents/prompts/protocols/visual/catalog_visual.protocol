@@ -239,17 +239,91 @@ If the render doesn't match profile specifications - iterate with corrected spec
 - **Pattern 5:** Hero shot (general)
 - **Pattern 5b:** Hero shot for TINTED transparent materials (with Clarity-Over-Color elements)
 
-### 4. BACKGROUND FOR CONTRAST
+### 4. BACKGROUND SELECTION DOCTRINE
 
-Background exists for ONE purpose: make the product pop.
+**Default:** White-to-gray gradient (marketplace compliant, transparency-friendly, professional standard).
 
-| Product Color | Background Choice | Why |
-|---------------|-------------------|-----|
-| Dark/black | White or light gray | Edge contrast |
-| Light/white | Light gray (not white) | Prevent lost edges |
-| Vibrant colors | Neutral white/gray | Let colors pop |
+**But the default isn't always optimal.** Use the doctrine below to decide.
 
-**The Test:** Can you clearly see product edges against background? If edges blend, wrong background.
+#### When to Use Default (White-to-Gray Gradient)
+
+| Scenario | Why Default Works |
+|----------|-------------------|
+| **Transparent products** (PET, glass) | Shows transparency depth - background visible through body |
+| **Marketplace listings** (Amazon, etc.) | White background often required or preferred |
+| **Unknown destination** | Safe universal choice |
+| **Vibrant colored products** | Neutral canvas lets product colors pop |
+| **Multi-platform catalog** | Works everywhere |
+
+#### When to DEVIATE from Default
+
+| Product/Context | Better Background | Rationale |
+|-----------------|-------------------|-----------|
+| **Dark/black products** | Charcoal-to-black gradient | Product pops against dark; white makes dark products look cheap |
+| **White/cream products** | Light gray (not pure white) | Prevents lost edges; shows product form |
+| **Premium positioning** | Subtle texture or brand color hint | Elevates perceived value |
+| **Brand with strong colors** | Subtle brand color gradient | Reinforces brand identity |
+| **Lifestyle/social content** | Platform-native (warm tones for Instagram) | Feels native to context |
+
+#### The Decision Flow
+
+```
+1. Is product TRANSPARENT?
+   YES -> White-to-gray (shows transparency)
+   NO  -> Continue
+
+2. Is product DARK (black, charcoal, navy)?
+   YES -> Dark gradient (charcoal-to-black)
+   NO  -> Continue
+
+3. Is product WHITE/CREAM?
+   YES -> Light gray gradient (not pure white)
+   NO  -> Continue
+
+4. Is destination SOCIAL/LIFESTYLE?
+   YES -> Consider platform-appropriate colors
+   NO  -> Continue
+
+5. Is positioning PREMIUM?
+   YES -> Consider subtle texture or brand tint
+   NO  -> Default white-to-gray
+```
+
+#### Background Spec Patterns
+
+**Default (most products):**
+```python
+background={"treatment": "gradient", "color": "white to light gray - subtle vertical gradient for depth"}
+```
+
+**Dark products:**
+```python
+background={"treatment": "gradient", "color": "charcoal to black - subtle vertical gradient"}
+```
+
+**White products:**
+```python
+background={"treatment": "gradient", "color": "light gray to medium gray - avoid pure white"}
+```
+
+**Premium positioning:**
+```python
+background={"treatment": "gradient", "color": "off-white to warm gray with subtle texture hint"}
+```
+
+#### The Contrast Test
+
+**Can you clearly see product edges against background?**
+
+If edges blend -> wrong background choice. Iterate.
+
+| Product Example | Wrong Background | Right Background | Why |
+|-----------------|------------------|------------------|-----|
+| Black coffee bag | White-to-gray | Charcoal-to-black | Dark product pops against dark; white creates harsh contrast |
+| White skincare jar | Pure white | Light gray-to-medium gray | Edges visible; product has form and depth |
+| Clear PET honey jar | Solid white | White-to-gray gradient | Gradient visible THROUGH body shows transparency |
+| Matte black speaker | White | Dark gray with subtle texture | Premium product needs premium backdrop |
+| Colorful snack packaging | Any colored | White-to-gray neutral | Let product colors dominate; neutral canvas |
 
 ### 5. PROFESSIONAL QUALITY BAR
 

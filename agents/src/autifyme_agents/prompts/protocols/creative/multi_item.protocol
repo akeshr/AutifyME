@@ -406,6 +406,8 @@ image_studio(
 - Inconsistent rendering across variants
 - Text/logos that may be mirrored or distorted
 
+**Background note:** Example shows default white-to-gray. For dark products, white products, or premium positioning, see `catalog_visual.protocol` "Background Selection Doctrine".
+
 ### SELECTIVE
 
 Filter to specific items, then apply INDIVIDUAL or COMPOSITE.

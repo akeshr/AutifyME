@@ -347,9 +347,10 @@ image_studio(
 ```
 
 **[CRITICAL] Background Choice:**
-- Use `gradient` (white to light gray) for professional photography look
+- **Default:** `gradient` (white to light gray) for professional photography look
 - `solid_color: white` looks flat/CGI - avoid for hero shots
 - For transparent PNG cutouts, use `transparent` treatment instead
+- **For non-default cases** (dark products, white products, premium): See `catalog_visual.protocol` "Background Selection Doctrine" for when to deviate
 
 **Key principle:** Include ALL specs. Minimal calls produce garbage.
 
