@@ -169,7 +169,15 @@ Material-specific rendering instructions.
 ```python
 material_treatment={
     "primary_material": "glossy PET - tinted [color]",
-    "rendering_notes": "[see catalog_visual for required language]",
+    "rendering_notes": (
+        # REQUIRED for all transparent materials:
+        "Crystal clear transparency - can see THROUGH to background. "
+        "Natural edge refraction only. No artificial rim highlights. "
+        "Photograph-like simplicity. No internal distortion patterns. "
+        "No vertical highlight streaks. "
+        # ADD if wall_thickness_effect = "thick_darkens":
+        "Uniform tint throughout body - no dark bands at neck/base."
+    ),
     "transparency": {
         "clarity_percentage": [0-100],      # From analyst
         "tint": "[color or none]",          # From analyst
@@ -180,6 +188,13 @@ material_treatment={
     }
 }
 ```
+
+**[CRITICAL] rendering_notes MUST include these phrases for transparent materials:**
+- "can see THROUGH to background" - prevents solid color rendering
+- "natural refraction only" - prevents artificial effects
+- "no artificial rim highlights" - prevents CGI-style edge glow
+- "no internal distortion patterns" - prevents wavy artifacts
+- "photograph-like simplicity" - keeps it real, not CGI
 
 **Required Specs (all mandatory for transparent materials):**
 - `focus`: `{"depth_of_field": "deep - everything sharp"}`
@@ -250,16 +265,24 @@ image_studio(
 ```
 Result: Extracted jar, transparent PNG, identity preserved.
 
-### Pattern 2: Extract with White Background
+### Pattern 2: Extract with Background
 
 ```python
+# For hero shots - use gradient for depth (RECOMMENDED)
+image_studio(
+    images=[{"path": "inbox/photo.jpg", "label": "source"}],
+    extraction={"target_description": "product in [source]"},
+    background={"treatment": "gradient", "color": "white to light gray"}
+)
+
+# For marketplace requirements needing pure white
 image_studio(
     images=[{"path": "inbox/photo.jpg", "label": "source"}],
     extraction={"target_description": "product in [source]"},
     background={"treatment": "solid_color", "color": "white"}
 )
 ```
-Result: Product on pure white background.
+Result: Product on clean background. Use gradient for photography look, solid white only when platform requires it.
 
 ### Pattern 3: Lifestyle Scene (with style_ref)
 
@@ -308,14 +331,89 @@ image_studio(
     focus={"depth_of_field": "deep - everything sharp"},
     enhancement={"sharpness": "tack sharp", "color_treatment": "accurate to source"},
     composition={"product_coverage": "75-85%", "camera_angle": "slight top (15-20 deg)"},
-    background={"treatment": "solid_color", "color": "[white or light gray based on product contrast]"},
+    background={"treatment": "gradient", "color": "white to light gray - subtle vertical gradient for depth"},
     lighting={"type": "studio_3point", "shadows": "soft contact shadow"},
     material_treatment={"primary_material": "[clear_plastic|opaque_plastic|glass|metal]"},
     output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1"}
 )
 ```
 
+**[CRITICAL] Background Choice:**
+- Use `gradient` (white to light gray) for professional photography look
+- `solid_color: white` looks flat/CGI - avoid for hero shots
+- For transparent PNG cutouts, use `transparent` treatment instead
+
 **Key principle:** Include ALL specs. Minimal calls produce garbage.
+
+### Pattern 5b: Hero Shot for TINTED Transparent Materials
+
+**For colored PET bottles, tinted glass, or any see-through material with color.**
+
+See `catalog_visual.protocol` "TINTED vs CLEAR Transparency" section for doctrine.
+
+```python
+image_studio(
+    images=[{"path": "inbox/[source].jpg", "label": "source"}],
+    extraction={
+        "target_description": "[color] PET bottle in [source]",
+        "targets": [{"target_bbox": [y_min, x_min, y_max, x_max], "target_image_label": "source"}],
+        "edge_treatment": "surgical clean"
+    },
+    fidelity={
+        "preserve_colors": "exact [color] tint visible THROUGH transparent body - NOT solid color",
+        "preserve_artwork": "exact labels sharp and readable",
+        "hero_features": "transparency depth at [X]% clarity, natural refraction only - no artificial rim highlights, clean simple render"
+    },
+    focus={"depth_of_field": "deep - everything sharp"},
+    enhancement={"sharpness": "tack sharp", "color_treatment": "accurate to source"},
+    composition={"product_coverage": "75-85%", "camera_angle": "slight top (15-20 deg)"},
+    background={"treatment": "gradient", "color": "white to light gray - visible THROUGH bottle body"},
+    lighting={
+        "type": "studio_3point",
+        "shadows": "soft contact shadow",
+        "specials": "no rim light - rely on natural edge refraction"
+    },
+    material_treatment={
+        "primary_material": "glossy PET - tinted [color]",
+        "rendering_notes": "Crystal clear transparency - can see THROUGH to background gradient. "
+                          "Natural edge refraction only. No artificial rim highlights. "
+                          "Photograph-like simplicity. No internal distortion patterns. "
+                          "No vertical highlight streaks. Uniform tint throughout body.",
+        "transparency": {
+            "clarity_percentage": 85,  # From analyst profile
+            "tint": "[color]",
+            "frost_percentage": 0,
+            "wall_thickness_effect": "uniform",  # or "thick_darkens" if applicable
+            "contents_state": "empty",
+            "contents_description": "empty bottle"
+        }
+    },
+    output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1"}
+)
+```
+
+**[CRITICAL] TINTED Transparency Rules:**
+1. Background MUST be visible THROUGH the material body
+2. Color is a TINT, not solid fill - like tinted sunglasses
+3. Use "uniform tint" in rendering_notes to prevent dark bands
+4. Include anti-artifact language: "no artificial rim highlights", "no internal distortion"
+
+**[BREAKTHROUGH] The Clarity-Over-Color Pattern:**
+
+The key to rendering tinted transparent materials correctly is emphasizing CLARITY over COLOR:
+
+| What DOESN'T Work | What WORKS |
+|-------------------|------------|
+| "blue PET bottle" | "CRYSTAL CLEAR PET with very subtle blue tint" |
+| "tinted blue" | "almost clear with just a hint of blue" |
+| "blue tint visible" | "It is NOT a blue bottle - it is a clear bottle with minimal blue tinting" |
+
+**Winning Prompt Elements:**
+- `primary_material`: "CRYSTAL CLEAR [material] with very subtle [color] tint"
+- `rendering_notes`: Include "It is NOT a [color] [product] - it is a clear [product] with minimal [color] tinting"
+- `fidelity.preserve_colors`: "VERY SUBTLE [color] tint - almost clear with just a hint of [color]"
+- Analogy: "Think of how a glass of water looks - nearly invisible with environment showing through"
+- Explicit prohibitions: "No opacity. No solid color."
 
 ---
 
@@ -509,6 +607,9 @@ Key field: `storage_path` - use this for creating asset records.
 | "Caustics/sheen" for "realistic" | Creates artifacts, not realism | See hitl.protocol (creative) |
 | No optical_behavior for transparent | Flat/unrealistic first render | See catalog_visual.protocol |
 | No uniform tint spec | Dark bands at neck/base ("black accents") | Include "uniform tint throughout body" in rendering_notes |
+| Saturated color for TINTED materials | Colored bottles look opaque, not see-through | Use "THROUGH transparent body" language, high clarity % |
+| Solid white background for hero | Flat/CGI look instead of photographic | Use gradient (white to light gray) |
+| Missing anti-artifact language | Rim highlights, distortion patterns, streaks | Include "no artificial rim highlights, no distortion patterns" |
 
 ---
 

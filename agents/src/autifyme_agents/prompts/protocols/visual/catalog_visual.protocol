@@ -45,6 +45,38 @@ Don't memorize lighting setups. Ask: "What does light DO to this material?" Then
 
 **[CRITICAL] Realism for transparent materials comes from ACCURATE OPTICAL BEHAVIOR - not from post-processing effects.**
 
+#### TINTED vs CLEAR Transparency (Critical Distinction)
+
+| Type | Example | Key Rendering Rule |
+|------|---------|-------------------|
+| **CLEAR** | Clear PET jar, water glass | Background visible directly through, no color cast |
+| **TINTED** | Colored bottles (Arrow H2O), tinted glass | Background visible THROUGH with COLOR CAST - like tinted sunglasses |
+
+**[CRITICAL] TINTED TRANSPARENT materials:**
+- They are SEE-THROUGH, not solid colored
+- Background MUST be visible through the material body
+- Color is a TINT applied to what you see through, NOT a solid fill
+- Think tinted sunglasses: you see the world through them, but with color cast
+- The material should NOT look like solid colored plastic
+
+**Common Mistake:** Rendering tinted bottles as saturated opaque color.
+**Correct:** Background gradient visible through bottle with color tint applied.
+
+**[BREAKTHROUGH] The Clarity-Over-Color Pattern:**
+
+When prompting for tinted transparent materials, emphasize CLARITY over COLOR:
+
+| Approach | Example | Result |
+|----------|---------|--------|
+| **WRONG** | "blue tinted PET bottle" | Saturated opaque blue |
+| **RIGHT** | "CRYSTAL CLEAR PET with very subtle blue tint" | True transparency with hint of color |
+
+**Key Language:**
+- "It is NOT a [color] bottle - it is a CLEAR bottle with minimal [color] tinting"
+- "VERY SUBTLE [color] tint - almost clear with just a hint of [color]"
+- "Think of how a glass of water looks - nearly invisible"
+- "No opacity. No solid color."
+
 #### The TransparencyProfile Revolution
 
 **Binary "transparent" vs "opaque" is INSUFFICIENT.** Visual Analyst now provides TRANSPARENCY PROFILE with quantified properties:
