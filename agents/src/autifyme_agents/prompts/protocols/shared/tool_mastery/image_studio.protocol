@@ -398,21 +398,12 @@ image_studio(
 3. Use "uniform tint" in rendering_notes to prevent dark bands
 4. Include anti-artifact language: "no artificial rim highlights", "no internal distortion"
 
-**[BREAKTHROUGH] The Clarity-Over-Color Pattern:**
+**Clarity-Over-Color Pattern:** See `catalog_visual.protocol` section 3 for full doctrine.
 
-The key to rendering tinted transparent materials correctly is emphasizing CLARITY over COLOR:
-
-| What DOESN'T Work | What WORKS |
-|-------------------|------------|
-| "blue PET bottle" | "CRYSTAL CLEAR PET with very subtle blue tint" |
-| "tinted blue" | "almost clear with just a hint of blue" |
-| "blue tint visible" | "It is NOT a blue bottle - it is a clear bottle with minimal blue tinting" |
-
-**Winning Prompt Elements:**
+**Winning Spec Elements (use these exact patterns):**
 - `primary_material`: "CRYSTAL CLEAR [material] with very subtle [color] tint"
-- `rendering_notes`: Include "It is NOT a [color] [product] - it is a clear [product] with minimal [color] tinting"
+- `rendering_notes`: "It is NOT a [color] [product] - it is a clear [product] with minimal [color] tinting"
 - `fidelity.preserve_colors`: "VERY SUBTLE [color] tint - almost clear with just a hint of [color]"
-- Analogy: "Think of how a glass of water looks - nearly invisible with environment showing through"
 - Explicit prohibitions: "No opacity. No solid color."
 
 ---

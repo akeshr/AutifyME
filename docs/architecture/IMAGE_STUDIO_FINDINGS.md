@@ -228,6 +228,46 @@ Based on tool testing, the creative specialist should:
 
 ---
 
+## Doctrine Reorganization (Post-Fix Cleanup)
+
+After initial fixes, protocols had duplicate content. Reorganized for clean separation of concerns.
+
+### Problem Identified
+
+| Content                    | Was In                         | Duplication |
+|----------------------------|--------------------------------|-------------|
+| Clarity-Over-Color concept | catalog_visual + image_studio  | DUPLICATE   |
+| Full Python syntax pattern | catalog_visual + image_studio  | REDUNDANT   |
+| TransparencyProfile schema | catalog_visual + image_studio  | OVERLAPPING |
+
+### Correct Architecture Applied
+
+**Domain protocols (catalog_visual)** = HOW TO THINK (doctrine, principles, quality bar)
+**Tool mastery protocols (image_studio)** = HOW TO USE (syntax, patterns, parameters)
+
+### Changes Made
+
+**catalog_visual.protocol:**
+
+- REMOVED: Full Python syntax pattern (lines 192-234)
+- ADDED: Reference to `image_studio.protocol` Pattern 5b for syntax
+- KEPT: Clarity-Over-Color doctrine, TransparencyProfile concepts, Anti-Simulation Principle
+
+**image_studio.protocol:**
+
+- REMOVED: Duplicate Clarity-Over-Color concept table
+- KEPT: Winning Spec Elements (actionable syntax patterns)
+- KEPT: Pattern 5b with full Python code
+- ADDED: Reference to `catalog_visual.protocol` section 3 for doctrine
+
+### Result
+
+- catalog_visual: -40 lines (removed redundant syntax)
+- image_studio: -8 lines (removed duplicate concept)
+- Cross-references ensure coherence without duplication
+
+---
+
 ## Next Steps
 
 1. [x] Complete tool testing
@@ -237,6 +277,7 @@ Based on tool testing, the creative specialist should:
 5. [x] Implement protocol improvements
 6. [x] Re-test with updated protocols to verify fix
 7. [x] Document breakthrough "Clarity-Over-Color" pattern
+8. [x] Reorganize doctrine placement (separation of concerns)
 
 ## Conclusion
 
