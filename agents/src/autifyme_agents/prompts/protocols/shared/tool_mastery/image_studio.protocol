@@ -489,6 +489,8 @@ image_studio(
 
 After generating multiple variants, create a visual grid for consistency verification:
 
+**[CRITICAL] Grid shots still need core specs - don't use minimal params:**
+
 ```python
 image_studio(
     images=[
@@ -498,11 +500,22 @@ image_studio(
         {"path": "pending/variant_4.png", "label": "v4"}
     ],
     composition={"position": "grid layout - 2x2, equal spacing"},
-    background={"treatment": "solid_color", "color": "white"},
+    background={"treatment": "gradient", "color": "white to light gray"},
+    lighting={"type": "studio_3point", "shadows": "soft contact shadow"},
+    focus={"depth_of_field": "deep - everything sharp"},
+    fidelity={"preserve_artwork": "all logos and text must remain readable and correctly oriented"},
+    seed=101,  # Same seed used for individual hero shots
+    temperature=0.4,
     output={"aspect_ratio": "1:1", "filename": "verification_grid"}
 )
 ```
-Result: Side-by-side grid to visually verify batch consistency before shipping.
+
+**Why full specs matter for grids:**
+- `solid_color: white` looks flat/CGI - use `gradient` for depth
+- Missing `fidelity` can cause text/logos to be mirrored or distorted
+- Missing `seed/temperature` breaks consistency with individual hero shots
+
+Result: Professional side-by-side grid to visually verify batch consistency before shipping.
 
 ---
 

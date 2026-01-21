@@ -90,7 +90,8 @@
       "Bash(ForEach-Object { $content = Get-Content $_FullName)",
       "Skill(evaluate)",
       "Skill(evaluate:*)",
-      "Skill(eval)"
+      "Skill(eval)",
+      "Bash(copy:*)"
     ],
     "deny": [],
     "ask": []

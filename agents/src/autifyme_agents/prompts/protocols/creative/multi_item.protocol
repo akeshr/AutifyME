@@ -370,6 +370,42 @@ image_studio(
 output: one composed asset
 ```
 
+**[CRITICAL] COMPOSITE Still Needs Core Specs:**
+
+COMPOSITE/GRID outputs are still catalog assets - they need the same quality specs as individual hero shots:
+
+```python
+# WRONG - minimal specs produce flat/CGI results
+image_studio(
+    images=[...],
+    composition={"arrangement": "2x2 grid"},
+    background={"treatment": "solid_color", "color": "white"}  # Flat!
+)
+
+# CORRECT - full specs even for grid
+image_studio(
+    images=[
+        {"path": "pending/variant1.png", "label": "v1"},
+        {"path": "pending/variant2.png", "label": "v2"},
+        {"path": "pending/variant3.png", "label": "v3"},
+        {"path": "pending/variant4.png", "label": "v4"}
+    ],
+    composition={"arrangement": "2x2 grid, equal spacing"},
+    background={"treatment": "gradient", "color": "white to light gray"},
+    lighting={"type": "studio_3point", "shadows": "soft contact shadow"},
+    focus={"depth_of_field": "deep - everything sharp"},
+    fidelity={"preserve_artwork": "all logos and text readable"},
+    seed=101,  # Same seed as individual hero shots
+    temperature=0.4,
+    output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1"}
+)
+```
+
+**Why this matters:** Grid shots without lighting/focus/fidelity produce:
+- Flat white backgrounds (no depth)
+- Inconsistent rendering across variants
+- Text/logos that may be mirrored or distorted
+
 ### SELECTIVE
 
 Filter to specific items, then apply INDIVIDUAL or COMPOSITE.
