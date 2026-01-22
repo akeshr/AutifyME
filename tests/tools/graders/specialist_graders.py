@@ -970,7 +970,9 @@ def transparency_spec_elevated(
                 if match:
                     clarity = int(match.group(1))
 
-        # If clarity specified but below 95%, flag it
+        # Check clarity issues:
+        # 1. If clarity specified but below 95%, flag it
+        # 2. If clarity NOT specified for transparent material, also flag (forces explicit spec)
         if clarity is not None and clarity < 95:
             calls_with_low_clarity.append(
                 {
@@ -978,6 +980,16 @@ def transparency_spec_elevated(
                     "clarity_percentage": clarity,
                     "material_preview": material_str[:100],
                     "issue": f"Transparent material with {clarity}% clarity - should be 95%+",
+                }
+            )
+        elif clarity is None:
+            # Transparent material without explicit clarity - should be specified
+            calls_with_low_clarity.append(
+                {
+                    "sequence": tc.sequence,
+                    "clarity_percentage": None,
+                    "material_preview": material_str[:100],
+                    "issue": "Transparent material without explicit clarity_percentage - should specify 95%+",
                 }
             )
 
