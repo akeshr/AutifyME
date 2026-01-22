@@ -67,7 +67,9 @@ class BackgroundSpec(BaseModel):
             "Examples: 'solid white', 'solid #F5F5F5', 'transparent', "
             "'gradient from warm cream to pure white', 'soft blur of original', "
             "'remove completely', 'replace with marble texture', "
-            "'generate modern kitchen scene', 'outdoor cafe setting at golden hour'"
+            "'generate modern kitchen scene', 'outdoor cafe setting at golden hour'. "
+            "WARNING: For transparent materials (glass, PET, clear plastic), "
+            "use 'gradient' NOT 'transparent' - gradient provides contrast that reveals transparency."
         ),
     )
     color: str | None = Field(
@@ -640,8 +642,10 @@ class TransparencyProfile(BaseModel):
         ge=0,
         le=100,
         description=(
-            "Overall optical clarity. 0=fully opaque, 100=crystal clear. "
-            "Examples: PET bottle 90-95%, frosted glass 20-40%, "
+            "Overall optical clarity observed in source image. 0=fully opaque, 100=crystal clear. "
+            "NOTE: This is the OBSERVED value from analyst. For rendering, use "
+            "MaterialTreatmentSpec.clarity_percentage at 95%+ for clear/tinted materials. "
+            "Examples (observation): PET bottle 85-90%, frosted glass 20-40%, "
             "translucent HDPE 15-25%, light frost 60-70%"
         ),
     )
@@ -697,6 +701,15 @@ class MaterialTreatmentSpec(BaseModel):
 
     Critical for accurate product representation. Different materials
     need different treatment for photorealistic results.
+
+    IMPORTANT for transparent materials:
+    - clarity_percentage MUST be specified at top level (not just in nested transparency)
+    - Use 95%+ for clear/tinted materials (PET bottles, glass jars)
+    - Only use lower values for genuinely frosted/diffused materials
+
+    PRECEDENCE: Top-level clarity_percentage is the RENDERING target.
+    Nested transparency.clarity_percentage is the OBSERVED value from analyst.
+    Always set top-level to 95%+ for clear materials regardless of observed value.
     """
 
     primary_material: str = Field(
@@ -706,6 +719,17 @@ class MaterialTreatmentSpec(BaseModel):
             "'glossy plastic', 'brushed metal', 'polished metal', "
             "'fabric/textile', 'ceramic', 'wood', 'paper/cardboard', 'leather'"
         )
+    )
+    clarity_percentage: int | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description=(
+            "[MANDATORY for transparent materials] Overall optical clarity at TOP LEVEL. "
+            "Use 95%+ for clear/tinted PET, glass - produces crystal clear renders. "
+            "Only use 80-90% if material is genuinely frosted/diffused. "
+            "NEVER copy analyst's observation value (80-90%) - ELEVATE to material's true potential."
+        ),
     )
     rendering_notes: str = Field(
         description=(
@@ -842,7 +866,7 @@ class ImageStudioInput(BaseModel):
 
     EXAMPLES:
 
-    1. Extract product with background removal:
+    1. Extract product with background removal (transparent material):
     ```python
     ImageStudioInput(
         images=[
@@ -854,10 +878,13 @@ class ImageStudioInput(BaseModel):
             isolation="complete isolation",
             edge_treatment="surgical clean edges"
         ),
-        background=BackgroundSpec(treatment="transparent"),
+        # NOTE: Use gradient NOT transparent for transparent materials
+        background=BackgroundSpec(treatment="gradient", color="white to light gray"),
         material_treatment=MaterialTreatmentSpec(
             primary_material="clear glass",
-            rendering_notes="preserve glass edge refraction, internal caustics"
+            clarity_percentage=95,  # MANDATORY for transparent materials - elevate to 95%+
+            rendering_notes="Crystal clear transparency - can see THROUGH to background. "
+                          "Natural edge refraction only. No artificial rim highlights."
         ),
         composition=CompositionSpec(product_coverage="85% frame", position="centered"),
         output=OutputSpec(format="PNG", size="2K")

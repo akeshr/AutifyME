@@ -496,22 +496,26 @@ When you identify a system issue, check ALL framework components:
 **Example from this session:**
 
 ```
-Issue: PM skipped visual_analyst for image-based shortcuts
-       (4-product image processed as single product)
+Issue: Transparent materials rendered opaque/milky despite "crystal clear" description
+       (5 HITL iterations before user approval - clarity not elevated to 95%+)
 
 System fixes:
-1. discovery_mindset.protocol - Visual Input Rule
-2. image_studio.protocol - batch consistency, logo position, transparency
+1. image_studio.protocol - Clarity elevation guidance (95%+ for transparent materials)
+2. image_studio.protocol - Multi-component material specification (cap/closure separate)
+3. image_studio.protocol - Studio backdrop pattern (base + backwall for transparent)
 
 Framework improvements:
-1. NEW GRADER: visual_analyst_for_images (pm_graders.py)
-2. NEW GRADER: image_studio_consistency_params (specialist_graders.py)
-3. UPDATED PATTERN TABLE: VISUAL_SKIPPED, BATCH_INCONSISTENT patterns
-4. No new model rubric needed (graders sufficient for this case)
+1. NEW GRADER: transparency_spec_elevated (specialist_graders.py)
+   - Detects clarity < 95% for transparent materials
+   - Detects missing explicit clarity_percentage
+2. HELPER ENHANCEMENT: get_workflow_window() now extracts HITL decisions
+   - hitl_decisions attached to approval analyzer traces
+   - hitl_response attached to subsequent workflow traces
+3. UPDATED PATTERN TABLE: TRANSPARENCY_NOT_ELEVATED, CLOSURE_MISSING, BACKDROP_WRONG
 
 Validation:
-- Failing trace before: PASS (0.91) - missed the issue
-- Failing trace after: PARTIAL (0.75) - correctly detected
+- Failing trace before: PASS (0.95) - missed the transparency issue
+- Failing trace after: PARTIAL (0.80) - correctly detected missing clarity spec
 ```
 
 **Grader Design Checklist:**
@@ -546,6 +550,9 @@ Validation:
 | Multi-product image as single | MULTI_ITEM_MISSED | creative specialist protocol | (model - use view_trace_image) |
 | Batch without seed/temperature | BATCH_INCONSISTENT | image_studio.protocol | image_studio_consistency_params |
 | Edge artifacts on transparent | EDGE_ARTIFACT | image_studio.protocol (rendering_notes) | (model - use view_trace_image) |
+| Transparent material with low clarity | TRANSPARENCY_NOT_ELEVATED | image_studio.protocol (clarity elevation) | transparency_spec_elevated |
+| Cap/closure not separately specified | CLOSURE_MISSING | image_studio.protocol (multi-component) | (model - check closure_material in spec) |
+| Gradient background for transparent | BACKDROP_WRONG | image_studio.protocol (studio backdrop) | (model - check background treatment) |
 
 ### Output Template
 
@@ -661,8 +668,16 @@ from tests.tools.evaluation.helpers import get_workflow_window
 
 # Bounded retrieval - O(window) not O(thread history)
 window = get_workflow_window(trace_id, hours_before=2.0, hours_after=2.0)
-# Returns: [{trace_id, start_time, end_time, is_starting_trace, session_break_before, status, error}, ...]
+# Returns: [{
+#   trace_id, start_time, end_time, is_starting_trace, session_break_before, status, error,
+#   has_user_input,        # True for PM workflow traces (vs sub-agent traces)
+#   is_approval_analyzer,  # True for approval analyzer traces
+#   hitl_decisions,        # List of {type, index, user_message} for approval analyzer traces
+#   hitl_response,         # User feedback text attached to workflow trace AFTER approval
+# }, ...]
 ```
+
+**HITL Visibility:** The workflow window now extracts HITL decisions from approval analyzer traces and attaches `hitl_response` to subsequent workflow traces. This makes HITL feedback visible in thread analysis without manual inspection.
 
 #### Step 2: Collect Per-Trace Data
 
@@ -709,22 +724,25 @@ HITL flows span two traces:
 - Trace N+1: User responds (approve/reject/edit), specialist acts
 
 ```python
+# NEW: HITL decisions now extracted automatically by get_workflow_window()
 hitl_flows = []
-for i, td in enumerate(trace_data[:-1]):  # Skip last (no next trace)
-    if td['has_hitl_interrupt']:
-        next_td = trace_data[i + 1]
+for t in window:
+    # Approval analyzer traces have extracted decisions
+    if t.get('is_approval_analyzer') and t.get('hitl_decisions'):
+        for decision in t['hitl_decisions']:
+            hitl_flows.append({
+                "trace_id": t['trace_id'],
+                "type": decision.get('type', 'unknown'),  # approved/rejected/edited
+                "user_message": decision.get('user_message', ''),
+                "index": decision.get('index'),
+            })
 
-        # Determine decision from next trace's user input or specialist behavior
-        # - If specialist persisted: likely approved
-        # - If specialist did NOT persist: likely rejected
-        # - If data differs from interrupt: likely edited
-
-        hitl_flows.append({
-            "interrupt_trace": td['trace_id'],
-            "response_trace": next_td['trace_id'],
-            "decision": "unknown",  # Infer from next trace analysis
-        })
+    # Workflow traces after approval have hitl_response attached
+    if t.get('hitl_response'):
+        print(f"Trace {t['trace_id'][:8]} received HITL feedback: {t['hitl_response']}")
 ```
+
+**Key insight:** The `hitl_decisions` field extracts structured decisions from approval analyzer traces, while `hitl_response` attaches user feedback text to the subsequent workflow trace for easy correlation.
 
 #### Step 4: Evaluate Cross-Trace Rubrics
 
@@ -1023,6 +1041,13 @@ grades: GraderSuiteResult = run_code_graders(trace_id)
 # - Agents ending in _reviewer are graded as reviewers
 # - Unclassified agents trigger a warning but still run universal graders
 # - Universal graders (like error_recovery_attempted) run on ALL agents
+
+# Creative specialist graders (run on creative_specialist):
+# - image_studio_fidelity_included: Checks fidelity spec present
+# - image_studio_core_specs_included: Checks essential specs (fidelity, focus, lighting/material, composition/output)
+# - image_studio_output_verified: Checks view_image called after generation
+# - image_studio_consistency_params: Checks seed/temperature for batch scenarios
+# - transparency_spec_elevated: Checks clarity_percentage >= 95% for transparent materials
 ```
 
 ### Scenarios
@@ -1132,6 +1157,17 @@ from tests.tools.evaluation.helpers import (
 
 # Get workflow context - O(window) not O(thread history)
 window = get_workflow_window(trace_id, hours_before=2.0, hours_after=2.0)
+# Each trace dict includes:
+#   trace_id, start_time, end_time, status, error, session_break_before
+#   has_user_input      - True for PM workflow traces (vs sub-agent)
+#   is_approval_analyzer - True for approval analyzer traces
+#   hitl_decisions      - List of {type, index, user_message} extracted from approval traces
+#   hitl_response       - User feedback text attached to workflow trace AFTER approval
+
+# Access HITL feedback directly from window:
+for t in window:
+    if t.get('hitl_response'):
+        print(f"Trace {t['trace_id'][:8]} got HITL feedback: {t['hitl_response']}")
 
 # Navigate with session boundary awareness (stops at 60+ min gaps)
 prev_id = prev_trace(trace_id)

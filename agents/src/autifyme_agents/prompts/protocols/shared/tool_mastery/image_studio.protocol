@@ -127,6 +127,11 @@ Set the background after extraction or for compositing.
 - `scene_description`: For scene backgrounds - describe environment
 - `custom`: Special background effects
 
+**[CRITICAL] Transparent materials (PET, glass, clear plastic) MUST NOT use `transparent` background.**
+- Transparent product on transparent background = undefined edges, floating in void
+- Use `gradient` instead: "white to light gray - visible THROUGH bottle body"
+- The gradient provides contrast that REVEALS the transparency
+
 ### lighting
 Control lighting style and direction.
 - `type`: Lighting setup (natural window, studio 3-point, rim, Rembrandt)
@@ -194,6 +199,7 @@ Analyst observation is a baseline reference, NOT a creative specification.
 ```python
 material_treatment={
     "primary_material": "glossy PET - tinted [color]",
+    "clarity_percentage": 95,  # [MANDATORY] Top-level, ALWAYS 95%+ for clear/tinted materials
     "rendering_notes": (
         # REQUIRED for all transparent materials:
         "Crystal clear transparency - can see THROUGH to background. "
@@ -204,15 +210,19 @@ material_treatment={
         "Uniform tint throughout body - no dark bands at neck/base."
     ),
     "transparency": {
-        "clarity_percentage": [0-100],      # From analyst
         "tint": "[color or none]",          # From analyst
-        "frost_percentage": [0-100],        # From analyst
+        "frost_percentage": [0-100],        # From analyst (only match if frosted)
         "wall_thickness_effect": "[uniform|thick_darkens|variable]",
         "contents_state": "[empty|clear_liquid|colored_liquid|opaque|partial]",
         "contents_description": "[from analyst]"
     }
 }
 ```
+
+**[MANDATORY] clarity_percentage MUST be:**
+- At TOP LEVEL of material_treatment (not nested in transparency)
+- Set to **95 or higher** for clear/tinted transparent materials
+- Only match analyst value if material is frosted/diffused (frost_percentage > 30%)
 
 **[CRITICAL] rendering_notes MUST include these phrases for transparent materials:**
 - "can see THROUGH to background" - prevents solid color rendering
@@ -222,8 +232,9 @@ material_treatment={
 - "photograph-like simplicity" - keeps it real, not CGI
 
 **Required Specs (all mandatory for transparent materials):**
+- `material_treatment.clarity_percentage`: **95** (NEVER copy analyst's 80-90% - ELEVATE)
 - `focus`: `{"depth_of_field": "deep - everything sharp"}`
-- `fidelity.hero_features`: Must include "transparency depth at X% clarity"
+- `fidelity.hero_features`: Must include "transparency depth at 95% clarity"
 - `fidelity.preserve_colors`: Must include "THROUGH transparent body"
 - `lighting.special_requirements`: "no rim light - rely on natural edge refraction"
 - All `transparency` sub-fields populated from analyst
@@ -427,12 +438,12 @@ image_studio(
     },
     material_treatment={
         "primary_material": "glossy PET - tinted [color]",
+        "clarity_percentage": 95,  # [MANDATORY] ELEVATE to 95%+ for transparent materials
         "rendering_notes": "Crystal clear transparency - can see THROUGH to background gradient. "
                           "Natural edge refraction only. No artificial rim highlights. "
                           "Photograph-like simplicity. No internal distortion patterns. "
                           "No vertical highlight streaks. Uniform tint throughout body.",
         "transparency": {
-            "clarity_percentage": 85,  # From analyst profile
             "tint": "[color]",
             "frost_percentage": 0,
             "wall_thickness_effect": "uniform",  # or "thick_darkens" if applicable
