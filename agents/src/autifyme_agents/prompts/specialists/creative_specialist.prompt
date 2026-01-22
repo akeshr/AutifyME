@@ -393,11 +393,11 @@ Why this fails:
 - Backwall gives refraction something to interact with
 
 ```python
-background={
+background={{
     "treatment": "studio_backdrop",  # NOT "transparent"!
     "base_gradient": "[light_gray -> medium_gray]",
     "backwall": "neutral gray seamless"
-}
+}}
 ```
 
 **Your role:**
