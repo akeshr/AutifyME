@@ -173,6 +173,23 @@ Material-specific rendering instructions.
 
 **For creative doctrine (WHY), see `catalog_visual.protocol` - "Transparent Material Doctrine" section.**
 
+### [CRITICAL] Clarity Elevation for Transparent Materials
+
+Visual analyst reports what's VISIBLE (often 80-90% due to lighting/photo quality).
+Creative specialist ELEVATES to the material's TRUE potential:
+
+| Material Type | Analyst Typically Reports | Creative Spec MUST Use |
+|---------------|---------------------------|------------------------|
+| Crystal clear PET | 80-90% | **95%+** |
+| Tinted PET (colored) | 80-90% | **95%+** |
+| Clear glass | 85-95% | **95-100%** |
+| Frosted/diffused | 40-70% | Match analyst (no elevation) |
+
+**Rule:** For CLEAR or TINTED transparent materials, ALWAYS start at **95%+ clarity**.
+Analyst observation is a baseline reference, NOT a creative specification.
+
+**Why this matters:** 85% clarity produces opaque/milky renders. 95%+ produces crystal-clear see-through quality.
+
 **TransparencyProfile Schema:**
 ```python
 material_treatment={
@@ -216,6 +233,32 @@ material_treatment={
 
 **For complete checklist, syntax patterns, and creative doctrine: see `catalog_visual.protocol` (domain=visual).**
 **For handling "make it more realistic" feedback: see `hitl.protocol` (domain=creative).**
+
+### [CRITICAL] Multi-Component Material Specification
+
+Products with multiple materials (body + cap, container + lid) require SEPARATE specifications:
+
+```python
+material_treatment={
+    "primary_material": "glossy PET - tinted Red",           # Body/container
+    "closure_material": "transparent PET cap",                # Cap/lid/pump
+    "rendering_notes": "Crystal clear transparency...",       # Body rendering
+    "closure_notes": "Cap shell is transparent with internal neck structure visible. "
+                     "Match body transparency level."
+}
+```
+
+**Always specify when product has distinct closure:**
+- `primary_material`: Body/main container material
+- `closure_material`: Cap, lid, pump, spout - when DIFFERENT material or needs separate treatment
+- `closure_notes`: Specific rendering for closure (transparency, visible threads, finish)
+
+**Common closure issues prevented:**
+| Problem | Fix |
+|---------|-----|
+| Cap looks opaque when body is transparent | Add `closure_material` + `closure_notes` |
+| Cap material wrong (PP vs PET) | Specify exact closure material from source |
+| Internal threads not visible | Add "internal neck structure visible" to closure_notes |
 
 ### fidelity (CRITICAL for source images)
 FIX photography problems, PRESERVE product identity. **Always include when processing [source]/[product].**
@@ -414,6 +457,46 @@ image_studio(
 - `rendering_notes`: "It is NOT a [color] [product] - it is a clear [product] with minimal [color] tinting"
 - `fidelity.preserve_colors`: "VERY SUBTLE [color] tint - almost clear with just a hint of [color]"
 - Explicit prohibitions: "No opacity. No solid color."
+
+### Pattern 5c: Hero Shot with Studio Backdrop (Base + Backwall)
+
+For professional studio look with grounded product (preferred for transparent materials):
+
+```python
+image_studio(
+    images=[{"path": "inbox/[source].jpg", "label": "source"}],
+    extraction={
+        "target_description": "[product] in [source]",
+        "targets": [{"target_bbox": [y_min, x_min, y_max, x_max], "target_image_label": "source"}],
+        "edge_treatment": "surgical clean"
+    },
+    background={
+        "treatment": "scene",
+        "custom": "Professional studio backdrop with visible horizontal surface (base) "
+                  "and vertical backwall. Subtle contact shadows on base to ground product. "
+                  "White-to-light-gray gradient for backwall."
+    },
+    lighting={
+        "type": "studio_3point",
+        "shadows": "soft contact shadow on base surface",
+        "special_requirements": "natural edge refraction, ground product firmly on base"
+    },
+    # ... fidelity, material_treatment, etc. as per Pattern 5/5b
+    output={"format": "PNG", "size": "2K", "aspect_ratio": "1:1"}
+)
+```
+
+**When to use Studio Backdrop vs Gradient:**
+| Use Case | Background Choice |
+|----------|-------------------|
+| Transparent materials (PET, glass) | **Studio backdrop** - shows see-through better |
+| Premium/luxury products | **Studio backdrop** - professional grounded look |
+| Quick catalog shots | Gradient (simpler, faster) |
+| Cutouts for compositing | Transparent |
+
+**Key difference:**
+- `gradient`: Product floats on gradient (no grounding surface)
+- `studio backdrop`: Product sits ON visible base with backwall (professional studio photography)
 
 ---
 
@@ -623,6 +706,9 @@ Key field: `storage_path` - use this for creating asset records.
 | Saturated color for TINTED materials | Colored bottles look opaque, not see-through | Use "THROUGH transparent body" language, high clarity % |
 | Solid white background for hero | Flat/CGI look instead of photographic | Use gradient (white to light gray) |
 | Missing anti-artifact language | Rim highlights, distortion patterns, streaks | Include "no artificial rim highlights, no distortion patterns" |
+| Using analyst clarity (85%) as spec | Opaque/milky output instead of crystal clear | ELEVATE to 95%+ for transparent materials |
+| No separate cap/closure spec | Cap renders wrong material or opaque | Add `closure_material` + `closure_notes` |
+| Gradient background for transparent | Product floats, doesn't show see-through well | Use studio backdrop (base + backwall) |
 
 ---
 
