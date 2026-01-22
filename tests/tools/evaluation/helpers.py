@@ -1345,11 +1345,16 @@ def get_workflow_window(
 
         session_runs = session_runs[start_idx:end_idx]
 
-    # Build result with session boundary detection
+    # Build result with session boundary detection and HITL extraction
+    # Import here to avoid circular imports
+    from tests.tools.trace_analysis import _extract_hitl_decisions
+
     result = []
     prev_time = None
     gap_threshold = timedelta(minutes=session_gap_minutes)
 
+    # First pass: build basic trace info and identify PM workflow traces
+    trace_list = []
     for r in session_runs:
         is_starting = str(r.id) == trace_id or str(r.id).startswith(trace_id)
 
@@ -1360,8 +1365,43 @@ def get_workflow_window(
             if gap > gap_threshold:
                 session_break = True
 
-        result.append(
+        # Classify trace type by checking for user input
+        inputs = r.inputs or {}
+        has_user_input = False
+        user_message_preview = None
+
+        if "messages" in inputs:
+            msgs = inputs["messages"]
+            if msgs and len(msgs) > 0:
+                last = msgs[-1]
+                if isinstance(last, dict):
+                    content = last.get("content", "")
+                    if isinstance(content, list):
+                        for c in content:
+                            if isinstance(c, dict) and c.get("type") == "text":
+                                text = c.get("text", "")
+                                if text and not text.startswith("("):
+                                    has_user_input = True
+                                    user_message_preview = text[:100]
+                                break
+                    elif content and isinstance(content, str):
+                        has_user_input = True
+                        user_message_preview = content[:100]
+
+        # Check if this is an approval analyzer trace (has BatchApprovalResponse output)
+        is_approval_analyzer = False
+        outputs = r.outputs or {}
+        if isinstance(outputs, dict):
+            if "responses" in outputs and "reasoning" in outputs:
+                is_approval_analyzer = True
+            elif "output" in outputs:
+                inner = outputs.get("output", {})
+                if isinstance(inner, dict) and "responses" in inner and "reasoning" in inner:
+                    is_approval_analyzer = True
+
+        trace_list.append(
             {
+                "run": r,
                 "trace_id": str(r.id),
                 "start_time": r.start_time,
                 "end_time": r.end_time,
@@ -1369,14 +1409,78 @@ def get_workflow_window(
                 "session_break_before": session_break,
                 "status": r.status,
                 "error": r.error if r.error else None,
+                "has_user_input": has_user_input,
+                "user_message": user_message_preview,
+                "is_approval_analyzer": is_approval_analyzer,
+                "hitl_decisions": None,  # Will be populated below
             }
         )
 
         prev_time = r.end_time or r.start_time
 
+    # Second pass: Extract HITL decisions for PM workflow traces
+    # HITL decisions come from approval analyzer traces that follow an interrupt
+    for i, t in enumerate(trace_list):
+        if t["is_approval_analyzer"]:
+            # This is an approval analyzer trace - extract the decisions
+            # and attach them to the PREVIOUS workflow trace
+            outputs = t["run"].outputs or {}
+            approval_response = None
+            if isinstance(outputs, dict):
+                if "responses" in outputs and "reasoning" in outputs:
+                    approval_response = outputs
+                elif "output" in outputs:
+                    inner = outputs.get("output", {})
+                    if isinstance(inner, dict) and "responses" in inner:
+                        approval_response = inner
+
+            if approval_response:
+                decisions = []
+                responses = approval_response.get("responses", [])
+                reasoning = approval_response.get("reasoning", "")
+
+                for idx, resp in enumerate(responses):
+                    if isinstance(resp, dict):
+                        resp_type = resp.get("type", "")
+                        user_message = resp.get("user_message")
+                        action = "approved" if resp_type == "accept" else "rejected"
+                        decisions.append(
+                            {
+                                "index": idx,
+                                "action": action,
+                                "user_message": user_message,
+                            }
+                        )
+
+                # Attach to this approval analyzer trace for visibility
+                t["hitl_decisions"] = decisions
+                t["hitl_reasoning"] = reasoning
+
+                # Also try to find and annotate the preceding workflow trace
+                if i > 0:
+                    for j in range(i - 1, -1, -1):
+                        prev_t = trace_list[j]
+                        if prev_t["has_user_input"] and not prev_t["is_approval_analyzer"]:
+                            # This is the workflow trace that triggered the HITL
+                            prev_t["hitl_response"] = {
+                                "decisions": decisions,
+                                "reasoning": reasoning,
+                            }
+                            break
+
+    # Build final result (exclude internal 'run' object)
+    for t in trace_list:
+        del t["run"]
+        result.append(t)
+
     print(f"Workflow window: {len(result)} traces in {hours_before}h before / {hours_after}h after")
     if any(t.get("session_break_before") for t in result):
         print(f"  (session breaks detected - gaps > {session_gap_minutes} min)")
+
+    # Count HITL decisions found
+    hitl_count = sum(1 for t in result if t.get("hitl_decisions"))
+    if hitl_count:
+        print(f"  (found {hitl_count} HITL approval responses)")
 
     return result
 
